@@ -4,9 +4,11 @@ Applies the `gitops/apps/openshift-oauth` ArgoCD Application pair, whose
 chart (`gitops/charts/openshift-oauth`) renders the cluster `OAuth`/`cluster`
 singleton (`config.openshift.io/v1`), a `Proxy`/`cluster` trust patch, plus
 the `ExternalSecret` that syncs its Vault-seeded OIDC client secret into
-`openshift-config`. A Day 1 component, ordered right after `keycloak` (the
-"openshift" client and its secret, plus its cert-manager-issued TLS cert,
-must exist first): `-d0` applies the `ExternalSecret`; the role then
+`openshift-config`. A Day 1 component (its dependency, `keycloak`, moved
+to Day 0 by ADR-0421, so this role now runs after all of Day 0 rather
+than immediately after a Day-1 `keycloak`): the "openshift" client and its
+secret, plus its cert-manager-issued TLS cert, must exist first. `-d0`
+applies the `ExternalSecret`; the role then
 copies two CA ConfigMaps into `openshift-config` (see below); `-d1`
 applies the `OAuth` singleton and the `Proxy` trust patch, which
 reference the Secret `-d0` creates and those CA ConfigMaps respectively.

@@ -1,8 +1,10 @@
 ---
-# Day 1 state check (`make day1 check`) - the AI-platform-operator stack
-# only, plus aiagent_operator. `namespaces`, `llm`, `models`, and
-# content-ingestion (rag/rag_ingestion/mcp/agents/mlops) all
-# moved to Day 2 - see day2_check.yml.
+# Day 1 state check (`make day1 check`) - the remainder of the
+# AI-platform-operator stack, plus aiagent_operator. `namespaces`, `llm`,
+# `models`, and content-ingestion (rag/rag_ingestion/mcp/agents/mlops) all
+# moved to Day 2 - see day2_check.yml. ADR-0421 moved postgresql/keycloak/
+# aap/aap_config out to Day 0 and smtp/nfd/nvidia_gpu/
+# custom_metrics_autoscaler in from Day 0 - see day1_install.yml.
 - name: "Day 1: check install state"
   hosts: localhost
   gather_facts: false
@@ -13,19 +15,19 @@
     zuno_day: d1
     day1_verb: check
     day1_components:
+      - smtp
+      - nfd
+      - nvidia_gpu
+      - custom_metrics_autoscaler
       - redis
       - observability
       - service_mesh
       - mesh_monitoring
       - kiali
       - grafana
-      - postgresql
       - mariadb
       - tempo
-      - keycloak
       - openshift_oauth
-      - aap
-      - aap_config
       - connectivity_link
       - lws
       - jobset

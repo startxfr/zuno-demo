@@ -1,0 +1,124 @@
+{{- if .Values.aapConfig.enabled }}
+# zuno-aap-installer (ADR-0418/WP-094): the machine credential for
+# install/build/reconcile Job Templates (Day 1/Day 2) and backup/restore/
+# sign (Day 3) - genuinely mutating verbs, unlike zuno-cluster-reader's
+# check-only scope. Resource-type-scoped to exactly what this repo's own
+# roles apply (ArgoCD Applications, OLM Subscriptions/OperatorGroups, the
+# CRDs each Day 1/Day 2 operator owns, and the core/apps/batch/networking
+# objects ExternalSecrets/charts create), confirmed against this cluster's
+# live `oc api-resources` output (2026-08-30) rather than assumed.
+# Deliberately excluded, matching ADR-0418's Security considerations
+# ("no comparable launch-gate exists... must be modeled... never a new,
+# separately-privileged identity" read narrowly - this is still far below
+# the bootstrap kubeconfig's cluster-admin):
+#   - cluster-scoped RBAC objects (ClusterRole/ClusterRoleBinding) - no
+#     privilege-escalation path from this credential to a broader one.
+#   - Node/MachineSet/Machine and other Day 0 `machines`-role territory.
+#   - aap.ansible.com/tower.ansible.com/automation{controller,hub}.ansible.com/
+#     eda.ansible.com themselves - aap/aap-config are Day 0 bootstrap
+#     components with their own kubeconfig-based install path (ADR-0421),
+#     not something a Day 1/2 Job Template should ever reconfigure.
+# This is a coarse, resource-type-level least-privilege boundary, not a
+# per-namespace one (a ClusterRole/ClusterRoleBinding pair is inherently
+# cluster-wide) - tightening to per-namespace Roles is a possible future
+# refinement once live testing (WP-094 acceptance) shows it is worth the
+# added maintenance, not assumed necessary here.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zuno-aap-installer
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-26"
+rules:
+  # GitOps Applications - every component's install/check/reconcile goes
+  # through ansible/tasks/apply_gitops_app.yml.
+  - apiGroups: ["argoproj.io"]
+    resources: ["applications", "appprojects"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # OLM discovery/subscription (ADR-0048 PackageManifest-driven channel
+  # discovery, then apply the Subscription/OperatorGroup).
+  - apiGroups: ["packages.operators.coreos.com"]
+    resources: ["packagemanifests"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["operators.coreos.com"]
+    resources: ["subscriptions", "operatorgroups", "installplans", "clusterserviceversions", "operatorconditions"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Vault-backed secret delivery every component's install.yml relies on.
+  - apiGroups: ["external-secrets.io"]
+    resources: ["externalsecrets", "clustersecretstores", "secretstores"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Core/workload objects components' charts and install.yml roles create
+  # or wait on directly (StatefulSet rollout-restarts, Job-based schema
+  # steps, precheck k8s_info lookups, etc.).
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps", "serviceaccounts", "pods", "pods/log", "services", "persistentvolumeclaims", "events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies", "ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["route.openshift.io"]
+    resources: ["routes"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Day 1: service-mesh (Istio), mesh-monitoring/kiali/grafana, postgresql/
+  # mariadb/tempo (Day 0 now for postgresql, but the same credential
+  # backs day3 backup/restore against it), connectivity-link (Kuadrant/
+  # Authorino/Limitador), lws, jobset, kueue, openshift-ai (RHOAI/KServe/
+  # Kubeflow), custom-metrics-autoscaler (KEDA), lightspeed, nvidia-gpu.
+  - apiGroups:
+      - sailoperator.io
+      - networking.istio.io
+      - security.istio.io
+      - telemetry.istio.io
+      - extensions.istio.io
+      - monitoring.coreos.com
+      - k8s.mariadb.com
+      - kuadrant.io
+      - extensions.kuadrant.io
+      - limitador.kuadrant.io
+      - authorino.kuadrant.io
+      - operator.authorino.kuadrant.io
+      - operator.openshift.io
+      - jobset.x-k8s.io
+      - kueue.x-k8s.io
+      - kueue.openshift.io
+      - keda.sh
+      - eventing.keda.sh
+      - http.keda.sh
+      - nvidia.com
+      - resource.nvidia.com
+      - lightspeed.ansible.com
+      - datasciencecluster.opendatahub.io
+      - dscinitialization.opendatahub.io
+      - components.platform.opendatahub.io
+      - services.platform.opendatahub.io
+      - infrastructure.opendatahub.io
+      - maas.opendatahub.io
+      - serving.kserve.io
+      - trainer.kubeflow.org
+      - modelregistry.opendatahub.io
+      - dashboard.opendatahub.io
+      - opendatahub.io
+      - datasciencepipelinesapplications.opendatahub.io
+      - trustyai.opendatahub.io
+      - mlflow.opendatahub.io
+      - config.opendatahub.io
+      - nim.opendatahub.io
+      - features.opendatahub.io
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Day 2: content-ingestion agent CRDs.
+  - apiGroups: ["zuno.zuno.ai"]
+    resources: ["*"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+{{- end }}

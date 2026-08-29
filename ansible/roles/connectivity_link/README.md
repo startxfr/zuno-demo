@@ -14,7 +14,7 @@ the operator to provision, enabling TLS on its listener - required by MaaS
 `spec.listener.tls.enabled` on the `Authorino` CR directly). This is a
 direct patch of the `Authorino` CR, not a `Kuadrant` CR field - this CRD
 version (`kuadrant.io/v1beta1`) exposes no `spec.authorino` override
-(confirmed via `oc explain kuadrant.spec`). A Day 0 component with all
+(confirmed via `oc explain kuadrant.spec`). A Day 1 component with all
 three verbs: `check` verifies the Application pair is
 Synced+Healthy and the `Kuadrant` instance exists; `install` discovers the
 package/channel, applies `-d0` (`Subscription` only, sync-wave `"10"`) then
@@ -51,10 +51,14 @@ against the target cluster and either pass `-e
 connectivity_link_package_name=<real name>` or correct the role/chart
 defaults.
 
-## Day 0 ordering
+## Day 1 ordering
 
-`ansible/playbooks/day0_{check,install,uninstall}.yml` list
-`connectivity_link` immediately before `openshift_ai` (after `nvidia_gpu`),
-and `Makefile`'s `DAY0_COMPONENTS` includes `connectivity-link` -
-`make d0 install connectivity-link` (or the default "all" run) installs it
-in that position.
+This has always been a Day 1 component (this section previously, and
+incorrectly, described a Day 0 placement it never actually had).
+`ansible/playbooks/day1_{check,install,uninstall}.yml` list
+`connectivity_link` immediately before `lws` and, since ADR-0421 moved
+`keycloak`/`aap`/`aap_config` out to Day 0, right after `openshift_oauth`
+(which now sits where `keycloak` used to). `Makefile`'s
+`DAY1_RUN_COMPONENTS` includes `connectivity-link` -
+`make d1 install connectivity-link` (or the default "all" run) installs
+it in that position.

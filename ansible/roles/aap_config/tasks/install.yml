@@ -34,7 +34,7 @@
 - name: "aap-config | fail if the Gateway Route doesn't exist"
   ansible.builtin.fail:
     msg: >-
-      Route 'aap' not found in zuno-aap - run `make d1 install aap` first
+      Route 'aap' not found in zuno-aap - run `make d0 install aap` first
       (aap-config configures a running AAP instance, it never installs
       one).
   when: (_aap_config_route.resources | default([]) | length) == 0
@@ -282,9 +282,14 @@
 # Census of what the CRs were supposed to produce, BEFORE waiting on it.
 # A CR reporting Successful proves nothing (the resource operator's create
 # task is ignore_errors, so a 401 leaves the CR green and the object
-# absent) - only the Controller API is authoritative. Cheap: four GETs
-# against an API this role already talks to, and it turns a 5-minute
-# opaque wait into a targeted nudge.
+# absent) - only the Controller API is authoritative. Cheap GETs against
+# an API this role already talks to, turning a 5-minute opaque wait into a
+# targeted nudge.
+# ADR-0418/WP-094/WP-095: census now spans every credential, every Job
+# Template and every Workflow Template in aap_config_credentials/
+# aap_config_job_templates/aap_config_workflow_templates (defaults/
+# main.yml, mirrors gitops/charts/aap-config/values.yaml), not just the
+# original zuno-cluster-reader/zuno-day0-check pair.
 - name: "aap-config | census the objects the CRs are supposed to have produced"
   ansible.builtin.uri:
     url: "{{ _aap_config_gateway_url }}/api/controller/v2/{{ item.path }}/?name={{ item.name }}"
@@ -295,11 +300,14 @@
     validate_certs: false
     status_code: [200, 401, 403]
   register: _aap_config_census
-  loop:
-    - {path: projects, name: "{{ aap_config_project_name | default('zuno-demo') }}"}
-    - {path: inventories, name: "{{ aap_config_inventory_name | default('zuno') }}"}
-    - {path: credentials, name: "{{ aap_config_credential_name | default('zuno-cluster-reader') }}"}
-    - {path: job_templates, name: "{{ aap_config_job_template_name | default('zuno-day0-check') }}"}
+  loop: >-
+    {{ [{'path': 'projects', 'name': aap_config_project_name},
+        {'path': 'inventories', 'name': aap_config_inventory_name}]
+       + (aap_config_credentials | map(attribute='name') | map('community.general.dict_kv', 'name') | map('combine', {'path': 'credentials'}) | list)
+       + (aap_config_job_templates | map(attribute='name') | map('community.general.dict_kv', 'name') | map('combine', {'path': 'job_templates'}) | list)
+       + (aap_config_workflow_templates | map(attribute='name') | map('community.general.dict_kv', 'name') | map('combine', {'path': 'workflow_job_templates'}) | list) }}
+  loop_control:
+    label: "{{ item.path }}/{{ item.name }}"
   changed_when: false
   failed_when: false
   no_log: true
@@ -308,16 +316,15 @@
 # 2026-08-27: an object can EXIST and still be unusable. `zuno-day0-check`
 # was present with inventory: None while ask_inventory_on_launch is false,
 # i.e. a Job Template that cannot be launched at all - which a plain
-# existence test would have called healthy. So: any missing object, or a
-# Job Template whose inventory never got bound.
+# existence test would have called healthy. So: any missing object among
+# the census above, or ANY Job Template whose inventory never got bound
+# (checked separately below, once each Job Template's id is known).
 - name: "aap-config | decide whether the tower.ansible.com CRs need a nudge"
   ansible.builtin.set_fact:
     _aap_config_crs_need_nudge: >-
       {{ (_aap_config_token_needs_mint | bool)
          or (_aap_config_census.results
-             | map(attribute='json.count', default=0) | map('int') | select('equalto', 0) | list | length > 0)
-         or ((_aap_config_census.results[3].json.results | default([]) | length) > 0
-             and (_aap_config_census.results[3].json.results[0].inventory | default(none)) is none) }}
+             | map(attribute='json.count', default=0) | map('int') | select('equalto', 0) | list | length > 0) }}
 
 # A re-minted token only reaches the CRs on their NEXT reconcile, and the
 # resource operator reconciles on a long period when nothing about the CR
@@ -337,11 +344,14 @@
       metadata:
         annotations:
           zuno.io/token-refreshed-at: "{{ lookup('pipe', 'date +%s') }}"
-  loop:
-    - {kind: AnsibleProject, name: "{{ aap_config_project_name | default('zuno-demo') }}"}
-    - {kind: AnsibleInventory, name: "{{ aap_config_inventory_name | default('zuno') }}"}
-    - {kind: AnsibleCredential, name: "{{ aap_config_credential_name | default('zuno-cluster-reader') }}"}
-    - {kind: JobTemplate, name: "{{ aap_config_job_template_name | default('zuno-day0-check') }}"}
+  loop: >-
+    {{ [{'kind': 'AnsibleProject', 'name': aap_config_project_name},
+        {'kind': 'AnsibleInventory', 'name': aap_config_inventory_name}]
+       + (aap_config_credentials | map(attribute='name') | map('community.general.dict_kv', 'name') | map('combine', {'kind': 'AnsibleCredential'}) | list)
+       + (aap_config_job_templates | map(attribute='name') | map('community.general.dict_kv', 'name') | map('combine', {'kind': 'JobTemplate'}) | list)
+       + (aap_config_workflow_templates | map(attribute='name') | map('community.general.dict_kv', 'name') | map('combine', {'kind': 'WorkflowTemplate'}) | list) }}
+  loop_control:
+    label: "{{ item.kind }}/{{ item.name }}"
   failed_when: false
   when: _aap_config_crs_need_nudge | bool
 
@@ -470,6 +480,48 @@
     (_aap_config_jt_credentials.json.results | default([])
      | selectattr('id', 'equalto', _aap_config_credential_lookup.json.results[0].id)
      | list | length) == 0
+  no_log: true
+
+# --- Job Template rollout for Day 1/Day 2/Day 3 (ADR-0418/WP-094) -----------
+# The block above only ever wired zuno-day0-check (kept as-is - the
+# mcp-aap section below still depends on its _aap_config_jt_lookup/
+# _aap_config_credential_lookup facts). Every other entry in
+# aap_config_job_templates (defaults/main.yml) gets the same credential
+# attachment plus, where declared, a target_component Survey - via
+# tasks/wire_job_template.yml, included once per template rather than
+# duplicating the block above 13 more times.
+- name: "aap-config | wire every Job Template's credential and Survey"
+  ansible.builtin.include_tasks: wire_job_template.yml
+  vars:
+    _wire_jt: "{{ item }}"
+  loop: "{{ aap_config_job_templates }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# --- Workflow Template rollout for Day 1/Day 2 (ADR-0418 clause 6/WP-095) ---
+# No credential/Survey wiring needed here - every node launches an
+# already-wired Job Template above, so a Workflow Template only needs to
+# exist. `unified_job_template.name` resolution against a live Job
+# Template happens inside the resource operator itself; this wait only
+# confirms the WorkflowTemplate CR's own Controller-side object appeared,
+# the same "CR Synced/Healthy proves nothing" caution as everywhere else
+# in this file.
+- name: "aap-config | wait for every Workflow Template to exist in Controller"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/workflow_job_templates/?name={{ item.name }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_wft_lookup
+  until: (_aap_config_wft_lookup.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 10
+  loop: "{{ aap_config_workflow_templates }}"
+  loop_control:
+    label: "{{ item.name }}"
   no_log: true
 
 # --- mcp-aap least-privilege identity (ADR-0355 clause 3, WP-074) -----------
@@ -875,7 +927,7 @@
   ansible.builtin.debug:
     msg: >-
       Secret aap-client-secret not found in zuno-auth - Keycloak's chart
-      hasn't materialized the aap client secret (run `make d1 install
+      hasn't materialized the aap client secret (run `make d0 install
       keycloak`). Skipping the SSO authenticator wiring; admin login
       stays local-only until a re-run.
   when: (_aap_config_kc_client_secret.resources | default([]) | length) == 0

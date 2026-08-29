@@ -1,8 +1,12 @@
 ---
 # Day 0 install (`make day0 install`). Same component order as day0_check.yml.
-# openshift_oauth moved to Day 1 (after keycloak) - it depends on Keycloak's
-# Ingress/TLS Secret, which don't exist until Day 1's keycloak component
-# has run. See ansible/playbooks/day1_install.yml.
+# openshift_oauth stays in Day 1 (after Day 0's keycloak) - it needs
+# Keycloak's Ingress/TLS Secret, which Day 0's own keycloak component now
+# provides. See ansible/playbooks/day1_install.yml. ADR-0421 moved
+# postgresql/keycloak/aap/aap_config here from Day 1, right after
+# "machines" - their real prerequisites (vault, external_secrets,
+# machines) all precede them below - and moved smtp/nfd/nvidia_gpu/
+# custom_metrics_autoscaler out to Day 1 in exchange.
 - name: "Day 0: install prerequisites"
   hosts: localhost
   gather_facts: false
@@ -20,13 +24,14 @@
       - vault
       - cert_manager
       - external_secrets
-      - smtp
-      # machines before nfd/nvidia_gpu: the permanent GPU node should exist
-      # (or be provisioning) before nvidia_gpu's ClusterPolicy-ready wait.
       - machines
-      - nfd
-      - nvidia_gpu
-      - custom_metrics_autoscaler
+      # postgresql/keycloak/aap/aap_config (ADR-0421): their only real
+      # prerequisites - vault, external_secrets, machines - are all
+      # already applied above.
+      - postgresql
+      - keycloak
+      - aap
+      - aap_config
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

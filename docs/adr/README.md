@@ -170,7 +170,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0349](0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) | v0.1 | Implemented | Restructure demo personas, ocp-* cluster-access groups and two new agents |
 | [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.3 | Implemented | Provide an AIAgent Kubernetes CRD and operator |
 | [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | v0.3 | Implemented (2026-08-26; amended same day by WP-083 - two permanent MIG nodes, see decisions 5 and 7) | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
-| [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.3 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0353](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) | v0.3 | Proposed | Support an optional external registry as the first-party runtime image source |
 | [ADR-0355](0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md) | v0.3 | Implemented | Expose AAP audits to agents through an mcp-aap server |
 
@@ -195,9 +194,10 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | v0.4 | Implemented | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
 | [ADR-0416](0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md) | v0.4 | Implemented | Consume gpt-oss-120b via OVHcloud AI Endpoints |
 | [ADR-0417](0417-consume-codestral-via-mistral-api.md) | v0.4 | Implemented | Consume Codestral via the Mistral API |
-| [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Proposed | Execute Day 0 and Day 1 operations as AAP Job Templates |
-| [ADR-0419](0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md) | v0.4 | Proposed | Split model preference into preferred/fallback, with prompt-slot overrides |
+| [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Partially implemented | Execute Day 0 and Day 1 operations as AAP Job Templates |
+| [ADR-0419](0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md) | v0.4 | Implemented | Split model preference into preferred/fallback, with prompt-slot overrides |
 | [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Implemented | Sign supply-chain artifacts in-cluster with Vault Transit |
+| [ADR-0421](0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md) | v0.4 | Implemented | Reshape Day 0/Day 1 boundaries around an "always-on infra" core |
 | [ADR-0516](0516-generate-diagrams-with-self-hosted-mermaid-rendering.md) | v0.4 | Implemented | Generate diagrams with self-hosted Mermaid rendering, alongside SDXL image generation |
 | [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) | v0.4 | Implemented | Modernize the local model fleet: Qwen3.6-27B chat, Qwen3-Embedding-0.6B RAG, Qwen3.5-9B training base |
 | [ADR-0519](0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) | v0.4 | Implemented | Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa) |
@@ -209,6 +209,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0527](0527-introduce-the-project-as-the-sharing-and-context-boundary.md) | v0.4 | Partially implemented | Introduce the project as the sharing and context boundary |
 | [ADR-0528](0528-rekey-project-binding-quota-and-telemetry-onto-the-zuno-project-id.md) | v0.4 | Repo work merged | Re-key project binding, quota and telemetry onto the Zuno project id |
 | [ADR-0530](0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) | v0.4 | Implemented | Reconcile Keycloak clients instead of relying on a create-only realm import |
+| [ADR-0531](0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md) | v0.4 | Proposed | Promote qwen3.5-9b to the fleet-wide default model, extend OVHcloud reasoning access from Arkos to Tekos/Comage |
 
 ## version 0.5
 
@@ -248,6 +249,7 @@ Also carried in v0.7, as an unrelated roadmap-reprioritization group (not part o
 | [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.7 | Partially implemented | Separate current Salesforce knowledge from legacy SXA |
 | [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.7 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
 | [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | v0.7 | Implemented | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |
+| [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.7 | Proposed | Run day-0 platform services in internal or external mode |
 
 ## OKF stream
 

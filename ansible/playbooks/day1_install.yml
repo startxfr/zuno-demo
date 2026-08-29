@@ -1,21 +1,22 @@
 ---
-# Day 1 install (`make day1 install`) - the AI-platform-operator stack
-# only (mesh, Keycloak, databases, Kueue, OpenShift AI, etc.) plus
-# aiagent_operator. `openshift_ai`/`kueue` back `models`' KServe/RHOAI
-# serving path and `keycloak` provides auth broadly across this tier, so
-# both precede `aiagent_operator`. `openshift_oauth` runs right after
-# `keycloak` (moved here from Day 0 - it needs Keycloak's Ingress/TLS
-# Secret to exist first, which Day 0 can never provide). `aap` (ADR-0354/
-# WP-072) runs right after `openshift_oauth` - AAP needs its own dedicated
-# PostgreSQL database (postgresql, earlier here) and the same Keycloak/
-# CA-trust bootstrap openshift_oauth itself needed. `aap_config` (WP-073)
-# follows immediately - it registers this repository (Project/Job
-# Template/SSO) inside the instance `aap` just installed. `aiagent_operator`
-# runs last -
-# standard operator-before-CR ordering: it must be running before Day 2's
-# `agents` component creates any `AIAgent` CRs. `namespaces`, `llm`,
-# `models`, and content-ingestion (rag/rag_ingestion/mcp/
-# agents/mlops) all moved to Day 2 - see day2_install.yml.
+# Day 1 install (`make day1 install`) - the remainder of the
+# AI-platform-operator stack (mesh, databases, Kueue, OpenShift AI, etc.)
+# plus aiagent_operator. ADR-0421 moved `smtp`/`nfd`/`nvidia_gpu`/
+# `custom_metrics_autoscaler` here from Day 0, at the head of this list -
+# none of the three GPU-node components need anything beyond `machines`
+# (Day 0, unaffected: nfd before nvidia_gpu), and `smtp` only needs
+# `vault`/`external_secrets` (Day 0). `postgresql`/`keycloak`/`aap`/
+# `aap_config` moved the other way, into Day 0 right after `machines` (see
+# day0_install.yml) - they are this repo's "always-on infra" core.
+# `openshift_ai`/`kueue` back `models`' KServe/RHOAI serving path, so both
+# precede `aiagent_operator`. `openshift_oauth` runs where `keycloak` used
+# to (right before `connectivity_link`) - it needs Keycloak's Ingress/TLS
+# Secret, now provided by Day 0's keycloak instead of a Day 1 one.
+# `aiagent_operator` runs last - standard operator-before-CR ordering: it
+# must be running before Day 2's `agents` component creates any `AIAgent`
+# CRs. `namespaces`, `llm`, `models`, and content-ingestion (rag/
+# rag_ingestion/mcp/agents/mlops) all moved to Day 2 - see
+# day2_install.yml.
 - name: "Day 1: install components"
   hosts: localhost
   gather_facts: false
@@ -30,19 +31,19 @@
     # silently trigger a rebuild.
     day1_verb: install
     day1_components:
+      - smtp
+      - nfd
+      - nvidia_gpu
+      - custom_metrics_autoscaler
       - redis
       - observability
       - service_mesh
       - mesh_monitoring
       - kiali
       - grafana
-      - postgresql
       - mariadb
       - tempo
-      - keycloak
       - openshift_oauth
-      - aap
-      - aap_config
       - connectivity_link
       - lws
       - jobset

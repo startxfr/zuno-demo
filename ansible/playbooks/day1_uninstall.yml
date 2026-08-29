@@ -3,13 +3,13 @@
 # order. `namespaces`, `llm`, `models`, and content-ingestion moved to
 # Day 2 - see day2_uninstall.yml. `aiagent_operator` runs first here
 # (last in install) - reverse of operator-before-CR: nothing left in
-# Day 1 depends on it once uninstall starts. `aap_config` (WP-073) runs
-# before `aap` - its CRs need the resource operator (part of aap's
-# bundle) still alive to clean up their Controller-side objects. `aap`
-# (ADR-0354/WP-072) runs right before `openshift_oauth`, mirroring its
-# install position right after it. `openshift_oauth` (moved here from
-# Day 0) runs right before `keycloak`, mirroring its install position
-# right after it.
+# Day 1 depends on it once uninstall starts. `openshift_oauth` runs right
+# before `connectivity_link`'s reverse position, mirroring its install
+# position. ADR-0421 moved postgresql/keycloak/aap/aap_config to Day 0
+# (see day0_uninstall.yml, removed there before `aap_config`/`aap`/
+# `keycloak`/`postgresql`'s Day-0 uninstall runs first) and moved smtp/
+# nfd/nvidia_gpu/custom_metrics_autoscaler here from Day 0, removed last
+# (reverse of their install position at the head of this list).
 - name: "Day 1: uninstall components"
   hosts: localhost
   gather_facts: false
@@ -26,19 +26,19 @@
       - jobset
       - lws
       - connectivity_link
-      - aap_config
-      - aap
       - openshift_oauth
-      - keycloak
       - tempo
       - mariadb
-      - postgresql
       - grafana
       - kiali
       - mesh_monitoring
       - service_mesh
       - observability
       - redis
+      - custom_metrics_autoscaler
+      - nvidia_gpu
+      - nfd
+      - smtp
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

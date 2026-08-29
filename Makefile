@@ -5,33 +5,44 @@ ANSIBLE_PLAYBOOK ?= ansible-playbook
 INVENTORY ?= ansible/inventories/demo/hosts.yml
 EXTRA_VARS ?=
 
-# ADR-0056/ADR-0060: Day 0 (cluster prerequisites) / Day 1 (AI-platform-
-# operator stack) / Day 2 (AI infrastructure + content ingestion) / Day 3
-# (agent test/stresstest operations) sequencing.
-DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets smtp machines nfd nvidia-gpu custom-metrics-autoscaler
+# ADR-0056/ADR-0060/ADR-0421: Day 0 (bare cluster prerequisites plus the
+# "always-on infra" core: PostgreSQL, Keycloak, AAP) / Day 1 (remaining
+# AI-platform-operator stack) / Day 2 (AI infrastructure + content
+# ingestion) / Day 3 (agent test/stresstest/operational actions)
+# sequencing. ADR-0421 moved "postgresql"/"keycloak"/"aap"/"aap-config"
+# here from Day 1, right after "machines" (their only real prerequisites -
+# vault, external-secrets, machines - already precede them in this same
+# list), and moved "smtp"/"nfd"/"nvidia-gpu"/"custom-metrics-autoscaler"
+# out to Day 1 in exchange (see Day 1 comment below) - this is the
+# "always-on infra" split ADR-0418's Context section had deferred to a
+# future ADR.
+DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets machines postgresql keycloak aap aap-config
 DAY0_VERBS := check install uninstall reconcile all reinstall
 
-# Day 1 is the AI-platform-operator stack only (mesh, Keycloak, databases,
-# Kueue, OpenShift AI, etc.) plus aiagent-operator, which runs last -
-# standard operator-before-CR ordering, since Day 2's "agents" component
-# creates the AIAgent CRs it reconciles. No build/run split beyond
-# ai-gateway (see ansible/roles/ai_gateway_build) and supply-chain-signer
-# (ADR-0420/WP-068, see ansible/roles/supply_chain_signer_build) - neither
-# has a matching run component, both are build-only images. "aap"
-# (ADR-0354/WP-072) sits right after "openshift-oauth": Ansible Automation
-# Platform needs its own dedicated PostgreSQL database (postgresql,
-# earlier here) and Keycloak/openshift-oauth's Ingress+CA-trust bootstrap,
-# same prerequisites openshift-oauth itself needed to move out of Day 0 for.
-# "aap-config" (WP-073) follows immediately: it registers this repository
-# (Project/Job Template/SSO) inside the AAP instance "aap" just installed.
-# "lightspeed" (ADR-0524/WP-085) sits after "openshift-ai" and before
-# "aiagent-operator": the OpenShift Lightspeed operator has no dependency
-# beyond OLM, which is exactly why only the OPERATOR is here. Its
-# configuration is a separate Day 2 component ("lightspeed-config") - an
-# OLSConfig created in Day 1 would reference a MaaS model and an MCP
-# endpoint that don't exist until Day 2, and would sit Degraded for the
-# whole window while ArgoCD self-healed it back.
-DAY1_RUN_COMPONENTS := redis observability service-mesh mesh-monitoring kiali grafana postgresql mariadb tempo keycloak openshift-oauth aap aap-config connectivity-link lws jobset kueue openshift-ai lightspeed aiagent-operator
+# Day 1 is the remainder of the AI-platform-operator stack (mesh, Kueue,
+# OpenShift AI, etc.) plus aiagent-operator, which runs last - standard
+# operator-before-CR ordering, since Day 2's "agents" component creates
+# the AIAgent CRs it reconciles. No build/run split beyond ai-gateway (see
+# ansible/roles/ai_gateway_build) and supply-chain-signer (ADR-0420/
+# WP-068, see ansible/roles/supply_chain_signer_build) - neither has a
+# matching run component, both are build-only images. ADR-0421 moved
+# "smtp"/"nfd"/"nvidia-gpu"/"custom-metrics-autoscaler" here from Day 0,
+# at the head of this list - none of the three GPU-node components need
+# anything beyond "machines" (Day 0, unaffected), and "smtp" only needs
+# "vault"/"external-secrets" (Day 0). "postgresql"/"keycloak"/"aap"/
+# "aap-config" moved the other way, into Day 0 (see above) - "aap"'s only
+# remaining Day 1 neighbor prerequisite was Keycloak/openshift-oauth's
+# Ingress+CA-trust bootstrap, which "openshift-oauth" (staying here)
+# still provides, now sourced from a Day-0-installed Keycloak instead of
+# a Day-1 one. "openshift-oauth" sits where "keycloak" used to, right
+# before "connectivity-link". "lightspeed" (ADR-0524/WP-085) sits after
+# "openshift-ai" and before "aiagent-operator": the OpenShift Lightspeed
+# operator has no dependency beyond OLM, which is exactly why only the
+# OPERATOR is here. Its configuration is a separate Day 2 component
+# ("lightspeed-config") - an OLSConfig created in Day 1 would reference a
+# MaaS model and an MCP endpoint that don't exist until Day 2, and would
+# sit Degraded for the whole window while ArgoCD self-healed it back.
+DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler redis observability service-mesh mesh-monitoring kiali grafana mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed aiagent-operator
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aiagent-operator
 DAY1_VERBS := check install build uninstall reconcile all reinstall
 
@@ -291,7 +302,7 @@ if [[ -z "$$verb" ]]; then \
     'Components (build; optional, default: all):' \
     '  $(DAY1_BUILD_COMPONENTS)' \
     '' \
-    'Example: make d1 install keycloak'; \
+    'Example: make d1 install kiali'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \

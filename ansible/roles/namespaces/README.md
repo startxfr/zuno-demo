@@ -43,10 +43,12 @@ special-cased `tasks_from`:
   namespaces` so the `-d1` Application isn't left targeting namespaces the
   `-d0` half already removed.
 
-**Tradeoff:** every other Day 0 component (`vault`, `cert_manager`,
-`external_secrets`, `postgresql`, `keycloak`, `smtp`, `nfd`, `nvidia_gpu`,
-`observability`, `openshift_ai`) runs immediately after `namespaces` in
-`day0_install.yml` and comes up with no quota/network-policy baseline
+**Tradeoff:** every other Day 0/Day 1 component (`vault`, `cert_manager`,
+`external_secrets`, `postgresql`, `keycloak`, `aap`, `smtp`, `nfd`,
+`nvidia_gpu`, `observability`, `openshift_ai`) runs after `namespaces`
+(ADR-0421 split several of these across Day 0/Day 1, but none of them
+carry namespace-policy protection of their own) and comes up with no
+quota/network-policy baseline
 until `make day1 install namespaces` (or `make day1 install`, which runs
 `namespaces` first) is run separately.
 

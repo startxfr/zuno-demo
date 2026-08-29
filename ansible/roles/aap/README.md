@@ -8,12 +8,15 @@ this role does not create it). The `-d1` half renders a single
 `AnsibleAutomationPlatform` CR (`aap.ansible.com/v1alpha1`) provisioning
 Gateway, Controller, Hub and EDA together, non-HA.
 
-Runs in `day1_components`, immediately after `openshift_oauth`: by that
-point PostgreSQL, Vault/External Secrets (Day 0) and Keycloak +
-`openshift_oauth` (Day 1, earlier in the same list) are already
-Synced+Healthy - all three are prerequisites (dedicated databases, Vault-
-seeded credentials, the Keycloak OIDC client registered by
-`ansible/roles/keycloak`).
+Runs in `day0_components`, immediately after `keycloak` (ADR-0421 moved
+`postgresql`/`keycloak`/`aap`/`aap_config` here from Day 1, right after
+`machines`, into this repo's "always-on infra" core): by that point
+`machines`, Vault/External Secrets and PostgreSQL/Keycloak (all earlier in
+the same list) are already Synced+Healthy - all are prerequisites
+(dedicated databases, Vault-seeded credentials, the Keycloak OIDC client
+registered by `ansible/roles/keycloak`). `openshift_oauth` (still Day 1)
+is not a prerequisite of `aap` itself - it only shared `keycloak` as a
+common dependency back when both were Day 1.
 
 ## Operator package/channel discovery
 
@@ -60,7 +63,7 @@ schema carries no field-level detail beyond the name, so the expected
 key set (`host`, `port`, `database`, `username`, `password`, `sslmode`,
 `type`) follows the documented upstream awx-operator/AAP-operator
 external-database Secret convention, not a live-confirmed one. If a
-component's postgres connection fails after `make d1 install aap`,
+component's postgres connection fails after `make d0 install aap`,
 check that pod's logs for the exact missing/unexpected key before
 assuming the chart is otherwise broken.
 
@@ -124,9 +127,8 @@ Confirmed live against this cluster's Gateway (2026-08-25):
 
 Failure behavior is deliberately **blocking**: bad RHN credentials,
 placeholder values with the flag enabled, or an unreachable Gateway API
-fail the whole `make d1 install aap` - `aap` precedes
-`connectivity-link`/`lws`/`jobset`/`kueue`/`openshift-ai`/
-`aiagent-operator` in Day 1, so a subscription problem stops the sequence
+fail the whole `make d0 install aap` - `aap` precedes `aap-config` in Day
+0 and everything in Day 1, so a subscription problem stops the sequence
 until resolved (explicit user decision over warn-and-continue). Admin
 authentication reuses the `aap-admin` Kubernetes Secret directly (the
 same one the CR's `admin_password_secret` consumes); the ArgoCD
@@ -158,7 +160,7 @@ subscribing the operator and running `oc explain` against the real CRDs
 on `demo222`, then deliberately tore that subscription back down before
 ever creating an `AnsibleAutomationPlatform` CR - the full
 Gateway+Controller+Hub+EDA install is a heavy, deliberate action, done
-once via `make d1 install aap` rather than as a side effect of schema
+once via `make d0 install aap` rather than as a side effect of schema
 discovery. So the following are informed by the confirmed field names
 above but not proven end to end:
 
@@ -172,5 +174,5 @@ above but not proven end to end:
   actually `Ready`, or whether some minimum (e.g. EDA's workers) turns
   out to require more than 1 in practice.
 
-Run `make d1 check aap` → `make d1 install aap` against the real cluster
+Run `make d0 check aap` → `make d0 install aap` against the real cluster
 and adjust any of the above that turns out to be wrong.

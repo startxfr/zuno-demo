@@ -1,7 +1,11 @@
 ---
 # Day 0 uninstall (`make day0 uninstall`). Reverses install order so
 # dependents are removed before what they depend on.
-# openshift_oauth moved to Day 1 (after keycloak) - see day1_uninstall.yml.
+# openshift_oauth stays in Day 1 (after Day 0's keycloak) - see
+# day1_uninstall.yml. ADR-0421 moved postgresql/keycloak/aap/aap_config
+# here from Day 1 (removed before machines, reverse of install) and
+# smtp/nfd/nvidia_gpu/custom_metrics_autoscaler out to Day 1 - see
+# day0_install.yml.
 - name: "Day 0: uninstall prerequisites"
   hosts: localhost
   gather_facts: false
@@ -11,14 +15,11 @@
     # in the shared blocked-findings tasks (ADR-0201 follow-up).
     zuno_day: d0
     day0_components:
-      - custom_metrics_autoscaler
-      - nvidia_gpu
-      - nfd
-      # machines after nvidia_gpu/nfd (reverse of install): tearing the GPU
-      # nodes away before the GPU operator uninstall would strand its
-      # node-scoped operands mid-delete.
+      - aap_config
+      - aap
+      - keycloak
+      - postgresql
       - machines
-      - smtp
       - external_secrets
       - cert_manager
       - vault

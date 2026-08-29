@@ -1,7 +1,10 @@
 ---
 # Day 0 state check (`make day0 check`). Component order matters: e.g.
 # vault must precede cert_manager/external_secrets, argocd before namespaces.
-# openshift_oauth moved to Day 1 (after keycloak) - see day1_check.yml.
+# openshift_oauth stays in Day 1 (after Day 0's keycloak) - see
+# day1_check.yml. ADR-0421 moved postgresql/keycloak/aap/aap_config here
+# from Day 1 (after machines) and smtp/nfd/nvidia_gpu/
+# custom_metrics_autoscaler out to Day 1 - see day0_install.yml.
 # (This list previously repeated almost every component twice, likely a
 # stray copy-paste - deduplicated to a single pass matching
 # day0_install.yml's order; no coverage was lost, the first pass already
@@ -33,11 +36,11 @@
       - vault
       - cert_manager
       - external_secrets
-      - smtp
       - machines
-      - nfd
-      - nvidia_gpu
-      - custom_metrics_autoscaler
+      - postgresql
+      - keycloak
+      - aap
+      - aap_config
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

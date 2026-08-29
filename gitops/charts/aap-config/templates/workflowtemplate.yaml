@@ -1,0 +1,61 @@
+{{- if .Values.aapConfig.enabled }}
+# One WorkflowTemplate per entry in .Values.workflowTemplates
+# (ADR-0418 clause 6/WP-095). Every node launches the same underlying
+# Job Template (`.jobTemplate`, already registered by templates/
+# jobtemplate.yaml) with a per-node `target_component` - confirmed live
+# 2026-08-30 that `tower.ansible.com/v1alpha1` ships a WorkflowTemplate
+# CRD (Path A, same as JobTemplate/AnsibleProject/AnsibleCredential), but
+# its `workflow_nodes` field carries NO CRD-documented schema
+# (`x-kubernetes-preserve-unknown-fields: true` - `oc explain
+# workflowtemplates.tower.ansible.com.spec` lists no suboptions for it).
+# The shape rendered below is the underlying resource operator's own
+# `awx.awx.workflow_job_template` Ansible module's documented
+# `workflow_nodes` argument spec (identifier/unified_job_template/
+# extra_data/related.{success_nodes,failure_nodes,always_nodes}/
+# all_parents_must_converge) - NOT yet confirmed to reconcile
+# successfully against this specific cluster's resource-operator version
+# (WP-095's own Acceptance checks cover that).
+# Sync-wave 0: after every JobTemplate (-5) - a workflow's nodes resolve
+# `unified_job_template.name` against an already-existing Controller
+# Job Template.
+{{- range .Values.workflowTemplates }}
+---
+apiVersion: tower.ansible.com/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  connection_secret: {{ $.Values.connectionSecret.name }}
+  name: {{ .name }}
+  organization: {{ $.Values.organization }}
+  inventory: {{ $.Values.inventory.name }}
+  ask_variables_on_launch: false
+  workflow_nodes:
+    {{- $jobTemplate := .jobTemplate }}
+    {{- range .nodes }}
+    - identifier: {{ .id }}
+      unified_job_template:
+        name: {{ $jobTemplate }}
+        organization:
+          name: {{ $.Values.organization }}
+        type: job_template
+      extra_data:
+        target_component: {{ .id }}
+      {{- if .allParentsMustConverge }}
+      all_parents_must_converge: true
+      {{- end }}
+      {{- if .successNodes }}
+      related:
+        success_nodes:
+          {{- range .successNodes }}
+          - identifier: {{ . }}
+          {{- end }}
+      {{- end }}
+    {{- end }}
+{{- end }}
+{{- end }}

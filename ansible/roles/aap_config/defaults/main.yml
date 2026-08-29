@@ -1,0 +1,72 @@
+---
+# Mirrors gitops/charts/aap-config/values.yaml's `jobTemplates`/
+# `workflowTemplates`/`credentials` lists (ADR-0418/WP-094/WP-095) - this
+# role's post-CR API calls (credential attachment, Survey wiring,
+# census/nudge/wait) need the same data the chart used to render the CRs,
+# and this role has no templating engine to read the chart's values.yaml
+# directly, so the two are kept in sync by convention, the same way
+# aap_config_project_name/aap_config_inventory_name already mirror the
+# chart's project/inventory names elsewhere in this role. Only the names
+# are needed here (unlike jobTemplates' full credential/survey data) -
+# workflows carry no credential/Survey of their own, they only launch
+# already-wired Job Templates per node.
+aap_config_organization: zuno
+aap_config_project_name: zuno-demo
+aap_config_inventory_name: zuno
+
+aap_config_credentials:
+  - name: zuno-cluster-reader
+  - name: zuno-aap-installer
+
+aap_config_job_templates:
+  - name: zuno-day0-check
+    credential: zuno-cluster-reader
+    survey_components: []
+  - name: zuno-day1-check
+    credential: zuno-cluster-reader
+    survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+  - name: zuno-day1-build
+    credential: zuno-aap-installer
+    survey_components: [ai-gateway, supply-chain-signer, aiagent-operator]
+  - name: zuno-day1-install
+    credential: zuno-aap-installer
+    survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+  - name: zuno-day1-reconcile
+    credential: zuno-aap-installer
+    survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+  - name: zuno-day2-check
+    credential: zuno-cluster-reader
+    survey_components: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config, supply-chain]
+  - name: zuno-day2-build
+    credential: zuno-aap-installer
+    survey_components: [mcp, rag, rag-ingestion, agent, mlops]
+  - name: zuno-day2-install
+    credential: zuno-aap-installer
+    survey_components: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config]
+  - name: zuno-day3-test
+    credential: zuno-cluster-reader
+    survey_components: [agents, platform]
+  - name: zuno-day3-stresstest
+    credential: zuno-aap-installer
+    survey_components: [agents, platform]
+  - name: zuno-day3-backup
+    credential: zuno-aap-installer
+    survey_components: [postgresql]
+  - name: zuno-day3-restore
+    credential: zuno-aap-installer
+    survey_components: [postgresql]
+  - name: zuno-day3-check
+    credential: zuno-cluster-reader
+    survey_components: [postgresql, lightspeed, lightspeed-config, agents, platform]
+  - name: zuno-day3-sign
+    credential: zuno-aap-installer
+    survey_components: [agents]
+
+aap_config_workflow_templates:
+  - name: zuno-day1-install
+  - name: zuno-day1-check
+  - name: zuno-day1-reconcile
+  - name: zuno-day1-build
+  - name: zuno-day2-install
+  - name: zuno-day2-check
+  - name: zuno-day2-build

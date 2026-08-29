@@ -1,0 +1,101 @@
+---
+# ADR-0418/WP-094: per-Job-Template post-CR wiring, included once per entry
+# in aap_config_job_templates (defaults/main.yml). Takes `_wire_jt`
+# ({name, credential, survey_components}) as input. Mirrors the original
+# zuno-day0-check-specific credential-attach block above (kept unchanged,
+# since ansible/roles/aap_config/tasks/install.yml's mcp-aap section below
+# still depends on that block's own _aap_config_jt_lookup/
+# _aap_config_credential_lookup facts) - this is the same idiom, made
+# reusable for the other 13 templates instead of a second copy-paste.
+
+- name: "aap-config | wire {{ _wire_jt.name }} | look up the Job Template"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/?name={{ _wire_jt.name }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_jt_lookup
+  until: (_wire_jt_lookup.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 10
+  no_log: true
+
+- name: "aap-config | wire {{ _wire_jt.name }} | look up its assigned credential"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/credentials/?name={{ _wire_jt.credential }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_jt_credential_lookup
+  until: (_wire_jt_credential_lookup.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 10
+  no_log: true
+
+- name: "aap-config | wire {{ _wire_jt.name }} | check which credentials it already has"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/{{ _wire_jt_lookup.json.results[0].id }}/credentials/"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_jt_credentials
+  no_log: true
+
+- name: "aap-config | wire {{ _wire_jt.name }} | attach its assigned credential"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/{{ _wire_jt_lookup.json.results[0].id }}/credentials/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      id: "{{ _wire_jt_credential_lookup.json.results[0].id }}"
+    status_code: 204
+  when: >-
+    (_wire_jt_credentials.json.results | default([])
+     | selectattr('id', 'equalto', _wire_jt_credential_lookup.json.results[0].id)
+     | list | length) == 0
+  no_log: true
+
+# No CRD field for survey_spec/survey_enabled either (only
+# ask_variables_on_launch is - set directly on the CR, see
+# gitops/charts/aap-config/templates/jobtemplate.yaml). A simple
+# multiplechoice Survey offering every component this playbook's Makefile
+# verb already accepts, plus "all" - never free text, so a launch can
+# never pass a component the Makefile itself would reject.
+- name: "aap-config | wire {{ _wire_jt.name }} | set the target_component Survey"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/{{ _wire_jt_lookup.json.results[0].id }}/"
+    method: PATCH
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      survey_enabled: true
+      survey_spec:
+        name: ""
+        description: ""
+        spec:
+          - question_name: "Target component"
+            question_description: "Component to run this playbook against, or 'all'"
+            variable: target_component
+            type: multiplechoice
+            choices: "{{ (_wire_jt.survey_components + ['all']) | join('\n') }}"
+            default: all
+            required: true
+    status_code: 200
+  when: (_wire_jt.survey_components | default([]) | length) > 0
+  no_log: true

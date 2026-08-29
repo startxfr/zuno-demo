@@ -16,7 +16,7 @@
 
 - name: "postgresql | fail if the PostgresCluster doesn't exist"
   ansible.builtin.fail:
-    msg: "zuno-postgresql PostgresCluster not found in zuno-data - nothing to back up. Run 'make d1 install postgresql' first."
+    msg: "zuno-postgresql PostgresCluster not found in zuno-data - nothing to back up. Run 'make d0 install postgresql' first."
   when: (_postgresql_backup_cluster_lookup.resources | default([]) | length) == 0
 
 # Baseline: the most recent *successful* scheduled/on-demand backup before

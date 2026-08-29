@@ -1,6 +1,7 @@
 # smtp
 
-A Day 0 component (ADR-0056, `make d0 install smtp`). Applies
+A Day 1 component (ADR-0056; moved here from Day 0 by ADR-0421,
+`make d1 install smtp`). Applies
 `gitops/apps/smtp/application-d0.yaml`/`application-d1.yaml`
 (`gitops/charts/smtp` - see `gitops/apps/README.md`), registering an
 `ExternalSecret` exposing the technical mail identity

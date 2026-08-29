@@ -6,11 +6,19 @@
 # install re-run, which re-applies the component's Application manifest - the
 # baseline remediation, since Applications are Ansible-applied, not
 # git-synced (ADR-0311/ADR-0343) - and re-runs the diagnosing waits.
-# openshift_oauth moved to Day 1 (after keycloak), and openshift_ai - the
-# one role with a tasks/reconcile.yml - is a Day 1 component too. Both are
-# reconciled by ansible/playbooks/day1_reconcile.yml (`make d1 reconcile`),
-# not from here: a Day 0 verb cannot take a Day 1 component, which is the
-# whole reason `make d1 reconcile openshift-ai` was never runnable.
+# openshift_oauth stays in Day 1 (after Day 0's keycloak), and
+# openshift_ai - the one role with a tasks/reconcile.yml - is a Day 1
+# component too. Both are reconciled by ansible/playbooks/
+# day1_reconcile.yml (`make d1 reconcile`), not from here: a Day 0 verb
+# cannot take a Day 1 component, which is the whole reason `make d1
+# reconcile openshift-ai` was never runnable. ADR-0421 moved
+# postgresql/keycloak/aap/aap_config here from Day 1 (after machines) and
+# smtp/nfd/nvidia_gpu/custom_metrics_autoscaler out to Day 1 - see
+# day0_install.yml. (This list was previously missing "machines" outright
+# - a pre-existing bug, since fixed here: it's present in
+# day0_install.yml/day0_check.yml but had never been added to reconcile,
+# so `make d0 reconcile all`/`make d0 reconcile machines` silently skipped
+# it.)
 - name: "Day 0: reconcile blocked prerequisites"
   hosts: localhost
   gather_facts: false
@@ -28,10 +36,11 @@
       - vault
       - cert_manager
       - external_secrets
-      - smtp
-      - nfd
-      - nvidia_gpu
-      - custom_metrics_autoscaler
+      - machines
+      - postgresql
+      - keycloak
+      - aap
+      - aap_config
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

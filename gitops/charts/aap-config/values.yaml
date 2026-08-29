@@ -23,29 +23,296 @@ project:
   repo: https://github.com/startxfr/zuno-demo.git
   branch: main
 
-# Inventory the Job Template runs against. The CRD has no host-management
-# field - the localhost host (ansible_connection=local) is added by
-# ansible/roles/aap_config/tasks/install.yml via the Controller API.
+# Inventory every Job/Workflow Template runs against. The CRD has no
+# host-management field - the localhost host (ansible_connection=local)
+# is added by ansible/roles/aap_config/tasks/install.yml via the
+# Controller API.
 inventory:
   name: zuno
 
-# Least-privilege machine credential (ADR-0354 Security considerations,
-# narrowed further per WP-073): a dedicated ServiceAccount bound to
-# cluster-reader, its token consumed through AnsibleCredential's native
-# kubernetes_api/kubernetes_bearer_token_secret fields. day0_check is
-# read-mostly by construction; if a precheck ever needs more, widen with
-# a targeted extra Role - never swap in an admin kubeconfig.
-credential:
-  name: zuno-cluster-reader
-  # The CRD's `type` field takes the Controller credential-type NAME.
-  type: OpenShift or Kubernetes API Bearer Token
-  kubernetesApi: https://kubernetes.default.svc
-serviceAccount:
-  name: aap-day0-check
+# ADR-0418/WP-094: two credential tiers, least-privilege per verb class -
+# never one shared admin identity.
+#   - zuno-cluster-reader: read-mostly checks (day0/day1/day2 "check",
+#     day3 "test"). Bound to the built-in cluster-reader ClusterRole
+#     (ADR-0354 Security considerations, narrowed per WP-073).
+#   - zuno-aap-installer: mutating verbs (install/build/reconcile on
+#     Day 1/Day 2, backup/restore/sign on Day 3). Bound to the new
+#     zuno-aap-installer ClusterRole (templates/clusterrole-installer.yaml)
+#     - resource-type-scoped to this repo's own operator CRDs/GitOps
+#     Applications, deliberately NOT cluster-admin and NOT granted
+#     ClusterRole/ClusterRoleBinding write (no privilege-escalation path).
+# Both are consumed through AnsibleCredential's native kubernetes_api/
+# kubernetes_bearer_token_secret fields (confirmed live via
+# `oc explain ansiblecredential.spec`, WP-073).
+credentials:
+  - name: zuno-cluster-reader
+    serviceAccount: aap-day0-check
+    clusterRole: cluster-reader
+    # The CRD's `type` field takes the Controller credential-type NAME.
+    type: OpenShift or Kubernetes API Bearer Token
+    kubernetesApi: https://kubernetes.default.svc
+    description: >-
+      cluster-reader ServiceAccount token for read-mostly cluster checks
+      (WP-073) - never an admin kubeconfig.
+  - name: zuno-aap-installer
+    serviceAccount: aap-installer
+    clusterRole: zuno-aap-installer
+    type: OpenShift or Kubernetes API Bearer Token
+    kubernetesApi: https://kubernetes.default.svc
+    description: >-
+      zuno-aap-installer ServiceAccount token for install/build/reconcile/
+      backup/restore/sign Job Templates (WP-094) - resource-type-scoped to
+      this repo's own operator CRDs and GitOps Applications, never an
+      admin kubeconfig and never able to grant RBAC itself.
 
-jobTemplate:
-  name: zuno-day0-check
-  playbook: ansible/playbooks/day0_check.yml
+# ADR-0418/WP-094: every Day 1/Day 2/Day 3 playbook registered as one Job
+# Template, named zuno-<day>-<verb> (zuno-day0-check keeps its original
+# pre-ADR-0418 name for continuity - it is the one template already
+# live-verified end to end, WP-073). `credential` names an entry in
+# `credentials` above. `surveyComponents`, when set, drives a Survey
+# offering `target_component` as a choice among that list plus "all" -
+# ansible/roles/aap_config/tasks/install.yml PATCHes survey_spec/
+# survey_enabled/ask_variables_on_launch onto the Controller object after
+# creation, mirroring the existing credential-attachment pattern (the
+# JobTemplate CRD documents neither field - WP-073). Entries with no
+# `surveyComponents` (day3 test/stresstest, whose component is resolved
+# dynamically from agents/*/agent.okf.md, never a fixed list - see
+# Makefile's DAY3_TEST_COMPONENTS comment) still get
+# `ask_variables_on_launch: true` with a free-text survey field instead of
+# a choice list.
+jobTemplates:
+  - name: zuno-day0-check
+    playbook: ansible/playbooks/day0_check.yml
+    credential: zuno-cluster-reader
+    askVariablesOnLaunch: false
+
+  - name: zuno-day1-check
+    playbook: ansible/playbooks/day1_check.yml
+    credential: zuno-cluster-reader
+    askVariablesOnLaunch: true
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+  - name: zuno-day1-build
+    playbook: ansible/playbooks/day1_build.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [ai-gateway, supply-chain-signer, aiagent-operator]
+  - name: zuno-day1-install
+    playbook: ansible/playbooks/day1_install.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+  - name: zuno-day1-reconcile
+    playbook: ansible/playbooks/day1_reconcile.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+
+  - name: zuno-day2-check
+    playbook: ansible/playbooks/day2_check.yml
+    credential: zuno-cluster-reader
+    askVariablesOnLaunch: true
+    surveyComponents: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config, supply-chain]
+  - name: zuno-day2-build
+    playbook: ansible/playbooks/day2_build.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [mcp, rag, rag-ingestion, agent, mlops]
+  - name: zuno-day2-install
+    playbook: ansible/playbooks/day2_install.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config]
+
+  - name: zuno-day3-test
+    playbook: ansible/playbooks/day3_test.yml
+    credential: zuno-cluster-reader
+    askVariablesOnLaunch: true
+    surveyComponents: [agents, platform]
+  - name: zuno-day3-stresstest
+    playbook: ansible/playbooks/day3_stresstest.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [agents, platform]
+  - name: zuno-day3-backup
+    playbook: ansible/playbooks/day3_backup.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [postgresql]
+  - name: zuno-day3-restore
+    playbook: ansible/playbooks/day3_restore.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [postgresql]
+  - name: zuno-day3-check
+    playbook: ansible/playbooks/day3_check.yml
+    credential: zuno-cluster-reader
+    askVariablesOnLaunch: true
+    surveyComponents: [postgresql, lightspeed, lightspeed-config, agents, platform]
+  - name: zuno-day3-sign
+    playbook: ansible/playbooks/day3_sign.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [agents]
+
+# ADR-0418 clause 6/WP-095: one Workflow Template per Day 1/Day 2 verb
+# that has more than one component (no Day 3 - its verbs have no
+# cross-component sequencing to orchestrate). Every node in a workflow
+# launches the SAME underlying Job Template (`jobTemplate`, one of the
+# entries in `jobTemplates` above) with a different `target_component` -
+# a workflow does not need its own dedicated Job Template per component,
+# only a different `extra_data` per node. `nodes[].successNodes` are
+# forward edges (AWX's own native representation - a node with no
+# `successNodes` is terminal; a node named as nobody's successor is a
+# root, launched immediately) - `allParentsMustConverge: true` on a node
+# with more than one incoming edge makes it wait for ALL of them, not
+# just the first (confirmed live 2026-08-30 via the resource operator's
+# own `awx.awx.workflow_job_template` module argument spec - the
+# WorkflowTemplate CRD's `workflow_nodes` field itself carries no
+# CRD-documented schema, `x-kubernetes-preserve-unknown-fields`).
+# Day 1 install/check/reconcile share the identical component graph
+# (`&day1ComponentDag`) - only which Job Template each workflow launches
+# differs. Parallel groups below match the dependency rationale already
+# documented in ansible/playbooks/day1_install.yml's header comment and
+# each component role's own README (re-verify live before trusting any
+# single edge - this graph has not yet been exercised against a real
+# Controller, see WP-095's own Acceptance checks).
+workflowTemplates:
+  - name: zuno-day1-install
+    jobTemplate: zuno-day1-install
+    nodes: &day1ComponentDag
+      # Wave 0: no dependency beyond Day 0's `machines` (unaffected by
+      # ADR-0421). nvidia-gpu additionally needs nfd (ADR-0047).
+      - id: smtp
+        successNodes: [redis]
+      - id: nfd
+        successNodes: [nvidia-gpu]
+      - id: custom-metrics-autoscaler
+        successNodes: [redis]
+      - id: nvidia-gpu
+        successNodes: [redis]
+      # Wave 1: needs smtp + custom-metrics-autoscaler + nvidia-gpu done.
+      - id: redis
+        successNodes: [observability]
+        allParentsMustConverge: true
+      - id: observability
+        successNodes: [service-mesh]
+      - id: service-mesh
+        successNodes: [mesh-monitoring]
+      - id: mesh-monitoring
+        successNodes: [kiali, grafana]
+      # Wave 2: kiali/grafana both only need mesh-monitoring - no
+      # dependency on each other (kiali's own Grafana URL reference is
+      # config, not a runtime health probe at install time - re-verify
+      # live per WP-095's Acceptance checks before trusting this edge).
+      - id: kiali
+        successNodes: [mariadb]
+      - id: grafana
+        successNodes: [mariadb]
+      - id: mariadb
+        successNodes: [tempo]
+        allParentsMustConverge: true
+      - id: tempo
+        successNodes: [openshift-oauth]
+      - id: openshift-oauth
+        successNodes: [connectivity-link]
+      # Wave 3: lws/jobset/kueue each only need connectivity-link.
+      - id: connectivity-link
+        successNodes: [lws, jobset, kueue]
+      - id: lws
+        successNodes: [openshift-ai]
+      - id: jobset
+        successNodes: [openshift-ai]
+      - id: kueue
+        successNodes: [openshift-ai]
+      - id: openshift-ai
+        successNodes: [lightspeed]
+        allParentsMustConverge: true
+      - id: lightspeed
+        successNodes: [aiagent-operator]
+      - id: aiagent-operator
+        successNodes: []
+  - name: zuno-day1-check
+    jobTemplate: zuno-day1-check
+    nodes: *day1ComponentDag
+  - name: zuno-day1-reconcile
+    jobTemplate: zuno-day1-reconcile
+    nodes: *day1ComponentDag
+
+  - name: zuno-day1-build
+    jobTemplate: zuno-day1-build
+    nodes:
+      # ai-gateway/aiagent-operator both only need supply-chain-signer
+      # built first (image-signing dependency) - no dependency on each
+      # other.
+      - id: supply-chain-signer
+        successNodes: [ai-gateway, aiagent-operator]
+      - id: ai-gateway
+        successNodes: []
+      - id: aiagent-operator
+        successNodes: []
+
+  - name: zuno-day2-install
+    jobTemplate: zuno-day2-install
+    nodes:
+      - id: namespaces
+        successNodes: [llm]
+      - id: llm
+        successNodes: [models]
+      # rag/rag-ingestion/mcp each only need models (ADR-0060: "models...
+      # since agents/rag in this same tier need models available") - no
+      # confirmed dependency on each other; re-verify live before
+      # trusting this edge (less documented than Day 1's, per WP-095).
+      - id: models
+        successNodes: [rag, rag-ingestion, mcp]
+      - id: rag
+        successNodes: [agents]
+      - id: rag-ingestion
+        successNodes: [agents]
+      - id: mcp
+        successNodes: [agents]
+      - id: agents
+        successNodes: [mlops]
+        allParentsMustConverge: true
+      - id: mlops
+        successNodes: [lightspeed-config]
+      - id: lightspeed-config
+        successNodes: []
+  - name: zuno-day2-check
+    jobTemplate: zuno-day2-check
+    nodes:
+      - id: namespaces
+        successNodes: [llm]
+      - id: llm
+        successNodes: [models]
+      - id: models
+        successNodes: [rag, rag-ingestion, mcp]
+      - id: rag
+        successNodes: [agents]
+      - id: rag-ingestion
+        successNodes: [agents]
+      - id: mcp
+        successNodes: [agents]
+      - id: agents
+        successNodes: [mlops]
+        allParentsMustConverge: true
+      - id: mlops
+        successNodes: [lightspeed-config]
+      # check-only tail (ADR-0420/WP-070) - no install/build of its own.
+      - id: lightspeed-config
+        successNodes: [supply-chain]
+      - id: supply-chain
+        successNodes: []
+
+  - name: zuno-day2-build
+    jobTemplate: zuno-day2-build
+    nodes:
+      # 5 independent BuildConfigs, no ordering dependency between them -
+      # all launch in parallel as workflow roots.
+      - {id: mcp, successNodes: []}
+      - {id: rag, successNodes: []}
+      - {id: rag-ingestion, successNodes: []}
+      - {id: agent, successNodes: []}
+      - {id: mlops, successNodes: []}
 
 # Secret holding the Gateway API access token every CR's
 # connection_secret references. Minted once by ansible/roles/aap_config

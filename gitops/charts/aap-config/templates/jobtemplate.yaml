@@ -1,28 +1,32 @@
 {{- if .Values.aapConfig.enabled }}
-# The single Job Template ADR-0354 clause 4 scopes this component to:
-# zuno-day0-check, running ansible/playbooks/day0_check.yml (read-mostly
-# by construction - the same property ADR-0418 uses to phase its rollout).
+# One Job Template per Day 1/Day 2/Day 3 playbook (ADR-0418/WP-094),
+# driven entirely from .Values.jobTemplates - no per-template hardcoding.
 # Field names confirmed live via the CRD's openAPIV3Schema (WP-073): the
-# JobTemplate CRD has NO credentials or extra_vars field - the
-# zuno-cluster-reader credential is attached via the Controller API by
-# ansible/roles/aap_config/tasks/install.yml after this CR reconciles.
+# JobTemplate CRD has NO credentials/survey_spec/extra_vars fields - the
+# credential attachment and Survey wiring both happen via the Controller
+# API by ansible/roles/aap_config/tasks/install.yml after each CR
+# reconciles (same generalized loop that used to be hardcoded to
+# zuno-day0-check alone).
 # Sync-wave -5: after project/inventory/credential (-10) - the resource
 # operator retries anyway, this just avoids a first-pass failure loop.
+{{- range .Values.jobTemplates }}
+---
 apiVersion: tower.ansible.com/v1alpha1
 kind: JobTemplate
 metadata:
-  name: {{ .Values.jobTemplate.name }}
-  namespace: {{ .Values.namespace }}
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
   labels:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-5"
 spec:
-  connection_secret: {{ .Values.connectionSecret.name }}
-  name: {{ .Values.jobTemplate.name }}
-  project: {{ .Values.project.name }}
-  playbook: {{ .Values.jobTemplate.playbook }}
-  inventory: {{ .Values.inventory.name }}
+  connection_secret: {{ $.Values.connectionSecret.name }}
+  name: {{ .name }}
+  project: {{ $.Values.project.name }}
+  playbook: {{ .playbook }}
+  inventory: {{ $.Values.inventory.name }}
   ask_inventory_on_launch: false
-  ask_variables_on_launch: false
+  ask_variables_on_launch: {{ .askVariablesOnLaunch | default false }}
+{{- end }}
 {{- end }}

@@ -1,7 +1,9 @@
 ---
 # Day 1 reconcile (`make day1|d1 reconcile [component]`): diagnose blocked
 # resources and apply known remediations automatically. Same component order
-# as day1_install.yml.
+# as day1_install.yml. ADR-0421 moved postgresql/keycloak/aap/aap_config
+# out to Day 0 and smtp/nfd/nvidia_gpu/custom_metrics_autoscaler in from
+# Day 0 - see day1_install.yml.
 #
 # Why this playbook exists (ADR-0201 follow-up). `reconcile` was a Day 0 verb
 # only, but the single role that has a tasks/reconcile.yml - openshift_ai - is
@@ -33,19 +35,19 @@
     # same value rather than introducing a third behaviour.
     day1_verb: install
     day1_components:
+      - smtp
+      - nfd
+      - nvidia_gpu
+      - custom_metrics_autoscaler
       - redis
       - observability
       - service_mesh
       - mesh_monitoring
       - kiali
       - grafana
-      - postgresql
       - mariadb
       - tempo
-      - keycloak
       - openshift_oauth
-      - aap
-      - aap_config
       - connectivity_link
       - lws
       - jobset
