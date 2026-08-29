@@ -72,6 +72,20 @@ tool_max_false_fire_rate: 0.10
 # the call rate: "named the tool and then wrote a sentence" is a different
 # failure from "declined", and only one of them is this regression.
 tool_max_narration_rate: 0.10
+
+# Calling a tool that was never offered. Kept separate from
+# tool_max_false_fire_rate because it is a different defect with a
+# different fix: a false fire is a misjudged situation, a hallucinated
+# tool is an invented interface the runtime cannot dispatch at all.
+# Measured 2026-08-29 on the same 27 probes:
+#
+#   qwen3.5-9b (base)        false-fire 8.3%  hallucination 11.1%
+#   qwen3.5-9b-wesh (after)  false-fire 0.0%  hallucination 18.5%
+#
+# Neither meets 0.10, the base model included - this ceiling states what
+# is wanted, not what the family currently delivers, and the gap is the
+# finding rather than a reason to relax it.
+tool_max_hallucination_rate: 0.10
 # A one-sided probe set makes both rates meaningless and is the easiest
 # way to end up with a scorer that always passes.
 tool_min_probes_per_side: 5

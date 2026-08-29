@@ -73,12 +73,16 @@ def test_right_tool_with_unusable_arguments_is_not_a_success():
 
 
 def test_calling_when_no_tool_applies_is_a_false_fire():
-    """Measured on the base model: given a deal-status question and only
-    generate_image/generate_diagram, it invented a call to
-    'salesforce.opportunity.read'. Recall-only scoring calls that
-    perfect."""
-    out = tc.score_probe(_probe(expects_tool=False, tool_calls=[_call("salesforce.opportunity.read", "{}")]))
-    assert out["outcome"] == "false_fire"
+    """Recall-only scoring would call a constant caller perfect.
+
+    The example this test originally used - the base model inventing
+    'salesforce.opportunity.read' on a deal-status question - moved to
+    `hallucinated_tool` on 2026-08-29, once measurement showed the two
+    behaviours have different fixes. A false fire is now specifically a
+    call to a tool that WAS offered and did not apply.
+    """
+    out = tc.score_probe(_probe(expects_tool=False, tool_calls=[_call("generate_image", '{"prompt": "x"}')]))
+    assert out["outcome"] == "false_fire", out
     assert tc.score_probe(_probe(expects_tool=False, content="Le deal est en negociation."))["outcome"] == "abstained"
 
 
@@ -131,10 +135,12 @@ def test_empty_input_fails_rather_than_passing_vacuously():
 
 def test_thresholds_come_from_gate_config_not_code():
     cfg = {"tool_min_call_rate": 0.5, "tool_max_false_fire_rate": 0.4,
-           "tool_max_narration_rate": 0.6, "tool_min_probes_per_side": 2}
+           "tool_max_narration_rate": 0.6, "tool_min_probes_per_side": 2,
+           "tool_max_hallucination_rate": 0.3}
     assert tc.thresholds_from_gate_config(cfg) == {
         "min_call_rate": 0.5, "max_false_fire_rate": 0.4,
         "max_narration_rate": 0.6, "min_probes_per_side": 2,
+        "max_hallucination_rate": 0.3,
     }
 
 
@@ -180,3 +186,93 @@ def test_probe_schemas_have_not_drifted_from_the_runtime():
     assert set(fixture) == set(live), "probe fixture and runtime disagree on which tools exist"
     for name, schema in fixture.items():
         assert schema == live[name], f"{name} schema drifted from components/agent-runtime"
+
+
+def test_a_call_to_a_tool_that_was_never_offered_is_not_a_false_fire():
+    # The distinction that mattered: on 2026-08-29 the variant scored five
+    # "false fires" and every one named a tool absent from its context,
+    # while it never spuriously called an offered one. Collapsed into one
+    # number that reads as "the negative training failed"; split, it reads
+    # as "the negative training worked and the model invents interfaces".
+    offered = ["generate_image", "generate_diagram"]
+    invented = tc.score_probe({
+        "id": "none-01", "expects_tool": False, "offered_tools": offered,
+        "tool_calls": [{"name": "salesforce.opportunity.read", "arguments": {"opportunity_id": "OPP-4821"}}],
+    })
+    assert invented["outcome"] == "hallucinated_tool", invented
+
+    real = tc.score_probe({
+        "id": "none-02", "expects_tool": False, "offered_tools": offered,
+        "tool_calls": [{"name": "generate_image", "arguments": {"prompt": "x"}}],
+    })
+    assert real["outcome"] == "false_fire", real
+
+
+def test_an_invented_tool_on_the_positive_side_is_not_a_wrong_tool():
+    # wrong_tool means "picked the other offered tool" - a judgement error.
+    offered = ["generate_image", "generate_diagram"]
+    out = tc.score_probe({
+        "id": "img-01", "expects_tool": True, "expected_tool": "generate_image",
+        "required_arguments": ["prompt"], "offered_tools": offered,
+        "tool_calls": [{"name": "search", "arguments": {"query": "x"}}],
+    })
+    assert out["outcome"] == "hallucinated_tool", out
+
+    swapped = tc.score_probe({
+        "id": "img-02", "expects_tool": True, "expected_tool": "generate_image",
+        "required_arguments": ["prompt"], "offered_tools": offered,
+        "tool_calls": [{"name": "generate_diagram", "arguments": {"mermaid_source": "graph TD; A-->B;"}}],
+    })
+    assert swapped["outcome"] == "wrong_tool", swapped
+
+
+def test_hallucinations_do_not_shrink_the_denominators_that_judge_them():
+    # A model that hallucinates on every probe must not thereby empty the
+    # positive/negative denominators and flatter its own call rate.
+    offered = ["generate_image"]
+    rows = [
+        {"id": f"img-{i}", "expects_tool": True, "expected_tool": "generate_image",
+         "required_arguments": ["prompt"], "offered_tools": offered,
+         "tool_calls": [{"name": "invented", "arguments": {}}]}
+        for i in range(6)
+    ] + [
+        {"id": f"none-{i}", "expects_tool": False, "offered_tools": offered, "tool_calls": []}
+        for i in range(6)
+    ]
+    out = tc.score_corpus(rows)
+    assert out["tool_applicable_count"] == 6, out
+    assert out["no_tool_count"] == 6, out
+    assert out["call_rate"] == 0.0, out
+    assert out["hallucination_rate"] == 0.5, out
+    assert not out["passed"]
+    assert any("hallucinated-tool rate" in f for f in out["failures"]), out["failures"]
+
+
+def test_the_hallucination_ceiling_is_read_from_gate_config():
+    th = tc.thresholds_from_gate_config({"tool_max_hallucination_rate": 0.25})
+    assert th["max_hallucination_rate"] == 0.25, th
+    assert tc.thresholds_from_gate_config({})["max_hallucination_rate"] == 0.10
+
+
+# Same plain-script convention as the sibling files in this directory. It
+# was missing until 2026-08-29: the 14 tests above existed, were never
+# collected by anything, and running the file printed nothing and exited
+# 0 - the one failure mode a test suite must not have.
+TESTS = [fn for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)]
+
+
+def main() -> int:
+    failed = 0
+    for test in TESTS:
+        try:
+            test()
+            print(f"PASS {test.__name__}")
+        except AssertionError as exc:
+            failed += 1
+            print(f"FAIL {test.__name__}: {exc}")
+    print(f"{len(TESTS) - failed}/{len(TESTS)} passed")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
