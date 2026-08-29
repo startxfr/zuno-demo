@@ -1,6 +1,9 @@
 # ADR-0501: Establish the OKF stream with its own milestones and roadmap
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-08-29) - the stream/roadmap mechanic is in
+  force and its OKF v0.1 milestone (in-repo content excellence) is done;
+  OKF v0.2 (extraction) and OKF v0.3 (live reconciliation) remain open
+  future work tracked in [docs/roadmap/okf-roadmap.md](../roadmap/okf-roadmap.md)
 - **Target:** OKF v0.1
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team

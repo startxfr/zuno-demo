@@ -933,3 +933,12 @@ target; revert to `latest` immediately after proving it.
     subject is git — produced false violations. Shell and YAML now
     require real delimiters. Zero false positives across all 908
     reference responses.
+
+### Dated entries (OKF stream) — current status per ADR
+
+- **ADR-0501**, 2026-08-29, **Accepted**: the OKF stream/roadmap mechanic
+  (05xx ADR band, `docs/roadmap/okf-roadmap.md` tracker, WP-43 onward) is
+  in force and its OKF v0.1 milestone is done (WP-43/44/45/46/54/56/061,
+  all Done). OKF v0.2 (extraction to a standalone `zuno-okf` repo) and
+  OKF v0.3 (live reconciliation) remain open future work under this
+  stream, not yet started.

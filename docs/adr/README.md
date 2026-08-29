@@ -253,7 +253,7 @@ Also carried in v0.7, as an unrelated roadmap-reprioritization group (not part o
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0501](0501-establish-the-okf-stream-with-its-own-milestones-and-roadmap.md) | OKF v0.1 | Proposed | Establish the OKF stream with its own milestones and roadmap |
+| [ADR-0501](0501-establish-the-okf-stream-with-its-own-milestones-and-roadmap.md) | OKF v0.1 | Accepted | Establish the OKF stream with its own milestones and roadmap |
 | [ADR-0502](0502-formalize-the-two-stage-agent-maturity-model.md) | OKF v0.1 | Implemented | Formalize the two-stage agent maturity model |
 | [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md) | OKF v0.1 | Implemented | Make each OKF bundle state its complete authorization contract |
 | [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md) | OKF v0.1 | Implemented | Define the agent tests directory structure and promotion gate |
