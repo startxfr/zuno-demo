@@ -1701,6 +1701,12 @@ def _score_register_conformance(config: MlopsConfig, store: ArtifactStore) -> Op
     )
 
 
+# Projected into every pod by OpenShift alongside the service-account
+# token. Signs in-cluster Service serving certificates, which is a
+# different root from the one signing Routes - see _install_internal_ca.
+_SERVICE_CA_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt"
+
+
 def _install_internal_ca() -> None:
     """Trusts the platform's internal root CA for the acceptance gate.
 
@@ -1717,16 +1723,38 @@ def _install_internal_ca() -> None:
     image's site-packages are not writable by the pod's random UID, and
     appending in place would also double the CA on a retry.
 
-    A missing CA is not fatal here - it is left to the gate to fail
+    TWO different authorities are needed, and conflating them cost a run.
+    ZUNO_INTERNAL_CA_PEM signs the platform's ROUTES. In-cluster Services
+    that carry an OpenShift serving certificate - the Model Registry at
+    zuno.rhoai-model-registries.svc:8443 among them - are signed by
+    openshift-service-serving-signer instead, an entirely separate root
+    that ships in every pod at _SERVICE_CA_PATH. Trusting only the first
+    fails against the second with the same CERTIFICATE_VERIFY_FAILED, so
+    the error says nothing about which one is missing.
+
+    A missing CA is not fatal here - it is left to the caller to fail
     loudly and legibly on its own HTTPS calls rather than pre-empting it
     with a less informative error.
     """
+    pems = []
     pem = os.environ.get("ZUNO_INTERNAL_CA_PEM", "").strip()
-    if not pem:
+    if pem:
+        pems.append(pem)
+    else:
         logger.warning(
-            "no ZUNO_INTERNAL_CA_PEM in the environment - every HTTPS scenario "
+            "no ZUNO_INTERNAL_CA_PEM in the environment - every HTTPS call "
             "against a platform Route will fail certificate verification"
         )
+    service_ca = Path(_SERVICE_CA_PATH)
+    if service_ca.is_file():
+        pems.append(service_ca.read_text().strip())
+    else:
+        logger.warning(
+            "no service CA at %s - HTTPS calls to in-cluster Services with an "
+            "OpenShift serving certificate will fail certificate verification",
+            _SERVICE_CA_PATH,
+        )
+    if not pems:
         return
     try:
         import certifi
@@ -1735,13 +1763,13 @@ def _install_internal_ca() -> None:
         return
 
     bundle = Path("/tmp/zuno-ca-bundle.pem")
-    bundle.write_text(Path(certifi.where()).read_text() + "\n" + pem + "\n")
+    bundle.write_text(Path(certifi.where()).read_text() + "\n" + "\n".join(pems) + "\n")
     # requests reads REQUESTS_CA_BUNDLE, httpx reads SSL_CERT_FILE via
     # ssl.create_default_context, and the subprocess the gate runs in
     # inherits both through os.environ.
     for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
         os.environ[var] = str(bundle)
-    logger.info("internal root CA appended to the trust store at %s", bundle)
+    logger.info("%d internal CA(s) appended to the trust store at %s", len(pems), bundle)
 
 
 def _score_tool_calling_conformance(config: MlopsConfig, store: ArtifactStore) -> Optional[Dict[str, Any]]:

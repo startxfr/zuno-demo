@@ -869,7 +869,32 @@ def test_every_stage_that_talks_https_installs_the_internal_ca():
         assert "_install_internal_ca()" in src[start:end], f"{stage} does not install the internal CA"
 
 
+def test_the_trust_store_carries_both_the_route_ca_and_the_service_ca():
+    # These are two different roots. ZUNO_INTERNAL_CA_PEM signs Routes;
+    # in-cluster Services with an OpenShift serving certificate - the
+    # Model Registry among them - are signed by
+    # openshift-service-serving-signer. Trusting only the first fails
+    # against the second with an identical, uninformative
+    # CERTIFICATE_VERIFY_FAILED. That cost a full pipeline run.
+    with tempfile.TemporaryDirectory() as tmp:
+        svc = pathlib.Path(tmp) / "service-ca.crt"
+        svc.write_text("-----BEGIN CERTIFICATE-----\nSERVICECA\n-----END CERTIFICATE-----")
+        env = {"ZUNO_INTERNAL_CA_PEM": "-----BEGIN CERTIFICATE-----\nROUTECA\n-----END CERTIFICATE-----"}
+        with mock.patch.dict(os.environ, env, clear=False), \
+             mock.patch.object(mlops, "_SERVICE_CA_PATH", str(svc)):
+            mlops._install_internal_ca()
+            bundle = pathlib.Path(os.environ["REQUESTS_CA_BUNDLE"]).read_text()
+            # Asserted inside the patch: mock.patch.dict restores the
+            # environment on exit, so a check placed after the block
+            # would read the pre-call environment and pass vacuously.
+            for var in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
+                assert os.environ[var].endswith("zuno-ca-bundle.pem"), var
+    assert "ROUTECA" in bundle, "route CA missing from the trust store"
+    assert "SERVICECA" in bundle, "service CA missing from the trust store"
+
+
 TESTS = [
+    test_the_trust_store_carries_both_the_route_ca_and_the_service_ca,
     test_every_stage_that_talks_https_installs_the_internal_ca,
     # WP-087 / ADR-0526
     test_cublas_workspace_is_configured_at_import_time,
