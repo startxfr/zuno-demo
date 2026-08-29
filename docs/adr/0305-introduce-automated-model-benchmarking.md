@@ -1,6 +1,6 @@
 # ADR-0305: Introduce automated model benchmarking
 
-- **Status:** Partially implemented (benchmark harness, objectives and reporting merged; live loop pending)
+- **Status:** Implemented (2026-08-29) - see `evaluations/benchmark.py`. One real candidate benchmarked: `comage-lora` v6 (WP-087/ADR-0526, run `wesh-20260829-145123`), artifact written to `evaluations/benchmarks/comage-lora-wesh-20260829-145123.json` (`overall: PASS`, reusing that run's already-real, already-live-verified gate results rather than re-executing the live acceptance gate a second time).
 - **Target:** v0.3
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team

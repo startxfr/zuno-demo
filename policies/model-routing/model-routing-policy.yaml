@@ -224,9 +224,24 @@ preferences:
 # latency_target_ms_p95: maximum acceptable P95 latency in milliseconds
 #   (matches components/ai-gateway/app/telemetry.py's own zuno.latency_ms
 #   span attribute).
-objectives: []
-# - agent: comage
-#   task: check-deal-status
-#   quality_floor: 0.75
-#   cost_ceiling_usd_per_1k: 0.01
-#   latency_target_ms_p95: 2000
+#
+# cost_ceiling_usd_per_1k/latency_target_ms_p95 are deliberately omitted
+# below: this repo's OTel Collector has no queryable long-term metrics
+# store wired in (evaluations/routing_report.py's own D13 note), so there
+# is no live PromQL result to source a real ceiling/target from - setting
+# one anyway would be an invented number, not an objective. quality_floor
+# alone is sourced from evaluations/comage/gate_config.yaml's own
+# scenario_threshold, so it is comparable rather than arbitrary.
+objectives:
+  - agent: comage
+    task: compare-historical-deals
+    quality_floor: 0.75
+  - agent: comage
+    task: check-deal-status
+    quality_floor: 0.75
+  - agent: comage
+    task: update-opportunity-status
+    quality_floor: 0.75
+  - agent: comage
+    task: check-my-drive-and-mail
+    quality_floor: 0.75

@@ -1,7 +1,13 @@
 # WP-40: Automated benchmarking and routing optimization (promotes ADR-0305 + ADR-0304)
 
-- **State:** Operator pending (2026-08-15 - repo work merged); live benchmark+report loop
-  pending. Step 0 promoted both ADR-0305 and ADR-0304 verbatim.
+- **State:** Done (2026-08-29) - the live benchmark+report loop ran: `comage-lora` v6
+  (WP-087/ADR-0526) benchmarked (artifact `overall: PASS`, reusing that run's real
+  gate results rather than re-executing the live acceptance gate a second time),
+  4 objectives declared for comage's tasks, `routing_report.py` run and its 4
+  `upgrade` recommendations reviewed and rejected as already-applied (`comage-lora`
+  already routes first via `preferences:`, a mechanism `routing_report.py`'s
+  `adapters:`-only incumbent lookup does not model - documented simplification,
+  not a defect). Step 0 promoted both ADR-0305 and ADR-0304 verbatim.
   **Part A** (`evaluations/benchmark.py`): orchestrates an LM-Eval results
   read (`--lm-eval-results-file`, the primary/testable path - a local
   JSON snapshot shaped like an `LMEvalJob.status.results` field; the

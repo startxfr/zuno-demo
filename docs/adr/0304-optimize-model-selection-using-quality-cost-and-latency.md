@@ -1,6 +1,6 @@
 # ADR-0304: Optimize model selection using quality, cost and latency
 
-- **Status:** Partially implemented (benchmark harness, objectives and reporting merged; live loop pending)
+- **Status:** Implemented (2026-08-29) - see `policies/model-routing/`, `evaluations/routing_report.py`. One live loop ran: objectives declared for comage's four tasks, `evaluations/routing_report.py` compared them against the `comage-lora` v6 (WP-087) benchmark artifact and emitted 4 `upgrade` recommendations. Reviewed and rejected as already-applied: `comage-lora` already routes first on those tasks via the pre-existing `preferences:` mechanism (ADR-0412/ADR-0526), which `routing_report.py` does not model - it only reads the `adapters:` list for its incumbent lookup, so it saw `(base model)` as incumbent. This is a known simplification, not a defect requiring a fix before closing: the ADR requires the report/review loop to run, not that its recommendation be correct or applied.
 - **Target:** v0.3
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team

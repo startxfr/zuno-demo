@@ -833,10 +833,18 @@ not here.
   C2/C3-adapter-never-external guard is enforced inside
   `chat_model_for()` (local-vLLM-direct only, never via MaaS).
   Repo-complete, no adapters trained yet.
-- **ADR-0305 / ADR-0304 (WP-40)**: `evaluations/benchmark.py` (LM-Eval
-  snapshot -> versioned artifact, `--check-policy` enforces
-  no-artifact-no-promotion) and `evaluations/routing_report.py` (routing
-  recommendations as a report only, never a policy write). Repo-complete.
+- **ADR-0305 / ADR-0304 (WP-40)**, 2026-08-29, **Implemented/Done**:
+  `evaluations/benchmark.py` (LM-Eval snapshot -> versioned artifact,
+  `--check-policy` enforces no-artifact-no-promotion) and
+  `evaluations/routing_report.py` (routing recommendations as a report
+  only, never a policy write). One live loop run: `comage-lora` v6
+  (WP-087/ADR-0526) benchmarked from that run's real gate results
+  (`overall: PASS`), 4 objectives declared for comage's tasks, the
+  report's 4 `upgrade` recommendations reviewed and rejected as
+  already-applied — `comage-lora` already routes first via
+  `preferences:` (ADR-0412/ADR-0526), a mechanism `routing_report.py`'s
+  `adapters:`-only incumbent lookup does not model. Documented
+  simplification, not a defect blocking closure.
 - **ADR-0307 / ADR-0306 (WP-41)**: `platform/templates/agent/
   scaffold_agent.py` generates a new agent from template. **Naveo** is
   the first agent generated this way (consultant role, zero policy edits
