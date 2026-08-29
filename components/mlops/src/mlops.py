@@ -1939,6 +1939,13 @@ def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
     if train_manifest is None:
         raise SystemExit(f"no train_manifest.json for {config.agent}/{config.run_id}")
 
+    # The Model Registry is served over HTTPS by the cluster's own CA, which
+    # certifi does not know. evaluate has folded that CA into the trust store
+    # since 2026-08-28; this stage needed it too and nobody could see that,
+    # because no run had ever passed the gate and reached this line. The
+    # first one that did failed on CERTIFICATE_VERIFY_FAILED.
+    _install_internal_ca()
+
     base_url = _model_registry_base_url(config)
     model_name = config.registered_model_name or f"{config.agent}-lora"
     version_name = config.run_id

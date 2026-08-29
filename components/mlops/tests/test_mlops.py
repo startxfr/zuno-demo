@@ -856,7 +856,21 @@ def test_the_sequence_cap_leaves_room_for_a_tool_row():
     assert "max_length = 256 if config.cpu_safe else 1536" in src, "sequence cap changed - re-measure the corpus"
 
 
+def test_every_stage_that_talks_https_installs_the_internal_ca():
+    # push-registry reaches the Model Registry over HTTPS signed by the
+    # cluster's own CA. It was missing this call and nothing could see it:
+    # no run had ever passed the gate, so no run had ever reached the
+    # line. The first that did died on CERTIFICATE_VERIFY_FAILED, after
+    # a full train and a 18.8GB merge.
+    src = (pathlib.Path(__file__).resolve().parent.parent / "src" / "mlops.py").read_text()
+    for stage in ("def stage_evaluate", "def stage_push_registry"):
+        start = src.index(stage)
+        end = min((src.index(n, start + 1) for n in ("\ndef stage_", "\ndef main(") if n in src[start + 1:]), default=len(src))
+        assert "_install_internal_ca()" in src[start:end], f"{stage} does not install the internal CA"
+
+
 TESTS = [
+    test_every_stage_that_talks_https_installs_the_internal_ca,
     # WP-087 / ADR-0526
     test_cublas_workspace_is_configured_at_import_time,
     test_deterministic_training_pins_every_source_of_run_to_run_drift,
