@@ -1946,6 +1946,45 @@ def _registry_session(config: MlopsConfig) -> "requests.Session":
     return session
 
 
+def _registry_upsert(session, *, create_url: str, payload: Dict[str, Any], lookup_url: str, what: str) -> Dict[str, Any]:
+    """POSTs, and on 409 returns the object that already exists.
+
+    push-registry is re-entered far more often than its first draft
+    assumed: a KFP resume re-runs the whole stage, and every one of its
+    three creations returns 409 the second time. Without this, a run that
+    failed on the SECOND call could never succeed, because the retry died
+    on the first - which is exactly what happened on 2026-08-29, three
+    times over.
+
+    Idempotence here is honest rather than convenient: the registry is a
+    record of what was trained, and a resumed run refers to the same
+    artifact, not a new one.
+
+    Both lookup shapes are handled - the singular endpoints return the
+    object, the plural ones return {"items": [...]} - so callers pass
+    whichever exists for their resource.
+    """
+    resp = session.post(create_url, json=payload, timeout=30)
+    if resp.status_code != 409:
+        resp.raise_for_status()
+        return resp.json()
+
+    found = session.get(lookup_url, timeout=30)
+    found.raise_for_status()
+    body = found.json()
+    obj = body if isinstance(body, dict) and "id" in body else None
+    if obj is None:
+        items = (body or {}).get("items") or []
+        obj = next((i for i in items if i.get("name") == payload.get("name")), None)
+    if obj is None:
+        raise SystemExit(
+            f"push-registry: the registry rejected {what} {payload.get('name')!r} as a "
+            f"conflict but does not return it from {lookup_url} - refusing to guess"
+        )
+    logger.info("push-registry: %s %r already existed, reusing id %s", what, payload.get("name"), obj["id"])
+    return obj
+
+
 def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
     """ADR-0302 point 6/7: registers a PASSING adapter in the OpenShift AI
     Model Registry. Never touches gitops/charts/models/values.yaml -
@@ -1989,17 +2028,19 @@ def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
     else:
         artifact_uri = f"s3://{config.s3_bucket}/{train_manifest['adapter_s3_prefix']}"
 
-    registered_model = session.post(
-        f"{base_url}/api/model_registry/v1alpha3/registered_models",
-        json={"name": model_name, "description": f"LoRA adapter for {config.agent} (ADR-0301/WP-34)"},
-        timeout=30,
-    )
-    registered_model.raise_for_status()
-    registered_model_id = registered_model.json()["id"]
+    api = f"{base_url}/api/model_registry/v1alpha3"
+    registered_model_id = _registry_upsert(
+        session,
+        create_url=f"{api}/registered_models",
+        payload={"name": model_name, "description": f"LoRA adapter for {config.agent} (ADR-0301/WP-34)"},
+        lookup_url=f"{api}/registered_model?name={model_name}",
+        what="registered model",
+    )["id"]
 
-    model_version = session.post(
-        f"{base_url}/api/model_registry/v1alpha3/registered_models/{registered_model_id}/versions",
-        json={
+    model_version_id = _registry_upsert(
+        session,
+        create_url=f"{api}/registered_models/{registered_model_id}/versions",
+        payload={
             "name": version_name,
             # Required IN THE BODY even though the path already carries it.
             # Omitting it returns 422 "required field 'registeredModelId' is
@@ -2011,17 +2052,17 @@ def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
                 "base_model": {"string_value": train_manifest["base_model"], "metadataType": "MetadataStringValue"},
             },
         },
-        timeout=30,
-    )
-    model_version.raise_for_status()
-    model_version_id = model_version.json()["id"]
+        lookup_url=f"{api}/model_version?name={version_name}&parentResourceId={registered_model_id}",
+        what="model version",
+    )["id"]
 
-    model_artifact = session.post(
-        f"{base_url}/api/model_registry/v1alpha3/model_versions/{model_version_id}/artifacts",
-        json={"name": f"{model_name}-{version_name}-artifact", "uri": artifact_uri, "artifactType": "model-artifact"},
-        timeout=30,
+    _registry_upsert(
+        session,
+        create_url=f"{api}/model_versions/{model_version_id}/artifacts",
+        payload={"name": f"{model_name}-{version_name}-artifact", "uri": artifact_uri, "artifactType": "model-artifact"},
+        lookup_url=f"{api}/model_versions/{model_version_id}/artifacts",
+        what="model artifact",
     )
-    model_artifact.raise_for_status()
 
     registration = {
         "agent": config.agent,

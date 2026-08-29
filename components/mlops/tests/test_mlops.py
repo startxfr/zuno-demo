@@ -901,12 +901,93 @@ def test_the_model_version_post_carries_its_registered_model_id():
     # field and 422 without.
     src = (pathlib.Path(__file__).resolve().parent.parent / "src" / "mlops.py").read_text()
     start = src.index("/registered_models/{registered_model_id}/versions")
-    end = src.index("raise_for_status", start)
+    end = src.index('what="model version"', start)
     assert '"registeredModelId": str(registered_model_id)' in src[start:end], \
         "the model-version POST no longer sends registeredModelId in its body"
 
 
+class _FakeResponse:
+    def __init__(self, status, body=None):
+        self.status_code = status
+        self._body = body or {}
+
+    def json(self):
+        return self._body
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise AssertionError(f"raise_for_status called on {self.status_code}")
+
+
+def test_registry_upsert_reuses_what_already_exists_on_409():
+    # A KFP resume re-runs the whole stage, and all three registry
+    # creations return 409 the second time. Without this, a run that
+    # failed on the second call could never succeed: the retry died on
+    # the first. That happened three times on 2026-08-29.
+    class _S:
+        def __init__(self):
+            self.posted = []
+
+        def post(self, url, json=None, timeout=None):
+            self.posted.append(url)
+            return _FakeResponse(409)
+
+        def get(self, url, timeout=None):
+            return _FakeResponse(200, {"id": "7", "name": "comage-lora"})
+
+    obj = mlops._registry_upsert(
+        _S(), create_url="c", payload={"name": "comage-lora"}, lookup_url="l", what="registered model"
+    )
+    assert obj["id"] == "7", obj
+
+
+def test_registry_upsert_handles_the_plural_items_lookup_shape():
+    class _S:
+        def post(self, url, json=None, timeout=None):
+            return _FakeResponse(409)
+
+        def get(self, url, timeout=None):
+            return _FakeResponse(200, {"items": [{"id": "1", "name": "other"}, {"id": "2", "name": "wanted"}]})
+
+    obj = mlops._registry_upsert(_S(), create_url="c", payload={"name": "wanted"}, lookup_url="l", what="model artifact")
+    assert obj["id"] == "2", obj
+
+
+def test_registry_upsert_refuses_to_guess_when_the_conflict_is_not_found():
+    # A 409 whose object the registry will not return is a real
+    # inconsistency; inventing an id here would write a registration.json
+    # pointing at nothing.
+    class _S:
+        def post(self, url, json=None, timeout=None):
+            return _FakeResponse(409)
+
+        def get(self, url, timeout=None):
+            return _FakeResponse(200, {"items": []})
+
+    try:
+        mlops._registry_upsert(_S(), create_url="c", payload={"name": "ghost"}, lookup_url="l", what="model version")
+    except SystemExit as exc:
+        assert "refusing to guess" in str(exc), exc
+    else:
+        raise AssertionError("a 409 with no recoverable object did not fail the stage")
+
+
+def test_registry_upsert_returns_the_created_object_when_there_is_no_conflict():
+    class _S:
+        def post(self, url, json=None, timeout=None):
+            return _FakeResponse(201, {"id": "9", "name": "fresh"})
+
+        def get(self, url, timeout=None):
+            raise AssertionError("lookup must not run when the POST succeeded")
+
+    assert mlops._registry_upsert(_S(), create_url="c", payload={"name": "fresh"}, lookup_url="l", what="x")["id"] == "9"
+
+
 TESTS = [
+    test_registry_upsert_reuses_what_already_exists_on_409,
+    test_registry_upsert_handles_the_plural_items_lookup_shape,
+    test_registry_upsert_refuses_to_guess_when_the_conflict_is_not_found,
+    test_registry_upsert_returns_the_created_object_when_there_is_no_conflict,
     test_the_model_version_post_carries_its_registered_model_id,
     test_the_trust_store_carries_both_the_route_ca_and_the_service_ca,
     test_every_stage_that_talks_https_installs_the_internal_ca,
