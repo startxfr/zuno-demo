@@ -893,7 +893,21 @@ def test_the_trust_store_carries_both_the_route_ca_and_the_service_ca():
     assert "SERVICECA" in bundle, "service CA missing from the trust store"
 
 
+def test_the_model_version_post_carries_its_registered_model_id():
+    # The Model Registry requires registeredModelId in the BODY even
+    # though the URL path already names it; without it the call returns
+    # 422 "required field 'registeredModelId' is zero value". Verified
+    # against the live API on 2026-08-29 - the same POST is 201 with the
+    # field and 422 without.
+    src = (pathlib.Path(__file__).resolve().parent.parent / "src" / "mlops.py").read_text()
+    start = src.index("/registered_models/{registered_model_id}/versions")
+    end = src.index("raise_for_status", start)
+    assert '"registeredModelId": str(registered_model_id)' in src[start:end], \
+        "the model-version POST no longer sends registeredModelId in its body"
+
+
 TESTS = [
+    test_the_model_version_post_carries_its_registered_model_id,
     test_the_trust_store_carries_both_the_route_ca_and_the_service_ca,
     test_every_stage_that_talks_https_installs_the_internal_ca,
     # WP-087 / ADR-0526

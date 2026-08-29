@@ -2001,6 +2001,10 @@ def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
         f"{base_url}/api/model_registry/v1alpha3/registered_models/{registered_model_id}/versions",
         json={
             "name": version_name,
+            # Required IN THE BODY even though the path already carries it.
+            # Omitting it returns 422 "required field 'registeredModelId' is
+            # zero value" - the API does not derive it from the URL.
+            "registeredModelId": str(registered_model_id),
             "description": f"base_model={train_manifest['base_model']} lora_r={train_manifest['lora_r']}",
             "customProperties": {
                 "classification": {"string_value": train_manifest["classification"], "metadataType": "MetadataStringValue"},
