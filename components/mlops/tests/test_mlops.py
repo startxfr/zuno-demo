@@ -831,11 +831,38 @@ def test_the_seed_reaches_training_arguments_explicitly():
     assert _config().seed == 42
 
 
+def test_a_fully_masked_example_fails_the_run_instead_of_training_on_nothing():
+    # prompt_len == len(input_ids): every label is -100. The example costs
+    # a forward and a backward and teaches nothing, and before this guard
+    # that was completely silent - 42 of WP-087's 56 tool rows were in
+    # this state against a 1024-token cap.
+    ok = [{"input_ids": [1, 2, 3, 4], "prompt_len": 2}]
+    mlops._assert_no_fully_masked(ok, 1536)
+
+    bad = ok + [{"input_ids": [1, 2, 3], "prompt_len": 3}]
+    try:
+        mlops._assert_no_fully_masked(bad, 1536)
+    except SystemExit as exc:
+        assert "fully masked" in str(exc), exc
+        assert "1536" in str(exc), exc
+    else:
+        raise AssertionError("a fully-masked example did not fail the run")
+
+
+def test_the_sequence_cap_leaves_room_for_a_tool_row():
+    # Measured on the real tokenizer: tool rows reach 1179 tokens, their
+    # prompts 1097. A cap at or below that silently masks them out.
+    src = (pathlib.Path(__file__).resolve().parent.parent / "src" / "mlops.py").read_text()
+    assert "max_length = 256 if config.cpu_safe else 1536" in src, "sequence cap changed - re-measure the corpus"
+
+
 TESTS = [
     # WP-087 / ADR-0526
     test_cublas_workspace_is_configured_at_import_time,
     test_deterministic_training_pins_every_source_of_run_to_run_drift,
     test_the_rng_is_seeded_before_anything_can_consume_randomness,
+    test_a_fully_masked_example_fails_the_run_instead_of_training_on_nothing,
+    test_the_sequence_cap_leaves_room_for_a_tool_row,
     test_determinism_can_be_disabled_but_only_explicitly,
     test_the_seed_reaches_training_arguments_explicitly,
     test_parse_tool_calls_reads_the_qwen_XML_block_not_json,

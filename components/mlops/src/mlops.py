@@ -154,6 +154,29 @@ def _enable_deterministic_training(torch, config: "MlopsConfig") -> None:
     logger.info("deterministic training enabled (seed %d)", config.seed)
 
 
+def _assert_no_fully_masked(tokenized, max_length: int) -> None:
+    """Fails a run whose examples carry no trainable target token.
+
+    _make_collator masks the first prompt_len labels to -100. When the
+    prompt alone reaches max_length, _encode clamps prompt_len to the full
+    length and EVERY label is masked: the example costs a forward and a
+    backward pass and teaches nothing.
+
+    This is not hypothetical. WP-087's tool-calling rows render to
+    824-1179 tokens against a 1024 cap, and 42 of 56 landed in exactly
+    this state - no error, no warning, a run that would have completed and
+    a corpus that trained nothing. Loud beats silent: a wrong cap should
+    cost one failed stage, not a whole misattributed experiment.
+    """
+    offenders = [i for i, ex in enumerate(tokenized) if ex["prompt_len"] >= len(ex["input_ids"])]
+    if offenders:
+        raise SystemExit(
+            f"{len(offenders)} of {len(tokenized)} examples are fully masked - their prompt "
+            f"reaches max_length ({max_length}), so every label is -100 and they contribute no "
+            f"loss (first offenders: {offenders[:5]}). Raise max_length or shorten the prompts."
+        )
+
+
 def _escalate(current: str, candidate: str) -> str:
     if _CLASSIFICATION_ORDER.get(candidate, 1) > _CLASSIFICATION_ORDER.get(current, 1):
         return candidate
@@ -1102,9 +1125,22 @@ def _run_lora_training(
             "prompt_len": min(prompt_len, len(full["input_ids"])),
         }
 
-    max_length = 256 if config.cpu_safe else 1024
+    # 1536, not 1024, because a row carrying tool schemas is an order of
+    # magnitude longer than a bare style exchange. Measured on the real
+    # tokenizer over the WP-087 corpus:
+    #
+    #   plain rows  33-86 tokens      (median 64)
+    #   tool rows   824-1179 tokens   (median 1122) - prompt alone 781-1097
+    #
+    # At 1024 the PROMPT of 42 of the 56 tool rows overflowed the cap, so
+    # prompt_len clamped to the full length, every label became -100, and
+    # those examples contributed exactly zero loss. Silently: no error, a
+    # green run, and a corpus that trained nothing.
+    max_length = 256 if config.cpu_safe else 1536
     dataset = Dataset.from_list([dict(ex) for ex in examples])
     tokenized = dataset.map(_encode, remove_columns=list(dataset.column_names))
+
+    _assert_no_fully_masked(tokenized, max_length)
 
     args = TrainingArguments(
         output_dir=str(output_dir / "checkpoints"),
@@ -1122,7 +1158,19 @@ def _run_lora_training(
         # the approach having failed.
         num_train_epochs=2,
         max_steps=5 if config.cpu_safe else -1,
-        per_device_train_batch_size=1 if config.cpu_safe else 8,
+        # Effective batch stays 8 - 2 x 4 - so the optimizer sees what it
+        # saw before the corpus grew tool rows. The split is forced: the
+        # collator pads to the longest row in the batch, so ONE 1179-token
+        # tool example turns an 8-row batch from ~690 padded tokens into
+        # ~9400, and Qwen3.5's chunked gated-delta attention then OOMed a
+        # 95GB GPU on step 1 of 222 (94.89GB in use, allocating 104MB).
+        per_device_train_batch_size=1 if config.cpu_safe else 2,
+        gradient_accumulation_steps=1 if config.cpu_safe else 4,
+        # Recompute activations instead of holding them. Mathematically a
+        # no-op on the gradients, which is why it is preferred here over
+        # shrinking the effective batch: it buys the memory back without
+        # changing what is optimised.
+        gradient_checkpointing=not config.cpu_safe,
         learning_rate=2e-4,
         logging_steps=1,
         save_strategy="no",
@@ -1130,6 +1178,13 @@ def _run_lora_training(
         report_to=[],
         use_cpu=config.cpu_safe or not torch.cuda.is_available(),
     )
+    # With a frozen base and only LoRA adapters trainable, the checkpointed
+    # segments have no input requiring grad, so autograd records nothing and
+    # every gradient arrives as None. enable_input_require_grads() is the
+    # documented fix and is a no-op when checkpointing is off.
+    if args.gradient_checkpointing:
+        model.enable_input_require_grads()
+
     trainer = Trainer(
         model=model,
         args=args,
