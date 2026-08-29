@@ -1,6 +1,8 @@
 # ADR-0419: Split model preference into preferred/fallback, with prompt-slot overrides
 
-- **Status:** Proposed
+- **Status:** Implemented (Status corrected 2026-08-30/ADR-0531 - the schema, generator fixes
+  and both concrete cases below landed across commits `57cef106`, `97469435`, `3f2f930b`,
+  `b2522e22`, `ed7e598e`; this field was simply never flipped from `Proposed`)
 - **Target:** v0.4
 - **Date:** 2026-08-20
 - **Decision owners:** Zuno Demo architecture team

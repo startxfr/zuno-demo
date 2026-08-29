@@ -218,11 +218,14 @@ providers:
     eligible_for: [C1, C2, C3]
 
   # ADR-0526 decision 2: the UNMODIFIED Qwen3.5-9B base (ADR-0518
-  # decision 3's training base), served on the other MIG node. No agent
-  # prefers it; it exists so the variant has a same-base comparison
-  # point, and it is a natural direct fallback wherever the variant is
-  # named. Its 24GB slice is the tight case - see gitops/charts/models
-  # for the reduced --max-model-len that makes 19.3GB of bf16 weights fit.
+  # decision 3's training base), served on the other MIG node - originally
+  # so the variant has a same-base comparison point, and a natural direct
+  # fallback wherever the variant is named. ADR-0531 promotes it to the
+  # fleet-wide default candidate (policies/model-routing/
+  # model-routing-policy.yaml's `preferences:` now names it explicitly for
+  # every agent), so it is no longer merely an unlisted comparison point.
+  # Its 24GB slice is the tight case - see gitops/charts/models for the
+  # reduced --max-model-len that makes 19.3GB of bf16 weights fit.
   - name: local-qwen35-maas
     kind: local
     model: qwen3.5-9b

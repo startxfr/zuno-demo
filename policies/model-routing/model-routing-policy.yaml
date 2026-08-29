@@ -50,6 +50,19 @@ adapters: []
 # in the per-row comments; simple lookup/listing/transactional tasks are
 # deliberately absent (qwen stays their first candidate).
 #
+# ADR-0531: qwen3.5-9b(-maas) (ADR-0526/WP-087's training base, live per
+# WP-092) is now the fleet-wide default candidate - every (agent, task)
+# below is explicit, no more implicit provider-routing.yaml file-order
+# default. Reasoning-heavy/reflexional entries (Tekos's
+# answer-technical-question, Comage's compare-historical-deals, both of
+# Arkos's document-workflow tasks) keep gpt-oss-20b's existing rank ahead
+# of qwen3.5-9b - this decision does not touch that doctrine, only extends
+# who gets ovhcloud-gpt-oss-120b ahead of it (see those entries' own
+# comments). Tekos/Comage additionally pair qwen3.5-9b with its own
+# fine-tune (Tekos: qwen3.5-9b primary / qwen3.5-9b-wesh fallback; Comage:
+# the reverse) since Comage is the fine-tune's own target agent (ADR-0526
+# decision 1).
+#
 # ADR-0521 (WP-076): every entry naming `local-gpt-oss` lists
 # `local-gpt-oss-maas` immediately before it, and every entry naming
 # `local` lists `local-maas` immediately before it - NOT optional styling.
@@ -64,34 +77,35 @@ adapters: []
 # regardless of this ordering: app/main.py skips via_maas candidates when
 # an adapter declaration resolved (adapter ids can't traverse MaaS auth).
 preferences:
-  # Multi-doc synthesis with citations (tekos's primary task).
-  # ADR-0419: local models still lead (unchanged doctrine - reasoning-heavy
-  # answer-technical-question keeps gpt-oss first per this file's own
-  # header comment, the two simple lookup tasks below keep qwen first,
-  # same as their pre-existing implicit default), then OVHcloud ahead of
+  # Multi-doc synthesis with citations (tekos's primary task, reflexional).
+  # ADR-0419: reasoning-heavy answer-technical-question keeps gpt-oss first
+  # per this file's own header comment, then OVHcloud ahead of
   # openai/gemini/anthropic (their own relative order unchanged), then
   # mistral. mistral-codestral is deliberately left unlisted - a
   # code-specialized model has no place being preferred for general Q&A/
   # lookup, but stays reachable at the very end rather than excluded.
   #
-  # ADR-0526 (WP-087) decision 7: the qwen3.5-9b-wesh pair is inserted in
-  # SECOND position on all four Tekos tasks - after each task's own
-  # existing first choice, never displacing it. Every other candidate
-  # keeps its existing relative order, so this is purely additive to the
-  # chains below. Tekos is C1-seeded and the variant is C1-eligible like
-  # every local provider, so it is reachable at Tekos's natural
-  # classification with no override.
+  # ADR-0531: qwen3.5-9b(-maas) is inserted right after gpt-oss (the
+  # reasoning doctrine's own leader is unchanged), ahead of the
+  # qwen3.5-9b-wesh pair Tekos already carried second (ADR-0526/WP-087
+  # decision 7) - Tekos's own default is the base model, wesh is its
+  # fallback, both still trailing OVH/gpt-oss on this specific reflexional
+  # task.
   - agent: tekos
     task: answer-technical-question
-    preferred: [local-gpt-oss-maas, local-gpt-oss, local-wesh-maas, local-wesh, local-maas, local, ovhcloud-gpt-oss-120b]
+    preferred: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-qwen35-maas, local-qwen35, local-wesh-maas, local-wesh, local-maas, local]
     fallback: [openai, gemini, anthropic, mistral]
+  # Simple lookup/listing tasks - no reflexional override, so ADR-0531's
+  # fleet default applies directly: qwen3.5-9b primary, qwen3.5-9b-wesh
+  # fallback (Tekos's own pairing, ADR-0526 decision 7's insertion kept
+  # right behind it), everything else unchanged further down the chain.
   - agent: tekos
     task: find-relevant-docs
-    preferred: [local-maas, local, local-wesh-maas, local-wesh, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
+    preferred: [local-qwen35-maas, local-qwen35, local-wesh-maas, local-wesh, local-maas, local, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
     fallback: [openai, gemini, anthropic, mistral]
   - agent: tekos
     task: check-my-drive-docs
-    preferred: [local-maas, local, local-wesh-maas, local-wesh, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
+    preferred: [local-qwen35-maas, local-qwen35, local-wesh-maas, local-wesh, local-maas, local, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
     fallback: [openai, gemini, anthropic, mistral]
   # Plan->draft->reflect->write document workflow; C3 by agent seed - the
   # flagship local-only reflexional case. draft_node's own call is always
@@ -116,57 +130,77 @@ preferences:
   # without `task` is rejected outright (app/model_routing_policy.py's
   # own validation), so "the default for Comage" is expressible only as
   # one entry per task - there is no agent-level default to write.
-  # Everything after the variant keeps the order it had before this WP:
-  # compare-historical-deals kept gpt-oss ahead of qwen (it was already a
-  # reflexional entry); the three tasks below had no entry at all, so
-  # their tails reproduce provider-routing.yaml's own file order exactly.
   #
-  # Multi-year comparison/analysis over C3 sxa-legacy data. This is the
-  # task ADR-0526's Security considerations single out: it escalates to
-  # C3 whenever knowledge.sxa-legacy contributes (ADR-0034), so the
-  # variant answers C3 turns by default. That is legitimate for a local
-  # provider, and it is exactly why the substance half of the promotion
-  # gate stays mandatory (decision 8) - a style model that degrades
-  # reasoning on C3 financial and legacy data is a security-relevant
-  # regression, not a cosmetic one.
+  # Multi-year comparison/analysis over C3 sxa-legacy data - reflexional,
+  # same doctrine as Tekos's answer-technical-question. This is the task
+  # ADR-0526's Security considerations single out: it escalates to C3
+  # whenever knowledge.sxa-legacy contributes (ADR-0034), so the variant
+  # answers C3 turns by default. That is legitimate for a local provider,
+  # and it is exactly why the substance half of the promotion gate stays
+  # mandatory (decision 8) - a style model that degrades reasoning on C3
+  # financial and legacy data is a security-relevant regression, not a
+  # cosmetic one. ADR-0531: ovhcloud-gpt-oss-120b now leads here too (same
+  # eligibility-filtering mechanism as Arkos's reflect_node - survives at
+  # C1/C2, excluded at C3, where wesh/qwen3.5-9b naturally take over),
+  # gpt-oss-20b keeps its existing rank right behind it; qwen3.5-9b is
+  # inserted after wesh (Comage's own fine-tune stays this task's local
+  # default, unchanged from ADR-0526).
   - agent: comage
     task: compare-historical-deals
-    prefer: [local-wesh-maas, local-wesh, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+    preferred: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-wesh-maas, local-wesh, local-qwen35-maas, local-qwen35, local-maas, local]
   # Opportunity lookup by name/stage - a simple transactional read, and a
   # tool-calling turn: the variant's serving runtime must therefore keep
   # a tool-call parser configured (gitops/charts/models), or tool use
-  # breaks silently for this task.
+  # breaks silently for this task. ADR-0531: qwen3.5-9b inserted right
+  # after the wesh pair (Comage's declared default: wesh primary,
+  # qwen3.5-9b fallback), no reflexional override on this task.
   - agent: comage
     task: check-deal-status
-    prefer: [local-wesh-maas, local-wesh, local-maas, local, local-gpt-oss-maas, local-gpt-oss]
+    preferred: [local-wesh-maas, local-wesh, local-qwen35-maas, local-qwen35, local-maas, local, local-gpt-oss-maas, local-gpt-oss]
   # Opportunity stage write-back.
   - agent: comage
     task: update-opportunity-status
-    prefer: [local-wesh-maas, local-wesh, local-maas, local, local-gpt-oss-maas, local-gpt-oss]
+    preferred: [local-wesh-maas, local-wesh, local-qwen35-maas, local-qwen35, local-maas, local, local-gpt-oss-maas, local-gpt-oss]
   # Drive/mail lookup over the user's own material - also tool-calling.
   - agent: comage
     task: check-my-drive-and-mail
-    prefer: [local-wesh-maas, local-wesh, local-maas, local, local-gpt-oss-maas, local-gpt-oss]
+    preferred: [local-wesh-maas, local-wesh, local-qwen35-maas, local-qwen35, local-maas, local, local-gpt-oss-maas, local-gpt-oss]
+  # ADR-0531: Advantage/Finage's tasks are analysis/judgment work, but the
+  # user confirmed these are NOT protected reflexional overrides the way
+  # Arkos/Tekos/Comage's reflect-slot tasks are - qwen3.5-9b becomes the
+  # new lead, gpt-oss-20b is demoted to a fallback rather than removed.
   # Project/bid synthesis.
   - agent: advantage
     task: answer-project-question
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Detection + judgment over adv knowledge (PO within 3 rolling days).
   - agent: advantage
     task: identify-new-business-with-po
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Margin analysis by state/customer/technology.
   - agent: advantage
     task: monthly-sales-report
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+  # ADR-0531: no prior entry (rode provider-routing.yaml's implicit file
+  # order) - now explicit, same fleet default as this agent's other tasks.
+  - agent: advantage
+    task: check-my-drive-and-mail
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Invoice-readiness evaluation over sxa financial data (C3-intended).
   - agent: finage
     task: identify-business-ready-to-invoice
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Aggregation report over sxa financial data (C3-intended).
   - agent: finage
     task: monthly-invoice-report
-    prefer: [local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+  # ADR-0531: no prior entry - now explicit, same fleet default.
+  - agent: finage
+    task: answer-finance-question
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+  - agent: finage
+    task: check-my-drive-and-mail
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
   # Board-level strategic/financial work, C3 agent seed - forward-declared
   # (cognos is a placeholder with no runtime route yet; inert until then).
   # ADR-0416: ovhcloud-gpt-oss-120b leads the chain for turns that compute
@@ -174,10 +208,28 @@ preferences:
   # eligible_for: [C1, C2] on that provider means a turn that escalates to
   # C3 excludes it automatically (ADR-0021/0035, no extra logic needed
   # here) and falls through to local-gpt-oss (via MaaS, then direct) then
-  # local exactly as before.
+  # local exactly as before. Pre-dates and is unrelated to ADR-0531's
+  # Arkos/Tekos/Comage-scoped OVH extension (this is Cognos's own,
+  # earlier, board-level-reasoning grant). ADR-0531 inserts qwen3.5-9b
+  # right behind it, same fleet default as every other agent.
   - agent: cognos
     task: coming-soon
-    prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+    preferred: [ovhcloud-gpt-oss-120b, local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+  # ADR-0531: no prior entry - now explicit. Still inert (no runtime
+  # route), forward-declared like coming-soon above.
+  - agent: cognos
+    task: review-historical-commercial-data
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+  # ADR-0531: Naveo/Soursage are pre-live agents (see their own
+  # NEXT_STEPS.md) - these entries are pure forward-declaration, identical
+  # in spirit to cognos/coming-soon above, zero live-routing effect until
+  # either agent is actually deployed.
+  - agent: naveo
+    task: answer-onboarding-question
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+  - agent: soursage
+    task: coming-soon
+    preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
 
   # ADR-0417: coding requests. Arkos's write-code call is a scoped,
   # early-exit branch of an otherwise C3-seeded agent (evaluated at a
