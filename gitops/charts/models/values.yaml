@@ -531,15 +531,21 @@ gptOssModel:
 # process). loraAdapters above therefore stays [], and neither model sets
 # serves_adapters in platform/ai-gateway/provider-routing.yaml.
 #
-# PLACEMENT. Nothing here pins a node, and nothing should: the two
-# permanent MIG nodes advertise 2x mig-1g.24gb + 1x mig-2g.48gb each, and
-# with qwen36-27b-instruct holding the 2g.48gb on ip-10-18-15-25 and
+# PLACEMENT. Nothing here pins a node - the two permanent MIG nodes
+# advertise 2x mig-1g.24gb + 1x mig-2g.48gb each, and with
+# qwen36-27b-instruct holding the 2g.48gb on ip-10-18-15-25 and
 # gpt-oss-20b + embeddings holding two 1g.24gb slices on ip-10-18-67-65,
 # SLICE AVAILABILITY alone puts the variant on ip-10-18-67-65's free
-# 2g.48gb and the base on ip-10-18-15-25's free 1g.24gb. The soft
-# spreadAcrossGpuNodes anti-affinity is reused exactly as-is; converting
-# any term to `required` would contradict ADR-0351 decision 1 and WP-086,
-# which both chose packing onto a survivor over leaving a pod Pending.
+# 2g.48gb and the base on ip-10-18-15-25's free 1g.24gb. WP-092/ADR-0414
+# adds a second spreadAcrossGpuNodes term to each of this pair's templates
+# that names the other model directly (app.kubernetes.io/name), so the
+# separation is now an expressed preference and not just a side effect of
+# which slice happened to be free - see llminferenceservice-qwen35.yaml /
+# llminferenceservice-wesh.yaml. Both terms stay
+# preferredDuringSchedulingIgnoredDuringExecution; converting either to
+# `required` would contradict ADR-0351 decision 1 and WP-086, which both
+# chose packing onto a survivor over leaving a pod Pending, and WP-086's
+# own live finding that a soft term can still lose to scheduling order.
 #
 # QUOTA. These two consume the LAST free slices: zuno-ai-run's GPU
 # ResourceQuota goes to 3/3 on mig-1g.24gb and 2/2 on mig-2g.48gb. It does

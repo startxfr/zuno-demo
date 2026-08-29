@@ -54,11 +54,13 @@ spec:
     nodeSelector:
       nvidia.com/gpu.present: "true"
     {{- if .Values.spreadAcrossGpuNodes }}
-    # Reused EXACTLY as-is (WP-086). Node separation for this model is
-    # guaranteed by slice availability - it takes the only free
-    # mig-2g.48gb - not by this term. Do not promote it to `required`:
-    # ADR-0351 decision 1 and WP-086 both chose packing onto a survivor
-    # over leaving a pod Pending, and ADR-0526 decision 5 restates it.
+    # Generic term reused EXACTLY as-is (WP-086). Second term added
+    # WP-092/ADR-0414: node separation from qwen35-9b (its own unmodified
+    # base) used to be guaranteed only by slice availability - this model
+    # taking the only free mig-2g.48gb - not by any expressed intent. Do
+    # not promote either term to `required`: ADR-0351 decision 1 and
+    # WP-086 both chose packing onto a survivor over leaving a pod
+    # Pending, and ADR-0526 decision 5 restates it.
     affinity:
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
@@ -68,6 +70,12 @@ spec:
               labelSelector:
                 matchLabels:
                   kserve.io/component: workload
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: {{ .Values.qwen35Model.inferenceServiceName }}
     {{- end }}
     serviceAccountName: {{ .Values.weshModel.llmInferenceService.serviceAccountName }}
     containers:

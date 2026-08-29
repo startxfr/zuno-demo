@@ -25,6 +25,44 @@
 > model set (`qwen3.6-27b-instruct`, `qwen3-embedding-0.6b`,
 > `gpt-oss-20b`), so the Qwen3-32B/Qwen3-8B tiers were never built.
 
+> **Amended 2026-08-29 (WP-092): model set updated again, MIG re-profiling
+> investigated and rejected, targeted anti-affinity added.** The 2026-08-26
+> banner's model set is itself now incomplete: WP-087/ADR-0526 added two
+> more predictors, so `zuno-ai-run` runs **five**, not three -
+> `qwen3.6-27b-instruct`, `qwen3-embedding-0.6b`, `gpt-oss-20b`,
+> `qwen3.5-9b` and `qwen3.5-9b-wesh` - across the same two permanent MIG
+> nodes, `zuno-gpu-a` and `zuno-gpu-c`, confirmed live still identical:
+> `all-balanced` = 2x `mig-1g.24gb` + 1x `mig-2g.48gb` each, 6 slices for 5
+> workloads.
+>
+> A request to repartition both nodes to `2x mig-2g.48gb` (dropping the
+> `1g.24gb` slices for uniform 48GB sizing) was investigated and rejected.
+> It would drop total capacity to 4 slices for 5 running models, and the
+> only way to make up the difference - giving `zuno-gpu-burst-a` a
+> permanent MIG profile too - fails on two counts: it is a `g7e.2xlarge`
+> (8 vCPU), the same instance type this ADR's own Context already
+> documents as unable to drive a 3-slice partition, and its current
+> MIG-disabled, whole-GPU profile is what lets the ClusterAutoscaler scale
+> it from zero at all - the moment it carries a `nvidia.com/mig-*` profile
+> it must become a permanent, always-on node, which would also remove the
+> only on-demand full-GPU node this repo has for training (WP-087's
+> fine-tune ran there). `all-balanced` on `zuno-gpu-a`/`zuno-gpu-c` stays
+> unchanged.
+>
+> `qwen3.5-9b` and `qwen3.5-9b-wesh` (the base and its fine-tuned variant,
+> WP-087) previously landed on separate nodes only because each happened
+> to take the last free slice of its size (documented in
+> `gitops/charts/models/values.yaml`'s PLACEMENT comment) - an accident of
+> bin-packing, not an expressed intent. WP-092 gives each of their
+> `LLMInferenceService` templates a second `spreadAcrossGpuNodes` term
+> (`preferredDuringSchedulingIgnoredDuringExecution`, weight 100) naming
+> the other model's pod label directly, so the separation is now an
+> explicit preference. Kept soft, not `required`: ADR-0351 decision 1 and
+> WP-086 both chose packing a survivor over leaving a pod `Pending`, and
+> WP-086's own live finding is that even a term in place can lose to
+> scheduling order - see WP-092 for the verification that proves the
+> preference steers without ever blocking scheduling.
+
 ## Context
 
 `zuno-ai-run` currently runs four GPU predictors across two physical RTX PRO

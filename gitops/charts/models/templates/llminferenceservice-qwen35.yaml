@@ -57,9 +57,12 @@ spec:
     nodeSelector:
       nvidia.com/gpu.present: "true"
     {{- if .Values.spreadAcrossGpuNodes }}
-    # Soft, unchanged (WP-086 / ADR-0351 decision 1). This model lands on
-    # the other node because it takes the only free mig-1g.24gb slice
-    # there, not because of this term - see llminferenceservice-wesh.yaml.
+    # Generic term unchanged (WP-086 / ADR-0351 decision 1): soft avoidance
+    # of any other model workload. Second term added WP-092/ADR-0414: node
+    # separation from qwen35-9b-wesh specifically used to be an accident of
+    # which mig-1g.24gb/mig-2g.48gb slice was free, not an intent expressed
+    # anywhere - this makes that intent explicit. Still soft: do not
+    # promote either term to `required`, see llminferenceservice-wesh.yaml.
     affinity:
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
@@ -69,6 +72,12 @@ spec:
               labelSelector:
                 matchLabels:
                   kserve.io/component: workload
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: {{ .Values.weshModel.inferenceServiceName }}
     {{- end }}
     serviceAccountName: {{ .Values.qwen35Model.llmInferenceService.serviceAccountName }}
     containers:
