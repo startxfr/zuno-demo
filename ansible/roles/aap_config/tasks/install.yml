@@ -1212,9 +1212,18 @@
          | list | length) == 0
       no_log: true
 
-    # Order 10: every authenticated realm user may log in (viewer-level
-    # until Controller RBAC grants more) - launch-RBAC hardening beyond
-    # this is ADR-0418's scope, not WP-073's.
+    # Order 10: every authenticated realm user may log in - this map is
+    # ONLY a login gate. Discovered live 2026-08-30 (WP-103's own
+    # verification pass): `map_type: allow` grants no object-level access
+    # by itself, contrary to what this comment used to claim - an
+    # authenticated user with no `aap_*` group sees ZERO Job/Workflow
+    # Templates, gated or not. That is left as-is deliberately: extending
+    # visibility to every Keycloak persona in the realm (sales,
+    # consultants, etc.) would be a far wider surface than this WP's own
+    # scope (3 tiers for 5 named platform-operator personas). aap_ops/
+    # aap_reader are instead granted on BOTH gated and ungated templates
+    # (see wire_launch_rbac.yml) - only members of one of those two Teams,
+    # or aap_admin, can see anything at all.
     - name: "aap-config | map all authenticated users to allow"
       ansible.builtin.uri:
         url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticator_maps/"

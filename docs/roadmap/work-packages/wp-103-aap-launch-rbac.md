@@ -43,14 +43,32 @@ authenticator (`install.yml:963-1116`):
   Workflow Template, view+sync (`awx.update_project`) on the `zuno-demo`
   Project.
 - **`aap_reader`** - maps onto the `aap-reader-team` Controller Team:
-  view-only on the same gated objects. A dedicated Team was chosen over
-  relying on the pre-existing `allow-authenticated` viewer default, for
-  declared/auditable state even though the practical effect is similar.
+  view-only on the same gated objects.
 
-**Gating is differentiated, not uniform** - only the higher-risk verbs are
-restricted; `check`/`build`/plain read-mostly templates stay open to
-every authenticated user via the pre-existing `allow-authenticated` map
-(`order: 10`), unchanged.
+**Revised 2026-08-30, after live verification:** `aap_ops`/`aap_reader`
+are each ALSO granted on the UNGATED templates/Project, not just the
+gated ones. Discovered live that `allow-authenticated` (`map_type: allow`)
+grants login only - it never carried the "viewer-level" object access
+this doc and `install.yml`'s own comment originally assumed, so before
+this fix an authenticated user with no `aap_*` group saw literally
+nothing at all, not even `check`/`build`. A fourth "every authenticated
+user" Team was considered and deliberately rejected: this WP's own scope
+is 3 tiers for 5 named platform-operator personas, and granting AAP
+visibility to every Keycloak persona in the realm (sales, consultants,
+etc. - none of whom have any operational reason to see AAP) would be a
+much wider surface than requested. Net effect: `aap_ops`/`aap_reader`/
+`aap_admin` each see and can act on the FULL set of 14 Job Templates + 7
+Workflow Templates (gated + ungated); anyone outside those three groups
+sees nothing, gated or not. "Gated" therefore no longer changes what
+`aap_ops`/`aap_reader` themselves can reach (they reach everything) - it
+only still marks the boundary nobody outside those two Teams can ever
+cross.
+
+**Gating is differentiated only in the credential-tier/risk sense, not
+in visibility** - the 7 gated Job Templates (install/reconcile/
+stresstest/backup/restore/sign) remain the ones a launch-RBAC boundary
+was worth building for; `check`/`build` never needed one, per this WP's
+own original brief.
 
 ### Partition of the 14 Job Templates + 7 Workflow Templates
 
@@ -225,19 +243,18 @@ with "Invalid parameter: redirect_uri" until caught and fixed by hand.
 Never extract a client block from this file without running it through
 the same string-`replace` first (or just let the reconcile Job apply it).
 
-**Separate, unresolved finding, not fixed here:** `consultant-03` (no
-`aap_ops`/`aap_admin` group) sees **zero** Job/Workflow Templates -
+**Third finding, fixed here (revised 2026-08-30):** `consultant-03` (no
+`aap_ops`/`aap_admin` group) saw **zero** Job/Workflow Templates -
 `allow-authenticated` (`map_type: allow`) only permits login, it does not
 grant object-level view the way `install.yml`'s own comment ("viewer-level
-until Controller RBAC grants more") and `README.md` claim. That claim
-predates this WP and was, like the two bugs above, never live-verified
-before now. Practical effect on this WP's own design: the "ungated
-templates stay open to any authenticated user" premise behind the
-differentiated-gating decision does not hold today for a user with no
-`aap_*` group at all - only `aap_ops`/`aap_admin`/superuser can currently
-see anything. Left as a documented gap for a future WP (a Team/role
-grant for "every authenticated user" is the likely fix, mirroring
-`aap-reader-team` but organization-wide) rather than expanded into here.
+until Controller RBAC grants more") and `README.md` used to claim. That
+claim predated this WP and was, like the two bugs above, never
+live-verified before now. Fixed by extending `aap_ops`/`aap_reader`'s own
+grants to cover the ungated templates too, rather than adding a fourth
+"every authenticated user" Team - see the "Design" section above for why
+that broader option was rejected. A user with no `aap_*` group still sees
+nothing at all today; that is the deliberate, final design, not a
+remaining gap.
 
 ## Acceptance checks (repo-side)
 
@@ -261,19 +278,20 @@ grant for "every authenticated user" is the likely fix, mirroring
    (`failed=0`); hit one real bug along the way (`map_type: team` needs a
    `role` field, see below - not yet known to this repo before now) that
    was fixed and re-run to a clean pass; a second re-run confirmed
-   idempotent (`changed=0`).
+   idempotent (`changed=0`). A third run, after extending `aap_ops`/
+   `aap_reader` onto the ungated templates too (see "Design" above),
+   again `failed=0`/`changed=0`.
 3. Real Keycloak SSO login (full OAuth authorization-code round-trip, not
    just an API check) exercised for one persona per tier and verified via
    `GET /api/controller/v2/job_templates|workflow_job_templates|projects/`
    as that authenticated session:
-   - `consultant-03` (`aap_reader`): sees exactly the 7 gated Job
-     Templates, all `user_capabilities.start: false` - read-only,
-     confirmed, cannot launch. Sees zero ungated templates (see the
-     "allow-authenticated" finding above).
-   - `paas-dev-01` (`aap_ops`): sees the 7 gated Job Templates + 3 gated
-     Workflow Templates + the `zuno-demo` Project, all with
-     `start: true`, `edit`/`delete: false` on every object - can launch
-     and sync, cannot manage RBAC.
+   - `consultant-03` (`aap_reader`): sees all 14 Job Templates (gated +
+     ungated), every one `user_capabilities.start: false` - read-only,
+     confirmed, cannot launch anything.
+   - `paas-dev-01` (`aap_ops`): sees all 14 Job Templates + all 7
+     Workflow Templates + the `zuno-demo` Project, every one with
+     `start: true`, `edit`/`delete: false` - can launch and sync
+     anything, cannot manage RBAC.
    - `paas-ops-01` (`aap_admin`): `GET /api/gateway/v1/me/` confirms
      `is_superuser: true`.
 4. `paas-ops-01` did not lose access during the authenticator-map cutover

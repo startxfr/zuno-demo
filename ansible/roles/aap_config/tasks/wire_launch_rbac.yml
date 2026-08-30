@@ -37,6 +37,20 @@
 # Controller superuser directly via an authenticator map (see the
 # Keycloak SSO section below in install.yml), which needs no Team or
 # object-scoped role at all.
+#
+# aap-ops-team/aap-reader-team are ALSO granted on the UNGATED templates/
+# Project below, not just the gated ones - discovered live (WP-103's own
+# verification pass) that `allow-authenticated` (`map_type: allow`)
+# grants login only, never the "viewer-level" object access its own
+# comment had always claimed. Deliberately NOT extended to a fourth,
+# "every authenticated user" Team: doing so would open AAP visibility to
+# every Keycloak persona in the realm (sales, consultants, etc.), a much
+# wider surface than this WP's own scope (3 tiers for 5 named platform
+# personas) - a user outside aap_ops/aap_reader/aap_admin sees nothing at
+# all, gated or not. "Gated" therefore no longer distinguishes what
+# aap_ops/aap_reader can reach (they reach everything) - it only still
+# matters as the boundary nobody outside those two Teams (and aap_admin)
+# can ever cross.
 
 # --- resolve the zuno organization's GATEWAY-side id -------------------
 # Re-read rather than reusing _aap_config_org_lookup: that fact was
@@ -420,6 +434,58 @@
     label: "{{ item.item.name }}"
   no_log: true
 
+# --- resolve the UNGATED Job/Workflow Templates' ids (aap_ops/aap_reader
+#     are granted these too, below - see the header comment for why) -----
+# "ungated" = every entry in aap_config_job_templates/
+# aap_config_workflow_templates that carries no `gated` key at all - never
+# `gated: false` (that value is never set anywhere in defaults/main.yml).
+
+- name: "aap-config | resolve each ungated Job Template's id"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/?name={{ item.name }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_ungated_jt_lookup
+  loop: "{{ aap_config_job_templates | rejectattr('gated', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: "aap-config | build the ungated Job Template name/id list"
+  ansible.builtin.set_fact:
+    _aap_config_ungated_jt_ids: "{{ (_aap_config_ungated_jt_ids | default([])) + [{'name': item.item.name, 'id': item.json.results[0].id}] }}"
+  loop: "{{ _aap_config_ungated_jt_lookup.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  no_log: true
+
+- name: "aap-config | resolve each ungated Workflow Template's id"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/workflow_job_templates/?name={{ item.name }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_ungated_wjt_lookup
+  loop: "{{ aap_config_workflow_templates | rejectattr('gated', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: "aap-config | build the ungated Workflow Template name/id list"
+  ansible.builtin.set_fact:
+    _aap_config_ungated_wjt_ids: "{{ (_aap_config_ungated_wjt_ids | default([])) + [{'name': item.item.name, 'id': item.json.results[0].id}] }}"
+  loop: "{{ _aap_config_ungated_wjt_lookup.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  no_log: true
+
 # --- grant the role_team_assignments (assign_team_role.yml, per object) -
 # The Project's id is already resolved (_aap_config_project_lookup,
 # install.yml:377) and unambiguous - only one Project exists - no re-query
@@ -484,3 +550,53 @@
     _role_definition_id: "{{ _aap_config_reader_proj_role_id }}"
     _object_id: "{{ _aap_config_project_lookup.json.results[0].id }}"
     _label: "aap-reader-team view on the {{ aap_config_project_name | default('zuno-demo') }} Project"
+
+# --- aap-ops-team/aap-reader-team, ALSO on the ungated objects (see the
+#     header comment - `allow-authenticated` alone grants nothing, and a
+#     fourth "every authenticated user" Team was deliberately rejected as
+#     out of this WP's scope). Project needs no extra grant here - it was
+#     already granted unconditionally above, gating never applied to it.
+
+- name: "aap-config | grant aap-ops-team execute on every ungated Job Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_ops_team_id }}"
+    _role_definition_id: "{{ _aap_config_ops_jt_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-ops-team execute on Job Template {{ item.name }}"
+  loop: "{{ _aap_config_ungated_jt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "aap-config | grant aap-ops-team execute on every ungated Workflow Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_ops_team_id }}"
+    _role_definition_id: "{{ _aap_config_ops_wjt_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-ops-team execute on Workflow Template {{ item.name }}"
+  loop: "{{ _aap_config_ungated_wjt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "aap-config | grant aap-reader-team view on every ungated Job Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_reader_team_id }}"
+    _role_definition_id: "{{ _aap_config_reader_jt_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-reader-team view on Job Template {{ item.name }}"
+  loop: "{{ _aap_config_ungated_jt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "aap-config | grant aap-reader-team view on every ungated Workflow Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_reader_team_id }}"
+    _role_definition_id: "{{ _aap_config_reader_wjt_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-reader-team view on Workflow Template {{ item.name }}"
+  loop: "{{ _aap_config_ungated_wjt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"

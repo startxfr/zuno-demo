@@ -14,10 +14,15 @@ aap_config_organization: zuno
 aap_config_project_name: zuno-demo
 aap_config_inventory_name: zuno
 
-# ADR-0418/WP-103: Controller Teams driving launch-RBAC on the `gated:
-# true` templates/project below. No admin team name here - aap_admin
-# grants superuser via a Keycloak authenticator map only (no Team
-# object), see ansible/roles/aap_config/tasks/wire_launch_rbac.yml.
+# ADR-0418/WP-103: Controller Teams driving launch-RBAC. No admin team
+# name here - aap_admin grants superuser via a Keycloak authenticator map
+# only (no Team object). aap_ops/aap_reader are each granted on BOTH the
+# `gated: true` templates/project below AND the ungated ones (WP-103's
+# own verification pass found `allow-authenticated` grants login only,
+# never object-level view - see ansible/roles/aap_config/tasks/
+# wire_launch_rbac.yml) - a user outside these two Teams (or aap_admin)
+# sees nothing at all, gated or not; that is deliberate, not a gap - see
+# docs/roadmap/work-packages/wp-103-aap-launch-rbac.md.
 aap_config_ops_team_name: aap-ops-team
 aap_config_reader_team_name: aap-reader-team
 

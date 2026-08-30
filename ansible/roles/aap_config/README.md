@@ -163,16 +163,22 @@ live via `/api/gateway/v1/authenticator_plugins/`). `tasks/install.yml`
 creates an authenticator "Keycloak zuno" against the `aap` realm client
 WP-072 registered (secret read from zuno-auth's `aap-client-secret`, the
 realm's RSA public key fetched live from the realm's public endpoint, both
-OAuth URLs set explicitly - the plugin's defaults carry the legacy
-`/auth/` prefix RHBK dropped, `GROUPS_CLAIM=groups`), plus four maps:
-`aap_admin` → superuser (revoking - membership tracked both ways),
-`aap_ops`/`aap_reader` → the `aap-ops-team`/`aap-reader-team` Controller
-Teams (ADR-0418/WP-103 launch-RBAC, `map_type: team`), and
-allow-all-authenticated (viewer-level catch-all for every other gated/
-ungated template not covered by the two Teams above). The local admin
-login stays as fallback. If `aap-client-secret` isn't materialized yet,
-the SSO wiring is skipped with a message and picked up on the next
-install run.
+OAuth URLs set explicitly (`ACCESS_TOKEN_URL` is the in-cluster HTTP
+listener, not the external Route - the gateway pod fetches it itself and
+doesn't trust the Route's Vault-PKI-issued edge cert, confirmed live
+2026-08-30) - the plugin's defaults carry the legacy `/auth/` prefix RHBK
+dropped, `GROUPS_CLAIM=groups`), plus four maps: `aap_admin` → superuser
+(revoking - membership tracked both ways), `aap_ops`/`aap_reader` → the
+`aap-ops-team`/`aap-reader-team` Controller Teams (ADR-0418/WP-103
+launch-RBAC, `map_type: team` - each Team is granted on BOTH the gated
+AND ungated templates/Project, see `tasks/wire_launch_rbac.yml`), and
+allow-all-authenticated (a login gate ONLY - `map_type: allow` grants no
+object-level access by itself, despite what an earlier version of this
+doc claimed; confirmed live 2026-08-30 that a user outside `aap_ops`/
+`aap_reader`/`aap_admin` sees zero Job/Workflow Templates, gated or not -
+deliberate, not a gap, see the WP-103 brief). The local admin login stays
+as fallback. If `aap-client-secret` isn't materialized yet, the SSO
+wiring is skipped with a message and picked up on the next install run.
 
 Group membership for `aap_admin`/`aap_ops`/`aap_reader` is realm-file +
 hand-applied `kcadm`, not chart-reconciled (ADR-0530 clause 4 excludes
