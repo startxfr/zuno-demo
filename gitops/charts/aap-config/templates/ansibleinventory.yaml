@@ -28,9 +28,21 @@ spec:
   # playbook's zuno_repo_root-relative task include failed
   # with "'zuno_repo_root' is undefined" (confirmed live 2026-08-30,
   # WP-099, `zuno-day1-check` job id 116). Set here once instead of
-  # touching the 176 references across 21 playbooks: inventory variables
-  # are templated in the running play's own Jinja context, so
-  # `playbook_dir` resolves exactly the same way it does locally.
+  # touching the 176 references across 21 playbooks.
+  #
+  # A first attempt tried mirroring the local group_vars' own Jinja
+  # expression (playbook_dir-relative) as the variable's value, but
+  # the resource-operator's own `inventory` role templates `spec.
+  # variables` THROUGH Ansible at CR-reconcile time (using the
+  # operator's OWN internal playbook_dir), storing an already-resolved,
+  # wrong path (`/tmp/ansible-operator/runner/.../AnsibleInventory/
+  # zuno-aap/zuno/project/../..`) rather than the literal Jinja string
+  # for each Job Template run to evaluate later - confirmed live via
+  # `GET .../inventories/?name=zuno`. Fixed instead with a plain,
+  # non-templated absolute path: every AAP Job Template execution
+  # environment checks out its Project at the same fixed `/runner/
+  # project` (confirmed live via `GET .../jobs/116/`'s own `job_cwd`),
+  # so no Jinja is needed at all here.
   variables:
-    zuno_repo_root: "{{ "{{" }} playbook_dir {{ "}}" }}/../.."
+    zuno_repo_root: /runner/project
 {{- end }}
