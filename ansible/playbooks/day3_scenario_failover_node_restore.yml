@@ -40,10 +40,21 @@
           drill actually run? Nothing to restore.
       when: (_sfn_pod_info.resources | default([]) | length) == 0
 
-    - name: Record the target pod name
+    - name: Record the target pod name and its phase at the start of this run
       ansible.builtin.set_fact:
         scenario_failover_pod_name: "{{ _sfn_pod_info.resources[0].metadata.name }}"
+        _sfn_initial_pod_phase: "{{ _sfn_pod_info.resources[0].status.phase }}"
 
+    # This playbook must be safely re-runnable: a prior run's uncordon+delete
+    # can succeed while a LATER step (e.g. the probe) still fails, and an
+    # operator re-running this playbook to retry that later step must not
+    # re-cordon-hunt against an already-healthy cluster (live-caught
+    # 2026-08-30: re-running after exactly this happened found zero cordoned
+    # nodes and failed loudly, correctly, but needlessly - nothing was left
+    # to restore). So the cordon/uncordon/delete sequence below only runs if
+    # the pod was still Pending when this run started; a Running pod skips
+    # straight to re-verifying and re-probing.
+    #
     # A truly unschedulable Pending pod has no spec.nodeName at all - it is
     # only set once the scheduler actually binds a pod to a node, which
     # never happened here (that is the whole point of the inject phase).
@@ -53,10 +64,12 @@
       kubernetes.core.k8s_info:
         kind: Node
       register: _sfn_node_info
+      when: _sfn_initial_pod_phase == 'Pending'
 
     - name: Record the list of cordoned nodes
       ansible.builtin.set_fact:
         _sfn_cordoned_nodes: "{{ _sfn_node_info.resources | selectattr('spec.unschedulable', 'defined') | selectattr('spec.unschedulable') | map(attribute='metadata.name') | list }}"
+      when: _sfn_initial_pod_phase == 'Pending'
 
     - name: Fail unless exactly one node is cordoned
       ansible.builtin.fail:
@@ -65,16 +78,15 @@
           half left unschedulable) - found {{ _sfn_cordoned_nodes | length }}
           ({{ _sfn_cordoned_nodes }}). Refusing to guess which one to
           uncordon - investigate manually before re-running this playbook.
-      when: (_sfn_cordoned_nodes | length) != 1
+      when: >-
+        _sfn_initial_pod_phase == 'Pending' and
+        (_sfn_cordoned_nodes | length) != 1
 
-    - name: Record the node to uncordon
-      ansible.builtin.set_fact:
-        scenario_failover_node_name: "{{ _sfn_cordoned_nodes[0] }}"
-
-    - name: "Uncordon {{ scenario_failover_node_name }}"
+    - name: "Uncordon {{ _sfn_cordoned_nodes[0] | default('') }}"
       ansible.builtin.command:
-        cmd: "oc adm uncordon {{ scenario_failover_node_name }}"
+        cmd: "oc adm uncordon {{ _sfn_cordoned_nodes[0] }}"
       changed_when: true
+      when: _sfn_initial_pod_phase == 'Pending'
 
     # Precedent: wp-092-qwen35-wesh-targeted-anti-affinity.md / wp-086-
     # spread-models-and-platform-hygiene.md both needed a second delete to
@@ -88,7 +100,7 @@
         name: "{{ scenario_failover_pod_name }}"
         namespace: "{{ scenario_failover_namespace }}"
         wait: true
-      when: _sfn_pod_info.resources[0].status.phase == 'Pending'
+      when: _sfn_initial_pod_phase == 'Pending'
 
     - name: Wait for the replacement pod to reach Running/Ready
       kubernetes.core.k8s_info:
@@ -103,6 +115,14 @@
         (_sfn_running_pod.resources[0].status.containerStatuses | default([]) | selectattr('ready') | list | length) > 0
       retries: 30
       delay: 10
+
+    # Resolved here, not earlier - only a Running pod is guaranteed to carry
+    # spec.nodeName (see the comment above on why the Pending pod can't be
+    # trusted for this), and this needs to work whether or not the
+    # cordon/uncordon block above actually ran.
+    - name: Record the node the pod ended up running on
+      ansible.builtin.set_fact:
+        scenario_failover_node_name: "{{ _sfn_running_pod.resources[0].spec.nodeName }}"
 
     - name: "Restore probe (node uncordoned, qwen3.5-9b-wesh Running again)"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/scenario_failover_probe_job.yml"
