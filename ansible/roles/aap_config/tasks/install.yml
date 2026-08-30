@@ -380,6 +380,55 @@
   delay: 10
   no_log: true
 
+# The Project's own AnsibleProject CR reconciles exactly once, ever: the
+# operator's `project` role (confirmed live 2026-08-30, WP-098) unconditionally
+# `end_play`s the instant `status.isFinished` is true, regardless of any later
+# spec/CR change, and there is no CRD field to force a re-sync - so a Job
+# Template referencing a playbook added to this repo AFTER the Project's
+# first-ever reconcile fails outright with "Playbook not found for project."
+# (hit live: `zuno-day3-sign`, added 2026-08-28, against a Project last synced
+# 2026-08-25). Triggered here via the Controller API directly, bypassing the
+# stuck CR entirely - idempotent, ~15s, and the only way this checkout ever
+# refreshes again.
+- name: "aap-config | trigger a Project SCM re-sync (the Project CR itself never re-syncs)"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/projects/{{ _aap_config_project_lookup.json.results[0].id }}/update/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 201
+  register: _aap_config_project_update
+  no_log: true
+
+- name: "aap-config | wait for the Project SCM re-sync to finish"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/project_updates/{{ _aap_config_project_update.json.id }}/"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_project_update_status
+  until: (_aap_config_project_update_status.json.status | default('')) in ['successful', 'failed', 'error', 'canceled']
+  retries: 30
+  delay: 5
+  no_log: true
+
+- name: "aap-config | fail if the Project SCM re-sync did not succeed"
+  ansible.builtin.fail:
+    msg: >-
+      Project SCM re-sync (project_update
+      {{ _aap_config_project_update.json.id }}) ended in status
+      '{{ _aap_config_project_update_status.json.status }}', not
+      'successful'. Every Job Template lookup below depends on this
+      checkout being current - check
+      {{ _aap_config_gateway_url }}/#/jobs/project/{{ _aap_config_project_update.json.id }}
+      for details.
+  when: _aap_config_project_update_status.json.status != 'successful'
+
 - name: "aap-config | wait for the Job Template to exist in Controller"
   ansible.builtin.uri:
     url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/?name={{ aap_config_job_template_name | default('zuno-day0-check') }}"

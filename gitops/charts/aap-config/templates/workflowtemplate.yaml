@@ -12,12 +12,33 @@
 # `awx.awx.workflow_job_template` Ansible module's documented
 # `workflow_nodes` argument spec (identifier/unified_job_template/
 # extra_data/related.{success_nodes,failure_nodes,always_nodes}/
-# all_parents_must_converge) - NOT yet confirmed to reconcile
-# successfully against this specific cluster's resource-operator version
-# (WP-095's own Acceptance checks cover that).
+# all_parents_must_converge) - confirmed live 2026-08-30 (WP-098) to
+# reconcile successfully against this cluster's resource-operator version
+# once the `organization` omission below was fixed.
 # Sync-wave 0: after every JobTemplate (-5) - a workflow's nodes resolve
 # `unified_job_template.name` against an already-existing Controller
 # Job Template.
+#
+# `unified_job_template.organization` deliberately omitted - confirmed
+# live 2026-08-30 (WP-098's own investigation) that `job_template.
+# organization` is null for EVERY Job Template on this Controller
+# (JobTemplate has no organization field of its own - CRD or API - it is
+# only ever a read-through of its Project's organization, and the
+# `zuno-demo` Project's own organization landed null on its first-ever
+# reconcile and can never be changed afterward once Job Templates
+# reference it: `PATCH .../projects/7/ {"organization": ...}` is
+# rejected outright with "Organization cannot be changed when in use by
+# job templates."). The underlying `ansible.controller.workflow_job_template`
+# module only adds an `organization` filter to its `unified_job_templates`
+# lookup when the node explicitly supplies one (module source,
+# `/opt/ansible/roles/workflowtemplate/tasks/main.yml` ->
+# `ansible.controller.workflow_job_template`'s `_disambiguate` step) - so
+# every node in every one of the 7 Workflow Templates failed identically
+# with `Unable to Find unified_job_template: {'type': 'job_template',
+# 'organization': 69}` (0 results, since no job_template ever matches a
+# non-null organization). Matching purely on name+type is exactly as
+# unambiguous here: every Job Template name in this repo is already
+# globally unique.
 {{- range .Values.workflowTemplates }}
 ---
 apiVersion: tower.ansible.com/v1alpha1
@@ -41,8 +62,6 @@ spec:
     - identifier: {{ .id }}
       unified_job_template:
         name: {{ $jobTemplate }}
-        organization:
-          name: {{ $.Values.organization }}
         type: job_template
       extra_data:
         target_component: {{ .id }}

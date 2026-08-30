@@ -46,6 +46,33 @@ operator:
       source:
         name: ""
         namespace: openshift-marketplace
+      # OLM's Subscription.spec.config.resources is a single override
+      # applied to EVERY container in EVERY Deployment the CSV installs
+      # (there is no per-Deployment targeting in the OLM API) - confirmed
+      # live 2026-08-30 (WP-098) that the CSV's own per-Deployment
+      # defaults are uneven: gateway/controller/hub/eda-operator already
+      # ship at 2 CPU/4000Mi, but resource-operator-controller-manager
+      # (the one that reconciles every tower.ansible.com CR - Project/
+      # Inventory/Credential/JobTemplate/WorkflowTemplate) ships at only
+      # 1 CPU/2Gi and automationmetricsservice/lightspeed-operator ship
+      # lower still (500m/1Gi, 500m/768Mi). Registering WP-094/095's 21
+      # CRs at once pegged resource-operator at 999m/1000m CPU and
+      # 2036Mi/2048Mi memory, failing its own /healthz probe under load
+      # and crash-looping (28 restarts in ~30 minutes) - nothing ever
+      # finished reconciling. This value is a uniform floor high enough
+      # to cover resource-operator's real need under a full 21-CR
+      # registration burst; it raises the already-generous sibling
+      # deployments too (4000Mi -> 4Gi is negligible), which is an
+      # accepted, harmless over-provision rather than a per-Deployment
+      # surgical fix OLM has no mechanism to express.
+      config:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: "2"
+            memory: 4Gi
   operatorGroup:
     enabled: true
     name: aap-operator-group
