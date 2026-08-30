@@ -98,8 +98,9 @@ mechanism ADR-0418 itself decided.
     idiom already used elsewhere in `aap_config/tasks/install.yml`**
     (e.g. the organization/host upsert blocks), not via a CR, to keep the
     registry password out of any committed manifest. Its password is the
-    token of the `zuno-aap-installer` ServiceAccount's existing
-    `zuno-aap-installer-token` Secret (already created by
+    token of the `aap-installer` ServiceAccount (the `zuno-aap-installer`
+    credential's underlying SA, not the credential's own name) via its
+    existing `aap-installer-token` Secret (already created by
     `gitops/charts/aap-config/templates/serviceaccount.yaml`) - once
     `zuno-aap` is added to the image-puller RoleBinding loop (below), no
     new ServiceAccount is needed.

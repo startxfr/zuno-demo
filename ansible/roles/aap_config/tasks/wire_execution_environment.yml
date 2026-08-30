@@ -55,19 +55,24 @@
 # templates/serviceaccount.yaml). Works once zuno-aap is added to the
 # system:image-puller RoleBinding loop in apply_openshift_build.yml /
 # image_mirrors (WP-102's RBAC change) - no new ServiceAccount needed.
-- name: "aap-config | wire-ee | read the zuno-aap-installer token"
+# Secret name is "<ServiceAccount name>-token" (templates/serviceaccount.yaml)
+# - the zuno-aap-installer CREDENTIAL's underlying ServiceAccount is named
+# aap-installer, not zuno-aap-installer (gitops/charts/aap-config/
+# values.yaml's credentials list: `serviceAccount: aap-installer`).
+# Confirmed live 2026-08-30 (job 433): the wrong guess here 404'd.
+- name: "aap-config | wire-ee | read the aap-installer token"
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret
     namespace: zuno-aap
-    name: zuno-aap-installer-token
+    name: aap-installer-token
   register: _wire_ee_registry_token_secret
   no_log: true
 
-- name: "aap-config | wire-ee | fail if the zuno-aap-installer token isn't materialized"
+- name: "aap-config | wire-ee | fail if the aap-installer token isn't materialized"
   ansible.builtin.fail:
     msg: >-
-      Secret zuno-aap-installer-token not found in zuno-aap - run
+      Secret aap-installer-token not found in zuno-aap - run
       `make d0 install aap-config` first.
   when: (_wire_ee_registry_token_secret.resources | default([]) | length) == 0
 
