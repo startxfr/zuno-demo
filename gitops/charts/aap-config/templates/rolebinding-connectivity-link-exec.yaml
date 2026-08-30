@@ -28,6 +28,15 @@
 # excludes `pods/exec` (a 403 on `pods/exec` in `openshift-ingress`,
 # distinct from the earlier `secrets` 403 in `kuadrant-system` already
 # fixed by rolebinding-connectivity-link-secrets.yaml).
+#
+# Amended 2026-08-30 (ADR-0418 live-launch verification, workflow job
+# 203/node 238): `create` alone still 403'd - `kubernetes.core.k8s_exec`
+# (the `kubernetes` Python client's `stream()`) issues its request as an
+# HTTP GET with an Upgrade header, and this cluster's API server
+# authorizes that as verb `get` on `pods/exec`, not `create` (unlike the
+# `create`-only convention documented for plain `kubectl exec`). Both
+# verbs are granted below so this works regardless of which connect
+# protocol/client library performs the upgrade.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -43,7 +52,7 @@ rules:
     verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["pods/exec"]
-    verbs: ["create"]
+    verbs: ["get", "create"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding

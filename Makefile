@@ -374,7 +374,7 @@ $(AAP_ROUTING_SHELL_FUNCS) \
 route_or_local() { \
   local verb="$$1" workflow="$$2" ev; \
   ev="{\"target_component\": \"$$component\"}"; \
-  if [[ "$$component" == "all" && -n "$$workflow" ]]; then aap_route workflow "$$workflow" "$$ev"; \
+  if [[ "$$component" == "all" && -n "$$workflow" ]]; then aap_route workflow "$$workflow" "{}"; \
   else aap_route job "zuno-day1-$$verb" "$$ev"; fi; \
   local rc=$$?; \
   if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day1_$${verb}.yml -e "target_component=$$component" $(EXTRA_VARS); else return $$rc; fi; \
@@ -457,7 +457,7 @@ $(AAP_ROUTING_SHELL_FUNCS) \
 route_or_local() { \
   local verb="$$1" workflow="$$2" ev; \
   ev="{\"target_component\": \"$$component\"}"; \
-  if [[ "$$component" == "all" && -n "$$workflow" ]]; then aap_route workflow "$$workflow" "$$ev"; \
+  if [[ "$$component" == "all" && -n "$$workflow" ]]; then aap_route workflow "$$workflow" "{}"; \
   else aap_route job "zuno-day2-$$verb" "$$ev"; fi; \
   local rc=$$?; \
   if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_$${verb}.yml -e "target_component=$$component" $(EXTRA_VARS); else return $$rc; fi; \
