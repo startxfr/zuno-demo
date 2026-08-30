@@ -112,4 +112,50 @@ subjects:
   - kind: ServiceAccount
     name: aap-day0-check
     namespace: {{ .Values.namespace }}
+---
+# Third, separate gap, same run family (job 486, zuno-day2-check's
+# supply-chain component this time, not agents): ansible/tasks/
+# verify_image_signatures.yml writes a ConfigMap and runs a verify Job in
+# zuno-ai-build - same "check that needs to mutate its own scratch
+# artifacts" shape as the agents gate above, different namespace. Its own
+# ClusterRole (not a reuse of the zuno-ai-run one above) since the
+# resource set differs (no namespaces/secrets/serviceaccounts/roles write
+# needed here, only configmaps/jobs/pods) - keeps each grant matched to
+# what its own namespace's task file actually does.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zuno-day2-check-supply-chain-gate
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-26"
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-day2-check-supply-chain-gate
+  namespace: zuno-ai-build
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zuno-day2-check-supply-chain-gate
+subjects:
+  - kind: ServiceAccount
+    name: aap-day0-check
+    namespace: {{ .Values.namespace }}
 {{- end }}
