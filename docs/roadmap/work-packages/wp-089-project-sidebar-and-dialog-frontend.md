@@ -1,7 +1,7 @@
 # WP-089: Projects sidebar, project dialog and read-only tabs (promotes ADR-0527)
 
-- **State:** Repo work merged (2026-08-28) - frontend rebuilt and deployed, `zuno-admin-api` provisioned; the single remaining criterion is the live two-persona pass, which needs two browser identities and is an operator task
-- **ADRs:** ADR-0527 clause 9 (Partially implemented -> Implemented once this WP lands and the live two-persona pass runs)
+- **State:** Done (2026-08-30) - the live two-persona pass ran against the live cluster (`consultant-01`/`consultant-02` on Tekos) and passed all 19 checks; see ADR-0527's dated note
+- **ADRs:** ADR-0527 clause 9 (Implemented)
 - **Depends on:** WP-088 (the `/api/projects` and `/api/groups` routes, and `Conversation`'s new `project_id`/`role` fields)
 - **Estimated files touched:** ~10
 
@@ -118,43 +118,45 @@ styles with `--pf-t--global--*` tokens only).
   2026-08-28. The `zuno-admin-api` prerequisite is also **done** (WP-091 /
   ADR-0530): `GET /api/colleagues` and `GET /api/groups` both answer 200, so
   the RBAC tab can add people.
-- **The one thing left: the live two-persona pass** ADR-0527's acceptance
-  criteria describe - create, share to a user, share to a group, verify all
-  four roles in the UI **and** as 403s at the API, clone, cascade delete. It
-  needs two real browser identities, so it is an operator task; nothing in the
-  repo blocks it.
+- ~~**The one thing left: the live two-persona pass**~~ **done 2026-08-30** -
+  ran against the live cluster as `consultant-01`/`consultant-02` on Tekos (the
+  pairing recommended below, for the eligibility reason recorded below): create,
+  share to a named user, all four roles verified in the UI **and** as a 403 at
+  the API for `read`, the project-row "+" producing a bound conversation for
+  `write`, clone enabled for `clone`, the RBAC tab appearing for `admin`, the
+  last-admin guard refusing a zero-admin save, and cascade delete. 19/19
+  checks passed, no product defect found. See ADR-0527's 2026-08-30 dated note
+  for the full list and the one test-script race it also records.
 
-  Two things to know before starting, or the pass will look broken when it is
-  not:
+  Two things worth knowing, kept here for the next time a live pass like this
+  is needed on a different persona/agent pair:
 
   1. **Pick the pair deliberately.** ADR-0213's inherited eligibility rule
      (hold `agent_<name>` **and** share a business-role group with the sharer)
      is unsatisfiable for several persona/agent pairs - `consultant-01` on
      Comage or Naveo, `ai-dev-01`, `ai-ops-01` and every
      `*-entitlement-only-*` fixture have **zero** eligible candidates, so the
-     picker is correctly empty and looks like a bug. Use `consultant-01` on
-     **Tekos** (2 eligible colleagues), or share through a **group** grant,
-     which carries no eligibility check at all. That asymmetry is ADR-0527's
-     own recorded open question, not a defect to fix on the way past.
-  2. **Criterion 1's binding half is already confirmed** - you do not need to
-     re-derive it. Project binding was broken until `eec08d50` (2026-08-28
-     09:09 UTC): the frontend proxy dropped `project_id` and the measurement
-     then was 0 bound out of 166 conversations. Re-measured 2026-08-29 against
-     `agent-conversations`: **3 bound conversations, created 09:24, 09:32 and
-     09:34 UTC** - all after the fix, on two different agents (tekos, comage),
-     all pointing at project `0b4daf98` (`keycloak`). What the pass still owes
-     this criterion is the *UI* half: that the conversation opened from a
-     project row's "+" is the one that lands bound.
+     picker is correctly empty and looks like a bug. `consultant-01` on
+     **Tekos** (2 eligible colleagues) is what this pass used; a **group**
+     grant works too and carries no eligibility check at all. That asymmetry
+     is ADR-0527's own recorded open question, not a defect to fix on the way
+     past.
+  2. **Criterion 1's binding half was already confirmed by measurement**
+     before this pass ran, and the pass then confirmed the *UI* half too:
+     project binding was broken until `eec08d50` (2026-08-28 09:09 UTC), and
+     the conversation created from a project row's "+" during this pass
+     carried the right `project_id` from the start.
 - This component has no frontend unit-test suite (the same gap ADR-0213's and
   ADR-0515's status lines both record), so the live pass is the only functional
   verification these components get.
 
 ## Status updates (then re-run check_docs.py)
 
-- After merge: ADR-0527 -> `Partially implemented (repo work complete; live
-  two-persona pass pending)`; Phase 21 tracker row -> `Repo work merged`.
-- After the live pass: ADR-0527 -> `Implemented`; tracker -> `Done`; a dated
-  `MEMORY.md` bullet.
+- After merge (2026-08-28): ADR-0527 -> `Partially implemented (repo work
+  complete; live two-persona pass pending)`; Phase 21 tracker row -> `Repo
+  work merged`.
+- After the live pass (2026-08-30): ADR-0527 -> `Implemented`; this WP ->
+  `Done`; tracker -> `Done`; a dated `MEMORY.md` bullet.
 
 ## Out of scope / deferred
 

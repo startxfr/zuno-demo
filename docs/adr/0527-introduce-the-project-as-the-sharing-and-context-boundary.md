@@ -1,6 +1,6 @@
 # ADR-0527: Introduce the project as the sharing and context boundary
 
-- **Status:** Partially implemented (2026-08-27) - WP-088's repo work is merged: the `projects`/`project_grants`/`project_stars` schema with its guarded migration (unverifiable `conversations.project_id` values cleared and NOTICE'd before the foreign key is added, `conversation_memberships` dropped); `app/projects.py` (grant resolution, the last-admin guard, the entitlement-group refusal on both the write and the resolution side, cascade archival); `conversations.resolve_access` replacing ADR-0213's `get_role` as the single one-round-trip access check; `list_conversations` widened from an `owner_sub` filter to the two-block membership join; the project context injected at BOTH prompt sites (`reason_node` and `arkos_nodes`' `draft_node`) under its own token budget, with `project_classification` folded into ADR-0034's escalation; the `project_memberships` projection pushed inside the grant-mutation transaction before its commit, with a monotone `grants_revision` and a non-fatal startup reconciliation; eight project endpoints, ten OpenAPI schemas and `GET /api/groups` through agent-bff; and the frontend Go route/config wiring. 23 new automated tests plus two rewritten suites. Along the way it fixed the write lease never being renewed mid-stream (ADR-0213 specified it, no call existed) and ADR-0525's `007_ivfflat_lists.sql` never being published by `configmap-schema.yaml`. WP-089 completed the frontend on the same day: `ConversationRow.tsx` extracted from `ConversationList.tsx` as a no-op refactor first, so the two sidebar blocks render ADR-0515's row rather than two implementations that drift; `projects.ts`, `ProjectRow.tsx` and a two-tab `ProjectDialog.tsx` that stages every change locally and commits with one request; `ConversationList.tsx` restructured into the PROJECTS and CONVERSATIONS blocks with per-project fold state persisted locally; read-only conversation tabs that hide the composer entirely rather than disabling it; and `ShareDialog.tsx` deleted with ADR-0213's membership client. Residual gap before `Implemented`, as of 2026-08-28: the live **two-persona** pass covering this ADR's acceptance criteria - sharing a project between two identities and checking each one's effective role - has still not been run. What HAS run is a single-persona pass (see the dated notes below): all four components rebuilt, `zuno-admin-api` provisioned by ADR-0530 so `GET /api/colleagues` and `GET /api/groups` answer 200, the backend exercised end to end, and the sidebar and dialog driven in a real browser. That pass found four defects in the seams between components, all fixed. Note this component still has no frontend unit-test suite (the same gap ADR-0213's and ADR-0515's status lines record), so the React work is verified by `tsc --noEmit` and the live pass, not by automated tests.
+- **Status:** Implemented (2026-08-30) - WP-088's repo work is merged: the `projects`/`project_grants`/`project_stars` schema with its guarded migration (unverifiable `conversations.project_id` values cleared and NOTICE'd before the foreign key is added, `conversation_memberships` dropped); `app/projects.py` (grant resolution, the last-admin guard, the entitlement-group refusal on both the write and the resolution side, cascade archival); `conversations.resolve_access` replacing ADR-0213's `get_role` as the single one-round-trip access check; `list_conversations` widened from an `owner_sub` filter to the two-block membership join; the project context injected at BOTH prompt sites (`reason_node` and `arkos_nodes`' `draft_node`) under its own token budget, with `project_classification` folded into ADR-0034's escalation; the `project_memberships` projection pushed inside the grant-mutation transaction before its commit, with a monotone `grants_revision` and a non-fatal startup reconciliation; eight project endpoints, ten OpenAPI schemas and `GET /api/groups` through agent-bff; and the frontend Go route/config wiring. 23 new automated tests plus two rewritten suites. Along the way it fixed the write lease never being renewed mid-stream (ADR-0213 specified it, no call existed) and ADR-0525's `007_ivfflat_lists.sql` never being published by `configmap-schema.yaml`. WP-089 completed the frontend on the same day: `ConversationRow.tsx` extracted from `ConversationList.tsx` as a no-op refactor first, so the two sidebar blocks render ADR-0515's row rather than two implementations that drift; `projects.ts`, `ProjectRow.tsx` and a two-tab `ProjectDialog.tsx` that stages every change locally and commits with one request; `ConversationList.tsx` restructured into the PROJECTS and CONVERSATIONS blocks with per-project fold state persisted locally; read-only conversation tabs that hide the composer entirely rather than disabling it; and `ShareDialog.tsx` deleted with ADR-0213's membership client. The live **two-persona** pass this ADR's acceptance criteria describe - sharing a project between two identities and checking each one's effective role - ran on 2026-08-30 against the live cluster (`consultant-01`/`consultant-02` on Tekos) and passed all 19 checks: create, share to a named user, read-only rendering and RBAC-tab hiding for `read`, a direct `PUT` refused 403 for `read`, a project-row conversation landing bound (`project_id` set) for `write`, the clone action enabled for `clone`, RBAC-tab visibility once promoted to `admin`, the last-admin guard refusing a save that would leave zero subject-scoped admins (confirmed non-mutating), and cascade delete removing the project from both members' lists. No defects found in the product; one test-script race (checking the RBAC tab before the dialog's own fetch had resolved) was corrected during the run. Note this component still has no frontend unit-test suite (the same gap ADR-0213's and ADR-0515's status lines record), so the React work is verified by `tsc --noEmit` and this live pass, not by automated tests.
 - **Target:** v0.4
 - **Date:** 2026-08-27
 - **Decision owners:** Zuno Demo architecture team
@@ -146,6 +146,49 @@ cleared three of them on the next boot, live.
 Residual gap: the two-persona UI pass has still not been run. Everything
 above is backend behaviour verified through agent-bff with a real Keycloak
 persona token; nobody has driven the sidebar and dialog in a browser.
+
+### 2026-08-30 - the live two-persona pass, closing the residual gap
+
+Ran against the live cluster with two real browser sessions, OIDC-logged-in as
+`consultant-01` (sharer) and `consultant-02` (grantee) on Tekos - the pairing
+WP-089 recommended, since it is one of the few with two mutually eligible
+colleagues under the inherited ADR-0213 rule. 19 checks, all passing:
+
+- Create a project via the sidebar's "+", Create button gating on a non-empty
+  title, creator auto-granted `admin`.
+- Share to a named colleague at `read`: the candidate renders enabled (not
+  greyed out), the project appears read-only in the grantee's own sidebar and
+  dialog (title suffixed "(read-only)"), the RBAC tab is absent, and a direct
+  `PUT /api/projects/{id}` from that identity is refused with **403** (not
+  404 - the grantee holds a role, just not a strong enough one).
+- Promote to `write`: a conversation created from the project row's "+" lands
+  with `project_id` already set (the binding fix from `eec08d50` holds at the
+  UI's own new-conversation path, closing the one criterion the backend-only
+  pass could not reach), and the RBAC tab stays hidden.
+- Promote to `clone`: the conversation's kebab "Clone" action is enabled.
+- Promote to `admin`: the RBAC tab appears, confirmed both server-side
+  (`GET /api/projects/{id}`'s `grants` array) and by driving the dialog.
+- **Last-admin guard**: a save whose `grants` would leave zero subject-scoped
+  admins is refused with **400**, and the rejection is non-mutating - the
+  existing grants are verified unchanged immediately after. (A first attempt
+  at this check sent a grant set that still contained a subject-scoped admin
+  - just a different one - which the guard correctly allows; that is a
+  transfer, not the zero-admin case the guard exists to block, and the test
+  was corrected rather than the product.)
+- **Cascade delete**: the confirmation names the exact counts (1 conversation,
+  2 users, 0 groups), and after accepting, the project is gone from both
+  members' `GET /api/projects` lists.
+
+No product defect surfaced. One test-only race did: the very first attempt at
+the `admin`-promotion check read the RBAC tab's presence immediately after
+navigating to the reloaded dialog, before its own `getProject` fetch had
+resolved (still showing the loading `Spinner`), and reported a false failure.
+Waiting for the Description tab - which renders for every role once loaded -
+before checking for RBAC fixed it; a same-page fetch diagnostic (both default
+and `cache: 'no-store'`) confirmed the API itself returned the correct,
+uncached `role` throughout, ruling out caching as a contributor.
+
+ADR-0527 moves to **Implemented**. WP-089 moves to **Done**.
 
 ## Context
 
