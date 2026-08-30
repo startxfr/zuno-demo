@@ -1,0 +1,162 @@
+---
+# `make day3|d3 scenario-failover-node` (inject half). WP-105/ADR-0536: cordon
+# the node carrying qwen3.5-9b's KServe pod, delete that pod, and prove live
+# that Tekos fails over to local-wesh while Comage (already primary on
+# local-wesh) is unaffected. Paired with
+# day3_scenario_failover_node_restore.yml - the Makefile pauses for
+# mandatory interactive human confirmation between the two (ADR-0536
+# Decision 2); this playbook deliberately leaves the node cordoned on exit,
+# that is the intended paused state, not a failure.
+#
+# Node/pod are resolved dynamically below, never hardcoded (ADR-0536
+# Decision 3) - every prior write-up of this exact maneuver
+# (docs/roadmap/work-packages/wp-086-spread-models-and-platform-hygiene.md,
+# wp-092-qwen35-wesh-targeted-anti-affinity.md) hand-copied a node IP from
+# `oc get pods -o wide`.
+- name: "Day 3: node failover drill - inject (cordon + kill pod)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    scenario_failover_namespace: zuno-ai-run
+    scenario_failover_model_label: "app.kubernetes.io/name=qwen35-9b"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve the cluster base domain
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    # ADR-0536 Decision 5: the semantic cache is keyed on the REQUESTED
+    # model, not the candidate that actually served it - if it were ever
+    # enabled for these providers, a local-wesh answer served during the
+    # inject phase could be replayed after restore, making the restore
+    # playbook's own re-probe a false positive. Read live, never assumed.
+    - name: Read platform/ai-gateway/provider-routing.yaml
+      ansible.builtin.set_fact:
+        _sfn_provider_routing: "{{ lookup('file', zuno_repo_root + '/platform/ai-gateway/provider-routing.yaml') | from_yaml }}"
+
+    - name: Fail if the semantic cache is enabled for local-qwen35 or local-wesh (any variant)
+      ansible.builtin.fail:
+        msg: >-
+          cache_enabled is true for one of local-qwen35(-maas)/local-wesh(-maas)
+          in provider-routing.yaml - ADR-0536 Decision 5 requires this off for
+          this drill's restore-phase re-probe to be trustworthy. Re-read that
+          ADR before proceeding.
+      loop: "{{ _sfn_provider_routing.providers | selectattr('name', 'in', ['local-qwen35', 'local-qwen35-maas', 'local-wesh', 'local-wesh-maas']) | list }}"
+      loop_control:
+        label: "{{ item.name }}"
+      when: item.cache_enabled | default(false) | bool
+
+    - name: Find the running qwen3.5-9b pod
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ scenario_failover_namespace }}"
+        label_selectors:
+          - "{{ scenario_failover_model_label }}"
+      register: _sfn_pod_info
+
+    - name: Fail if the qwen3.5-9b pod isn't found or isn't Running
+      ansible.builtin.fail:
+        msg: >-
+          Expected exactly one Running pod labeled
+          {{ scenario_failover_model_label }} in {{ scenario_failover_namespace }}
+          before starting this drill - found
+          {{ _sfn_pod_info.resources | default([]) | length }}. Nothing has
+          been touched.
+      when: >-
+        (_sfn_pod_info.resources | default([]) | length) != 1 or
+        _sfn_pod_info.resources[0].status.phase != 'Running'
+
+    - name: Record the target pod name and node
+      ansible.builtin.set_fact:
+        scenario_failover_pod_name: "{{ _sfn_pod_info.resources[0].metadata.name }}"
+        scenario_failover_node_name: "{{ _sfn_pod_info.resources[0].spec.nodeName }}"
+
+    - name: "Baseline probe (before any disruption)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/scenario_failover_probe_job.yml"
+      vars:
+        scenario_failover_phase: baseline
+
+    - name: Record the baseline verdict
+      ansible.builtin.set_fact:
+        scenario_failover_baseline: "{{ scenario_failover_probe_result }}"
+
+    - name: Fail if the baseline doesn't match ADR-0526's expected routing
+      ansible.builtin.fail:
+        msg: >-
+          Baseline probe did not match ADR-0526's expected routing
+          (comage.provider={{ scenario_failover_baseline.comage.provider }},
+          expected local-wesh; tekos.provider={{ scenario_failover_baseline.tekos.provider }},
+          expected local-qwen35) - stop before touching the cluster and
+          re-check platform/ai-gateway/provider-routing.yaml and
+          policies/model-routing/model-routing-policy.yaml.
+      when: >-
+        not scenario_failover_baseline.comage.ok or
+        not scenario_failover_baseline.tekos.ok or
+        scenario_failover_baseline.comage.provider != 'local-wesh' or
+        scenario_failover_baseline.tekos.provider != 'local-qwen35'
+
+    - name: "Cordon {{ scenario_failover_node_name }}"
+      ansible.builtin.command:
+        cmd: "oc adm cordon {{ scenario_failover_node_name }}"
+      changed_when: true
+
+    # Deletes scenario_failover_pod_name only - never a node-wide delete.
+    # The co-located qwen3.6-27b-instruct pod on the same node must keep
+    # running; cordon already prevents any NEW pod from landing there.
+    - name: Delete the qwen3.5-9b pod
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        name: "{{ scenario_failover_pod_name }}"
+        namespace: "{{ scenario_failover_namespace }}"
+        wait: true
+
+    # Pending is the expected, desired outcome here, not a failure - two MIG
+    # nodes total, no third to absorb the cordon (ADR-0526's own
+    # Consequences section).
+    - name: Wait for the replacement pod to reach Pending
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ scenario_failover_namespace }}"
+        label_selectors:
+          - "{{ scenario_failover_model_label }}"
+      register: _sfn_pending_pod
+      until: >-
+        (_sfn_pending_pod.resources | default([]) | length) > 0 and
+        _sfn_pending_pod.resources[0].status.phase == 'Pending'
+      retries: 18
+      delay: 10
+
+    - name: "Failover probe (node cordoned, qwen3.5-9b pod Pending)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/scenario_failover_probe_job.yml"
+      vars:
+        scenario_failover_phase: failover
+
+    - name: Record the failover verdict
+      ansible.builtin.set_fact:
+        scenario_failover_failover: "{{ scenario_failover_probe_result }}"
+
+    - name: Warn (do not fail) if the live failover did not match ADR-0526's expected direction
+      ansible.builtin.debug:
+        msg: >-
+          WARNING: expected tekos.provider=local-wesh and comage.provider
+          unchanged (local-wesh) during the failure window; got
+          comage={{ scenario_failover_failover.comage }},
+          tekos={{ scenario_failover_failover.tekos }}. The node is left
+          cordoned for inspection - do not restore until this is understood.
+      when: >-
+        not scenario_failover_failover.tekos.ok or
+        scenario_failover_failover.tekos.provider != 'local-wesh' or
+        not scenario_failover_failover.comage.ok or
+        scenario_failover_failover.comage.provider != 'local-wesh'
+
+    - name: Print the inject-phase verdict (this is what the Makefile shows before the human validation pause)
+      ansible.builtin.debug:
+        msg:
+          baseline: "{{ scenario_failover_baseline }}"
+          failover: "{{ scenario_failover_failover }}"
+          node: "{{ scenario_failover_node_name }}"
+          pod: "{{ scenario_failover_pod_name }}"

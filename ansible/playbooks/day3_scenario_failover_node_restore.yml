@@ -1,0 +1,103 @@
+---
+# `make day3|d3 scenario-failover-node` (restore half). WP-105/ADR-0536:
+# uncordon the node, reschedule qwen3.5-9b, and prove live that Tekos
+# returns to local-qwen35. Run only after
+# day3_scenario_failover_node_inject.yml and its interactive human
+# validation pause (Makefile) - re-derives node/pod state from scratch
+# rather than trusting anything carried over from that separate
+# ansible-playbook process.
+- name: "Day 3: node failover drill - restore (uncordon + reschedule)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    scenario_failover_namespace: zuno-ai-run
+    scenario_failover_model_label: "app.kubernetes.io/name=qwen35-9b"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve the cluster base domain
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: Find the (Pending) qwen3.5-9b pod
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ scenario_failover_namespace }}"
+        label_selectors:
+          - "{{ scenario_failover_model_label }}"
+      register: _sfn_pod_info
+
+    - name: Fail if no qwen3.5-9b pod exists at all
+      ansible.builtin.fail:
+        msg: >-
+          No pod labeled {{ scenario_failover_model_label }} found in
+          {{ scenario_failover_namespace }} - was the inject half of this
+          drill actually run? Nothing to restore.
+      when: (_sfn_pod_info.resources | default([]) | length) == 0
+
+    - name: Record the target pod name and node
+      ansible.builtin.set_fact:
+        scenario_failover_pod_name: "{{ _sfn_pod_info.resources[0].metadata.name }}"
+        scenario_failover_node_name: "{{ _sfn_pod_info.resources[0].spec.nodeName }}"
+
+    - name: "Uncordon {{ scenario_failover_node_name }}"
+      ansible.builtin.command:
+        cmd: "oc adm uncordon {{ scenario_failover_node_name }}"
+      changed_when: true
+
+    # Precedent: wp-092-qwen35-wesh-targeted-anti-affinity.md / wp-086-
+    # spread-models-and-platform-hygiene.md both needed a second delete to
+    # force rescheduling onto the now-uncordoned node - uncordoning alone
+    # does not retrigger the scheduler for an already-Pending pod.
+    - name: "Delete the Pending qwen3.5-9b pod again, to force rescheduling"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: v1
+        kind: Pod
+        name: "{{ scenario_failover_pod_name }}"
+        namespace: "{{ scenario_failover_namespace }}"
+        wait: true
+      when: _sfn_pod_info.resources[0].status.phase == 'Pending'
+
+    - name: Wait for the replacement pod to reach Running/Ready
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ scenario_failover_namespace }}"
+        label_selectors:
+          - "{{ scenario_failover_model_label }}"
+      register: _sfn_running_pod
+      until: >-
+        (_sfn_running_pod.resources | default([]) | length) > 0 and
+        _sfn_running_pod.resources[0].status.phase == 'Running' and
+        (_sfn_running_pod.resources[0].status.containerStatuses | default([]) | selectattr('ready') | list | length) > 0
+      retries: 30
+      delay: 10
+
+    - name: "Restore probe (node uncordoned, qwen3.5-9b Running again)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/scenario_failover_probe_job.yml"
+      vars:
+        scenario_failover_phase: restore
+
+    - name: Record the restore verdict
+      ansible.builtin.set_fact:
+        scenario_failover_restore: "{{ scenario_failover_probe_result }}"
+
+    - name: Fail if Tekos did not return to local-qwen35
+      ansible.builtin.fail:
+        msg: >-
+          Expected tekos.provider=local-qwen35 after restore, got
+          {{ scenario_failover_restore.tekos }}. The node is uncordoned and
+          the pod is Running, so this is a routing/probe issue, not a
+          scheduling one - re-check provider-routing.yaml's cache_enabled
+          precondition (ADR-0536 Decision 5) first.
+      when: >-
+        not scenario_failover_restore.tekos.ok or
+        scenario_failover_restore.tekos.provider != 'local-qwen35'
+
+    - name: Print the restore-phase verdict
+      ansible.builtin.debug:
+        msg:
+          restore: "{{ scenario_failover_restore }}"
+          node: "{{ scenario_failover_node_name }}"
+          pod: "{{ scenario_failover_pod_name }}"

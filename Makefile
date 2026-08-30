@@ -101,7 +101,7 @@ DAY3_SIGN_COMPONENTS := agents
 # OLSConfig operand is absent, and vice versa.
 DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config
 DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS))
-DAY3_VERBS := test stresstest backup restore check sign
+DAY3_VERBS := test stresstest backup restore check sign scenario-failover-node
 
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
 # recipe below sources to route mutating/read verbs through AAP when
@@ -530,6 +530,11 @@ if [[ -z "$$verb" ]]; then \
     '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
     '  sign         Re-sign every OKF bundle against the deployed agent-runtime image, then verify (ADR-0420)' \
     '               The signed digest covers every file under agents/<name>/, tasks/ included - not just agent.okf.md' \
+    '  scenario-failover-node   Live GPU-node failover drill (WP-105/ADR-0536): cordon+kill the qwen3.5-9b' \
+    '               pod, verify Tekos fails over to qwen3.5-9b-wesh (Comage unaffected), pause for human' \
+    '               confirmation, then uncordon+reschedule and verify the return to normal. Requires a TTY' \
+    '               (refuses to run non-interactively) and mutates live shared GPU infra - coordinate with' \
+    '               any other session on this cluster first.' \
     '' \
     'Components (test/stresstest/check; optional, default: all):' \
     '  $(DAY3_TEST_COMPONENTS)' \
@@ -552,7 +557,8 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 stresstest CLEANUP=0   # keep test conversations for inspection' \
     'Example: make d3 backup postgresql' \
     'Example: make d3 restore postgresql' \
-    'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything'; \
+    'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything' \
+    'Example: make d3 scenario-failover-node   # interactive - pauses for confirmation between cordon+kill and uncordon+restore'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \
@@ -602,6 +608,19 @@ case "$$verb" in \
     case " $(DAY3_SIGN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 sign component: '$$component' (expected one of: $(DAY3_SIGN_COMPONENTS) or all)" >&2; exit 2;; esac; \
     aap_route job zuno-day3-sign "{\"target_component\": \"$$component\"}"; rc=$$?; \
     if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_sign.yml -e "target_component=$$component" $(EXTRA_VARS); else exit $$rc; fi ;; \
+  scenario-failover-node) \
+    if [[ ! -t 0 ]]; then \
+      echo "day3 scenario-failover-node requires an interactive terminal - it mutates live shared GPU infra and needs a human to confirm the failover before restoring (ADR-0536). Refusing to run non-interactively." >&2; \
+      exit 2; \
+    fi; \
+    aap_route workflow zuno-day3-scenario-failover-node-workflow "{}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then \
+      $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_scenario_failover_node_inject.yml $(EXTRA_VARS) || exit $$?; \
+      read -r -p "Inject phase complete (see the verdict above). Press Enter to uncordon and restore, or Ctrl-C to abort and leave the node cordoned for inspection: " _scenario_failover_confirm; \
+      $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_scenario_failover_node_restore.yml $(EXTRA_VARS); \
+    else \
+      exit $$rc; \
+    fi ;; \
 esac
 endef
 

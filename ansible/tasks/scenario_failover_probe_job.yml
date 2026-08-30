@@ -1,0 +1,250 @@
+---
+# WP-105/ADR-0536: runs evaluations/scenario_failover_verify.py (which
+# itself shells out to scenario_failover_probe.py once per agent) as a
+# one-shot in-cluster Job, then parses its single JSON output line into the
+# `scenario_failover_probe_result` fact. Included (not a role) from both
+# day3_scenario_failover_node_inject.yml and ..._restore.yml, parameterized
+# by `scenario_failover_phase` (baseline|failover|restore - label only, used
+# for Job/session naming so consecutive runs don't collide).
+#
+# Same "no external Route, must run in-cluster" reasoning and Job shape as
+# ansible/roles/agents/tasks/run_acceptance_gate.yml and
+# ansible/roles/day3/tasks/stresstest_job_run_one.yml - this file is
+# deliberately smaller (inline ConfigMap `data:` instead of the
+# apply_kustomize.yml multi-file bundle those two use) since it only ever
+# mounts two flat Python files, not a per-agent OKF bundle.
+#
+# Requires cluster_base_domain (ansible/tasks/resolve_cluster_base_domain.yml)
+# and k8s_auth_environment (ansible/tasks/load_k8s_auth_env.yml) already
+# resolved by the calling playbook.
+
+- name: "scenario-failover-probe | read the demo-persona password from zuno-auth"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: demo-personas-password
+  register: _sfp_password_secret
+  no_log: true
+
+- name: "scenario-failover-probe | read the comage-frontend and tekos-frontend client secrets from zuno-auth"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: "{{ item }}-frontend-client-secret"
+  register: _sfp_client_secret_lookups
+  loop: [comage, tekos]
+  no_log: true
+
+- name: "scenario-failover-probe | read the grafana-prometheus-reader token (existing identity, no new RBAC - ADR-0536 Decision 4)"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-monitoring
+    name: grafana-prometheus-reader-token
+  register: _sfp_prom_token_secret
+  no_log: true
+
+- name: "scenario-failover-probe | fail if any required credential is missing"
+  ansible.builtin.fail:
+    msg: >-
+      One of demo-personas-password (zuno-auth), comage-frontend-client-secret
+      (zuno-auth), tekos-frontend-client-secret (zuno-auth) or
+      grafana-prometheus-reader-token (zuno-monitoring) was not found - each
+      is provisioned by an existing component (keycloak, grafana) this drill
+      does not itself install.
+  when: >-
+    (_sfp_password_secret.resources | default([]) | length) == 0 or
+    (_sfp_client_secret_lookups.results | selectattr('resources', 'defined') | map(attribute='resources') | map('length') | min | default(0)) == 0 or
+    (_sfp_prom_token_secret.resources | default([]) | length) == 0
+
+- name: "scenario-failover-probe | copy the credentials into a zuno-ai-run Secret the Job can mount"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: scenario-failover-node-credentials
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      type: Opaque
+      data:
+        demo-persona-password: "{{ _sfp_password_secret.resources[0].data.password }}"
+        comage-client-secret: "{{ (_sfp_client_secret_lookups.results | selectattr('item', 'equalto', 'comage') | first).resources[0].data.client_secret }}"
+        tekos-client-secret: "{{ (_sfp_client_secret_lookups.results | selectattr('item', 'equalto', 'tekos') | first).resources[0].data.client_secret }}"
+        prom-bearer-token: "{{ _sfp_prom_token_secret.resources[0].data.token }}"
+  no_log: true
+
+- name: "scenario-failover-probe | build the probe scripts ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: scenario-failover-node-scripts
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        scenario_failover_probe.py: "{{ lookup('file', zuno_repo_root + '/evaluations/scenario_failover_probe.py') }}"
+        scenario_failover_verify.py: "{{ lookup('file', zuno_repo_root + '/evaluations/scenario_failover_verify.py') }}"
+        run_scenarios.py: "{{ lookup('file', zuno_repo_root + '/evaluations/tekos/run_scenarios.py') }}"
+
+- name: "scenario-failover-probe | delete any previous probe Job (Jobs are immutable, this task is idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: "zuno-scenario-failover-node-probe"
+    namespace: zuno-ai-run
+    wait: true
+
+- name: "scenario-failover-probe | run the {{ scenario_failover_phase }} probe Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: "zuno-scenario-failover-node-probe"
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        backoffLimit: 0
+        # Bounded: two agents, each up to POLL_TIMEOUT_SECONDS (150s) of
+        # polling - never left to run unbounded (this repo's own "always
+        # bound cluster job runtime" lesson).
+        activeDeadlineSeconds: 600
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: acceptance-gate
+          spec:
+            restartPolicy: Never
+            priorityClassName: zuno-platform-weak
+            serviceAccountName: acceptance-gate
+            containers:
+              - name: scenario-failover-probe
+                image: "docker.io/library/python:3.12-slim"
+                command:
+                  - sh
+                  - -c
+                  - >-
+                    pip install --quiet --no-cache-dir httpx pyyaml &&
+                    python3 /gate/scenario_failover_verify.py --phase {{ scenario_failover_phase }}
+                workingDir: /gate
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+                env:
+                  - name: PYTHONUNBUFFERED
+                    value: "1"
+                  - name: HOME
+                    value: /tmp
+                  - name: PYTHONUSERBASE
+                    value: /tmp/.pyuser
+                  - name: KEYCLOAK_URL
+                    value: "https://keycloak.{{ cluster_base_domain }}"
+                  - name: DEMO_PERSONA_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: scenario-failover-node-credentials
+                        key: demo-persona-password
+                  - name: COMAGE_FRONTEND_CLIENT_SECRET
+                    valueFrom:
+                      secretKeyRef:
+                        name: scenario-failover-node-credentials
+                        key: comage-client-secret
+                  - name: TEKOS_FRONTEND_CLIENT_SECRET
+                    valueFrom:
+                      secretKeyRef:
+                        name: scenario-failover-node-credentials
+                        key: tekos-client-secret
+                  - name: PROM_BEARER_TOKEN
+                    valueFrom:
+                      secretKeyRef:
+                        name: scenario-failover-node-credentials
+                        key: prom-bearer-token
+                volumeMounts:
+                  - name: gate
+                    mountPath: /gate
+            volumes:
+              # ConfigMap data keys can't contain '/' (same constraint
+              # documented in run_acceptance_gate.yml/
+              # stresstest_job_run_one.yml) - run_scenarios.py must land
+              # under a tekos/ subdirectory since scenario_failover_probe.py
+              # does `sys.path.insert(0, .../"tekos")`, matching the real
+              # repo layout (evaluations/tekos/run_scenarios.py) rather than
+              # the flat ConfigMap key it's stored under
+              # (scenario-failover-node-scripts). items[].path supports that
+              # nested remap; the bare `data:` key cannot.
+              - name: gate
+                configMap:
+                  name: scenario-failover-node-scripts
+                  items:
+                    - key: scenario_failover_probe.py
+                      path: scenario_failover_probe.py
+                    - key: scenario_failover_verify.py
+                      path: scenario_failover_verify.py
+                    - key: run_scenarios.py
+                      path: tekos/run_scenarios.py
+
+- name: "scenario-failover-probe | wait for the {{ scenario_failover_phase }} probe Job to reach a terminal state"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai-run
+    name: "zuno-scenario-failover-node-probe"
+  register: _sfp_job
+  until: >-
+    (_sfp_job.resources[0].status.succeeded | default(0)) > 0 or
+    (_sfp_job.resources[0].status.failed | default(0)) > 0
+  retries: 40
+  delay: 15
+
+# controller-uid, not job-name - same stale-pod trap documented in
+# run_acceptance_gate.yml/stresstest_job_run_one.yml.
+- name: "scenario-failover-probe | find the {{ scenario_failover_phase }} probe Job's pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai-run
+    label_selectors:
+      - "controller-uid={{ _sfp_job.resources[0].metadata.uid }}"
+  register: _sfp_pod
+
+- name: "scenario-failover-probe | fetch the {{ scenario_failover_phase }} probe Job's output"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai-run
+    name: "{{ _sfp_pod.resources[0].metadata.name }}"
+  register: _sfp_log
+  when: (_sfp_pod.resources | default([]) | length) > 0
+
+- name: "scenario-failover-probe | print the raw probe output"
+  ansible.builtin.debug:
+    msg: "{{ _sfp_log.log_lines | default(['no pod/log found']) }}"
+
+- name: "scenario-failover-probe | parse the {{ scenario_failover_phase }} probe verdict"
+  ansible.builtin.set_fact:
+    scenario_failover_probe_result: >-
+      {{
+        (_sfp_log.log_lines | default([]))
+        | select('match', '^\{.*\}$')
+        | map('from_json')
+        | list
+        | last
+      }}
+  when: (_sfp_log.log_lines | default([]) | select('match', '^\{.*\}$') | list | length) > 0
+
+- name: "scenario-failover-probe | fail if the {{ scenario_failover_phase }} probe Job produced no parseable verdict"
+  ansible.builtin.fail:
+    msg: >-
+      zuno-scenario-failover-node-probe (phase={{ scenario_failover_phase }})
+      produced no JSON verdict line - see the debug output above for the raw
+      log.
+  when: scenario_failover_probe_result is not defined
