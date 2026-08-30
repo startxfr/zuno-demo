@@ -1,15 +1,19 @@
 # ADR-0526: Fine-tune and serve a French urban-register model variant (`-wesh`)
 
-- **Status:** Implemented (2026-08-29) - one run, `wesh-20260829-145123`, went the whole way: `overall: PASS` on all THREE gate halves (acceptance 20/22, register PASS, tool-calling PASS) and `push-registry` SUCCEEDED, registering `comage-lora` version `wesh-20260829-145123` (model_version_id 6) with the merged checkpoint as its artifact. The variant serves as `qwen3.5-9b-wesh` on a different node from its base and answers Comage live. Getting there needed a second corpus revision and five `push-registry` attempts, each failing on a distinct defect in code that had never executed - the stage refuses to run without a passing gate result, and no run had ever produced one. STILL NOT TRUE: decision 5 as written (see the amendment below); the fallback behaviours (Comage when the variant is unavailable, Tekos on either path) remain untested; and the tool-calling half passes on hallucination at 7.4% against a 10% ceiling that the UNMODIFIED base model does not meet either (11.1%), so that ceiling states an intent rather than a property of this model family
+- **Status:** Implemented (2026-08-29) - one run, `wesh-20260829-145123`, went the whole way: `overall: PASS` on all THREE gate halves (acceptance 20/22, register PASS, tool-calling PASS) and `push-registry` SUCCEEDED, registering `comage-lora` version `wesh-20260829-145123` (model_version_id 6) with the merged checkpoint as its artifact. The variant serves as `qwen3.5-9b-wesh` on a different node from its base and answers Comage live. Getting there needed a second corpus revision and five `push-registry` attempts, each failing on a distinct defect in code that had never executed - the stage refuses to run without a passing gate result, and no run had ever produced one. Decision 7's original wording was corrected 2026-08-30 (see the amendment below, and decision 7 itself, which now states it directly). STILL NOT TRUE: the fallback behaviours (Comage when the variant is unavailable, Tekos on either path) remain untested; and the tool-calling half passes on hallucination at 7.4% against a 10% ceiling that the UNMODIFIED base model does not meet either (11.1%), so that ceiling states an intent rather than a property of this model family
 - **Target:** v0.4
 - **Date:** 2026-08-27
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) in part (decisions 1 and 5 — the serving mechanism and the starting candidate's objective) and [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) in part (decisions 2 and 4 — dataset sourcing and the training objective). Every other decision point of both records remains in effect.
 
 
-## Amendment (2026-08-29): decision 5 was false as written, and a third gate half was added
+## Amendment (2026-08-29): decision 7 was false as written, and a third gate half was added
 
-**Decision 5 said Comage is routed to the variant on all four tasks.** That
+**Decision 7 said Comage is routed to the variant on all four tasks.** (This
+amendment originally mislabeled it "decision 5" — decision 5 is Serving and
+placement, which is correct as written; the routing decision is decision 7.
+Corrected 2026-08-30, and the fix below is now folded into decision 7's own
+text.) That
 configuration was in force from 2026-08-28 and it broke tool calling. The variant
 kept the register and lost the *decision* to call a tool: measured on the two
 served models with identical prompts and schemas, the base called
@@ -47,13 +51,13 @@ distinguishes four outcomes a single "did it call" number conflates - notably
 misfires read as "the negative training failed" when in fact it had worked
 perfectly and the model was inventing interfaces.
 
-**What decision 5 should say:** Comage is routed to the variant on all four
-tasks, and only two tools are ever model-facing - `generate_image` and
-`generate_diagram`, both from `check-deal-status`.
-`salesforce.opportunity.read` is graph-driven via `live_read_tool` and never
-offered to the model; `web_search` is declared in task frontmatter and bound to
-nothing in the runtime. The original wording implied four tasks' worth of tool
-use that the runtime does not expose.
+**What decision 7 now says** (folded into the Decision section below): Comage
+is routed to the variant on all four tasks, and only two tools are ever
+model-facing - `generate_image` and `generate_diagram`, both from
+`check-deal-status`. `salesforce.opportunity.read` is graph-driven via
+`live_read_tool` and never offered to the model; `web_search` is declared in
+task frontmatter and bound to nothing in the runtime. The original wording
+implied four tasks' worth of tool use that the runtime does not expose.
 
 ## Context
 
@@ -178,7 +182,14 @@ sans raisonner différemment"*.
    and entries without a `task` are rejected, this is expressed as one entry per
    task, not an agent-level default. Fallback needs no new mechanism: the
    gateway's candidate loop advances on exception, so an unavailable model is
-   skipped by exhaustion.
+   skipped by exhaustion. Only two tools are ever model-facing on Comage's
+   tasks — `generate_image` and `generate_diagram`, both from
+   `check-deal-status`. `salesforce.opportunity.read` is graph-driven via
+   `live_read_tool` and is never offered to the model; `web_search` is
+   declared in task frontmatter but bound to nothing in the runtime. (This
+   clarification was added 2026-08-30, correcting the original wording, which
+   implied four tasks' worth of tool use that the runtime does not expose —
+   see the Amendment above.)
 
 8. **The quality gate covers style *and* substance** — a new register-conformance
    evaluation is added **in addition to** the existing acceptance gate, which
