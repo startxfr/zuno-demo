@@ -33,12 +33,19 @@ copy would drift unvalidated).
   single pinned reference (baked-image build model unchanged), then the
   moved content is cut over out of this repository; every consuming
   component isolates its OKF parsing behind one adaptation hook validated
-  by a shared conformance suite.
+  by a shared conformance suite. ADR-0506/ADR-0507/ADR-0508 retargeted out
+  of this milestone to platform v0.7 on 2026-08-30 (all `Proposed`,
+  gated on an owner-created `zuno-okf` repository not yet provisioned) —
+  see change log; WP-48/WP-49/WP-50/WP-51 stay tracked in this file's own
+  Tracker below, only their ADRs' version `Target` moved.
 - **OKF v0.3 — live reconciliation** (ADR-0509 – 0510): OKF content reaches
   running components as operator-materialized mounted artifacts instead of
   baked image copies, and the AIAgent operator watches the `zuno-okf`
   repository to reconcile running agent configuration within CR-declared
-  boundaries.
+  boundaries. ADR-0509/ADR-0510 retargeted out of this milestone to
+  platform v0.7 on 2026-08-30 alongside ADR-0506–0508 — see change log;
+  WP-52/WP-53 stay tracked in this file's own Tracker below, only their
+  ADRs' version `Target` moved.
 
 ## Execution model
 
@@ -143,6 +150,18 @@ WP-43 ─┬─ WP-44 ─┬──────────────┬─ WP-
 
 ## Change log
 
+- 2026-08-30 — ADR-0506, ADR-0507, ADR-0508 (OKF v0.2 -> v0.7) and
+  ADR-0509, ADR-0510 (OKF v0.3 -> v0.7) retargeted to the platform
+  roadmap's v0.7 band, alongside its other not-yet-started work
+  (ADR-0352, ADR-0534). All five ADRs are `Proposed`, all six WPs
+  (WP-48–WP-53) are `Not started`; there is no repo-side blocker — WP-48's
+  own dependencies (WP-44/45/46) are all `Done` — only the operator step
+  of provisioning the `zuno-okf` GitHub repository (branch protection +
+  CODEOWNERS) is outstanding. Docs-only move, following the precedent set
+  when ADR-0511/ADR-0512 left OKF v0.1 for the platform bands: WP-48
+  through WP-53 stay tracked in this file's own Tracker; only the ADRs'
+  `Target` moved. See `docs/adr/README.md`'s matching Retargeting note and
+  `docs/roadmap/versions.md`.
 - 2026-08-25 — WP-54 closed `Done`, ADR-0511 `Implemented`. The
   429-exceedance acceptance run passed live with a real token
   (`intensive` 429 at request 11 against 10/5m, `standard` at 61 against

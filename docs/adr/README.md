@@ -28,6 +28,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Retargeting note (2026-08-30, second move same day):** ADR-0307 and ADR-0410 (v0.7 -> v0.9) - both are `Proposed` under Cancelled WP-41 (2026-08-23), which will not pursue the sixth-agent deployment gate that would discharge either. User decision: Naveo is not to be pursued as the new-agent-onboarding proof before at least v0.9, possibly later - so rather than sit in v0.7's long-term/harder band, they move on to join ADR-0535 in the newer v0.9 band. This is a docs-only move; the merged template generator (`platform/templates/agent/`) and Naveo agent bundle (`agents/naveo/`) are untouched. Numbering is unchanged; only `Target` moves. (Earlier the same day: ADR-0307 and ADR-0410 moved v0.4 -> v0.7 - both are `Proposed` under Cancelled WP-41 (2026-08-23) - rather than leave them blocking v0.4's closure indefinitely. v0.4 has no remaining open items after that first move.)
 
+**Retargeting note (2026-08-30, third move same day):** ADR-0506, ADR-0507, ADR-0508 (OKF v0.2 -> v0.7) and ADR-0509, ADR-0510 (OKF v0.3 -> v0.7) - all five are `Proposed` and `Not started` (WP-48 through WP-53), gated on an owner-created `zuno-okf` GitHub repository that has not yet been provisioned. Scheduled to land alongside v0.7's other not-yet-started work (ADR-0352, ADR-0534) rather than open a dedicated OKF band with no active work. This is a docs-only move: no code, no repository provisioning, no live cluster action. Numbering (05xx band) is unchanged; only `Target` moves. WP-48 through WP-53 stay tracked in the [OKF roadmap](../roadmap/okf-roadmap.md)'s own tracker, per the precedent set when ADR-0511/ADR-0512 moved out of OKF v0.1 (WP-54/WP-55 stayed tracked there too).
+
 **Retargeting note (2026-08-24, evening):** ADR-0354 (Add Ansible Automation Platform as a new Day 0 component, v0.3) is amended in place - it was never implemented, so this is a correction rather than a superseding decision. Placement moves from a Day 0 sequence ADR-0060 has since retired (`... keycloak → aap → machines ...`) to Day 1, immediately after `openshift_oauth`; scope is split into two components (`aap` for the platform itself, `aap-config` for repository/Job-Template registration, mechanism decided from a live CRD inventory rather than assumed); sizing is explicitly non-HA; `Target` moves v0.3 -> v0.2. The file is renamed to `0354-add-ansible-automation-platform-as-a-day-1-component.md` to keep the filename in sync with the corrected title. ADR-0355 is a new companion ADR (v0.3) covering the follow-on `mcp-aap` server that lets agents launch/read AAP. ADR-0418 (execute Day 0/Day 1 operations as AAP Job Templates, v0.4) is unchanged.
 
 ## version 0
@@ -257,6 +259,11 @@ Also carried in v0.7, as a separate large-scope effort unrelated to the GitHub-A
 |---|---|---|---|
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.7 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | v0.7 | Proposed | Integrate TrustyAI for AI evaluation and guardrails |
+| [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | v0.7 | Proposed | Extract OKF content into a standalone zuno-okf repository |
+| [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | v0.7 | Proposed | Consume the zuno-okf repository through a single pinned reference |
+| [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | v0.7 | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
+| [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | v0.7 | Proposed | Deliver OKF content as mounted versioned artifacts |
+| [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | v0.7 | Proposed | Make the AIAgent operator watch the zuno-okf repository |
 
 ## version 0.8
 
@@ -284,11 +291,6 @@ Goal: prove the platform's Day 0–3 automation is complete and portable by rede
 | [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md) | OKF v0.1 | Implemented | Make each OKF bundle state its complete authorization contract |
 | [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md) | OKF v0.1 | Implemented | Define the agent tests directory structure and promotion gate |
 | [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) | OKF v0.1 | Superseded by ADR-0515 (Abandoned before implementation) | Open OKF tasks as concurrent per-agent frontend tabs |
-| [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | OKF v0.2 | Proposed | Extract OKF content into a standalone zuno-okf repository |
-| [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | OKF v0.2 | Proposed | Consume the zuno-okf repository through a single pinned reference |
-| [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | OKF v0.2 | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
-| [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | OKF v0.3 | Proposed | Deliver OKF content as mounted versioned artifacts |
-| [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | OKF v0.3 | Proposed | Make the AIAgent operator watch the zuno-okf repository |
 | [ADR-0513](0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md) | OKF v0.1 | Implemented | Give OKF rag/, tools/ and policies/ directories a real schema |
 | [ADR-0514](0514-generalize-arkos-plan-draft-write-for-multiple-document-kinds.md) | OKF v0.1 | Implemented | Generalize Arkos's plan_draft_write shape for multiple document kinds |
 | [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md) | OKF v0.1 | Implemented | Open per-conversation tabs with one browser tab per agent |

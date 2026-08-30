@@ -1,7 +1,7 @@
 # ADR-0508: Isolate OKF parsing behind per-component adaptation hooks
 
 - **Status:** Proposed
-- **Target:** OKF v0.2
+- **Target:** v0.7 (retargeted from OKF v0.2 on 2026-08-30 — see ADR-0506's note)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
 

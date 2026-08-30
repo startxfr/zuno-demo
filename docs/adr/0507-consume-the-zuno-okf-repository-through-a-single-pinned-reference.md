@@ -1,7 +1,7 @@
 # ADR-0507: Consume the zuno-okf repository through a single pinned reference
 
 - **Status:** Proposed
-- **Target:** OKF v0.2
+- **Target:** v0.7 (retargeted from OKF v0.2 on 2026-08-30 — see ADR-0506's note)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
 

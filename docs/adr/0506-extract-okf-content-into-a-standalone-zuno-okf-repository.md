@@ -1,7 +1,7 @@
 # ADR-0506: Extract OKF content into a standalone zuno-okf repository
 
 - **Status:** Proposed
-- **Target:** OKF v0.2
+- **Target:** v0.7 (retargeted from OKF v0.2 on 2026-08-30 — Not started, gated on an owner-created `zuno-okf` GitHub repository not yet provisioned; scheduled alongside v0.7's other not-yet-started work rather than open a dedicated OKF band)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
 
