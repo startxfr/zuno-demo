@@ -18,7 +18,7 @@ and service restarts, proven by tests that kill and resume a run.
 
 ## ADR references
 
-Stub origin (`docs/adr/0100-v0.1-roadmap.md`): persist workflow checkpoints
+Stub origin (`docs/roadmap/adr-decisions-v0.1.md`): persist workflow checkpoints
 so document-generation jobs survive browser disconnects and service
 restarts.
 
@@ -46,7 +46,7 @@ Acceptance criteria: Standard clauses (docs/adr/README.md#standard-clauses).
    Decision:
 
    > Promote this decision from a one-line v0.1-roadmap entry
-   > (`0100-v0.1-roadmap.md`) to a full record.
+   > (`../adr-decisions-v0.1.md`) to a full record.
    >
    > Persist Agent Runtime workflow state with the LangGraph PostgreSQL
    > checkpointer, using a dedicated schema/role on the shared
@@ -64,7 +64,7 @@ Acceptance criteria: Standard clauses (docs/adr/README.md#standard-clauses).
    > Acceptance criteria and Review evidence.
 
    Related ADRs list: 0015, 0039, 0045, 0209, 0315.
-2. In `docs/adr/0100-v0.1-roadmap.md`: KEEP the `### ADR-0103: …` heading;
+2. In `docs/roadmap/adr-decisions-v0.1.md`: KEEP the `### ADR-0103: …` heading;
    replace the body with
    `Promoted to a full decision record: see [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) (WP-08 implementation).`
 3. In `docs/adr/README.md`: flip the ADR-0103 row link from the roadmap

@@ -97,7 +97,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0045](0045-stream-responses-end-to-end-with-sse.md)
 - [ADR-0054](0054-define-the-bff-contract-openapi-first.md)
 - [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md)
-- [ADR-0200](0200-v0.2-roadmap.md)
+- [ADR-0200](../roadmap/adr-decisions-v0.2.md)
 - [ADR-0209](0209-introduce-project-scoped-agent-memory.md)
 - [ADR-0213](0213-introduce-role-based-conversation-sharing.md) (extends this ADR's ownership check to shared roles)
 - [ADR-0214](0214-refresh-agent-frontend-chrome-branding-footer-and-menu-icons.md) (adds icons to this ADR's left menu)

@@ -19,7 +19,7 @@ bundles.
 
 ## ADR references
 
-Stub origin (`docs/adr/0100-v0.1-roadmap.md`): verify signatures and
+Stub origin (`docs/roadmap/adr-decisions-v0.1.md`): verify signatures and
 schema/policy validity before promoting agent definitions.
 
 Related: ADR-0038 (OKF bundle format), ADR-0039 (runtime executes the OKF
@@ -53,7 +53,7 @@ this adds a trust boundary.
    ## Decision
 
    Promote this decision from a one-line v0.1-roadmap entry
-   (`0100-v0.1-roadmap.md`) to a full record, since WP-04's supply-chain
+   (`../adr-decisions-v0.1.md`) to a full record, since WP-04's supply-chain
    tooling makes it concretely implementable.
 
    Sign every OKF agent bundle (the per-agent content under `agents/<agent>/`)
@@ -78,12 +78,12 @@ this adds a trust boundary.
    - [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md)
    ```
 
-2. In `docs/adr/0100-v0.1-roadmap.md`: KEEP the heading
+2. In `docs/roadmap/adr-decisions-v0.1.md`: KEEP the heading
    `### ADR-0106: Enforce OKF bundle signing and validation`; replace its
    one-line body with:
    `Promoted to a full decision record: see [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) (WP-05 implementation).`
 3. In `docs/adr/README.md`: change the ADR-0106 row link from the
-   `0100-v0.1-roadmap.md#adr-0106-...` anchor to
+   `../adr-decisions-v0.1.md#adr-0106-...` anchor to
    `0106-enforce-okf-bundle-signing-and-validation.md`; status cell
    `Proposed` → `To be implemented`.
 4. `python3 platform/docs/check_docs.py` must exit 0 before continuing.

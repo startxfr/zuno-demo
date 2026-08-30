@@ -329,7 +329,7 @@ Alternatives, Consequences, Migration/evolution and Acceptance criteria.
 - [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) - Restructure deployment into Day 0 / Day 1 sequencing
 - [ADR-0315](0315-dedicated-keycloak-postgresql-database.md) - Dedicated Keycloak database/role on the shared PostgreSQL cluster
 - [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) - Separate the OpenShift AI control plane from AI build and run workload namespaces
-- [ADR-0105](0100-v0.1-roadmap.md#adr-0105-automate-source-specific-knowledge-ingestion) - Automate source-specific knowledge ingestion
+- [ADR-0105](../roadmap/adr-decisions-v0.1.md#adr-0105-automate-source-specific-knowledge-ingestion) - Automate source-specific knowledge ingestion
 - [ADR-0202](0202-introduce-logical-knowledge-domains.md) - Introduce logical knowledge domains
 - [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) - Prefer indexed knowledge for read and live tools for freshness and write
 - [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) - Generalize the RAG platform to multiple isolated knowledge domains

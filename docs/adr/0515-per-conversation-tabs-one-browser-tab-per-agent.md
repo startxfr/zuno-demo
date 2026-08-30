@@ -209,7 +209,7 @@ Migration/evolution and Review evidence.
 - [ADR-0054](0054-define-the-bff-contract-openapi-first.md)
 - [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md)
 - [ADR-0213](0213-introduce-role-based-conversation-sharing.md)
-- [ADR-0407](0400-v0.4-roadmap.md#adr-0407-add-specialized-task-oriented-frontend-views)
+- [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views)
 - [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md)
 - [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) (superseded by this ADR)
 - [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md)

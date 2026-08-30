@@ -8,7 +8,7 @@
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record.
+(`../roadmap/adr-decisions-v0.1.md`) to a full record.
 
 Use provenance, `source_modified_at`, `indexed_at` and source/domain
 freshness policy to rank knowledge, signal stale content and trigger a

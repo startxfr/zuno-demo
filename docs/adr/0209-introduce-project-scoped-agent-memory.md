@@ -71,4 +71,4 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md)
 - [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)
 - [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md)
-- [ADR-0404](0400-v0.4-roadmap.md#adr-0404-introduce-controlled-shared-agent-memory)
+- [ADR-0404](../roadmap/adr-decisions-v0.4.md#adr-0404-introduce-controlled-shared-agent-memory)

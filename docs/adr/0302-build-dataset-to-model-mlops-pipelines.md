@@ -8,7 +8,7 @@
 ## Decision
 
 Promote this decision from a one-line v0.3-roadmap entry
-(`0300-v0.3-roadmap.md`) to a full record, for the same reason as
+(`../roadmap/adr-decisions-v0.3.md`) to a full record, for the same reason as
 ADR-0301: `ansible/roles/mlops` needs a real target to scaffold
 against. This ADR is the pipeline that produces the LoRA/PEFT adapters
 ADR-0301 serves - dataset preparation, training, evaluation, registry

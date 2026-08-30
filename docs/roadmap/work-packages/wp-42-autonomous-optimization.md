@@ -76,7 +76,7 @@ audit trail, automatic rollback triggers, and a kill switch.
 
 ## ADR references
 
-Stub (verbatim, from `docs/adr/0300-v0.3-roadmap.md`): "Allow bounded
+Stub (verbatim, from `docs/roadmap/adr-decisions-v0.3.md`): "Allow bounded
 automated tuning of routing, caching and model choices under explicit
 governance."
 
@@ -104,7 +104,7 @@ governance."
    all autonomy in one configuration change. Anything outside the
    enumerated scope remains a human-reviewed PR (ADR-0304)." Related:
    0104, 0304, 0305.
-2. `docs/adr/0300-v0.3-roadmap.md`: KEEP heading; body →
+2. `docs/roadmap/adr-decisions-v0.3.md`: KEEP heading; body →
    `Promoted to a full decision record: see [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) (WP-42 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.

@@ -17,7 +17,7 @@ fail closed, scheduled with each domain's refresh.
 
 ## ADR references
 
-Stub (from `docs/adr/0100-v0.1-roadmap.md`): keep private vector indexes aligned with current source authorization and remove inaccessible content.
+Stub (from `docs/roadmap/adr-decisions-v0.1.md`): keep private vector indexes aligned with current source authorization and remove inaccessible content.
 
 Related: ADR-0046 (`acl_groups` metadata + retrieval filter), ADR-0330
 (Confluence `acl_groups` tagging from `requiredGroups`), ADR-0105/WP-22
@@ -50,7 +50,7 @@ mandatory (authorization boundary).
    > the index). Deletions are logged with provenance for audit.
 
    Standard-clauses pointer + Related ADRs (0046, 0105, 0330, 0408).
-2. `docs/adr/0100-v0.1-roadmap.md`: KEEP heading; body →
+2. `docs/roadmap/adr-decisions-v0.1.md`: KEEP heading; body →
    `Promoted to a full decision record: see [ADR-0110](0110-automate-document-acl-synchronization.md) (WP-25 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.

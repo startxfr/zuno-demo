@@ -16,7 +16,7 @@
   CR reconciliation, which the condition check above confirms works.
   ADR-0308 → Implemented; ADR-0350 → Implemented, per this file's own
   stated trigger now that ADR-0308 closed. Repo work merged (2026-08-15):
-  Step 0 promoted ADR-0308 verbatim from its `docs/adr/0300-v0.3-roadmap.md`
+  Step 0 promoted ADR-0308 verbatim from its `docs/roadmap/adr-decisions-v0.3.md`
   stub. Controller (`operator/aiagent-operator/internal/controller/`):
   `AIAgentReconciler.Reconcile` generates exactly CONTRACT.md's resource
   set for each CR - two ServiceAccounts, frontend/BFF Deployments+Services,
@@ -119,7 +119,7 @@ status conditions), within the contract's hard boundaries.
 
 ## ADR references
 
-- ADR-0308 stub (verbatim, from `docs/adr/0300-v0.3-roadmap.md`): "Automate
+- ADR-0308 stub (verbatim, from `docs/roadmap/adr-decisions-v0.3.md`): "Automate
   more lifecycle, policy and deployment reconciliation around agent
   definitions."
 - [docs/adr/0327-...md](../../adr/0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md)
@@ -156,7 +156,7 @@ status conditions), within the contract's hard boundaries.
    with the plain-manifest path remaining valid until each agent's CR is
    adopted." Standard-clauses pointer + Related ADRs (0113, 0327, 0022,
    0008).
-2. `docs/adr/0300-v0.3-roadmap.md`: KEEP the `### ADR-0308:` heading; body →
+2. `docs/roadmap/adr-decisions-v0.3.md`: KEEP the `### ADR-0308:` heading; body →
    `Promoted to a full decision record: see [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) (WP-38 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.

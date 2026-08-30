@@ -9,7 +9,7 @@
 
 Provide controlled templates, validation and workflows for teams to
 define new agents (the stub decision, promoted verbatim from
-`docs/adr/0300-v0.3-roadmap.md`).
+`docs/roadmap/adr-decisions-v0.3.md`).
 
 A new agent is created from a repository template
 (`platform/templates/agent/`) that scaffolds the OKF bundle skeleton,

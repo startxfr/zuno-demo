@@ -8,7 +8,7 @@
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record.
+(`../roadmap/adr-decisions-v0.1.md`) to a full record.
 
 Persist Agent Runtime workflow state with the LangGraph PostgreSQL
 checkpointer, using a dedicated schema/role on the shared

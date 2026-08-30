@@ -9,7 +9,7 @@
 
 Allow bounded automated tuning of routing, caching and model choices
 under explicit governance (the stub decision, promoted verbatim from
-`docs/adr/0300-v0.3-roadmap.md`).
+`docs/roadmap/adr-decisions-v0.3.md`).
 
 A governance policy (`policies/optimization/optimization-policy.yaml`)
 enumerates exactly which parameters may be auto-tuned (initial scope:

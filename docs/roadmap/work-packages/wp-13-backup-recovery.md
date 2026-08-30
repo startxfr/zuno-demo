@@ -16,7 +16,7 @@ drill on a real cluster is the operator part.
 
 ## ADR references
 
-Stub origin (`docs/adr/0100-v0.1-roadmap.md`): define backup, restore and
+Stub origin (`docs/roadmap/adr-decisions-v0.1.md`): define backup, restore and
 recovery objectives for PostgreSQL, configuration and critical state.
 
 Related: ADR-0015 (PostgreSQL platform), ADR-0024 (Vault), ADR-0022 (Git as
@@ -39,7 +39,7 @@ explicitly), ADR-0101/WP-12. Acceptance criteria: Standard clauses.
    this Decision:
 
    > Promote this decision from a one-line v0.1-roadmap entry
-   > (`0100-v0.1-roadmap.md`) to a full record.
+   > (`../adr-decisions-v0.1.md`) to a full record.
    >
    > Define and implement backup/restore for all critical platform state:
    > PostgreSQL databases via the postgres operator's pgBackRest
@@ -55,7 +55,7 @@ explicitly), ADR-0101/WP-12. Acceptance criteria: Standard clauses.
    > documented before this ADR claims Implemented.
 
    Standard-clauses pointer + Related ADRs (0015, 0022, 0024, 0101, 0315).
-2. `docs/adr/0100-v0.1-roadmap.md`: KEEP heading; body →
+2. `docs/roadmap/adr-decisions-v0.1.md`: KEEP heading; body →
    `Promoted to a full decision record: see [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) (WP-13 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.

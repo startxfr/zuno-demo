@@ -10,7 +10,7 @@
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record.
+(`../roadmap/adr-decisions-v0.1.md`) to a full record.
 
 Use OpenShift AI's LM-Eval capability (`LMEvalJob` resources on the
 DataScienceCluster's evaluation component) to benchmark candidate local

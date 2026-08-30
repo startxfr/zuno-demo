@@ -8,7 +8,7 @@
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record.
+(`../roadmap/adr-decisions-v0.1.md`) to a full record.
 
 Adopt 99.9% monthly availability as the industrialized objective for the
 user-facing agent path (frontend -> BFF -> Agent Runtime -> AI Gateway ->

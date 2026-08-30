@@ -9,7 +9,7 @@
 
 Share base models while selecting approved task/agent adapters
 dynamically (the stub decision, promoted verbatim from
-`docs/adr/0300-v0.3-roadmap.md`).
+`docs/roadmap/adr-decisions-v0.3.md`).
 
 The AI Gateway resolves the serving target per request: an agent/task
 whose model-routing policy declares an approved adapter is routed to
@@ -66,5 +66,5 @@ this conclusion.
 - [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md)
 - [ADR-0301](0301-introduce-lora-and-peft-model-customization.md)
 - [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md)
-- [ADR-0304](0300-v0.3-roadmap.md#adr-0304-optimize-model-selection-using-quality-cost-and-latency)
+- [ADR-0304](../roadmap/adr-decisions-v0.3.md#adr-0304-optimize-model-selection-using-quality-cost-and-latency)
 - [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) — supersedes the ADR-0301 serving mechanism this ADR depends on; see Evolution above

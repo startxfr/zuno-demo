@@ -52,7 +52,7 @@ Migration/evolution and Related ADRs.
 - [ADR-0054](0054-define-the-bff-contract-openapi-first.md)
 - [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md)
 - [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md)
-- [ADR-0407](0400-v0.4-roadmap.md#adr-0407-add-specialized-task-oriented-frontend-views) (this ADR was meant to deliver its per-agent task-tab portion early; ADR-0515 does so instead)
+- [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views) (this ADR was meant to deliver its per-agent task-tab portion early; ADR-0515 does so instead)
 - [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md)
 - [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md)
 - [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md) (supersedes this ADR)

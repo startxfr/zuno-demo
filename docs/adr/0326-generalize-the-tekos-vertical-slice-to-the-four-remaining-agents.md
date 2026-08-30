@@ -97,8 +97,8 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md)
 - [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md)
 - [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md)
-- [ADR-0401](0400-v0.4-roadmap.md#adr-0401-introduce-agent-to-agent-communication)
-- [ADR-0402](0400-v0.4-roadmap.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol)
+- [ADR-0401](../roadmap/adr-decisions-v0.4.md#adr-0401-introduce-agent-to-agent-communication)
+- [ADR-0402](../roadmap/adr-decisions-v0.4.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol)
 - [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — removed `knowledge.adv`'s only ingestion adapter
 - [ADR-0532](0532-accept-knowledge-adv-as-sourceless-pending-a-replacement-adapter.md) — Advantage's own sourcing decision
 - [ADR-0533](0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) — consolidates Advantage's and Finage's non-promotion decisions, tracked at v0.8

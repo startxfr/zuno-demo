@@ -102,7 +102,7 @@ proving the platform onboards beyond the initial five.
 
 ## ADR references
 
-Stubs (verbatim, from `docs/adr/0300-v0.3-roadmap.md`):
+Stubs (verbatim, from `docs/roadmap/adr-decisions-v0.3.md`):
 - ADR-0307: "Provide controlled templates, validation and workflows for teams to define new agents."
 - ADR-0410: "Demonstrate that the generic platform supports broader enterprise agent onboarding."
 
@@ -136,7 +136,7 @@ Stubs (verbatim, from `docs/adr/0300-v0.3-roadmap.md`):
    external systems) end to end: template scaffold → validation workflow →
    review → deployment via `AIAgent` CR → evaluation gate. The sixth agent
    is a permanent template regression proof." Related: 0307, 0326.
-3. `docs/adr/0300-v0.3-roadmap.md`: KEEP both headings; bodies → promotion
+3. `docs/roadmap/adr-decisions-v0.3.md`: KEEP both headings; bodies → promotion
    pointer lines (`(WP-41 implementation)`).
 4. `docs/adr/README.md`: both rows → direct links, `To be implemented`.
 5. `python3 platform/docs/check_docs.py` exits 0.

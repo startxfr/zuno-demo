@@ -8,7 +8,7 @@
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record.
+(`../roadmap/adr-decisions-v0.1.md`) to a full record.
 
 Keep private vector indexes aligned with current source authorization and
 remove inaccessible content.
@@ -21,7 +21,7 @@ authorization" is the platform's own declared configuration
 `fetch-confluence` already stamps onto every chunk it writes, not a live
 Confluence restrictions/permissions API call (no such integration exists
 in this repository; generalizing to real per-document source-restriction
-sync is deferred to v0.4, [ADR-0408](0400-v0.4-roadmap.md#adr-0408-automate-removal-of-inaccessible-private-rag-content)). What
+sync is deferred to v0.4, [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content)). What
 `reconcile-acls` *does* re-read live is page **existence and visibility**:
 it re-lists every currently-configured source and compares against every
 indexed chunk, not just this run's changeset (an unchanged document's

@@ -318,7 +318,7 @@ from Quay (or another external registry) - i.e. actually moving a chart's
 `repository`/`frontendRepository`/`bffRepository` off the in-cluster
 mirror - is a distinct, legitimate future direction, deliberately
 deferred to **ADR-0353** (v0.3, not yet written; see
-[docs/adr/0300-v0.3-roadmap.md](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source)),
+[docs/roadmap/adr-decisions-v0.3.md](../roadmap/adr-decisions-v0.3.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source)),
 not decided or implemented here. This is a third, distinct sense of
 "external" from ADR-0352's (who deploys the platform's own infrastructure
 services) and ADR-0116/0117's (how agents reach third-party SaaS tool

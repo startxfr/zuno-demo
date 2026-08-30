@@ -10,7 +10,7 @@
 
 Demonstrate that the generic platform supports broader enterprise agent
 onboarding (the stub decision, promoted verbatim from
-`docs/adr/0300-v0.3-roadmap.md`).
+`docs/roadmap/adr-decisions-v0.3.md`).
 
 Prove ADR-0307's path by onboarding a sixth demo agent (synthetic
 persona, existing knowledge domains and capabilities only, no new

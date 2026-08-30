@@ -75,7 +75,7 @@ is ADR-0309/WP-42).
 
 ## ADR references
 
-Stubs (verbatim, from `docs/adr/0300-v0.3-roadmap.md`):
+Stubs (verbatim, from `docs/roadmap/adr-decisions-v0.3.md`):
 - ADR-0305: "Benchmark candidate models before routing-policy promotion."
 - ADR-0304: "Continuously improve routing using measured operational and evaluation signals."
 
@@ -110,7 +110,7 @@ human-reviewed PR.
    recommendation is a normal reviewed GitOps change. No component changes
    routing autonomously (that is ADR-0309's separately governed scope)."
    Related: 0021, 0029, 0303, 0305, 0309.
-3. `docs/adr/0300-v0.3-roadmap.md`: KEEP both headings; bodies → promotion
+3. `docs/roadmap/adr-decisions-v0.3.md`: KEEP both headings; bodies → promotion
    pointer lines (`(WP-40 implementation)`).
 4. `docs/adr/README.md`: both rows → direct links, `To be implemented`.
 5. `python3 platform/docs/check_docs.py` exits 0.

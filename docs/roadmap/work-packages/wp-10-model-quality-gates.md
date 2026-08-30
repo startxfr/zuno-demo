@@ -31,7 +31,7 @@ candidate local-model comparison. GPU/cluster execution is the operator part.
 
 ## ADR references
 
-Stub origins (`docs/adr/0100-v0.1-roadmap.md`): ADR-0107 blocks promotion when model/agent regression breaches agreed thresholds; ADR-0108 uses OpenShift AI evaluation capabilities to compare candidate local models.
+Stub origins (`docs/roadmap/adr-decisions-v0.1.md`): ADR-0107 blocks promotion when model/agent regression breaches agreed thresholds; ADR-0108 uses OpenShift AI evaluation capabilities to compare candidate local models.
 
 Related: ADR-0027 (20 acceptance scenarios), ADR-0028 (75% threshold),
 ADR-0053 (make check as acceptance/security gate), ADR-0019 (OpenShift AI
@@ -53,7 +53,7 @@ serving). Acceptance criteria: Standard clauses.
    this Decision:
 
    > Promote this decision from a one-line v0.1-roadmap entry
-   > (`0100-v0.1-roadmap.md`) to a full record.
+   > (`../adr-decisions-v0.1.md`) to a full record.
    >
    > A model or agent change may only be promoted when the target agent's
    > ADR-0027 acceptance suite passes at the ADR-0028 threshold (75%)
@@ -69,7 +69,7 @@ serving). Acceptance criteria: Standard clauses.
    this Decision:
 
    > Promote this decision from a one-line v0.1-roadmap entry
-   > (`0100-v0.1-roadmap.md`) to a full record.
+   > (`../adr-decisions-v0.1.md`) to a full record.
    >
    > Use OpenShift AI's LM-Eval capability (`LMEvalJob` resources on the
    > DataScienceCluster's evaluation component) to benchmark candidate
@@ -81,7 +81,7 @@ serving). Acceptance criteria: Standard clauses.
 
    Both files end with the Standard-clauses pointer and Related ADRs
    (0107: 0027, 0028, 0053, 0108; 0108: 0019, 0021, 0107).
-3. In `docs/adr/0100-v0.1-roadmap.md`: KEEP both `### ADR-0107:`/`### ADR-0108:`
+3. In `docs/roadmap/adr-decisions-v0.1.md`: KEEP both `### ADR-0107:`/`### ADR-0108:`
    headings; replace each body with the promotion pointer line to its new file
    (`Promoted to a full decision record: see [ADR-0107](0107-introduce-automated-model-quality-gates.md) (WP-10 implementation).` etc.).
 4. In `docs/adr/README.md`: flip both rows to direct links; statuses

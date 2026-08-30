@@ -15,7 +15,7 @@ existing hardening checker so the new controls are enforced in CI.
 
 ## ADR references
 
-Stub origin (`docs/adr/0100-v0.1-roadmap.md`): harden deployment, supply
+Stub origin (`docs/roadmap/adr-decisions-v0.1.md`): harden deployment, supply
 chain, identity, network and data controls toward SecNumCloud-oriented
 expectations.
 
@@ -38,7 +38,7 @@ Acceptance criteria: Standard clauses.
    this Decision:
 
    > Promote this decision from a one-line v0.1-roadmap entry
-   > (`0100-v0.1-roadmap.md`) to a full record.
+   > (`../adr-decisions-v0.1.md`) to a full record.
    >
    > Maintain a SecNumCloud-oriented control matrix at
    > `docs/security/secnumcloud-controls.md` mapping control families
@@ -56,7 +56,7 @@ Acceptance criteria: Standard clauses.
    > file mount is supported); image-provenance rows point at ADR-0115.
 
    Standard-clauses pointer + Related ADRs (0037, 0041, 0052, 0115).
-2. `docs/adr/0100-v0.1-roadmap.md`: KEEP the heading, body →
+2. `docs/roadmap/adr-decisions-v0.1.md`: KEEP the heading, body →
    `Promoted to a full decision record: see [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) (WP-11 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.

@@ -9,7 +9,7 @@
 
 Continuously improve routing using measured operational and evaluation
 signals (the stub decision, promoted verbatim from
-`docs/adr/0300-v0.3-roadmap.md`).
+`docs/roadmap/adr-decisions-v0.3.md`).
 
 Routing policy (`policies/model-routing/`) gains explicit quality/cost/
 latency objectives per task class; a reporting job compares live
@@ -28,4 +28,4 @@ Migration/evolution and Review evidence.
 - [ADR-0029](0029-instrument-model-usage-costs-and-distributed-traces.md)
 - [ADR-0303](0303-support-dynamic-lora-adapter-loading.md)
 - [ADR-0305](0305-introduce-automated-model-benchmarking.md)
-- [ADR-0309](0300-v0.3-roadmap.md#adr-0309-introduce-policy-driven-autonomous-optimization)
+- [ADR-0309](../roadmap/adr-decisions-v0.3.md#adr-0309-introduce-policy-driven-autonomous-optimization)

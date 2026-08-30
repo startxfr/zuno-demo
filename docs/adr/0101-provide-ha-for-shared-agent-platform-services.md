@@ -8,7 +8,7 @@
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record.
+(`../roadmap/adr-decisions-v0.1.md`) to a full record.
 
 Every shared platform service (Agent Runtime, AI Gateway, MCP Gateway,
 rag-service, Keycloak, PostgreSQL, Redis, and the observability stack)

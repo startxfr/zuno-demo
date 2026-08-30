@@ -8,7 +8,7 @@
 ## Decision
 
 Benchmark candidate models before routing-policy promotion (the stub
-decision, promoted verbatim from `docs/adr/0300-v0.3-roadmap.md`).
+decision, promoted verbatim from `docs/roadmap/adr-decisions-v0.3.md`).
 
 Every candidate model or adapter is benchmarked before routing-policy
 promotion: LM-Eval task suites (ADR-0108) plus the target agents'

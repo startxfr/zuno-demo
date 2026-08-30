@@ -87,7 +87,7 @@ follow-up WP.
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record, since WP-04's supply-chain
+(`../roadmap/adr-decisions-v0.1.md`) to a full record, since WP-04's supply-chain
 tooling makes it concretely implementable.
 
 Sign every OKF agent bundle (the per-agent content under `agents/<agent>/`)

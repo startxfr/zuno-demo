@@ -21,7 +21,7 @@ that always distinguish indexed vs live vs both.
 ## ADR references
 
 - [docs/adr/0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md](../../adr/0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md)
-- ADR-0109 stub (from `docs/adr/0100-v0.1-roadmap.md`): rank knowledge using provenance, `source_modified_at`, `indexed_at` and source/domain freshness policy; signal stale content; trigger a live MCP/API read when an indexed answer isn't fresh enough for the requested operation.
+- ADR-0109 stub (from `docs/roadmap/adr-decisions-v0.1.md`): rank knowledge using provenance, `source_modified_at`, `indexed_at` and source/domain freshness policy; signal stale content; trigger a live MCP/API read when an indexed answer isn't fresh enough for the requested operation.
 
 ADR-0205 acceptance criteria: a normal sales semantic question is answered from `knowledge.sales` without a live Salesforce call; a question explicitly asking for the current value of a mutable Salesforce field can trigger live verification; every Salesforce mutation goes through a write capability, never through RAG; technical Confluence content is answered from `knowledge.tech`, while an authorized live Confluence action can still read/update the source page; traces show whether a response used indexed knowledge, live verification, or both.
 
@@ -51,7 +51,7 @@ with alerts against domain objectives.
    `rag-service` ranking and the Agent Runtime retrieval step; thresholds
    come from the domain descriptors (`knowledge/<domain>/domain.yaml`), not
    code." Standard-clauses pointer + Related ADRs (0046, 0105, 0202, 0205).
-   In `docs/adr/0100-v0.1-roadmap.md`: KEEP the `### ADR-0109:` heading,
+   In `docs/roadmap/adr-decisions-v0.1.md`: KEEP the `### ADR-0109:` heading,
    body → promotion pointer (`(WP-24 implementation)`).
    `docs/adr/README.md`: direct link + `To be implemented`. Run
    `check_docs.py`.

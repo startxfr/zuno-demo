@@ -250,4 +250,4 @@ considered, Migration/evolution and Review evidence.
 - [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md) (transcript replay for the user; this ADR adds it for the model)
 - [ADR-0213](0213-introduce-role-based-conversation-sharing.md) (a shared conversation's history travels with the checkpoint unchanged)
 - [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) (both shapes gain the same terminal node)
-- [ADR-0404](0400-v0.4-roadmap.md#adr-0404-introduce-controlled-shared-agent-memory) (future shared memory; unaffected)
+- [ADR-0404](../roadmap/adr-decisions-v0.4.md#adr-0404-introduce-controlled-shared-agent-memory) (future shared memory; unaffected)

@@ -67,7 +67,7 @@ deferred to v0.7.
 ## ADR references
 
 - [docs/adr/0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md](../../adr/0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) — source-adapter mapping: web + Confluence → tech, validated SQL dump → sxa-legacy, through one generic ingestion framework (Salesforce → sales and Aramis → adv bullets superseded by ADR-0218).
-- ADR-0105 stub (from `docs/adr/0100-v0.1-roadmap.md`): ingestion runs per each source's freshness objective instead of one global monthly cadence — weekly minimum for tech (web/Confluence), on-demand for immutable legacy sources — manual refresh retained (the hours-scale Salesforce clause superseded by ADR-0218).
+- ADR-0105 stub (from `docs/roadmap/adr-decisions-v0.1.md`): ingestion runs per each source's freshness objective instead of one global monthly cadence — weekly minimum for tech (web/Confluence), on-demand for immutable legacy sources — manual refresh retained (the hours-scale Salesforce clause superseded by ADR-0218).
 - [docs/adr/0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md](../../adr/0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — drops Salesforce/Aramis from this WP's scope.
 
 ## Preconditions (verify before starting)
@@ -92,7 +92,7 @@ deferred to v0.7.
    `gitops/charts/rag-ingestion/values.yaml`; manual refresh remains
    `make d1 install rag-ingestion` triggering an immediate run.
    Standard-clauses pointer + Related ADRs (0204, 0205, 0330).
-2. `docs/adr/0100-v0.1-roadmap.md`: KEEP the `### ADR-0105:` heading **and
+2. `docs/roadmap/adr-decisions-v0.1.md`: KEEP the `### ADR-0105:` heading **and
    its explicit `<a id="adr-0105-automate-monthly-knowledge-ingestion"></a>`
    anchor line** (external links target it); replace only the body paragraph
    with `Promoted to a full decision record: see [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) (WP-22 implementation).`

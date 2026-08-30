@@ -5,7 +5,7 @@
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team
 
-v0.3 rolls the single-agent pattern v0.2 established (see [0200-v0.2-roadmap.md](0200-v0.2-roadmap.md)) out to the four remaining agents - Arkos, Comage, Advantage and Finage - using the same shared platform rather than forks.
+v0.3 rolls the single-agent pattern v0.2 established (see [adr-decisions-v0.2.md](adr-decisions-v0.2.md)) out to the four remaining agents - Arkos, Comage, Advantage and Finage - using the same shared platform rather than forks.
 
 Consolidated from 9 individual ADR files, plus four further decisions promoted to full records once the multi-agent rollout needed them (ADR-0326, ADR-0327, ADR-0340, ADR-0342, listed at the end of this file). Each entry below is its own immutable decision record, citable as `ADR-0NNN`; only the Decision line is unique per entry - [Standard clauses](README.md#standard-clauses) (Context, Alternatives, Consequences, Security/Operational considerations, Migration/evolution, Related ADRs) apply to every entry unless overridden here.
 

@@ -117,7 +117,7 @@ until a future ADR reactivates the GitHub Actions/immutable-tag stream.
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record.
+(`../roadmap/adr-decisions-v0.1.md`) to a full record.
 
 Maintain a SecNumCloud-oriented control matrix at
 `docs/security/secnumcloud-controls.md` mapping control families

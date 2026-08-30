@@ -9,7 +9,7 @@
 
 Automate more lifecycle, policy and deployment reconciliation around agent
 definitions (the stub decision, promoted verbatim from
-`docs/adr/0300-v0.3-roadmap.md`).
+`docs/roadmap/adr-decisions-v0.3.md`).
 
 Implement the AIAgent Operator against the ADR-0327 contract exactly: the
 operator reconciles per-agent frontend/BFF/OKF-reference/NetworkPolicy/

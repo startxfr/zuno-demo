@@ -8,7 +8,7 @@
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record.
+(`../roadmap/adr-decisions-v0.1.md`) to a full record.
 
 Add an opt-in semantic cache in the AI Gateway, stored in the existing
 platform Redis. The cache key includes, at minimum: normalized prompt

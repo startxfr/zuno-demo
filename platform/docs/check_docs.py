@@ -81,19 +81,6 @@ AUTO_FIX_RE = re.compile(r"^\s*auto_fix:\s*[\"']?(.+?)[\"']?\s*$", re.MULTILINE)
 OPENSHIFT_VERSION_RE = re.compile(r"OpenShift(?: Container Platform)? (\d+\.\d+)\b")
 OPENSHIFT_AI_VERSION_RE = re.compile(r"OpenShift AI (\d+\.\d+(?: EA\d)?)\b")
 
-# Roadmap container files (0100/0200/0300/0400) hold embedded/promoted
-# ADR-0101.. / ADR-0201.. / ADR-0301.. / ADR-0401.. entries, each
-# individually indexed via its own row or an anchor link into the
-# container - the container file itself is not a numbered ADR and has no
-# row of its own, by docs/adr/README.md's own convention (see its
-# ADR-0101.. rows).
-ADR_INDEX_EXCLUDED_FILES = {
-    "0100-v0.1-roadmap.md",
-    "0200-v0.2-roadmap.md",
-    "0300-v0.3-roadmap.md",
-    "0400-v0.4-roadmap.md",
-}
-
 WP_DIR = REPO_ROOT / "docs" / "roadmap" / "work-packages"
 # Both roadmap files carry WP tracker tables with the identical 6-column
 # header; there is no third one (verified across docs/roadmap/*.md).
@@ -279,8 +266,6 @@ def check_adr_index() -> List[Finding]:
     index_text = ADR_README_PATH.read_text()
 
     for adr_path in sorted(ADR_DIR.glob("[0-9][0-9][0-9][0-9]-*.md")):
-        if adr_path.name in ADR_INDEX_EXCLUDED_FILES:
-            continue
         adr_number = adr_path.name[:4]
         row_match = re.search(rf"\[ADR-{adr_number}\]\({re.escape(adr_path.name)}\)[^\n]*", index_text)
         if not row_match:

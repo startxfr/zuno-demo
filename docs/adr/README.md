@@ -174,7 +174,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0349](0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) | v0.1 | Implemented | Restructure demo personas, ocp-* cluster-access groups and two new agents |
 | [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.3 | Implemented | Provide an AIAgent Kubernetes CRD and operator |
 | [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | v0.3 | Implemented (2026-08-26; amended same day by WP-083 - two permanent MIG nodes, see decisions 5 and 7) | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
-| [ADR-0353](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) | v0.3 | Proposed | Support an optional external registry as the first-party runtime image source |
+| [ADR-0353](../roadmap/adr-decisions-v0.3.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) | v0.3 | Proposed | Support an optional external registry as the first-party runtime image source |
 | [ADR-0355](0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md) | v0.3 | Implemented | Expose AAP audits to agents through an mcp-aap server |
 | [ADR-0532](0532-accept-knowledge-adv-as-sourceless-pending-a-replacement-adapter.md) | v0.3 | Implemented | Accept `knowledge.adv` as sourceless pending a replacement adapter |
 
@@ -182,15 +182,15 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0401](0400-v0.4-roadmap.md#adr-0401-introduce-agent-to-agent-communication) | v0.4 | Proposed | Introduce agent-to-agent communication |
-| [ADR-0402](0400-v0.4-roadmap.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol) | v0.4 | Proposed | Adopt A2A as the inter-agent protocol |
-| [ADR-0403](0400-v0.4-roadmap.md#adr-0403-propagate-user-identity-across-agent-to-agent-calls) | v0.4 | Proposed | Propagate user identity across agent-to-agent calls |
-| [ADR-0404](0400-v0.4-roadmap.md#adr-0404-introduce-controlled-shared-agent-memory) | v0.4 | Proposed | Introduce controlled shared agent memory |
-| [ADR-0405](0400-v0.4-roadmap.md#adr-0405-expose-agent-delegation-traces-to-users) | v0.4 | Proposed | Expose agent delegation traces to users |
-| [ADR-0406](0400-v0.4-roadmap.md#adr-0406-limit-recursive-agent-delegation) | v0.4 | Proposed | Limit recursive agent delegation |
-| [ADR-0407](0400-v0.4-roadmap.md#adr-0407-add-specialized-task-oriented-frontend-views) | v0.4 | Proposed | Add specialized task-oriented frontend views |
-| [ADR-0408](0400-v0.4-roadmap.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) | v0.4 | Proposed | Automate removal of inaccessible private RAG content |
-| [ADR-0409](0400-v0.4-roadmap.md#adr-0409-introduce-advanced-human-approval-workflows) | v0.4 | Proposed | Introduce advanced human approval workflows |
+| [ADR-0401](../roadmap/adr-decisions-v0.4.md#adr-0401-introduce-agent-to-agent-communication) | v0.4 | Proposed | Introduce agent-to-agent communication |
+| [ADR-0402](../roadmap/adr-decisions-v0.4.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol) | v0.4 | Proposed | Adopt A2A as the inter-agent protocol |
+| [ADR-0403](../roadmap/adr-decisions-v0.4.md#adr-0403-propagate-user-identity-across-agent-to-agent-calls) | v0.4 | Proposed | Propagate user identity across agent-to-agent calls |
+| [ADR-0404](../roadmap/adr-decisions-v0.4.md#adr-0404-introduce-controlled-shared-agent-memory) | v0.4 | Proposed | Introduce controlled shared agent memory |
+| [ADR-0405](../roadmap/adr-decisions-v0.4.md#adr-0405-expose-agent-delegation-traces-to-users) | v0.4 | Proposed | Expose agent delegation traces to users |
+| [ADR-0406](../roadmap/adr-decisions-v0.4.md#adr-0406-limit-recursive-agent-delegation) | v0.4 | Proposed | Limit recursive agent delegation |
+| [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views) | v0.4 | Proposed | Add specialized task-oriented frontend views |
+| [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) | v0.4 | Proposed | Automate removal of inaccessible private RAG content |
+| [ADR-0409](../roadmap/adr-decisions-v0.4.md#adr-0409-introduce-advanced-human-approval-workflows) | v0.4 | Proposed | Introduce advanced human approval workflows |
 | [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.4 | Proposed | Expand the agent catalog beyond the initial five agents |
 | [ADR-0411](0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) | v0.4 | Implemented | Trust the Vault PKI root in every agent frontend's OIDC client |
 | [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |

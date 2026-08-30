@@ -18,7 +18,7 @@ across user-authorization or classification boundaries.
 
 ## ADR references
 
-Stub origin (`docs/adr/0100-v0.1-roadmap.md`): reduce latency and cost
+Stub origin (`docs/roadmap/adr-decisions-v0.1.md`): reduce latency and cost
 without leaking cross-user or cross-classification content.
 
 Related: ADR-0021 (C1/C2/C3 routing), ADR-0034 (effective classification),
@@ -41,7 +41,7 @@ mandatory (this touches a classification boundary).
    today's date, owners) and this Decision:
 
    > Promote this decision from a one-line v0.1-roadmap entry
-   > (`0100-v0.1-roadmap.md`) to a full record.
+   > (`../adr-decisions-v0.1.md`) to a full record.
    >
    > Add an opt-in semantic cache in the AI Gateway, stored in the existing
    > platform Redis. The cache key includes, at minimum: normalized prompt
@@ -60,7 +60,7 @@ mandatory (this touches a classification boundary).
    > Acceptance criteria and Review evidence.
 
    Related ADRs list: 0021, 0029, 0034, 0035.
-2. In `docs/adr/0100-v0.1-roadmap.md`: KEEP the `### ADR-0104: …` heading;
+2. In `docs/roadmap/adr-decisions-v0.1.md`: KEEP the `### ADR-0104: …` heading;
    replace the body with
    `Promoted to a full decision record: see [ADR-0104](0104-introduce-controlled-semantic-caching.md) (WP-09 implementation).`
 3. In `docs/adr/README.md`: flip the ADR-0104 row link to the new file;

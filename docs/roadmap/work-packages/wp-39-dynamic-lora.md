@@ -74,7 +74,7 @@ configuration, subject to classification routing.
 
 ## ADR references
 
-Stub (verbatim, from `docs/adr/0300-v0.3-roadmap.md`): "Share base models
+Stub (verbatim, from `docs/roadmap/adr-decisions-v0.3.md`): "Share base models
 while selecting approved task/agent adapters dynamically."
 
 Boundaries: ADR-0301 split off dynamic selection so it could be
@@ -106,7 +106,7 @@ adapter per agent/task honored per request), not optimization.
    classification (ADR-0021/0034). Selection is recorded in traces and
    usage metering." Standard-clauses pointer + Related ADRs (0021, 0034,
    0301, 0302, 0304).
-2. `docs/adr/0300-v0.3-roadmap.md`: KEEP heading; body →
+2. `docs/roadmap/adr-decisions-v0.3.md`: KEEP heading; body →
    `Promoted to a full decision record: see [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) (WP-39 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.

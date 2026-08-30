@@ -8,7 +8,7 @@
 ## Decision
 
 Promote this decision from a one-line v0.1-roadmap entry
-(`0100-v0.1-roadmap.md`) to a full record.
+(`../roadmap/adr-decisions-v0.1.md`) to a full record.
 
 A model or agent change may only be promoted when the target agent's
 ADR-0027 acceptance suite passes at the ADR-0028 threshold (75%) against

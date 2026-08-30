@@ -19,7 +19,7 @@ operator part.
 
 ## ADR references
 
-Stub origins (`docs/adr/0100-v0.1-roadmap.md`): ADR-0101 runs shared runtime, gateway, identity, data and observability services with production-oriented availability; ADR-0102 adopts 99.9% as the industrialized service objective.
+Stub origins (`docs/roadmap/adr-decisions-v0.1.md`): ADR-0101 runs shared runtime, gateway, identity, data and observability services with production-oriented availability; ADR-0102 adopts 99.9% as the industrialized service objective.
 
 Related: ADR-0015 (PostgreSQL platform), ADR-0012 (Keycloak), ADR-0029
 (observability instrumentation), ADR-0112/WP-13 (recovery is the
@@ -45,7 +45,7 @@ counterpart). Acceptance criteria: Standard clauses.
    this Decision:
 
    > Promote this decision from a one-line v0.1-roadmap entry
-   > (`0100-v0.1-roadmap.md`) to a full record.
+   > (`../adr-decisions-v0.1.md`) to a full record.
    >
    > Every shared platform service (Agent Runtime, AI Gateway, MCP Gateway,
    > rag-service, Keycloak, PostgreSQL, Redis, and the observability stack)
@@ -62,7 +62,7 @@ counterpart). Acceptance criteria: Standard clauses.
    this Decision:
 
    > Promote this decision from a one-line v0.1-roadmap entry
-   > (`0100-v0.1-roadmap.md`) to a full record.
+   > (`../adr-decisions-v0.1.md`) to a full record.
    >
    > Adopt 99.9% monthly availability as the industrialized objective for
    > the user-facing agent path (frontend -> BFF -> Agent Runtime -> AI
@@ -76,7 +76,7 @@ counterpart). Acceptance criteria: Standard clauses.
 
    Both end with Standard-clauses pointer + Related ADRs (0101: 0012, 0015,
    0029, 0102, 0112; 0102: 0029, 0101).
-3. `docs/adr/0100-v0.1-roadmap.md`: KEEP both headings; bodies → promotion
+3. `docs/roadmap/adr-decisions-v0.1.md`: KEEP both headings; bodies → promotion
    pointer lines to the two new files (`(WP-12 implementation)`).
 4. `docs/adr/README.md`: both rows → direct links, `To be implemented`.
 5. `python3 platform/docs/check_docs.py` exits 0.
