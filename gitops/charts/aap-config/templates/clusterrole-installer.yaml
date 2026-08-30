@@ -55,6 +55,21 @@ rules:
   - apiGroups: [""]
     resources: ["secrets", "configmaps", "serviceaccounts", "pods", "pods/log", "services", "persistentvolumeclaims", "events"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # WP-102: namespaces, needed by ansible/tasks/apply_openshift_build.yml's
+  # "ensure the zuno-ai-build namespace" task (shared by every Day 1/Day 2
+  # build role) - a genuine gap, not a deliberate exclusion (this ClusterRole
+  # documents its deliberate exclusions above and namespaces isn't one of
+  # them). Confirmed live 2026-08-30: zuno-day1-build (aap-execution-
+  # environment) is the first component build ever launched via AAP with
+  # this credential, and kubernetes.core.k8s always GETs an object first
+  # for its own idempotency check regardless of whether it already exists,
+  # so every other build role would fail identically once launched through
+  # AAP instead of the bootstrap kubeconfig. No delete: a build credential
+  # deleting a namespace is a blast radius this role's own least-privilege
+  # posture (see the file header) has no reason to grant.
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
