@@ -73,4 +73,43 @@ subjects:
   - kind: ServiceAccount
     name: aap-day0-check
     namespace: {{ .Values.namespace }}
+---
+# Second, separate gap in the same run (job 466, after the zuno-ai-run fix
+# above unblocked the namespace patch): run_acceptance_gate.yml also reads
+# two Secrets from zuno-auth (demo-personas-password and
+# <agent>-frontend-client-secret, ADR-0041) - `cluster-reader` deliberately
+# excludes Secret contents cluster-wide (a standard OpenShift convention,
+# not a repo choice), so this needs its own explicit grant. Read-only
+# (get/list/watch, no write) and its own ClusterRole so the zuno-ai-run
+# write grant above never leaks into zuno-auth.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zuno-day2-check-agents-gate-auth-read
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-26"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-day2-check-agents-gate-auth-read
+  namespace: zuno-auth
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zuno-day2-check-agents-gate-auth-read
+subjects:
+  - kind: ServiceAccount
+    name: aap-day0-check
+    namespace: {{ .Values.namespace }}
 {{- end }}
