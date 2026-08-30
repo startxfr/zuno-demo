@@ -254,6 +254,7 @@ Also carried in v0.7, as a separate large-scope effort unrelated to the GitHub-A
 | ADR | Target | Status | Decision |
 |---|---|---|---|
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.7 | Proposed | Run day-0 platform services in internal or external mode |
+| [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | v0.7 | Proposed | Integrate TrustyAI for AI evaluation and guardrails |
 
 ## version 0.8
 

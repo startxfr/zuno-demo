@@ -1,0 +1,163 @@
+# ADR-0534: Integrate TrustyAI for AI evaluation and guardrails
+
+- **Status:** Proposed
+- **Target:** v0.7
+- **Date:** 2026-08-30
+- **Decision owners:** Zuno Demo architecture team
+
+## Context
+
+Zuno-demo runs multiple AI agents on shared AI services, models, RAG sources and external tools
+(MCP). As the platform grows, model availability alone is not sufficient. Zuno also needs
+mechanisms to evaluate AI response quality, evaluate RAG effectiveness, detect unsafe or malicious
+prompts, protect against jailbreak and prompt injection, apply input/output filters, evaluate
+model and agent security, and compare models using reproducible evaluations.
+
+TrustyAI, OpenShift AI's evaluation/guardrails operand, is **already part of this platform**: it is
+declared `Managed` on the `DataScienceCluster` (`gitops/charts/openshift-ai/values.yaml`,
+`spec.components.trustyai`) and already backs ADR-0108/WP-10's `LMEvalJob` model-benchmarking gate
+(Implemented, with four documented upstream 3.5.0-ea.2 operator bugs found and worked around live).
+Its `mcpGuardrailsMode` field already exists on that spec and is currently `false` - the guardrails
+half of the operand has never been turned on. This decision is therefore about **extending** an
+already-integrated capability from benchmarking-only to evaluation-and-guardrails, not about
+introducing TrustyAI to the platform.
+
+TrustyAI does not replace the platform's existing components. The real request/response path
+(`docs/architecture/logical-architecture.md`, `docs/architecture/ai-architecture.md`) is:
+
+```text
+Agent Frontend -> Agent BFF -> Agent Runtime
+Agent Runtime -> RAG Service       (retrieval, pgvector)
+Agent Runtime -> MCP Gateway       (tool invocation)
+Agent Runtime -> AI/Inference Gateway -> {local models (KServe/MaaS), approved SaaS models}
+```
+
+Agent Runtime, not the AI/Inference Gateway, is where RAG results, MCP tool calls and the final
+response converge - the AI/Inference Gateway only sees raw model routing/fallback/quota. Since
+several of this ADR's objectives (RAG quality, jailbreak/prompt-injection detection on the full
+exchange, MCP-guardrails) need that converged context, TrustyAI must observe Agent Runtime's
+boundary, not only the AI/Inference Gateway's.
+
+## Decision
+
+Zuno-demo will progressively extend its existing TrustyAI integration from model benchmarking
+(ADR-0108) to evaluation and guardrails, hooking in **in front of Agent Runtime** so it can
+evaluate the full agent exchange - retrieved RAG context, MCP tool use and the final response -
+not just raw model calls. The AI Gateway keeps sole responsibility for model routing/fallback/
+quota; TrustyAI adds an evaluation/guardrail layer alongside it, never inside it.
+
+```text
+Agent
+  |
+  v
+Agent Runtime -----------------------------+
+  |                                        |
+  +--> RAG Service                         |
+  +--> MCP Gateway                         v
+  +--> AI/Inference Gateway --> Model   TrustyAI
+                                        evaluation & guardrails
+                                        (quality / RAG / security)
+```
+
+The integration proceeds in three phases.
+
+**Phase 1 - Extend the existing TrustyAI enablement (informal target: v0.5).** TrustyAI is already
+`Managed` and already serves LM-Eval (ADR-0108). This phase only:
+- confirms the operand's health beyond the LM-Eval path already exercised (`oc get
+  datasciencecluster zuno-dsc`, TrustyAI component conditions);
+- documents the existing `spec.components.trustyai` block (`eval.lmeval`, `mcpGuardrailsMode`) as
+  the shared configuration surface this ADR will extend, rather than re-declaring it;
+- introduces no agent-specific evaluation logic yet.
+
+This phase is a platform-readiness check on top of what already exists, not a new enablement.
+
+**Phase 2 - Evaluate and protect the AI chain (informal target: v0.6).** Flip
+`mcpGuardrailsMode` on and wire TrustyAI, observing Agent Runtime's boundary, to progressively
+evaluate or control:
+- RAG quality;
+- response quality;
+- jailbreak attempts and prompt injection;
+- input and output filtering;
+- sensitive or inappropriate content;
+- model and agent security;
+- general model behaviour and reliability.
+
+Where relevant, standard TrustyAI/OpenShift AI evaluation frameworks - **LM-Eval** (already in use,
+ADR-0108), **RAGAS** and **Garak** (both new to this repo) - are preferred over Zuno-specific
+implementations.
+
+```text
+                 TrustyAI
+                    |
+       +------------+-------------+
+       v            v             v
+    Quality        RAG          Security
+   evaluation   evaluation    evaluation
+       |            |             |
+    LM-Eval       RAGAS          Garak
+```
+
+These evaluations should eventually become part of the validation criteria used before an AI
+configuration is considered suitable for Zuno agents.
+
+**Phase 3 - Evaluate customized models (informal target: v0.7).** Extend the TrustyAI evaluation
+chain to models customized by Zuno, especially models produced via PEFT/LoRA. The objective is not
+only to verify that fine-tuning improves the targeted behaviour, but also to detect regressions in
+existing capabilities: expected task quality, general response quality, RAG behaviour, tool/MCP
+usage capability, security and jailbreak resistance.
+
+```text
+Base model
+    |
+    +--------------+
+    v              v
+baseline        PEFT/LoRA
+evaluation        model
+                    |
+                    v
+               evaluation
+                    |
+                    v
+              comparison
+```
+
+A customized model must therefore not be adopted only because it performs better on its fine-tuned
+task - it must also demonstrate that critical existing capabilities have not significantly
+regressed.
+
+## Non-goals
+
+This decision does not replace ADR-0108's `LMEvalJob` benchmarking gate (Phase 2 extends it, does
+not supersede it); does not move RAG/MCP orchestration out of Agent Runtime or into TrustyAI or the
+AI/Inference Gateway; and does not itself define concrete evaluation datasets, thresholds or pass/
+fail policies - those are left to later, phase-specific ADRs/WPs as noted below.
+
+## Operational considerations
+
+Phase 1 verification reads `spec.components.trustyai` conditions on the `zuno-dsc`
+`DataScienceCluster`, the same object ADR-0108's `LMEvalJob` checks already depend on. Phase 2's
+`mcpGuardrailsMode: true` flip should be validated the same way ADR-0108 validated `LMEvalJob`: a
+live run against this cluster, not just a green sync, given the four upstream operator bugs already
+found in this same operand at the current OpenShift AI version. Day-2/Day-3 check wiring
+(`make d2/d3 check trustyai` or equivalent) should follow the existing `models`/`trustyai`
+precheck pattern in `ansible/roles/models/tasks/precheck.yml` rather than inventing a new one.
+
+## Migration / evolution
+
+Concrete evaluation datasets, thresholds, evaluation policies, and the WP brief(s) that execute
+each phase are deliberately left to later ADRs/WPs as the Zuno architecture matures and this
+decision moves past `Proposed`. Phase 2's RAGAS/Garak adoption and Phase 3's PEFT/LoRA comparison
+gate each warrant their own WP once scheduled.
+
+See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Consequences,
+Security considerations, Acceptance criteria and Review evidence.
+
+## Related ADRs
+
+- [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) - the existing TrustyAI/LM-Eval
+  integration this decision extends from benchmarking-only to evaluation-and-guardrails.
+- [ADR-0107](0107-introduce-automated-model-quality-gates.md) - the model quality gate LM-Eval
+  results already feed, and that Phase 2/3's RAGAS/Garak/PEFT-LoRA results should extend.
+- [ADR-0010](0010-introduce-a-central-mcp-gateway.md),
+  [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md) - the MCP Gateway boundary
+  Phase 2's `mcpGuardrailsMode` sits alongside, not inside.
