@@ -1018,6 +1018,21 @@
       register: _aap_config_authenticator_lookup
       no_log: true
 
+    # ACCESS_TOKEN_URL is fetched server-to-server, by the gateway pod
+    # itself, never the user's browser - so it MUST be the in-cluster
+    # HTTP listener, never the external Route. Confirmed live 2026-08-30
+    # (WP-103's own verification pass, the first real SSO login this repo
+    # ever exercised end to end): pointed at the external HTTPS Route,
+    # every login failed with CERTIFICATE_VERIFY_FAILED - the gateway pod
+    # has no reason to trust the edge Route's cert (issued by this
+    # cluster's Vault PKI CA, not a public CA), and there is no
+    # REQUESTS_CA_BUNDLE wiring it into that trust store. AUTHORIZATION_URL
+    # stays external - the user's own browser is redirected there and has
+    # no relationship to the gateway pod's trust store. Same in-cluster
+    # listener the keycloak chart's own client-reconcile Job already uses
+    # (gitops/charts/keycloak/values.yaml's `clientReconcile.serverUrl`) -
+    # no shared var exists between the two Helm charts/Ansible roles, kept
+    # in sync by convention like every other cross-chart value in this role.
     - name: "aap-config | create the Keycloak authenticator"
       ansible.builtin.uri:
         url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticators/"
@@ -1038,7 +1053,7 @@
             SECRET: "{{ _aap_config_kc_client_secret.resources[0].data.client_secret | b64decode }}"
             PUBLIC_KEY: "{{ _aap_config_realm_info.json.public_key }}"
             AUTHORIZATION_URL: "https://keycloak.{{ cluster_base_domain }}/realms/zuno/protocol/openid-connect/auth"
-            ACCESS_TOKEN_URL: "https://keycloak.{{ cluster_base_domain }}/realms/zuno/protocol/openid-connect/token"
+            ACCESS_TOKEN_URL: "http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/token"
             GROUPS_CLAIM: groups
         status_code: 201
       register: _aap_config_authenticator_created

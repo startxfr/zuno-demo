@@ -1,6 +1,6 @@
 # WP-103: Model Controller RBAC for who may launch which Job/Workflow Template
 
-- **State:** Repo work merged.
+- **State:** Done.
 - **ADRs:** ADR-0418 (Security considerations - Phase 3/4 launch-RBAC).
 - **Depends on:** WP-094 (Job Templates registered), WP-097 (launch
   mechanism itself).
@@ -179,6 +179,66 @@ To remove, mirror with `kcadm delete groups -r zuno --id <gid>`.
   here) or `"Team Admin"` (also grants change/delete on the Team itself -
   not needed).
 
+## Two pre-existing SSO bugs found and fixed during live verification
+
+Nobody had ever completed a real browser/OAuth login into AAP before this
+WP - WP-073/WP-094-099's "Keycloak SSO confirmed live" claims only ever
+verified that the authenticator/map *objects* existed via the admin API,
+never an actual login round-trip. Both bugs below are pre-existing,
+unrelated to launch-RBAC itself, and would have blocked **any** SSO login
+(including the existing `aap_admin` superuser path) - fixed here because
+they blocked this WP's own verification, not because they are in scope.
+
+1. **`ACCESS_TOKEN_URL` pointed at the external HTTPS Route** - the
+   gateway pod fetches this URL itself (server-to-server, never the
+   user's browser) and has no reason to trust the Route's cert (edge TLS,
+   issued by this cluster's own Vault PKI CA - `CN=zuno-demo.internal` -
+   not a public CA, and no `REQUESTS_CA_BUNDLE` wires that CA into the
+   gateway pod's trust store). Every login failed with
+   `CERTIFICATE_VERIFY_FAILED`. Fixed by pointing `ACCESS_TOKEN_URL` at
+   the in-cluster HTTP listener (`http://zuno-service.zuno-auth.svc:8080/...`,
+   the same one `gitops/charts/keycloak`'s own client-reconcile Job
+   already uses) - `AUTHORIZATION_URL` stays external, the user's browser
+   is redirected there directly and never touches the gateway pod's trust
+   store. Fixed in `install.yml`'s authenticator-creation task (survives
+   reinstall) and applied live via a direct `PATCH` (the task is
+   create-only, per this role's existing "never PATCHed" convention -
+   README.md).
+2. **The `aap` Keycloak client had no audience protocol mapper** - only
+   the `groups` mapper existed. The ID token's `aud` claim then failed
+   `ansible_base`'s audience check (`jwt.exceptions.InvalidAudienceError`)
+   after bug 1 was fixed. Fixed by adding an `oidc-audience-mapper`
+   (`included.client.audience: aap`) to the `aap` client's
+   `protocolMappers` in `realm-zuno.json` - this client is already one of
+   the ones ADR-0530's client-reconcile Job merges on every sync, so the
+   fix reaches a live realm through the *existing* mechanism, no new
+   reconciliation path needed.
+
+**Trap hit applying fix 2 live, for any future session doing the same:**
+extracting a client block directly from `realm-zuno.json` and feeding it
+to `kcadm update -m` bypasses a REQUIRED step - both `realmimport.yaml`
+and `configmap-clients.yaml` `replace "apps.mycluster.example.com"
+.Values.clusterBaseDomain` on the RAW FILE TEXT before parsing JSON.
+Skipping that step merged the literal placeholder domain into the live
+`aap` client's `rootUrl`/`redirectUris`/`webOrigins`, breaking every login
+with "Invalid parameter: redirect_uri" until caught and fixed by hand.
+Never extract a client block from this file without running it through
+the same string-`replace` first (or just let the reconcile Job apply it).
+
+**Separate, unresolved finding, not fixed here:** `consultant-03` (no
+`aap_ops`/`aap_admin` group) sees **zero** Job/Workflow Templates -
+`allow-authenticated` (`map_type: allow`) only permits login, it does not
+grant object-level view the way `install.yml`'s own comment ("viewer-level
+until Controller RBAC grants more") and `README.md` claim. That claim
+predates this WP and was, like the two bugs above, never live-verified
+before now. Practical effect on this WP's own design: the "ungated
+templates stay open to any authenticated user" premise behind the
+differentiated-gating decision does not hold today for a user with no
+`aap_*` group at all - only `aap_ops`/`aap_admin`/superuser can currently
+see anything. Left as a documented gap for a future WP (a Team/role
+grant for "every authenticated user" is the likely fix, mirroring
+`aap-reader-team` but organization-wide) rather than expanded into here.
+
 ## Acceptance checks (repo-side)
 
 - `python3 platform/docs/check_docs.py` exits 0.
@@ -191,22 +251,40 @@ To remove, mirror with `kcadm delete groups -r zuno --id <gid>`.
 - `python3 -c "import json; json.load(open('gitops/charts/keycloak/files/realm-zuno.json'))"`
   still succeeds (the realm file stays valid JSON).
 
-## Operator / human follow-up (live)
+## Operator / human follow-up (live) - completed 2026-08-30
 
-1. Run the "Live group provisioning" `kcadm` commands above.
-2. `make d0 install aap-config` (idempotent - re-run should change
-   nothing on a second pass, only 400 "already exists" branches).
-3. Log in via Keycloak SSO as `consultant-03`: read-only on the gated
-   templates/Project, no Launch button/403 on launch; ungated templates
-   (check/build/test) remain launchable via `allow-authenticated`,
-   unchanged.
-4. Log in as `paas-dev-01`/`consultant-02`: can launch gated templates
-   and trigger a Project sync; no access to Controller's own RBAC/Teams/
-   Users admin screens.
-5. Log in as `paas-ops-01`/`consultant-01`: full superuser.
-6. Confirm `paas-ops-01` did not lose access during the authenticator-map
-   cutover (check `ocp-paas-ops` still grants cluster RBAC and `aap_admin`
-   independently grants AAP RBAC).
+1. Ran the "Live group provisioning" `kcadm` commands above - all 3
+   groups created, all 5 users joined, confirmed via `kcadm get
+   users/$uid/groups`.
+2. `make d0 install aap-config` - first run created the Teams/
+   role_definitions/role_team_assignments/authenticator maps cleanly
+   (`failed=0`); hit one real bug along the way (`map_type: team` needs a
+   `role` field, see below - not yet known to this repo before now) that
+   was fixed and re-run to a clean pass; a second re-run confirmed
+   idempotent (`changed=0`).
+3. Real Keycloak SSO login (full OAuth authorization-code round-trip, not
+   just an API check) exercised for one persona per tier and verified via
+   `GET /api/controller/v2/job_templates|workflow_job_templates|projects/`
+   as that authenticated session:
+   - `consultant-03` (`aap_reader`): sees exactly the 7 gated Job
+     Templates, all `user_capabilities.start: false` - read-only,
+     confirmed, cannot launch. Sees zero ungated templates (see the
+     "allow-authenticated" finding above).
+   - `paas-dev-01` (`aap_ops`): sees the 7 gated Job Templates + 3 gated
+     Workflow Templates + the `zuno-demo` Project, all with
+     `start: true`, `edit`/`delete: false` on every object - can launch
+     and sync, cannot manage RBAC.
+   - `paas-ops-01` (`aap_admin`): `GET /api/gateway/v1/me/` confirms
+     `is_superuser: true`.
+4. `paas-ops-01` did not lose access during the authenticator-map cutover
+   - its `aap_admin` group membership (step 1) was applied and confirmed
+   live before the map replacement ran, matching the ordering warning
+   above.
+5. `consultant-02`/`consultant-01` (the second user in the ops/admin
+   tiers) were not individually login-tested - both carry the same group
+   membership as the tested persona in their tier and the authorization
+   path is entirely group/Team-driven, not per-user, so this is
+   considered covered by the tested persona rather than a real gap.
 
 ## Out of scope / deferred
 
