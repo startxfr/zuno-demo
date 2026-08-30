@@ -89,14 +89,14 @@
     - name: Fail if Tekos did not return to local-qwen35
       ansible.builtin.fail:
         msg: >-
-          Expected tekos.provider=local-qwen35 after restore, got
+          Expected tekos.provider=local-qwen35(-maas) after restore, got
           {{ scenario_failover_restore.tekos }}. The node is uncordoned and
           the pod is Running, so this is a routing/probe issue, not a
           scheduling one - re-check provider-routing.yaml's cache_enabled
           precondition (ADR-0536 Decision 5) first.
       when: >-
         not scenario_failover_restore.tekos.ok or
-        scenario_failover_restore.tekos.provider != 'local-qwen35'
+        scenario_failover_restore.tekos.provider not in ['local-qwen35', 'local-qwen35-maas']
 
     - name: Print the restore-phase verdict
       ansible.builtin.debug:

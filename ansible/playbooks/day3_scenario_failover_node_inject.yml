@@ -88,19 +88,23 @@
         scenario_failover_baseline: "{{ scenario_failover_probe_result }}"
 
     - name: Fail if the baseline doesn't match ADR-0526's expected routing
+      # local-wesh-maas / local-qwen35-maas are the legitimate MaaS-preferred
+      # siblings tried first (provider-routing.yaml file order) - a healthy
+      # baseline naming either the -maas or the direct provider is correct,
+      # not just the exact direct name.
       ansible.builtin.fail:
         msg: >-
           Baseline probe did not match ADR-0526's expected routing
           (comage.provider={{ scenario_failover_baseline.comage.provider }},
-          expected local-wesh; tekos.provider={{ scenario_failover_baseline.tekos.provider }},
-          expected local-qwen35) - stop before touching the cluster and
-          re-check platform/ai-gateway/provider-routing.yaml and
+          expected local-wesh(-maas); tekos.provider={{ scenario_failover_baseline.tekos.provider }},
+          expected local-qwen35(-maas)) - stop before touching the cluster
+          and re-check platform/ai-gateway/provider-routing.yaml and
           policies/model-routing/model-routing-policy.yaml.
       when: >-
         not scenario_failover_baseline.comage.ok or
         not scenario_failover_baseline.tekos.ok or
-        scenario_failover_baseline.comage.provider != 'local-wesh' or
-        scenario_failover_baseline.tekos.provider != 'local-qwen35'
+        scenario_failover_baseline.comage.provider not in ['local-wesh', 'local-wesh-maas'] or
+        scenario_failover_baseline.tekos.provider not in ['local-qwen35', 'local-qwen35-maas']
 
     - name: "Cordon {{ scenario_failover_node_name }}"
       ansible.builtin.command:
@@ -147,16 +151,16 @@
     - name: Warn (do not fail) if the live failover did not match ADR-0526's expected direction
       ansible.builtin.debug:
         msg: >-
-          WARNING: expected tekos.provider=local-wesh and comage.provider
-          unchanged (local-wesh) during the failure window; got
-          comage={{ scenario_failover_failover.comage }},
+          WARNING: expected tekos.provider=local-wesh(-maas) and
+          comage.provider unchanged (local-wesh(-maas)) during the failure
+          window; got comage={{ scenario_failover_failover.comage }},
           tekos={{ scenario_failover_failover.tekos }}. The node is left
           cordoned for inspection - do not restore until this is understood.
       when: >-
         not scenario_failover_failover.tekos.ok or
-        scenario_failover_failover.tekos.provider != 'local-wesh' or
+        scenario_failover_failover.tekos.provider not in ['local-wesh', 'local-wesh-maas'] or
         not scenario_failover_failover.comage.ok or
-        scenario_failover_failover.comage.provider != 'local-wesh'
+        scenario_failover_failover.comage.provider not in ['local-wesh', 'local-wesh-maas']
 
     - name: Print the inject-phase verdict (this is what the Makefile shows before the human validation pause)
       ansible.builtin.debug:

@@ -53,7 +53,15 @@ POLL_INTERVAL_SECONDS = 10
 # scenario_failover_probe.py's own call to cleanup_created_runs()).
 _AGENTS = [
     {"agent": "comage", "persona": "sale-01", "message": "Peux-tu me faire un point rapide sur nos opportunités en cours ?"},
-    {"agent": "tekos", "persona": "consultant-01", "message": "Peux-tu m'expliquer rapidement l'architecture de la plateforme Zuno ?"},
+    # Deliberately a plain retrieval-style question, NOT an open-ended
+    # "explain the architecture" one - live-caught 2026-08-30: the latter
+    # got classified as a reflexional/reasoning task and routed to
+    # ovhcloud-gpt-oss-120b (ADR-0412/ADR-0416, extended to Tekos by
+    # WP-096/ADR-0531) instead of Tekos's normal local-qwen35 chain,
+    # producing a false-negative baseline failure. Reused verbatim from
+    # evaluations/tekos/scenarios.yaml's own known-good, non-reflexional
+    # scenario set.
+    {"agent": "tekos", "persona": "consultant-01", "message": "What GPU does the local model run on?"},
 ]
 
 
