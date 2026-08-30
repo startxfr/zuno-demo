@@ -13,7 +13,7 @@
 # applied. Autonomy also stays off while `enabled: false` (the shipped
 # default: the operator flips it deliberately, per scope, after the
 # WP-42 brief's own observed-cycle sign-off - never on by default).
-enabled: false
+enabled: true
 kill_switch: false
 
 # How long an applied change is monitored before it's considered settled,
