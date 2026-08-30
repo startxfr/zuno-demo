@@ -34,8 +34,10 @@ zuno:
       Placeholder pending the live acceptance gate; C2 matches
       `knowledge.sales`/`salesforce.*`'s own classification
       (policies/data-classification/classification.yaml's `sales-data`
-      domain) - escalates to C3 whenever a turn touches
-      `knowledge.sxa-legacy` (ADR-0034).
+      domain). `knowledge.sxa-legacy` no longer escalates a turn beyond C2:
+      reclassified from C3 to C2 (ADR-0206 Status update, 2026-08-30) - an
+      immutable historical snapshot with no live write path, same tier as
+      `sales-data`.
   access:
     # ADR-0040: agent entitlement group, orthogonal to the `sales` business
     # role that governs tool/data permissions inside Comage.
@@ -111,7 +113,7 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 | `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `knowledge.sales` | knowledge | — | C2 | sales, adv, board, cdp, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sales` |
 | `check-deal-status` (primary; prompt: `prompts/check-deal-status.md`) | `knowledge.project` | knowledge | — | — | consultant, board, sales, adv, finance, cdp | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.project` |
 | `update-opportunity-status` | `salesforce.opportunity.update` | tool | `salesforce.opportunity.update` @ salesforce | C2 | sales, board | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `salesforce.opportunity.update` |
-| `compare-historical-deals` | `knowledge.sxa-legacy` | knowledge | — | C3 | sales, board, adv, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sxa-legacy` |
+| `compare-historical-deals` | `knowledge.sxa-legacy` | knowledge | — | C2 | sales, board, adv, finance | — | `standard` (user 60 req/5m) | `knowledge/knowledge-policy.yaml` `knowledge.sxa-legacy` |
 | `check-my-drive-and-mail` | `list_drive_files` | tool | `drive.document.search` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `list_drive_files` |
 | `check-my-drive-and-mail` | `read_gmail` | tool | `gmail.message.read` @ google-workspace | C1 | consultant, board, cdp, sales, adv, finance | allowed | `standard` (user 60 req/5m) | `tools/tool-policy.yaml` `read_gmail` |
 

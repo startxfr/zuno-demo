@@ -131,15 +131,18 @@ preferences:
   # own validation), so "the default for Comage" is expressible only as
   # one entry per task - there is no agent-level default to write.
   #
-  # Multi-year comparison/analysis over C3 sxa-legacy data - reflexional,
-  # same doctrine as Tekos's answer-technical-question. This is the task
-  # ADR-0526's Security considerations single out: it escalates to C3
+  # Multi-year comparison/analysis over C2 sxa-legacy data (reclassified
+  # C3 -> C2 by ADR-0206's 2026-08-30 Status update) - reflexional, same
+  # doctrine as Tekos's answer-technical-question. This is the task
+  # ADR-0526's Security considerations single out: it escalates to C2
   # whenever knowledge.sxa-legacy contributes (ADR-0034), so the variant
-  # answers C3 turns by default. That is legitimate for a local provider,
+  # answers C2 turns by default. That is legitimate for a local provider,
   # and it is exactly why the substance half of the promotion gate stays
-  # mandatory (decision 8) - a style model that degrades reasoning on C3
+  # mandatory (decision 8) - a style model that degrades reasoning on
   # financial and legacy data is a security-relevant regression, not a
-  # cosmetic one. ADR-0531: ovhcloud-gpt-oss-120b now leads here too (same
+  # cosmetic one. This preference list deliberately stays local/OVH-only -
+  # C2 makes restricted SaaS technically eligible but no SaaS entry is
+  # added here. ADR-0531: ovhcloud-gpt-oss-120b now leads here too (same
   # eligibility-filtering mechanism as Arkos's reflect_node - survives at
   # C1/C2, excluded at C3, where wesh/qwen3.5-9b naturally take over),
   # gpt-oss-20b keeps its existing rank right behind it; qwen3.5-9b is
@@ -186,11 +189,14 @@ preferences:
   - agent: advantage
     task: check-my-drive-and-mail
     preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
-  # Invoice-readiness evaluation over sxa financial data (C3-intended).
+  # Invoice-readiness evaluation over sxa financial data (C2-intended -
+  # reclassified C3 -> C2 by ADR-0206's 2026-08-30 Status update; this
+  # preference list deliberately stays local/OVH-only, no SaaS entry added).
   - agent: finage
     task: identify-business-ready-to-invoice
     preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
-  # Aggregation report over sxa financial data (C3-intended).
+  # Aggregation report over sxa financial data (C2-intended, same
+  # reclassification as above).
   - agent: finage
     task: monthly-invoice-report
     preferred: [local-qwen35-maas, local-qwen35, local-gpt-oss-maas, local-gpt-oss, local-maas, local]

@@ -465,11 +465,11 @@ def test_load_sxa_dump_writes_one_record_per_row_without_any_sql_engine():
     assert record["url"] == "sxa-dump://customers/1"
     assert record["domain"] == "knowledge.sxa-legacy"
     assert record["source_type"] == "sxa-dump"
-    assert record["classification"] == "C3"
+    assert record["classification"] == "C2"
     assert record["sxa"]["table"] == "customers"
     assert len(record["sxa"]["snapshot_checksum"]) == 64
     # No transform of any kind (ADR-0219): values reach the index as-is,
-    # with allowed_groups + C3 as the only safeguard.
+    # with allowed_groups + C2 as the only safeguard.
     assert "Acme" in record["text"]
 
 
@@ -637,7 +637,7 @@ def test_normalize_omits_stale_after_for_sxa_legacy_regardless_of_spec():
     config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy", STALE_AFTER="7d")
     raw = {
         "doc_id": "doc1", "url": "sxa-dump://affaire", "title": "affaire", "text": "CREATE TABLE...",
-        "domain": "knowledge.sxa-legacy", "source_type": "sxa-dump", "classification": "C3",
+        "domain": "knowledge.sxa-legacy", "source_type": "sxa-dump", "classification": "C2",
         "acl_groups": [], "provenance": "sxa-dump snapshot 2026-08",
     }
     metadata = _normalize_one(config, raw)

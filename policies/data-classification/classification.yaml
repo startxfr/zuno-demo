@@ -52,6 +52,10 @@ data_domains:
   # restriction stricter than this domain's own classification level.
   confluence: C2
   sales-data: C2
+  # ADR-0206 Status update (2026-08-30): legacy pre-2021 commercial dump,
+  # RAG-only and immutable between imports - same tier as sales-data above,
+  # not the financial-data tier below (no live write path to protect).
+  sxa-legacy: C2
   financial-data: C3
   hr-data: C3
   # ADR-0340 (WP-32): Workday employee-profile capabilities

@@ -6,7 +6,7 @@
   `sxa.*` path this WP created, so there is no MCP surface left to deny. The
   `sales.*`/`sxa.*` namespace separation this WP established still stands and
   is still tested; see [WP-084](wp-084-retire-the-sxa-mcp-path-and-second-rag-domain.md).
-- **ADRs:** ADR-0206 (To be implemented -> Partially implemented -> Implemented, retargeted to v0.7 on 2026-08-26 — roadmap reprioritization alongside ADR-0105, unrelated to the WP-04/WP-11 GitHub-Actions v0.7 theme)
+- **ADRs:** ADR-0206 (To be implemented -> Partially implemented -> Implemented, retargeted to v0.7 on 2026-08-26 then v0.6 on 2026-08-30 — roadmap reprioritization alongside ADR-0105; Status update 2026-08-30 records the WP-084 live load and the C3 -> C2 reclassification below)
 - **Depends on:** WP-20 (merged), WP-21 (merged); WP-22's `load-sxa-dump`
   adapter (merged 2026-08-15, already satisfied — not a live blocker;
   WP-22's own remaining scope is unrelated recurring-cadence automation)
@@ -109,6 +109,20 @@ fixtures stay synthetic (ADR-0025).
 - After operator load: ADR-0206 →
   `Implemented - see \`policies/knowledge/\`, \`components/mcp-servers/sales-db/\`.`;
   index row `Implemented`; tracker → `Done`; MEMORY.md dated bullet.
+- 2026-08-30: operator follow-up item 2 (field-level data review) is
+  **closed by decision, not by execution**. `knowledge.sxa-legacy` is
+  reclassified C3 → C2 at the domain level (rationale: immutable historical
+  snapshot, RAG-only, no live write path, treated as one undifferentiated
+  corpus) — see ADR-0206's 2026-08-30 Status update. No further
+  field-by-field review is scheduled. Files touched:
+  `components/rag-ingestion/src/rag_ingestion.py` (the actual enforcement
+  point), its tests, `policies/knowledge/knowledge-policy.yaml`,
+  `knowledge/sxa-legacy/domain.yaml`,
+  `policies/data-classification/classification.yaml`, and comments in
+  `platform/ai-gateway/provider-routing.yaml` /
+  `policies/model-routing/model-routing-policy.yaml` (no routing behavior
+  change — Comage/Finage's `preferred:` lists stay local/OVH-only). ADR-0206
+  body Status also bumped to `Implemented`, index row updated to match.
 
 ## Out of scope / deferred
 

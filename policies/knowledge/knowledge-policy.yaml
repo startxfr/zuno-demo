@@ -108,7 +108,12 @@ domains:
       - board
       - adv
       - finance
-    min_classification: C3
+    # Reclassified C3 -> C2 (ADR-0206 Status update, 2026-08-30): an
+    # immutable historical snapshot with no live write path, treated as one
+    # undifferentiated corpus rather than field-by-field - closes WP-23's
+    # deferred field-level review action. Same tier as sales-data in
+    # policies/data-classification/classification.yaml.
+    min_classification: C2
 
   knowledge.adv:
     allowed_groups:

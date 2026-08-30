@@ -54,7 +54,10 @@ freshness:
 
 classification:
   default_by_source_type:
-    sxa-dump: C3   # sales-history/financial-adjacent legacy data, C3 by default
+    # Reclassified C3 -> C2 (ADR-0206 Status update, 2026-08-30): immutable
+    # historical snapshot, no live write path, treated as one
+    # undifferentiated corpus - closes WP-23's deferred field-level review.
+    sxa-dump: C2
 
 exempt_from_freshness_enforcement: true   # immutable source (WP-24 / ADR-0205)
 

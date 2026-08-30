@@ -1070,8 +1070,9 @@ def _load_sxa_dump(config: IngestionConfig, store: CorpusStore) -> int:
     `_parse_insert_rows` are sufficient without a database round-trip.
 
     Content is emitted exactly as it arrives from S3 - no transform, no
-    scanning. `min_classification: C3` plus `knowledge.sxa-legacy`'s
-    `allowed_groups` are the safeguard.
+    scanning. `min_classification: C2` (reclassified from C3, ADR-0206
+    Status update 2026-08-30) plus `knowledge.sxa-legacy`'s `allowed_groups`
+    are the safeguard.
 
     Idempotent per snapshot: a re-run against a byte-identical dump
     produces byte-identical records, so detect-changes sees unchanged
@@ -1142,9 +1143,12 @@ def _load_sxa_dump(config: IngestionConfig, store: CorpusStore) -> int:
             "version": None,
             "language": "fr",
             "source_type": "sxa-dump",
-            # Historical commercial data: C3 by default (ADR-0206) until the
-            # field-level review WP-23 records says otherwise.
-            "classification": "C3",
+            # Historical commercial data: reclassified C3 -> C2 (ADR-0206
+            # Status update, 2026-08-30) - an immutable historical snapshot
+            # with no live write path, treated as one undifferentiated
+            # corpus rather than field-by-field. Closes WP-23's deferred
+            # field-level review action.
+            "classification": "C2",
             "acl_groups": [],
             "fetched_at": imported_at,
             "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),

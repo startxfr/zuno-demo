@@ -195,10 +195,13 @@ providers:
   #
   # eligible_for is [C1, C2, C3], same as every other local provider: the
   # merged checkpoint inherits the training corpus's C1 classification
-  # (decision 3), and Comage's compare-historical-deals computes at C3
-  # (ADR-0034, whenever knowledge.sxa-legacy contributes) where only
-  # local providers survive eligibility filtering. Restricting these to
-  # C1 would strand that task's entire preference chain.
+  # (decision 3), and Comage's compare-historical-deals computes at C2
+  # (ADR-0034, whenever knowledge.sxa-legacy contributes - reclassified
+  # C3 -> C2 by ADR-0206's 2026-08-30 Status update). Restricting these to
+  # C1 would still strand that task's entire preference chain, and the
+  # task's own `preferred:` list in model-routing-policy.yaml deliberately
+  # stays local/OVH-only regardless - C2 makes restricted SaaS technically
+  # eligible but it is not exercised here.
   - name: local-wesh-maas
     kind: local
     model: qwen3.5-9b-wesh
