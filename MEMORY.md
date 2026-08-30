@@ -843,6 +843,22 @@ not here.
     `Partially implemented` / `Operator pending` by user decision - don't
     re-attempt closing this pair without a genuinely new
     dynamically-loadable adapter.
+  - **2026-08-30, corrected: this is a status change.** ADR-0301 (this
+    mechanism's own foundation) already declares its serving-mechanism
+    decision unconditionally `Superseded by ADR-0526` - not scoped to the
+    wesh case - and ADR-0526's own Alternatives-considered section rejected
+    keeping that mechanism intact for general reasons (same GPU cost as a
+    separate deployment for one adapter, no adapter-download mechanism
+    exists in `gitops/charts/models`), not wesh-specific ones. No v0.4-v0.7
+    roadmap item or pre-live agent's `NEXT_STEPS.md` names a future adapter
+    need. ADR-0303's Status is now `Superseded by ADR-0526` (matching
+    ADR-0301/0302) and WP-39's tracker State is `Closed — deferred`, both
+    with the full reasoning written directly into the ADR's own `##
+    Evolution` section - not MEMORY.md-only, as the 2026-08-29 entry above
+    left it. Reviving this mechanism needs a new ADR decision backed by a
+    real non-merged adapter and an actual multi-adapter-sharing need (kept
+    honest: ADR-0526's Consequences call this mechanism "neither
+    implemented nor contradicted," not dead in principle).
 - **ADR-0305 / ADR-0304 (WP-40)**, 2026-08-29, **Implemented/Done**:
   `evaluations/benchmark.py` (LM-Eval snapshot -> versioned artifact,
   `--check-policy` enforces no-artifact-no-promotion) and

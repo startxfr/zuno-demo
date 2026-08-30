@@ -135,7 +135,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 |---|---|---|---|
 | [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) | v0.3 | Superseded by ADR-0526 | Introduce LoRA and PEFT model customization |
 | [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | v0.3 | Superseded by ADR-0526 | Build dataset-to-model MLOps pipelines |
-| [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Partially implemented | Support dynamic LoRA adapter loading |
+| [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Superseded by ADR-0526 | Support dynamic LoRA adapter loading |
 | [ADR-0304](0304-optimize-model-selection-using-quality-cost-and-latency.md) | v0.3 | Implemented | Optimize model selection using quality cost and latency |
 | [ADR-0305](0305-introduce-automated-model-benchmarking.md) | v0.3 | Implemented | Introduce automated model benchmarking |
 | [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.4 | Proposed | Support self-service agent onboarding |

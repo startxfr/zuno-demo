@@ -1,7 +1,12 @@
 # WP-39: Dynamic LoRA adapter loading (promotes ADR-0303)
 
-- **State:** Operator pending (2026-08-15 - repo work merged; GPU verification is the outstanding operator step).
-  Step 0 promoted ADR-0303 verbatim. New
+- **State:** Closed — deferred (2026-08-30 — ADR-0303 reclassified Superseded
+  by ADR-0526 for the serving mechanism it depends on; no live candidate or
+  roadmap-declared need for per-request multi-LoRA selection; resumes under a
+  future ADR if a genuinely new, non-merged adapter and a real
+  multi-adapter-sharing need arise — see ADR-0303's Evolution note). (History:
+  2026-08-15 - repo work merged; GPU verification was the outstanding
+  operator step at the time. Step 0 promoted ADR-0303 verbatim. New
   `policies/model-routing/model-routing-policy.yaml` (per-agent/task
   `adapter:` declarations, `adapters: []` by default - WP-34's GPU
   training run hasn't produced a real registered adapter yet, so
@@ -52,8 +57,8 @@
   suites (`test_cache_integration.py`'s background OTel exporter
   DNS-resolution noise is the same pre-existing, expected no-live-cluster
   gap this repo already documents elsewhere; its own 5 assertions pass,
-  exit 0). `python3 platform/docs/check_docs.py` PASS.
-- **ADRs:** ADR-0303 (Partially implemented merged here -> Implemented after GPU verification)
+  exit 0). `python3 platform/docs/check_docs.py` PASS.)
+- **ADRs:** ADR-0303 (Partially implemented -> Superseded by ADR-0526, 2026-08-30)
 - **Depends on:** WP-34 (merged + GPU run done)
 - **Estimated files touched:** ~6
 
