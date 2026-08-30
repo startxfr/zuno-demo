@@ -1,6 +1,6 @@
 # ADR-0309: Introduce policy-driven autonomous optimization
 
-- **Status:** Partially implemented (governance policy, bounded tuner, rollback and kill switch merged; live cycle pending)
+- **Status:** Implemented (2026-08-30) - see `policies/optimization/`. Autonomy enabled live on the cluster (cache-TTL/cache-enabled scopes; routing scope stays structurally inert, `pre_approved_equivalents: []`); one full tune-evaluate cycle observed (`cache_ttl` 3600s→7200s, clean outcome reported, no rollback); one rollback forced (`cache_ttl` 7200s→1800s, error_rate 0.10 breach reported) - both open audit entries auto-reverted, confirming `report_outcome()` rolls back every open action on a trigger breach, not just the most recent one. Operator sign-off given 2026-08-30. Routing scope stays disabled in practice (no pre-approved equivalents exist yet) pending a future reviewed PR.
 - **Target:** v0.3
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team

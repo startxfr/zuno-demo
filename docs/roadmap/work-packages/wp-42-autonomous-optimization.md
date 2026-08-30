@@ -1,6 +1,13 @@
 # WP-42: Policy-driven autonomous optimization (promotes ADR-0309)
 
-- **State:** Operator pending (2026-08-15 - repo work merged); observed live autonomy cycle +
+- **State:** Done (2026-08-30) - live-verified on cluster: autonomy enabled
+  (`enabled: true`), one full tune-evaluate cycle observed (`cache_ttl`
+  3600s→7200s applied, clean outcome, no rollback), one rollback forced
+  (`cache_ttl` 7200s→1800s, error_rate 0.10 breach) - both open audit
+  entries auto-reverted, per `report_outcome()`'s "every open action"
+  contract. User sign-off given 2026-08-30. Routing scope stays disabled
+  in practice (`pre_approved_equivalents: []`), unchanged from repo merge.
+  Prior state for the record (2026-08-15 - repo work merged); observed live autonomy cycle +
   user sign-off pending - **the roadmap's final WP; this closes the
   v0.1-v0.3 repo work.** Step 0 promoted ADR-0309 verbatim. New
   `policies/optimization/optimization-policy.yaml` + README: ships
@@ -59,7 +66,7 @@
   tests (applied end-to-end through `should_use_cache()`,
   global-switch-supremacy, allow-list refusal, rollback/kill revert) -
   18 total, all green.
-- **ADRs:** ADR-0309 (Partially implemented merged here -> Implemented after the observed live cycle + user sign-off)
+- **ADRs:** ADR-0309 (Implemented 2026-08-30 - observed live cycle + user sign-off both done)
 - **Depends on:** WP-40 (merged + live loop done); WP-09 (cache tuning surface)
 - **Estimated files touched:** ~7
 

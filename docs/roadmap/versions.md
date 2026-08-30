@@ -14,7 +14,7 @@ Knowledge governance: logical knowledge domains, knowledge authorization as poli
 
 ## v0.3
 
-Multi-agent rollout and optimization: the four remaining agent slices (Arkos, Comage, Advantage, Finage), multiple agent graph shapes, CDP/scoped capabilities, the AIAgent CRD/operator, LoRA/PEFT with dataset-to-model pipelines, dynamic adapters, benchmark-driven routing, self-service agent onboarding. Open ADRs: 0301–0309, 0326, 0327, 0340, 0342 — [implementation roadmap](v0.1-v0.3-implementation-roadmap.md) Phase 3. Also carries ADR-0355, a new `mcp-aap` server exposing AAP cluster/platform audits to Tekos and Arkos once v0.2's `aap`/`aap-config` are live. Open WP: WP-074.
+Multi-agent rollout and optimization: the four remaining agent slices (Arkos, Comage, Advantage, Finage), multiple agent graph shapes, CDP/scoped capabilities, the AIAgent CRD/operator, LoRA/PEFT with dataset-to-model pipelines, dynamic adapters, benchmark-driven routing, self-service agent onboarding. Open ADRs: 0301–0309, 0326, 0327, 0340, 0342 — [implementation roadmap](v0.1-v0.3-implementation-roadmap.md) Phase 3. Also carries ADR-0355, a new `mcp-aap` server exposing AAP cluster/platform audits to Tekos and Arkos once v0.2's `aap`/`aap-config` are live. **v0.3 closed 2026-08-30**: ADR-0309/WP-42 (policy-driven autonomous optimization), the roadmap's final open item, flipped `Implemented` after a live cluster verification — autonomy enabled, one full tune-evaluate cycle observed and one rollback forced (both live-verified, `report_outcome()` reverts every open action on a trigger breach), user sign-off given. This closes the entire v0.1–v0.3 roadmap.
 
 ## v0.4
 
