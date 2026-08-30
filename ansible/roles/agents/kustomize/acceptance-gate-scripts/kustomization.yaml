@@ -46,6 +46,18 @@ configMapGenerator:
       - arkos-task-workshop-presentation.md=../../../../../agents/arkos/tasks/workshop-presentation.md
       - arkos-task-structure-demo.md=../../../../../agents/arkos/tasks/structure-demo.md
       - arkos-task-write-code.md=../../../../../agents/arkos/tasks/write-code.md
+      # ADR-0326/WP-31/33/35/36: each remaining agent's own scenarios.yaml/
+      # security_checks.py, prefixed (ConfigMap keys are flat) so
+      # run_acceptance_gate.yml's gate-agent volume can select the right
+      # one via items - see that task file's agent_name parameterization.
+      - arkos-scenarios.yaml=../../../../../evaluations/arkos/scenarios.yaml
+      - arkos-security_checks.py=../../../../../evaluations/arkos/security_checks.py
+      - comage-scenarios.yaml=../../../../../evaluations/comage/scenarios.yaml
+      - comage-security_checks.py=../../../../../evaluations/comage/security_checks.py
+      - advantage-scenarios.yaml=../../../../../evaluations/advantage/scenarios.yaml
+      - advantage-security_checks.py=../../../../../evaluations/advantage/security_checks.py
+      - finage-scenarios.yaml=../../../../../evaluations/finage/scenarios.yaml
+      - finage-security_checks.py=../../../../../evaluations/finage/security_checks.py
 generatorOptions:
   disableNameSuffixHash: true
   labels:

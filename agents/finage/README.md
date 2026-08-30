@@ -17,15 +17,19 @@ empty directories retained, filled at promotion).
   primary task `answer-finance-question` plus
   `identify-business-ready-to-invoice`, `monthly-invoice-report` and
   `check-my-drive-and-mail` — four declared tasks.
-- Evaluations: `evaluations/finage/` authored; **human scenario review
-  and the 75 % gate are the open promotion steps** (per WP-36 — the
-  four-agent fleet gate).
+- Evaluations: `evaluations/finage/` authored. Human scenario review and
+  a live 75% gate run both completed 2026-08-30 (WP-36) — the suite is
+  explicitly written for placeholder behavior, Layer 1 100% (20/20).
+  D10 (no finance-specific RAG domain, deterministic `sxa.*` capabilities
+  instead) is the decided, final scope — there is no pending "flip to
+  active" step.
 - OKF-stream note: the two invoice tasks are the designated first
   `zuno.project_required` candidates (ADR-0512/WP-55) — Finage is the
   project-binding exemplar.
 
-**Next step:** `platform/templates/agent/PROMOTION.md` from step 1
-(scenario review); CR migration alongside step 2.
+**Next step:** none for promotion — this agent is deliberately staying
+`placeholder` (D10). CR migration remains available whenever an operator
+wants to do it, independent of that decision.
 
 ## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 

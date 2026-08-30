@@ -38,16 +38,15 @@ real content - `deployment/` and `tests/` no longer are, see below).
 - Evaluations: `evaluations/arkos/scenarios.yaml` authored and updated
   for the two new tasks (WP-10 - scenarios 8/9 now exercise
   workshop-presentation/structure-demo instead of generic DAT text).
-  **A formal human scenario-review sign-off and a live 75 % gate run
-  (`run_acceptance_gate.py`) are still outstanding as separate,
-  documented checkpoints** - PROMOTION.md steps 1 and 3 - even though the
-  agent is already live (WP-11 flipped status ahead of them, at the
-  operator's own risk/judgment call).
+  PROMOTION.md steps 1 and 3 (human scenario review, live 75% gate run)
+  completed retroactively 2026-08-30 - see WP-31's own "2026-08-30
+  retroactive gate catch-up" section for the full result. Closed the gap
+  WP-11's earlier status flip left open.
 
-**Next step:** run `platform/templates/agent/PROMOTION.md` steps 1 and 3
-retroactively (human scenario review of `evaluations/arkos/scenarios.yaml`,
-then the live gate) to close out the paperwork the status flip jumped
-ahead of.
+**Known open item:** scenario 9 (`structure-demo` streaming) times out at
+30s on every run - a single-call path with no `model-routing-policy.yaml`
+override, riding the WP-096 fleet-wide default model. Non-blocking (Layer 1
+still clears the 75% threshold at 19/20) but unresolved; see WP-31.
 
 ## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 

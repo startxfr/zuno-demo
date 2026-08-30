@@ -23,26 +23,24 @@ directories are retained, not deleted, and still await real content —
   `retrieve_reason_respond` shape, primary task `check-deal-status`
   plus `update-opportunity-status`, `compare-historical-deals` and
   `check-my-drive-and-mail` — four declared tasks.
-- Evaluations: `evaluations/comage/` authored. **A formal human
-  scenario-review sign-off and a live 75 % gate run
-  (`run_acceptance_gate.py`) are still outstanding as separate,
-  documented checkpoints** — PROMOTION.md steps 1 and 3 — even though
-  the agent is already live (this flip jumped ahead of them, at the
-  operator's own call).
+- Evaluations: `evaluations/comage/` authored. PROMOTION.md steps 1 and 3
+  (human scenario review, live 75% gate run) completed retroactively
+  2026-08-30 — see WP-33's own "State" field for the full result (18/22
+  scenarios, 82%, Layer 2/3 100%). Closed the gap this flip left open.
 - **Known live-read gap:** `check-deal-status`'s live
   `salesforce.opportunity.read` call cannot succeed yet — `salesforce-mcp`
   has no deployment in-cluster, and its Vault-sourced credentials
-  (`salesforce/technical`) are still unresolved (standing operator gap,
-  tracked separately). Chat still works: agent-runtime degrades
-  gracefully to indexed-only (`knowledge.sales`) context when the live
-  tool call fails, it just never reaches `source_mode: live`/`both`
-  until that gap closes.
+  (`salesforce/technical`) are still unresolved. Chat still works:
+  agent-runtime degrades gracefully to indexed-only (`knowledge.sales`)
+  context when the live tool call fails, it just never reaches
+  `source_mode: live`/`both` until that gap closes. Carved out 2026-08-30
+  to [WP-101](../../docs/roadmap/work-packages/wp-101-salesforce-sandbox-credentials.md)
+  (v0.7) as its own owner rather than an unowned residual note — no
+  Salesforce org has ever existed in this cluster.
 
-**Next step:** run `platform/templates/agent/PROMOTION.md` steps 1 and 3
-retroactively (human scenario review of `evaluations/comage/scenarios.yaml`,
-then the live gate) to close out the paperwork the status flip jumped
-ahead of; deploy `salesforce-mcp` and fix its Vault secret to close the
-live-read gap; CR migration remains a later promotion-time step.
+**Next step:** CR migration remains a later promotion-time step (see
+Naveo/Arkos for the pattern); the Salesforce live-read gap follows
+WP-101's own timeline.
 
 ## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 

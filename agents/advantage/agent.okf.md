@@ -8,8 +8,8 @@ description: >-
   sales reporting, drawing on indexed ADV/project knowledge - never
   live Salesforce data (ADR-0326: explicit cross-domain boundary, not
   implicit inheritance from Comage). ADR-0218 removed `knowledge.adv`'s
-  only ingestion adapter, so that domain has no source today; choosing a
-  replacement is an open decision for this slice.
+  only ingestion adapter; ADR-0532 formally accepts the domain staying
+  sourceless (agent stays `placeholder`) rather than leaving it open.
 provenance:
   maintainer: Zuno Demo architecture team
   repository: zuno-demo
@@ -18,7 +18,7 @@ verification:
 freshness:
   last_reviewed: "2026-08-05"
 sources:
-  - "knowledge.adv (no ingestion adapter since ADR-0218; source undecided)"
+  - "knowledge.adv (sourceless by decision, ADR-0532 - no ingestion adapter since ADR-0218, no replacement adopted)"
   - "knowledge.project"
 zuno:
   name: advantage

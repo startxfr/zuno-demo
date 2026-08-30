@@ -102,7 +102,15 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
         f"{BFF_URL}/api/chat",
         headers=auth_headers("consultant-01"),
         json={"session_id": "sec-check-1", "message": "Draft a DAT for a test project."},
-        timeout=30,
+        # "Draft a DAT..." chains two full-document local-model LLM calls
+        # (draft then reflect) - same structurally-slow shape as
+        # run_scenarios.py's chat_basic_qa scenario 7, which overrides to
+        # 180s for exactly this reason. This check was never given the
+        # same override even though it sends the same message - a
+        # pre-existing gap only a real live gate run against this
+        # DAT-drafting shape ever surfaces (ADR-0326/WP-31 retroactive
+        # PROMOTION.md step 3 catch-up, 2026-08-30).
+        timeout=180,
     )
     ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
     return CheckResult(
@@ -129,7 +137,10 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
             "user_sub": forged_sub,
             "message": "Draft a DAT for a test project.",
         },
-        timeout=30,
+        # See bff_forwards_identity_to_runtime's own comment - same
+        # DAT-drafting message, same structurally-slow shape, same
+        # never-applied 180s override until this retroactive gate run.
+        timeout=180,
     )
     ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
     return CheckResult(
@@ -423,7 +434,8 @@ def arkos_chat_never_returns_photorealistic_images() -> CheckResult:
             "user_sub": "consultant-01",
             "message": "Draft a short architecture testimonial and include a diagram illustrating a Kubernetes Deployment rolling update.",
         },
-        timeout=30,
+        # Same DAT-drafting shape/rationale as bff_forwards_identity_to_runtime.
+        timeout=180,
     )
     images = resp.json().get("images", []) if resp.status_code == 200 else []
     ok = resp.status_code == 200 and all(img.get("mime_type") == "image/svg+xml" for img in images)

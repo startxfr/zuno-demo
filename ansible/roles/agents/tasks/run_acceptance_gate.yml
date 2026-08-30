@@ -1,8 +1,10 @@
 ---
-# Runs evaluations/tekos/run_acceptance_gate.py as a one-shot in-cluster Job
-# rather than from the control node: most services it calls (agent-runtime,
-# mcp-gateway, ai-gateway, rag-service) have no OpenShift Route and are only
-# reachable over in-cluster Service DNS.
+# Runs evaluations/<agent>/run_acceptance_gate.py (the canonical
+# evaluations/tekos/ implementation, AGENT-parameterized - ADR-0342/WP-31)
+# as a one-shot in-cluster Job rather than from the control node: most
+# services it calls (agent-runtime, mcp-gateway, ai-gateway, rag-service)
+# have no OpenShift Route and are only reachable over in-cluster Service
+# DNS.
 #
 # The Job runs in zuno-ai-run labeled app.kubernetes.io/name: acceptance-gate,
 # explicitly allow-listed in the relevant NetworkPolicies - never a
@@ -12,6 +14,39 @@
 # KEYCLOAK_URL uses the Keycloak CR's actual Route hostname
 # ("keycloak.<domain>"), not the "sso.<domain>" convention some other
 # charts' defaults assume but no Route here actually creates.
+#
+# agent_name (default "tekos", the only value check.yml's unconditional
+# call ever passes) selects which agent's scenarios.yaml/security_checks.py
+# this Job runs - ADR-0326/WP-31/33/35/36's retroactive gate catch-up for
+# arkos/comage/advantage/finage set this explicitly. Layer 3 (gate_checks.py)
+# stays agent-invariant on purpose (its checks are fixed platform-wide
+# assertions, some of which read the tekos/arkos bundles specifically
+# regardless of which agent's Layers 1-2 are running) so gate-tekos-bundle
+# and gate-arkos-bundle stay mounted unconditionally below.
+- name: "acceptance-gate | resolve the target agent name"
+  ansible.builtin.set_fact:
+    _gate_agent: "{{ agent_name | default('tekos') }}"
+
+# The canonical evaluations/tekos/run_scenarios.py's TASK_NAME defaults to
+# "answer-technical-question" (Tekos's own task) - each agent's own
+# evaluations/<agent>/run_acceptance_gate.py wrapper sets the real default
+# via os.environ.setdefault() before delegating, but this Job calls the
+# canonical implementation directly (bypassing the wrapper, same reason
+# AGENT is set explicitly above), so TASK_NAME needs the same per-agent
+# override here or every _invoke_tool call in security_checks.py targets
+# the wrong OKF task and gets a 403 "has no task" response.
+- name: "acceptance-gate | resolve the target agent's OKF task name"
+  ansible.builtin.set_fact:
+    _gate_task_name: >-
+      {{
+        {
+          "tekos": "answer-technical-question",
+          "arkos": "draft-architecture-testimonial",
+          "comage": "check-deal-status",
+          "advantage": "answer-project-question",
+          "finage": "answer-finance-question",
+        }[_gate_agent]
+      }}
 
 - name: "acceptance-gate | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
@@ -65,19 +100,19 @@
   register: _gate_demo_password_secret
   no_log: true
 
-- name: "acceptance-gate | read the tekos-frontend client secret from zuno-auth"
+- name: "acceptance-gate | read the {{ _gate_agent }}-frontend client secret from zuno-auth"
   kubernetes.core.k8s_info:
     kind: Secret
     namespace: zuno-auth
-    name: tekos-frontend-client-secret
+    name: "{{ _gate_agent }}-frontend-client-secret"
   register: _gate_client_secret_secret
   no_log: true
 
 - name: "acceptance-gate | fail if either Keycloak secret is missing"
   ansible.builtin.fail:
     msg: >-
-      demo-personas-password / tekos-frontend-client-secret not found in
-      zuno-auth - run `make d0 configure keycloak` first (see
+      demo-personas-password / {{ _gate_agent }}-frontend-client-secret not
+      found in zuno-auth - run `make d0 configure keycloak` first (see
       ansible/roles/keycloak/README.md).
   when: >-
     (_gate_demo_password_secret.resources | default([]) | length) == 0 or
@@ -97,7 +132,7 @@
       type: Opaque
       data:
         demo-persona-password: "{{ _gate_demo_password_secret.resources[0].data.password }}"
-        tekos-frontend-client-secret: "{{ _gate_client_secret_secret.resources[0].data.client_secret }}"
+        frontend-client-secret: "{{ _gate_client_secret_secret.resources[0].data.client_secret }}"
   no_log: true
 
 # disableNameSuffixHash keeps the ConfigMap name stable so the inline Job
@@ -112,7 +147,7 @@
     state: absent
     api_version: batch/v1
     kind: Job
-    name: zuno-acceptance-gate
+    name: "zuno-acceptance-gate-{{ _gate_agent }}"
     namespace: zuno-ai-run
     wait: true
 
@@ -171,7 +206,7 @@
       apiVersion: batch/v1
       kind: Job
       metadata:
-        name: zuno-acceptance-gate
+        name: "zuno-acceptance-gate-{{ _gate_agent }}"
         namespace: zuno-ai-run
         labels:
           zuno.io/managed-by: zuno-ansible
@@ -233,32 +268,42 @@
                     value: /tmp
                   - name: PYTHONUSERBASE
                     value: /tmp/.pyuser
+                  # run_scenarios.py's AGENT constant is os.getenv("AGENT",
+                  # "tekos") - must be set explicitly here for every
+                  # non-tekos run, or run_acceptance_gate.py's
+                  # _load_security_checks() loads the wrong agent's
+                  # security_checks.py.
+                  - name: AGENT
+                    value: "{{ _gate_agent }}"
+                  - name: TASK_NAME
+                    value: "{{ _gate_task_name }}"
                   - name: KEYCLOAK_URL
                     value: "https://keycloak.{{ cluster_base_domain }}"
                   - name: FRONTEND_URL
-                    value: "https://tekos.{{ cluster_base_domain }}"
+                    value: "https://{{ _gate_agent }}.{{ cluster_base_domain }}"
                   - name: DEMO_PERSONA_PASSWORD
                     valueFrom:
                       secretKeyRef:
                         name: acceptance-gate-credentials
                         key: demo-persona-password
-                  - name: TEKOS_FRONTEND_CLIENT_SECRET
+                  # run_scenarios.py reads {AGENT.upper()}_FRONTEND_CLIENT_SECRET.
+                  - name: "{{ _gate_agent | upper }}_FRONTEND_CLIENT_SECRET"
                     valueFrom:
                       secretKeyRef:
                         name: acceptance-gate-credentials
-                        key: tekos-frontend-client-secret
+                        key: frontend-client-secret
                 volumeMounts:
                   - name: gate
                     mountPath: /gate
                   # WP-31 parameterized run_acceptance_gate.py to load
                   # security checks from <script-dir>/<AGENT>/ - ConfigMap
                   # keys can't contain '/', so the same ConfigMap is
-                  # mounted a second time, projecting only that one file
-                  # into the per-agent subdirectory the script resolves
-                  # (otherwise FileNotFoundError on
-                  # /gate/tekos/security_checks.py).
+                  # mounted a second time, projecting only that one agent's
+                  # files into the per-agent subdirectory the script
+                  # resolves (otherwise FileNotFoundError on
+                  # /gate/<agent>/security_checks.py).
                   - name: gate-agent
-                    mountPath: /gate/tekos
+                    mountPath: "/gate/{{ _gate_agent }}"
                   # security_checks.py resolves repo_root as parents[2] of
                   # its own resolved path (/gate) - the policy files it
                   # reads land under /gate/policies via items sub-paths.
@@ -289,16 +334,22 @@
               - name: gate
                 configMap:
                   name: acceptance-gate-scripts
+              # tekos's own security_checks.py/scenarios.yaml keep their
+              # original unprefixed ConfigMap keys (used elsewhere too, see
+              # the "gate" volume above); every other agent's files were
+              # added to the acceptance-gate-scripts ConfigMap under an
+              # "<agent>-" prefix (ConfigMap keys are flat, can't nest per
+              # agent - see kustomization.yaml).
               - name: gate-agent
                 configMap:
                   name: acceptance-gate-scripts
                   items:
-                    - key: security_checks.py
+                    - key: "{{ 'security_checks.py' if _gate_agent == 'tekos' else _gate_agent + '-security_checks.py' }}"
                       path: security_checks.py
                     # The shared runner resolves scenarios.yaml per-agent
                     # too (run_scenarios.py: "its scenarios.yaml lives in
                     # ITS directory").
-                    - key: scenarios.yaml
+                    - key: "{{ 'scenarios.yaml' if _gate_agent == 'tekos' else _gate_agent + '-scenarios.yaml' }}"
                       path: scenarios.yaml
               - name: gate-policies
                 configMap:
@@ -357,7 +408,7 @@
     api_version: batch/v1
     kind: Job
     namespace: zuno-ai-run
-    name: zuno-acceptance-gate
+    name: "zuno-acceptance-gate-{{ _gate_agent }}"
   register: _gate_job
   until: >-
     (_gate_job.resources[0].status.succeeded | default(0)) > 0 or
@@ -399,7 +450,7 @@
   ansible.builtin.fail:
     msg: >-
       The ADR-0053 acceptance gate did not pass (Job
-      zuno-acceptance-gate/zuno-ai-run succeeded={{ _gate_job.resources[0].status.succeeded | default(0) }}
+      zuno-acceptance-gate-{{ _gate_agent }}/zuno-ai-run succeeded={{ _gate_job.resources[0].status.succeeded | default(0) }}
       failed={{ _gate_job.resources[0].status.failed | default(0) }}) - see the output above
       for which scenario/security check/gate check failed.
   when: (_gate_job.resources[0].status.succeeded | default(0)) == 0

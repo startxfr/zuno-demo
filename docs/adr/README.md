@@ -156,7 +156,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | v0.1 | Implemented | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
 | [ADR-0323](0323-establish-canonical-generated-and-validated-platform-documentation.md) | v0 | Implemented | Establish canonical generated and validated platform documentation |
 | [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md) | v0 | Implemented | Reconcile the CI build inventory with the repository component lifecycle |
-| [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v0.3 | Partially implemented | Generalize the Tekos vertical slice to the four remaining agents |
+| [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | v0.3 | Implemented | Generalize the Tekos vertical slice to the four remaining agents |
 | [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v0.3 | Implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
 | [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | v0 | Superseded by ADR-0331 | Separate the OpenShift AI control plane from AI build and run workload namespaces |
 | [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md) | v0 | Implemented | Consolidate agent workloads into the shared zuno-ai-run namespace |
@@ -176,6 +176,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | v0.3 | Implemented (2026-08-26; amended same day by WP-083 - two permanent MIG nodes, see decisions 5 and 7) | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
 | [ADR-0353](0300-v0.3-roadmap.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) | v0.3 | Proposed | Support an optional external registry as the first-party runtime image source |
 | [ADR-0355](0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md) | v0.3 | Implemented | Expose AAP audits to agents through an mcp-aap server |
+| [ADR-0532](0532-accept-knowledge-adv-as-sourceless-pending-a-replacement-adapter.md) | v0.3 | Implemented | Accept `knowledge.adv` as sourceless pending a replacement adapter |
 
 ## version 0.4
 

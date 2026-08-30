@@ -7,7 +7,7 @@ component contract, `platform_profile.yaml`'s declared version intent).
 No live cluster or registry needed - pure static text/YAML inspection,
 same style as `platform/supply-chain/check_build_matrix.py`.
 
-Six checks, each independent (a failure in one doesn't block the others
+Seven checks, each independent (a failure in one doesn't block the others
 from reporting):
   - make_commands: every literal `make day0|d0|day1|d1 ...` example in
     README.md uses a verb/component this repository's actual Makefile
@@ -20,6 +20,11 @@ from reporting):
     row, and that row's State matches the brief's own `- **State:**` line
     (the WP half of adr_index - the roadmap's rule wants five copies moved
     together, and this pair was the one nothing validated);
+  - agent_status_vs_adr: for every wp-NN-<agent>-slice.md brief, if
+    agents/<agent>/agent.okf.md declares `zuno.status: active`, its own
+    WP's governing ADR(s) (title + `- **ADRs:**` bullet) must be
+    `Implemented`, not still `Partially implemented`/`Proposed` (caught a
+    real drift live 2026-08-30 - see ADR-0326/WP-31);
   - day0_day1_roles: every Makefile DAY0_COMPONENTS/DAY1_RUN_COMPONENTS/
     DAY1_BUILD_COMPONENTS entry has a matching ansible/roles/<name> role;
   - version_consistency: README.md/MEMORY.md/docs/architecture/*.md/
@@ -406,6 +411,78 @@ def check_wp_state() -> List[Finding]:
     return findings
 
 
+AGENTS_DIR = REPO_ROOT / "agents"
+# Matches the naming convention the ADR-0326 slice WPs use
+# (wp-31-arkos-slice.md, wp-33-comage-slice.md, ...) - deliberately not
+# every WP maps to exactly one agent, so this scopes the check to the
+# briefs that do rather than trying to cover the whole tracker.
+SLICE_WP_RE = re.compile(r"^wp-\d+-([a-z0-9]+)-slice\.md$")
+
+
+def _wp_governing_adrs(wp_path: pathlib.Path) -> List[str]:
+    """ADR ids this WP brief's title and `- **ADRs:**` bullet name.
+
+    Deliberately NOT a scan of the whole brief body - a brief's narrative
+    State field mentions dozens of ADRs in passing (security/policy ADRs
+    its own checks cover), only a small fraction of which are the ADR(s)
+    that actually gate this agent's `zuno.status`.
+    """
+    text = wp_path.read_text()
+    title_line = text.splitlines()[0] if text else ""
+    adrs_bullet = re.search(r"^- \*\*ADRs:\*\*\s*(.+?)(?=\n- \*\*|\n\n|\Z)", text, re.MULTILINE | re.DOTALL)
+    scoped_text = title_line + "\n" + (adrs_bullet.group(1) if adrs_bullet else "")
+    return sorted(set(re.findall(r"ADR-(\d{4})", scoped_text)))
+
+
+def check_agent_status_vs_adr() -> List[Finding]:
+    """An agent bundle's `zuno.status: active` implies its slice WP's
+    governing ADR(s) are genuinely `Implemented`, not still `Partially
+    implemented`/`Proposed`.
+
+    ADR-0326/WP-31 found this drift live 2026-08-30: Arkos and Comage had
+    both been flipped to `active` by explicit operator direction days
+    before ADR-0326's own `**Status:**` field caught up to
+    `Partially implemented` -> `Implemented` - and nothing else in this
+    script checks the OKF-bundle/ADR pair the way check_adr_index checks
+    the ADR/index pair or check_wp_state checks the WP/tracker pair.
+    """
+    findings: List[Finding] = []
+
+    for wp_path in sorted(WP_DIR.glob("wp-*.md")):
+        match = SLICE_WP_RE.match(wp_path.name)
+        if not match:
+            continue
+        agent = match.group(1)
+        okf_path = AGENTS_DIR / agent / "agent.okf.md"
+        if not okf_path.is_file():
+            continue
+
+        status_match = re.search(r"^\s*status:\s*(\S+)", okf_path.read_text(), re.MULTILINE)
+        if not status_match or status_match.group(1) != "active":
+            continue
+
+        for adr_id in _wp_governing_adrs(wp_path):
+            adr_matches = sorted(ADR_DIR.glob(f"{adr_id}-*.md"))
+            if not adr_matches:
+                continue
+            status_line = re.search(r"\*\*Status:\*\*\s*(.+)", adr_matches[0].read_text())
+            if not status_line:
+                continue
+            adr_status = _normalize_adr_status(status_line.group(1))
+            # A superseded ADR's replacement is out of this check's scope -
+            # only flag a governing ADR that is still open/partial on its
+            # own terms.
+            if adr_status != "Implemented" and not adr_status.startswith("Superseded"):
+                findings.append(Finding(
+                    "agent_status_vs_adr",
+                    f"agents/{agent}/agent.okf.md declares zuno.status: active, but "
+                    f"{wp_path.relative_to(REPO_ROOT)}'s governing ADR-{adr_id} status is "
+                    f"'{adr_status}', not Implemented - a promotion flip should not outrun "
+                    f"its own gate ADR.",
+                ))
+    return findings
+
+
 def check_day0_day1_roles() -> List[Finding]:
     findings: List[Finding] = []
     lists = _parse_makefile_lists()
@@ -471,14 +548,15 @@ def main() -> int:
         + check_auto_fix_commands()
         + check_adr_index()
         + check_wp_state()
+        + check_agent_status_vs_adr()
         + check_day0_day1_roles()
         + check_version_consistency(profile)
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
           "docs/adr/README.md index, work-package state vs the roadmap trackers, "
-          "Makefile/ansible role consistency, and platform version prose "
-          f"against {PROFILE_PATH.relative_to(REPO_ROOT)}.")
+          "agent zuno.status vs its governing ADR(s), Makefile/ansible role "
+          f"consistency, and platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")
         return 0

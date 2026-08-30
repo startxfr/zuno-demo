@@ -18,14 +18,17 @@ empty directories retained, filled at promotion).
   `monthly-sales-report` and `check-my-drive-and-mail` — four declared
   tasks.
 - Evaluations: `evaluations/advantage/` authored (including its
-  hand-authored narrative security checks); **human scenario review,
-  the 75 % gate are the open promotion steps** (per WP-35). Aramis
-  live verification is no longer one of them: ADR-0218 dropped the
-  adapter, leaving `knowledge.adv` with no source and its sourcing an
-  open decision for this slice.
+  hand-authored narrative security checks). Human scenario review and
+  a live 75% gate run both completed 2026-08-30 (WP-35) — the suite is
+  explicitly written for placeholder behavior (tiles/chat "correctly
+  blocked"), Layer 1 100% (20/20). [ADR-0532](../../docs/adr/0532-accept-knowledge-adv-as-sourceless-pending-a-replacement-adapter.md)
+  formally accepts `knowledge.adv` staying sourceless — this is not an
+  open decision anymore, it is the decided, final state, so there is
+  no pending "flip to active" step.
 
-**Next step:** `platform/templates/agent/PROMOTION.md` from step 1
-(scenario review); CR migration alongside step 2.
+**Next step:** none for promotion — this agent is deliberately staying
+`placeholder` (ADR-0532). CR migration remains available whenever an
+operator wants to do it, independent of that decision.
 
 ## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 
