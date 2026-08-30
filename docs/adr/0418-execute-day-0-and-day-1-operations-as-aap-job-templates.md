@@ -310,7 +310,7 @@ open, unaddressed by WP-094 and still deferred to whichever WP implements
 Phase 3/4 for real: *who* (which Controller user/team) may launch each
 Job Template - the two credential tiers WP-094 added govern what the
 launched job can DO to the cluster, not who is allowed to click launch.
-**(2026-08-30):** this remaining item is now tracked as **WP-101**.
+**(2026-08-30):** this remaining item is now tracked as **WP-103**.
 
 ## Operational considerations
 
@@ -333,7 +333,7 @@ assumed one.
 
 This ADR delivers a decision record; implementation lands one phase at a
 time via work packages (WP-094 for clause 1's registration, WP-095/WP-097
-for clause 6's Workflow Templates/routing, WP-101 for the still-open
+for clause 6's Workflow Templates/routing, WP-103 for the still-open
 launch-RBAC item), per this repository's
 existing pattern (ADR-0352 clause 9: "roadmap briefs live under
 `docs/roadmap/`, not in this ADR").
