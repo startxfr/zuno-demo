@@ -541,11 +541,16 @@ gptOssModel:
 # that names the other model directly (app.kubernetes.io/name), so the
 # separation is now an expressed preference and not just a side effect of
 # which slice happened to be free - see llminferenceservice-qwen35.yaml /
-# llminferenceservice-wesh.yaml. Both terms stay
-# preferredDuringSchedulingIgnoredDuringExecution; converting either to
-# `required` would contradict ADR-0351 decision 1 and WP-086, which both
-# chose packing onto a survivor over leaving a pod Pending, and WP-086's
-# own live finding that a soft term can still lose to scheduling order.
+# llminferenceservice-wesh.yaml. The generic term (any GPU workload) stays
+# preferred; the pair-specific term was PROMOTED to `required` by
+# WP-105/ADR-0536 (amendment to ADR-0526 decision 5) after a live drift was
+# found 2026-08-30: both pods were recreated within the same ~40s window
+# during a routine restart and the scheduler colocated them anyway - the
+# soft term was satisfiable but scoring still chose to violate it. This
+# pair specifically needs a hard separation guarantee for WP-105's
+# node-failover drill; ADR-0351 decision 1/WP-086's general "pack onto a
+# survivor over leaving a pod Pending" preference still governs every
+# other model on this platform, including the generic term above.
 #
 # QUOTA. These two consume the LAST free slices: zuno-ai-run's GPU
 # ResourceQuota goes to 3/3 on mig-1g.24gb and 2/2 on mig-2g.48gb. It does

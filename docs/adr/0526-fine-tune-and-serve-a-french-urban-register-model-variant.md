@@ -7,6 +7,32 @@
 - **Supersedes:** [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) in part (decisions 1 and 5 — the serving mechanism and the starting candidate's objective) and [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) in part (decisions 2 and 4 — dataset sourcing and the training objective). Every other decision point of both records remains in effect.
 
 
+## Amendment (2026-08-30): decision 5's anti-affinity promoted to `required` for this pair
+
+**Decision 5 said node separation between `qwen3.5-9b` and `qwen3.5-9b-wesh` is
+guaranteed by slice availability, with a `preferred` anti-affinity term
+expressing the intent (WP-092/ADR-0414).** Live-cluster-confirmed 2026-08-30
+(WP-105/ADR-0536): both pods were recreated within the same ~40-second window
+during a routine restart, and the scheduler colocated them on the same node
+anyway - the anti-affinity was satisfiable elsewhere (the other node had a
+free matching slice) but scoring still chose to violate it. A soft term does
+not guarantee separation under simultaneous rescheduling, only bias it.
+
+This pair's anti-affinity term is now `requiredDuringSchedulingIgnoredDuringExecution`
+(`gitops/charts/models/templates/llminferenceservice-qwen35.yaml` /
+`llminferenceservice-wesh.yaml`), overriding ADR-0351 decision 1/WP-086's
+general "pack onto a survivor over leaving a pod Pending" preference **for
+this one named pair only** - every other model on this platform keeps the
+generic `kserve.io/component: workload` term `preferred`, unchanged. The
+accepted trade-off, made explicit here rather than left implicit: if the node
+carrying either of these two models is lost, the other can no longer pack
+onto the survivor and will sit `Pending` until capacity returns, same as
+before this amendment - what changes is that it can also never silently swap
+places with its sibling under routine pod churn. This hardening exists
+because WP-105's node-failover drill needs deterministic separation to be
+meaningful; it is not a general recommendation for other model pairs on this
+platform.
+
 ## Amendment (2026-08-29): decision 7 was false as written, and a third gate half was added
 
 **Decision 7 said Comage is routed to the variant on all four tasks.** (This

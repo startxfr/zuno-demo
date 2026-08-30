@@ -58,11 +58,7 @@ spec:
       nvidia.com/gpu.present: "true"
     {{- if .Values.spreadAcrossGpuNodes }}
     # Generic term unchanged (WP-086 / ADR-0351 decision 1): soft avoidance
-    # of any other model workload. Second term added WP-092/ADR-0414: node
-    # separation from qwen35-9b-wesh specifically used to be an accident of
-    # which mig-1g.24gb/mig-2g.48gb slice was free, not an intent expressed
-    # anywhere - this makes that intent explicit. Still soft: do not
-    # promote either term to `required`, see llminferenceservice-wesh.yaml.
+    # of any other model workload.
     affinity:
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
@@ -72,12 +68,26 @@ spec:
               labelSelector:
                 matchLabels:
                   kserve.io/component: workload
-          - weight: 100
-            podAffinityTerm:
-              topologyKey: kubernetes.io/hostname
-              labelSelector:
-                matchLabels:
-                  app.kubernetes.io/name: {{ .Values.weshModel.inferenceServiceName }}
+        # Second term added WP-092/ADR-0414 as `preferred` (soft); promoted
+        # to `required` by WP-105/ADR-0536 (amendment to ADR-0526 decision
+        # 5). Live-cluster-confirmed 2026-08-30: with only 2 permanent MIG
+        # nodes and both fully saturated with 5 GPU workloads, a soft term
+        # let the scheduler colocate qwen35-9b and qwen35-9b-wesh on the
+        # same node under normal pod churn (both pods recreated in the same
+        # ~40s window during a routine restart) - the anti-affinity was
+        # satisfiable elsewhere but scoring still chose to violate it. This
+        # pair specifically needs a HARD guarantee of separation for
+        # WP-105's node-failover drill to be deterministic (killing
+        # qwen35-9b's pod must never let it silently reschedule onto
+        # qwen35-9b-wesh's node), so ADR-0351 decision 1/WP-086's general
+        # "pack onto a survivor" preference is overridden for this one
+        # named pair only - every other model on this platform keeps the
+        # soft-only generic term above unchanged.
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: {{ .Values.weshModel.inferenceServiceName }}
     {{- end }}
     serviceAccountName: {{ .Values.qwen35Model.llmInferenceService.serviceAccountName }}
     containers:

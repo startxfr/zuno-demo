@@ -93,6 +93,24 @@ exercise.
    ADR-0526 gap analysis warns must be checked live, not read once and
    trusted forever.
 
+6. **Node separation is a hard requirement for this pair, not a soft
+   preference.** Live-cluster-confirmed 2026-08-30, before this drill's
+   first live run: `qwen3.5-9b` and `qwen3.5-9b-wesh` were found colocated
+   on the same node despite WP-092/ADR-0414's `preferred` anti-affinity —
+   both pods had been recreated within the same ~40-second window during a
+   routine restart, and scoring chose to violate the soft term even though
+   it was satisfiable elsewhere. Left uncorrected, this drill's own
+   precondition ("each on a different node") would fail intermittently, and
+   worse, a cordon+kill of `qwen3.5-9b` could silently reschedule onto
+   whichever node `qwen3.5-9b-wesh` occupies if that node had a free
+   matching slice — defeating the whole demonstration. Fixed by promoting
+   this one pair's anti-affinity term to
+   `requiredDuringSchedulingIgnoredDuringExecution` (amendment to ADR-0526
+   decision 5, see that ADR) and physically re-separating the two live pods
+   onto their originally-intended nodes before the drill's first run. This
+   is scoped to this pair only — every other model on the platform keeps
+   its existing soft-only anti-affinity.
+
 ## Consequences
 
 - The cluster spends the drill window (cordon-to-uncordon) with **zero**
@@ -108,10 +126,14 @@ exercise.
   — a reusable capability for future gated, human-in-the-loop scenarios, not
   a one-off hack for this drill alone.
 - Closes ADR-0526's "STILL NOT TRUE" gap for the node/pod-failure fallback
-  path once the drill has actually run and its evidence is recorded; it does
-  **not** amend ADR-0526 itself (that record stays immutable) — the gap is
-  closed by this ADR's own evidence doc plus a note added to ADR-0526's
-  index entry pointing here.
+  path once the drill has actually run and its evidence is recorded, via this
+  ADR's own evidence doc — that gap statement in ADR-0526's Status line is
+  otherwise left untouched. Decision 6 above **is** recorded as an in-place
+  Amendment on ADR-0526 itself (its decision 5, the `preferred`→`required`
+  anti-affinity promotion), following this repo's existing amendment
+  convention (ADR-0526 already carries one, for decision 7) — narrower in
+  scope than the fallback-gap statement, and a genuine correction to a
+  decision that no longer matched live reality, not a rewrite of history.
 
 ## Security considerations
 

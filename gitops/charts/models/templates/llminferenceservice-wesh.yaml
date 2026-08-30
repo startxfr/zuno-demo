@@ -54,13 +54,7 @@ spec:
     nodeSelector:
       nvidia.com/gpu.present: "true"
     {{- if .Values.spreadAcrossGpuNodes }}
-    # Generic term reused EXACTLY as-is (WP-086). Second term added
-    # WP-092/ADR-0414: node separation from qwen35-9b (its own unmodified
-    # base) used to be guaranteed only by slice availability - this model
-    # taking the only free mig-2g.48gb - not by any expressed intent. Do
-    # not promote either term to `required`: ADR-0351 decision 1 and
-    # WP-086 both chose packing onto a survivor over leaving a pod
-    # Pending, and ADR-0526 decision 5 restates it.
+    # Generic term reused EXACTLY as-is (WP-086).
     affinity:
       podAntiAffinity:
         preferredDuringSchedulingIgnoredDuringExecution:
@@ -70,12 +64,18 @@ spec:
               labelSelector:
                 matchLabels:
                   kserve.io/component: workload
-          - weight: 100
-            podAffinityTerm:
-              topologyKey: kubernetes.io/hostname
-              labelSelector:
-                matchLabels:
-                  app.kubernetes.io/name: {{ .Values.qwen35Model.inferenceServiceName }}
+        # Second term added WP-092/ADR-0414 as `preferred` (soft); promoted
+        # to `required` by WP-105/ADR-0536 (amendment to ADR-0526 decision
+        # 5) - see llminferenceservice-qwen35.yaml's matching comment for
+        # the live-cluster finding that motivated this (a soft term let
+        # this exact pair colocate under normal pod churn) and why only
+        # this one named pair is hardened, not the platform-wide generic
+        # term above.
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: {{ .Values.qwen35Model.inferenceServiceName }}
     {{- end }}
     serviceAccountName: {{ .Values.weshModel.llmInferenceService.serviceAccountName }}
     containers:

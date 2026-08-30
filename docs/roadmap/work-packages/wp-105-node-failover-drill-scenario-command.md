@@ -41,6 +41,23 @@ check, the two-playbook split).
   app.kubernetes.io/name=qwen35-9b-wesh -o wide` shows exactly one `Running`
   pod, each on a different node - confirms the topology ADR-0536 assumes
   still holds before touching anything live.
+
+  **Found false live 2026-08-30, before this drill's first run:** both pods
+  were colocated on `ip-10-18-15-25` (WP-092/ADR-0414's anti-affinity was
+  only `preferred`, and both pods had been recreated in the same ~40s
+  window during a routine restart - satisfiable elsewhere, but scoring
+  still chose to violate it). Fixed live via a 3-pod shuffle (temporarily
+  scaling `qwen36-27b-instruct-kserve` to 0 to break a scheduling race,
+  full sequence not reproduced here - see the session transcript) that
+  restored the originally-intended placement (`qwen3.5-9b` +
+  `qwen36-27b-instruct` on `ip-10-18-15-25`; `qwen3.5-9b-wesh` +
+  `gpt-oss-20b` on `ip-10-18-67-65`), and by promoting this pair's
+  anti-affinity to `required` in `gitops/charts/models/templates/llminferenceservice-qwen35.yaml`
+  / `llminferenceservice-wesh.yaml` (Amendment to ADR-0526 decision 5, see
+  ADR-0536 Decision 6) so it cannot silently drift back. Re-run this precondition
+  check before every future live use of this drill regardless - a `required`
+  term guarantees separation going forward, but does not retroactively
+  guarantee today's placement stays correct if the chart is ever reverted.
 - `platform/ai-gateway/provider-routing.yaml` has no `cache_enabled: true`
   entry for `local-qwen35(-maas)`/`local-wesh(-maas)` (grep for it) - if this
   has changed, stop and re-read ADR-0536's Decision 5 before proceeding.
