@@ -1,6 +1,20 @@
 # WP-105: `make d3 scenario-failover-node` - live GPU-node failover drill (qwen-normal ↔ qwen-wesh)
 
-- **State:** Not started.
+- **State:** Operator pending (2026-08-30 — Part A merged and live-verified
+  end to end on the real cluster: baseline probe, cordon+kill, `Pending`
+  confirmation, failover probe, human confirmation pause, uncordon+
+  reschedule, restore probe all passed for both Comage
+  (`local-wesh(-maas)` → `local-qwen35(-maas)` → `local-wesh(-maas)`) and
+  Tekos (`ovhcloud-gpt-oss-120b` unchanged throughout, the decoupling
+  control) — full verdict JSON in
+  `docs/roadmap/evidence/adr-0536-node-failover-drill.md`. Three real bugs
+  found and fixed live during this run (see that evidence doc): a
+  restore-playbook crash reading `spec.nodeName` off a genuinely
+  unschedulable `Pending` pod, a too-tight 30s probe HTTP timeout that
+  didn't account for a freshly-rescheduled model's cold-start first
+  response, and a restore-playbook idempotency gap that made a re-run after
+  a partial success fail needlessly. Part B (AAP Workflow Template with a
+  human approval gate) not started — no repo work exists for it yet.)
 - **ADRs:** ADR-0536 (Proposed), ADR-0418 (Implemented - `aap_route`/Workflow Template mechanism this WP extends).
 - **Depends on:** WP-094 (Job Templates), WP-095 (Workflow Templates), WP-097 (make/AAP routing), WP-103 (launch-RBAC), WP-087/ADR-0526 (the qwen-normal/qwen-wesh fallback this drill proves).
 - **Estimated files touched:** ~10 (2 new ADR/WP docs + 1 evidence doc, 1 new Python probe script, 2 new Ansible playbooks, Makefile, check_docs.py, roadmap tracker; Part B additionally touches the aap-config chart/role).
