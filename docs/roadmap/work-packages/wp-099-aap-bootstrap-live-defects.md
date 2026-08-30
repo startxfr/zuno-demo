@@ -1,10 +1,9 @@
 # WP-099: Fix three live defects found running `make d0 install aap-config` for real
 
-- **State:** Repo work merged - live re-verification pending on the fixed
-  paths (resource-operator sizing and the Workflow Template organization
-  omission were confirmed fixed live 2026-08-30; the SCM re-sync task is
-  new code, not yet exercised end to end via `make d0 install aap-config`
-  itself).
+- **State:** Done - `make d0 install aap-config` ran clean end to end
+  2026-08-30 (`failed=0`, `changed=0` on the second consecutive run), all
+  14 Job Templates/7 Workflow Templates/2 credentials confirmed live via
+  the Controller API.
 - **ADRs:** ADR-0418 (clauses 4/6 - Job/Workflow Template registration).
 - **Depends on:** WP-094 (Job Templates), WP-095 (Workflow Templates),
   WP-098 (Demo-object cleanup - ran in the same investigation).
@@ -118,6 +117,39 @@ exact same failure.
   needed, since the whole point is to catch a drift the existing
   count-based nudge logic cannot see.
 
+### 4. Project SCM re-sync task itself: wrong expected HTTP status
+
+The new task from fix #3 above was written expecting `status_code: 201`
+on `POST projects/{id}/update/`, based on a manual `curl` test during
+diagnosis that only checked the JSON body, never the actual HTTP status.
+Running it for real via `make d0 install aap-config` failed immediately:
+the Controller API returns **202** (Accepted, async job queued), not 201.
+Fixed in the same task (`ansible/roles/aap_config/tasks/install.yml`).
+
+### 5. `zuno-day3-sign`'s stuck CR needed a real delete, not a nudge
+
+Even after fix #3/#4 landed and the Project's SCM checkout was
+genuinely current, `zuno-day3-sign` alone still didn't get created - the
+"force the tower.ansible.com CRs to reconcile" annotation-only patch
+this repo uses everywhere else never re-triggers this operator's
+watch for a `JobTemplate` whose `metadata.generation` hasn't changed
+(confirmed live: `generation: 1`, unchanged, and zero fresh reconcile
+attempts in the operator's own logs after the annotation patch - this
+operator's ansible-operator watch only reacts to genuine spec changes,
+not metadata/annotation-only updates or its own status writes). Since
+the `JobTemplate` CRD has no `state: absent` field to express a
+declarative delete, and the CR has zero dependents (it didn't exist on
+the Controller yet), the fix was operational, not code: delete the CR
+(`oc delete jobtemplate.tower.ansible.com zuno-day3-sign -n zuno-aap`),
+ArgoCD's `selfHeal` recreated it within seconds, and the fresh CR
+reconciled cleanly on its first attempt. This is a defect-class note,
+not a repo change: the existing annotation-nudge mechanism used
+throughout `install.yml` is silently ineffective for any CR whose
+watch predicate is generation-based and which needs a *retry* of an
+already-attempted (and already-`ignore_errors`-swallowed) failure -
+worth remembering if another Job/Workflow Template ever gets stuck the
+same way.
+
 ## What NOT to touch
 
 - The `zuno-demo` Project's `spec.organization` field in
@@ -150,38 +182,36 @@ exact same failure.
   7 Workflow Templates report `isFinished: true` with no error; a direct
   Controller API query (`GET .../workflow_job_templates/`) lists all 7 by
   name.
-- Live, still pending (needs a fresh `make d0 install aap-config` run
-  exercising the new SCM re-sync task and the durable Subscription
-  resize together): `zuno-day3-sign` appears in
-  `GET .../job_templates/` after a clean run with no manual API
-  intervention.
+- Live, confirmed 2026-08-30: two consecutive `make d0 install
+  aap-config` runs (second run `failed=0, changed=0`, fully idempotent)
+  registered all 14 Job Templates including `zuno-day3-sign` (after the
+  one-time CR delete+recreate from fix #5), all 7 Workflow Templates with
+  full node sets, both credentials, and Keycloak SSO - `GET
+  .../job_templates/` and `.../workflow_job_templates/` both confirm the
+  complete set by name.
 
 ## Operator / human follow-up
 
-- Run `make d0 install aap-config` again end to end and confirm it
-  completes with no manual API calls needed this time (the SCM re-sync
-  task and the durable resource sizing are both new code, exercised
-  individually live but not yet together through the Makefile path).
 - Confirm the durable `Subscription.spec.config.resources` change
-  actually reaches the 7 CSV-owned Deployments once ArgoCD syncs it (OLM
-  is expected to pick up a `Subscription.spec.config` change without a
-  CSV version bump - re-verify this cluster does the same, since the
-  live patch already fixed the symptom independently and could mask a
-  durable-fix regression).
+  actually reaches the 7 CSV-owned Deployments once ArgoCD syncs it -
+  **done**, confirmed live: `oc get subscription
+  ansible-automation-platform-operator -o jsonpath='{.spec.config}'` and
+  the running `resource-operator-controller-manager` Deployment's own
+  `resources` block both show the new values, OLM picked it up with no
+  CSV version bump.
 - Launch `zuno-day1-check-workflow` for real and confirm in the
   Controller UI that its parallel waves (kiali/grafana; lws/jobset/kueue)
   actually start concurrently - WP-095's own still-open acceptance item,
-  now finally unblocked.
+  now finally unblocked (structurally ready; wave-timing itself not yet
+  observed from a real launch).
 
 ## Status updates
 
-- 2026-08-30: All three defects diagnosed and fixed live during a real
-  `make d0 install aap-config` run; repo changes merged. Resource-operator
-  and Workflow Template fixes confirmed live; SCM re-sync task added but
-  not yet exercised via the Makefile path (the live "Playbook not found"
-  was fixed by a one-off manual `project/7/update/` API call during
-  diagnosis, before the code fix existed). State: `Repo work merged - live
-  re-verification pending`.
+- 2026-08-30: All three original defects plus two more found running the
+  fix itself (##4 wrong HTTP status code, #5 the stuck CR needing a real
+  delete) diagnosed and fixed; two consecutive `make d0 install
+  aap-config` runs confirm a fully clean, idempotent pass with all 14 Job
+  Templates/7 Workflow Templates/2 credentials live. State: `Done`.
 
 ## Rollback
 

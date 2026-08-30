@@ -192,14 +192,20 @@ sequencing model around it.
      than assumed. Day 3 gets no Workflow Template - its verbs have no
      cross-component sequencing to orchestrate (each verb already targets
      one component or a dynamically-resolved agent/platform set).
-     **Repo work merged 2026-08-30 (WP-095):** all 7 Workflow Templates
-     registered in `gitops/charts/aap-config`, their DAGs mechanically
-     verified offline (no broken edges, no cycles, every multi-parent node
-     flagged `all_parents_must_converge`, every node's `target_component`
-     matching its Job Template's Survey exactly) - **not yet exercised
-     against a real Controller**, and two edges (`kiali`/`grafana`
-     independence; Day 2's `rag`/`rag-ingestion`/`mcp` parallel group) are
-     flagged for live re-verification before being trusted, per
+     **Repo work merged 2026-08-30 (WP-095), live-verified 2026-08-30
+     (WP-099):** all 7 Workflow Templates registered in
+     `gitops/charts/aap-config`, their DAGs mechanically verified offline
+     (no broken edges, no cycles, every multi-parent node flagged
+     `all_parents_must_converge`, every node's `target_component` matching
+     its Job Template's Survey exactly) and confirmed live against a real
+     Controller - each Workflow Template's `workflow_nodes` resolved
+     against its underlying Job Template with the exact expected node
+     count (WP-099 fixed a real blocker here: `unified_job_template`
+     cannot carry an `organization` filter on this Controller, since no
+     Job Template here ever has a non-null organization). Two edges
+     (`kiali`/`grafana` independence; Day 2's `rag`/`rag-ingestion`/`mcp`
+     parallel group) and the actual parallel-wave timing are still flagged
+     for live re-verification from a real launch, per
      `ansible/roles/aap_config/README.md`.
    - `make day1|d1`/`make day2|d2 <verb>` route through the matching
      Workflow Template when the requested component is `all` (a Workflow
@@ -308,25 +314,35 @@ existing pattern (ADR-0352 clause 9: "roadmap briefs live under
 
 ## Implementation state
 
-**Partially implemented (2026-08-30, WP-094/WP-095/WP-097 - repo work
-merged, live verification pending).** All 14 Job Templates (clause 1's
-full Day 1/2/3 list plus `zuno-day0-check`) and all 7 Workflow Templates
-(clause 6) are registered by `gitops/charts/aap-config`/`ansible/roles/
-aap_config`, each Job Template with its credential tier and (where
-applicable) `target_component` Survey, each Workflow Template's DAG
-mechanically self-consistent (no broken edges, no cycles, convergence
-flagged correctly, node/Survey component sets matching exactly) -
-`helm lint`/`helm template` confirm the chart renders correctly. `make`
-routing (`zuno_make_aap_mode`, `aap_probe.yml`/`aap_launch.yml`,
+**Partially implemented (2026-08-30, WP-094/WP-095/WP-097/WP-099 - repo
+work merged, registration live-verified, launch/routing round-trip still
+pending).** All 14 Job Templates (clause 1's full Day 1/2/3 list plus
+`zuno-day0-check`) and all 7 Workflow Templates (clause 6) are registered
+by `gitops/charts/aap-config`/`ansible/roles/aap_config`, each Job
+Template with its credential tier and (where applicable)
+`target_component` Survey, each Workflow Template's DAG mechanically
+self-consistent (no broken edges, no cycles, convergence flagged
+correctly, node/Survey component sets matching exactly). `make` routing
+(`zuno_make_aap_mode`, `aap_probe.yml`/`aap_launch.yml`,
 `aap_route()`/`resolve_aap_mode()` in the Makefile) is implemented and
 offline-verified (`bash -n` on every verb×day combination's generated
 recipe, isolated shell-logic tests of all four mode/outcome branches).
-**Not yet live-applied or exercised against a real Controller** -
-registering the CRs on the real cluster (`make d0 install aap-config`)
-and confirming a real launch/routing round-trip end to end are deferred
-to an operator-run session, per this repository's shared-cluster
-convention. Phase 3/4 launch-RBAC (who may launch which template) remains
-entirely unimplemented.
+**Live-verified 2026-08-30 (WP-099):** `make d0 install aap-config` runs
+clean end to end against a real Controller (`api.demo222.startx.fr`,
+two consecutive runs, second `failed=0 changed=0`) - all 14 Job
+Templates, all 7 Workflow Templates (each with its full, correctly
+resolved node set), both credential tiers and the `zuno-aap-installer`
+ClusterRole confirmed live via the Controller API. Fixed along the way: a
+`resource-operator` sizing defect that crash-looped under the load of
+registering 21 CRs at once, the Workflow Template `organization` lookup
+bug described in clause 6 above, and a stale Project SCM checkout that
+silently blocks any newly-added playbook from ever becoming a Job
+Template (full account in WP-099's brief). **Still pending:** an actual
+launch/routing round-trip (a real `make d1 check <component>` or `make
+d1 check` invoking `zuno_make_aap_mode=auto/remote` against this live
+Controller) has not yet been exercised - registration and launch are
+different code paths. Phase 3/4 launch-RBAC (who may launch which
+template) remains entirely unimplemented.
 
 ## Related ADRs
 
