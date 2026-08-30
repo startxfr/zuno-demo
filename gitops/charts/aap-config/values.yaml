@@ -95,12 +95,15 @@ jobTemplates:
     playbook: ansible/playbooks/day1_build.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [ai-gateway, supply-chain-signer, aiagent-operator]
+    surveyComponents: [ai-gateway, supply-chain-signer, aiagent-operator, aap-execution-environment]
+  # WP-103: gated (launch-RBAC) - aap_ops/aap_reader Controller Teams only,
+  # see ansible/roles/aap_config/defaults/main.yml's `gated: true`.
   - name: zuno-day1-install
     playbook: ansible/playbooks/day1_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
     surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+  # WP-103: gated (launch-RBAC)
   - name: zuno-day1-reconcile
     playbook: ansible/playbooks/day1_reconcile.yml
     credential: zuno-aap-installer
@@ -117,6 +120,7 @@ jobTemplates:
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
     surveyComponents: [mcp, rag, rag-ingestion, agent, mlops]
+  # WP-103: gated (launch-RBAC)
   - name: zuno-day2-install
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
@@ -128,16 +132,19 @@ jobTemplates:
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
     surveyComponents: [agents, platform]
+  # WP-103: gated (launch-RBAC)
   - name: zuno-day3-stresstest
     playbook: ansible/playbooks/day3_stresstest.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
     surveyComponents: [agents, platform]
+  # WP-103: gated (launch-RBAC)
   - name: zuno-day3-backup
     playbook: ansible/playbooks/day3_backup.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
     surveyComponents: [postgresql]
+  # WP-103: gated (launch-RBAC)
   - name: zuno-day3-restore
     playbook: ansible/playbooks/day3_restore.yml
     credential: zuno-aap-installer
@@ -148,6 +155,7 @@ jobTemplates:
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
     surveyComponents: [postgresql, lightspeed, lightspeed-config, agents, platform]
+  # WP-103: gated (launch-RBAC)
   - name: zuno-day3-sign
     playbook: ansible/playbooks/day3_sign.yml
     credential: zuno-aap-installer
@@ -185,6 +193,7 @@ jobTemplates:
 # confusing side by side in the Controller UI's separate Job Templates
 # and Workflow Templates lists.
 workflowTemplates:
+  # WP-103: gated (launch-RBAC)
   - name: zuno-day1-install-workflow
     jobTemplate: zuno-day1-install
     nodes: &day1ComponentDag
@@ -242,6 +251,7 @@ workflowTemplates:
   - name: zuno-day1-check-workflow
     jobTemplate: zuno-day1-check
     nodes: *day1ComponentDag
+  # WP-103: gated (launch-RBAC)
   - name: zuno-day1-reconcile-workflow
     jobTemplate: zuno-day1-reconcile
     nodes: *day1ComponentDag
@@ -259,6 +269,7 @@ workflowTemplates:
       - id: aiagent-operator
         successNodes: []
 
+  # WP-103: gated (launch-RBAC)
   - name: zuno-day2-install-workflow
     jobTemplate: zuno-day2-install
     nodes:

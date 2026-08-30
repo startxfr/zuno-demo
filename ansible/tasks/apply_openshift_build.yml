@@ -83,6 +83,14 @@
     # namespace, since the build stays in zuno-ai-build while the
     # DSPA/pipeline run lives in zuno-mlops.
     - zuno-mlops
+    # WP-102/ADR-0418 clause 6: AAP Controller's task pods need to pull
+    # the custom aap-execution-environment image built here. This grant
+    # covers the Kubernetes/kubelet-level pull only - Controller's own
+    # podman-via-Receptor EE pull uses a separate Container Registry
+    # credential (ansible/roles/aap_config/tasks/wire_execution_environment.yml),
+    # authenticated with a token from a service account in this same
+    # namespace, which is what this RoleBinding's group subject covers.
+    - zuno-aap
   loop_control:
     loop_var: "rbname"
 

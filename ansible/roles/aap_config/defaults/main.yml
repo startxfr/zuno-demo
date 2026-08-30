@@ -14,9 +14,29 @@ aap_config_organization: zuno
 aap_config_project_name: zuno-demo
 aap_config_inventory_name: zuno
 
+# ADR-0418/WP-103: Controller Teams driving launch-RBAC on the `gated:
+# true` templates/project below. No admin team name here - aap_admin
+# grants superuser via a Keycloak authenticator map only (no Team
+# object), see ansible/roles/aap_config/tasks/wire_launch_rbac.yml.
+aap_config_ops_team_name: aap-ops-team
+aap_config_reader_team_name: aap-reader-team
+
 aap_config_credentials:
   - name: zuno-cluster-reader
   - name: zuno-aap-installer
+
+# WP-102/ADR-0418 clause 6: Job Templates whose underlying playbook shells
+# out to kustomize/oc/cosign directly on localhost - the only ones that
+# actually need the custom "aap-execution-environment" EE (least-privilege
+# assignment, not every template). See
+# wp-102-aap-execution-environment-kustomize.md's Job Template table for
+# the binary->template trace this list is derived from.
+aap_config_ee_job_templates:
+  - zuno-day2-check
+  - zuno-day2-install
+  - zuno-day1-build
+  - zuno-day2-build
+  - zuno-day3-sign
 
 aap_config_job_templates:
   - name: zuno-day0-check
@@ -27,12 +47,14 @@ aap_config_job_templates:
     survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
   - name: zuno-day1-build
     credential: zuno-aap-installer
-    survey_components: [ai-gateway, supply-chain-signer, aiagent-operator]
+    survey_components: [ai-gateway, supply-chain-signer, aiagent-operator, aap-execution-environment]
   - name: zuno-day1-install
     credential: zuno-aap-installer
+    gated: true
     survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
   - name: zuno-day1-reconcile
     credential: zuno-aap-installer
+    gated: true
     survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
   - name: zuno-day2-check
     credential: zuno-cluster-reader
@@ -42,24 +64,29 @@ aap_config_job_templates:
     survey_components: [mcp, rag, rag-ingestion, agent, mlops]
   - name: zuno-day2-install
     credential: zuno-aap-installer
+    gated: true
     survey_components: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config]
   - name: zuno-day3-test
     credential: zuno-cluster-reader
     survey_components: [agents, platform]
   - name: zuno-day3-stresstest
     credential: zuno-aap-installer
+    gated: true
     survey_components: [agents, platform]
   - name: zuno-day3-backup
     credential: zuno-aap-installer
+    gated: true
     survey_components: [postgresql]
   - name: zuno-day3-restore
     credential: zuno-aap-installer
+    gated: true
     survey_components: [postgresql]
   - name: zuno-day3-check
     credential: zuno-cluster-reader
     survey_components: [postgresql, lightspeed, lightspeed-config, agents, platform]
   - name: zuno-day3-sign
     credential: zuno-aap-installer
+    gated: true
     survey_components: [agents]
 
 # "-workflow" suffix (WP-097 fix): a Workflow Template and its underlying
@@ -70,9 +97,12 @@ aap_config_job_templates:
 # Workflow Templates lists.
 aap_config_workflow_templates:
   - name: zuno-day1-install-workflow
+    gated: true
   - name: zuno-day1-check-workflow
   - name: zuno-day1-reconcile-workflow
+    gated: true
   - name: zuno-day1-build-workflow
   - name: zuno-day2-install-workflow
+    gated: true
   - name: zuno-day2-check-workflow
   - name: zuno-day2-build-workflow

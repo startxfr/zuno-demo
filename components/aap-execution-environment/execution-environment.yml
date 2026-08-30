@@ -1,0 +1,71 @@
+---
+# WP-102/ADR-0418 clause 6: a custom AAP Controller execution environment
+# (EE) layering the CLI binaries the stock Red Hat EE below does not ship
+# but this repo's Ansible shells out to directly on localhost (this repo
+# runs `ansible_connection: local` everywhere, so any `command`/`shell`
+# task executes INSIDE the EE container itself, never inside a target
+# pod): `kustomize` (ansible/tasks/apply_kustomize.yml), `oc`
+# (ansible/tasks/apply_openshift_build.yml's `oc start-build`, mlops/
+# rag_ingestion's `oc whoami -t`), and `cosign`
+# (ansible/tasks/verify_okf_signatures.yml, via sign_okf_bundle.py
+# verify). `vault`/`helm` were investigated and do NOT need bundling -
+# see wp-102-aap-execution-environment-kustomize.md.
+#
+# `Dockerfile` in this directory is meant to be ansible-builder's
+# generated output (`ansible-builder create -f execution-environment.yml
+# -c .`) so the BuildConfig here can keep using this repo's normal Docker
+# strategy, same as every other components/<name>/Dockerfile - it was
+# hand-authored instead because this sandbox's `ansible-builder` install
+# is broken (wrong python3.8 shebang, no ansible_builder module). If a
+# working `ansible-builder` toolchain ever regenerates it, diff carefully
+# before overwriting - the extra dnf/curl layers below (oc/kustomize/
+# cosign) live in `additional_build_steps.append_final` here specifically
+# so a regeneration keeps them.
+version: 3
+
+images:
+  base_image:
+    name: registry.redhat.io/ansible-automation-platform-27/ee-supported-rhel9:latest
+
+# No additional Python/system/Galaxy content needed - the stock EE
+# already carries every collection (kubernetes.core, community.general,
+# ansible.posix) and Python package this repo's Ansible depends on; the
+# gap this WP closes is CLI binaries, handled entirely below.
+dependencies:
+  python: []
+  system: []
+  galaxy: {}
+
+additional_build_steps:
+  append_final:
+    # oc: available as an RPM under this cluster's RHN subscription
+    # auto-attach (already proven for the `aap` role's own install) -
+    # far simpler than kustomize/cosign below, which have no RHEL9 RPM.
+    - RUN dnf install -y openshift-clients && dnf clean all
+
+    # kustomize/cosign: no RHEL9 package - pinned-version release
+    # binaries from their respective GitHub Releases, checksum-verified
+    # against each project's own published checksums manifest
+    # (kustomize's checksums.txt, cosign's cosign_checksums.txt).
+    # SHA256 digests below fetched live from those manifests for the
+    # exact pinned versions - re-verify both against the same files on
+    # any version bump, never carry a digest forward or fabricate one.
+    #
+    # COSIGN_VERSION matches components/supply-chain-signer/Dockerfile's
+    # own pin (v2.4.1) - keep both in sync on a bump, same binary shape.
+    - ARG KUSTOMIZE_VERSION=5.4.3
+    - ARG KUSTOMIZE_SHA256=REPLACE_ME_WITH_REAL_KUSTOMIZE_SHA256
+    - ARG COSIGN_VERSION=v2.4.1
+    - ARG COSIGN_SHA256=REPLACE_ME_WITH_REAL_COSIGN_SHA256
+    - >-
+      RUN curl -sSL -o /tmp/kustomize.tar.gz
+      "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz"
+      && echo "${KUSTOMIZE_SHA256}  /tmp/kustomize.tar.gz" | sha256sum -c -
+      && tar -xzf /tmp/kustomize.tar.gz -C /usr/bin kustomize
+      && chmod +x /usr/bin/kustomize
+      && rm -f /tmp/kustomize.tar.gz
+    - >-
+      RUN curl -sSL -o /usr/bin/cosign
+      "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
+      && echo "${COSIGN_SHA256}  /usr/bin/cosign" | sha256sum -c -
+      && chmod +x /usr/bin/cosign

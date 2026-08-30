@@ -582,6 +582,11 @@
     label: "{{ item.name }}"
   no_log: true
 
+# --- launch-RBAC for the gated templates (ADR-0418 Security considerations
+#     / WP-103) -------------------------------------------------------------
+- name: "aap-config | wire launch-RBAC (Teams/role_team_assignments) on the gated templates"
+  ansible.builtin.include_tasks: wire_launch_rbac.yml
+
 # --- mcp-aap least-privilege identity (ADR-0355 clause 3, WP-074) -----------
 # ADR-0355 requires mcp-aap to authenticate as a least-privilege AAP user
 # that can launch zuno-day0-check and read platform status - never as
@@ -1059,10 +1064,43 @@
       register: _aap_config_maps
       no_log: true
 
-    # Order 1, revoke: superuser tracks ocp-paas-ops membership both ways
-    # (granted on login when present, removed when not) - platform
-    # operations is the realm group that maps to "administers AAP".
-    - name: "aap-config | map ocp-paas-ops to superuser"
+    # ADR-0418/WP-103: superuser is now driven by the dedicated aap_admin
+    # Keycloak group, not ocp-paas-ops (a cluster-access group, orthogonal
+    # to AAP RBAC) - a single source of truth for "who administers AAP".
+    # The old map is deleted first so the two never coexist evaluating in
+    # undefined relative order. paas-ops-01 (the only user who relied on
+    # ocp-paas-ops for this) is added to aap_admin in realm-zuno.json/live
+    # Keycloak as part of this same WP - see wp-103-aap-launch-rbac.md's
+    # "Live group provisioning" section; that group-join MUST be applied
+    # before this task runs against a real environment, or paas-ops-01
+    # loses superuser for the gap between the two.
+    - name: "aap-config | look up the stale superuser-ocp-paas-ops map"
+      ansible.builtin.uri:
+        url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticator_maps/?name=superuser-ocp-paas-ops"
+        method: GET
+        url_username: admin
+        url_password: "{{ _aap_config_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: _aap_config_stale_superuser_map
+      no_log: true
+
+    - name: "aap-config | delete the stale superuser-ocp-paas-ops map"
+      ansible.builtin.uri:
+        url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticator_maps/{{ _aap_config_stale_superuser_map.json.results[0].id }}/"
+        method: DELETE
+        url_username: admin
+        url_password: "{{ _aap_config_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: [204, 404]
+      when: (_aap_config_stale_superuser_map.json.count | default(0) | int) > 0
+      no_log: true
+
+    # Order 1, revoke: superuser tracks aap_admin membership both ways
+    # (granted on login when present, removed when not).
+    - name: "aap-config | map aap_admin to superuser"
       ansible.builtin.uri:
         url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticator_maps/"
         method: POST
@@ -1072,7 +1110,7 @@
         validate_certs: false
         body_format: json
         body:
-          name: superuser-ocp-paas-ops
+          name: superuser-aap-admin
           authenticator: "{{ _aap_config_authenticator_id | int }}"
           map_type: is_superuser
           revoke: true
@@ -1080,11 +1118,82 @@
           triggers:
             groups:
               has_or:
-                - ocp-paas-ops
+                - aap_admin
         status_code: 201
       when: >-
         (_aap_config_maps.json.results | default([])
-         | selectattr('name', 'equalto', 'superuser-ocp-paas-ops')
+         | selectattr('name', 'equalto', 'superuser-aap-admin')
+         | list | length) == 0
+      no_log: true
+
+    # Order 2/3 (ADR-0418/WP-103): aap_ops/aap_reader Keycloak group
+    # membership grants Controller Team membership, which is where the
+    # actual view/execute/sync permissions live (role_team_assignments,
+    # wire_launch_rbac.yml). `team`/`organization` are plain NAME strings
+    # here (confirmed live via OPTIONS on this endpoint - not ids), unlike
+    # every other id-based field this role uses elsewhere. `role` is
+    # REQUIRED for map_type: team - the API rejects it otherwise ("You
+    # must specify a role with the selected map type", confirmed live
+    # 2026-08-30, not documented in the OPTIONS help_text). "Team Member"
+    # is one of two built-in managed role_definitions on `shared.team`
+    # (the other, "Team Admin", also grants change/delete on the team
+    # itself - not needed here) - it is what makes a Team member inherit
+    # every role_team_assignment already granted to that Team.
+    - name: "aap-config | map aap_ops to {{ aap_config_ops_team_name | default('aap-ops-team') }}"
+      ansible.builtin.uri:
+        url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticator_maps/"
+        method: POST
+        url_username: admin
+        url_password: "{{ _aap_config_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: team-aap-ops
+          authenticator: "{{ _aap_config_authenticator_id | int }}"
+          map_type: team
+          team: "{{ aap_config_ops_team_name | default('aap-ops-team') }}"
+          organization: "{{ aap_config_organization | default('zuno') }}"
+          role: "Team Member"
+          revoke: true
+          order: 2
+          triggers:
+            groups:
+              has_or:
+                - aap_ops
+        status_code: 201
+      when: >-
+        (_aap_config_maps.json.results | default([])
+         | selectattr('name', 'equalto', 'team-aap-ops')
+         | list | length) == 0
+      no_log: true
+
+    - name: "aap-config | map aap_reader to {{ aap_config_reader_team_name | default('aap-reader-team') }}"
+      ansible.builtin.uri:
+        url: "{{ _aap_config_gateway_url }}/api/gateway/v1/authenticator_maps/"
+        method: POST
+        url_username: admin
+        url_password: "{{ _aap_config_admin_password }}"
+        force_basic_auth: true
+        validate_certs: false
+        body_format: json
+        body:
+          name: team-aap-reader
+          authenticator: "{{ _aap_config_authenticator_id | int }}"
+          map_type: team
+          team: "{{ aap_config_reader_team_name | default('aap-reader-team') }}"
+          organization: "{{ aap_config_organization | default('zuno') }}"
+          role: "Team Member"
+          revoke: true
+          order: 3
+          triggers:
+            groups:
+              has_or:
+                - aap_reader
+        status_code: 201
+      when: >-
+        (_aap_config_maps.json.results | default([])
+         | selectattr('name', 'equalto', 'team-aap-reader')
          | list | length) == 0
       no_log: true
 

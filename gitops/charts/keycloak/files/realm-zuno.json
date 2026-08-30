@@ -375,6 +375,33 @@
                     "ADR-0349 cluster-access dimension (replaces ADR-0320's aiops and zuno-admin's per-namespace admin) \u2014 bound to admin as RoleBindings over the live-discovered zuno.io/managed=true namespace set; no ClusterRole"
                 ]
             }
+        },
+        {
+            "name": "aap_admin",
+            "path": "/aap_admin",
+            "attributes": {
+                "description": [
+                    "ADR-0418/WP-103 AAP launch-RBAC dimension \u2014 maps (authenticator map_type: is_superuser) to full Controller superuser, replacing the old ocp-paas-ops-triggered map. NOT reconciled by ADR-0530 (clause 4, groups are create-only) \u2014 membership here only seeds a future fresh install; the live realm is updated by hand via kcadm, see wp-103-aap-launch-rbac.md."
+                ]
+            }
+        },
+        {
+            "name": "aap_ops",
+            "path": "/aap_ops",
+            "attributes": {
+                "description": [
+                    "ADR-0418/WP-103 AAP launch-RBAC dimension \u2014 maps (authenticator map_type: team) to the aap-ops-team Controller Team: view+execute on the gated Phase 3/4 Job/Workflow Templates and view+sync on the zuno-demo Project. NOT reconciled by ADR-0530 (clause 4) \u2014 see wp-103-aap-launch-rbac.md."
+                ]
+            }
+        },
+        {
+            "name": "aap_reader",
+            "path": "/aap_reader",
+            "attributes": {
+                "description": [
+                    "ADR-0418/WP-103 AAP launch-RBAC dimension \u2014 maps (authenticator map_type: team) to the aap-reader-team Controller Team: view-only on the gated Phase 3/4 Job/Workflow Templates and the zuno-demo Project. NOT reconciled by ADR-0530 (clause 4) \u2014 see wp-103-aap-launch-rbac.md."
+                ]
+            }
         }
     ],
     "users": [
@@ -451,7 +478,8 @@
                 "/agent_comage",
                 "/agent_tekos",
                 "/agent_arkos",
-                "/agent_naveo"
+                "/agent_naveo",
+                "/aap_admin"
             ],
             "credentials": [
                 {
@@ -482,7 +510,8 @@
                 "/consultant/confluence-archi-openshift-ai",
                 "/consultant/confluence-archi-keycloak",
                 "/agent_tekos",
-                "/agent_arkos"
+                "/agent_arkos",
+                "/aap_ops"
             ],
             "credentials": [
                 {
@@ -508,7 +537,8 @@
                 "/consultant",
                 "/consultant/confluence-run-openshift",
                 "/consultant/confluence-run-keycloak",
-                "/agent_tekos"
+                "/agent_tekos",
+                "/aap_reader"
             ],
             "credentials": [
                 {
@@ -753,7 +783,8 @@
             },
             "groups": [
                 "/ocp-paas-dev",
-                "/agent_tekos"
+                "/agent_tekos",
+                "/aap_ops"
             ],
             "credentials": [
                 {
@@ -777,7 +808,8 @@
             },
             "groups": [
                 "/ocp-paas-ops",
-                "/agent_tekos"
+                "/agent_tekos",
+                "/aap_admin"
             ],
             "credentials": [
                 {
@@ -1555,19 +1587,32 @@
                 "roles",
                 "email"
             ],
-            "protocolMappers": [{
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": false,
-                "config": {
-                    "full.path": "false",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "claim.name": "groups"
+            "protocolMappers": [
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "false",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
+                    }
+                },
+                {
+                    "name": "aap-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "aap",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true"
+                    }
                 }
-            }],
+            ],
             "secret": "${vault.aap_client_secret}",
             "clientAuthenticatorType": "client-secret"
         },

@@ -1,0 +1,48 @@
+---
+# Shared subtask for wire_launch_rbac.yml (ADR-0418/WP-103) - grants one
+# Team a role_definition on one object, check-first/idempotent, mirroring
+# the per-user pattern at install.yml:813-846 but POSTing `team` instead
+# of `user`. Callers set _team_id / _role_definition_id / _object_id /
+# _label (used only in task names/loop labels, no functional effect).
+
+- name: "aap-config | check whether {{ _label }} is already assigned"
+  ansible.builtin.uri:
+    url: >-
+      {{ _aap_config_gateway_url }}/api/controller/v2/role_team_assignments/?role_definition={{
+      _role_definition_id }}&team={{ _team_id }}&object_id={{ _object_id }}
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_launch_rbac_assignment_lookup
+  no_log: true
+
+- name: "aap-config | grant {{ _label }}"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_team_assignments/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      role_definition: "{{ _role_definition_id | int }}"
+      team: "{{ _team_id | int }}"
+      object_id: "{{ _object_id | string }}"
+    status_code: [201, 400]
+  register: _aap_config_launch_rbac_assignment
+  when: (_aap_config_launch_rbac_assignment_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | fail if {{ _label }} was rejected for a real reason"
+  ansible.builtin.fail:
+    msg: >-
+      Granting {{ _label }} failed with HTTP 400 for a reason other than
+      "already assigned" - launch-RBAC for this object is incomplete.
+  when:
+    - _aap_config_launch_rbac_assignment.status is defined
+    - _aap_config_launch_rbac_assignment.status == 400
+    - "'already exists' not in (_aap_config_launch_rbac_assignment.json | default({}) | string)"

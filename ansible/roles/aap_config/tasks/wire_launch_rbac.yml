@@ -1,0 +1,486 @@
+---
+# ADR-0418 Security considerations / WP-103: models *who* may launch each
+# gated Job/Workflow Template inside Controller's own RBAC, on top of the
+# zuno-cluster-reader/zuno-aap-installer credential tiers WP-094 already
+# wired (those govern what a launched job can DO, not who can click
+# launch). Included once from install.yml, after every Job/Workflow
+# Template and the Project already exist (this file resolves their ids
+# by name, never hardcoded).
+#
+# Live findings, confirmed 2026-08-30 against this cluster's AAP (same
+# "verify before trusting" discipline as the mcp-aap RBAC section above -
+# install.yml:593-609):
+#   - Teams are GATEWAY resources, same lesson as Organizations/Users
+#     (install.yml:75-80/637-671): POST only works against
+#     /api/gateway/v1/teams/ (confirmed via OPTIONS - `organization` is a
+#     required field there), then the object syncs down into
+#     /api/controller/v2/teams/ with a DIFFERENT id - confirmed live the
+#     zuno organization itself already differs (gateway id 2, controller
+#     id 69), so the same cross-id trap applies to Teams and is not
+#     assumed away here.
+#   - /api/controller/v2/role_team_assignments/ exists (200, mirrors the
+#     role_user_assignments/ endpoint install.yml:813-846 already uses).
+#   - Exact permission strings, read live from
+#     /api/controller/v2/role_metadata/'s `allowed_permissions`:
+#     content_type `awx.project` -> [view_project, update_project, ...]
+#     ("sync" = update_project, not "sync_project"); content_type
+#     `awx.workflowjobtemplate` -> [view_workflowjobtemplate,
+#     execute_workflowjobtemplate, ...] (no underscores splitting
+#     "workflow"/"job"/"template", unlike the CRD/API path names that do
+#     split them - do not guess this one, it does not follow the same
+#     convention as awx.jobtemplate's own permissions).
+#   - An authenticator_map's `map_type: team`/`organization` fields are
+#     both plain strings (team/organization NAME, not id) - confirmed via
+#     OPTIONS on /api/gateway/v1/authenticator_maps/.
+#
+# No Team/role_definition is created for aap_admin: that group grants
+# Controller superuser directly via an authenticator map (see the
+# Keycloak SSO section below in install.yml), which needs no Team or
+# object-scoped role at all.
+
+# --- resolve the zuno organization's GATEWAY-side id -------------------
+# Re-read rather than reusing _aap_config_org_lookup: that fact was
+# captured by the EXISTENCE check earlier in this file, which on a first
+# install ran before the organization was created and carries no id
+# (same caution as install.yml:702-706 for the mcp-aap user).
+
+- name: "aap-config | re-read the {{ aap_config_organization | default('zuno') }} organization's Gateway id"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/organizations/?name={{ aap_config_organization | default('zuno') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_launch_rbac_org_gw
+  no_log: true
+
+# --- Teams (aap_admin needs none - superuser via authenticator map) ----
+
+- name: "aap-config | check whether the {{ aap_config_ops_team_name | default('aap-ops-team') }} Team exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/teams/?name={{ aap_config_ops_team_name | default('aap-ops-team') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_ops_team_lookup
+  no_log: true
+
+- name: "aap-config | create the {{ aap_config_ops_team_name | default('aap-ops-team') }} Team"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/teams/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: "{{ aap_config_ops_team_name | default('aap-ops-team') }}"
+      organization: "{{ _aap_config_launch_rbac_org_gw.json.results[0].id | int }}"
+      description: "ADR-0418/WP-103 - view+execute on gated Job/Workflow Templates, view+sync on the zuno-demo Project. Membership driven by the aap_ops Keycloak group via a team authenticator map."
+    status_code: 201
+  when: (_aap_config_ops_team_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | wait for {{ aap_config_ops_team_name | default('aap-ops-team') }} to sync down into Controller"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/teams/?name={{ aap_config_ops_team_name | default('aap-ops-team') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_ops_team_ctrl
+  until: (_aap_config_ops_team_ctrl.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 5
+  no_log: true
+
+- name: "aap-config | check whether the {{ aap_config_reader_team_name | default('aap-reader-team') }} Team exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/teams/?name={{ aap_config_reader_team_name | default('aap-reader-team') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_reader_team_lookup
+  no_log: true
+
+- name: "aap-config | create the {{ aap_config_reader_team_name | default('aap-reader-team') }} Team"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/gateway/v1/teams/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: "{{ aap_config_reader_team_name | default('aap-reader-team') }}"
+      organization: "{{ _aap_config_launch_rbac_org_gw.json.results[0].id | int }}"
+      description: "ADR-0418/WP-103 - view-only on gated Job/Workflow Templates and the zuno-demo Project. Membership driven by the aap_reader Keycloak group via a team authenticator map."
+    status_code: 201
+  when: (_aap_config_reader_team_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | wait for {{ aap_config_reader_team_name | default('aap-reader-team') }} to sync down into Controller"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/teams/?name={{ aap_config_reader_team_name | default('aap-reader-team') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_reader_team_ctrl
+  until: (_aap_config_reader_team_ctrl.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 5
+  no_log: true
+
+- name: "aap-config | resolve the two Teams' Controller-side ids"
+  ansible.builtin.set_fact:
+    _aap_config_ops_team_id: "{{ _aap_config_ops_team_ctrl.json.results[0].id }}"
+    _aap_config_reader_team_id: "{{ _aap_config_reader_team_ctrl.json.results[0].id }}"
+
+# --- role_definitions (view/execute on Job/Workflow Templates, view/sync
+#     on the Project) - GET-then-POST, same pattern as install.yml:766-803
+
+- name: "aap-config | check whether the aap-ops-jobtemplate-executor role definition exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/?name=aap-ops-jobtemplate-executor"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_ops_jt_role_lookup
+  no_log: true
+
+- name: "aap-config | create the aap-ops-jobtemplate-executor role definition"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: aap-ops-jobtemplate-executor
+      description: "ADR-0418/WP-103 - view+execute a gated Job Template (aap_ops)"
+      content_type: awx.jobtemplate
+      permissions: [awx.view_jobtemplate, awx.execute_jobtemplate]
+    status_code: 201
+  register: _aap_config_ops_jt_role_created
+  when: (_aap_config_ops_jt_role_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | check whether the aap-reader-jobtemplate-viewer role definition exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/?name=aap-reader-jobtemplate-viewer"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_reader_jt_role_lookup
+  no_log: true
+
+- name: "aap-config | create the aap-reader-jobtemplate-viewer role definition"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: aap-reader-jobtemplate-viewer
+      description: "ADR-0418/WP-103 - view-only a gated Job Template (aap_reader)"
+      content_type: awx.jobtemplate
+      permissions: [awx.view_jobtemplate]
+    status_code: 201
+  register: _aap_config_reader_jt_role_created
+  when: (_aap_config_reader_jt_role_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | check whether the aap-ops-workflowjobtemplate-executor role definition exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/?name=aap-ops-workflowjobtemplate-executor"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_ops_wjt_role_lookup
+  no_log: true
+
+- name: "aap-config | create the aap-ops-workflowjobtemplate-executor role definition"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: aap-ops-workflowjobtemplate-executor
+      description: "ADR-0418/WP-103 - view+execute a gated Workflow Template (aap_ops)"
+      content_type: awx.workflowjobtemplate
+      permissions: [awx.view_workflowjobtemplate, awx.execute_workflowjobtemplate]
+    status_code: 201
+  register: _aap_config_ops_wjt_role_created
+  when: (_aap_config_ops_wjt_role_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | check whether the aap-reader-workflowjobtemplate-viewer role definition exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/?name=aap-reader-workflowjobtemplate-viewer"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_reader_wjt_role_lookup
+  no_log: true
+
+- name: "aap-config | create the aap-reader-workflowjobtemplate-viewer role definition"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: aap-reader-workflowjobtemplate-viewer
+      description: "ADR-0418/WP-103 - view-only a gated Workflow Template (aap_reader)"
+      content_type: awx.workflowjobtemplate
+      permissions: [awx.view_workflowjobtemplate]
+    status_code: 201
+  register: _aap_config_reader_wjt_role_created
+  when: (_aap_config_reader_wjt_role_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | check whether the aap-ops-project-syncer role definition exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/?name=aap-ops-project-syncer"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_ops_proj_role_lookup
+  no_log: true
+
+- name: "aap-config | create the aap-ops-project-syncer role definition"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: aap-ops-project-syncer
+      description: "ADR-0418/WP-103 - view+sync the zuno-demo Project (aap_ops). 'sync' = awx.update_project (role_metadata), no separate 'sync' permission exists."
+      content_type: awx.project
+      permissions: [awx.view_project, awx.update_project]
+    status_code: 201
+  register: _aap_config_ops_proj_role_created
+  when: (_aap_config_ops_proj_role_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | check whether the aap-reader-project-viewer role definition exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/?name=aap-reader-project-viewer"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_reader_proj_role_lookup
+  no_log: true
+
+- name: "aap-config | create the aap-reader-project-viewer role definition"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: aap-reader-project-viewer
+      description: "ADR-0418/WP-103 - view-only the zuno-demo Project (aap_reader)"
+      content_type: awx.project
+      permissions: [awx.view_project]
+    status_code: 201
+  register: _aap_config_reader_proj_role_created
+  when: (_aap_config_reader_proj_role_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | resolve the six role_definition ids"
+  ansible.builtin.set_fact:
+    _aap_config_ops_jt_role_id: >-
+      {{ _aap_config_ops_jt_role_created.json.id
+         if (_aap_config_ops_jt_role_lookup.json.count | default(0) | int) == 0
+         else _aap_config_ops_jt_role_lookup.json.results[0].id }}
+    _aap_config_reader_jt_role_id: >-
+      {{ _aap_config_reader_jt_role_created.json.id
+         if (_aap_config_reader_jt_role_lookup.json.count | default(0) | int) == 0
+         else _aap_config_reader_jt_role_lookup.json.results[0].id }}
+    _aap_config_ops_wjt_role_id: >-
+      {{ _aap_config_ops_wjt_role_created.json.id
+         if (_aap_config_ops_wjt_role_lookup.json.count | default(0) | int) == 0
+         else _aap_config_ops_wjt_role_lookup.json.results[0].id }}
+    _aap_config_reader_wjt_role_id: >-
+      {{ _aap_config_reader_wjt_role_created.json.id
+         if (_aap_config_reader_wjt_role_lookup.json.count | default(0) | int) == 0
+         else _aap_config_reader_wjt_role_lookup.json.results[0].id }}
+    _aap_config_ops_proj_role_id: >-
+      {{ _aap_config_ops_proj_role_created.json.id
+         if (_aap_config_ops_proj_role_lookup.json.count | default(0) | int) == 0
+         else _aap_config_ops_proj_role_lookup.json.results[0].id }}
+    _aap_config_reader_proj_role_id: >-
+      {{ _aap_config_reader_proj_role_created.json.id
+         if (_aap_config_reader_proj_role_lookup.json.count | default(0) | int) == 0
+         else _aap_config_reader_proj_role_lookup.json.results[0].id }}
+
+# --- resolve the gated Job/Workflow Templates' ids ----------------------
+# Re-queried by name rather than reusing the earlier wait-loops'
+# registered facts (_aap_config_jt_lookup/_aap_config_wft_lookup are
+# overwritten on every loop iteration during the earlier "wire every Job
+# Template"/"wait for every Workflow Template" blocks, so only the LAST
+# item's result would still be in scope here).
+
+- name: "aap-config | resolve each gated Job Template's id"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/?name={{ item.name }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_gated_jt_lookup
+  loop: "{{ aap_config_job_templates | selectattr('gated', 'defined') | selectattr('gated') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: "aap-config | build the gated Job Template name/id list"
+  ansible.builtin.set_fact:
+    _aap_config_gated_jt_ids: "{{ (_aap_config_gated_jt_ids | default([])) + [{'name': item.item.name, 'id': item.json.results[0].id}] }}"
+  loop: "{{ _aap_config_gated_jt_lookup.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  no_log: true
+
+- name: "aap-config | resolve each gated Workflow Template's id"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/workflow_job_templates/?name={{ item.name }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_gated_wjt_lookup
+  loop: "{{ aap_config_workflow_templates | selectattr('gated', 'defined') | selectattr('gated') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+- name: "aap-config | build the gated Workflow Template name/id list"
+  ansible.builtin.set_fact:
+    _aap_config_gated_wjt_ids: "{{ (_aap_config_gated_wjt_ids | default([])) + [{'name': item.item.name, 'id': item.json.results[0].id}] }}"
+  loop: "{{ _aap_config_gated_wjt_lookup.results }}"
+  loop_control:
+    label: "{{ item.item.name }}"
+  no_log: true
+
+# --- grant the role_team_assignments (assign_team_role.yml, per object) -
+# The Project's id is already resolved (_aap_config_project_lookup,
+# install.yml:377) and unambiguous - only one Project exists - no re-query
+# needed.
+
+- name: "aap-config | grant aap-ops-team execute on every gated Job Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_ops_team_id }}"
+    _role_definition_id: "{{ _aap_config_ops_jt_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-ops-team execute on Job Template {{ item.name }}"
+  loop: "{{ _aap_config_gated_jt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "aap-config | grant aap-ops-team execute on every gated Workflow Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_ops_team_id }}"
+    _role_definition_id: "{{ _aap_config_ops_wjt_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-ops-team execute on Workflow Template {{ item.name }}"
+  loop: "{{ _aap_config_gated_wjt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "aap-config | grant aap-ops-team sync on the {{ aap_config_project_name | default('zuno-demo') }} Project"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_ops_team_id }}"
+    _role_definition_id: "{{ _aap_config_ops_proj_role_id }}"
+    _object_id: "{{ _aap_config_project_lookup.json.results[0].id }}"
+    _label: "aap-ops-team sync on the {{ aap_config_project_name | default('zuno-demo') }} Project"
+
+- name: "aap-config | grant aap-reader-team view on every gated Job Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_reader_team_id }}"
+    _role_definition_id: "{{ _aap_config_reader_jt_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-reader-team view on Job Template {{ item.name }}"
+  loop: "{{ _aap_config_gated_jt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "aap-config | grant aap-reader-team view on every gated Workflow Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_reader_team_id }}"
+    _role_definition_id: "{{ _aap_config_reader_wjt_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-reader-team view on Workflow Template {{ item.name }}"
+  loop: "{{ _aap_config_gated_wjt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: "aap-config | grant aap-reader-team view on the {{ aap_config_project_name | default('zuno-demo') }} Project"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_reader_team_id }}"
+    _role_definition_id: "{{ _aap_config_reader_proj_role_id }}"
+    _object_id: "{{ _aap_config_project_lookup.json.results[0].id }}"
+    _label: "aap-reader-team view on the {{ aap_config_project_name | default('zuno-demo') }} Project"

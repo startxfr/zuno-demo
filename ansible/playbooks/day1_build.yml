@@ -27,6 +27,13 @@
       # BuildConfig/ImageStream and the operator Deployment sits in
       # ImagePullBackOff on a fresh cluster (hit live 2026-08-25).
       - aiagent_operator_build
+      # WP-102/ADR-0418 clause 6: the custom AAP execution environment
+      # (kustomize/oc/cosign). Role name must match the target_component
+      # resolution below (aap-execution-environment -> aap_execution_
+      # environment_build). After supply_chain_signer_build (this image
+      # gets signed too, like every other build here) - order relative to
+      # ai_gateway_build/aiagent_operator_build doesn't matter.
+      - aap_execution_environment_build
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

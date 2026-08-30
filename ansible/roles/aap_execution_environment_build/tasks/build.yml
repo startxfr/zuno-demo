@@ -1,0 +1,30 @@
+---
+# WP-102/ADR-0418 clause 6: builds the custom AAP execution environment
+# (kustomize + oc + cosign, layered onto ee-supported-rhel9 - see
+# components/aap-execution-environment/execution-environment.yml for why
+# these three and not vault/helm). Same shared build task every other
+# component image uses - nothing EE-specific about the BuildConfig/
+# ImageStream mechanism itself, only about what its Dockerfile installs.
+- name: "aap_execution_environment_build | build aap-execution-environment"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: aap-execution-environment
+    build_dockerfile_path: components/aap-execution-environment/Dockerfile
+    build_context_dir: "."
+
+# Registers the credential/execution_environment objects in Controller and
+# assigns the EE to the Job Templates that need it (zuno-day2-check,
+# zuno-day2-install, zuno-day1-build, zuno-day2-build, zuno-day3-sign) -
+# lives in aap_config, not here, purely to reuse that role's existing
+# Gateway URL/admin-password resolution and GET-then-POST idiom
+# (ansible/roles/aap_config/tasks/install.yml) rather than duplicating it.
+# Only on an explicit build (day1_verb: build), same gating as the image
+# signing step apply_openshift_build.yml already runs - a routine
+# "ensure this image exists" install path never re-wires Controller.
+- name: "aap_execution_environment_build | register the execution environment and wire it onto the Job Templates that need it"
+  ansible.builtin.include_role:
+    name: aap_config
+    tasks_from: wire_execution_environment
+  when: >-
+    (day1_verb | default('install')) == 'build' or
+    (day2_verb | default('install')) == 'build'

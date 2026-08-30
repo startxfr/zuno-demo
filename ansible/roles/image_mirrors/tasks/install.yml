@@ -168,5 +168,10 @@
     # data-plane pods both run here - needed to pull odh-ogx-core-rhel9
     # above from the internal mirror.
     - redhat-ods-applications
+    # WP-102/ADR-0418 clause 6: kept symmetric with the identical grant in
+    # ansible/tasks/apply_openshift_build.yml (this repo's own documented
+    # convention for these two lists) - not strictly needed for a mirrored
+    # base image today, but avoids the two lists silently drifting.
+    - zuno-aap
   loop_control:
     loop_var: "rbname"

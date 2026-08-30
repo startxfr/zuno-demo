@@ -164,12 +164,21 @@ creates an authenticator "Keycloak zuno" against the `aap` realm client
 WP-072 registered (secret read from zuno-auth's `aap-client-secret`, the
 realm's RSA public key fetched live from the realm's public endpoint, both
 OAuth URLs set explicitly - the plugin's defaults carry the legacy
-`/auth/` prefix RHBK dropped, `GROUPS_CLAIM=groups`), plus two maps:
-`ocp-paas-ops` → superuser (revoking - membership tracked both ways) and
-allow-all-authenticated (viewer-level until Controller RBAC grants more -
-launch-RBAC hardening is ADR-0418's scope). The local admin login stays as
-fallback. If `aap-client-secret` isn't materialized yet, the SSO wiring is
-skipped with a message and picked up on the next install run.
+`/auth/` prefix RHBK dropped, `GROUPS_CLAIM=groups`), plus four maps:
+`aap_admin` → superuser (revoking - membership tracked both ways),
+`aap_ops`/`aap_reader` → the `aap-ops-team`/`aap-reader-team` Controller
+Teams (ADR-0418/WP-103 launch-RBAC, `map_type: team`), and
+allow-all-authenticated (viewer-level catch-all for every other gated/
+ungated template not covered by the two Teams above). The local admin
+login stays as fallback. If `aap-client-secret` isn't materialized yet,
+the SSO wiring is skipped with a message and picked up on the next
+install run.
+
+Group membership for `aap_admin`/`aap_ops`/`aap_reader` is realm-file +
+hand-applied `kcadm`, not chart-reconciled (ADR-0530 clause 4 excludes
+groups from its client-reconciliation Job by design) - see
+`docs/roadmap/work-packages/wp-103-aap-launch-rbac.md`'s "Live group
+provisioning" section for the exact commands.
 
 An existing authenticator is never PATCHed - config drift (e.g. a rotated
 client secret) is fixed by deleting the authenticator in the Gateway UI

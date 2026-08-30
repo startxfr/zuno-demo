@@ -1,0 +1,226 @@
+---
+# WP-102/ADR-0418 clause 6: registers the custom "aap-execution-
+# environment" image (built by ansible/roles/aap_execution_environment_build,
+# Day 1) in Controller and assigns it to the Job Templates that actually
+# shell out to kustomize/oc/cosign on localhost. Included from that role's
+# tasks/build.yml, NOT from this role's own install.yml/Day 0 flow: the
+# image and its Controller EE object don't exist yet at Day 0, so this
+# has to run at Day 1 build time, after the image is built. That also
+# means the Gateway URL/admin password resolved in install.yml aren't
+# available here (separate playbook run, no shared in-memory state) -
+# re-resolved below, same pattern, not the same variables.
+#
+# There is no ExecutionEnvironment CRD (confirmed live via `oc get crd`:
+# 9 tower.ansible.com kinds, none for execution environments) - both the
+# registry credential and the EE object are raw Controller-API GET-then-
+# POST-if-absent calls, the same idiom as the organization/host upsert
+# blocks in install.yml. AnsibleCredential DOES have a generic `inputs`
+# field (confirmed via `oc explain ansiblecredential.spec`), but every
+# credential in this repo sources its secret via a Secret reference
+# (kubernetes_bearer_token_secret), never inline - inputs has no such
+# indirection, so a CR here would mean committing the registry password
+# into a Helm value. Raw API call it is, same as this file's own idiom.
+
+- name: "aap-config | wire-ee | look up the Gateway Route"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: zuno-aap
+    name: aap
+  register: _wire_ee_route
+
+- name: "aap-config | wire-ee | fail if the Gateway Route doesn't exist"
+  ansible.builtin.fail:
+    msg: >-
+      Route 'aap' not found in zuno-aap - run `make d0 install aap` first.
+  when: (_wire_ee_route.resources | default([]) | length) == 0
+
+- name: "aap-config | wire-ee | read the admin password from the aap-admin Secret"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-aap
+    name: aap-admin
+  register: _wire_ee_admin_secret
+  no_log: true
+
+- name: "aap-config | wire-ee | resolve Gateway URL and admin credentials"
+  ansible.builtin.set_fact:
+    _wire_ee_gateway_url: "https://{{ _wire_ee_route.resources[0].spec.host }}"
+    _wire_ee_admin_password: "{{ _wire_ee_admin_secret.resources[0].data.password | b64decode }}"
+  no_log: true
+
+# The registry credential's password: the zuno-aap-installer
+# ServiceAccount's own long-lived token Secret (gitops/charts/aap-config/
+# templates/serviceaccount.yaml). Works once zuno-aap is added to the
+# system:image-puller RoleBinding loop in apply_openshift_build.yml /
+# image_mirrors (WP-102's RBAC change) - no new ServiceAccount needed.
+- name: "aap-config | wire-ee | read the zuno-aap-installer token"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-aap
+    name: zuno-aap-installer-token
+  register: _wire_ee_registry_token_secret
+  no_log: true
+
+- name: "aap-config | wire-ee | fail if the zuno-aap-installer token isn't materialized"
+  ansible.builtin.fail:
+    msg: >-
+      Secret zuno-aap-installer-token not found in zuno-aap - run
+      `make d0 install aap-config` first.
+  when: (_wire_ee_registry_token_secret.resources | default([]) | length) == 0
+
+- name: "aap-config | wire-ee | check whether the registry credential exists"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/credentials/?name=aap-execution-environment-registry"
+    method: GET
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_ee_credential_lookup
+  no_log: true
+
+- name: "aap-config | wire-ee | look up the Container Registry credential type id"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/credential_types/?name=Container%20Registry"
+    method: GET
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_ee_registry_cred_type_lookup
+  when: (_wire_ee_credential_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+# host has no scheme: Controller's Container Registry credential type
+# takes a bare host[:port] (confirmed via the credential type's own
+# input schema, GET /api/controller/v2/credential_types/?name=Container+Registry).
+# verify_ssl left true (the internal registry's cert is service-ca signed,
+# same trust chain kubelet already uses for every other in-cluster image
+# pull) - flip to false only if the live build proves Controller's
+# podman-in-task-pod does NOT already trust that CA (see wp-102's
+# verification checklist).
+- name: "aap-config | wire-ee | create the registry credential"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/credentials/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: aap-execution-environment-registry
+      credential_type: "{{ _wire_ee_registry_cred_type_lookup.json.results[0].id }}"
+      organization: "{{ aap_config_organization | default('zuno') }}"
+      inputs:
+        host: "image-registry.openshift-image-registry.svc:5000"
+        username: serviceaccount
+        password: "{{ _wire_ee_registry_token_secret.resources[0].data.token | b64decode }}"
+        verify_ssl: true
+    status_code: 201
+  when: (_wire_ee_credential_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | wire-ee | re-look-up the registry credential"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/credentials/?name=aap-execution-environment-registry"
+    method: GET
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_ee_credential_lookup_final
+  until: (_wire_ee_credential_lookup_final.json.count | default(0) | int) > 0
+  retries: 12
+  delay: 5
+  no_log: true
+
+# --- the execution_environments object itself -------------------------------
+
+- name: "aap-config | wire-ee | check whether the execution environment is registered"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/execution_environments/?name=aap-execution-environment"
+    method: GET
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_ee_lookup
+  no_log: true
+
+- name: "aap-config | wire-ee | register the execution environment"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/execution_environments/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: aap-execution-environment
+      image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/aap-execution-environment:latest"
+      credential: "{{ _wire_ee_credential_lookup_final.json.results[0].id }}"
+      organization: "{{ aap_config_organization | default('zuno') }}"
+    status_code: 201
+  when: (_wire_ee_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
+- name: "aap-config | wire-ee | re-look-up the execution environment"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/execution_environments/?name=aap-execution-environment"
+    method: GET
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_ee_lookup_final
+  until: (_wire_ee_lookup_final.json.count | default(0) | int) > 0
+  retries: 12
+  delay: 5
+  no_log: true
+
+# --- assign it to the Job Templates that need it (narrow, per ADR-0418's ----
+#     least-privilege posture - see wp-102's Job Template table) -----------
+- name: "aap-config | wire-ee | look up each Job Template that needs the custom EE"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/job_templates/?name={{ item }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_ee_jt_lookup
+  until: (_wire_ee_jt_lookup.json.count | default(0) | int) > 0
+  retries: 30
+  delay: 10
+  loop: "{{ aap_config_ee_job_templates }}"
+  loop_control:
+    label: "{{ item }}"
+  no_log: true
+
+- name: "aap-config | wire-ee | assign the custom EE to each of those Job Templates"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/job_templates/{{ item.json.results[0].id }}/"
+    method: PATCH
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      execution_environment: "{{ _wire_ee_lookup_final.json.results[0].id }}"
+    status_code: 200
+  loop: "{{ _wire_ee_jt_lookup.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+  no_log: true
