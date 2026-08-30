@@ -197,3 +197,9 @@ func EndBFFRequestSpan(span trace.Span, code, runID, projectID string, start tim
 // manual reader, so telemetry_test.go can assert on recorded values
 // without going through Init's real OTLP exporter/network setup.
 func SetCounterForTest(c metric.Int64Counter) { requestCounter = c }
+
+// SetTracerForTest points tracer at one backed by a test span recorder, so
+// telemetry_test.go can assert on `bff_request`'s exported attributes
+// (ADR-0528's zuno.project_id among them) without Init's real OTLP trace
+// exporter/network setup.
+func SetTracerForTest(tr trace.Tracer) { tracer = tr }

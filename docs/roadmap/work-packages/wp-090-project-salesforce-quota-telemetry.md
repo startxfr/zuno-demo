@@ -1,13 +1,30 @@
 # WP-090: Salesforce link, quota and telemetry on the Zuno project id (promotes ADR-0528)
 
-- **State:** Repo work merged (2026-08-29) - the telemetry criterion is confirmed live and the `tool-policy.yaml` decision is recorded (no change); the one criterion left is the live Salesforce pass, blocked outside this repo on the WP-22/WP-33 sandbox credential gap
+- **State:** Done (2026-08-30) - the telemetry criterion is confirmed live and the `tool-policy.yaml` decision is recorded (no change); `zuno.project_id`'s presence is now regression-tested in all three services (ai-gateway, agent-runtime, agent-bff - see the 2026-08-30 note below); the live Salesforce pass is carved out to [WP-101](wp-101-salesforce-sandbox-credentials.md) (v0.7) rather than gating this WP's closure, since it depends on a sandbox credential this repo cannot provision.
 
 > Sequencing note (2026-08-27): step 2 landed early, inside WP-088 Part A.
 > Removing `_bind_project_if_required` was not separable - `agent_chat`
 > cannot compile against a binding step that no longer matches the
 > server-resolved project - so `_require_customer_project` shipped with the
 > backend it depends on. Steps 1 and 3-6 landed here as briefed.
-- **ADRs:** ADR-0528 (Proposed -> Repo work merged after this WP; Implemented needs a live Salesforce pass, still blocked on the WP-22/WP-33 sandbox credential gap)
+
+> Amendment (2026-08-30): closing ADR-0528/WP-090 was blocked only on "the
+> live Salesforce pass" - itself blocked on the WP-22/WP-33 sandbox
+> credential gap, which has no repo-side fix and no owning WP. Carrying
+> both indefinitely at `Repo work merged` misrepresented the roadmap the
+> same way ADR-0218 found Aramis/Salesforce ingestion doing in a
+> different corner of the tree. [WP-101](wp-101-salesforce-sandbox-credentials.md)
+> now owns the credential provisioning and the confirming live pass,
+> targeted v0.7; this WP and ADR-0528 close on the acceptance criteria the
+> repository can independently verify (all four Decision clauses,
+> fixture-tested cause taxonomy, live-verified telemetry, recorded policy
+> decision). Also added while closing: a regression test for
+> `zuno.project_id`'s presence in ai-gateway (`tests/test_telemetry.py`)
+> and agent-bff (`internal/telemetry/telemetry_test.go`), plus the
+> equivalent in agent-runtime (`tests/test_telemetry.py`) - none existed
+> before, so a refactor could have silently dropped the attribute with CI
+> staying green (see this WP's own "Still missing" note below, now closed).
+- **ADRs:** ADR-0528 (Proposed -> Repo work merged -> Implemented 2026-08-30; the live Salesforce sandbox pass is tracked separately by WP-101, not a precondition for `Implemented`)
 - **Depends on:** WP-088 (needs `projects.salesforce_*` and the server-resolved `project_id` on graph state)
 - **Estimated files touched:** ~10
 
@@ -105,9 +122,13 @@ Read also: [ADR-0512](../../adr/0512-introduce-project-bound-tasks-with-salesfor
 
 ## Operator / human follow-up (not executable by the model)
 
-- A live Salesforce pass (set a real opportunity on a project, confirm the three
-  failure causes) remains blocked on the standing WP-22/WP-33 sandbox credential
-  gap - the same block ADR-0512 already carried.
+- ~~A live Salesforce pass (set a real opportunity on a project, confirm the
+  three failure causes) remains blocked on the standing WP-22/WP-33 sandbox
+  credential gap - the same block ADR-0512 already carried.~~ **Carved out
+  2026-08-30 to [WP-101](wp-101-salesforce-sandbox-credentials.md) (v0.7)** -
+  the gap has no repo-side fix, so it no longer gates this WP's or
+  ADR-0528's closure; WP-101 owns the credential provisioning and the
+  confirming pass when a sandbox exists.
 - ~~A reviewed `tool-policy.yaml` decision on whether `finance` gains
   `salesforce.opportunity.read`.~~ **Decided 2026-08-29: no change.**
   `salesforce.opportunity.read` keeps `allowed_groups: [sales, board]`
@@ -159,16 +180,27 @@ Read also: [ADR-0512](../../adr/0512-introduce-project-bound-tasks-with-salesfor
   `zuno.run_id` references, no trace-tree traversal). But there is no single
   waterfall to look at.
 
-  **Still missing, and not closed by this:** no test in ai-gateway or agent-bff
-  asserts the attribute. It is proven present in production and unguarded
-  against regression - a refactor could drop it and CI would stay green.
+  ~~**Still missing, and not closed by this:** no test in ai-gateway or
+  agent-bff asserts the attribute. It is proven present in production and
+  unguarded against regression - a refactor could drop it and CI would stay
+  green.~~ **Closed 2026-08-30**: `components/ai-gateway/tests/test_telemetry.py`,
+  `components/agent-bff/internal/telemetry/telemetry_test.go` and
+  `components/agent-runtime/tests/test_telemetry.py` (the last one closing
+  the same gap there too - it turned out to have zero coverage as well,
+  correcting this WP's original claim) now assert `zuno.project_id` is
+  present when set and absent when not, on every span that carries it.
 
 ## Status updates (then re-run check_docs.py)
 
-- After merge: ADR-0528 -> `Repo work merged`; index row to match; Phase 21
-  tracker row -> `Repo work merged`.
-- After the live Salesforce pass: ADR-0528 -> `Implemented`; tracker -> `Done`;
-  a dated `MEMORY.md` bullet.
+- After merge (2026-08-27/29): ADR-0528 -> `Repo work merged`; index row to
+  match; Phase 21 tracker row -> `Repo work merged`.
+- After closing on repo-verifiable criteria, with the live Salesforce pass
+  carved out to WP-101/v0.7 (2026-08-30): ADR-0528 -> `Implemented`; this WP
+  -> `Done`; tracker row -> `Done`; index row to match; a dated `MEMORY.md`
+  bullet.
+- When WP-101 lands a sandbox and runs the confirming live pass: no further
+  status change here (this WP is already `Done`) - update WP-101 and
+  ADR-0512's own residual-gap note instead.
 
 ## Out of scope / deferred
 
@@ -176,3 +208,5 @@ Read also: [ADR-0512](../../adr/0512-introduce-project-bound-tasks-with-salesfor
 - Non-Salesforce project registries.
 - Dropping `conversations.project_id_verified_at`, which this WP stops writing;
   keep the column one release and drop it separately.
+- The live Salesforce sandbox pass and its credential provisioning - see
+  [WP-101](wp-101-salesforce-sandbox-credentials.md) (v0.7).
