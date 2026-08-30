@@ -19,4 +19,18 @@ spec:
   organization: {{ .Values.organization }}
   description: >-
     localhost-only inventory for cluster-facing playbooks (WP-073).
+  # zuno_repo_root normally comes from ansible/inventories/demo/
+  # group_vars/all/auto.yml, loaded automatically for LOCAL execution
+  # (`ansible-playbook -i ansible/inventories/demo/hosts.yml ...`) because
+  # that's the inventory file's own directory. A Job Template running
+  # INSIDE AAP uses this Controller-side inventory instead - a completely
+  # separate object with no group_vars directory of its own - so every
+  # playbook's zuno_repo_root-relative task include failed
+  # with "'zuno_repo_root' is undefined" (confirmed live 2026-08-30,
+  # WP-099, `zuno-day1-check` job id 116). Set here once instead of
+  # touching the 176 references across 21 playbooks: inventory variables
+  # are templated in the running play's own Jinja context, so
+  # `playbook_dir` resolves exactly the same way it does locally.
+  variables:
+    zuno_repo_root: "{{ "{{" }} playbook_dir {{ "}}" }}/../.."
 {{- end }}

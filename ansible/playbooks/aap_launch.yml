@@ -92,7 +92,12 @@
         validate_certs: false
         body_format: json
         body:
-          extra_vars: "{{ (aap_launch_extra_vars | default('{}')) | from_json }}"
+          # aap_launch_extra_vars now arrives as a native dict, not a JSON
+          # string - the Makefile's aap_route() passes the whole -e
+          # argument as one top-level JSON object (WP-099), so ansible's
+          # own extra-vars loader already parsed it before this playbook
+          # ever runs. default({}) matches that shape (not '{}').
+          extra_vars: "{{ aap_launch_extra_vars | default({}) }}"
         status_code: 201
       register: _aap_launch_result
       no_log: true

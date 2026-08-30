@@ -123,6 +123,19 @@ DAY3_VERBS := test stresstest backup restore check sign
 # auto mode once AAP was confirmed reachable) that the caller must
 # propagate as-is, never silently falling back to local for it - remote
 # mode's whole point is "no silent fallback" (ADR-0418 clause 6).
+# WP-099 (live bug, found running `make d1 check kiali` for real): passing
+# each piece as its own `-e "key=value"` argument breaks the moment
+# extra_vars_json contains a space (every `{"k": "v"}` this repo builds
+# does, right after the colon) - ansible-playbook's `key=value` extra-vars
+# parser splits on WHITESPACE, not just `=`, so `-e "aap_launch_extra_vars=
+# {\"target_component\": \"kiali\"}"` silently truncated the value at the
+# first space, leaving `aap_launch.yml`'s `from_json` filter a truncated,
+# invalid JSON fragment to parse. Fixed by passing ONE combined `-e` whose
+# value is itself a full JSON object (ansible detects a value starting
+# with `{` and parses the WHOLE argument via its YAML/JSON loader instead
+# of the whitespace-splitting key=value loader) - internal spaces are then
+# irrelevant, and `aap_launch_extra_vars` arrives as an already-native
+# dict rather than a string needing `from_json`.
 define AAP_ROUTING_SHELL_FUNCS
 resolve_aap_mode() { \
   local mode="auto"; \
@@ -149,7 +162,7 @@ aap_route() { \
       fi ;; \
     remote) ;; \
   esac; \
-  $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/aap_launch.yml -e "aap_launch_type=$$kind" -e "aap_launch_template=$$template" -e "aap_launch_extra_vars=$$extra_vars_json" $(EXTRA_VARS); \
+  $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/aap_launch.yml -e "{\"aap_launch_type\": \"$$kind\", \"aap_launch_template\": \"$$template\", \"aap_launch_extra_vars\": $$extra_vars_json}" $(EXTRA_VARS); \
 };
 endef
 
