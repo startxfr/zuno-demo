@@ -7,6 +7,12 @@
   into two independently-cadenced KFP pipelines - this WP's own scope and
   `State: Done` above are unchanged (WP-100 is a new, dependent WP, not a
   reopening of this one).
+- **State (2026-08-30, WP-100 closed):** WP-100 reached `Done` this same
+  day - `rag-dspa` readiness (the blocker this WP's tracker row had carried
+  since 2026-08-17) cleared, and the live operator confirmation both WPs
+  were waiting on ran successfully, including a real concurrent-run proof
+  (see WP-100's own status update). This WP's own scope/state remain
+  unchanged; recorded here as the closing cross-reference.
 - **State (2026-08-26):** [ADR-0218](../../adr/0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md)
   amended and enacted. Aramis is no longer merely untracked here: the
   `fetch-aramis` adapter and every trace of its wiring are removed from the

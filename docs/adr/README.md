@@ -240,7 +240,7 @@ Goal: close out the roadmap-reprioritization cluster left over from v0.7 - sourc
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.6 | Partially implemented | Automate source-specific knowledge ingestion |
+| [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.6 | Implemented | Automate source-specific knowledge ingestion |
 | [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.6 | Implemented | Separate current Salesforce knowledge from legacy SXA |
 | [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.6 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
 | [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | v0.6 | Implemented | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |

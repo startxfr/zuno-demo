@@ -1,6 +1,6 @@
 # ADR-0105: Automate source-specific knowledge ingestion
 
-- **Status:** Partially implemented (tech/legacy cadence merged; Salesforce/Aramis clauses superseded by [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — see the 2026-08-23 note below; live KFP schedule confirmation still blocked on rag-dspa readiness, see ADR-0330; tech's two sources now independently scheduled — see the 2026-08-30 amendment below — pending WP-100's operator-run confirmation)
+- **Status:** Implemented - see `components/rag-ingestion/`. (Salesforce/Aramis clauses remain superseded by [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md), out of this ADR's scope.)
 - **Target:** v0.6 (retargeted from v0.7 on 2026-08-30 — v0.7 split into a short-term closeout band (v0.6) and a long-term/harder band (v0.7); this item and its already-closed siblings ADR-0206/ADR-0213/ADR-0218 move to v0.6, while ADR-0111/ADR-0115 (externally blocked) and ADR-0352 (large not-started effort) remain in v0.7. Previously retargeted from v0.1 on 2026-08-26 — roadmap reprioritization, grouped into v0.7 as a second, unrelated deferred-items set alongside WP-04's GitHub-Actions release-automation theme already there)
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
@@ -81,6 +81,39 @@ split). See WP-100 for the detect-changes/changeset concurrency-isolation
 fix that independent per-source scheduling required
 (`components/rag-ingestion/src/rag_ingestion.py`'s `stage_detect_changes`
 and `_changeset_key`).
+
+## Live verification check (2026-08-30, WP-100 operator confirmation)
+
+`rag-dspa` reached `Ready` this same day, unblocking the confirmation this
+ADR's Status line had been waiting on since 2026-08-17. Ran WP-100's
+outstanding operator follow-up live on cluster (`ansible/playbooks/
+day2_install.yml -e target_component=rag-ingestion`, routed locally after
+the AAP job-template path hit an unrelated `aap-installer` RBAC gap on
+`ingresses.config.openshift.io`, out of this ADR's scope):
+
+- PipelineVersions compiled and applied for `tech-redhat`/`tech-confluence`
+  (previously empty-shell Pipelines with zero versions).
+- Two independent KFP recurring runs created and confirmed `ENABLED` with
+  the correct per-source cron (`rag-corpus-ingestion-tech-redhat-schedule`
+  weekly, `rag-corpus-ingestion-tech-confluence-schedule` every 6h).
+- The orphaned cleanup task removed both the old pre-WP-100 shared
+  recurring run (broken - 404 pipeline version, `ARAMIS_SOURCES_JSON`
+  config-drift error) and a second orphan, `rag-corpus-ingestion-sxa-schedule`
+  (a stale weekly schedule with no matching ConfigMap - sxa-legacy is
+  on-demand only by design, confirming that gap needed no separate fix).
+- Manually triggered one end-to-end run per new source; both `SUCCEEDED`,
+  landed rows in `knowledge.tech`'s database with correct `domain`/
+  `technology` metadata, and `manifest.json` carries `source_type` for
+  newly-touched entries (pre-existing untagged rows correctly kept `None`,
+  per WP-100's conservative default).
+- Real concurrency proof, not just a design review: the confluence
+  recurring schedule auto-fired at its normal 6h cadence *while* the
+  manual `tech-redhat` run was still finishing its own pipeline. Both
+  completed `SUCCEEDED`; `manifest.json`'s entry count and `source_type`
+  distribution were unchanged before/after the overlap, and each run's
+  scoped changeset (`changeset-fetch-redhat.json`/`changeset-fetch-
+  confluence.json`) persisted independently - the exact race WP-100's
+  `_changeset_key`/`_owned_by_this_run` scoping was built to survive.
 
 ## Related ADRs
 

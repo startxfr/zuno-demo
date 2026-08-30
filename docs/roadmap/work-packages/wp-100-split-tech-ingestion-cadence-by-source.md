@@ -1,8 +1,22 @@
 # WP-100: Split knowledge.tech's ingestion cadence by source (amends WP-22 / ADR-0105)
 
-- **State:** Repo work merged - operator confirmation of the two live KFP
-  schedules pending (same `rag-dspa`-readiness/API-shape caveats WP-22 and
-  WP-07 already carry for every recurring-run activation in this chart).
+- **State:** Done (2026-08-30) - `rag-dspa` reached `Ready` this same day,
+  clearing the blocker WP-22/WP-07 had carried since 2026-08-17. Ran
+  `ansible/playbooks/day2_install.yml -e target_component=rag-ingestion`
+  live (local execution - the AAP job-template route hit an unrelated
+  `aap-installer` RBAC gap on `ingresses.config.openshift.io`, out of this
+  WP's scope): both PipelineVersions compiled, both per-source recurring
+  runs created and confirmed `ENABLED` with the correct cron, and the
+  cleanup task removed both the old shared orphan and a second orphan
+  (`rag-corpus-ingestion-sxa-schedule`, no matching ConfigMap - sxa-legacy
+  is on-demand only by design). One manual end-to-end run per source
+  `SUCCEEDED` with correct `domain`/`technology` metadata and `source_type`
+  populated in `manifest.json`. The tech-confluence recurring schedule then
+  auto-fired at its normal 6h cadence while the manual tech-redhat run was
+  still finishing - a live concurrency proof of this WP's `_changeset_key`/
+  `_owned_by_this_run` scoping: both runs `SUCCEEDED`, `manifest.json`'s
+  entry count and `source_type` distribution were unchanged across the
+  overlap, and each run's scoped changeset file persisted independently.
 - **ADRs:** ADR-0105 (amended 2026-08-30 - see its "Amended" section).
 - **Depends on:** WP-22 (merged; this WP does not reopen it - see its own
   amendment bullet).
@@ -124,25 +138,30 @@ to only the source(s) a given run actually fetched
   `KeyError`s, since it ships `enabled: false`, unchanged pre-existing
   behavior).
 - `python3 platform/docs/check_knowledge_refs.py` → `RESULT: PASS`.
-- `python3 platform/docs/check_docs.py` → to be confirmed as part of this
-  WP's status update pass.
+- `python3 platform/docs/check_docs.py` → `RESULT: PASS` (confirmed
+  2026-08-30, as part of this WP's closure pass).
 
-## Operator / human follow-up (not executable by the model)
+## Operator / human follow-up (completed 2026-08-30, live on cluster)
 
-1. Operator: deploy the chart + Ansible changes (`make d1 reinstall
-   rag-ingestion` or equivalent), confirm both `rag-corpus-ingestion-tech-redhat`
-   and `rag-corpus-ingestion-tech-confluence` Pipelines/PipelineVersions
-   exist in KFP.
-2. Operator: confirm the KFP recurring-run activation step (best-effort,
-   same UNVERIFIED-against-live-cluster caveats as WP-22/WP-07) actually
-   creates both new recurring runs and removes the old shared
-   `rag-corpus-ingestion-schedule` one via the new cleanup task; verify via
-   the OpenShift AI dashboard if the automated step reports a skip.
-3. Operator: watch the first pair of scoped runs land content with
-   `source_type` populated in `manifest.json` before trusting the
-   scoped-orphan-deletion path on real data (the design already treats a
-   missing `source_type` as "never delete," so this is a soft
-   confirmation step, not a blocking migration).
+1. Deployed via `ansible/playbooks/day2_install.yml -e
+   target_component=rag-ingestion` (local execution - AAP job-template
+   routing hit an unrelated `aap-installer` RBAC gap on
+   `ingresses.config.openshift.io`, out of this WP's scope). Confirmed both
+   `rag-corpus-ingestion-tech-redhat` and `rag-corpus-ingestion-tech-confluence`
+   Pipelines now have a compiled PipelineVersion (were empty shells before).
+2. Confirmed both new recurring runs exist and are `ENABLED` with the
+   correct cron via the KFP API. The cleanup task removed the old shared
+   `rag-corpus-ingestion-schedule` orphan and a second orphan found live,
+   `rag-corpus-ingestion-sxa-schedule` (no matching ConfigMap - expected,
+   sxa-legacy is on-demand only by design).
+3. Confirmed: one manual end-to-end run per source `SUCCEEDED`, with
+   `source_type` populated in `manifest.json` for newly-touched entries.
+   The tech-confluence recurring schedule then auto-fired at its normal 6h
+   cadence while the manual tech-redhat run was still finishing - both
+   completed successfully, and `manifest.json`'s entry count/`source_type`
+   distribution were unchanged across the overlap, confirming the scoped-
+   orphan-deletion path is safe under real concurrent runs, not just in
+   design.
 
 ## Out of scope / deferred
 
