@@ -58,6 +58,28 @@ check, the two-playbook split).
   check before every future live use of this drill regardless - a `required`
   term guarantees separation going forward, but does not retroactively
   guarantee today's placement stays correct if the chart is ever reverted.
+
+  **Live-verified fixed, 2026-08-30**, after pushing the chart change and
+  syncing `zuno-models-d1` (ArgoCD app, `gitops/charts/models` path):
+  `qwen35-9b-kserve-7b4968bcd9-d9x9b` `2/2 Running` on `ip-10-18-15-25`,
+  `qwen35-9b-wesh-kserve-689595d44f-jt9kv` `2/2 Running` on `ip-10-18-67-65`,
+  both pods' live `spec.affinity` confirmed carrying the new
+  `requiredDuringSchedulingIgnoredDuringExecution` term against each other.
+
+  **New operational finding, worth remembering for any future change to
+  these 5 models' pod templates:** both `qwen35-9b-kserve` and
+  `qwen35-9b-wesh-kserve` Deployments use the default `RollingUpdate`
+  strategy (`maxSurge: 25%`, `maxUnavailable: 25%` → 1/0 at replicas=1).
+  With `zuno-ai-run-gpu-cap` permanently saturated (3/3 `mig-1g.24gb`, 2/2
+  `mig-2g.48gb` at steady state), a surge pod is unconditionally rejected
+  at admission (`exceeded quota: zuno-ai-run-gpu-cap`) - the rollout
+  deadlocks forever with the old pod still `Running` (harmless, but the new
+  pod template never takes effect) until an operator manually scales the
+  OLD ReplicaSet to 0 to free the slot, then nudges the new ReplicaSet
+  (scale 0→1) past its exponential backoff. This will recur on every future
+  pod-template change to any of these 5 GPU-saturated models unless the
+  chart is changed to `strategy: {type: Recreate}` - out of scope for this
+  WP, flagged here rather than fixed silently.
 - `platform/ai-gateway/provider-routing.yaml` has no `cache_enabled: true`
   entry for `local-qwen35(-maas)`/`local-wesh(-maas)` (grep for it) - if this
   has changed, stop and re-read ADR-0536's Decision 5 before proceeding.
