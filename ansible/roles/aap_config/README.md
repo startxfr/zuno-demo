@@ -132,14 +132,26 @@ Both are consumed through `AnsibleCredential`'s native
 bootstrap cluster-admin kubeconfig (ADR-0354 Security considerations,
 narrowed per WP-073, extended per WP-094). If a precheck or install ever
 fails on permissions, widen with a targeted extra Role/ClusterRole entry,
-never swap in a broader built-in or cluster-admin - two such widenings
-exist so far, both because `cluster-reader` deliberately excludes
-Secrets entirely: `templates/rolebinding-vault-secrets.yaml`
+never swap in a broader built-in or cluster-admin - three such widenings
+exist so far. Two are routine, both because `cluster-reader` deliberately
+excludes Secrets entirely: `templates/rolebinding-vault-secrets.yaml`
 (`zuno-vault`, vault's own precheck) and
 `templates/rolebinding-connectivity-link-secrets.yaml` (`kuadrant-system`,
 confirmed live 2026-08-30 running `zuno-day1-check-workflow` for real -
 connectivity_link's precheck reads `authorino-server-cert`'s
-`tls.crt`/`tls.key` keys, WP-071's regression check).
+`tls.crt`/`tls.key` keys, WP-071's regression check). The third,
+`templates/rolebinding-connectivity-link-exec.yaml` (`openshift-ingress`,
+also confirmed live 2026-08-30 in the same run), is **not** routine -
+`pods/exec` grants arbitrary command execution inside any pod the Role's
+namespace scope covers, categorically different from a read-only
+`get`/`list`/`watch` grant, and was only accepted (confirmed with the
+operator before landing) because the command actually run is a fixed,
+hardcoded `cat` of a public, non-sensitive file baked into this repo's
+own playbook (`ansible/roles/connectivity_link/tasks/
+verify_ext_authz_tls.yml`), scoped to one namespace, granted to a
+ServiceAccount that otherwise has no write access anywhere. Treat any
+*future* `pods/exec` need the same way - confirm explicitly, never grant
+it as a routine "widen and move on" fix.
 `ansible/tasks/load_k8s_auth_env.yml` detects the credential's injected
 `K8S_AUTH_HOST` and skips its kubeconfig resolution, so the same
 playbooks run unmodified from an operator shell and from AAP.

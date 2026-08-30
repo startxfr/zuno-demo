@@ -1,0 +1,69 @@
+{{- if .Values.aapConfig.enabled }}
+# Targeted widening beyond cluster-reader (ADR-0354 Security
+# considerations), same pattern as rolebinding-vault-secrets.yaml and
+# rolebinding-connectivity-link-secrets.yaml - but a real step up in
+# risk level, not a routine one, and treated explicitly as such
+# (confirmed with the operator before landing, 2026-08-30).
+#
+# `pods/exec` grants the ability to run ARBITRARY commands inside any
+# pod this Role's namespace scope covers - RBAC has no mechanism to
+# restrict WHICH command gets run via exec, only WHICH pod/namespace.
+# This is categorically different from every other widening in this
+# chart (all of which are read-only `get`/`list`/`watch` on `secrets`),
+# and is only accepted here because: (1) the command actually run is a
+# fixed, hardcoded `cat` of a public, non-sensitive file (`ansible/
+# roles/connectivity_link/tasks/verify_ext_authz_tls.yml`'s
+# `service-ca.crt` - every pod's own mounted CA bundle, not a secret),
+# baked into this repo's own playbook, not attacker-controlled; (2) it
+# is scoped to the single namespace (`openshift-ingress`) this precheck
+# actually targets, not cluster-wide; (3) the `aap-day0-check`
+# ServiceAccount it's bound to already has no ability to create/modify
+# anything (cluster-reader is read-only otherwise) - the blast radius of
+# a compromised token is "arbitrary exec in openshift-ingress pods",
+# not "arbitrary exec anywhere".
+#
+# Confirmed live 2026-08-30 (WP-099, `zuno-day1-check-workflow` job
+# 178): connectivity_link's WP-071 TLS-chain verification execs into
+# each gateway's istio-proxy sidecar to read that file, and cluster-reader
+# excludes `pods/exec` (a 403 on `pods/exec` in `openshift-ingress`,
+# distinct from the earlier `secrets` 403 in `kuadrant-system` already
+# fixed by rolebinding-connectivity-link-secrets.yaml).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: zuno-aap-day0-check-connectivity-link-exec
+  namespace: openshift-ingress
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-aap-day0-check-connectivity-link-exec
+  namespace: openshift-ingress
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: zuno-aap-day0-check-connectivity-link-exec
+subjects:
+  {{- range .Values.credentials }}
+  {{- if eq .name "zuno-cluster-reader" }}
+  - kind: ServiceAccount
+    name: {{ .serviceAccount }}
+    namespace: {{ $.Values.namespace }}
+  {{- end }}
+  {{- end }}
+{{- end }}
