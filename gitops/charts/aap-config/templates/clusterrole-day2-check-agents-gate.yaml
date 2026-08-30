@@ -1,0 +1,76 @@
+{{- if .Values.aapConfig.enabled }}
+# WP-102 follow-up (ADR-0418): zuno-day2-check's `agents` node runs the
+# ADR-0053 acceptance gate (ansible/roles/agents/tasks/run_acceptance_gate.yml)
+# unconditionally - not gated on any verb, confirmed live 2026-08-30 (job
+# 452, the first real `zuno-day2-check-workflow` run to ever reach this
+# step once WP-102 got `kustomize` working in the EE) - which creates a
+# Namespace/ConfigMap/Secret/ServiceAccount/Role/RoleBinding/Job in
+# zuno-ai-run, genuinely mutating actions. zuno-day2-check's own
+# credential (zuno-cluster-reader, bound to the built-in `cluster-reader`
+# ClusterRole) is deliberately read-only ("check-only scope" per
+# clusterrole-installer.yaml's own header) - `cluster-reader` is a
+# platform-standard role, not something this repo should extend with
+# write verbs.
+#
+# Fix: a second, narrowly-scoped ClusterRole for exactly what this one
+# check step needs, bound via a RoleBinding (not a ClusterRoleBinding)
+# confined to zuno-ai-run only - the aap-day0-check ServiceAccount keeps
+# read-only, cluster-wide access via cluster-reader everywhere else, and
+# gains write ONLY inside this one namespace, for exactly these resource
+# types. `namespaces` get/update/patch (no create/delete) relies on the
+# Kubernetes-documented special case: a RoleBinding referencing a
+# ClusterRole that grants verbs on the cluster-scoped `namespaces`
+# resource is honored only against the ONE namespace object matching the
+# RoleBinding's own namespace - it cannot reach any other namespace, so
+# this stays confined to zuno-ai-run even though `namespaces` itself
+# isn't a namespaced resource. `get` on namespaces was already working
+# before this fix (cluster-reader already grants it) - included here
+# too since this ClusterRole is meant to be self-contained.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zuno-day2-check-agents-gate
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-26"
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # The acceptance-gate Job's own ServiceAccount only ever needs a Role
+  # granting pods:get/list/watch (run_acceptance_gate.yml's inline
+  # "acceptance-gate" Role) - already covered by the pods rule above, so
+  # creating/binding that Role never trips the privilege-escalation
+  # check the same way the WP-102 image-puller RoleBinding did.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-day2-check-agents-gate
+  namespace: zuno-ai-run
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zuno-day2-check-agents-gate
+subjects:
+  - kind: ServiceAccount
+    name: aap-day0-check
+    namespace: {{ .Values.namespace }}
+{{- end }}
