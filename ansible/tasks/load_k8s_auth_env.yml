@@ -45,3 +45,40 @@
     k8s_auth_environment:
       K8S_AUTH_KUBECONFIG: "{{ k8s_auth_kubeconfig_path }}"
   when: k8s_auth_environment is not defined
+
+# WP-102: K8S_AUTH_HOST/K8S_AUTH_API_KEY are read natively by the
+# kubernetes.core Python modules (the whole point of the block above),
+# but the raw `oc` CLI (apply_openshift_build.yml's `oc start-build`,
+# mlops/rag_ingestion's `oc whoami -t`) understands neither - it needs an
+# actual kubeconfig, which an AAP Job Template's injected environment
+# never provides (confirmed live 2026-08-30: `oc start-build` failed
+# "Missing or incomplete configuration info" the first time any raw `oc`
+# command ever ran under AAP, since no EE shipped `oc` at all before this
+# WP). `oc login` writes one under /tmp - never $HOME/.kube/config, since
+# an arbitrary-UID EE container's $HOME is not reliably writable (same
+# reasoning as run_acceptance_gate.yml's PYTHONUSERBASE: /tmp/.pyuser) -
+# then folds KUBECONFIG into k8s_auth_environment so every later task in
+# this same play (including plain `command`/`shell` ones, which don't see
+# module-only K8S_AUTH_* facts) inherits it via the play-level
+# `environment: "{{ k8s_auth_environment | default({}) }}"` block every
+# day1/day2/day3 playbook already sets - same propagation mechanism the
+# non-AAP branch above already uses for K8S_AUTH_KUBECONFIG. Runs once
+# per playbook, only when AAP-injected (an operator shell already has a
+# real login).
+- name: "k8s-auth | log the oc CLI into the AAP-injected cluster (Job Template execution only)"
+  ansible.builtin.command:
+    cmd: >-
+      oc login --server={{ lookup('env', 'K8S_AUTH_HOST') }}
+      --token={{ lookup('env', 'K8S_AUTH_API_KEY') }}
+      --kubeconfig=/tmp/oc-kubeconfig
+      {{ '--insecure-skip-tls-verify=true'
+         if (lookup('env', 'K8S_AUTH_VERIFY_SSL') | default('true', true) | lower) in ['false', 'no', '0']
+         else '' }}
+  when: (lookup('env', 'K8S_AUTH_HOST') | default('', true)) | length > 0
+  changed_when: false
+  no_log: true
+
+- name: "k8s-auth | fold the oc CLI's kubeconfig into the shared environment"
+  ansible.builtin.set_fact:
+    k8s_auth_environment: "{{ k8s_auth_environment | combine({'KUBECONFIG': '/tmp/oc-kubeconfig'}) }}"
+  when: (lookup('env', 'K8S_AUTH_HOST') | default('', true)) | length > 0
