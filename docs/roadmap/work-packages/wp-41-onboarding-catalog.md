@@ -1,6 +1,6 @@
 # WP-41: Self-service onboarding and catalog expansion (promotes ADR-0307 + ADR-0410)
 
-> ADR-0307 and ADR-0410 retargeted v0.4 → v0.7 on 2026-08-30 — see docs/roadmap/versions.md.
+> ADR-0307 and ADR-0410 retargeted v0.4 → v0.7 → v0.9 (both moves 2026-08-30) — see docs/roadmap/versions.md.
 
 - **State:** Cancelled (2026-08-23) — deprioritized; ADR-0307 and ADR-0410
   deferred to v0.4 with status `Proposed`. The already-merged template
