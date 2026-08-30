@@ -1,12 +1,16 @@
 ---
 # `make day3|d3 scenario-failover-node` (inject half). WP-105/ADR-0536: cordon
-# the node carrying qwen3.5-9b's KServe pod, delete that pod, and prove live
-# that Tekos fails over to local-wesh while Comage (already primary on
-# local-wesh) is unaffected. Paired with
-# day3_scenario_failover_node_restore.yml - the Makefile pauses for
-# mandatory interactive human confirmation between the two (ADR-0536
-# Decision 2); this playbook deliberately leaves the node cordoned on exit,
-# that is the intended paused state, not a failure.
+# the node carrying qwen3.5-9b-wesh's KServe pod, delete that pod, and prove
+# live that Comage fails over to local-qwen35 while Tekos (routed
+# off-cluster to ovhcloud-gpt-oss-120b for its one chat-reachable task) is
+# unaffected - a decoupling control, not the other half of the fallback.
+# Revision 2026-08-30: originally scoped the other direction (kill
+# qwen3.5-9b, prove Tekos fails over to local-wesh) - found live to be
+# unprovable through real chat traffic, see ADR-0536's Context section for
+# why. Paired with day3_scenario_failover_node_restore.yml - the Makefile
+# pauses for mandatory interactive human confirmation between the two
+# (ADR-0536 Decision 2); this playbook deliberately leaves the node cordoned
+# on exit, that is the intended paused state, not a failure.
 #
 # Node/pod are resolved dynamically below, never hardcoded (ADR-0536
 # Decision 3) - every prior write-up of this exact maneuver
@@ -20,11 +24,10 @@
   vars:
     scenario_failover_namespace: zuno-ai-run
     # kserve.io/component=workload is required - app.kubernetes.io/name
-    # alone also matches the lightweight qwen35-9b-kserve-router-scheduler
-    # pod (a separate, non-GPU pod on a different node entirely), live-
-    # discovered 2026-08-30 when this precondition check correctly refused
-    # to proceed on finding 2 matching pods instead of 1.
-    scenario_failover_model_label: "app.kubernetes.io/name=qwen35-9b,kserve.io/component=workload"
+    # alone also matches the lightweight qwen35-9b-wesh-kserve-router-scheduler
+    # pod (a separate, non-GPU pod on a different node entirely) - same trap
+    # already live-caught 2026-08-30 on the qwen35-9b selector.
+    scenario_failover_model_label: "app.kubernetes.io/name=qwen35-9b-wesh,kserve.io/component=workload"
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -34,9 +37,10 @@
 
     # ADR-0536 Decision 5: the semantic cache is keyed on the REQUESTED
     # model, not the candidate that actually served it - if it were ever
-    # enabled for these providers, a local-wesh answer served during the
-    # inject phase could be replayed after restore, making the restore
-    # playbook's own re-probe a false positive. Read live, never assumed.
+    # enabled for these providers, the local-qwen35 answer Comage gets
+    # during the failover window could be replayed after restore, making
+    # the restore playbook's own re-probe a false positive. Read live,
+    # never assumed.
     - name: Read platform/ai-gateway/provider-routing.yaml
       ansible.builtin.set_fact:
         _sfn_provider_routing: "{{ lookup('file', zuno_repo_root + '/platform/ai-gateway/provider-routing.yaml') | from_yaml }}"
@@ -53,7 +57,7 @@
         label: "{{ item.name }}"
       when: item.cache_enabled | default(false) | bool
 
-    - name: Find the running qwen3.5-9b pod
+    - name: Find the running qwen3.5-9b-wesh pod
       kubernetes.core.k8s_info:
         kind: Pod
         namespace: "{{ scenario_failover_namespace }}"
@@ -61,7 +65,7 @@
           - "{{ scenario_failover_model_label }}"
       register: _sfn_pod_info
 
-    - name: Fail if the qwen3.5-9b pod isn't found or isn't Running
+    - name: Fail if the qwen3.5-9b-wesh pod isn't found or isn't Running
       ansible.builtin.fail:
         msg: >-
           Expected exactly one Running pod labeled
@@ -87,24 +91,25 @@
       ansible.builtin.set_fact:
         scenario_failover_baseline: "{{ scenario_failover_probe_result }}"
 
-    - name: Fail if the baseline doesn't match ADR-0526's expected routing
-      # local-wesh-maas / local-qwen35-maas are the legitimate MaaS-preferred
-      # siblings tried first (provider-routing.yaml file order) - a healthy
-      # baseline naming either the -maas or the direct provider is correct,
-      # not just the exact direct name.
+    - name: Fail if the baseline doesn't match ADR-0536's expected routing
+      # local-wesh-maas is the legitimate MaaS-preferred sibling tried first
+      # (provider-routing.yaml file order) - a healthy baseline naming either
+      # the -maas or the direct provider is correct for Comage. Tekos is a
+      # decoupling control - its reflexional task routes off-cluster to OVH
+      # and is never expected to touch local-wesh/local-qwen35 at all.
       ansible.builtin.fail:
         msg: >-
-          Baseline probe did not match ADR-0526's expected routing
+          Baseline probe did not match ADR-0536's expected routing
           (comage.provider={{ scenario_failover_baseline.comage.provider }},
           expected local-wesh(-maas); tekos.provider={{ scenario_failover_baseline.tekos.provider }},
-          expected local-qwen35(-maas)) - stop before touching the cluster
+          expected ovhcloud-gpt-oss-120b) - stop before touching the cluster
           and re-check platform/ai-gateway/provider-routing.yaml and
           policies/model-routing/model-routing-policy.yaml.
       when: >-
         not scenario_failover_baseline.comage.ok or
         not scenario_failover_baseline.tekos.ok or
         scenario_failover_baseline.comage.provider not in ['local-wesh', 'local-wesh-maas'] or
-        scenario_failover_baseline.tekos.provider not in ['local-qwen35', 'local-qwen35-maas']
+        scenario_failover_baseline.tekos.provider != 'ovhcloud-gpt-oss-120b'
 
     - name: "Cordon {{ scenario_failover_node_name }}"
       ansible.builtin.command:
@@ -112,9 +117,9 @@
       changed_when: true
 
     # Deletes scenario_failover_pod_name only - never a node-wide delete.
-    # The co-located qwen3.6-27b-instruct pod on the same node must keep
-    # running; cordon already prevents any NEW pod from landing there.
-    - name: Delete the qwen3.5-9b pod
+    # The co-located gpt-oss-20b pod on the same node must keep running;
+    # cordon already prevents any NEW pod from landing there.
+    - name: Delete the qwen3.5-9b-wesh pod
       kubernetes.core.k8s:
         state: absent
         api_version: v1
@@ -139,7 +144,7 @@
       retries: 18
       delay: 10
 
-    - name: "Failover probe (node cordoned, qwen3.5-9b pod Pending)"
+    - name: "Failover probe (node cordoned, qwen3.5-9b-wesh pod Pending)"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/scenario_failover_probe_job.yml"
       vars:
         scenario_failover_phase: failover
@@ -148,19 +153,19 @@
       ansible.builtin.set_fact:
         scenario_failover_failover: "{{ scenario_failover_probe_result }}"
 
-    - name: Warn (do not fail) if the live failover did not match ADR-0526's expected direction
+    - name: Warn (do not fail) if the live failover did not match ADR-0536's expected direction
       ansible.builtin.debug:
         msg: >-
-          WARNING: expected tekos.provider=local-wesh(-maas) and
-          comage.provider unchanged (local-wesh(-maas)) during the failure
+          WARNING: expected comage.provider=local-qwen35(-maas) and
+          tekos.provider unchanged (ovhcloud-gpt-oss-120b) during the failure
           window; got comage={{ scenario_failover_failover.comage }},
           tekos={{ scenario_failover_failover.tekos }}. The node is left
           cordoned for inspection - do not restore until this is understood.
       when: >-
-        not scenario_failover_failover.tekos.ok or
-        scenario_failover_failover.tekos.provider not in ['local-wesh', 'local-wesh-maas'] or
         not scenario_failover_failover.comage.ok or
-        scenario_failover_failover.comage.provider not in ['local-wesh', 'local-wesh-maas']
+        scenario_failover_failover.comage.provider not in ['local-qwen35', 'local-qwen35-maas'] or
+        not scenario_failover_failover.tekos.ok or
+        scenario_failover_failover.tekos.provider != 'ovhcloud-gpt-oss-120b'
 
     - name: Print the inject-phase verdict (this is what the Makefile shows before the human validation pause)
       ansible.builtin.debug:

@@ -9,14 +9,26 @@
 
 ## Goal
 
-Prove, live, that Tekos and Comage actually fail over between `local-qwen35`
-and `local-wesh` when the model each currently prefers becomes physically
-unschedulable (node cordoned, pod killed) - not just when a dependency like
-MaaS goes unreachable (already drilled, ADR-0521). Package the drill as a
-standing `make d3 scenario-failover-node` command, built local-first then
-transposed to a full AAP Workflow Template with a human approval gate, per
-this repo's own "every new make action gets both a local and an AAP path"
-convention (ADR-0418 clause 6).
+Prove, live, that Comage actually fails over from `local-wesh` to
+`local-qwen35` when the wesh model becomes physically unschedulable (node
+cordoned, pod killed) - not just when a dependency like MaaS goes unreachable
+(already drilled, ADR-0521) - while Tekos's chat traffic (routed off-cluster
+to `ovhcloud-gpt-oss-120b`) is unaffected throughout, as a decoupling
+control. Package the drill as a standing `make d3 scenario-failover-node`
+command, built local-first then transposed to a full AAP Workflow Template
+with a human approval gate, per this repo's own "every new make action gets
+both a local and an AAP path" convention (ADR-0418 clause 6).
+
+**Revision, 2026-08-30 (before first live run):** originally scoped the
+other direction (kill `qwen3.5-9b`, prove Tekos fails over to `local-wesh`).
+Live investigation found that's unprovable through real chat traffic - see
+ADR-0536's Context section for the full finding (Tekos's only chat-reachable
+task is a reflexional one routed to OVH first, never touching `local-qwen35`
+or `local-wesh` at all). Comage's own primary task, `check-deal-status`, is
+chat-reachable, non-reflexional, and already leads `local-wesh(-maas)` then
+`local-qwen35(-maas)` - so this WP now drills that direction instead, which
+was previously listed below as "out of scope" future work before this
+finding made it the only viable one.
 
 ## Why
 
@@ -124,30 +136,31 @@ otel-collector, itself scraped by prometheus-k8s on a 30s interval
 (`gitops/charts/observability/templates/servicemonitor-otel-collector.yaml`)
 - an instant diff would false-negative on a perfectly healthy fallback.
 Prints one combined JSON verdict: `{"phase": "...", "comage": {"provider":
-"local-wesh", "ok": true}, "tekos": {"provider": "local-qwen35", "ok": true}}`.
+"local-wesh", "ok": true}, "tekos": {"provider": "ovhcloud-gpt-oss-120b",
+"ok": true}}`. Comage's provider is the actual fallback proof; Tekos's is
+expected constant across all three phases (the decoupling control).
 
 **B. `ansible/playbooks/day3_scenario_failover_node_inject.yml`** (new):
 1. Resolve the node dynamically: `oc get pods -n zuno-ai-run -l
-   app.kubernetes.io/name=qwen35-9b,kserve.io/component=workload -o
+   app.kubernetes.io/name=qwen35-9b-wesh,kserve.io/component=workload -o
    jsonpath='{.items[0].spec.nodeName}'` and the pod name the same way -
    never hardcode the IPs seen in `wp-086`/`wp-092`. Both label keys are
    required (see the Preconditions section above for why).
 2. Read `platform/ai-gateway/provider-routing.yaml`'s `cache_enabled` for
    `local-qwen35`/`local-wesh`(-`maas`) and fail with a clear message if any
    is `true` (ADR-0536 Decision 5).
-3. Run the baseline probe (A). Assert Comage → `local-wesh`, Tekos →
-   `local-qwen35`.
+3. Run the baseline probe (A). Assert Comage → `local-wesh(-maas)`, Tekos →
+   `ovhcloud-gpt-oss-120b`.
 4. `oc adm cordon <node>`.
-5. `oc delete pod <qwen35-pod> -n zuno-ai-run` - this pod only, never a
-   node-wide delete (the co-located `qwen3.6-27b-instruct` pod must keep
-   running).
+5. `oc delete pod <wesh-pod> -n zuno-ai-run` - this pod only, never a
+   node-wide delete (the co-located `gpt-oss-20b` pod must keep running).
 6. Poll (bounded deadline, e.g. 3 minutes) for the replacement pod to reach
    `Pending` with a `FailedScheduling` event - the expected, desired outcome
    here, not a failure of the playbook.
-7. Run the probe again. Assert Tekos now reads `local-wesh`; Comage
-   unchanged. Surface the ai-gateway fallback warning log line
-   (`"provider '...' failed ... trying next fallback"`) as corroborating
-   evidence in the output.
+7. Run the probe again. Assert Comage now reads `local-qwen35(-maas)`; Tekos
+   unchanged (`ovhcloud-gpt-oss-120b`). Surface the ai-gateway fallback
+   warning log line (`"provider '...' failed ... trying next fallback"`) as
+   corroborating evidence in the output.
 8. Print the verdict; exit 0 regardless of the node being left cordoned -
    that is the intended paused state, not an error.
 
@@ -165,13 +178,14 @@ playbook to assert against.
    from the inject run - re-derive it, matching this repo's "always
    re-verify" convention).
 2. `oc adm uncordon <node>`.
-3. `oc delete pod <qwen35-pod> -n zuno-ai-run` again, to force
+3. `oc delete pod <wesh-pod> -n zuno-ai-run` again, to force
    rescheduling onto the now-uncordoned node (exact precedent:
    `wp-092-qwen35-wesh-targeted-anti-affinity.md:121`,
    `wp-086-spread-models-and-platform-hygiene.md:264`).
 4. Poll (bounded deadline) for `Running`/`Ready`.
-5. Run the probe (A) one more time. Assert Tekos is back on `local-qwen35`;
-   Comage still unaffected throughout.
+5. Run the probe (A) one more time. Assert Comage is back on
+   `local-wesh(-maas)`; Tekos still unaffected throughout
+   (`ovhcloud-gpt-oss-120b`).
 
 **D. `Makefile`:**
 - `DAY3_VERBS` (line 104): append `scenario-failover-node`.
@@ -250,9 +264,9 @@ from step D.1's comment and re-validate with `zuno_make_aap_mode: auto`.
 
 ## What NOT to touch
 
-- Never delete or restart the `qwen3.6-27b-instruct` pod co-located on the
-  same node as `qwen3.5-9b` - only cordon the node and delete the
-  `qwen3.5-9b` pod specifically, by name/label.
+- Never delete or restart the `gpt-oss-20b` pod co-located on the same node
+  as `qwen3.5-9b-wesh` - only cordon the node and delete the
+  `qwen3.5-9b-wesh` pod specifically, by name/label.
 - Do not fold `scenario-failover-node`'s pseudo-component into
   `DAY3_COMPONENTS`/`DAY3_TEST_COMPONENTS`/`DAY3_BACKUP_COMPONENTS`.
 - Do not edit ADR-0526 itself to mark the fallback "proven" - its ADR file
@@ -274,7 +288,8 @@ from step D.1's comment and re-validate with `zuno_make_aap_mode: auto`.
 2. Force `zuno_make_aap_mode: local` (or `EXTRA_VARS` override).
 3. Run `make d3 scenario-failover-node`, watch the inject-phase verdict,
    confirm both agents behave as expected, press Enter to restore.
-4. Confirm the restore-phase verdict shows Tekos back on `local-qwen35`.
+4. Confirm the restore-phase verdict shows Comage back on `local-wesh` and
+   Tekos still unchanged on `ovhcloud-gpt-oss-120b` throughout.
 5. Record full before/during/after timestamps, `oc` output and verdict JSON
    in `docs/roadmap/evidence/adr-0536-node-failover-drill.md` (owned by this
    WP), on the template of `docs/roadmap/evidence/adr-0521-maas-local-traffic.md:90-115`.
@@ -294,9 +309,15 @@ from step D.1's comment and re-validate with `zuno_make_aap_mode: auto`.
 
 ## Out of scope / deferred
 
-- Extending this drill to the reverse direction (killing `local-wesh` to
-  prove Comage falls back to `local-qwen35`) - same mechanism, a natural
-  follow-up, not required to close ADR-0526's specific gap statement.
+- Extending this drill to the other direction (killing `qwen3.5-9b` to prove
+  Tekos falls back to `local-wesh`) - this was the originally-scoped drill,
+  found live 2026-08-30 to be unprovable through real chat traffic: Tekos's
+  only chat-reachable task is reflexional and never touches `local-qwen35`/
+  `local-wesh` at all (see ADR-0536's Context). Would require a real v1 route
+  for `find-relevant-docs`/`check-my-drive-docs` (Tekos's two tasks that
+  *do* lead with `local-qwen35` in the routing policy but have no dispatch
+  path from a chat turn) before it could be drilled the same way - a genuine
+  runtime feature, not something this WP builds.
 - A frontend-visible indicator of which provider answered a turn (`zuno_provider`
   is dropped well before the frontend, per ADR-0536 Decision 4) - a separate,
   larger change across agent-runtime/agent-bff/frontend, not needed to prove

@@ -28,12 +28,52 @@ models unschedulable until capacity returns"* — exactly the condition under
 which `ai-gateway`'s candidate-exhaustion fallback (`app/main.py:_invoke_with_fallback`)
 is supposed to save the turn, and never has been proven to.
 
-This ADR closes that gap with a real drill — cordon the node carrying
-`qwen3.5-9b-kserve`, delete its pod, and prove from the two calling agents'
-own live traffic that Tekos fails over to `local-wesh` while Comage (whose
-primary is already `local-wesh`) is unaffected — and packages the drill as a
-standing, repeatable demo/operational capability rather than a one-off manual
-exercise.
+**Revision, 2026-08-30, before this drill's first live run:** the drill as
+originally scoped here — kill `qwen3.5-9b`'s pod and watch Tekos fail over to
+`local-wesh` — turned out to be unprovable through Tekos's real chat traffic.
+Tekos's `POST /v1/agents/tekos/chat` endpoint always executes its one
+primary task, `answer-technical-question` (`components/agent-runtime/app/graph/nodes.py:63-66`
+- Tekos's other declared tasks, `find-relevant-docs`/`check-my-drive-docs`,
+have no dedicated route yet, v1 scope). WP-096/ADR-0531 (closed the same day
+as this ADR was first drafted) flagged that exact task "reflexional" and
+routes it to `ovhcloud-gpt-oss-120b` *first*, ahead of every local model, at
+compute tiers C1/C2 (`policies/model-routing/model-routing-policy.yaml:94-97`).
+The only tasks that lead with `local-qwen35(-maas)` in the routing policy
+(`find-relevant-docs`/`check-my-drive-docs`) are exactly the two Tekos never
+reaches via a real chat turn. So a genuine chat message to Tekos can never
+land on `local-qwen35` today, regardless of node health — killing that pod
+would change nothing a live Tekos user actually sees, and this ADR would have
+been "proving" a fallback path that no live traffic ever takes.
+
+Comage has the identical one-task-per-turn architecture (`components/agent-runtime/app/graph/build.py:111-120`,
+same `retrieve_reason_respond` shape, confirmed no Comage-specific branching
+anywhere in `app/graph/nodes.py`), but its own primary task, `check-deal-status`,
+is **not** flagged reflexional and its preference list already leads with
+`local-wesh(-maas)` then `local-qwen35(-maas)`
+(`policies/model-routing/model-routing-policy.yaml:162`) — exactly the two
+models on the two MIG nodes this drill can physically fail between, and a
+task genuinely reachable by a real chat turn. This ADR therefore closes the
+*other* half of ADR-0526's own gap statement instead — "Comage when the
+[wesh] variant is unavailable" — by cordoning the node carrying
+`qwen3.5-9b-wesh-kserve` (not `qwen3.5-9b`) and proving Comage's real chat
+traffic fails over from `local-wesh` to `local-qwen35` and back. Tekos is
+kept in the drill as a second, real chat probe, but its role changes from
+"the other half of the fallback" to a **decoupling control**: because its
+reflexional task is served off-cluster via OVH, it should show zero change
+throughout the whole drill window — a genuine, different, and arguably more
+useful proof (on-prem GPU node health has no bearing on OVH-routed traffic)
+than the original framing. ADR-0526's "Tekos on either path" gap statement
+stays explicitly open after this ADR — not silently dropped: it cannot be
+closed by a real chat probe until a v1 route exists for
+`find-relevant-docs`/`check-my-drive-docs`, and this ADR does not build that
+route (out of scope, see WP-105's deferred section).
+
+This ADR closes that (revised) gap with a real drill — cordon the node
+carrying `qwen3.5-9b-wesh-kserve`, delete its pod, and prove from Comage's
+own live chat traffic that it fails over to `local-qwen35` while Tekos
+(routed off-cluster to `ovhcloud-gpt-oss-120b`) is unaffected — and packages
+the drill as a standing, repeatable demo/operational capability rather than a
+one-off manual exercise.
 
 ## Decision
 
@@ -60,13 +100,13 @@ exercise.
    of this exact cordon/kill maneuver (`wp-086-spread-models-and-platform-hygiene.md:258-261`,
    `wp-092-qwen35-wesh-targeted-anti-affinity.md:100-125`) hand-copied a node
    IP out of `oc get pods -o wide`. The playbook instead resolves the node
-   from the running pod's own label (`app.kubernetes.io/name=qwen35-9b,kserve.io/component=workload`
+   from the running pod's own label (`app.kubernetes.io/name=qwen35-9b-wesh,kserve.io/component=workload`
    — the `kserve.io/component=workload` half is required, or the selector also
-   matches the unrelated `qwen35-9b-kserve-router-scheduler` pod on a different
+   matches the unrelated `*-router-scheduler` pod on a different
    node; found live 2026-08-30 by this drill's own precondition check refusing
    to proceed on "found 2" instead of failing silently — namespace
    `zuno-ai-run`) at run time, and only ever deletes that one pod —
-   never a blanket delete on the node, so the co-located `qwen3.6-27b-instruct`
+   never a blanket delete on the node, so the co-located `gpt-oss-20b`
    pod on the same node is left running undisturbed (cordon blocks new
    scheduling only; it does not evict what is already there).
 
@@ -81,7 +121,10 @@ exercise.
    reading the before/after delta of the `zuno_model_calls_total{agent,
    provider, outcome}` counter (`components/ai-gateway/app/telemetry.py`,
    already scraped by prometheus-k8s per `gitops/charts/grafana/templates/datasource-prometheus.yaml`)
-   for both agents. A warning-level log line
+   for both agents. Comage's delta is the actual fallback proof
+   (`local-wesh(-maas)` → `local-qwen35(-maas)`); Tekos's delta is the
+   decoupling control and is expected to show **no** change
+   (`ovhcloud-gpt-oss-120b` throughout). A warning-level log line
    (`components/ai-gateway/app/main.py:502-506`, `"provider '...' failed ...
    trying next fallback"`) is captured as corroborating evidence only, never
    as the sole proof.
@@ -129,15 +172,19 @@ exercise.
   given workflow shares one Job Template, `templates/workflowtemplate.yaml:59-78`)
   — a reusable capability for future gated, human-in-the-loop scenarios, not
   a one-off hack for this drill alone.
-- Closes ADR-0526's "STILL NOT TRUE" gap for the node/pod-failure fallback
-  path once the drill has actually run and its evidence is recorded, via this
-  ADR's own evidence doc — that gap statement in ADR-0526's Status line is
-  otherwise left untouched. Decision 6 above **is** recorded as an in-place
-  Amendment on ADR-0526 itself (its decision 5, the `preferred`→`required`
-  anti-affinity promotion), following this repo's existing amendment
-  convention (ADR-0526 already carries one, for decision 7) — narrower in
-  scope than the fallback-gap statement, and a genuine correction to a
-  decision that no longer matched live reality, not a rewrite of history.
+- Closes half of ADR-0526's "STILL NOT TRUE" gap for the node/pod-failure
+  fallback path — specifically "Comage when the [wesh] variant is
+  unavailable" — once the drill has actually run and its evidence is
+  recorded, via this ADR's own evidence doc. The other half, "Tekos on
+  either path," stays explicitly open: it is structurally unprovable through
+  real chat traffic today (see Context) and is not addressed by this ADR.
+  ADR-0526's Status line is otherwise left untouched. Decision 6 above **is**
+  recorded as an in-place Amendment on ADR-0526 itself (its decision 5, the
+  `preferred`→`required` anti-affinity promotion), following this repo's
+  existing amendment convention (ADR-0526 already carries one, for decision
+  7) — narrower in scope than the fallback-gap statement, and a genuine
+  correction to a decision that no longer matched live reality, not a
+  rewrite of history.
 
 ## Security considerations
 
@@ -153,7 +200,7 @@ Requires coordination with any other live session already operating on this
 shared cluster before running (standing house rule since the WP-084
 collision) — this command mutates a GPU node's schedulability and deletes a
 production-serving pod. If interrupted after cordon but before the restore
-playbook runs, the node is left cordoned and `local-qwen35` left `Pending`
+playbook runs, the node is left cordoned and `local-wesh` left `Pending`
 until an operator manually runs `oc adm uncordon` and re-deletes the pod (or
 re-runs `make d3 scenario-failover-node`'s restore half) — this is a known,
 documented recovery path, not a failure mode of the command.
@@ -164,9 +211,9 @@ Beyond the Standard clauses:
 
 - `make d3 scenario-failover-node` (local path) runs end-to-end on the real
   cluster at least once, with before/during/after evidence for **both**
-  Tekos (expected: `local-qwen35` → `local-wesh` → `local-qwen35`) and Comage
-  (expected: `local-wesh` throughout, unaffected) captured in
-  `docs/roadmap/evidence/adr-0536-node-failover-drill.md`.
+  Comage (expected: `local-wesh` → `local-qwen35` → `local-wesh`) and Tekos
+  (expected: `ovhcloud-gpt-oss-120b` throughout, unaffected — the decoupling
+  control) captured in `docs/roadmap/evidence/adr-0536-node-failover-drill.md`.
 - The same scenario re-runs cleanly via the AAP Workflow Template (Part B),
   with the human approval step exercised in the Controller UI.
 - `python3 platform/docs/check_docs.py` exits 0.

@@ -18,16 +18,25 @@ this scenario as proven from this file's presence alone.
 
 _Not yet run._
 
+Drills Comage's `check-deal-status` fallback (`local-wesh` → `local-qwen35`),
+cordoning/killing the `qwen3.5-9b-wesh` pod, not `qwen3.5-9b` — see ADR-0536's
+Context section for why the originally-scoped direction (killing `qwen3.5-9b`
+to prove Tekos fails over) turned out to be unprovable through real chat
+traffic. Tekos is probed throughout as a decoupling control, expected to stay
+on `ovhcloud-gpt-oss-120b` the whole time.
+
 Expected to record, per run:
 
 - Node/pod resolved dynamically (name, not assumed from a prior write-up).
-- Baseline probe verdict (Comage → `local-wesh`, Tekos → `local-qwen35`).
+- Baseline probe verdict (Comage → `local-wesh(-maas)`, Tekos →
+  `ovhcloud-gpt-oss-120b`).
 - Cordon/delete timestamps, and the `Pending`/`FailedScheduling` confirmation
   with its own timestamp.
-- Failover probe verdict (Comage unchanged, Tekos → `local-wesh`), plus the
-  corroborating ai-gateway fallback warning log line.
+- Failover probe verdict (Comage → `local-qwen35(-maas)`, Tekos unchanged),
+  plus the corroborating ai-gateway fallback warning log line.
 - Uncordon/reschedule timestamps, and the `Running`/`Ready` confirmation.
-- Restore probe verdict (Tekos back on `local-qwen35`).
+- Restore probe verdict (Comage back on `local-wesh(-maas)`, Tekos still
+  unchanged).
 - Total wall-clock time cordoned, and any anomaly observed.
 
 ## Part B — AAP path (Workflow Template with manual approval node)

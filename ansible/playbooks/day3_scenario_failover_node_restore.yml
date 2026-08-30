@@ -1,7 +1,8 @@
 ---
 # `make day3|d3 scenario-failover-node` (restore half). WP-105/ADR-0536:
-# uncordon the node, reschedule qwen3.5-9b, and prove live that Tekos
-# returns to local-qwen35. Run only after
+# uncordon the node, reschedule qwen3.5-9b-wesh, and prove live that Comage
+# returns to local-wesh (Tekos, the decoupling control, is expected to have
+# stayed on ovhcloud-gpt-oss-120b throughout). Run only after
 # day3_scenario_failover_node_inject.yml and its interactive human
 # validation pause (Makefile) - re-derives node/pod state from scratch
 # rather than trusting anything carried over from that separate
@@ -15,7 +16,7 @@
     # kserve.io/component=workload is required - see day3_scenario_failover_node_inject.yml's
     # matching comment (app.kubernetes.io/name alone also matches the
     # router-scheduler pod on a different node).
-    scenario_failover_model_label: "app.kubernetes.io/name=qwen35-9b,kserve.io/component=workload"
+    scenario_failover_model_label: "app.kubernetes.io/name=qwen35-9b-wesh,kserve.io/component=workload"
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -23,7 +24,7 @@
     - name: Resolve the cluster base domain
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
-    - name: Find the (Pending) qwen3.5-9b pod
+    - name: Find the (Pending) qwen3.5-9b-wesh pod
       kubernetes.core.k8s_info:
         kind: Pod
         namespace: "{{ scenario_failover_namespace }}"
@@ -31,7 +32,7 @@
           - "{{ scenario_failover_model_label }}"
       register: _sfn_pod_info
 
-    - name: Fail if no qwen3.5-9b pod exists at all
+    - name: Fail if no qwen3.5-9b-wesh pod exists at all
       ansible.builtin.fail:
         msg: >-
           No pod labeled {{ scenario_failover_model_label }} found in
@@ -53,7 +54,7 @@
     # spread-models-and-platform-hygiene.md both needed a second delete to
     # force rescheduling onto the now-uncordoned node - uncordoning alone
     # does not retrigger the scheduler for an already-Pending pod.
-    - name: "Delete the Pending qwen3.5-9b pod again, to force rescheduling"
+    - name: "Delete the Pending qwen3.5-9b-wesh pod again, to force rescheduling"
       kubernetes.core.k8s:
         state: absent
         api_version: v1
@@ -77,7 +78,7 @@
       retries: 30
       delay: 10
 
-    - name: "Restore probe (node uncordoned, qwen3.5-9b Running again)"
+    - name: "Restore probe (node uncordoned, qwen3.5-9b-wesh Running again)"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/scenario_failover_probe_job.yml"
       vars:
         scenario_failover_phase: restore
@@ -86,17 +87,21 @@
       ansible.builtin.set_fact:
         scenario_failover_restore: "{{ scenario_failover_probe_result }}"
 
-    - name: Fail if Tekos did not return to local-qwen35
+    - name: Fail if Comage did not return to local-wesh, or Tekos moved off ovhcloud-gpt-oss-120b
       ansible.builtin.fail:
         msg: >-
-          Expected tekos.provider=local-qwen35(-maas) after restore, got
-          {{ scenario_failover_restore.tekos }}. The node is uncordoned and
-          the pod is Running, so this is a routing/probe issue, not a
-          scheduling one - re-check provider-routing.yaml's cache_enabled
-          precondition (ADR-0536 Decision 5) first.
+          Expected comage.provider=local-wesh(-maas) and
+          tekos.provider=ovhcloud-gpt-oss-120b (unchanged) after restore, got
+          comage={{ scenario_failover_restore.comage }},
+          tekos={{ scenario_failover_restore.tekos }}. The node is uncordoned
+          and the pod is Running, so a Comage mismatch is a routing/probe
+          issue, not a scheduling one - re-check provider-routing.yaml's
+          cache_enabled precondition (ADR-0536 Decision 5) first.
       when: >-
+        not scenario_failover_restore.comage.ok or
+        scenario_failover_restore.comage.provider not in ['local-wesh', 'local-wesh-maas'] or
         not scenario_failover_restore.tekos.ok or
-        scenario_failover_restore.tekos.provider not in ['local-qwen35', 'local-qwen35-maas']
+        scenario_failover_restore.tekos.provider != 'ovhcloud-gpt-oss-120b'
 
     - name: Print the restore-phase verdict
       ansible.builtin.debug:
