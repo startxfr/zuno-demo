@@ -76,6 +76,25 @@
       `make d0 install aap-config` first.
   when: (_wire_ee_registry_token_secret.resources | default([]) | length) == 0
 
+# Both the credential and EE POST below take `organization` as a numeric
+# id ("Incorrect type. Expected pk value, received str.", confirmed live
+# 2026-08-30 sending the org NAME like every other `organization:` field
+# in this role's install.yml does - those are all Gateway-side fields,
+# which DO take a name; these two are plain Controller-side fields with
+# a stricter `type: id` per their own OPTIONS schema, an inconsistency
+# specific to this endpoint pair, not a copy-paste of the wrong idiom).
+- name: "aap-config | wire-ee | resolve the organization id"
+  ansible.builtin.uri:
+    url: "{{ _wire_ee_gateway_url }}/api/controller/v2/organizations/?name={{ aap_config_organization | default('zuno') }}"
+    method: GET
+    url_username: admin
+    url_password: "{{ _wire_ee_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _wire_ee_org_lookup
+  no_log: true
+
 - name: "aap-config | wire-ee | check whether the registry credential exists"
   ansible.builtin.uri:
     url: "{{ _wire_ee_gateway_url }}/api/controller/v2/credentials/?name=aap-execution-environment-registry"
@@ -121,7 +140,7 @@
     body:
       name: aap-execution-environment-registry
       credential_type: "{{ _wire_ee_registry_cred_type_lookup.json.results[0].id }}"
-      organization: "{{ aap_config_organization | default('zuno') }}"
+      organization: "{{ _wire_ee_org_lookup.json.results[0].id }}"
       inputs:
         host: "image-registry.openshift-image-registry.svc:5000"
         username: serviceaccount
@@ -173,7 +192,7 @@
       name: aap-execution-environment
       image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/aap-execution-environment:latest"
       credential: "{{ _wire_ee_credential_lookup_final.json.results[0].id }}"
-      organization: "{{ aap_config_organization | default('zuno') }}"
+      organization: "{{ _wire_ee_org_lookup.json.results[0].id }}"
     status_code: 201
   when: (_wire_ee_lookup.json.count | default(0) | int) == 0
   no_log: true
