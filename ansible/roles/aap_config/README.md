@@ -131,7 +131,14 @@ Both are consumed through `AnsibleCredential`'s native
 bootstrap cluster-admin kubeconfig (ADR-0354 Security considerations,
 narrowed per WP-073, extended per WP-094). If a precheck or install ever
 fails on permissions, widen with a targeted extra Role/ClusterRole entry,
-never swap in a broader built-in or cluster-admin.
+never swap in a broader built-in or cluster-admin - two such widenings
+exist so far, both because `cluster-reader` deliberately excludes
+Secrets entirely: `templates/rolebinding-vault-secrets.yaml`
+(`zuno-vault`, vault's own precheck) and
+`templates/rolebinding-connectivity-link-secrets.yaml` (`kuadrant-system`,
+confirmed live 2026-08-30 running `zuno-day1-check-workflow` for real -
+connectivity_link's precheck reads `authorino-server-cert`'s
+`tls.crt`/`tls.key` keys, WP-071's regression check).
 `ansible/tasks/load_k8s_auth_env.yml` detects the credential's injected
 `K8S_AUTH_HOST` and skips its kubeconfig resolution, so the same
 playbooks run unmodified from an operator shell and from AAP.
