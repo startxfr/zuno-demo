@@ -99,3 +99,31 @@
     status_code: 200
   when: (_wire_jt.survey_components | default([]) | length) > 0
   no_log: true
+
+# No CRD field for allow_simultaneous either. Every Workflow Template's
+# nodes launch the SAME underlying Job Template with a different
+# target_component (WP-095's whole design) - Job Templates default to
+# allow_simultaneous: false, which silently serializes every "parallel"
+# wave regardless of the DAG's own success_nodes edges, since Controller
+# refuses to run a second instance of a template that's already running.
+# Confirmed live 2026-08-30 (WP-099): `zuno-day1-check-workflow`'s
+# smtp/nfd/custom-metrics-autoscaler wave (no dependency on each other)
+# and kiali/grafana wave both ran fully sequentially, each starting only
+# seconds after the previous one finished. Applied unconditionally to
+# every Job Template, not just the ones a Workflow Template currently
+# references - harmless for the rest (permits, never forces, concurrent
+# runs of the same template) and future-proofs any Job Template a later
+# Workflow Template might reference.
+- name: "aap-config | wire {{ _wire_jt.name }} | allow simultaneous launches (workflow parallelization)"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/job_templates/{{ _wire_jt_lookup.json.results[0].id }}/"
+    method: PATCH
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      allow_simultaneous: true
+    status_code: 200
+  no_log: true

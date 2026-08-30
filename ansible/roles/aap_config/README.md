@@ -103,6 +103,7 @@ idempotent GET-then-POST (same `ansible.builtin.uri` Basic-auth pattern
 | Inventory host `localhost` | API | the `AnsibleInventory` CRD has no host field |
 | Credential→JT attachment (all 14 templates) | API | the `JobTemplate` CRD has no credentials field |
 | `target_component` Survey (13 of 14 templates) | API | the `JobTemplate` CRD has no survey_spec/survey_enabled field either - `ask_variables_on_launch` alone IS a CRD field, set directly in `templates/jobtemplate.yaml` |
+| `allow_simultaneous: true` (all 14 templates) | API | no CRD field; without it every Workflow Template's "parallel" nodes silently serialize, since they all launch the SAME underlying Job Template and Controller refuses a second concurrent run of one by default - confirmed live 2026-08-30 (WP-099) |
 | Keycloak SSO authenticator + maps | API | authenticators are gateway API objects, no CRD |
 | Removing AAP's shipped "Demo Project"/"Demo Job Template"/"Demo Inventory" (WP-098) | API | neither `JobTemplate` nor `AnsibleProject`'s CRD has a `state` field (only `AnsibleInventory` does), so a uniform declarative removal can't cover all three; done idempotently by name in `tasks/remove_aap_defaults.yml`, tolerant of any of the three already being absent |
 
