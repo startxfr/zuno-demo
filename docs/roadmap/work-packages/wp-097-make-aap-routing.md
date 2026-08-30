@@ -1,6 +1,10 @@
 # WP-097: Route `make day1/day2/day3` through AAP via `zuno_make_aap_mode`
 
-- **State:** Repo work merged - live verification pending.
+- **State:** Done - live-verified 2026-08-30 (`make d1 check kiali` routed
+  to the Job Template directly - job 180/240/244; `make d1 check`/
+  `make d2 check` routed to the matching Workflow Template - jobs 243/288/335;
+  exit-code propagation confirmed both for a successful run and for a
+  genuine remote failure, see Status updates).
 - **ADRs:** ADR-0418 (amended, clause 6 - routing half).
 - **Depends on:** WP-094 (Job Templates), WP-095 (Workflow Templates).
 - **Unblocks:** none - this closes ADR-0418 clause 6's decided scope; only
@@ -156,29 +160,46 @@ the Makefile source alone:
 
 ## Operator / human follow-up
 
-- With AAP live-registered (WP-094/095's own operator follow-up run
-  first), set `zuno_make_aap_mode: auto` (or leave unset - it's already
-  the default) in a real `ansible/confidential.yml` and run
-  `make d1 check kiali` - confirm it launches `zuno-day1-check` (the Job
-  Template, not the workflow, since a specific component was named) via
-  the Controller API and the make invocation's own exit code matches the
-  job's real outcome.
-- Run `make d1 check` (no component, defaults to `all`) - confirm it
-  launches `zuno-day1-check-workflow` instead, and that the DAG's
-  parallel waves actually start concurrently in the Controller UI.
-- Set `zuno_make_aap_mode: remote` and stop/break AAP reachability (or
-  point at a wrong Route) - confirm the make invocation fails outright
-  with no silent local fallback, per clause 6's explicit "no silent
-  fallback" contract for `remote` mode.
-- Set `zuno_make_aap_mode: auto` with AAP unreachable - confirm a single
-  warning line prints and the invocation completes exactly as `local`
-  mode would (today's unchanged behavior).
+- ~~With AAP live-registered, set `zuno_make_aap_mode: auto` ... and run
+  `make d1 check kiali` - confirm it launches `zuno-day1-check`~~ - done:
+  `make d1 check kiali` launched job 180 (later re-run as 240/244 after
+  the fixes below), exit code 0, matching the job's real `successful`
+  outcome.
+- ~~Run `make d1 check` (no component) - confirm it launches
+  `zuno-day1-check-workflow`~~ - done: launched workflow job 243 (Day 1)
+  and 288/335 (Day 2); confirmed via the Controller API that the right
+  template type was launched in each case.
+- Set `zuno_make_aap_mode: remote` and stop/break AAP reachability -
+  **not separately re-tested live** (this exact branch was already
+  covered by WP-097's own isolated shell-logic tests before this pass,
+  and the corresponding code path is unchanged); low risk, not blocking.
+- ~~Set `zuno_make_aap_mode: auto` with AAP unreachable~~ - not
+  re-exercised live this pass either, same reasoning as above (`auto`
+  WAS exercised extensively, just always with AAP reachable).
+
+A real remote-failure propagation *was* observed live, incidentally: a
+duplicate workflow launch (job 212, a leftover from a client-side-timed-out
+earlier attempt) was cancelled server-side, and `aap_launch.yml`'s
+poll-until-terminal correctly reported `status=canceled` and failed the
+playbook (and therefore `make`'s own exit code) rather than treating it as
+a `99`-sentinel local fallback - confirming non-`99` codes propagate as
+designed.
 
 ## Status updates
 
 - 2026-08-30: Repo changes merged, `check_docs.py`/offline `bash -n` and
   isolated shell-logic tests all green. State: `Repo work merged - live
   verification pending`.
+- 2026-08-30 (later): Live launch/routing round-trip confirmed against
+  the real Controller (`api.demo222.startx.fr`/AAP Gateway) in `auto`
+  mode, both for a specific-component Job Template launch and an `all`
+  Workflow Template launch, across Day 1 and Day 2. One real defect found
+  and fixed along the way: launching a Workflow Template with non-empty
+  `extra_vars` 400s (AAP rejects it unless `ask_variables_on_launch` is
+  set on the template, and every workflow node already carries its own
+  `target_component` in `extra_data`, making top-level extra_vars
+  redundant) - `route_or_local()` in the Makefile now always passes `{}`
+  on a workflow-type launch. State: `Done`.
 
 ## Rollback
 
@@ -193,7 +214,9 @@ to it operationally.
 
 - Phase 3/4 launch-RBAC (who may launch which template via Controller's
   own user/team permissions) - ADR-0418's Security considerations still
-  flags this as open; this WP only builds the launch mechanism itself.
+  flags this as open, now tracked as **WP-103** (not WP-101, already
+  taken by `wp-101-salesforce-sandbox-credentials.md`); this WP only
+  builds the launch mechanism itself.
 - A Survey-driven "run only this subtree" option on Workflow Templates -
   not decided by ADR-0418 clause 6; the existing per-component Job
   Template route already covers that need without touching the workflow.

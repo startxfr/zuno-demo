@@ -1,6 +1,6 @@
 # ADR-0418: Execute Day 0 and Day 1 operations as AAP Job Templates
 
-- **Status:** Partially implemented
+- **Status:** Implemented
 - **Target:** v0.4
 - **Date:** 2026-08-20
 - **Amended:** 2026-08-30 (depends on ADR-0421, which landed the "always-on
@@ -15,7 +15,19 @@
   to every Day 1/Day 2/Day 3 playbook - clause 1 below is updated to add
   Day 2/Day 3 phases and the two-tier credential design; clause 6 (new)
   records the routing mechanism (`zuno_make_aap_mode`) and Workflow
-  Templates as separate, still-unimplemented follow-on work (WP-095/096)
+  Templates as separate, still-unimplemented follow-on work (WP-095/WP-097)
+- **Amended:** 2026-08-30 (live-launch verification): the launch/routing
+  round-trip clause 6 named as still-pending is now confirmed live for
+  Day 1 (full green `zuno-day1-check-workflow` run, all parallel edges
+  timestamp-confirmed) and structurally for Day 2 (DAG/edges confirmed,
+  full green run blocked on WP-102's execution-environment gap, not on
+  anything ADR-0418 itself decided). Phase 3/4 launch-RBAC is carved out
+  as its own follow-on, **WP-103** (renumbered from an initial WP-101
+  draft that collided with the pre-existing Salesforce WP-101) - Status
+  moves to `Implemented` on
+  that basis: the mechanism this ADR decided is proven working end to
+  end, and the one remaining open item (who may launch) has its own
+  tracked WP rather than blocking this ADR indefinitely.
 - **Decision owners:** Zuno Demo architecture team
 
 ## Context
@@ -204,9 +216,24 @@ sequencing model around it.
      cannot carry an `organization` filter on this Controller, since no
      Job Template here ever has a non-null organization). Two edges
      (`kiali`/`grafana` independence; Day 2's `rag`/`rag-ingestion`/`mcp`
-     parallel group) and the actual parallel-wave timing are still flagged
-     for live re-verification from a real launch, per
-     `ansible/roles/aap_config/README.md`.
+     parallel group) and the actual parallel-wave timing were flagged
+     for live re-verification from a real launch. **Confirmed live
+     2026-08-30** (WP-095/WP-097): `zuno-day1-check-workflow` completed
+     successfully end to end (job 243) with every flagged Day 1 wave (root
+     components; `kiali`/`grafana`; `lws`/`jobset`/`kueue`) starting within
+     milliseconds of each other, proving real parallelism rather than an
+     accidental serial fallback; `zuno-day2-check-workflow`'s own flagged
+     edge (`rag`/`rag-ingestion`/`mcp`) likewise confirmed concurrent
+     (started within 80ms of each other). Two real defects surfaced only
+     by this live run and were fixed: launching a Workflow Template with
+     non-empty `extra_vars` 400s (fixed in the Makefile - see the routing
+     paragraph below) and `connectivity-link`'s exec-based precheck needed
+     `pods/exec` `get`, not just `create`, on this cluster's API server
+     (`rolebinding-connectivity-link-exec.yaml`). A full green Day 2 run
+     is separately blocked on the `agents` node's `kustomize` CLI
+     dependency missing from AAP's execution environment - an
+     execution-environment gap, not a Workflow Template defect, tracked
+     as **WP-102**.
    - `make day1|d1`/`make day2|d2 <verb>` route through the matching
      Workflow Template when the requested component is `all` (a Workflow
      Template's DAG always runs its full node set - there is no way to
@@ -237,9 +264,15 @@ sequencing model around it.
      text for every verb×day combination, and isolated shell-logic tests
      confirming the local/auto-unreachable/remote-success/remote-failure
      branches each behave correctly (fall back to local only on the two
-     "not routed" cases, never on a genuine remote failure). **Not yet
-     exercised against a real Controller** - deferred to an operator-run
-     session, per this repository's shared-cluster convention.
+     "not routed" cases, never on a genuine remote failure). **Confirmed
+     live 2026-08-30:** `make d1 check kiali` (specific component) routed
+     to the Job Template directly; `make d1 check`/`make d2 check` (no
+     component) routed to the matching Workflow Template; a cancelled
+     duplicate workflow launch confirmed a genuine remote failure (not a
+     `99`-sentinel "not routed" case) propagates correctly to `make`'s own
+     exit code. The `remote`-unreachable and `auto`-fallback branches were
+     not separately re-exercised live this pass (unchanged from their
+     offline-verified state; low risk).
 
 ## Consequences
 
@@ -277,6 +310,7 @@ open, unaddressed by WP-094 and still deferred to whichever WP implements
 Phase 3/4 for real: *who* (which Controller user/team) may launch each
 Job Template - the two credential tiers WP-094 added govern what the
 launched job can DO to the cluster, not who is allowed to click launch.
+**(2026-08-30):** this remaining item is now tracked as **WP-101**.
 
 ## Operational considerations
 
@@ -298,8 +332,9 @@ assumed one.
 ## Acceptance criteria
 
 This ADR delivers a decision record; implementation lands one phase at a
-time via work packages (WP-094 for clause 1's registration, WP-095/096
-for clause 6's Workflow Templates/routing), per this repository's
+time via work packages (WP-094 for clause 1's registration, WP-095/WP-097
+for clause 6's Workflow Templates/routing, WP-101 for the still-open
+launch-RBAC item), per this repository's
 existing pattern (ADR-0352 clause 9: "roadmap briefs live under
 `docs/roadmap/`, not in this ADR").
 
@@ -314,9 +349,9 @@ existing pattern (ADR-0352 clause 9: "roadmap briefs live under
 
 ## Implementation state
 
-**Partially implemented (2026-08-30, WP-094/WP-095/WP-097/WP-099 - repo
-work merged, registration live-verified, launch/routing round-trip still
-pending).** All 14 Job Templates (clause 1's full Day 1/2/3 list plus
+**Implemented (2026-08-30, WP-094/WP-095/WP-097/WP-099 - repo work
+merged, registration and launch/routing round-trip both live-verified).**
+All 14 Job Templates (clause 1's full Day 1/2/3 list plus
 `zuno-day0-check`) and all 7 Workflow Templates (clause 6) are registered
 by `gitops/charts/aap-config`/`ansible/roles/aap_config`, each Job
 Template with its credential tier and (where applicable)
@@ -337,12 +372,25 @@ ClusterRole confirmed live via the Controller API. Fixed along the way: a
 registering 21 CRs at once, the Workflow Template `organization` lookup
 bug described in clause 6 above, and a stale Project SCM checkout that
 silently blocks any newly-added playbook from ever becoming a Job
-Template (full account in WP-099's brief). **Still pending:** an actual
-launch/routing round-trip (a real `make d1 check <component>` or `make
-d1 check` invoking `zuno_make_aap_mode=auto/remote` against this live
-Controller) has not yet been exercised - registration and launch are
-different code paths. Phase 3/4 launch-RBAC (who may launch which
-template) remains entirely unimplemented.
+Template (full account in WP-099's brief). **Live-verified 2026-08-30
+(WP-095/WP-097):** the launch/routing round-trip itself - `make d1 check
+<component>` (direct Job Template launch) and `make d1|d2 check`
+(Workflow Template launch via `zuno_make_aap_mode=auto`) - both confirmed
+against the live Controller, including a full green `zuno-day1-check-workflow`
+run (job 243, every parallel wave timestamp-confirmed) and exit-code
+propagation for both success and a genuine remote failure. Two real
+defects found and fixed by this pass: a Workflow Template launch must not
+carry top-level `extra_vars` (400s otherwise; nodes already carry their
+own via `extra_data`), and `connectivity-link`'s exec-based precheck
+needed `pods/exec` `get` in addition to `create`. Day 2's own workflow
+confirmed the same for its DAG/edges, but a full green run is blocked on
+a separate execution-environment gap (`kustomize` missing, tracked as
+**WP-102**) unrelated to the Job/Workflow Template mechanism itself.
+**Remaining, explicitly deferred:** Phase 3/4 launch-RBAC (who may launch
+which template) remains entirely unimplemented, now tracked as
+**WP-103** (not WP-101, already taken by
+`wp-101-salesforce-sandbox-credentials.md`) rather than blocking this
+ADR's own status.
 
 ## Related ADRs
 

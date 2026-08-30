@@ -198,7 +198,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | v0.4 | Implemented | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
 | [ADR-0416](0416-consume-gpt-oss-120b-via-ovhcloud-ai-endpoints.md) | v0.4 | Implemented | Consume gpt-oss-120b via OVHcloud AI Endpoints |
 | [ADR-0417](0417-consume-codestral-via-mistral-api.md) | v0.4 | Implemented | Consume Codestral via the Mistral API |
-| [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Partially implemented | Execute Day 0 and Day 1 operations as AAP Job Templates |
+| [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Implemented | Execute Day 0 and Day 1 operations as AAP Job Templates |
 | [ADR-0419](0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md) | v0.4 | Implemented | Split model preference into preferred/fallback, with prompt-slot overrides |
 | [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Implemented | Sign supply-chain artifacts in-cluster with Vault Transit |
 | [ADR-0421](0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md) | v0.4 | Implemented | Reshape Day 0/Day 1 boundaries around an "always-on infra" core |

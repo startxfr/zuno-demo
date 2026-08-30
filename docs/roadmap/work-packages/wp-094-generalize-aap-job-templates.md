@@ -1,6 +1,8 @@
 # WP-094: Generalize the Job Template mechanism, register every Day 1/2/3 playbook
 
-- **State:** Repo work merged - live verification pending.
+- **State:** Done - live-verified 2026-08-30 (`zuno-day1-check` launched
+  directly for `kiali` - jobs 180/240/244 - and via `zuno-day1-check-workflow`
+  job 243's nodes; Survey/credential wiring confirmed end to end).
 - **ADRs:** ADR-0418 (amended, clause 1 extended + new clause 6).
 - **Depends on:** WP-093/ADR-0421 (final Day 0/Day 1 component placement
   had to be settled first - a Job Template's `playbook` field is
@@ -121,23 +123,32 @@ amendment notes in `docs/adr/0418-*.md`.
 
 ## Operator / human follow-up
 
-- Run `make d0 install aap-config` for real, confirm all 14 Job Templates
-  appear in the Controller API (`GET /api/controller/v2/job_templates/`),
-  each with its correct credential attached and (for the 13 with a
-  Survey) `survey_enabled: true`/the expected `multiplechoice` spec.
-- Manually launch at least one read-only template beyond `zuno-day0-check`
+- ~~Run `make d0 install aap-config` for real, confirm all 14 Job Templates
+  appear in the Controller API~~ - done (WP-099).
+- ~~Manually launch at least one read-only template beyond `zuno-day0-check`
   (e.g. `zuno-day1-check` with `target_component=kiali`) to confirm the
-  Survey/credential wiring actually works end to end, not just that the
-  API calls that configure it returned 2xx.
+  Survey/credential wiring actually works end to end~~ - done: jobs
+  180/240/244 (direct launch) and every node of workflow job 243
+  (Survey-driven `target_component`, one per node) all succeeded.
 - Confirm the `zuno-aap-installer` ClusterRole is sufficient for at least
   one real install-type launch (e.g. `zuno-day1-install` against a single,
   low-risk component) - widen only the specific missing verb/resource if
   a launch fails on a permissions error, never swap in a broader built-in.
+  **Not yet done** - deliberately deferred past this closure pass (Phase 3
+  install-type launches carry more risk on a shared cluster than the
+  Phase 1 check-verb launches above; Phase 1's reliability is now
+  demonstrated, which is what clause 1 names as the gate before moving to
+  Phase 3).
 
 ## Status updates
 
 - 2026-08-30: Repo changes merged, `check_docs.py`/`helm lint`/syntax-
   checks green. State: `Repo work merged - live verification pending`.
+- 2026-08-30 (later): Live launch/routing round-trip confirmed - see
+  WP-095's Status updates for the full Workflow Template evidence, and
+  WP-097's for the `make d1 check`/routing evidence. State: `Done`. The
+  install-type ClusterRole check above stays open, by choice, not by
+  defect - not required to close clause 1's Phase 1 scope this WP covers.
 
 ## Rollback
 
@@ -153,4 +164,7 @@ WP's own execution).
   per-namespace Role scoping - a possible future refinement once live
   testing shows whether the coarser grant is actually a problem.
 - Phase 3/4 launch-RBAC (who may launch which template) - ADR-0418's own
-  Security considerations still flags this as open.
+  Security considerations still flags this as open, now tracked as
+  **WP-103** (not WP-101 - that number was already taken by
+  `wp-101-salesforce-sandbox-credentials.md`; WP-102 is claimed by a
+  concurrent session's Day 2 execution-environment gap work).
