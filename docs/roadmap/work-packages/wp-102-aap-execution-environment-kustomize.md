@@ -1,6 +1,6 @@
 # WP-102: Custom AAP execution environment carrying `kustomize`, `oc` and `cosign`
 
-- **State:** Done/Implemented - live-verified 2026-08-30.
+- **State:** Done - live-verified 2026-08-30.
 - **ADRs:** ADR-0418 (clause 6 - Workflow Template Day 2 live verification).
 - **Depends on:** WP-095 (Workflow Templates registered and DAG-verified).
 - **Unblocks:** a full green `zuno-day2-check-workflow` run (was blocked on
