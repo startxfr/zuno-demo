@@ -91,16 +91,38 @@ def _query_provider_counts(agent: str) -> dict:
     return {row["metric"]["provider"]: float(row["value"][1]) for row in result}
 
 
+# A freshly-rescheduled model's pod reaching Running/Ready (checked by the
+# calling playbook before the restore-phase probe) only proves the container
+# and its readiness probe are up - not that vLLM has finished loading model
+# weights onto the MIG slice. Live-caught 2026-08-30: the restore probe's
+# first real chat request after a reschedule hit a genuine HTTP-layer
+# timeout at the old 30s default, well before the counter-polling phase even
+# started. 90s comfortably covers a cold-loaded 9B model's first response
+# without masking a truly broken fallback (POLL_TIMEOUT_SECONDS below still
+# bounds the overall wait separately).
+_PROBE_HTTP_TIMEOUT_SECONDS = 90
+_PROBE_SUBPROCESS_TIMEOUT_SECONDS = 110  # must stay above the probe's own HTTP timeout plus interpreter/network overhead
+
+
 def _run_probe(agent: str, persona: str, message: str, session_id: str) -> dict:
     env = dict(os.environ, AGENT=agent)
     script = str(pathlib.Path(__file__).resolve().parent / "scenario_failover_probe.py")
-    proc = subprocess.run(
-        [sys.executable, script, "--persona", persona, "--message", message, "--session-id", session_id],
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=45,
-    )
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable, script,
+                "--persona", persona,
+                "--message", message,
+                "--session-id", session_id,
+                "--timeout-seconds", str(_PROBE_HTTP_TIMEOUT_SECONDS),
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=_PROBE_SUBPROCESS_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return {"agent": agent, "persona": persona, "ok": False, "detail": f"probe subprocess exceeded {_PROBE_SUBPROCESS_TIMEOUT_SECONDS}s: stdout={exc.stdout!r} stderr={exc.stderr!r}"}
     try:
         return json.loads(proc.stdout.strip().splitlines()[-1])
     except (IndexError, json.JSONDecodeError):

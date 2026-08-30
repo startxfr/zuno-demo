@@ -145,10 +145,13 @@
           zuno.io/managed-by: zuno-ansible
       spec:
         backoffLimit: 0
-        # Bounded: two agents, each up to POLL_TIMEOUT_SECONDS (150s) of
-        # polling - never left to run unbounded (this repo's own "always
-        # bound cluster job runtime" lesson).
-        activeDeadlineSeconds: 600
+        # Bounded: two agents, each up to a 110s probe HTTP call (cold-model
+        # first-response allowance, evaluations/scenario_failover_verify.py's
+        # _PROBE_SUBPROCESS_TIMEOUT_SECONDS) plus POLL_TIMEOUT_SECONDS (150s)
+        # of counter polling - never left to run unbounded (this repo's own
+        # "always bound cluster job runtime" lesson). ~260s/agent worst case
+        # x2 agents + pip install overhead, with headroom.
+        activeDeadlineSeconds: 900
         template:
           metadata:
             labels:
@@ -245,7 +248,7 @@
   until: >-
     (_sfp_job.resources[0].status.succeeded | default(0)) > 0 or
     (_sfp_job.resources[0].status.failed | default(0)) > 0
-  retries: 40
+  retries: 60
   delay: 15
 
 # controller-uid, not job-name - same stale-pod trap documented in
