@@ -133,7 +133,7 @@
 - name: "okf-signatures | report which agents still have no signature yet"
   ansible.builtin.debug:
     msg: >-
-      {{ (_okf_verify_fetched.results | default([]) | rejectattr('rc', 'equalto', 0)
+      {{ (_okf_verify_signatures | default([]) | rejectattr('rc', 'equalto', 0)
           | map(attribute='agent_dir.path') | map('basename') | list) }}
       have no signature in Vault KV yet (ZUNO_REQUIRE_SIGNED_BUNDLES stays
       off until all agents do - run the signing Job:
