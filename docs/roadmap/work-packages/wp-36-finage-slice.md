@@ -25,7 +25,10 @@
 - **ADRs:** ADR-0326 (Partially implemented -> Implemented, capstone —
   redefined 2026-08-30 to close on Arkos/Comage reaching `active` plus
   Advantage/Finage's non-promotion each being a documented decision
-  (ADR-0532, D10), not on all four literally flipping to `active`)
+  (ADR-0532, D10), not on all four literally flipping to `active`).
+  D10 is formalized as its own decision in
+  [ADR-0533](../../adr/0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md)
+  (2026-08-30), which consolidates it alongside Advantage's ADR-0532.
 - **Depends on:** WP-35 (merged + gate passed)
 - **Estimated files touched:** ~20 (three parts a/b/c)
 

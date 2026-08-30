@@ -36,7 +36,7 @@ Separately, this band also carries ADR-0352 (run day-0 platform services in inte
 
 ## v0.8
 
-Prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster (`demo333`). Carries [ADR-0517](../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md), retargeted from v0.6 on 2026-08-30 — deprioritized behind v0.7's release-automation work.
+Prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster (`demo333`). Carries [ADR-0517](../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md), retargeted from v0.6 on 2026-08-30 — deprioritized behind v0.7's release-automation work. Also carries [ADR-0533](../adr/0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) (consolidate Advantage's and Finage's non-promotion into a dedicated decision), a new small ADR authored 2026-08-30 to hold the open question of whether either agent is ever promoted to `active`.
 
 ## OKF stream
 

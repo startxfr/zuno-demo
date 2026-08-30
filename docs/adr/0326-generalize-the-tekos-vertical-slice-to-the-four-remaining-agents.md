@@ -1,6 +1,6 @@
 # ADR-0326: Generalize the Tekos vertical slice to the four remaining agents
 
-- **Status:** Implemented (2026-08-30) - all four agents' repo work merged and their live acceptance gates run (WP-31/33/35/36). Arkos and Comage genuinely reached `active`. Advantage and Finage deliberately stay `placeholder`: each has its own documented non-promotion decision ([ADR-0532](0532-accept-knowledge-adv-as-sourceless-pending-a-replacement-adapter.md) for Advantage's sourceless `knowledge.adv`; WP-36's own D10 for Finage's deterministic-only scope), proven correct by their own placeholder-scoped evaluation gates, not left as an unresolved residual gap. See the Acceptance criteria section for how this reading of "every agent" was decided.
+- **Status:** Implemented (2026-08-30) - all four agents' repo work merged and their live acceptance gates run (WP-31/33/35/36). Arkos and Comage genuinely reached `active`. Advantage and Finage deliberately stay `placeholder`, each proven correct by its own placeholder-scoped evaluation gate rather than left as an unresolved residual gap; their non-promotion decisions are consolidated in [ADR-0533](0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md). See the Acceptance criteria section for how this reading of "every agent" was decided.
 - **Target:** v0.3
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team
@@ -68,7 +68,7 @@ Evaluation fixtures must use synthetic/anonymized commercial and document data a
 
 ## Acceptance criteria
 
-- Arkos, Comage, Advantage and Finage move from `status: placeholder` to active only after their complete common acceptance pattern passes. **2026-08-30 closure note:** read as requiring each agent's promotion (or deliberate non-promotion) to be decided and gate-proven, not as requiring all four to literally reach `active`. Arkos and Comage passed the complete pattern and are `active`. Advantage and Finage each have their own ADR/decision-level record for staying `placeholder` (ADR-0532; WP-36's D10) and still ran their own placeholder-scoped acceptance gate live, proving that decision holds rather than skipping verification.
+- Arkos, Comage, Advantage and Finage move from `status: placeholder` to active only after their complete common acceptance pattern passes. **2026-08-30 closure note:** read as requiring each agent's promotion (or deliberate non-promotion) to be decided and gate-proven, not as requiring all four to literally reach `active`. Arkos and Comage passed the complete pattern and are `active`. Advantage and Finage each ran their own placeholder-scoped acceptance gate live, proving their non-promotion decision holds rather than skipping verification; see [ADR-0533](0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) for the consolidated record.
 - No agent introduces a private fork of Agent Runtime, AI Gateway or MCP Gateway.
 - Arkos proves delegated Drive/Docs access, `knowledge.tech` reuse and live Jira/Confluence actions without physical endpoint coupling.
 - Comage proves `knowledge.sales` preferred reads, live Salesforce freshness/write actions, delegated Google Workspace access and explicit legacy SXA access.
@@ -100,4 +100,5 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 - [ADR-0401](0400-v0.4-roadmap.md#adr-0401-introduce-agent-to-agent-communication)
 - [ADR-0402](0400-v0.4-roadmap.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol)
 - [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — removed `knowledge.adv`'s only ingestion adapter
-- [ADR-0532](0532-accept-knowledge-adv-as-sourceless-pending-a-replacement-adapter.md) — closes Advantage's non-promotion decision
+- [ADR-0532](0532-accept-knowledge-adv-as-sourceless-pending-a-replacement-adapter.md) — Advantage's own sourcing decision
+- [ADR-0533](0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) — consolidates Advantage's and Finage's non-promotion decisions, tracked at v0.8

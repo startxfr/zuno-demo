@@ -262,6 +262,7 @@ Goal: prove the platform's Day 0–3 automation is complete and portable by rede
 | ADR | Target | Status | Decision |
 |---|---|---|---|
 | [ADR-0517](0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) | v0.8 | Proposed | Redeploy the full platform from scratch on a new demo333 cluster |
+| [ADR-0533](0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) | v0.8 | Proposed | Consolidate Advantage's and Finage's non-promotion into a dedicated decision |
 
 ## OKF stream
 
