@@ -1,7 +1,7 @@
 # ADR-0352: Run day-0 platform services in internal or external mode
 
 - **Status:** Proposed
-- **Target:** v0.3
+- **Target:** v0.7
 - **Date:** 2026-08-17
 - **Decision owners:** Zuno Demo architecture team
 

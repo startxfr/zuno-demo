@@ -22,6 +22,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Retargeting note (2026-08-30):** ADR-0517 (v0.6 -> v0.8) - the demo333 from-scratch redeploy is deprioritized behind v0.7's release-automation work. v0.6 was created solely for this ADR and is now a vacant band; a new v0.8 band is opened to carry it (same goal text, unchanged Status/scope). Numbering is unchanged; only `Target` moves.
 
+**Retargeting note (2026-08-30):** v0.7 is split by done-ness into a short-term closeout band and a long-term/harder band. ADR-0105, ADR-0206, ADR-0213 and ADR-0218 (v0.7 -> v0.6) - all four are already closed out (WP-22/WP-23 Done, ADR-0213 Superseded, ADR-0218 Implemented) and only need formal retargeting; they fill the band left vacant by ADR-0517's move to v0.8. ADR-0111 and ADR-0115 stay in v0.7 (externally blocked on the same WP-04 GitHub-billing lock), joined there by ADR-0352 (a large, not-yet-started day-0 tiering effort, previously carried in v0.7's now-removed second table). Numbering is unchanged; only `Target` moves.
+
 **Retargeting note (2026-08-24, evening):** ADR-0354 (Add Ansible Automation Platform as a new Day 0 component, v0.3) is amended in place - it was never implemented, so this is a correction rather than a superseding decision. Placement moves from a Day 0 sequence ADR-0060 has since retired (`... keycloak → aap → machines ...`) to Day 1, immediately after `openshift_oauth`; scope is split into two components (`aap` for the platform itself, `aap-config` for repository/Job-Template registration, mechanism decided from a live CRD inventory rather than assumed); sizing is explicitly non-HA; `Target` moves v0.3 -> v0.2. The file is renamed to `0354-add-ansible-automation-platform-as-a-day-1-component.md` to keep the filename in sync with the corrected title. ADR-0355 is a new companion ADR (v0.3) covering the follow-on `mcp-aap` server that lets agents launch/read AAP. ADR-0418 (execute Day 0/Day 1 operations as AAP Job Templates, v0.4) is unchanged.
 
 ## version 0
@@ -228,7 +230,14 @@ Goal: make the OpenShift AI MaaS governance plane live and route agent model cal
 
 ## version 0.6
 
-Goal: prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster. Vacant as of 2026-08-30 - its sole ADR, ADR-0517, retargeted to v0.8 (see retargeting note below).
+Goal: close out the roadmap-reprioritization cluster left over from v0.7 - source-specific ingestion cadences, Salesforce/SXA-legacy separation, and the now-superseded role-based conversation sharing. All four items are already delivered; this band exists to formalize their retargeted status. It reuses the band vacated by ADR-0517's move to v0.8.
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
+| [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.6 | Partially implemented | Automate source-specific knowledge ingestion |
+| [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.6 | Partially implemented | Separate current Salesforce knowledge from legacy SXA |
+| [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.6 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
+| [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | v0.6 | Implemented | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |
 
 ## version 0.7
 
@@ -239,14 +248,10 @@ Goal: automate the release/supply-chain pipeline using GitHub Actions (build, si
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Deferred | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | v0.7 | Deferred | Use immutable and verifiable software supply chain artifacts |
 
-Also carried in v0.7, as an unrelated roadmap-reprioritization group (not part of the GitHub-Actions release-automation goal above):
+Also carried in v0.7, as a separate large-scope effort unrelated to the GitHub-Actions goal above and not yet started:
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.7 | Partially implemented | Automate source-specific knowledge ingestion |
-| [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | v0.7 | Partially implemented | Separate current Salesforce knowledge from legacy SXA |
-| [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.7 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
-| [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | v0.7 | Implemented | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.7 | Proposed | Run day-0 platform services in internal or external mode |
 
 ## version 0.8

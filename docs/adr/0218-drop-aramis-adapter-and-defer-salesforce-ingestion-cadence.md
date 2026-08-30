@@ -1,7 +1,7 @@
 # ADR-0218: Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence
 
-- **Status:** Implemented (2026-08-26) - the Aramis adapter and every trace of its wiring are removed from the repository (see Decision 1); the Salesforce cadence deferral is realized as a v0.7 target.
-- **Target:** v0.7 (retargeted from `Unscheduled (backlog)` on 2026-08-26 - roadmap reprioritization, grouped into v0.7's second deferred-items set alongside ADR-0105/ADR-0206/ADR-0213, unrelated to WP-04's GitHub-Actions release-automation theme)
+- **Status:** Implemented (2026-08-26) - the Aramis adapter and every trace of its wiring are removed from the repository (see Decision 1); the Salesforce cadence deferral is realized as a v0.6 target.
+- **Target:** v0.6 (retargeted from v0.7 on 2026-08-30 — v0.7 split into a short-term closeout band (v0.6) and a long-term/harder band (v0.7); this item and its already-closed siblings ADR-0105/ADR-0206/ADR-0213 move to v0.6, while ADR-0111/ADR-0115 (externally blocked) and ADR-0352 (large not-started effort) remain in v0.7. Previously retargeted from `Unscheduled (backlog)` on 2026-08-26 - roadmap reprioritization, grouped into v0.7's second deferred-items set alongside ADR-0105/ADR-0206/ADR-0213, unrelated to WP-04's GitHub-Actions release-automation theme)
 - **Date:** 2026-08-23 (amended 2026-08-26)
 - **Decision owners:** Zuno Demo architecture team
 - **Supersedes:** [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) (Salesforce/Aramis clauses only) and [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) (the `Salesforce -> knowledge.sales` / `Aramis -> knowledge.adv` source-adapter mapping bullets only) - both ADRs otherwise stand unchanged.

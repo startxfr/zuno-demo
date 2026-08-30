@@ -1,7 +1,7 @@
 # ADR-0206: Separate current Salesforce knowledge from legacy SXA
 
 - **Status:** Partially implemented (policy, deterministic query capabilities, metadata separation and snapshot discipline merged; live snapshot load pending)
-- **Target:** v0.7 (retargeted from v0.2 on 2026-08-26 — roadmap reprioritization, grouped into v0.7 alongside ADR-0105)
+- **Target:** v0.6 (retargeted from v0.7 on 2026-08-30 — v0.7 split into a short-term closeout band (v0.6) and a long-term/harder band (v0.7); this item and its already-closed siblings ADR-0105/ADR-0213/ADR-0218 move to v0.6, while ADR-0111/ADR-0115 (externally blocked) and ADR-0352 (large not-started effort) remain in v0.7. Previously retargeted from v0.2 on 2026-08-26 — roadmap reprioritization, grouped into v0.7 alongside ADR-0105)
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team
 

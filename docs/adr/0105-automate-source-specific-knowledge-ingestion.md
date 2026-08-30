@@ -1,7 +1,7 @@
 # ADR-0105: Automate source-specific knowledge ingestion
 
 - **Status:** Partially implemented (tech/legacy cadence merged; Salesforce/Aramis clauses superseded by [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — see the 2026-08-23 note below; live KFP schedule confirmation still blocked on rag-dspa readiness, see ADR-0330; tech's two sources now independently scheduled — see the 2026-08-30 amendment below — pending WP-100's operator-run confirmation)
-- **Target:** v0.7 (retargeted from v0.1 on 2026-08-26 — roadmap reprioritization, grouped into v0.7 as a second, unrelated deferred-items set alongside WP-04's GitHub-Actions release-automation theme already there)
+- **Target:** v0.6 (retargeted from v0.7 on 2026-08-30 — v0.7 split into a short-term closeout band (v0.6) and a long-term/harder band (v0.7); this item and its already-closed siblings ADR-0206/ADR-0213/ADR-0218 move to v0.6, while ADR-0111/ADR-0115 (externally blocked) and ADR-0352 (large not-started effort) remain in v0.7. Previously retargeted from v0.1 on 2026-08-26 — roadmap reprioritization, grouped into v0.7 as a second, unrelated deferred-items set alongside WP-04's GitHub-Actions release-automation theme already there)
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
 
