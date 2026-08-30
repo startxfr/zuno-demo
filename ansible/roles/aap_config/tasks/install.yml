@@ -398,7 +398,11 @@
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
     validate_certs: false
-    status_code: 201
+    # The Controller API returns 202 (Accepted, async job queued) here -
+    # confirmed live 2026-08-30, contradicting an initial guess of 201
+    # made from a manual curl test that never actually checked the HTTP
+    # status code, only the JSON body.
+    status_code: 202
   register: _aap_config_project_update
   no_log: true
 
