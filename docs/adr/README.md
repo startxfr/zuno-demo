@@ -213,7 +213,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0527](0527-introduce-the-project-as-the-sharing-and-context-boundary.md) | v0.4 | Partially implemented | Introduce the project as the sharing and context boundary |
 | [ADR-0528](0528-rekey-project-binding-quota-and-telemetry-onto-the-zuno-project-id.md) | v0.4 | Repo work merged | Re-key project binding, quota and telemetry onto the Zuno project id |
 | [ADR-0530](0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) | v0.4 | Implemented | Reconcile Keycloak clients instead of relying on a create-only realm import |
-| [ADR-0531](0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md) | v0.4 | Proposed | Promote qwen3.5-9b to the fleet-wide default model, extend OVHcloud reasoning access from Arkos to Tekos/Comage |
+| [ADR-0531](0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md) | v0.4 | Implemented | Promote qwen3.5-9b to the fleet-wide default model, extend OVHcloud reasoning access from Arkos to Tekos/Comage |
 
 ## version 0.5
 

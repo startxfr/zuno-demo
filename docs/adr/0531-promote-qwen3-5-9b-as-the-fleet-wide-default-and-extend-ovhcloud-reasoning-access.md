@@ -1,6 +1,8 @@
 # ADR-0531: Promote qwen3.5-9b to the fleet-wide default model, extend OVHcloud reasoning access from Arkos to Tekos/Comage
 
-- **Status:** Proposed
+- **Status:** Implemented (2026-08-30 - live-verified: `ai-gateway` rebuilt/rolled out, direct
+  routing checks confirmed the new leads live for Tekos/Comage/Advantage across C1/C2/C3, zero
+  model-pod churn; see WP-096's Verification checklist)
 - **Target:** v0.4
 - **Date:** 2026-08-30
 - **Decision owners:** Zuno Demo architecture team
