@@ -70,6 +70,21 @@ rules:
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # WP-102: imagestreams/layers get, in BOTH the core and image.openshift.io
+  # apiGroups. apply_openshift_build.yml's image-pull RoleBinding grants
+  # system:image-puller (which itself carries this exact permission) to
+  # each consuming namespace - Kubernetes' privilege-escalation check
+  # refuses to let this credential CREATE a RoleBinding granting a
+  # permission it doesn't already hold, confirmed live 2026-08-30 the
+  # first time this credential ever had to create a NEW instance of that
+  # RoleBinding (zuno-ai-build-image-puller-zuno-aap) rather than re-verify
+  # one that already existed from an earlier bootstrap-kubeconfig run. Read
+  # only (get, not list/watch/write) - this credential only needs to BIND
+  # the permission onward via RoleBinding, never to read image layers
+  # itself.
+  - apiGroups: ["", "image.openshift.io"]
+    resources: ["imagestreams/layers"]
+    verbs: ["get"]
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
