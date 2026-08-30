@@ -4,8 +4,9 @@ type: agent
 title: Finage
 description: >-
   Finance assistant. Identifies business ready to invoice and produces
-  monthly invoice reporting, drawing on deterministic legacy SXA
-  revenue/billing queries and durable project memory - never live
+  monthly invoice reporting, drawing on legacy SXA revenue/billing
+  history via retrieval (knowledge.sxa-legacy, ADR-0219 - no deterministic
+  query capabilities remain) and durable project memory - never live
   Salesforce or ADV/project-delivery data (ADR-0326: strictly
   finance-scoped, no implicit inheritance from Comage/Advantage).
 provenance:
