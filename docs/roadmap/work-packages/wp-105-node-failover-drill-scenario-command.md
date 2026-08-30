@@ -36,11 +36,16 @@ check, the two-playbook split).
 
 ## Preconditions (verify before starting)
 
-- `oc get pods -n zuno-ai-run -l app.kubernetes.io/name=qwen35-9b -o wide`
-  shows exactly one `Running` pod, and `oc get pods -n zuno-ai-run -l
-  app.kubernetes.io/name=qwen35-9b-wesh -o wide` shows exactly one `Running`
-  pod, each on a different node - confirms the topology ADR-0536 assumes
-  still holds before touching anything live.
+- `oc get pods -n zuno-ai-run -l app.kubernetes.io/name=qwen35-9b,kserve.io/component=workload -o wide`
+  shows exactly one `Running` pod, and the same with `qwen35-9b-wesh` shows
+  exactly one `Running` pod, each on a different node - confirms the
+  topology ADR-0536 assumes still holds before touching anything live. The
+  `kserve.io/component=workload` half of the selector is required - the
+  bare `app.kubernetes.io/name` label also matches the unrelated
+  `*-router-scheduler` pod on a different node entirely (live-caught
+  2026-08-30 by the inject playbook's own precondition check correctly
+  refusing to proceed on "found 2" - see `day3_scenario_failover_node_inject.yml`'s
+  `scenario_failover_model_label` fact).
 
   **Found false live 2026-08-30, before this drill's first run:** both pods
   were colocated on `ip-10-18-15-25` (WP-092/ADR-0414's anti-affinity was
@@ -123,9 +128,10 @@ Prints one combined JSON verdict: `{"phase": "...", "comage": {"provider":
 
 **B. `ansible/playbooks/day3_scenario_failover_node_inject.yml`** (new):
 1. Resolve the node dynamically: `oc get pods -n zuno-ai-run -l
-   app.kubernetes.io/name=qwen35-9b -o jsonpath='{.items[0].spec.nodeName}'`
-   and the pod name the same way - never hardcode the IPs seen in
-   `wp-086`/`wp-092`.
+   app.kubernetes.io/name=qwen35-9b,kserve.io/component=workload -o
+   jsonpath='{.items[0].spec.nodeName}'` and the pod name the same way -
+   never hardcode the IPs seen in `wp-086`/`wp-092`. Both label keys are
+   required (see the Preconditions section above for why).
 2. Read `platform/ai-gateway/provider-routing.yaml`'s `cache_enabled` for
    `local-qwen35`/`local-wesh`(-`maas`) and fail with a clear message if any
    is `true` (ADR-0536 Decision 5).

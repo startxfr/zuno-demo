@@ -60,8 +60,12 @@ exercise.
    of this exact cordon/kill maneuver (`wp-086-spread-models-and-platform-hygiene.md:258-261`,
    `wp-092-qwen35-wesh-targeted-anti-affinity.md:100-125`) hand-copied a node
    IP out of `oc get pods -o wide`. The playbook instead resolves the node
-   from the running pod's own label (`app.kubernetes.io/name=qwen35-9b`,
-   namespace `zuno-ai-run`) at run time, and only ever deletes that one pod —
+   from the running pod's own label (`app.kubernetes.io/name=qwen35-9b,kserve.io/component=workload`
+   — the `kserve.io/component=workload` half is required, or the selector also
+   matches the unrelated `qwen35-9b-kserve-router-scheduler` pod on a different
+   node; found live 2026-08-30 by this drill's own precondition check refusing
+   to proceed on "found 2" instead of failing silently — namespace
+   `zuno-ai-run`) at run time, and only ever deletes that one pod —
    never a blanket delete on the node, so the co-located `qwen3.6-27b-instruct`
    pod on the same node is left running undisturbed (cordon blocks new
    scheduling only; it does not evict what is already there).

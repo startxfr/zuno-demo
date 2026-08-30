@@ -19,7 +19,12 @@
   environment: "{{ k8s_auth_environment | default({}) }}"
   vars:
     scenario_failover_namespace: zuno-ai-run
-    scenario_failover_model_label: "app.kubernetes.io/name=qwen35-9b"
+    # kserve.io/component=workload is required - app.kubernetes.io/name
+    # alone also matches the lightweight qwen35-9b-kserve-router-scheduler
+    # pod (a separate, non-GPU pod on a different node entirely), live-
+    # discovered 2026-08-30 when this precondition check correctly refused
+    # to proceed on finding 2 matching pods instead of 1.
+    scenario_failover_model_label: "app.kubernetes.io/name=qwen35-9b,kserve.io/component=workload"
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
