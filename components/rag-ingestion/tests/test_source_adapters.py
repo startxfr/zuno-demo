@@ -18,6 +18,8 @@ from rag_ingestion import (  # noqa: E402
     SOURCE_ADAPTERS,
     STAGES,
     IngestionConfig,
+    _changeset_key,
+    _load_changeset,
     _parse_duration_spec,
     _parse_http_last_modified,
     _run_source_adapter,
@@ -659,8 +661,8 @@ def test_normalize_omits_stale_after_when_no_duration_is_configured():
 # --- detect-changes (WP-58) --------------------------------------------------
 
 
-def _raw_record(doc_id, sha256, url="https://docs.test/x"):
-    return {"doc_id": doc_id, "sha256": sha256, "url": url}
+def _raw_record(doc_id, sha256, url="https://docs.test/x", source_type=None):
+    return {"doc_id": doc_id, "sha256": sha256, "url": url, "source_type": source_type}
 
 
 def test_stage_detect_changes_classifies_new_changed_deleted_unchanged():
@@ -690,7 +692,9 @@ def test_stage_detect_changes_classifies_new_changed_deleted_unchanged():
     assert changeset["deleted_urls"] == ["https://docs.test/deleted"]
     assert changeset["unchanged"] == ["doc-unchanged"]
     assert set(changeset["current_new_changed"]) == {"doc-new", "doc-changed"}
-    assert changeset["current_new_changed"]["doc-new"] == {"sha256": "new-sha", "url": "https://docs.test/new"}
+    assert changeset["current_new_changed"]["doc-new"] == {
+        "sha256": "new-sha", "url": "https://docs.test/new", "source_type": None,
+    }
     # WP-067 (2026-08-26): detect-changes must not touch manifest.json itself
     # any more - only stage_validate does, once indexing is confirmed. A
     # downstream-stage failure must never leave the manifest poisoned.
@@ -715,6 +719,92 @@ def test_stage_detect_changes_reads_raw_records_concurrently():
     assert changeset["deleted"] == []
     assert set(changeset["current_new_changed"]) == set(doc_ids)
     assert f"{config.manifest_prefix}/manifest.json" not in store.json
+
+
+# --- detect-changes per-source scoping (WP-100 / ADR-0105 amendment) --------
+
+
+def test_stage_detect_changes_writes_a_per_scope_changeset_key():
+    # knowledge.tech's fetch-redhat and fetch-confluence pipelines run
+    # independently now - each must write its own changeset key so one
+    # pipeline's detect-changes can never clobber the other's in-flight
+    # changeset between detect-changes and normalize/validate reading it.
+    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-confluence")
+    store = FakeStore()
+    store.json[f"{config.raw_prefix}/doc1.json"] = _raw_record("doc1", "sha-1", source_type="confluence")
+
+    stage_detect_changes(config, store)
+
+    assert _changeset_key(config) == f"{config.manifest_prefix}/changeset-fetch-confluence.json"
+    assert _changeset_key(config) in store.json
+    assert f"{config.manifest_prefix}/changeset.json" not in store.json
+
+
+def test_load_changeset_reads_the_same_scoped_key_it_was_written_to():
+    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-redhat")
+    store = FakeStore()
+    store.json[f"{config.raw_prefix}/doc1.json"] = _raw_record("doc1", "sha-1", source_type="product-doc")
+
+    stage_detect_changes(config, store)
+    changeset = _load_changeset(config, store, "normalize")
+
+    assert changeset is not None
+    assert changeset["new"] == ["doc1"]
+
+
+def test_stage_detect_changes_is_unscoped_when_fetch_stages_not_set():
+    # Every non-tech domain (sales, sxa-legacy) never sets
+    # INGESTION_FETCH_STAGES - confirms the legacy shared-changeset-key,
+    # domain-wide-orphan-detection behavior is completely unchanged.
+    config = _config(INGESTION_DOMAIN="knowledge.sales")
+    store = FakeStore()
+    store.json[f"{config.manifest_prefix}/manifest.json"] = {
+        "doc-gone": {"sha256": "gone-sha", "url": "https://sf.test/gone", "source_type": "salesforce-object"},
+    }
+    store.json[f"{config.raw_prefix}/doc1.json"] = _raw_record("doc1", "sha-1", source_type="salesforce-object")
+
+    stage_detect_changes(config, store)
+
+    assert _changeset_key(config) == f"{config.manifest_prefix}/changeset.json"
+    changeset = store.json[f"{config.manifest_prefix}/changeset.json"]
+    assert changeset["deleted"] == ["doc-gone"]
+
+
+def test_stage_detect_changes_scopes_orphan_detection_to_fetch_stages_in_this_run():
+    # The scenario this whole mechanism exists to prevent: a redhat-only
+    # scheduled run must never mark confluence-sourced manifest entries as
+    # deleted just because this run's raw scan didn't happen to include them.
+    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-redhat")
+    store = FakeStore()
+    store.json[f"{config.manifest_prefix}/manifest.json"] = {
+        "redhat-gone": {"sha256": "old-sha", "url": "https://docs.test/gone", "source_type": "product-doc"},
+        "confluence-doc": {"sha256": "cf-sha", "url": "https://confluence.test/x", "source_type": "confluence"},
+    }
+    # Neither doc appears in this run's raw scan (redhat-gone really was
+    # removed upstream; confluence-doc was simply never fetched by this
+    # redhat-only pipeline).
+
+    stage_detect_changes(config, store)
+
+    changeset = store.json[_changeset_key(config)]
+    assert changeset["deleted"] == ["redhat-gone"]
+    assert "confluence-doc" not in changeset["deleted"]
+
+
+def test_stage_detect_changes_treats_missing_source_type_as_not_owned_by_any_scoped_run():
+    # A manifest entry written before WP-100 (or by any pre-migration run)
+    # has no source_type at all - a scoped run must never guess it belongs
+    # to itself and delete it.
+    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-redhat")
+    store = FakeStore()
+    store.json[f"{config.manifest_prefix}/manifest.json"] = {
+        "legacy-doc": {"sha256": "old-sha", "url": "https://docs.test/legacy"},
+    }
+
+    stage_detect_changes(config, store)
+
+    changeset = store.json[_changeset_key(config)]
+    assert changeset["deleted"] == []
 
 
 class _FakeValidateCursor:
@@ -1517,6 +1607,11 @@ TESTS = [
     test_normalize_omits_stale_after_when_no_duration_is_configured,
     test_stage_detect_changes_classifies_new_changed_deleted_unchanged,
     test_stage_detect_changes_reads_raw_records_concurrently,
+    test_stage_detect_changes_writes_a_per_scope_changeset_key,
+    test_load_changeset_reads_the_same_scoped_key_it_was_written_to,
+    test_stage_detect_changes_is_unscoped_when_fetch_stages_not_set,
+    test_stage_detect_changes_scopes_orphan_detection_to_fetch_stages_in_this_run,
+    test_stage_detect_changes_treats_missing_source_type_as_not_owned_by_any_scoped_run,
     test_stage_validate_fails_closed_on_an_operational_chunk_missing_freshness_metadata,
     test_stage_validate_passes_a_complete_operational_chunk,
     test_stage_validate_exempts_sxa_legacy_from_freshness_enforcement,

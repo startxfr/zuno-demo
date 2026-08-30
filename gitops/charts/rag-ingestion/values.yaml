@@ -1407,19 +1407,41 @@ corpus:
   hashAlgorithm: sha256
   deleteOrphans: true
 
-# knowledge.tech's cadence (ADR-0105: weekly minimum for tech). KFP
-# recurring runs are created through the OpenShift AI/KFP API, not a
-# chart-rendered CRD (this RHOAI version's DataSciencePipelinesApplication
-# doesn't expose a K8s-native RecurringRun resource) - what the chart DOES
-# render is one schedule ConfigMap per scheduled domain
-# (templates/schedule-configmaps.yaml, this block + each enabled
-# domains.<name>.schedule below), which
+# WP-100 (ADR-0105 amendment): knowledge.tech has two independent source
+# systems (fetch-redhat weekly, fetch-confluence hours-scale) that must
+# keep sharing tech's single database (ADR-0202's cross-source vocabulary
+# requirement) but no longer share one schedule/pipeline. Each entry below
+# becomes its own KFP pipeline (rag-corpus-ingestion-tech-<name>) and its
+# own schedule ConfigMap, while still mounting the SAME top-level
+# redhat[]/confluence[]/postgres/ConfigMap config above - only the
+# schedule/fetchStages/pipeline-run granularity is per-source. This
+# replaces the old single top-level `schedule:` block that used to cover
+# both sources at once. KFP recurring runs are created through the
+# OpenShift AI/KFP API, not a chart-rendered CRD (this RHOAI version's
+# DataSciencePipelinesApplication doesn't expose a K8s-native RecurringRun
+# resource) - what the chart DOES render is one schedule ConfigMap per
+# scheduled pipeline (templates/schedule-configmaps.yaml, this map + each
+# enabled domains.<name>.schedule below), which
 # ansible/roles/rag_ingestion/tasks/install.yml consumes to create the
 # actual recurring runs - see README's "Scheduling" section.
-schedule:
-  enabled: true
-  cron: "0 0 2 * * 0"
-  timezone: Europe/Paris
+techSources:
+  redhat:
+    fetchStages: [fetch-redhat]
+    schedule:
+      enabled: true
+      cron: "0 0 2 * * 0"
+      timezone: Europe/Paris
+  confluence:
+    fetchStages: [fetch-confluence]
+    # ADR-0110 (WP-25): only the source that actually has Confluence
+    # content needs reconcile-acls - a no-op wired into the redhat-only
+    # pipeline would just mount Confluence credentials for nothing.
+    reconcileAcls: true
+    schedule:
+      enabled: true
+      # ADR-0105: hours-scale for confluence - every 6 hours.
+      cron: "0 0 */6 * * *"
+      timezone: Europe/Paris
 
 pipeline:
   name: rag-corpus-ingestion

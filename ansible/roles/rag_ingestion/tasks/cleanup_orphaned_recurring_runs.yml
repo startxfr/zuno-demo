@@ -1,0 +1,61 @@
+---
+# WP-100 (ADR-0105 amendment): knowledge.tech used to render one schedule
+# ConfigMap ("tech") for a single shared fetch-redhat+fetch-confluence
+# pipeline; it now renders two ("tech-redhat", "tech-confluence"). Once the
+# chart change deploys, the old "tech" ConfigMap stops rendering, but
+# recurring_run.yml's own per-ConfigMap loop above never visits a
+# ConfigMap that no longer exists - so the recurring run it previously
+# created (display_name "{{ pipeline.name }}-schedule", e.g.
+# "rag-corpus-ingestion-schedule") would otherwise keep firing forever on
+# its old shared weekly cron. This sweep generalizes recurring_run.yml's
+# existing stale-VERSION cleanup (which already deletes-and-recreates a
+# recurring run when its pipeline_version_id goes stale) to also catch a
+# whole ConfigMap disappearing, not just its version - same authority,
+# same "{{ pipeline.name }}-schedule" naming convention, just compared
+# against every zuno.io/rag-ingestion-schedule ConfigMap discovered THIS
+# run instead of one at a time. Included once, after that per-ConfigMap
+# loop, from the same rescue:-wrapped best-effort block in install.yml.
+# Expects `_rag_ingestion_schedule_cms` in scope (already fetched there).
+
+- name: "rag_ingestion | list all recurring runs for orphan cleanup"
+  ansible.builtin.uri:
+    url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/recurringruns?page_size=100"
+    headers:
+      Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
+    validate_certs: false
+    status_code: [200]
+    return_content: true
+  register: _rag_ingestion_all_recurring_runs
+
+- name: "rag_ingestion | compute this run's expected schedule display names"
+  ansible.builtin.set_fact:
+    _rag_ingestion_expected_schedule_display_names: >-
+      {{ _rag_ingestion_schedule_cms.resources | default([])
+         | map(attribute='data.PIPELINE_NAME')
+         | map('regex_replace', '^(.*)$', '\1-schedule')
+         | list }}
+
+- name: "rag_ingestion | identify orphaned recurring runs (chart-managed naming, no matching ConfigMap left)"
+  ansible.builtin.set_fact:
+    _rag_ingestion_orphaned_recurring_runs: >-
+      {{ _rag_ingestion_all_recurring_runs.json.recurringRuns | default([])
+         | selectattr('display_name', 'search', '-schedule$')
+         | rejectattr('display_name', 'in', _rag_ingestion_expected_schedule_display_names)
+         | list }}
+
+- name: "rag_ingestion | no orphaned recurring runs found"
+  ansible.builtin.debug:
+    msg: "No chart-managed recurring run is orphaned - every '*-schedule' entry matches a current schedule ConfigMap."
+  when: (_rag_ingestion_orphaned_recurring_runs | default([]) | length) == 0
+
+- name: "rag_ingestion | delete orphaned recurring run(s) whose schedule ConfigMap no longer exists"
+  ansible.builtin.uri:
+    url: "{{ _rag_ingestion_kfp_api_base }}/apis/v2beta1/recurringruns/{{ item.recurring_run_id }}"
+    method: DELETE
+    headers:
+      Authorization: "Bearer {{ _rag_ingestion_kfp_token }}"
+    validate_certs: false
+    status_code: [200]
+  loop: "{{ _rag_ingestion_orphaned_recurring_runs | default([]) }}"
+  loop_control:
+    label: "{{ item.display_name }} ({{ item.recurring_run_id }})"

@@ -1,6 +1,6 @@
 # ADR-0105: Automate source-specific knowledge ingestion
 
-- **Status:** Partially implemented (tech/legacy cadence merged; Salesforce/Aramis clauses superseded by [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — see the 2026-08-23 note below; live KFP schedule confirmation still blocked on rag-dspa readiness, see ADR-0330)
+- **Status:** Partially implemented (tech/legacy cadence merged; Salesforce/Aramis clauses superseded by [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) — see the 2026-08-23 note below; live KFP schedule confirmation still blocked on rag-dspa readiness, see ADR-0330; tech's two sources now independently scheduled — see the 2026-08-30 amendment below — pending WP-100's operator-run confirmation)
 - **Target:** v0.7 (retargeted from v0.1 on 2026-08-26 — roadmap reprioritization, grouped into v0.7 as a second, unrelated deferred-items set alongside WP-04's GitHub-Actions release-automation theme already there)
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
@@ -62,6 +62,25 @@ leaving them generic:
   additionally blocked on `rag-dspa` not being `Ready` on this cluster
   (see ADR-0330's 2026-08-17 note, WP-07) - independent of the credential
   gap above.
+
+## Amended (2026-08-30)
+
+The Decision text above states cadences are "realized as per-source KFP
+recurring-run schedules" - true for sales (`fetch-salesforce`) and
+sxa-legacy (`load-sxa-dump`) since WP-22, but `knowledge.tech`'s two
+sources (`fetch-redhat`, `fetch-confluence`) shared one domain-level
+schedule and one KFP pipeline despite the adapter-level separation WP-22
+delivered. This gap is closed by WP-100: `fetch-redhat` and
+`fetch-confluence` now have independent KFP recurring-run schedules
+(`gitops/charts/rag-ingestion/values.yaml`'s `techSources.redhat` weekly /
+`techSources.confluence` every 6 hours), each compiled to its own Pipeline
+(`rag-corpus-ingestion-tech-redhat` / `-tech-confluence`), while continuing
+to share `knowledge.tech`'s single database (ADR-0202 unaffected — the
+`fetch_stages` scoping this required is task-level env, not a ConfigMap
+split). See WP-100 for the detect-changes/changeset concurrency-isolation
+fix that independent per-source scheduling required
+(`components/rag-ingestion/src/rag_ingestion.py`'s `stage_detect_changes`
+and `_changeset_key`).
 
 ## Related ADRs
 

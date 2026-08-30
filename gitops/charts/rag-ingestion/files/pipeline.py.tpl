@@ -161,7 +161,7 @@ def component(stage: str):
     return _component
 
 
-def configure(task, *, stage, domain="tech", confluence=False, postgres=False, embedding=False, source_secret=False):
+def configure(task, *, stage, domain="tech", confluence=False, postgres=False, embedding=False, source_secret=False, fetch_stages=None):
     resources = RESOURCES[stage]
     task.set_cpu_request(resources["requests"]["cpu"])
     task.set_cpu_limit(resources["limits"]["cpu"])
@@ -202,6 +202,12 @@ def configure(task, *, stage, domain="tech", confluence=False, postgres=False, e
             secret_key_to_env={"EMBEDDING_API_TOKEN": "EMBEDDING_API_TOKEN"},
         )
 {{- end }}
+    if fetch_stages:
+        # WP-100: scopes detect-changes' changeset key and orphan detection
+        # to this run's own source(s) - set per task (not via the shared
+        # ConfigMap) since knowledge.tech's two pipelines mount the SAME
+        # ConfigMap but must carry different scopes.
+        task.set_env_variable("INGESTION_FETCH_STAGES", ",".join(fetch_stages))
     kubernetes.set_image_pull_policy(task, "{{ .Values.images.ingestion.pullPolicy }}")
     return task
 
@@ -226,28 +232,46 @@ FETCH_COMPONENTS = {
 }
 
 
-@dsl.pipeline(name="{{ .Values.pipeline.name }}", description="{{ .Values.pipeline.description }}")
-def rag_ingestion_pipeline():
-    rh = configure(fetch_redhat(), stage="fetch-redhat")
-{{- if $confluenceEnabled }}
-    cf = configure(fetch_confluence(), stage="fetch-confluence", confluence=True)
-    changes = configure(detect_changes().after(rh, cf), stage="detect-changes")
-{{- else }}
-    changes = configure(detect_changes().after(rh), stage="detect-changes")
+{{- /* WP-100 (ADR-0105 amendment): knowledge.tech's two sources
+(fetch-redhat, fetch-confluence) each get their own independently
+schedulable pipeline instead of one shared "rag_ingestion_pipeline" -
+same generic per-source-with-fetchStages shape as the domains loop below,
+but domain="tech" is fixed so both reuse CONFIGMAPS["tech"]/
+PG_SECRETS["tech"] (the same ConfigMap/Postgres secret, keeping both
+sources in the one knowledge.tech database per ADR-0202). fetch_stages is
+threaded into every stage so detect-changes/normalize/.../validate scope
+their shared-S3-state access to just this pipeline's source(s) (see
+_changeset_key/_run_scope_source_types in rag_ingestion.py). */}}
+{{- range $srcName, $src := .Values.techSources }}
+@dsl.pipeline(
+    name="{{ $.Values.pipeline.name }}-tech-{{ $srcName }}",
+    description="knowledge.tech ({{ $srcName }}) ingestion - {{ $.Values.pipeline.description }}",
+)
+def rag_ingestion_pipeline_tech_{{ $srcName | replace "-" "_" }}():
+    fetch_stages = {{ $src.fetchStages | toJson }}
+    fetches = []
+{{- range $stage := $src.fetchStages }}
+    fetches.append(configure(
+        FETCH_COMPONENTS["{{ $stage }}"](), stage="{{ $stage }}", domain="tech",
+{{- if eq $stage "fetch-confluence" }} confluence=True,{{- end }}
+        fetch_stages=fetch_stages,
+    ))
 {{- end }}
-    normalized = configure(normalize().after(changes), stage="normalize")
-    chunks = configure(chunk().after(normalized), stage="chunk")
-    embeddings = configure(embed().after(chunks), stage="embed", embedding=True)
-    indexed = configure(index_pgvector().after(embeddings), stage="index-pgvector", postgres=True)
-    validated = configure(validate().after(indexed), stage="validate", postgres=True)
-    # ADR-0110 (WP-25): after validate, over every indexed Confluence
-    # chunk (not just this run's changeset) - needs the same Confluence
-    # credential fetch_confluence uses (re-lists live pages) plus
-    # postgres (updates/deletes). A no-op for the tech pipeline too if
-    # no confluence sources are configured (see stage_reconcile_acls).
-    configure(reconcile_acls().after(validated), stage="reconcile-acls", confluence=True, postgres=True)
+    changes = configure(detect_changes().after(*fetches), stage="detect-changes", domain="tech", fetch_stages=fetch_stages)
+    normalized = configure(normalize().after(changes), stage="normalize", domain="tech", fetch_stages=fetch_stages)
+    chunks = configure(chunk().after(normalized), stage="chunk", domain="tech", fetch_stages=fetch_stages)
+    embeddings = configure(embed().after(chunks), stage="embed", domain="tech", embedding=True, fetch_stages=fetch_stages)
+    indexed = configure(index_pgvector().after(embeddings), stage="index-pgvector", domain="tech", postgres=True, fetch_stages=fetch_stages)
+    validated = configure(validate().after(indexed), stage="validate", domain="tech", postgres=True, fetch_stages=fetch_stages)
+{{- if $src.reconcileAcls }}
+    # ADR-0110 (WP-25): only the source with live Confluence access runs
+    # this - a no-op on the redhat-only pipeline would just mount
+    # Confluence credentials for nothing (see stage_reconcile_acls).
+    configure(reconcile_acls().after(validated), stage="reconcile-acls", domain="tech", confluence=True, postgres=True)
+{{- end }}
 
 
+{{- end }}
 {{- range $name, $domain := .Values.domains }}
 {{- if $domain.enabled }}
 
@@ -277,7 +301,9 @@ def rag_ingestion_pipeline_{{ $name | replace "-" "_" }}():
 
 
 PIPELINES = {
-    "tech": (rag_ingestion_pipeline, "{{ .Values.pipeline.name }}"),
+{{- range $srcName, $src := .Values.techSources }}
+    "tech-{{ $srcName }}": (rag_ingestion_pipeline_tech_{{ $srcName | replace "-" "_" }}, "{{ $.Values.pipeline.name }}-tech-{{ $srcName }}"),
+{{- end }}
 {{- range $name, $domain := .Values.domains }}
 {{- if $domain.enabled }}
     "{{ $name }}": (rag_ingestion_pipeline_{{ $name | replace "-" "_" }}, "{{ $.Values.pipeline.name }}-{{ $name }}"),
@@ -287,9 +313,9 @@ PIPELINES = {
 
 
 if __name__ == "__main__":
-    # One compile per domain: `python pipeline.py [tech|sales|adv|sxa-legacy|sxa]`
-    # (default tech, the original single-domain behavior).
-    target = sys.argv[1] if len(sys.argv) > 1 else "tech"
+    # One compile per pipeline: `python pipeline.py [tech-redhat|tech-confluence|sales|sxa-legacy]`
+    # (default tech-redhat).
+    target = sys.argv[1] if len(sys.argv) > 1 else "tech-redhat"
     pipeline_func, pipeline_name = PIPELINES[target]
     # PipelineVersion is a plain namespaced Kubernetes resource - its
     # metadata.name is unique per (namespace, kind), NOT scoped per
@@ -298,11 +324,10 @@ if __name__ == "__main__":
     # moment a second domain's PipelineVersion was ever applied (confirmed
     # live 2026-08-21: sxa's compile got rejected with "Pipeline spec is
     # immutable" against tech's already-existing v0-3-0 object) - every
-    # non-tech domain's version name must be suffixed to stay unique.
-    _pipeline_version_name = (
-        "{{ .Values.pipeline.version }}" if target == "tech"
-        else "{{ .Values.pipeline.version }}-" + target
-    )
+    # pipeline's version name must be suffixed to stay unique, including
+    # WP-100's two tech-<source> pipelines (there is no more single "tech"
+    # exempt from this rule).
+    _pipeline_version_name = "{{ .Values.pipeline.version }}-" + target
     compiler.Compiler().compile(
         pipeline_func=pipeline_func,
         package_path="pipeline-kubernetes.yaml",

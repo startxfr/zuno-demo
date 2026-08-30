@@ -35,10 +35,22 @@ freshness:
   # Realized as per-source KFP recurring-run schedules in
   # gitops/charts/rag-ingestion/values.yaml (WP-22 / ADR-0105); this is the
   # objective the schedule must satisfy, not the schedule itself.
+  # WP-100 (ADR-0105 amendment): this is now the domain-wide
+  # aggregate/fallback objective (the loosest guarantee any of this
+  # domain's content meets) - see by_source_class below for what each
+  # source system's own schedule actually targets.
   objective: weekly
   rationale: >-
     Product documentation and Confluence architecture/build/run content
     change on a documentation-release cadence, not continuously.
+  # WP-100: knowledge.tech's two source systems no longer share one
+  # schedule (gitops/charts/rag-ingestion/values.yaml's techSources.redhat/
+  # techSources.confluence) - each source_class states its own objective.
+  by_source_class:
+    product-doc:
+      objective: weekly
+    confluence:
+      objective: hours-scale
   # Allowed staleness per operation class (WP-24 / ADR-0109): how long an
   # indexed answer may lag the source before Agent Runtime's live-read
   # trigger prefers/adds a live capability call over the indexed chunk

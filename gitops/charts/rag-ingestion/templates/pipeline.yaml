@@ -1,20 +1,30 @@
 {{- if .Values.pipeline.createPipelineResource }}
+{{- /* WP-100 (ADR-0105 amendment): knowledge.tech no longer compiles to
+one bare Pipeline CR - fetch-redhat and fetch-confluence each get their
+own independently-schedulable Pipeline CR (rag-corpus-ingestion-tech-
+<source>), same shape as the per-domain loop below. One further Pipeline
+CR per enabled additional domain; each variant's DAG lives in the same
+pipeline.py source, compiled per pipeline - see files/pipeline.py.tpl. */}}
+{{- $root := . }}
+{{- $first := true }}
+{{- range $srcName, $src := .Values.techSources }}
+{{- if not $first }}
+---
+{{- end }}
+{{- $first = false }}
 apiVersion: pipelines.kubeflow.org/v2beta1
 kind: Pipeline
 metadata:
-  name: {{ .Values.pipeline.name }}
-  namespace: {{ .Values.platform.namespace }}
+  name: {{ $root.Values.pipeline.name }}-tech-{{ $srcName }}
+  namespace: {{ $root.Values.platform.namespace }}
   labels:
-    {{- include "rag-ingestion.labels" . | nindent 4 }}
+    {{- include "rag-ingestion.labels" $root | nindent 4 }}
+    zuno.io/rag-ingestion-domain: "tech"
+    zuno.io/rag-ingestion-source: {{ $srcName | quote }}
 spec:
-  displayName: {{ .Values.pipeline.displayName | quote }}
-  description: {{ .Values.pipeline.description | quote }}
-{{- /* ADR-0204 part 2 (WP-22): one further Pipeline CR per enabled
-additional domain. The tech pipeline above keeps its original
-name/displayName untouched (the WP-07-verified lookup path); each
-domain's DAG variant lives in the same pipeline.py source, compiled per
-domain - see files/pipeline.py.tpl. */}}
-{{- $root := . }}
+  displayName: "{{ $root.Values.pipeline.displayName }} (tech-{{ $srcName }})"
+  description: "knowledge.tech ({{ $srcName }}) ingestion - {{ $root.Values.pipeline.description }}"
+{{- end }}
 {{- range $name, $domain := .Values.domains }}
 {{- if $domain.enabled }}
 ---

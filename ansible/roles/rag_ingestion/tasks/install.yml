@@ -145,6 +145,14 @@
       loop_control:
         loop_var: _rag_schedule_cm
         label: "{{ _rag_schedule_cm.metadata.name }}"
+
+    # WP-100 (ADR-0105 amendment): sweep any chart-managed recurring run
+    # left over from a schedule ConfigMap that no longer renders (e.g.
+    # knowledge.tech's old shared "tech" schedule, replaced by
+    # "tech-redhat"/"tech-confluence") - see that task file's header for
+    # the exact naming-convention scoping this relies on.
+    - name: "rag_ingestion | clean up recurring runs orphaned by a removed schedule ConfigMap"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/rag_ingestion/tasks/cleanup_orphaned_recurring_runs.yml"
   rescue:
     # ADR-0330/roadmap WP-07: enumerate the three concrete UNVERIFIED
     # assumptions this block depends on (not just "see the task output

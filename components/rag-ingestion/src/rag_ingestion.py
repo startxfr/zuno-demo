@@ -251,6 +251,14 @@ class IngestionConfig:
     # corpus reached 310k documents.
     validate_read_concurrency: int
 
+    # WP-100 (ADR-0105 amendment): when set, this run belongs to one of
+    # knowledge.tech's independently-scheduled per-source pipelines
+    # (fetch-redhat / fetch-confluence) rather than the whole domain.
+    # Empty tuple (every domain but tech, and any legacy/manual tech run)
+    # preserves the exact pre-WP-100 unscoped behavior everywhere below -
+    # see _changeset_key/_run_scope_source_types.
+    fetch_stages: tuple
+
 
 def _env(name: str, default: Optional[str] = None, required: bool = False) -> Optional[str]:
     val = os.environ.get(name, default)
@@ -341,6 +349,9 @@ def load_config() -> IngestionConfig:
         chunk_concurrency=_env_int("CHUNK_CONCURRENCY", 16),
         embed_concurrency=_env_int("EMBED_CONCURRENCY", 4),
         index_read_concurrency=_env_int("INDEX_READ_CONCURRENCY", 16),
+        fetch_stages=tuple(
+            s.strip() for s in os.environ.get("INGESTION_FETCH_STAGES", "").split(",") if s.strip()
+        ),
     )
 
 
@@ -1375,10 +1386,43 @@ SOURCE_ADAPTERS = {
     )
 }
 
+# WP-100: ties each fetch stage to the `source_type` value its own records
+# are stamped with (see _build_redhat_record/_fetch_confluence/
+# _fetch_salesforce/_load_sxa_dump) - the identifier stage_detect_changes
+# uses to scope orphan detection to only the source(s) a given run fetched.
+STAGE_SOURCE_TYPES = {
+    "fetch-redhat": "product-doc",
+    "fetch-confluence": "confluence",
+    "fetch-salesforce": "salesforce-object",
+    "load-sxa-dump": "sxa-dump",
+}
+
 
 # --------------------------------------------------------------------------
 # detect-changes
 # --------------------------------------------------------------------------
+
+
+def _changeset_key(config: IngestionConfig) -> str:
+    # WP-100: knowledge.tech's fetch-redhat and fetch-confluence now run as
+    # two independently-scheduled KFP pipelines sharing one domain/database
+    # (ADR-0202). Without a per-scope key here, one pipeline's detect-changes
+    # could overwrite the shared changeset.json between the other pipeline's
+    # detect-changes and its own normalize/index-pgvector/validate reads,
+    # silently misattributing or dropping that run's new/changed documents.
+    # Every domain but tech (fetch_stages unset) keeps the exact legacy path.
+    if not config.fetch_stages:
+        return f"{config.manifest_prefix}/changeset.json"
+    scope = "-".join(sorted(config.fetch_stages))
+    return f"{config.manifest_prefix}/changeset-{scope}.json"
+
+
+def _run_scope_source_types(config: IngestionConfig) -> Optional[frozenset]:
+    if not config.fetch_stages:
+        return None
+    return frozenset(
+        STAGE_SOURCE_TYPES[stage] for stage in config.fetch_stages if stage in STAGE_SOURCE_TYPES
+    )
 
 
 def stage_detect_changes(config: IngestionConfig, store: CorpusStore) -> None:
@@ -1395,7 +1439,11 @@ def stage_detect_changes(config: IngestionConfig, store: CorpusStore) -> None:
         for record in pool.map(store.get_json, raw_keys):
             if not record:
                 continue
-            current[record["doc_id"]] = {"sha256": record["sha256"], "url": record["url"]}
+            current[record["doc_id"]] = {
+                "sha256": record["sha256"],
+                "url": record["url"],
+                "source_type": record.get("source_type"),
+            }
 
     if not config.corpus_incremental:
         new_ids = list(current.keys())
@@ -1409,7 +1457,18 @@ def stage_detect_changes(config: IngestionConfig, store: CorpusStore) -> None:
         ]
 
     if config.corpus_delete_orphans:
-        deleted_ids = [doc_id for doc_id in manifest if doc_id not in current]
+        run_scope = _run_scope_source_types(config)
+
+        def _owned_by_this_run(doc_id: str) -> bool:
+            if run_scope is None:
+                return True  # unscoped run (every non-tech domain): unchanged behavior
+            # A manifest entry with no recorded source_type predates WP-100
+            # and its provenance is unknown - never treat it as this scoped
+            # run's to delete (conservative default during the transition).
+            entry_source = manifest[doc_id].get("source_type")
+            return entry_source is not None and entry_source in run_scope
+
+        deleted_ids = [doc_id for doc_id in manifest if doc_id not in current and _owned_by_this_run(doc_id)]
         deleted_urls = [manifest[doc_id]["url"] for doc_id in deleted_ids if "url" in manifest[doc_id]]
     else:
         deleted_ids, deleted_urls = [], []
@@ -1438,7 +1497,7 @@ def stage_detect_changes(config: IngestionConfig, store: CorpusStore) -> None:
         "current_new_changed": {doc_id: current[doc_id] for doc_id in new_ids + changed_ids},
         "generated_at": _utcnow_iso(),
     }
-    store.put_json(f"{config.manifest_prefix}/changeset.json", changeset)
+    store.put_json(_changeset_key(config), changeset)
     logger.info(
         "detect-changes: %d new, %d changed, %d deleted, %d unchanged",
         len(new_ids), len(changed_ids), len(deleted_ids), len(unchanged_ids),
@@ -1446,7 +1505,7 @@ def stage_detect_changes(config: IngestionConfig, store: CorpusStore) -> None:
 
 
 def _load_changeset(config: IngestionConfig, store: CorpusStore, stage_name: str) -> Optional[dict]:
-    changeset = store.get_json(f"{config.manifest_prefix}/changeset.json")
+    changeset = store.get_json(_changeset_key(config))
     if not changeset:
         logger.warning("%s: no changeset found, run detect-changes first", stage_name)
     return changeset
@@ -2595,11 +2654,23 @@ def main() -> int:
             "to run for a domain they don't feed (ADR-0204)."
         ),
     )
+    parser.add_argument(
+        "--fetch-stages",
+        help=(
+            "comma-separated fetch stages this run is scoped to (default: "
+            "INGESTION_FETCH_STAGES env, empty = unscoped). WP-100: scopes "
+            "detect-changes' changeset key and orphan detection to only "
+            "these stages' source_type(s) - used by knowledge.tech's "
+            "independently-scheduled fetch-redhat/fetch-confluence pipelines."
+        ),
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     if args.domain:
         os.environ["INGESTION_DOMAIN"] = args.domain
+    if args.fetch_stages:
+        os.environ["INGESTION_FETCH_STAGES"] = args.fetch_stages
     config = load_config()
     logger.info("Starting RAG ingestion stage: %s (domain %s)", args.stage, config.domain)
 

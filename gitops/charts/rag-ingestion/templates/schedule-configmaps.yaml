@@ -1,21 +1,23 @@
-{{- /* ADR-0105 (WP-22): one schedule ConfigMap per scheduled domain -
-knowledge.tech from the chart's top-level schedule block, every enabled
-domains.<name> from its own schedule block. RHOAI's DSPA exposes no
-Kubernetes-native RecurringRun CRD, so these ConfigMaps are the chart's
-declarative half of scheduling: ansible/roles/rag_ingestion/tasks/
-install.yml discovers them by the zuno.io/rag-ingestion-schedule label
-and creates one KFP recurring run per ConfigMap through the v2beta1 API
-(the same API the OpenShift AI dashboard uses). The cron in values.yaml
-is therefore no longer decorative - this is the single source the
-Ansible role reads.
+{{- /* ADR-0105 (WP-22, amended WP-100): one schedule ConfigMap per
+scheduled pipeline - knowledge.tech's two independent sources from
+.Values.techSources, every enabled domains.<name> from its own schedule
+block. RHOAI's DSPA exposes no Kubernetes-native RecurringRun CRD, so
+these ConfigMaps are the chart's declarative half of scheduling:
+ansible/roles/rag_ingestion/tasks/install.yml discovers them by the
+zuno.io/rag-ingestion-schedule label and creates one KFP recurring run
+per ConfigMap through the v2beta1 API (the same API the OpenShift AI
+dashboard uses). The cron in values.yaml is therefore no longer
+decorative - this is the single source the Ansible role reads.
 
 TIMEZONE is carried for the operator/dashboard but not sent to the API:
 the KFP v2beta1 recurring-run payload has no confirmed timezone field in
 this RHOAI version (see install.yml's comment). */}}
 {{- $root := . }}
 {{- $entries := list }}
-{{- if .Values.schedule.enabled }}
-{{- $entries = append $entries (dict "name" "tech" "domain" "knowledge.tech" "pipelineName" .Values.pipeline.name "displayName" .Values.pipeline.displayName "schedule" .Values.schedule) }}
+{{- range $srcName, $src := .Values.techSources }}
+{{- if $src.schedule.enabled }}
+{{- $entries = append $entries (dict "name" (printf "tech-%s" $srcName) "domain" "knowledge.tech" "pipelineName" (printf "%s-tech-%s" $root.Values.pipeline.name $srcName) "displayName" (printf "%s (tech-%s)" $root.Values.pipeline.displayName $srcName) "schedule" $src.schedule) }}
+{{- end }}
 {{- end }}
 {{- range $name, $domain := .Values.domains }}
 {{- if and $domain.enabled $domain.schedule.enabled }}

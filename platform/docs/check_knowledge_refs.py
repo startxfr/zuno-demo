@@ -160,6 +160,26 @@ def check_domain_descriptors() -> List[Finding]:
                     if not isinstance(value, str) or not MAX_STALENESS_RE.match(value):
                         findings.append(Finding("domain_descriptors", f"{label}: freshness.operation_classes.{op_class}.max_staleness={value!r} must be '<int>d', '<int>h', '<int>m', or 'none'"))
 
+            # WP-100 (ADR-0105 amendment): an optional, additive per-source
+            # cadence override for domains whose sources no longer share one
+            # objective (knowledge.tech: product-doc weekly, confluence
+            # hours-scale). freshness.objective above stays the domain-wide
+            # aggregate/fallback. Each key here must name a real declared
+            # source_class - the same typo-guard REQUIRED_OPERATION_CLASSES
+            # gives operation_classes.
+            by_source_class = freshness.get("by_source_class")
+            if by_source_class is not None:
+                if not isinstance(by_source_class, dict):
+                    findings.append(Finding("domain_descriptors", f"{label}: freshness.by_source_class must be a mapping"))
+                else:
+                    taxonomy = doc.get("taxonomy")
+                    declared_classes = set(taxonomy.get("source_classes") or []) if isinstance(taxonomy, dict) else set()
+                    for source_class, entry in by_source_class.items():
+                        if source_class not in declared_classes:
+                            findings.append(Finding("domain_descriptors", f"{label}: freshness.by_source_class.{source_class} is not a declared taxonomy.source_classes entry"))
+                        if not isinstance(entry, dict) or "objective" not in entry:
+                            findings.append(Finding("domain_descriptors", f"{label}: freshness.by_source_class.{source_class}.objective is missing"))
+
         for lineno, line in enumerate(text.splitlines(), start=1):
             # Only the YAML content is checked, never comment text - a
             # descriptor's `related_adrs:` list legitimately references

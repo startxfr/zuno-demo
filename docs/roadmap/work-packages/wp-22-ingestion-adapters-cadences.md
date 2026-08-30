@@ -2,6 +2,11 @@
 
 - **State:** Done (2026-08-26 - tech/legacy live cadence runs completed; the Salesforce and
   Aramis clauses were superseded by ADR-0218 rather than delivered here).
+- **State (2026-08-30, amended by):** [WP-100](wp-100-split-tech-ingestion-cadence-by-source.md)
+  splits `knowledge.tech`'s shared fetch-redhat+fetch-confluence schedule
+  into two independently-cadenced KFP pipelines - this WP's own scope and
+  `State: Done` above are unchanged (WP-100 is a new, dependent WP, not a
+  reopening of this one).
 - **State (2026-08-26):** [ADR-0218](../../adr/0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md)
   amended and enacted. Aramis is no longer merely untracked here: the
   `fetch-aramis` adapter and every trace of its wiring are removed from the
