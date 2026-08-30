@@ -1,0 +1,44 @@
+---
+# ADR-0418/WP-099: shared by day1_check.yml/day2_check.yml/day3_check.yml
+# via `include_tasks` in a loop (never `include_role`+loop+register - see
+# below for why). Input: `_precheck_component` (the current loop_var, one
+# role name) and optionally `_precheck_tasks_from` (defaults to
+# `precheck` - day2_check.yml passes a per-component value since its
+# components don't all share one tasks_from name). Output:
+# `_precheck_failed_components`, a plain list of role
+# names accumulated across iterations - callers must initialize it to
+# `[]` before the loop (a `set_fact` inside an included tasks file DOES
+# reliably persist to the parent scope across loop iterations, this is
+# standard Ansible behavior, not the part that was broken).
+#
+# Real bug found running `zuno-day1-check` for real via AAP (job id 119,
+# 2026-08-30): the previous pattern - `include_role: {name: "{{ item
+# }}"}` in a loop, `ignore_errors: true`, `register: X`, then later
+# `X.results | selectattr('failed', 'defined') | selectattr('failed') |
+# map(attribute='item')` in a SEPARATE later task - worked perfectly on
+# every local run (ansible-core 2.19.11) but failed on AAP's execution
+# environment (`ee-supported-rhel9`, an older ansible-core) with
+# "'item' is undefined". Root cause: `include_role`+loop's registered
+# result stores each iteration's raw, NOT-YET-rendered `{{ item }}`
+# string inside `results[].include_args.name`. Referencing the
+# registered variable in a brand-new Jinja expression forces that older
+# ansible-core to recursively re-template the WHOLE nested structure
+# first - including that leftover `{{ item }}` fragment, evaluated
+# OUTSIDE the loop where `item` no longer exists. Confirmed NOT
+# reproducible locally - this is an ansible-core version difference, not
+# a logic bug in the selectattr/map chain itself.
+#
+# Fix: block/rescue INSIDE the loop, one iteration at a time - never a
+# post-hoc Jinja pass over a registered loop result's internals, so
+# there is nothing left for any ansible-core version to mis-template.
+
+- name: "precheck | run {{ _precheck_component }}"
+  block:
+    - name: "precheck | {{ _precheck_component }}"
+      ansible.builtin.include_role:
+        name: "{{ _precheck_component }}"
+        tasks_from: "{{ _precheck_tasks_from | default('precheck') }}"
+  rescue:
+    - name: "precheck | record {{ _precheck_component }} as failed"
+      ansible.builtin.set_fact:
+        _precheck_failed_components: "{{ (_precheck_failed_components | default([])) + [_precheck_component] }}"

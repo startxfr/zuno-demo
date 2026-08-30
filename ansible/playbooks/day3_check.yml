@@ -61,15 +61,16 @@
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/init_state_report.yml"
       when: (selected_precheck_components | length) > 0
 
+    - name: Initialize failed-component tracking
+      ansible.builtin.set_fact:
+        _precheck_failed_components: []
+
     - name: Run Day 3 component prechecks
-      ansible.builtin.include_role:
-        name: "{{ item }}"
-        tasks_from: precheck
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_component_precheck.yml"
       loop: "{{ selected_precheck_components }}"
       loop_control:
-        label: "{{ item }}"
-      ignore_errors: true
-      register: _day3_check_precheck_results
+        loop_var: _precheck_component
+        label: "{{ _precheck_component }}"
       when: (selected_precheck_components | length) > 0
 
     - name: Display the state report
@@ -82,17 +83,10 @@
         msg: >-
           One or more Day 3 checks failed:
           {{ 'agents/platform availability test failed. ' if (_day3_check_test_failed | default(false)) else '' }}
-          {{ 'Precheck failed for: ' ~ (
-               (_day3_check_precheck_results.results | default([]))
-               | selectattr('failed', 'defined') | selectattr('failed')
-               | map(attribute='item') | list
-             ) if (_day3_check_precheck_results is defined
-                   and (_day3_check_precheck_results.results | default([])
-                        | selectattr('failed', 'defined') | selectattr('failed') | list | length) > 0)
+          {{ ('Precheck failed for: ' ~ _precheck_failed_components)
+             if (_precheck_failed_components | default([]) | length) > 0
              else '' }}
           See the task output above for detail.
       when: >-
         (_day3_check_test_failed | default(false))
-        or (_day3_check_precheck_results is defined
-            and (_day3_check_precheck_results.results | default([])
-                 | selectattr('failed', 'defined') | selectattr('failed') | list | length) > 0)
+        or ((_precheck_failed_components | default([])) | length) > 0
