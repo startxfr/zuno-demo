@@ -1,7 +1,7 @@
 # ADR-0307: Support self-service agent onboarding
 
-- **Status:** Proposed (deferred to v0.4 - WP-41 cancelled 2026-08-23; the merged template generator under `platform/templates/agent/` remains in the repo but self-service onboarding is not an active decision for v0.3)
-- **Target:** v0.4
+- **Status:** Proposed (deferred - WP-41 cancelled 2026-08-23; the merged template generator under `platform/templates/agent/` remains in the repo but self-service onboarding is not an active decision)
+- **Target:** v0.7 (retargeted from v0.4 on 2026-08-30 — WP-41 cancelled, no live pursuit planned; deprioritized alongside ADR-0111/ADR-0115/ADR-0352 in v0.7's long-term/harder band rather than v0.4, which is otherwise fully closed)
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
 

@@ -26,6 +26,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Superseding note (2026-08-30):** new ADR-0535 (v0.9, Proposed) adopts RHTAS as the platform's artifact-signing mechanism, superseding ADR-0420 (v0.4 -> Superseded by ADR-0535). This is a product-demonstration decision, not a security-driven reversal - ADR-0420's Vault Transit mechanism stays technically sufficient and cheaper; RHTAS is adopted to demonstrate Red Hat's own trusted-supply-chain product on this platform, the same rationale already behind AAP/TrustyAI/OpenShift Lightspeed. WP-068/WP-069/WP-070 (ADR-0420's implementing WPs) are unaffected and remain `Done` - real work already delivered, not retroactively invalidated. A new v0.9 band is opened for this ADR (v0.6 was reused earlier today for an unrelated closeout cluster, v0.7/v0.8 are already occupied by differently-blocked work); see `docs/roadmap/versions.md`.
 
+**Retargeting note (2026-08-30):** ADR-0307 and ADR-0410 (v0.4 -> v0.7) - both are `Proposed` under Cancelled WP-41 (2026-08-23), which will not pursue the sixth-agent deployment gate that would discharge either. Rather than leave them blocking v0.4's closure indefinitely, they join v0.7's long-term/harder band alongside ADR-0111/ADR-0115/ADR-0352 - all four share the same "not actively being pursued right now, but not formally superseded either" status. This is a docs-only move; the merged template generator (`platform/templates/agent/`) and Naveo agent bundle (`agents/naveo/`) are untouched. Numbering is unchanged; only `Target` moves. v0.4 has no remaining open items after this move.
+
 **Retargeting note (2026-08-24, evening):** ADR-0354 (Add Ansible Automation Platform as a new Day 0 component, v0.3) is amended in place - it was never implemented, so this is a correction rather than a superseding decision. Placement moves from a Day 0 sequence ADR-0060 has since retired (`... keycloak → aap → machines ...`) to Day 1, immediately after `openshift_oauth`; scope is split into two components (`aap` for the platform itself, `aap-config` for repository/Job-Template registration, mechanism decided from a live CRD inventory rather than assumed); sizing is explicitly non-HA; `Target` moves v0.3 -> v0.2. The file is renamed to `0354-add-ansible-automation-platform-as-a-day-1-component.md` to keep the filename in sync with the corrected title. ADR-0355 is a new companion ADR (v0.3) covering the follow-on `mcp-aap` server that lets agents launch/read AAP. ADR-0418 (execute Day 0/Day 1 operations as AAP Job Templates, v0.4) is unchanged.
 
 ## version 0
@@ -140,7 +142,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Superseded by ADR-0526 | Support dynamic LoRA adapter loading |
 | [ADR-0304](0304-optimize-model-selection-using-quality-cost-and-latency.md) | v0.3 | Implemented | Optimize model selection using quality cost and latency |
 | [ADR-0305](0305-introduce-automated-model-benchmarking.md) | v0.3 | Implemented | Introduce automated model benchmarking |
-| [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.4 | Proposed | Support self-service agent onboarding |
 | [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v0.3 | Implemented | Expand agent lifecycle management through the AIAgent Operator |
 | [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) | v0.3 | Partially implemented | Introduce policy-driven autonomous optimization |
 | [ADR-0310](0310-manage-static-kubernetes-resources-as-per-role-kustomize-directories.md) | v0 | Implemented | Manage static Kubernetes resources as per-role kustomize directories |
@@ -193,7 +194,6 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views) | v0.4 | Proposed | Add specialized task-oriented frontend views |
 | [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) | v0.4 | Proposed | Automate removal of inaccessible private RAG content |
 | [ADR-0409](../roadmap/adr-decisions-v0.4.md#adr-0409-introduce-advanced-human-approval-workflows) | v0.4 | Proposed | Introduce advanced human approval workflows |
-| [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.4 | Proposed | Expand the agent catalog beyond the initial five agents |
 | [ADR-0411](0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) | v0.4 | Implemented | Trust the Vault PKI root in every agent frontend's OIDC client |
 | [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | v0.4 | Implemented | Consolidate Grafana dashboards into six platform views |
@@ -257,6 +257,8 @@ Also carried in v0.7, as a separate large-scope effort unrelated to the GitHub-A
 |---|---|---|---|
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.7 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | v0.7 | Proposed | Integrate TrustyAI for AI evaluation and guardrails |
+| [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.7 | Proposed | Support self-service agent onboarding |
+| [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.7 | Proposed | Expand the agent catalog beyond the initial five agents |
 
 ## version 0.8
 
