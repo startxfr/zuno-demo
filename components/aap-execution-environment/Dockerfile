@@ -29,9 +29,9 @@ RUN dnf install -y openshift-clients && dnf clean all
 # COSIGN_VERSION matches components/supply-chain-signer/Dockerfile's own
 # pin (v2.4.1) - keep both in sync on a bump, same binary shape.
 ARG KUSTOMIZE_VERSION=5.4.3
-ARG KUSTOMIZE_SHA256=REPLACE_ME_WITH_REAL_KUSTOMIZE_SHA256
+ARG KUSTOMIZE_SHA256=3669470b454d865c8184d6bce78df05e977c9aea31c30df3c669317d43bcc7a7
 ARG COSIGN_VERSION=v2.4.1
-ARG COSIGN_SHA256=REPLACE_ME_WITH_REAL_COSIGN_SHA256
+ARG COSIGN_SHA256=8b24b946dd5809c6bd93de08033bcf6bc0ed7d336b7785787c080f574b89249b
 
 RUN curl -sSL -o /tmp/kustomize.tar.gz \
       "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" \
