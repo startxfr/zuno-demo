@@ -1,11 +1,12 @@
 # WP-102: Custom AAP execution environment carrying `kustomize`, `oc` and `cosign`
 
-- **State:** Not started.
+- **State:** Done/Implemented - live-verified 2026-08-30.
 - **ADRs:** ADR-0418 (clause 6 - Workflow Template Day 2 live verification).
 - **Depends on:** WP-095 (Workflow Templates registered and DAG-verified).
-- **Unblocks:** a full green `zuno-day2-check-workflow` run (currently
-  blocked on the `agents` node alone), and green `zuno-day1-build`/
-  `zuno-day2-build`/`zuno-day3-sign` runs once launched via AAP.
+- **Unblocks:** a full green `zuno-day2-check-workflow` run (was blocked on
+  the `agents` node alone, now green end-to-end - job 514), and green
+  `zuno-day1-build`/`zuno-day2-build`/`zuno-day3-sign` runs via AAP (jobs
+  508/510/512).
 
 > Execute this brief as a standalone task from the repository root.
 
@@ -63,15 +64,21 @@ mechanism ADR-0418 itself decided.
 
 - **Build**: an `ansible-builder` execution-environment definition under
   `components/aap-execution-environment/` (`execution-environment.yml`),
-  layering onto `ee-supported-rhel9` as base image: `openshift-clients`
-  (`oc`) via `dnf` (this cluster's RHN subscription auto-attach already
-  makes this RPM available, proven for the `aap` role), plus pinned-
-  version `kustomize` and `cosign` release binaries downloaded and
-  checksum-verified. The `Dockerfile` committed alongside it is
-  `ansible-builder create`'s generated output, matching every other
-  component's `components/<name>/{Dockerfile|Containerfile}` convention
-  - the BuildConfig here uses a plain `Docker` strategy, same as
-  everywhere else in this repo, not `ansible-builder build` itself.
+  layering onto `ee-supported-rhel9` as base image. **Correction found
+  live**: that minimal base image ships no `dnf` at all (the RHN
+  auto-attach mechanism proven for the `aap` role applies to full RHEL VM
+  hosts, not this container) - so `oc` is installed the same way as
+  `kustomize`/`cosign`, as a pinned-version release binary downloaded and
+  checksum-verified (`openshift-client-linux-${OC_VERSION}.tar.gz` from
+  `mirror.openshift.com`, pinned to `4.22.8` to match this cluster's own
+  server version). The `Dockerfile` committed alongside it is
+  hand-authored to mirror `execution-environment.yml` exactly (the
+  `ansible-builder` binary available in the build sandbox was broken -
+  wrong Python shebang, no `ansible_builder` module - so its generated
+  output could not be produced directly), matching every other
+  component's `components/<name>/{Dockerfile|Containerfile}` convention -
+  the BuildConfig here uses a plain `Docker` strategy, same as everywhere
+  else in this repo, not `ansible-builder build` itself.
 - **Publish**: an in-cluster OpenShift `BuildConfig`/`ImageStream` in
   `zuno-ai-build`, via the existing shared task
   `ansible/tasks/apply_openshift_build.yml` (new role
@@ -135,25 +142,40 @@ mechanism ADR-0418 itself decided.
   finalizing in case a later commit adds a new
   `apply_kustomize.yml`/build-verb/`verify_okf_signatures.yml` caller.
 
-## Verification checklist (live, unresolved - do not assume)
+## Verification checklist (live, resolved 2026-08-30)
 
-- **Build-time egress**: does the `zuno-ai-build` BuildConfig's build pod
-  reach GitHub Releases to download `kustomize`/`cosign`? This cluster's
-  NetworkPolicies are allowlist-based elsewhere (see
-  `ansible/roles/image_mirrors/README.md`'s whole rationale for mirroring
-  base images specifically to avoid needing such egress) - if blocked,
-  mirror the release tarballs first instead of downloading at build time.
-- **`oc` via RPM**: confirm `dnf install openshift-clients` succeeds
-  under this cluster's RHN auto-attach subscription during the EE image
-  build (already proven for the `aap` role's own install, not yet for a
-  BuildConfig build pod specifically).
-- **TLS trust**: does Controller's podman-in-task-pod process trust the
-  internal registry's service-ca-signed certificate the same way kubelet
-  does automatically for normal pod image pulls? Unverified - may need
-  `verify_ssl: false` or an explicit CA bundle on the registry credential.
+- **Build-time egress**: confirmed working - the `zuno-ai-build`
+  BuildConfig's build pod reaches `mirror.openshift.com`/GitHub Releases
+  to download `oc`/`kustomize`/`cosign`; no mirroring needed.
+- **`oc` via RPM**: N/A - superseded by the pinned-binary approach above
+  once `dnf` was found absent from the base image.
+- **TLS trust**: was a real gap - Controller's pull did not initially
+  trust the internal registry's service-ca-signed certificate; fixed as
+  part of the credential/EE wiring (see AAP-gateway TLS-trust fix,
+  [[wp103-aap-launch-rbac-sso-bugs]] for the related gateway-side trust
+  issue found the same day).
 - **NetworkPolicy egress** `zuno-aap` → `openshift-image-registry:5000`:
-  no existing allow rule found - confirm whether one is actually needed
-  before adding it speculatively.
+  not needed in practice - the image-puller RBAC change was sufficient.
+
+Full chain live-verified via real AAP Job/Workflow Template launches
+(11 previously-latent RBAC/config gaps found and fixed along the way -
+never introduced by this WP, only exposed because these code paths had
+never executed via AAP for real before):
+
+- `zuno-day1-build` (job 439) - first full green build under the new EE.
+- `zuno-day2-check-workflow` node `agents` (job 500) - `kustomize build`
+  and the OKF signature check both succeed under AAP for the first time
+  (originally failing as job 335/353, `kustomize: command not found`).
+- `zuno-day1-build ai-gateway` (job 508), `zuno-day2-build mlops` (job
+  510), `zuno-day2-build rag-ingestion` (job 512) - `cosign`-based image
+  signing succeeds under AAP; these three images had never been signed
+  before (built via an implicit `install`-time dependency, which never
+  triggers `run_image_signing_job.yml` - only an explicit `build` verb
+  does) - a real, separate supply-chain gap found via the stretch goal
+  below, fixed by re-running an explicit build for each.
+- `zuno-day2-check-workflow` (job 514) - **fully successful**, all 10
+  nodes green including `supply-chain` (all 14 first-party images now
+  verified) - the stretch goal beyond this WP's original scope.
 
 ## Out of scope / deferred
 
@@ -163,3 +185,9 @@ mechanism ADR-0418 itself decided.
 - Re-signing any agent bundle whose signature is stale - a data-state
   issue, not an execution-environment one (see WP-31/33/35/36's own
   retroactive-signing work for that).
+- The general "an implicitly-built image never gets signed" gap - fixed
+  here only for the three images this run happened to expose
+  (`ai-gateway`/`mlops`/`rag-ingestion`); no change was made to
+  `apply_openshift_build.yml`'s build-vs-install signing gate itself, so
+  the same gap will recur for any other component if it's ever built
+  only via an implicit `install`-time dependency.
