@@ -913,6 +913,18 @@ target; revert to `latest` immediately after proving it.
 
 ### Dated entries (roadmap work packages, v0.4) — current status per ADR
 
+- **ADR-0525**, 2026-08-30, **Implemented (live-verified)**: batched
+  `executemany()` writes (1000-row batches) and ivfflat `lists` sized from
+  real row counts in `components/rag-ingestion/src/rag_ingestion.py`'s
+  `index-pgvector` stage, plus `007_ivfflat_lists.sql`'s migration for
+  existing databases. Live-verified via a real `knowledge.tech` one-off
+  run (`5e751c12`): `943/943 documents processed, upserted 65926 chunk
+  rows, deleted 0 orphaned rows`, no errors; `ix_document_embeddings_
+  embedding_cosine` stayed at `lists='68'` for 68945 -> 68962 rows,
+  exactly matching `clamp(rows/1000, 10, 1000)`. The drop/rebuild branch
+  didn't trigger in this run (net-new delta far below the 20% threshold)
+  but was already independently proven correct by the migration script
+  producing the same value. No WP tracks this ADR.
 - **ADR-0526 (WP-087)**, 2026-08-27, **Repo work merged**, not yet
   live-verified: a French urban-register variant of ADR-0518's Qwen3.5-9B
   training base — LoRA rank 8, merged into a standalone bf16 checkpoint,

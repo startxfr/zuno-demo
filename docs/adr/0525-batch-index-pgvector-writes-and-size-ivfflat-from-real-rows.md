@@ -1,7 +1,19 @@
 # ADR-0525: Batch index-pgvector writes and size ivfflat from real row counts
 
-- **Status:** Repo work merged (2026-08-27) - not yet live-verified; the baseline to beat
-  is ~113k chunk rows in ~66 min (~31 rows/s) measured on `knowledge.sxa-legacy`
+- **Status:** Implemented (live-verified 2026-08-30) - a real one-off `knowledge.tech`
+  domain run (`index-pgvector`, run `5e751c12`) confirmed the batched `executemany()`
+  write path live: `943/943 documents processed, upserted 65926 chunk rows, deleted 0
+  orphaned rows`, no errors. The live `ix_document_embeddings_embedding_cosine` index
+  stayed at `lists='68'` before and after (68945 -> 68962 rows, +17 net new after the
+  upsert), exactly matching `clamp(rows/1000, 10, 1000)` - confirms the sizing formula
+  is correct in production. The drop/rebuild path correctly did not trigger (net-new
+  delta far below the 20%-of-existing-rows threshold), so this run did not exercise
+  that branch directly, but `007_ivfflat_lists.sql`'s migration already independently
+  produced the same correct `lists` value on this same index (schema-apply Job,
+  2026-08-28) using the identical formula. The baseline to beat is ~113k chunk rows in
+  ~66 min (~31 rows/s) measured on `knowledge.sxa-legacy` (not re-measured here - this
+  run's domain and corpus size differ, so it is not a like-for-like throughput
+  comparison, only a correctness verification)
 - **Target:** v0.4
 - **Date:** 2026-08-27
 - **Decision owners:** Zuno Demo architecture team
