@@ -40,10 +40,36 @@
           drill actually run? Nothing to restore.
       when: (_sfn_pod_info.resources | default([]) | length) == 0
 
-    - name: Record the target pod name and node
+    - name: Record the target pod name
       ansible.builtin.set_fact:
         scenario_failover_pod_name: "{{ _sfn_pod_info.resources[0].metadata.name }}"
-        scenario_failover_node_name: "{{ _sfn_pod_info.resources[0].spec.nodeName }}"
+
+    # A truly unschedulable Pending pod has no spec.nodeName at all - it is
+    # only set once the scheduler actually binds a pod to a node, which
+    # never happened here (that is the whole point of the inject phase).
+    # So the node to uncordon must come from the Node objects themselves,
+    # not from the pod this drill is trying to reschedule.
+    - name: Find any cordoned node
+      kubernetes.core.k8s_info:
+        kind: Node
+      register: _sfn_node_info
+
+    - name: Record the list of cordoned nodes
+      ansible.builtin.set_fact:
+        _sfn_cordoned_nodes: "{{ _sfn_node_info.resources | selectattr('spec.unschedulable', 'defined') | selectattr('spec.unschedulable') | map(attribute='metadata.name') | list }}"
+
+    - name: Fail unless exactly one node is cordoned
+      ansible.builtin.fail:
+        msg: >-
+          Expected exactly one cordoned node (the one this drill's inject
+          half left unschedulable) - found {{ _sfn_cordoned_nodes | length }}
+          ({{ _sfn_cordoned_nodes }}). Refusing to guess which one to
+          uncordon - investigate manually before re-running this playbook.
+      when: (_sfn_cordoned_nodes | length) != 1
+
+    - name: Record the node to uncordon
+      ansible.builtin.set_fact:
+        scenario_failover_node_name: "{{ _sfn_cordoned_nodes[0] }}"
 
     - name: "Uncordon {{ scenario_failover_node_name }}"
       ansible.builtin.command:

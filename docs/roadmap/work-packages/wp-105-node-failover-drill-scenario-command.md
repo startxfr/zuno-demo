@@ -176,7 +176,15 @@ playbook to assert against.
 **C. `ansible/playbooks/day3_scenario_failover_node_restore.yml`** (new):
 1. Resolve the same node/pod dynamically (do not trust state carried over
    from the inject run - re-derive it, matching this repo's "always
-   re-verify" convention).
+   re-verify" convention). **Live bug found and fixed 2026-08-30 on this
+   drill's first real run:** the node can't be read from the Pending pod's
+   own `spec.nodeName` - a truly unschedulable pod never gets bound to a
+   node, so that field is entirely absent (not merely empty), and the
+   original implementation crashed reading it. Fixed by resolving the node
+   independently: list all Nodes, select the one(s) with
+   `spec.unschedulable: true`, and fail loudly (not guess) unless exactly
+   one is found - the pod is still used to get the pod *name* for the
+   force-reschedule delete, just not the node name.
 2. `oc adm uncordon <node>`.
 3. `oc delete pod <wesh-pod> -n zuno-ai-run` again, to force
    rescheduling onto the now-uncordoned node (exact precedent:
