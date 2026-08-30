@@ -85,6 +85,37 @@ rules:
   - apiGroups: ["", "image.openshift.io"]
     resources: ["imagestreams/layers"]
     verbs: ["get"]
+  # WP-102: the ImageStream/BuildConfig/Build objects apply_openshift_build.yml
+  # itself creates/waits on, plus imagestreamtags (read, resolved by
+  # run_image_signing_job.yml to get the just-built image's digest before
+  # signing it). Confirmed live 2026-08-30: this ClusterRole had NO
+  # image.openshift.io/build.openshift.io rule at all before this - every
+  # component build to date had only ever run through the bootstrap
+  # kubeconfig (cluster-admin), never through AAP with this credential,
+  # so this whole apiGroup pair was simply never exercised until WP-102's
+  # aap-execution-environment build. buildconfigs/instantiate (create) is
+  # the subresource `oc start-build` needs - kubernetes.core.k8s has no
+  # support for it (see apply_openshift_build.yml's own comment on why
+  # that step is a command exception), so it isn't covered by the
+  # buildconfigs rule's own verbs. No delete anywhere here, same least-
+  # privilege posture as the rest of this file - builds/log omitted too:
+  # nothing in this repo's Ansible reads it, only a human-facing `oc logs`
+  # hint in a failure message.
+  - apiGroups: ["image.openshift.io"]
+    resources: ["imagestreams"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["image.openshift.io"]
+    resources: ["imagestreamtags"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["build.openshift.io"]
+    resources: ["buildconfigs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["build.openshift.io"]
+    resources: ["buildconfigs/instantiate"]
+    verbs: ["create"]
+  - apiGroups: ["build.openshift.io"]
+    resources: ["builds"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
