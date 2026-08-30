@@ -1,10 +1,15 @@
 # ADR-0420: Sign supply-chain artifacts in-cluster with Vault Transit
 
-- **Status:** Implemented - WP-068 (backend), WP-069 (OKF bundle signing,
+- **Status:** Superseded by ADR-0535 (2026-08-30) - a product-demonstration
+  decision to adopt RHTAS as the platform's artifact-signing mechanism
+  instead, not a reversal of this ADR's technical reasoning (Vault Transit
+  remains sufficient and cheaper for the signing problem alone). WP-068
+  (backend), WP-069 (OKF bundle signing,
   `ZUNO_REQUIRE_SIGNED_BUNDLES=true` live on the real Deployment), and
   WP-070 (image signing, all 14 first-party images signed and an
-  automated `make d2 check supply-chain` gate live) are all Done - see the
-  2026-08-22 implementation notes below.
+  automated `make d2 check supply-chain` gate live) are all Done and stay
+  Done - see the 2026-08-22 implementation notes below - until WP-104 cuts
+  Priority-1 image signing over to RHTAS.
 - **Target:** v0.4
 - **Date:** 2026-08-22
 - **Decision owners:** Zuno Demo architecture team

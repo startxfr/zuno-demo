@@ -24,6 +24,8 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Retargeting note (2026-08-30):** v0.7 is split by done-ness into a short-term closeout band and a long-term/harder band. ADR-0105, ADR-0206, ADR-0213 and ADR-0218 (v0.7 -> v0.6) - all four are already closed out (WP-22/WP-23 Done, ADR-0213 Superseded, ADR-0218 Implemented) and only need formal retargeting; they fill the band left vacant by ADR-0517's move to v0.8. ADR-0111 and ADR-0115 stay in v0.7 (externally blocked on the same WP-04 GitHub-billing lock), joined there by ADR-0352 (a large, not-yet-started day-0 tiering effort, previously carried in v0.7's now-removed second table). Numbering is unchanged; only `Target` moves.
 
+**Superseding note (2026-08-30):** new ADR-0535 (v0.9, Proposed) adopts RHTAS as the platform's artifact-signing mechanism, superseding ADR-0420 (v0.4 -> Superseded by ADR-0535). This is a product-demonstration decision, not a security-driven reversal - ADR-0420's Vault Transit mechanism stays technically sufficient and cheaper; RHTAS is adopted to demonstrate Red Hat's own trusted-supply-chain product on this platform, the same rationale already behind AAP/TrustyAI/OpenShift Lightspeed. WP-068/WP-069/WP-070 (ADR-0420's implementing WPs) are unaffected and remain `Done` - real work already delivered, not retroactively invalidated. A new v0.9 band is opened for this ADR (v0.6 was reused earlier today for an unrelated closeout cluster, v0.7/v0.8 are already occupied by differently-blocked work); see `docs/roadmap/versions.md`.
+
 **Retargeting note (2026-08-24, evening):** ADR-0354 (Add Ansible Automation Platform as a new Day 0 component, v0.3) is amended in place - it was never implemented, so this is a correction rather than a superseding decision. Placement moves from a Day 0 sequence ADR-0060 has since retired (`... keycloak → aap → machines ...`) to Day 1, immediately after `openshift_oauth`; scope is split into two components (`aap` for the platform itself, `aap-config` for repository/Job-Template registration, mechanism decided from a live CRD inventory rather than assumed); sizing is explicitly non-HA; `Target` moves v0.3 -> v0.2. The file is renamed to `0354-add-ansible-automation-platform-as-a-day-1-component.md` to keep the filename in sync with the corrected title. ADR-0355 is a new companion ADR (v0.3) covering the follow-on `mcp-aap` server that lets agents launch/read AAP. ADR-0418 (execute Day 0/Day 1 operations as AAP Job Templates, v0.4) is unchanged.
 
 ## version 0
@@ -201,7 +203,7 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 | [ADR-0417](0417-consume-codestral-via-mistral-api.md) | v0.4 | Implemented | Consume Codestral via the Mistral API |
 | [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md) | v0.4 | Implemented | Execute Day 0 and Day 1 operations as AAP Job Templates |
 | [ADR-0419](0419-split-model-preference-into-preferred-fallback-with-prompt-slot-overrides.md) | v0.4 | Implemented | Split model preference into preferred/fallback, with prompt-slot overrides |
-| [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Implemented | Sign supply-chain artifacts in-cluster with Vault Transit |
+| [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Superseded by ADR-0535 | Sign supply-chain artifacts in-cluster with Vault Transit |
 | [ADR-0421](0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md) | v0.4 | Implemented | Reshape Day 0/Day 1 boundaries around an "always-on infra" core |
 | [ADR-0516](0516-generate-diagrams-with-self-hosted-mermaid-rendering.md) | v0.4 | Implemented | Generate diagrams with self-hosted Mermaid rendering, alongside SDXL image generation |
 | [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) | v0.4 | Implemented | Modernize the local model fleet: Qwen3.6-27B chat, Qwen3-Embedding-0.6B RAG, Qwen3.5-9B training base |
@@ -264,6 +266,12 @@ Goal: prove the platform's Day 0–3 automation is complete and portable by rede
 |---|---|---|---|
 | [ADR-0517](0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) | v0.8 | Proposed | Redeploy the full platform from scratch on a new demo333 cluster |
 | [ADR-0533](0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) | v0.8 | Proposed | Consolidate Advantage's and Finage's non-promotion into a dedicated decision |
+
+## version 0.9
+
+| ADR | Target | Status | Decision |
+|---|---|---|---|
+| [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | v0.9 | Proposed | Adopt RHTAS as the artifact trust and supply-chain service |
 
 ## OKF stream
 

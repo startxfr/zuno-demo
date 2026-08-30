@@ -38,6 +38,26 @@ Separately, this band also carries ADR-0352 (run day-0 platform services in inte
 
 Prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster (`demo333`). Carries [ADR-0517](../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md), retargeted from v0.6 on 2026-08-30 — deprioritized behind v0.7's release-automation work. Also carries [ADR-0533](../adr/0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) (consolidate Advantage's and Finage's non-promotion into a dedicated decision), a new small ADR authored 2026-08-30 to hold the open question of whether either agent is ever promoted to `active`.
 
+## v0.9
+
+Adopt RHTAS as the platform's artifact trust and supply-chain service.
+Carries [ADR-0535](../adr/0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md),
+a new ADR authored 2026-08-30 that supersedes ADR-0420 (v0.4, in-cluster
+Vault Transit signing) — a product-demonstration decision (showing Red
+Hat's own trusted-software-supply-chain product on this platform), not a
+reversal of ADR-0420's technical reasoning, which remains valid: Vault
+Transit is smaller, cheaper and fully sufficient for the signing problem on
+its own. WP-104 deploys RHTAS, wires Keycloak/OIDC signing identities, cuts
+the existing 14 signed first-party images over to RHTAS/Cosign keyless
+signing, and deploys the Sigstore Policy Controller in audit-only mode.
+OKF bundle trust (blocked on ADR-0506/ADR-0507's still-`Proposed` `zuno-okf`
+extraction), AI/model artifact trust, and admission enforcement (reject
+mode) are deliberately left for later ADRs/WPs, authored once each is
+actually ready to start rather than pre-declared now. This band reuses no
+prior vacated slot — v0.6 was reused earlier the same day for an unrelated
+closeout cluster, and v0.7/v0.8 already carry differently-blocked work — so
+v0.9 is a genuinely new band.
+
 ## OKF stream
 
 A standalone version line for the Open Knowledge Format initiative (ADR-0501 – ADR-0512), decoupled from the platform bands above — [OKF roadmap](okf-roadmap.md).
