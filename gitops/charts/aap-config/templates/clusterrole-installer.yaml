@@ -13,7 +13,9 @@
 # the bootstrap kubeconfig's cluster-admin):
 #   - cluster-scoped RBAC objects (ClusterRole/ClusterRoleBinding) - no
 #     privilege-escalation path from this credential to a broader one.
-#   - Node/MachineSet/Machine and other Day 0 `machines`-role territory.
+#   - MachineSet/Machine and other Day 0 `machines`-role territory (Node
+#     itself gained a narrow get/list/watch/patch grant, see the 2026-08-31
+#     Amendment below - cordon/uncordon only, no create/delete).
 #   - aap.ansible.com/tower.ansible.com/automation{controller,hub}.ansible.com/
 #     eda.ansible.com themselves - aap/aap-config are Day 0 bootstrap
 #     components with their own kubeconfig-based install path (ADR-0421),
@@ -191,4 +193,24 @@ rules:
   - apiGroups: ["config.openshift.io"]
     resources: ["ingresses"]
     verbs: ["get", "list", "watch"]
+  # Amendment (2026-08-31, WP-105/ADR-0536 Part B): this file's own header
+  # comment above lists "Node/MachineSet/Machine and other Day 0 `machines`-
+  # role territory" as deliberately excluded - live-caught 2026-08-31 running
+  # the failover drill's inject Job Template for real: `oc adm cordon`
+  # 403'd ("cannot get resource \"nodes\" ... at the cluster scope"), since
+  # this credential never had ANY node access at all. Narrowly amended, not
+  # reversed: `get`/`list`/`watch`/`patch` only (what `oc adm cordon`/
+  # `uncordon` actually does - a PATCH of `spec.unschedulable` after a GET;
+  # the restore playbook's own cordoned-node lookup needs `list`) - no
+  # `create`/`delete` on nodes, no Machine/MachineSet access at all, so
+  # provisioning/deprovisioning a node is still entirely out of this
+  # credential's reach. This still widens every OTHER zuno-aap-installer-
+  # credentialed Job Template's reach by the same narrow margin (this
+  # ClusterRole's own header comment already documents its boundary as
+  # coarse/resource-type-level, not per-Job-Template) - a real, deliberate
+  # trade-off against building a second dedicated credential + multi-
+  # credential Job Template attachment for one drill, not an oversight.
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "patch"]
 {{- end }}
