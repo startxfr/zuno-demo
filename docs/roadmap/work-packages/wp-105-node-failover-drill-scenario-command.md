@@ -1,6 +1,6 @@
 # WP-105: `make d3 scenario-failover-node` - live GPU-node failover drill (qwen-normal ↔ qwen-wesh)
 
-- **State:** Operator pending (2026-08-30 — Part A merged and live-verified
+- **State:** Done (2026-08-30 — Part A merged and live-verified
   end to end on the real cluster, via the actual `make d3 scenario-failover-node`
   command (interactive TTY, real human confirmation pause): baseline probe,
   cordon+kill, `Pending` confirmation, failover probe, uncordon+reschedule,
@@ -34,12 +34,21 @@
   with zero actual nodes), and approving an approval node needs a genuinely
   separate `awx.approve_workflowjobtemplate` permission which itself needed
   `view_workflowjobtemplate` bundled in to be accepted by Controller's own
-  role_definition validation - both confirmed live and fixed. **Remaining:**
-  an actual end-to-end run of the drill through the AAP path (launch the
-  Workflow Template, approve the paused node in the Controller UI, confirm
-  the same Comage/Tekos verdicts as Part A) - the CRs and RBAC are proven
-  correct, only a live run through them is left.)
-- **ADRs:** ADR-0536 (Proposed), ADR-0418 (Implemented - `aap_route`/Workflow Template mechanism this WP extends).
+  role_definition validation - both confirmed live and fixed. 2026-08-31 —
+  **Part B live-verified end to end, real run:** launched
+  `zuno-day3-scenario-failover-node-workflow` for real (workflow job 579).
+  First attempt (job 576) hit a third real bug - `zuno-aap-installer` had
+  zero node access at all, `oc adm cordon` 403'd - fixed by a narrow
+  `get`/`list`/`watch`/`patch`-on-`nodes` amendment to its ClusterRole (no
+  create/delete, no Machine/MachineSet access). Second attempt (job 579)
+  succeeded completely: baseline probe, cordon+kill, failover probe (same
+  expected "timed out" warn-only miss as Part A's own authoritative run),
+  a real human Approve click in the Controller UI, then uncordon+reschedule
+  +restore probe - Comage `local-wesh-maas` → `local-qwen35-maas` →
+  `local-wesh-maas`, Tekos `ovhcloud-gpt-oss-120b` unchanged throughout,
+  overall workflow `status: successful`. Full trace in the evidence doc.
+  **WP-105 is closed - both Part A and Part B are live-verified end to end.**)
+- **ADRs:** ADR-0536 (Implemented), ADR-0418 (Implemented - `aap_route`/Workflow Template mechanism this WP extends).
 - **Depends on:** WP-094 (Job Templates), WP-095 (Workflow Templates), WP-097 (make/AAP routing), WP-103 (launch-RBAC), WP-087/ADR-0526 (the qwen-normal/qwen-wesh fallback this drill proves).
 - **Estimated files touched:** ~10 (2 new ADR/WP docs + 1 evidence doc, 1 new Python probe script, 2 new Ansible playbooks, Makefile, check_docs.py, roadmap tracker; Part B additionally touches the aap-config chart/role).
 
@@ -391,16 +400,20 @@ scenario-failover-node` run will genuinely attempt the AAP path end to end
 
 ## Live verification (operator step, Part B)
 
-1. Re-run the same scenario via the AAP Controller UI (launch the
-   `-workflow` Workflow Template, approve the manual gate node).
-2. Append that run's evidence to the same evidence doc.
+**Done, 2026-08-31.** Launched `zuno-day3-scenario-failover-node-workflow`
+for real via `zuno_make_aap_mode: auto`'s `aap_route` mechanism (workflow
+job 579), watched it cordon+kill the wesh pod, pause at the approval node,
+approved it in the Controller UI, watched it uncordon+reschedule+restore.
+Overall workflow `status: successful`, same verdicts as Part A's own
+authoritative run. Full trace (including the first attempt's node-RBAC
+failure and fix) in `docs/roadmap/evidence/adr-0536-node-failover-drill.md`.
 
 ## Status updates (then re-run check_docs.py)
 
-- On completion, add a row for WP-105 to the Phase 22 table in
-  `docs/roadmap/v0.1-v0.3-implementation-roadmap.md` with the final State,
-  and flip ADR-0536's Status from `Proposed` to `Implemented` once both
-  Parts A and B are live-verified.
+- Done: WP-105's State is `Done`, the Phase 22 table row in
+  `docs/roadmap/v0.1-v0.3-implementation-roadmap.md` reflects it, and
+  ADR-0536's Status is flipped from `Proposed` to `Implemented` (both Parts
+  A and B live-verified end to end).
 
 ## Out of scope / deferred
 

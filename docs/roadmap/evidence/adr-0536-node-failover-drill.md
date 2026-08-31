@@ -6,12 +6,11 @@ Records the live-cluster proof behind
 [WP-105](../work-packages/wp-105-node-failover-drill-scenario-command.md) —
 see the [implementation roadmap](../v0.1-v0.3-implementation-roadmap.md).
 
-**Status: Part A live-verified 2026-08-30, end to end.** Part B (AAP
-Workflow Template path) has not been built yet — see WP-105. ADR-0526's
-"STILL NOT TRUE" caveat is now closed for the half this ADR scoped
-("Comage when the [wesh] variant is unavailable"); the other half ("Tekos on
-either path") stays explicitly open, unprovable through real chat traffic
-today (ADR-0536's Context section).
+**Status: both Part A and Part B live-verified end to end, 2026-08-30/31.**
+ADR-0526's "STILL NOT TRUE" caveat is now closed for the half this ADR
+scoped ("Comage when the [wesh] variant is unavailable"); the other half
+("Tekos on either path") stays explicitly open, unprovable through real
+chat traffic today (ADR-0536's Context section).
 
 ## Part A — local path (`make d3 scenario-failover-node`, `zuno_make_aap_mode: local`)
 
@@ -200,9 +199,77 @@ Controller API:
   `aap-reader-workflowjobtemplate-viewer` (view-only, as designed - never
   granted approve).
 
-**Still not exercised: an actual end-to-end run through the AAP path** -
-launching the Workflow Template, approving the paused node in the
-Controller UI, and confirming both Job Templates' logs and the same
-Comage/Tekos provider verdicts as Part A. The CRs and RBAC are proven
-correct; a live run through them (with `zuno_make_aap_mode: auto`) is the
-one remaining step to fully close WP-105.
+### First live end-to-end attempt (2026-08-31): a third real bug
+
+Launched via `zuno_make_aap_mode: auto`'s actual `aap_route workflow`
+mechanism (invoked directly against `ansible/playbooks/aap_launch.yml` -
+the operator's shell had no TTY, so the Makefile's own
+`scenario-failover-node` guard was bypassed the same way Part A's first
+run was; the real human gate here is the Controller's own approval node,
+not a local prompt). Workflow job 576, inject job 577.
+
+Baseline probe passed (Comage `local-wesh-maas`, Tekos
+`ovhcloud-gpt-oss-120b`), then the cordon step failed outright:
+
+```
+fatal: [localhost]: FAILED! => {"changed": true, "cmd": ["oc", "adm", "cordon",
+"ip-10-18-15-25.eu-west-2.compute.internal"], ...,
+"stderr": "Error from server (Forbidden): nodes \"ip-10-18-15-25...\" is
+forbidden: User \"system:serviceaccount:zuno-aap:aap-installer\" cannot get
+resource \"nodes\" in API group \"\" at the cluster scope"}
+```
+
+`zuno-aap-installer`'s ClusterRole had **zero** node access at all -
+deliberately excluded per its own header comment, never exercised until
+this drill because no other AAP-executed playbook touches Nodes. Fixed by
+a narrow amendment (`get`/`list`/`watch`/`patch` on `nodes` only - no
+`create`/`delete`, no Machine/MachineSet access -
+`gitops/charts/aap-config/templates/clusterrole-installer.yaml`), a real,
+documented trade-off against building a second dedicated credential for
+one drill rather than an oversight. ArgoCD auto-synced the fix live within
+its normal poll cycle; nothing else needed re-running (the failed cordon
+never mutated anything - `oc adm cordon` is atomic, no partial state to
+clean up).
+
+### Second live end-to-end attempt (2026-08-31): full success
+
+Workflow job **579**, inject job **580**, approval node job **583**,
+restore job **584**.
+
+1. **Baseline probe** (job 580): Comage `local-wesh-maas`, Tekos
+   `ovhcloud-gpt-oss-120b`, both `ok: true`.
+2. **Cordon + delete the `qwen3.5-9b-wesh` pod** - succeeded this time,
+   ~7 minutes wall clock for the inject job end to end (baseline probe +
+   cordon + `Pending` confirmation + failover probe).
+3. **Failover probe**: Comage `{"provider": null, "ok": false, "detail":
+   "timed out"}`, Tekos unchanged (`ovhcloud-gpt-oss-120b`) - the same
+   expected, non-fatal cold-cutover timeout already documented in Part A's
+   own authoritative run (the inject playbook's own check is warn-only by
+   design for exactly this reason; it printed the warning and continued).
+4. **Human approval, via the real Controller UI** (not a local prompt) -
+   the operator opened workflow job 579 in the AAP UI, found the paused
+   `approve-restore` node, and clicked Approve.
+5. **Restore job** (584): uncordon + delete-to-reschedule + wait for
+   `Running`/`Ready`, then the restore probe:
+   ```json
+   {"phase": "restore",
+    "comage": {"provider": "local-wesh-maas", "ok": true,
+      "detail": "counts_before={'local-qwen35-maas': 78.0, 'local-wesh-maas': 348.0} counts_after={'local-qwen35-maas': 78.0, 'local-wesh-maas': 351.0}"},
+    "tekos": {"provider": "ovhcloud-gpt-oss-120b", "ok": true,
+      "detail": "counts_before={'ovhcloud-gpt-oss-120b': 240.0} counts_after={'ovhcloud-gpt-oss-120b': 252.0}"}}
+   ```
+   Final pod: `qwen35-9b-wesh-kserve-689595d44f-dgszw`, back on
+   `ip-10-18-15-25.eu-west-2.compute.internal`.
+6. **Overall workflow job 579**: `status: successful`. The `aap_launch.yml`
+   poller (the same mechanism `aap_route`/`make d3 scenario-failover-node`
+   uses under `zuno_make_aap_mode: auto`) correctly detected the terminal
+   state and reported `"workflow 'zuno-day3-scenario-failover-node-workflow'
+   finished: successful (id 579)"`, `PLAY RECAP failed=0`.
+
+**Conclusion: WP-105/ADR-0536 Part B's acceptance criteria are met.** The
+AAP path reproduces Part A's result exactly - Comage fails over
+`local-wesh` → `local-qwen35` → `local-wesh`, Tekos unaffected throughout -
+driven entirely through the Controller (Job/Workflow Templates, launch-RBAC,
+and a real human approval click in the UI), with three real bugs found and
+fixed live along the way (broken node creation, missing approve permission,
+missing node-cordon RBAC) rather than assumed away.

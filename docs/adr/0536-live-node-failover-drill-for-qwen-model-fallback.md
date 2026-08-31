@@ -1,6 +1,9 @@
 # ADR-0536: Live GPU-node failover drill for the qwen-normal/qwen-wesh fallback, and a reusable `make d3 scenario-failover-node` command
 
-- **Status:** Proposed
+- **Status:** Implemented (2026-08-31 - both Part A, local path, and Part B,
+  AAP Workflow Template with a real human approval-click in the Controller
+  UI, live-verified end to end; see the evidence doc for the two live-run
+  attempts, three real bugs found and fixed, and full verdict JSON)
 - **Target:** v0.4
 - **Date:** 2026-08-30
 - **Decision owners:** Zuno Demo architecture team
