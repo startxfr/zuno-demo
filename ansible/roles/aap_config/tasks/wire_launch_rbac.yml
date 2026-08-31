@@ -261,6 +261,47 @@
   when: (_aap_config_ops_wjt_role_lookup.json.count | default(0) | int) == 0
   no_log: true
 
+# WP-105/ADR-0536 Part B: approving a paused workflow_approval node is a
+# DISTINCT permission from execute - confirmed live 2026-08-31 against this
+# cluster's own /api/controller/v2/role_metadata/ (`awx.workflowjobtemplate`'s
+# `allowed_permissions` lists `awx.approve_workflowjobtemplate` separately
+# from `awx.execute_workflowjobtemplate`), and independently corroborated by
+# the Workflow Template object's own `summary_fields.object_roles` always
+# carrying a distinct `approval_role` ("Can approve or deny a workflow
+# approval node") alongside `execute_role`. aap_ops only - approving is a
+# mutating/gating action, never granted to aap-reader-team (view-only by
+# design, see this file's header comment).
+- name: "aap-config | check whether the aap-ops-workflowjobtemplate-approver role definition exists"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/?name=aap-ops-workflowjobtemplate-approver"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: 200
+  register: _aap_config_ops_wjt_approver_role_lookup
+  no_log: true
+
+- name: "aap-config | create the aap-ops-workflowjobtemplate-approver role definition"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/"
+    method: POST
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      name: aap-ops-workflowjobtemplate-approver
+      description: "ADR-0536/WP-105 - approve/deny a gated Workflow Template's approval node (aap_ops)"
+      content_type: awx.workflowjobtemplate
+      permissions: [awx.approve_workflowjobtemplate]
+    status_code: 201
+  register: _aap_config_ops_wjt_approver_role_created
+  when: (_aap_config_ops_wjt_approver_role_lookup.json.count | default(0) | int) == 0
+  no_log: true
+
 - name: "aap-config | check whether the aap-reader-workflowjobtemplate-viewer role definition exists"
   ansible.builtin.uri:
     url: "{{ _aap_config_gateway_url }}/api/controller/v2/role_definitions/?name=aap-reader-workflowjobtemplate-viewer"
@@ -354,7 +395,7 @@
   when: (_aap_config_reader_proj_role_lookup.json.count | default(0) | int) == 0
   no_log: true
 
-- name: "aap-config | resolve the six role_definition ids"
+- name: "aap-config | resolve the seven role_definition ids"
   ansible.builtin.set_fact:
     _aap_config_ops_jt_role_id: >-
       {{ _aap_config_ops_jt_role_created.json.id
@@ -368,6 +409,10 @@
       {{ _aap_config_ops_wjt_role_created.json.id
          if (_aap_config_ops_wjt_role_lookup.json.count | default(0) | int) == 0
          else _aap_config_ops_wjt_role_lookup.json.results[0].id }}
+    _aap_config_ops_wjt_approver_role_id: >-
+      {{ _aap_config_ops_wjt_approver_role_created.json.id
+         if (_aap_config_ops_wjt_approver_role_lookup.json.count | default(0) | int) == 0
+         else _aap_config_ops_wjt_approver_role_lookup.json.results[0].id }}
     _aap_config_reader_wjt_role_id: >-
       {{ _aap_config_reader_wjt_role_created.json.id
          if (_aap_config_reader_wjt_role_lookup.json.count | default(0) | int) == 0
@@ -513,6 +558,21 @@
   loop_control:
     label: "{{ item.name }}"
 
+# WP-105/ADR-0536 Part B: distinct from execute (see the role_definition's
+# own header comment above) - granted on every gated Workflow Template, not
+# just the one that currently has an approval node, so a future gated
+# workflow with its own approval node needs no further RBAC change.
+- name: "aap-config | grant aap-ops-team approve on every gated Workflow Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_ops_team_id }}"
+    _role_definition_id: "{{ _aap_config_ops_wjt_approver_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-ops-team approve on Workflow Template {{ item.name }}"
+  loop: "{{ _aap_config_gated_wjt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"
+
 - name: "aap-config | grant aap-ops-team sync on the {{ aap_config_project_name | default('zuno-demo') }} Project"
   ansible.builtin.include_tasks: assign_team_role.yml
   vars:
@@ -575,6 +635,19 @@
     _role_definition_id: "{{ _aap_config_ops_wjt_role_id }}"
     _object_id: "{{ item.id }}"
     _label: "aap-ops-team execute on Workflow Template {{ item.name }}"
+  loop: "{{ _aap_config_ungated_wjt_ids }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# WP-105/ADR-0536 Part B: see the gated grant above for why this is separate
+# from execute.
+- name: "aap-config | grant aap-ops-team approve on every ungated Workflow Template"
+  ansible.builtin.include_tasks: assign_team_role.yml
+  vars:
+    _team_id: "{{ _aap_config_ops_team_id }}"
+    _role_definition_id: "{{ _aap_config_ops_wjt_approver_role_id }}"
+    _object_id: "{{ item.id }}"
+    _label: "aap-ops-team approve on Workflow Template {{ item.name }}"
   loop: "{{ _aap_config_ungated_wjt_ids }}"
   loop_control:
     label: "{{ item.name }}"

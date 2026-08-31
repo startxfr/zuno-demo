@@ -85,8 +85,23 @@ spec:
       unified_job_template:
         name: {{ .jobTemplate | default $defaultJobTemplate }}
         type: job_template
+      {{- if not .jobTemplate }}
+      # Only emitted for nodes that fall back to the workflow-level shared
+      # Job Template (the original ADR-0418 clause 6/WP-095 fan-out shape) -
+      # a node with its own per-node `.jobTemplate` (WP-105/ADR-0536 Part B)
+      # skips this. Live-caught 2026-08-31: WP-105's two Job Templates have
+      # `ask_variables_on_launch: false` (they take no launch-time choice at
+      # all), and Controller flatly rejects extra_data on a template that
+      # doesn't allow it - "Unable to create workflow_job_template_node
+      # inject: {'extra_data': ['Variables target_component are not allowed
+      # on launch...']}". The underlying role swallows that failure
+      # (`ignore_errors`), so the CR still reported "Successful" with ZERO
+      # workflow nodes actually created - the same "CR Synced/Healthy proves
+      # nothing" trap documented elsewhere in this file, caught here by
+      # querying workflow_nodes/ directly against the live Controller API.
       extra_data:
         target_component: {{ .id }}
+      {{- end }}
       {{- end }}
       {{- if .allParentsMustConverge }}
       all_parents_must_converge: true
