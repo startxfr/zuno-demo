@@ -42,6 +42,12 @@ aap_config_ee_job_templates:
   - zuno-day1-build
   - zuno-day2-build
   - zuno-day3-sign
+  - zuno-day3-stresstest
+  # WP-105/ADR-0536 Part B: both playbooks run `ansible.builtin.command: oc
+  # adm cordon/uncordon` directly, same "shells out to oc on localhost"
+  # criterion as the other entries above.
+  - zuno-day3-scenario-failover-node-inject
+  - zuno-day3-scenario-failover-node-restore
 
 aap_config_job_templates:
   - name: zuno-day0-check
@@ -93,6 +99,16 @@ aap_config_job_templates:
     credential: zuno-aap-installer
     gated: true
     survey_components: [agents]
+  # WP-105/ADR-0536 Part B: no survey_components - both playbooks resolve
+  # their target pod/node dynamically and take no per-launch choice.
+  - name: zuno-day3-scenario-failover-node-inject
+    credential: zuno-aap-installer
+    gated: true
+    survey_components: []
+  - name: zuno-day3-scenario-failover-node-restore
+    credential: zuno-aap-installer
+    gated: true
+    survey_components: []
 
 # "-workflow" suffix (WP-097 fix): a Workflow Template and its underlying
 # Job Template would otherwise share the exact same name (e.g.
@@ -111,3 +127,5 @@ aap_config_workflow_templates:
     gated: true
   - name: zuno-day2-check-workflow
   - name: zuno-day2-build-workflow
+  - name: zuno-day3-scenario-failover-node-workflow
+    gated: true

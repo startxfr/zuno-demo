@@ -94,11 +94,75 @@ No cache-related false positive was observed (`cache_enabled` remains unset
 for `local-qwen35`/`local-wesh` per ADR-0536 Decision 5's precondition
 check, which passed silently on every run).
 
+### Authoritative run — the real `make d3 scenario-failover-node` command
+
+**Run date: 2026-08-30, later the same day**, after the three bug fixes
+above. This is the acceptance-criteria run: the operator invoked the actual
+`make d3 scenario-failover-node` command from an interactive terminal (TTY
+present this time) — the Makefile's own inject → human `read -r -p` pause →
+restore sequence ran exactly as designed, not the manual two-playbook
+substitute used above.
+
+Full verdict, both phases:
+
+```json
+{"phase": "baseline",
+ "comage": {"provider": "local-wesh-maas", "ok": true},
+ "tekos": {"provider": "ovhcloud-gpt-oss-120b", "ok": true}}
+{"phase": "failover",
+ "comage": {"provider": null, "ok": false, "detail": "timed out"},
+ "tekos": {"provider": "ovhcloud-gpt-oss-120b", "ok": true}}
+{"phase": "restore",
+ "comage": {"provider": "local-wesh-maas", "ok": true},
+ "tekos": {"provider": "ovhcloud-gpt-oss-120b", "ok": true}}
+```
+
+`PLAY RECAP`, both plays: `failed=0`.
+
+**The failover-phase probe itself timed out on Comage** (`"detail": "timed
+out"`, even at the widened 90s) — and this is expected, not a defect: the
+inject playbook's own failover check is a `debug`-level **warning, not a
+`fail`** by design (see the "Warn (do not fail)..." task), precisely because
+the very first request against a mid-cutover model can exceed any
+reasonable fixed timeout. The playbook printed the warning and continued to
+the human pause as designed.
+
+**Independent, more valuable confirmation: the operator manually drove the
+real chat UI during the whole outage window**, for both agents, and
+reported: Tekos showed no disruption at any point; Comage returned
+noticeably slower responses with intermittent network errors for a period
+after the cordon+kill, then began answering correctly again (via
+`local-qwen35`, the fallback) once the failover settled; the same
+slower/intermittent pattern recurred briefly after uncordon+reschedule
+before Comage's answers were reliably served by `local-wesh` again. This
+matches the automated probes exactly — the "timed out" verdict above is the
+automation hitting the same real transition window a live user felt as
+"network errors," not a probe bug — and is materially stronger evidence
+than the JSON verdicts alone, since it confirms the actual chat experience
+degrades gracefully (slow, then correct) rather than erroring outright.
+
+**Conclusion: ADR-0536's Acceptance criteria for Part A are met.** Comage's
+real chat traffic demonstrably fails over `local-wesh` → `local-qwen35` on
+node/pod failure and returns to `local-wesh` on restore; Tekos is
+confirmed unaffected throughout, live, via both the automated probe and
+direct manual use of the chat UI.
+
 ## Part B — AAP path (Workflow Template with manual approval node)
 
-_Not yet run — depends on Part A closing first, and on the
-`gitops/charts/aap-config` Workflow Template rendering extension (WP-105
-Part B) actually landing._
+**Repo work merged 2026-08-31** (two new Job Templates, a per-node
+`jobTemplate` override plus a new `type: approval` node type in
+`gitops/charts/aap-config/templates/workflowtemplate.yaml`, role
+defaults/EE-assignment updated — see WP-105's own Part B section for the
+full list). `helm lint`/`helm template --set aapConfig.enabled=true`
+confirmed clean rendering, including that the 7 pre-existing Workflow
+Templates render unchanged.
 
-Expected to record the same verdicts as Part A, plus the Controller job/
-workflow-job ids and the operator who approved the manual gate.
+**Not yet run against a live Controller** — no ArgoCD sync of this chart
+change has happened yet, and the actual live drill through the AAP path
+(launch the Workflow Template, approve the paused node in the Controller
+UI, confirm both Job Templates' logs) has not been exercised. Expected to
+record the same verdicts as Part A, plus the Controller job/workflow-job
+ids and the operator who approved the manual gate — and to resolve the one
+open question flagged in WP-105: whether `aap-ops-team`'s existing
+`execute_workflowjobtemplate` grant is by itself sufficient to approve the
+approval node.

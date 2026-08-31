@@ -162,6 +162,25 @@ jobTemplates:
     askVariablesOnLaunch: true
     surveyComponents: [agents]
 
+  # WP-105/ADR-0536 Part B: the two halves of the node failover drill, each
+  # its own Job Template (not one shared template with a target_component,
+  # unlike every entry above) - they need to run as two separate nodes in
+  # one Workflow Template with a human approval gate between them, so each
+  # needs its own launchable identity. No target_component/Survey: both
+  # playbooks resolve their target pod/node dynamically and take no
+  # per-launch choice. `zuno-aap-installer` credential - mutating (cordon/
+  # delete pod), same tier as backup/restore/sign.
+  # WP-103: gated (launch-RBAC)
+  - name: zuno-day3-scenario-failover-node-inject
+    playbook: ansible/playbooks/day3_scenario_failover_node_inject.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: false
+  # WP-103: gated (launch-RBAC)
+  - name: zuno-day3-scenario-failover-node-restore
+    playbook: ansible/playbooks/day3_scenario_failover_node_restore.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: false
+
 # ADR-0418 clause 6/WP-095: one Workflow Template per Day 1/Day 2 verb
 # that has more than one component (no Day 3 - its verbs have no
 # cross-component sequencing to orchestrate). Every node in a workflow
@@ -332,6 +351,35 @@ workflowTemplates:
       - {id: rag-ingestion, successNodes: []}
       - {id: agent, successNodes: []}
       - {id: mlops, successNodes: []}
+
+  # WP-105/ADR-0536 Part B: the first Workflow Template that is NOT one
+  # Job Template fanned out by target_component - each node names its OWN
+  # jobTemplate (no top-level `jobTemplate:` key on this entry at all,
+  # unlike every workflow above), and a new `type: approval` node sits
+  # between them, matching ADR-0536 Decision 2's local-path human
+  # confirmation pause (the Makefile's `read -r -p`) with a real Controller
+  # approval gate instead. `approvalTimeoutSeconds: 0` = no timeout (module
+  # default; confirmed via awx.awx.workflow_job_template's own EXAMPLES -
+  # a workflow_approval-type node's `unified_job_template.name` becomes the
+  # approval prompt's own name, not a lookup against an existing object).
+  # WP-103: gated (launch-RBAC)
+  - name: zuno-day3-scenario-failover-node-workflow
+    nodes:
+      - id: inject
+        jobTemplate: zuno-day3-scenario-failover-node-inject
+        successNodes: [approve-restore]
+      - id: approve-restore
+        type: approval
+        approvalName: "Confirm the failover, then approve to uncordon+restore"
+        approvalDescription: >-
+          Inject phase complete: the node is cordoned and the wesh pod
+          deleted. Review this node's own Job output for the baseline and
+          failover probe verdicts (ADR-0536) before approving - approving
+          uncordons the node and reschedules the pod immediately.
+        approvalTimeoutSeconds: 0
+        successNodes: [restore]
+      - id: restore
+        jobTemplate: zuno-day3-scenario-failover-node-restore
 
 # Secret holding the Gateway API access token every CR's
 # connection_secret references. Minted once by ansible/roles/aap_config

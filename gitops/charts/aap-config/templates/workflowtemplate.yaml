@@ -1,8 +1,15 @@
 {{- if .Values.aapConfig.enabled }}
 # One WorkflowTemplate per entry in .Values.workflowTemplates
-# (ADR-0418 clause 6/WP-095). Every node launches the same underlying
-# Job Template (`.jobTemplate`, already registered by templates/
-# jobtemplate.yaml) with a per-node `target_component` - confirmed live
+# (ADR-0418 clause 6/WP-095). Every node launches an underlying Job
+# Template - either the workflow-level `.jobTemplate` shared by every node
+# (the original ADR-0418 clause 6/WP-095 shape, one template fanned out by a
+# per-node `target_component`) or, since WP-105/ADR-0536 Part B, a per-node
+# `.nodes[].jobTemplate` override for workflows whose nodes each need a
+# genuinely different Job Template. A node may instead set `type: approval`
+# (WP-105/ADR-0536 Part B) to render a `workflow_approval`-type node instead
+# of a `job_template` one - see the approval-node comment block below for
+# the exact shape and how it was confirmed against the underlying resource
+# operator module. Confirmed live
 # 2026-08-30 that `tower.ansible.com/v1alpha1` ships a WorkflowTemplate
 # CRD (Path A, same as JobTemplate/AnsibleProject/AnsibleCredential), but
 # its `workflow_nodes` field carries NO CRD-documented schema
@@ -57,14 +64,30 @@ spec:
   inventory: {{ $.Values.inventory.name }}
   ask_variables_on_launch: false
   workflow_nodes:
-    {{- $jobTemplate := .jobTemplate }}
+    {{- $defaultJobTemplate := .jobTemplate }}
     {{- range .nodes }}
     - identifier: {{ .id }}
+      {{- if eq (.type | default "job_template") "approval" }}
+      # WP-105/ADR-0536 Part B: an inline approval node - `name` here
+      # becomes the approval prompt's own name (never a lookup against a
+      # pre-existing object, confirmed against awx.awx.workflow_job_template
+      # module's own EXAMPLES: a `type: workflow_approval` node supplies
+      # name/description/timeout directly, no `organization` field).
+      # `timeout: 0` = no timeout, the module's own documented default.
       unified_job_template:
-        name: {{ $jobTemplate }}
+        type: workflow_approval
+        name: {{ .approvalName | default .id }}
+        {{- if .approvalDescription }}
+        description: {{ .approvalDescription | quote }}
+        {{- end }}
+        timeout: {{ .approvalTimeoutSeconds | default 0 }}
+      {{- else }}
+      unified_job_template:
+        name: {{ .jobTemplate | default $defaultJobTemplate }}
         type: job_template
       extra_data:
         target_component: {{ .id }}
+      {{- end }}
       {{- if .allParentsMustConverge }}
       all_parents_must_converge: true
       {{- end }}

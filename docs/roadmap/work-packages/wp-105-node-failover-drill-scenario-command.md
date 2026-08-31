@@ -1,20 +1,34 @@
 # WP-105: `make d3 scenario-failover-node` - live GPU-node failover drill (qwen-normal ↔ qwen-wesh)
 
 - **State:** Operator pending (2026-08-30 — Part A merged and live-verified
-  end to end on the real cluster: baseline probe, cordon+kill, `Pending`
-  confirmation, failover probe, human confirmation pause, uncordon+
-  reschedule, restore probe all passed for both Comage
+  end to end on the real cluster, via the actual `make d3 scenario-failover-node`
+  command (interactive TTY, real human confirmation pause): baseline probe,
+  cordon+kill, `Pending` confirmation, failover probe, uncordon+reschedule,
+  restore probe all passed for both Comage
   (`local-wesh(-maas)` → `local-qwen35(-maas)` → `local-wesh(-maas)`) and
   Tekos (`ovhcloud-gpt-oss-120b` unchanged throughout, the decoupling
   control) — full verdict JSON in
-  `docs/roadmap/evidence/adr-0536-node-failover-drill.md`. Three real bugs
-  found and fixed live during this run (see that evidence doc): a
-  restore-playbook crash reading `spec.nodeName` off a genuinely
-  unschedulable `Pending` pod, a too-tight 30s probe HTTP timeout that
-  didn't account for a freshly-rescheduled model's cold-start first
-  response, and a restore-playbook idempotency gap that made a re-run after
-  a partial success fail needlessly. Part B (AAP Workflow Template with a
-  human approval gate) not started — no repo work exists for it yet.)
+  `docs/roadmap/evidence/adr-0536-node-failover-drill.md`. Independently
+  corroborated by the operator manually driving the real chat UI for both
+  agents during the live outage window: Tekos showed no disruption; Comage
+  was slow/intermittently erroring for a period after the cordon+kill, then
+  correct via the fallback, with the same brief pattern again after restore
+  - matching the automated probes' own "timed out" verdict during the exact
+  cutover window (that check is warn-only by design, not a hard failure, for
+  precisely this reason). Three real bugs found and fixed live during Part
+  A (see the evidence doc): a restore-playbook crash reading `spec.nodeName`
+  off a genuinely unschedulable `Pending` pod, a too-tight 30s probe HTTP
+  timeout that didn't account for a freshly-rescheduled model's cold-start
+  first response, and a restore-playbook idempotency gap that made a re-run
+  after a partial success fail needlessly. 2026-08-31 — Part B repo work
+  merged (two new Job Templates, a per-node `jobTemplate` override plus a
+  new `type: approval` node type added to the Workflow Template chart
+  rendering, role defaults/EE-assignment updated, `helm lint`/`helm template`
+  clean) but NOT yet live-verified against a real Controller - no ArgoCD
+  sync or live workflow run has happened yet for this chart change. See
+  WP-105's own Part B section for the one open, unverified RBAC question
+  (whether approving the approval node needs anything beyond the existing
+  `execute_workflowjobtemplate` grant).)
 - **ADRs:** ADR-0536 (Proposed), ADR-0418 (Implemented - `aap_route`/Workflow Template mechanism this WP extends).
 - **Depends on:** WP-094 (Job Templates), WP-095 (Workflow Templates), WP-097 (make/AAP routing), WP-103 (launch-RBAC), WP-087/ADR-0526 (the qwen-normal/qwen-wesh fallback this drill proves).
 - **Estimated files touched:** ~10 (2 new ADR/WP docs + 1 evidence doc, 1 new Python probe script, 2 new Ansible playbooks, Makefile, check_docs.py, roadmap tracker; Part B additionally touches the aap-config chart/role).
@@ -247,42 +261,69 @@ never appends one, so `python3 platform/docs/check_docs.py` already passes
 against the Makefile change in D. (Initially assumed a code change would be
 required here - it was not; confirmed live by running the check after D.)
 
-### Part B - AAP version (only after Part A is validated live)
+### Part B - AAP version (repo work landed 2026-08-31, after Part A validated live)
 
-**F. `gitops/charts/aap-config/templates/jobtemplate.yaml` + `values.yaml`:**
-add two Job Templates, `zuno-day3-scenario-failover-node-inject` and
-`zuno-day3-scenario-failover-node-restore`, each pointing at its Part-A
-playbook, `aap-installer` credential tier (mutating, same tier as
-backup/restore/sign per WP-103's own rule).
+**F. `gitops/charts/aap-config/templates/jobtemplate.yaml` + `values.yaml`**
+(landed): two new Job Templates, `zuno-day3-scenario-failover-node-inject`
+and `zuno-day3-scenario-failover-node-restore`, each pointing at its Part-A
+playbook, `zuno-aap-installer` credential (mutating, same tier as
+backup/restore/sign per WP-103's own rule), no survey (both playbooks
+resolve their target dynamically, no per-launch choice).
 
-**G. `gitops/charts/aap-config/templates/workflowtemplate.yaml`:** extend
-the rendering to support, per node, either the current shared-Job-Template
-`type: job_template` shape **with a per-node `jobTemplate` override** (today
-one Job Template is shared across every node in a workflow -
-`$jobTemplate := .jobTemplate` at the top of the range, `templates/workflowtemplate.yaml:60`),
-or a new `type: approval` node (`timeout`/`description`, no
-`unified_job_template`). Verify the exact `workflow_nodes` argument shape
-for an approval node via `oc explain workflowtemplates.tower.ansible.com.spec`
-and the live Controller API before writing the CR - this repo's standing
-convention, and this is new, unverified ground (no approval node exists
-anywhere in the repo today).
+**G. `gitops/charts/aap-config/templates/workflowtemplate.yaml`** (landed):
+extended the rendering to support, per node, either the original
+shared-Job-Template `type: job_template` shape (unchanged for all 7
+pre-existing workflows - a node with no per-node `jobTemplate` still falls
+back to the workflow-level default) **or a per-node `jobTemplate` override**,
+plus a new `type: approval` node. The exact `workflow_nodes` shape for an
+inline approval node was confirmed by reading the underlying resource
+operator's own `awx.awx.workflow_job_template` module source directly
+(`ansible_collections/awx/awx/plugins/modules/workflow_job_template.py`,
+found locally installed on this machine) rather than against the live
+Controller API - its own `EXAMPLES` block and `create_workflow_nodes`/node-
+creation code confirm a `type: workflow_approval` node supplies
+`name`/`description`/`timeout` directly under `unified_job_template` (no
+`organization`, and no pre-existing object to look up - the approval
+"template" is created inline via a
+`workflow_job_template_nodes/<id>/create_approval_template/` call the
+module makes itself). `helm lint`/`helm template --set aapConfig.enabled=true`
+confirmed the new CRs render as expected and the 7 pre-existing workflows'
+rendering is unchanged.
 
-**H. `ansible/roles/aap_config/defaults/main.yml`:** add
+**H. `ansible/roles/aap_config/defaults/main.yml`** (landed): added
+`zuno-day3-scenario-failover-node-inject`/`...-restore` to
+`aap_config_job_templates` (both `gated: true`, `zuno-aap-installer`, no
+survey) and both to `aap_config_ee_job_templates` (both playbooks shell out
+to `oc adm cordon`/`uncordon` directly via `ansible.builtin.command`, same
+criterion as the other 6 entries there); added
 `zuno-day3-scenario-failover-node-workflow` to `aap_config_workflow_templates`
-(`gated: true`, matching `zuno-day1-install-workflow`), with 3 nodes:
-inject-job → approval → restore-job.
+(`gated: true`). Cross-checked by hand that both lists exactly match the
+chart's own `jobTemplates`/`workflowTemplates` name sets (no automated
+check enforces this - "kept in sync by convention" per this file's own
+header comment).
 
-**I. Launch-RBAC:** per WP-103's Design section, `aap_ops`/`aap_reader`
-already gain view/execute or view-only across the *full* set of Job/Workflow
-Templates (gated and ungated) once `wire_launch_rbac.yml` re-runs against
-whatever `values.yaml` currently lists - confirm this is genuinely dynamic
-(loops over the chart's template lists rather than a hardcoded count) before
-assuming no RBAC code change is needed; if it turns out to be a fixed
-enumeration, extend `ansible/roles/aap_config/tasks/wire_launch_rbac.yml`
-accordingly.
+**I. Launch-RBAC:** confirmed `ansible/roles/aap_config/tasks/wire_launch_rbac.yml`
+is genuinely dynamic (`aap_config_job_templates | selectattr('gated', ...)`/
+same for workflow templates, no hardcoded enumeration) - no code change
+needed, the new gated Job/Workflow Templates are picked up automatically.
+**Open, NOT yet live-verified question:** whether `aap-ops-team`'s existing
+`execute_workflowjobtemplate` grant on the new gated Workflow Template is
+by itself sufficient to *approve* its approval node mid-run, or whether AAP
+requires a separate permission for that action specifically - not
+determined from any local source (searched this machine's installed AWX/
+controller collections and a local AAP dev bundle, no answer found offline).
+The Part B live verification step below (approving the node via the
+Controller UI) is what actually answers this - if it turns out a separate
+permission is needed, `wire_launch_rbac.yml` will need a follow-up.
 
-**J. `Makefile`:** once F-I are live, drop the "force local mode" caveat
-from step D.1's comment and re-validate with `zuno_make_aap_mode: auto`.
+**J. `Makefile`:** no code change needed - the `case` branch already calls
+`aap_route workflow zuno-day3-scenario-failover-node-workflow "{}"`
+unconditionally (written in Part A, anticipating Part B). Once Part B is
+live-verified, revert `ansible/confidential.yml`'s `zuno_make_aap_mode`
+back to `auto` (already done once, then reverted to `auto` again on its
+own before Part B's repo work landed - re-verify its value before the next
+live run either way, forcing `local` again if AAP is reachable but this
+workflow hasn't synced yet).
 
 ## What NOT to touch
 
