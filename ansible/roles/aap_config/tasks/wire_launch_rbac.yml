@@ -296,7 +296,14 @@
       name: aap-ops-workflowjobtemplate-approver
       description: "ADR-0536/WP-105 - approve/deny a gated Workflow Template's approval node (aap_ops)"
       content_type: awx.workflowjobtemplate
-      permissions: [awx.approve_workflowjobtemplate]
+      # view_workflowjobtemplate is required here, not optional - confirmed
+      # live 2026-08-31: POST rejects a custom role_definition missing it
+      # with 400 "Permissions for model workflow job template needs to
+      # include view, got: approve_workflowjobtemplate" (every other
+      # role_definition in this file already includes its content type's
+      # view_* permission alongside its other one(s) - this is that same
+      # requirement, just not previously hit by a single-permission role).
+      permissions: [awx.view_workflowjobtemplate, awx.approve_workflowjobtemplate]
     status_code: 201
   register: _aap_config_ops_wjt_approver_role_created
   when: (_aap_config_ops_wjt_approver_role_lookup.json.count | default(0) | int) == 0
