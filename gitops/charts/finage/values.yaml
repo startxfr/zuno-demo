@@ -74,12 +74,17 @@ redis:
 
 keycloak:
   issuerUrl: ""  # empty means "https://keycloak.<global.clusterBaseDomain>/realms/zuno"
+  # Where the BFF actually fetches the JWKS (issuerUrl stays the iss
+  # comparison string) - the in-cluster Service path avoids the external
+  # Route's Vault-internal CA. See gitops/charts/advantage/values.yaml for
+  # the same pattern; this chart never had this key, which left finage-bff
+  # falling back to the external issuer Route and failing every JWKS fetch
+  # with 401 "invalid or expired token" regardless of token validity.
+  jwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
   # ADR-0530/WP-091: agent-bff's Keycloak Admin API boundary. Bare host - the
-  # client appends /realms/<realm>/... itself. Note this chart, unlike tekos/
-  # comage/advantage, has no jwksUrl: the 2026-08-22 in-cluster JWKS fix never
-  # reached it. That gap is pre-existing and untouched here; this URL is the
-  # in-cluster listener regardless, because the external Route presents a
-  # Vault-internal CA. Blanking adminClientId disables the whole boundary and
+  # client appends /realms/<realm>/... itself. Same in-cluster HTTP listener
+  # as jwksUrl above, for the same reason (the external Route presents a
+  # Vault-internal CA). Blanking adminClientId disables the whole boundary and
   # agent-bff keeps its documented fail-closed 503.
   adminBaseUrl: http://zuno-service.zuno-auth.svc:8080
   adminClientId: zuno-admin-api

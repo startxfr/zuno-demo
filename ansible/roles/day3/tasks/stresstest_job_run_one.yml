@@ -182,6 +182,12 @@
                   # gate_checks.py only ever runs for AGENT == "tekos").
                   - name: gate-tekos-agent
                     mountPath: /agents/tekos
+                  # gate_checks.py's arkos_declares_no_photorealistic_image_
+                  # generation_capability check cross-reads Arkos's own
+                  # bundle at /agents/arkos - same "mounted for every agent,
+                  # harmless" posture as gate-tekos-agent above.
+                  - name: gate-arkos-agent
+                    mountPath: /agents/arkos
                   - name: gate-ca
                     mountPath: /gate-ca
             volumes:
@@ -242,6 +248,20 @@
                     - key: tekos-tasks-find-relevant-docs.md
                       path: tasks/find-relevant-docs.md
                     - key: tekos-tasks-write-code.md
+                      path: tasks/write-code.md
+              - name: gate-arkos-agent
+                configMap:
+                  name: day2-stresstest-scripts
+                  items:
+                    - key: arkos-agent.okf.md
+                      path: agent.okf.md
+                    - key: arkos-tasks-draft-architecture-testimonial.md
+                      path: tasks/draft-architecture-testimonial.md
+                    - key: arkos-tasks-workshop-presentation.md
+                      path: tasks/workshop-presentation.md
+                    - key: arkos-tasks-structure-demo.md
+                      path: tasks/structure-demo.md
+                    - key: arkos-tasks-write-code.md
                       path: tasks/write-code.md
               - name: gate-ca
                 configMap:

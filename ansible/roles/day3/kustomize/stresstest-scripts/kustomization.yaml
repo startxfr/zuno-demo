@@ -21,6 +21,17 @@ configMapGenerator:
       # (the quota-demo Route is Tekos-only today) and returns a coverage
       # row for every other agent, so one unprefixed key is correct.
       - quota_429.py=../../../../../platform/testing/quota_429.py
+      # run_scenarios.py's chat_register_conformance handler (used by
+      # Comage's French-register-conformance scenarios) imports this at
+      # call time. Previously bundled only for the ADR-0053 acceptance-gate
+      # Job (ansible/roles/agents/kustomize/acceptance-gate-scripts) - this
+      # ConfigMap never carried it, so every day2-stresstest Comage run hit
+      # "No module named 'register_conformance'" instead of actually
+      # scoring the reply. Unprefixed like quota_429.py above: the "gate"
+      # volume mounts this whole ConfigMap flatly at /gate, matching where
+      # run_scenarios.py's own sys.path search (its own directory) expects
+      # to find it.
+      - register_conformance.py=../../../../../evaluations/register_conformance.py
       # Repo policy/routing files security_checks.py, gate_checks.py and
       # stress_test.py each read relative to their own resolved location
       # once mounted (same ConfigMap-symlink-indirection arithmetic
@@ -80,6 +91,17 @@ configMapGenerator:
       - tekos-tasks-check-my-drive-docs.md=../../../../../agents/tekos/tasks/check-my-drive-docs.md
       - tekos-tasks-find-relevant-docs.md=../../../../../agents/tekos/tasks/find-relevant-docs.md
       - tekos-tasks-write-code.md=../../../../../agents/tekos/tasks/write-code.md
+      # gate_checks.py's arkos_declares_no_photorealistic_image_generation_
+      # capability check cross-reads Arkos's own bundle the same way -
+      # previously absent from this ConfigMap entirely, so that check
+      # always errored with FileNotFoundError instead of running. Same
+      # four declared tasks as agents/arkos/agent.okf.md's own
+      # zuno.tasks list.
+      - arkos-agent.okf.md=../../../../../agents/arkos/agent.okf.md
+      - arkos-tasks-draft-architecture-testimonial.md=../../../../../agents/arkos/tasks/draft-architecture-testimonial.md
+      - arkos-tasks-workshop-presentation.md=../../../../../agents/arkos/tasks/workshop-presentation.md
+      - arkos-tasks-structure-demo.md=../../../../../agents/arkos/tasks/structure-demo.md
+      - arkos-tasks-write-code.md=../../../../../agents/arkos/tasks/write-code.md
 generatorOptions:
   disableNameSuffixHash: true
   labels:
