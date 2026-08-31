@@ -182,4 +182,13 @@ rules:
   - apiGroups: ["zuno.zuno.ai"]
     resources: ["*"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ansible/tasks/resolve_cluster_base_domain.yml reads the cluster-scoped
+  # Ingress.config.openshift.io/cluster singleton to discover the apps
+  # wildcard domain - every zuno-aap-installer-credentialed template that
+  # reaches apply_gitops_app.yml hits this. Previously deferred as an
+  # "unrelated RBAC gap" in WP-100 for zuno-day2-install; also breaks
+  # zuno-day3-stresstest (job 559/563) the same way. Read-only.
+  - apiGroups: ["config.openshift.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
 {{- end }}
