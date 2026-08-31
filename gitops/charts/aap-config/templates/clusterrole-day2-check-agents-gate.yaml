@@ -158,4 +158,47 @@ subjects:
   - kind: ServiceAccount
     name: aap-day0-check
     namespace: {{ .Values.namespace }}
+---
+# Fourth, separate gap (job 568, zuno-day3-check's platform component):
+# ansible/roles/day3/tasks/lightspeed_health_check.yml runs its probe Job in
+# openshift-lightspeed instead of a Zuno-owned namespace (ADR-0524/WP-085,
+# see that file's own header for why) - cluster-reader covers the Service
+# discovery/read steps there, but grants no write verbs anywhere, so the
+# delete-then-create Job pattern shared with platform_health_check.yml and
+# verify_image_signatures.yml above 403'd on delete. Same minimal shape as
+# the supply-chain gate: only jobs/pods, no configmaps (this probe writes
+# nothing but the Job itself).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zuno-day3-check-lightspeed-gate
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-26"
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-day3-check-lightspeed-gate
+  namespace: openshift-lightspeed
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-25"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zuno-day3-check-lightspeed-gate
+subjects:
+  - kind: ServiceAccount
+    name: aap-day0-check
+    namespace: {{ .Values.namespace }}
 {{- end }}

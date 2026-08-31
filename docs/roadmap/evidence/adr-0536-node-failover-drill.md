@@ -157,12 +157,52 @@ full list). `helm lint`/`helm template --set aapConfig.enabled=true`
 confirmed clean rendering, including that the 7 pre-existing Workflow
 Templates render unchanged.
 
-**Not yet run against a live Controller** — no ArgoCD sync of this chart
-change has happened yet, and the actual live drill through the AAP path
-(launch the Workflow Template, approve the paused node in the Controller
-UI, confirm both Job Templates' logs) has not been exercised. Expected to
-record the same verdicts as Part A, plus the Controller job/workflow-job
-ids and the operator who approved the manual gate — and to resolve the one
-open question flagged in WP-105: whether `aap-ops-team`'s existing
-`execute_workflowjobtemplate` grant is by itself sufficient to approve the
-approval node.
+**CRs live-verified against the real Controller, 2026-08-31** (ArgoCD sync
+of `zuno-aap-config-d1`, then `make d0 install aap-config` for the
+launch-RBAC wiring). Two real bugs found and fixed along the way, both
+hidden by a "CR Synced/Healthy proves nothing" trap — the WorkflowTemplate
+CR reported `Successful` with **zero** actual workflow nodes created the
+first time, caught only by querying `workflow_nodes/` directly against the
+Controller API:
+
+- The chart unconditionally sent `extra_data.target_component` on every
+  `job_template`-type node, a leftover from the original shared-Job-Template
+  fan-out shape. WP-105's two Job Templates have
+  `ask_variables_on_launch: false` (no launch-time choice at all), and
+  Controller rejects `extra_data` on a template that disallows it - the
+  underlying resource-operator role's `ignore_errors` swallowed the failure
+  silently (`"Unable to create workflow_job_template_node inject:
+  {'extra_data': ['Variables target_component are not allowed on
+  launch...']}"`). Fixed: `extra_data` is now only emitted for nodes with no
+  per-node `jobTemplate` override.
+- Confirmed live that approving a `workflow_approval` node needs a genuinely
+  separate permission, `awx.approve_workflowjobtemplate` (this cluster's own
+  `/api/controller/v2/role_metadata/` lists it apart from
+  `execute_workflowjobtemplate`, and the Workflow Template's own
+  `object_roles` always carries a distinct `approval_role`) - this **answers
+  WP-105's own open question**: the existing execute grant was NOT
+  sufficient. A follow-up bug: Controller's `role_definitions` endpoint
+  rejects a custom role for `workflowjobtemplate` missing `view` (`400
+  "Permissions for model workflow job template needs to include view, got:
+  approve_workflowjobtemplate"`) - fixed by bundling
+  `view_workflowjobtemplate` alongside `approve_workflowjobtemplate` in the
+  new `aap-ops-workflowjobtemplate-approver` role definition.
+
+**Final live-verified state**, confirmed via the Controller API directly:
+- `workflow_job_templates/63/workflow_nodes/` — 3 nodes: `inject` (job,
+  `zuno-day3-scenario-failover-node-inject`), `approve-restore`
+  (`workflow_approval`, name "Confirm the failover, then approve to
+  uncordon+restore"), `restore` (job,
+  `zuno-day3-scenario-failover-node-restore`).
+- `role_team_assignments` on that workflow: `aap-ops-team` holds both
+  `aap-ops-workflowjobtemplate-executor` and the new
+  `aap-ops-workflowjobtemplate-approver`; `aap-reader-team` holds only
+  `aap-reader-workflowjobtemplate-viewer` (view-only, as designed - never
+  granted approve).
+
+**Still not exercised: an actual end-to-end run through the AAP path** -
+launching the Workflow Template, approving the paused node in the
+Controller UI, and confirming both Job Templates' logs and the same
+Comage/Tekos provider verdicts as Part A. The CRs and RBAC are proven
+correct; a live run through them (with `zuno_make_aap_mode: auto`) is the
+one remaining step to fully close WP-105.

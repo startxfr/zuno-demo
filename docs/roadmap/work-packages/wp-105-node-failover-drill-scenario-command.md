@@ -21,14 +21,24 @@
   timeout that didn't account for a freshly-rescheduled model's cold-start
   first response, and a restore-playbook idempotency gap that made a re-run
   after a partial success fail needlessly. 2026-08-31 — Part B repo work
-  merged (two new Job Templates, a per-node `jobTemplate` override plus a
-  new `type: approval` node type added to the Workflow Template chart
-  rendering, role defaults/EE-assignment updated, `helm lint`/`helm template`
-  clean) but NOT yet live-verified against a real Controller - no ArgoCD
-  sync or live workflow run has happened yet for this chart change. See
-  WP-105's own Part B section for the one open, unverified RBAC question
-  (whether approving the approval node needs anything beyond the existing
-  `execute_workflowjobtemplate` grant).)
+  merged and its CRs/RBAC live-verified against the real Controller (ArgoCD
+  sync of `zuno-aap-config-d1` + `make d0 install aap-config`): the
+  `zuno-day3-scenario-failover-node-workflow`'s 3 nodes (`inject` job,
+  `approve-restore` approval, `restore` job) confirmed to exist correctly
+  via the Controller API, and `aap-ops-team` confirmed to hold both execute
+  and the new approve role on it (`aap-reader-team` view-only, as designed).
+  Two more real bugs found and fixed live during this verification (see the
+  evidence doc): the chart's unconditional `extra_data.target_component`
+  broke node creation on these `ask_variables_on_launch: false` Job
+  Templates (silently, via `ignore_errors` - the CR still said `Successful`
+  with zero actual nodes), and approving an approval node needs a genuinely
+  separate `awx.approve_workflowjobtemplate` permission which itself needed
+  `view_workflowjobtemplate` bundled in to be accepted by Controller's own
+  role_definition validation - both confirmed live and fixed. **Remaining:**
+  an actual end-to-end run of the drill through the AAP path (launch the
+  Workflow Template, approve the paused node in the Controller UI, confirm
+  the same Comage/Tekos verdicts as Part A) - the CRs and RBAC are proven
+  correct, only a live run through them is left.)
 - **ADRs:** ADR-0536 (Proposed), ADR-0418 (Implemented - `aap_route`/Workflow Template mechanism this WP extends).
 - **Depends on:** WP-094 (Job Templates), WP-095 (Workflow Templates), WP-097 (make/AAP routing), WP-103 (launch-RBAC), WP-087/ADR-0526 (the qwen-normal/qwen-wesh fallback this drill proves).
 - **Estimated files touched:** ~10 (2 new ADR/WP docs + 1 evidence doc, 1 new Python probe script, 2 new Ansible playbooks, Makefile, check_docs.py, roadmap tracker; Part B additionally touches the aap-config chart/role).
@@ -304,26 +314,48 @@ header comment).
 
 **I. Launch-RBAC:** confirmed `ansible/roles/aap_config/tasks/wire_launch_rbac.yml`
 is genuinely dynamic (`aap_config_job_templates | selectattr('gated', ...)`/
-same for workflow templates, no hardcoded enumeration) - no code change
-needed, the new gated Job/Workflow Templates are picked up automatically.
-**Open, NOT yet live-verified question:** whether `aap-ops-team`'s existing
-`execute_workflowjobtemplate` grant on the new gated Workflow Template is
-by itself sufficient to *approve* its approval node mid-run, or whether AAP
-requires a separate permission for that action specifically - not
-determined from any local source (searched this machine's installed AWX/
-controller collections and a local AAP dev bundle, no answer found offline).
-The Part B live verification step below (approving the node via the
-Controller UI) is what actually answers this - if it turns out a separate
-permission is needed, `wire_launch_rbac.yml` will need a follow-up.
+same for workflow templates, no hardcoded enumeration) - the new gated
+Job/Workflow Templates are picked up automatically, no code change needed
+for that part. **The open question this section originally flagged - is now
+answered, live, and required a real fix:** approving a `workflow_approval`
+node needs a genuinely separate permission, `awx.approve_workflowjobtemplate`
+- confirmed against this cluster's own `/api/controller/v2/role_metadata/`
+(`awx.workflowjobtemplate`'s `allowed_permissions` lists it apart from
+`execute_workflowjobtemplate`) and the Workflow Template object's own
+`summary_fields.object_roles.approval_role`
+("Can approve or deny a workflow approval node"). Added a new
+`aap-ops-workflowjobtemplate-approver` role definition (permissions:
+`[view_workflowjobtemplate, approve_workflowjobtemplate]` - Controller's own
+role_definition POST rejects `approve_workflowjobtemplate` alone with a 400,
+"Permissions for model workflow job template needs to include view, got:
+approve_workflowjobtemplate", confirmed live via a scratch role definition
+created then deleted) and granted it to `aap-ops-team` on every gated AND
+ungated Workflow Template (never `aap-reader-team` - approving is a mutating
+action, reader stays view-only by design). Live-verified via the Controller
+API: `aap-ops-team` now holds both `aap-ops-workflowjobtemplate-executor`
+and `aap-ops-workflowjobtemplate-approver` on
+`zuno-day3-scenario-failover-node-workflow`; `aap-reader-team` holds only
+`aap-reader-workflowjobtemplate-viewer`.
+
+A second, unrelated bug surfaced by the same live sync: the chart's
+`extra_data.target_component`, previously assumed harmless-but-unused for
+these nodes, actually broke node creation entirely on Job Templates with
+`ask_variables_on_launch: false` (Controller rejects `extra_data` on a
+template that disallows it; the resource-operator role's `ignore_errors`
+swallowed the failure, so the WorkflowTemplate CR reported `Successful`
+with **zero** actual nodes - caught only by querying `workflow_nodes/`
+directly, not by trusting the CR's own status). Fixed in
+`templates/workflowtemplate.yaml`: `extra_data` is now only emitted for a
+node with no per-node `jobTemplate` override, preserving the original
+shared-Job-Template behavior for all 7 pre-existing workflows unchanged.
 
 **J. `Makefile`:** no code change needed - the `case` branch already calls
 `aap_route workflow zuno-day3-scenario-failover-node-workflow "{}"`
-unconditionally (written in Part A, anticipating Part B). Once Part B is
-live-verified, revert `ansible/confidential.yml`'s `zuno_make_aap_mode`
-back to `auto` (already done once, then reverted to `auto` again on its
-own before Part B's repo work landed - re-verify its value before the next
-live run either way, forcing `local` again if AAP is reachable but this
-workflow hasn't synced yet).
+unconditionally (written in Part A, anticipating Part B). The CRs and RBAC
+are now live-verified correct; `ansible/confidential.yml`'s
+`zuno_make_aap_mode` is currently `auto` - the next `make d3
+scenario-failover-node` run will genuinely attempt the AAP path end to end
+(not yet exercised - see the Live verification section below).
 
 ## What NOT to touch
 
