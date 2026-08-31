@@ -431,13 +431,19 @@ def chat_streaming_sse(s: Dict[str, Any]) -> ScenarioResult:
     # first, before any "token"/"done" event - captured here purely for
     # cleanup_created_runs(), never used for this scenario's own pass/fail.
     expect_start_data = False
+    # Same per-scenario override as chat_basic_qa's own timeout - was
+    # hardcoded to 30 here regardless of the scenario's declared
+    # timeout_seconds, so arkos's structure-demo streaming scenario (which
+    # declares 180s for exactly this reason) always raced a client-side
+    # timeout well before the BFF's own 180s streaming budget, surfacing as
+    # a false "timed out" instead of exercising the real behavior.
     try:
         with httpx.stream(
             "POST",
             f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
             headers={**auth_headers(s["persona"]), "Accept": "text/event-stream"},
             json={"session_id": "eval-10", "user_sub": s["persona"], "message": s["message"]},
-            timeout=30,
+            timeout=s.get("timeout_seconds", 30),
         ) as resp:
             for line in resp.iter_lines():
                 if expect_start_data and line.startswith("data:"):

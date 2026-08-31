@@ -329,8 +329,20 @@ func NewClient(baseURL, agentName string) *Client {
 	return &Client{
 		baseURL:   baseURL,
 		agentName: agentName,
+		// MEMORY.md's own architecture constraint: "long document workflows
+		// may take up to 10 minutes." main.go's chatHandler already derives
+		// a 600s context for the non-streaming /api/chat call (see its own
+		// comment), but this fixed http.Client.Timeout raced it and always
+		// won at 55s regardless - confirmed live (2026-08-31): a genuine
+		// DAT-drafting call surfaced as agent-bff's own 502 "agent runtime
+		// unreachable" with "Client.Timeout exceeded while awaiting
+		// headers" in the log, the literal net/http wording for this field
+		// firing, not context cancellation. Shared with doJSON's four
+		// conversation-management methods below, all of which pass their
+		// own much shorter (15-30s) context - unaffected, since whichever
+		// of {ctx deadline, Client.Timeout} is sooner wins.
 		httpClient: &http.Client{
-			Timeout: 55 * time.Second,
+			Timeout: 600 * time.Second,
 		},
 		streamClient: &http.Client{},
 	}

@@ -554,7 +554,13 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 		// 2026-08-21: raised from 55s - long-form DAT/workshop drafting
 		// plus a reflect pass was routinely running past it, independent
 		// of the local-gpt-oss/image-gen issues fixed the same day.
-		ctx, cancel := context.WithTimeout(r.Context(), 110*time.Second)
+		// 2026-08-31: raised again, from 110s to MEMORY.md's own documented
+		// SLO (600s / "up to 10 minutes" for long document workflows) -
+		// 110s was still short of that, and runtimeClient's own
+		// http.Client.Timeout (internal/runtime/client.go) was actually the
+		// binding constraint at 55s the whole time regardless of this
+		// value; both are raised together here.
+		ctx, cancel := context.WithTimeout(r.Context(), 600*time.Second)
 		defer cancel()
 
 		resp, err := runtimeClient.Chat(ctx, token, runtimeReq)

@@ -68,6 +68,23 @@ async def handle(
             )
             response.raise_for_status()
             body = response.json()
+    except httpx.HTTPStatusError as exc:
+        # diagram-render's own 422 body carries a specific, actionable
+        # reason (components/diagram-render/server.js's findRenderIssue -
+        # e.g. "Mermaid could not parse this diagram (syntax error in the
+        # mermaid_source)."). agent-runtime's _resolve_diagram_generation_
+        # call makes one retry call offering the model this exact detail so
+        # it can self-correct its mermaid_source - swallowing it into the
+        # generic httpx exception string below silently broke that retry's
+        # only feedback signal. Fall back to the generic message only if
+        # the body isn't the JSON shape we expect.
+        detail = None
+        try:
+            detail = exc.response.json().get("error")
+        except (ValueError, AttributeError):
+            pass
+        logger.warning("diagram render call failed: %s", exc)
+        return {"error": detail or f"diagram generation failed: {exc}"}
     except httpx.HTTPError as exc:
         logger.warning("diagram render call failed: %s", exc)
         return {"error": f"diagram generation failed: {exc}"}
