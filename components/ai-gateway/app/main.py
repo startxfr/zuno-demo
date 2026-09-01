@@ -278,7 +278,7 @@ async def chat_completions(
             _stream_completion(
                 candidates, classification, messages, request_id, adapter_decl,
                 identity=identity, tools=payload.tools, agent=x_zuno_agent, run_id=run_id,
-                project_id=project_id,
+                project_id=project_id, quota_class=quota_class,
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
@@ -576,6 +576,13 @@ async def _stream_completion(
     # the common case (agent-runtime always streams), so omitting it here
     # would have left the attribute effectively absent in practice.
     project_id: Optional[str] = None,
+    # ADR-0511 (WP-54): same reasoning as project_id just above - streaming
+    # is the common case (agent-runtime always streams), so until this was
+    # threaded through, quota.ledger.consume() below was only ever reached
+    # by the non-streaming path, and the ledger never reflected real chat
+    # usage at all (confirmed live 2026-09-01: only test/stresstest traffic,
+    # which calls this endpoint non-streaming, ever drew the budget down).
+    quota_class: str = "",
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -644,6 +651,15 @@ async def _stream_completion(
                         yield _sse_chunk(completion_id, created, effective_model_name, {"content": token})
                 prompt_tokens, completion_tokens = _usage_tokens(final_chunk)
                 call.record_usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+                # ADR-0511: attribute consumption per the precedence order,
+                # same call as the non-streaming path above - see this
+                # function's own quota_class parameter comment for why this
+                # was missing until now.
+                if identity is not None:
+                    quota.ledger.consume(
+                        quota_class, identity.sub, identity.groups, project_id,
+                        prompt_tokens + completion_tokens,
+                    )
         except Exception as exc:
             logger.warning("provider '%s' failed mid-stream-setup: %s", candidate.name, exc)
             errors.append(f"{candidate.name}: {exc}")
