@@ -47,7 +47,7 @@ spec:
       "uid": "zuno-data",
       "title": "Data",
       "description": "ADR-0413, split 2026-09-01 from dashboard-infra-data.yaml: PostgreSQL/MariaDB/Redis database exporter health, throughput and cache efficiency.",
-      "tags": ["zuno", "data", "postgresql", "mariadb", "redis", "adr-0413"],
+      "tags": ["zuno", "data", "postgresql", "mariadb", "redis"],
       "timezone": "browser",
       "schemaVersion": 39,
       "time": {"from": "now-6h", "to": "now"},

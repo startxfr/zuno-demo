@@ -37,7 +37,7 @@ spec:
       "uid": "zuno-mesh-gateway",
       "title": "Mesh & gateway",
       "description": "ADR-0413: Istio/Envoy mesh traffic (mesh-prometheus datasource) and Kuadrant Authorino/Limitador (prometheus datasource) - empty-by-design until ADR-0201's MaaS AuthPolicy gap closes.",
-      "tags": ["zuno", "network", "mesh", "kuadrant", "maas", "adr-0413"],
+      "tags": ["zuno", "network", "mesh", "kuadrant", "maas"],
       "timezone": "browser",
       "schemaVersion": 39,
       "time": {"from": "now-6h", "to": "now"},

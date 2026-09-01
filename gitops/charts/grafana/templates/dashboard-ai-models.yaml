@@ -38,7 +38,7 @@ spec:
       "uid": "zuno-ai-models",
       "title": "AI models & serving",
       "description": "ADR-0029/ADR-0413: gateway model traffic, semantic cache, vLLM serving internals and GPU (DCGM) health, filterable by provider/model/outcome.",
-      "tags": ["zuno", "adr-0029", "models", "vllm", "gpu", "adr-0413"],
+      "tags": ["zuno", "models", "vllm", "gpu"],
       "timezone": "browser",
       "schemaVersion": 39,
       "time": {"from": "now-6h", "to": "now"},

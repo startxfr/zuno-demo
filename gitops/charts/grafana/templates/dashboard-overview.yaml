@@ -37,7 +37,7 @@ spec:
       "uid": "zuno-overview",
       "title": "Zuno overview",
       "description": "ADR-0413: platform landing page - SLO/error budget, component health, headline usage KPIs, links to the other Zuno dashboards.",
-      "tags": ["zuno", "overview", "slo", "adr-0102", "adr-0413"],
+      "tags": ["zuno", "overview", "slo"],
       "timezone": "browser",
       "schemaVersion": 39,
       "time": {"from": "now-6h", "to": "now"},

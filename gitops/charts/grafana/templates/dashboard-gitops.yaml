@@ -27,7 +27,7 @@ spec:
       "uid": "zuno-gitops",
       "title": "GitOps",
       "description": "ADR-0413, split 2026-09-01 from dashboard-infra-data.yaml: ArgoCD application sync/health status and the openshift-gitops control-plane's own resource footprint.",
-      "tags": ["zuno", "gitops", "argocd", "adr-0413"],
+      "tags": ["zuno", "gitops", "argocd"],
       "timezone": "browser",
       "schemaVersion": 39,
       "time": {"from": "now-6h", "to": "now"},

@@ -41,7 +41,7 @@ spec:
       "uid": "zuno-usage-cost",
       "title": "Usage & cost",
       "description": "ADR-0029/ADR-0413: model calls/tokens/cost and API requests by user and Keycloak group, filterable by user/group/agent/model/provider.",
-      "tags": ["zuno", "adr-0029", "usage", "cost", "adr-0413"],
+      "tags": ["zuno", "usage", "cost"],
       "timezone": "browser",
       "schemaVersion": 39,
       "time": {"from": "now-24h", "to": "now"},

@@ -27,7 +27,7 @@ spec:
       "uid": "zuno-agents-tools-rag",
       "title": "Agents, tools & RAG",
       "description": "ADR-0102/ADR-0011/ADR-0036/ADR-0050/ADR-0109/ADR-0413: per-agent SLO/error budget, MCP tool authorization outcomes, RAG search and freshness health.",
-      "tags": ["zuno", "agents", "mcp", "rag", "slo", "adr-0413"],
+      "tags": ["zuno", "agents", "mcp", "rag", "slo"],
       "timezone": "browser",
       "schemaVersion": 39,
       "time": {"from": "now-6h", "to": "now"},

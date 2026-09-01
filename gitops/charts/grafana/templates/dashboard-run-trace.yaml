@@ -39,7 +39,7 @@ spec:
       "uid": "zuno-run-trace",
       "title": "Run Trace (per-run drill-down)",
       "description": "ADR-0517: select an agent, paste a run_id, see every MCP/RAG/model/BFF/API hop that run consumed - cost, tokens, latency, outcomes.",
-      "tags": ["zuno", "agents", "mcp", "rag", "tracing", "adr-0517"],
+      "tags": ["zuno", "agents", "mcp", "rag", "tracing"],
       "timezone": "browser",
       "schemaVersion": 39,
       "time": {"from": "now-6h", "to": "now"},

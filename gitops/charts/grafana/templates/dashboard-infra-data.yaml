@@ -34,7 +34,7 @@ spec:
       "uid": "zuno-infra-data",
       "title": "Infrastructure",
       "description": "ADR-0413: node/pod/deployment health, node and pod resource consumption (CPU/RAM/GPU/disk/network/errors). Database exporters moved to dashboard-data.yaml and ArgoCD sync health to dashboard-gitops.yaml on 2026-09-01.",
-      "tags": ["zuno", "infra", "kubernetes", "adr-0413"],
+      "tags": ["zuno", "infra", "kubernetes"],
       "timezone": "browser",
       "schemaVersion": 39,
       "time": {"from": "now-6h", "to": "now"},
