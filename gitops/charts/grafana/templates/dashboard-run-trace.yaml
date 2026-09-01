@@ -12,8 +12,15 @@
 # Panels needing a span attribute beyond Tempo's fixed search-result
 # columns (Trace ID/Start time/Service/Name/Duration) use TraceQL's
 # `select()` to project it as a real field (e.g. `| select(span.zuno.
-# estimated_cost_usd)`) - the resulting field name is the exact string
-# passed to select(). Trace/span links point at this platform's own
+# estimated_cost_usd)`) - the resulting field name DROPS the `span.`/
+# `resource.` scope prefix (that's TraceQL query syntax, not part of the
+# attribute key itself): `select(span.zuno.estimated_cost_usd)` yields a
+# field literally named `zuno.estimated_cost_usd`. Verified live
+# 2026-09-01 by querying Tempo's /api/search directly - every
+# filterFieldsByName/calculateField/groupBy transformation below matches
+# on the bare `zuno.*` name, never `span.zuno.*` (only the TraceQL
+# `query` strings themselves keep the `span.` scope prefix). Trace/span
+# links point at this platform's own
 # Jaeger UI (exposed read-only behind the Tempo operator's built-in
 # oauth-proxy, see gitops/charts/tempo/templates/tempomonolithic.yaml),
 # not Grafana's own Explore - Jaeger UI's `/trace/<id>` works uniformly
@@ -77,31 +84,12 @@ spec:
           ]
         },
         {
-          "id": 2,
-          "title": "Span durations by name & service",
-          "type": "timeseries",
-          "datasource": {"type": "tempo", "uid": "tempo"},
-          "description": "Every span this run made, grouped/colored by originating service, one bar per span at its start time. Spans are independent traces (no cross-service parent/child linking, ADR-0517) - this reconstructs a run's shape without a true connected waterfall. Uses timeseries/bars rather than the barchart panel type: barchart throws \"Converting circular structure to JSON\" whenever two spans share the same name within a service (a known Grafana bug in its duplicate-category handling) - timeseries doesn't hit that path, same as the Span timeline panel below.",
-          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 4},
-          "fieldConfig": {"defaults": {"unit": "ms", "custom": {"drawStyle": "bars", "fillOpacity": 60, "axisLabel": "Duration (ms)"}}, "overrides": []},
-          "options": {
-            "legend": {"displayMode": "list", "placement": "bottom"},
-            "tooltip": {"mode": "single"}
-          },
-          "transformations": [
-            {"id": "partitionByValues", "options": {"fields": ["traceService"], "keepFields": false, "naming": {"asLabels": true}}}
-          ],
-          "targets": [
-            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{span.zuno.run_id=\"$run_id\"}", "limit": 50, "tableType": "traces", "refId": "A"}
-          ]
-        },
-        {
           "id": 3,
           "title": "Span timeline",
           "type": "timeseries",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "description": "Same spans as above, plotted by actual start time (points mode) rather than grouped by name - shows chronological ordering across hops.",
-          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 14},
+          "description": "Every span this run made, grouped/colored by originating service, plotted by actual start time (points mode) - shows chronological ordering across hops.",
+          "gridPos": {"h": 10, "w": 24, "x": 0, "y": 4},
           "fieldConfig": {"defaults": {"unit": "ms", "custom": {"drawStyle": "points", "pointSize": 8, "axisLabel": "Duration (ms)", "showPoints": "always"}}, "overrides": []},
           "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "single"}},
           "transformations": [
@@ -120,7 +108,7 @@ spec:
             {"matcher": {"id": "byName", "options": "traceService"}, "properties": [{"id": "custom.hidden", "value": true}]},
             {"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Jaeger", "url": "https://tempo-jaegerui-zuno-monitoring.{{ .Values.appsDomain }}/trace/${__value.raw}", "targetBlank": true}]}]}
           ]},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 14},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"bff_request\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
           ]
@@ -134,7 +122,7 @@ spec:
             {"matcher": {"id": "byName", "options": "traceService"}, "properties": [{"id": "custom.hidden", "value": true}]},
             {"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Jaeger", "url": "https://tempo-jaegerui-zuno-monitoring.{{ .Values.appsDomain }}/trace/${__value.raw}", "targetBlank": true}]}]}
           ]},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 14},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"api_request\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
           ]
@@ -148,7 +136,7 @@ spec:
             {"matcher": {"id": "byName", "options": "traceService"}, "properties": [{"id": "custom.hidden", "value": true}]},
             {"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Jaeger", "url": "https://tempo-jaegerui-zuno-monitoring.{{ .Values.appsDomain }}/trace/${__value.raw}", "targetBlank": true}]}]}
           ]},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 22},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"tool_invoke\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
           ]
@@ -162,7 +150,7 @@ spec:
             {"matcher": {"id": "byName", "options": "traceService"}, "properties": [{"id": "custom.hidden", "value": true}]},
             {"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Jaeger", "url": "https://tempo-jaegerui-zuno-monitoring.{{ .Values.appsDomain }}/trace/${__value.raw}", "targetBlank": true}]}]}
           ]},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 22},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"rag_search\" && span.zuno.run_id=\"$run_id\"}", "limit": 20, "tableType": "traces", "refId": "A"}
           ]
@@ -172,10 +160,10 @@ spec:
           "title": "Model calls (all - provider/model/duration)",
           "type": "bargauge",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "description": "One bar per model call this run. Bar label defaults to whichever field Grafana picks first (likely provider) - adjust in the UI if needed. See Model calls - local/distant below for cost.",
-          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40},
+          "description": "One bar per model call this run (reduceOptions.values:true - \"Calculate\" mode would collapse every call into a single lastNotNull bar per field instead). Bar label defaults to whichever field Grafana picks first (likely provider) - adjust in the UI if needed. See Model calls - local/distant below for cost.",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 30},
           "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
-          "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}},
+          "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": true}},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && span.zuno.run_id=\"$run_id\"} | select(span.zuno.provider, span.zuno.model)", "limit": 20, "tableType": "traces", "refId": "A"}
           ]
@@ -185,9 +173,10 @@ spec:
           "title": "Cost per call - local (self-hosted)",
           "type": "bargauge",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 8, "w": 9, "x": 0, "y": 48},
+          "description": "reduceOptions.fields pins this to the estimated_cost_usd field - without it, the built-in Duration column (also numeric, present on every trace search result) would draw its own bar under the currencyUSD unit.",
+          "gridPos": {"h": 8, "w": 9, "x": 0, "y": 38},
           "fieldConfig": {"defaults": {"unit": "currencyUSD"}, "overrides": []},
-          "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}},
+          "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": true, "fields": "/^zuno\\.estimated_cost_usd$/"}},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"local\"} | select(span.zuno.estimated_cost_usd, span.zuno.model)", "limit": 20, "tableType": "traces", "refId": "A"}
           ]
@@ -197,10 +186,10 @@ spec:
           "title": "Total cost - local",
           "type": "stat",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 8, "w": 3, "x": 9, "y": 48},
+          "gridPos": {"h": 8, "w": 3, "x": 9, "y": 38},
           "fieldConfig": {"defaults": {"unit": "currencyUSD"}, "overrides": []},
           "transformations": [
-            {"id": "filterFieldsByName", "options": {"include": {"names": ["span.zuno.estimated_cost_usd"]}}},
+            {"id": "filterFieldsByName", "options": {"include": {"names": ["zuno.estimated_cost_usd"]}}},
             {"id": "reduce", "options": {"reducers": ["sum"]}}
           ],
           "targets": [
@@ -212,9 +201,10 @@ spec:
           "title": "Cost per call - distant (SaaS)",
           "type": "bargauge",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 8, "w": 9, "x": 12, "y": 48},
+          "description": "reduceOptions.fields pins this to the estimated_cost_usd field - without it, the built-in Duration column (also numeric, present on every trace search result) would draw its own bar under the currencyUSD unit.",
+          "gridPos": {"h": 8, "w": 9, "x": 12, "y": 38},
           "fieldConfig": {"defaults": {"unit": "currencyUSD"}, "overrides": []},
-          "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": false}},
+          "options": {"displayMode": "gradient", "orientation": "horizontal", "reduceOptions": {"calcs": ["lastNotNull"], "values": true, "fields": "/^zuno\\.estimated_cost_usd$/"}},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"saas\"} | select(span.zuno.estimated_cost_usd, span.zuno.model)", "limit": 20, "tableType": "traces", "refId": "A"}
           ]
@@ -224,10 +214,10 @@ spec:
           "title": "Total cost - distant",
           "type": "stat",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 8, "w": 3, "x": 21, "y": 48},
+          "gridPos": {"h": 8, "w": 3, "x": 21, "y": 38},
           "fieldConfig": {"defaults": {"unit": "currencyUSD"}, "overrides": []},
           "transformations": [
-            {"id": "filterFieldsByName", "options": {"include": {"names": ["span.zuno.estimated_cost_usd"]}}},
+            {"id": "filterFieldsByName", "options": {"include": {"names": ["zuno.estimated_cost_usd"]}}},
             {"id": "reduce", "options": {"reducers": ["sum"]}}
           ],
           "targets": [
@@ -243,7 +233,7 @@ spec:
           "fieldConfig": {"overrides": [
             {"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Jaeger", "url": "https://tempo-jaegerui-zuno-monitoring.{{ .Values.appsDomain }}/trace/${__value.raw}", "targetBlank": true}]}]}
           ]},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 46},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{span.zuno.run_id=\"$run_id\" && status=error}", "limit": 20, "tableType": "traces", "refId": "A"}
           ]
@@ -257,7 +247,7 @@ spec:
           "fieldConfig": {"overrides": [
             {"matcher": {"id": "byName", "options": "traceID"}, "properties": [{"id": "links", "value": [{"title": "Open trace in Jaeger", "url": "https://tempo-jaegerui-zuno-monitoring.{{ .Values.appsDomain }}/trace/${__value.raw}", "targetBlank": true}]}]}
           ]},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 56},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 46},
           "targets": [
             {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{span.zuno.run_id=\"$run_id\" && span.zuno.outcome=\"denied\"}", "limit": 20, "tableType": "traces", "refId": "A"}
           ]
@@ -268,11 +258,11 @@ spec:
           "type": "piechart",
           "datasource": {"type": "tempo", "uid": "tempo"},
           "description": "Share of total latency across bff_request/api_request/agent_graph_run/tool_invoke/rag_search/model_call spans - where did the time go?",
-          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 64},
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 54},
           "transformations": [
             {"id": "groupBy", "options": {"fields": {
               "traceName": {"aggregations": [], "operation": "groupby"},
-              "span.zuno.latency_ms": {"aggregations": ["sum"], "operation": "aggregate"}
+              "zuno.latency_ms": {"aggregations": ["sum"], "operation": "aggregate"}
             }}}
           ],
           "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut"},
@@ -285,12 +275,12 @@ spec:
           "title": "Cost by provider",
           "type": "piechart",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 64},
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 54},
           "fieldConfig": {"defaults": {"unit": "currencyUSD"}, "overrides": []},
           "transformations": [
             {"id": "groupBy", "options": {"fields": {
-              "span.zuno.provider": {"aggregations": [], "operation": "groupby"},
-              "span.zuno.estimated_cost_usd": {"aggregations": ["sum"], "operation": "aggregate"}
+              "zuno.provider": {"aggregations": [], "operation": "groupby"},
+              "zuno.estimated_cost_usd": {"aggregations": ["sum"], "operation": "aggregate"}
             }}}
           ],
           "options": {"legend": {"displayMode": "table", "placement": "right", "values": ["value", "percent"]}, "pieType": "donut"},
@@ -304,7 +294,7 @@ spec:
           "type": "piechart",
           "datasource": {"type": "tempo", "uid": "tempo"},
           "description": "OTel span status (ok/error/unset) across every span this run made - a universal field, unlike zuno.outcome which not every span type sets.",
-          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 64},
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 54},
           "transformations": [
             {"id": "groupBy", "options": {"fields": {
               "traceID": {"aggregations": ["count"], "operation": "aggregate"}
@@ -320,10 +310,10 @@ spec:
           "title": "Total run cost",
           "type": "stat",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 72},
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 62},
           "fieldConfig": {"defaults": {"unit": "currencyUSD"}, "overrides": []},
           "transformations": [
-            {"id": "filterFieldsByName", "options": {"include": {"names": ["span.zuno.estimated_cost_usd"]}}},
+            {"id": "filterFieldsByName", "options": {"include": {"names": ["zuno.estimated_cost_usd"]}}},
             {"id": "reduce", "options": {"reducers": ["sum"]}}
           ],
           "targets": [
@@ -335,9 +325,9 @@ spec:
           "title": "Total tokens",
           "type": "stat",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 72},
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 62},
           "transformations": [
-            {"id": "calculateField", "options": {"mode": "binary", "binary": {"left": "span.zuno.prompt_tokens", "operator": "+", "right": "span.zuno.completion_tokens"}, "alias": "total_tokens", "replaceFields": true}},
+            {"id": "calculateField", "options": {"mode": "binary", "binary": {"left": "zuno.prompt_tokens", "operator": "+", "right": "zuno.completion_tokens"}, "alias": "total_tokens", "replaceFields": true}},
             {"id": "reduce", "options": {"reducers": ["sum"]}}
           ],
           "targets": [
@@ -349,7 +339,7 @@ spec:
           "title": "Total MCP tool calls",
           "type": "stat",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 72},
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 62},
           "transformations": [
             {"id": "filterFieldsByName", "options": {"include": {"names": ["traceID"]}}},
             {"id": "reduce", "options": {"reducers": ["count"]}}
@@ -363,7 +353,7 @@ spec:
           "title": "Total RAG searches",
           "type": "stat",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 72},
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 62},
           "transformations": [
             {"id": "filterFieldsByName", "options": {"include": {"names": ["traceID"]}}},
             {"id": "reduce", "options": {"reducers": ["count"]}}
