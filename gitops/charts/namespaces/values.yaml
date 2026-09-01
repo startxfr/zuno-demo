@@ -512,6 +512,22 @@ platformNamespaces:
     allowedFromNamespaces: []
     extraLabels:
       zuno.io/managed: "true"
+  - name: ai-tenants
+    displayName: MaaS AI Tenants
+    description: >-
+      Same class of maas-controller hardcoded operand namespace as
+      models-as-a-service just above (AITENANT_NAMESPACE, not configurable
+      via any CRD - verified live 2026-09-01), for the newer AITenant CRD
+      (maas.opendatahub.io v1alpha1) - superseding the legacy
+      Tenant.spec.externalOIDC per opendatahub-io/models-as-a-service's own
+      migration docs ("existing Tenant/default-tenant.spec.externalOIDC
+      settings are automatically migrated to
+      AITenant/models-as-a-service.spec.oidc"). Created here for the same
+      from-scratch-install race reason. Holds CRs only, no pods (verified
+      live) - same no-op-but-defense-in-depth NetworkPolicy posture.
+    allowedFromNamespaces: []
+    extraLabels:
+      zuno.io/managed: "true"
 
 # ADR-0351: MIG-aware GPU quota mirroring the permanent node's all-balanced
 # partition (2x 1g.24gb + 1x 2g.48gb on the RTX PRO 6000 Blackwell 96GB) -
