@@ -47,7 +47,7 @@ postgresVersion: 18
 # Crunchy's own postgres_exporter sidecar (spec.monitoring.pgmonitor.exporter,
 # `oc explain postgrescluster.spec.monitoring.pgmonitor.exporter` confirmed
 # against the live cluster) on every instance pod, port "exporter" (9187) -
-# the ccp_* series dashboard-infra-data.yaml (ADR-0413) needs. PGO manages
+# the ccp_* series dashboard-data.yaml (ADR-0413) needs. PGO manages
 # the container/image itself; no image override needed here, same as
 # postgresVersion's own comment above about the operand image. PGO creates
 # no ServiceMonitor for this on its own - templates/podmonitor-postgres.yaml

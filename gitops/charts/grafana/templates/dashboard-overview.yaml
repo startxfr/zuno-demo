@@ -2,10 +2,12 @@
 # ADR-0413: landing page for the "Zuno Platform" folder - the platform's
 # ADR-0102 SLO/error-budget posture, a component-health summary and the
 # headline usage KPIs in one screen, with a dashboard-list panel linking to
-# the five dashboards below it (dashboard-ai-models.yaml,
+# the other dashboards below it (dashboard-ai-models.yaml,
 # dashboard-usage-cost.yaml, dashboard-agents-tools-rag.yaml,
-# dashboard-infra-data.yaml, dashboard-mesh-gateway.yaml - the same "Zuno
-# Platform" folder/"zuno" tag every one of them carries). Deliberately has
+# dashboard-infra-data.yaml, dashboard-data.yaml, dashboard-gitops.yaml,
+# dashboard-mesh-gateway.yaml - the same "Zuno Platform" folder/"zuno" tag
+# every one of them carries; dashboard-data.yaml and dashboard-gitops.yaml
+# split out of dashboard-infra-data.yaml on 2026-09-01). Deliberately has
 # no template variables of its own: this is meant to be read at a glance,
 # not filtered - drill-down happens on the linked dashboards.
 #
@@ -34,7 +36,7 @@ spec:
     {
       "uid": "zuno-overview",
       "title": "Zuno overview",
-      "description": "ADR-0413: platform landing page - SLO/error budget, component health, headline usage KPIs, links to the other five Zuno dashboards.",
+      "description": "ADR-0413: platform landing page - SLO/error budget, component health, headline usage KPIs, links to the other Zuno dashboards.",
       "tags": ["zuno", "overview", "slo", "adr-0102", "adr-0413"],
       "timezone": "browser",
       "schemaVersion": 39,

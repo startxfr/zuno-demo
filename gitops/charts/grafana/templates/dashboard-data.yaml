@@ -1,0 +1,202 @@
+{{- if .Values.grafana.enabled }}
+# ADR-0413, split 2026-09-01 out of dashboard-infra-data.yaml into its own
+# dashboard: the PostgreSQL/MariaDB/Redis database-exporter panels, kept
+# together so the data tier can be read without infrastructure noise.
+#
+# PostgreSQL panels fixed 2026-08-22: this was never a metric-name guessing
+# problem. PGO 5.8.8 explicitly does not create the ccp_monitoring role for
+# postgresVersion 18 ("postgres_exporter not supported for pg18; use OTel
+# for postgres 18 and later" - PGO also fails its own custom-query setup
+# every reconcile with `schema "monitor" does not exist`, harmless but
+# noisy). The sidecar exporter itself is the stock prometheus-community
+# postgres_exporter (DATA_SOURCE_* env vars, not a Crunchy-specific
+# binary), so once the role exists with pg_monitor granted, its built-in
+# collectors (not Crunchy's broken custom queries) work fine and expose
+# plain pg_stat_*/pg_database_size_bytes/pg_replication_lag_seconds names
+# - no ccp_* prefix ever existed on this exporter. The role's creation
+# (and password, kept in sync with the zuno-postgresql-monitoring secret
+# on every sync) is automated as of 2026-08-22 by
+# gitops/charts/postgresql/templates/job-monitoring-role.yaml, an ArgoCD
+# Sync-hook Job - see that file's own header for why PGO won't do this
+# itself on this Postgres version. An OTel-receiver alternative was
+# considered and ruled out: this cluster's Red Hat OpenTelemetry
+# Collector image ships no postgresql/sqlquery receiver at all.
+#
+# MariaDB (mysqld_exporter) and Redis (oliver006/redis_exporter, bitnami's
+# default) metric names are the stable upstream defaults and were already
+# correct. None of these panels filter by $namespace/$node/$pod - the
+# exporters are one-per-service, not multi-tenant, so no templating block
+# is needed here (unlike dashboard-infra-data.yaml).
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: data
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  uid: zuno-data
+  folder: "Zuno Platform"
+  json: |
+    {
+      "uid": "zuno-data",
+      "title": "Data",
+      "description": "ADR-0413, split 2026-09-01 from dashboard-infra-data.yaml: PostgreSQL/MariaDB/Redis database exporter health, throughput and cache efficiency.",
+      "tags": ["zuno", "data", "postgresql", "mariadb", "redis", "adr-0413"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "time": {"from": "now-6h", "to": "now"},
+      "refresh": "30s",
+      "links": [
+        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
+      ],
+      "panels": [
+        {
+          "id": 1,
+          "title": "Database exporters: up",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 24, "x": 0, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "min(pg_up)", "legendFormat": "postgresql"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "min(mysql_up)", "legendFormat": "mariadb"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "min(redis_up)", "legendFormat": "redis"}
+          ]
+        },
+        {
+          "id": 2,
+          "title": "PostgreSQL: active connections",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "postgres_exporter's built-in pg_stat_activity collector - verified live 2026-08-22 after fixing the ccp_monitoring role (PGO doesn't create it for pg18; see this dashboard's header comment).",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (pod) (pg_stat_activity_count)", "legendFormat": "{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 3,
+          "title": "PostgreSQL: transactions/s",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "postgres_exporter's built-in pg_stat_database collector - verified live 2026-08-22.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(pg_stat_database_xact_commit[5m])) + sum(rate(pg_stat_database_xact_rollback[5m]))"}
+          ]
+        },
+        {
+          "id": 4,
+          "title": "PostgreSQL: database size",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "postgres_exporter's built-in pg_database_size_bytes collector - verified live 2026-08-22.",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+          "fieldConfig": {"defaults": {"unit": "bytes"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "pg_database_size_bytes", "legendFormat": "{{`{{datname}}`}}"}
+          ]
+        },
+        {
+          "id": 5,
+          "title": "PostgreSQL: replication lag",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "3-instance Patroni cluster (docs/platform/slo.md's failover drill: new primary Ready in 4.8s). postgres_exporter's built-in pg_replication_lag_seconds collector - verified live 2026-08-22.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+          "fieldConfig": {"defaults": {"unit": "s"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "pg_replication_lag_seconds", "legendFormat": "{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 6,
+          "title": "MariaDB: connections",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "mysql_global_status_threads_connected", "legendFormat": "connected"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "mysql_global_variables_max_connections", "legendFormat": "max"}
+          ]
+        },
+        {
+          "id": 7,
+          "title": "MariaDB: queries/s and slow queries/s",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_questions[5m])", "legendFormat": "queries/s"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_slow_queries[5m])", "legendFormat": "slow queries/s"}
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Redis: memory used vs max",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+          "fieldConfig": {"defaults": {"unit": "bytes"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_used_bytes", "legendFormat": "used"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_memory_max_bytes", "legendFormat": "max"}
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Redis: hit ratio",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))"}
+          ]
+        },
+        {
+          "id": 10,
+          "title": "PostgreSQL: cache hit ratio",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Verified live 2026-08-22 once the ccp_monitoring role fix (job-monitoring-role.yaml) landed.",
+          "gridPos": {"h": 8, "w": 8, "x": 0, "y": 36},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(pg_stat_database_blks_hit[5m])) / (sum(rate(pg_stat_database_blks_hit[5m])) + sum(rate(pg_stat_database_blks_read[5m])))"}
+          ]
+        },
+        {
+          "id": 11,
+          "title": "MariaDB: InnoDB buffer pool hit ratio",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 8, "x": 8, "y": 36},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - (rate(mysql_global_status_innodb_buffer_pool_reads[5m]) / rate(mysql_global_status_innodb_buffer_pool_read_requests[5m]))"}
+          ]
+        },
+        {
+          "id": 12,
+          "title": "MariaDB: table lock waits",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 36},
+          "fieldConfig": {"defaults": {"unit": "ops"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_table_locks_waited[5m])", "legendFormat": "waited"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_table_locks_immediate[5m])", "legendFormat": "immediate"}
+          ]
+        }
+      ]
+    }
+{{- end }}

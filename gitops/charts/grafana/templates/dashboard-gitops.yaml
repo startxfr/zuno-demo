@@ -1,0 +1,87 @@
+{{- if .Values.grafana.enabled }}
+# ADR-0413, split 2026-09-01 out of dashboard-infra-data.yaml into its own
+# dashboard: ArgoCD sync/health (argocd_app_info - already queryable, no
+# scrape change needed) plus two new panels for the openshift-gitops
+# control-plane's own resource footprint, adapted from dashboard-infra-
+# data.yaml's cluster-wide "Deployment availability" and "CPU usage by
+# namespace" panels but hardcoded to namespace="openshift-gitops" (this
+# dashboard carries no $namespace variable - it's single-namespace by
+# design, unlike the infra dashboard).
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: gitops
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  uid: zuno-gitops
+  folder: "Zuno Platform"
+  json: |
+    {
+      "uid": "zuno-gitops",
+      "title": "GitOps",
+      "description": "ADR-0413, split 2026-09-01 from dashboard-infra-data.yaml: ArgoCD application sync/health status and the openshift-gitops control-plane's own resource footprint.",
+      "tags": ["zuno", "gitops", "argocd", "adr-0413"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "time": {"from": "now-6h", "to": "now"},
+      "refresh": "30s",
+      "links": [
+        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
+      ],
+      "panels": [
+        {
+          "id": 1,
+          "title": "ArgoCD application sync/health status",
+          "type": "table",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 16, "x": 0, "y": 0},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (name, sync_status, health_status) (argocd_app_info{namespace=\"openshift-gitops\"})", "format": "table", "instant": true}
+          ]
+        },
+        {
+          "id": 2,
+          "title": "ArgoCD apps out of sync",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "orange", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(argocd_app_info{namespace=\"openshift-gitops\", sync_status!=\"Synced\"}) or vector(0)"}
+          ]
+        },
+        {
+          "id": 3,
+          "title": "ArgoCD Deployment availability",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "dashboard-infra-data.yaml's \"Deployment availability\" panel, scoped to namespace=openshift-gitops.",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_deployment_status_replicas_available{namespace=\"openshift-gitops\"} / kube_deployment_spec_replicas{namespace=\"openshift-gitops\"}", "legendFormat": "{{`{{deployment}}`}}"}
+          ]
+        },
+        {
+          "id": 4,
+          "title": "ArgoCD CPU usage",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "dashboard-infra-data.yaml's \"CPU usage by namespace\" panel, scoped to namespace=openshift-gitops.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=\"openshift-gitops\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}"}
+          ]
+        }
+      ]
+    }
+{{- end }}

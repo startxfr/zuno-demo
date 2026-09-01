@@ -6,7 +6,7 @@
 # SharedResourceWarning between zuno-postgresql-d0 and -d1.
 # Scrapes the crunchy-postgres-exporter sidecar spec.monitoring.pgmonitor.
 # exporter above adds to every instance pod - the ccp_* series (connections,
-# transaction rate, database size, replication lag) dashboard-infra-data.yaml
+# transaction rate, database size, replication lag) dashboard-data.yaml
 # (ADR-0413) needs. A PodMonitor, not a ServiceMonitor: the exporter is a
 # sidecar container on the instance Pod, not fronted by its own Service (the
 # instance/-ha/-primary/-replica Services PGO creates are all postgres

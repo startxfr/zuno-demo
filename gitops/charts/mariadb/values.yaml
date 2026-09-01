@@ -117,7 +117,7 @@ cluster:
     max_connections=200
   # ADR-0413: mysqld-exporter sidecar (spec.metrics, `oc explain
   # mariadb.spec.metrics` confirmed against the live cluster) - the
-  # mysql_* series dashboard-infra-data.yaml needs. Unlike
+  # mysql_* series dashboard-data.yaml needs. Unlike
   # mariadbOperatorActivation.metrics above (the operator controller's OWN
   # metrics), this is the operand MariaDB CR's built-in exporter support:
   # the operator provisions the mysqld-exporter container, a monitoring DB
