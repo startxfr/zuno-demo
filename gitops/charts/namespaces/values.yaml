@@ -147,7 +147,7 @@ platformNamespaces:
       istio-injection: enabled
       zuno.io/managed: "true"
   - name: zuno-ai-build
-    displayName: Zuno Infra AI Runtime
+    displayName: Zuno AI Build
     description: >-
       In-cluster OpenShift build pipeline producing this platform's
       component images.
@@ -196,7 +196,7 @@ platformNamespaces:
       istio-injection: enabled
       zuno.io/managed: "true"
   - name: zuno-ai-run
-    displayName: Zuno AI Runtime
+    displayName: Zuno AI Run
     description: >-
       Agent Runtime, AI Gateway and MCP Gateway - shared runtime hosting
       every active agent.
@@ -224,7 +224,7 @@ platformNamespaces:
       istio-injection: enabled
       zuno.io/managed: "true"
   - name: zuno-mesh
-    displayName: Zuno Service Mesh
+    displayName: Zuno Infra Service Mesh
     description: >-
       Istio control plane (istiod), IstioCNI and istio-csr - the platform's
       mesh/mTLS layer (service-mesh component).
@@ -279,7 +279,7 @@ platformNamespaces:
     # by the API server, same pattern as ESO's secretstore-validate webhook.
     allowApiServerWebhooks: true
   - name: zuno-aap
-    displayName: Zuno Ansible Automation Platform
+    displayName: Zuno Infra AAP
     description: >-
       Ansible Automation Platform (Gateway, Controller, Hub, EDA) - the
       platform's automation-execution surface (ADR-0354).
