@@ -75,16 +75,30 @@ def enabled() -> bool:
     return MAAS_ADAPTER_ENABLED
 
 
-def _maas_bearer_token() -> str:
-    """Prefers the pod's own projected ServiceAccount token
-    (MAAS_SA_TOKEN_PATH) over the external API-key env var - read fresh
-    from disk on every call, never cached at import time, since kubelet
-    rotates a projected token in place before it expires (this file's
-    module-level constants are read once at import, which would silently
-    serve an expired token if this read the same way). Falls back to the
-    API-key path when no token file is configured, so an environment that
-    still relies on MAAS_GATEWAY_API_KEY keeps working unchanged.
+def _maas_bearer_token(caller_bearer_token: Optional[str] = None) -> str:
+    """2026-09-01 (identity-per-caller): prefers the real caller's own
+    Keycloak bearer token (the one this gateway already validated for its
+    own AuthN - app/auth.py's CallerIdentity.token) over the pod's fixed
+    ServiceAccount/API-key identity, so the MaaS Gateway's Authorino
+    AuthConfig (once ModelsAsService.spec.externalOIDC is set -
+    gitops/charts/models/templates/maas.yaml) resolves the REAL user's
+    sub/groups instead of always landing in the single shared "ai-gateway"
+    MaaSSubscription. Every real Zuno request has a caller identity by the
+    time chat_model_for() runs (app/main.py's `identity` dependency is
+    required, never optional) - the None branch here only covers a
+    standalone/test caller of this module that never threads one through.
+
+    Falls back to the SA-token/API-key path below only when no caller
+    token was passed in at all - this does NOT retry with the SA token if
+    the MaaS Gateway itself rejects the forwarded caller token at request
+    time (e.g. the still-open clientId/audience question, see
+    templates/maas.yaml's comment); that would surface as a normal
+    provider failure and this candidate's own existing fallback-to-next-
+    provider handling (app/main.py) takes over, same as any other
+    transient provider error.
     """
+    if caller_bearer_token:
+        return caller_bearer_token
     if MAAS_SA_TOKEN_PATH and os.path.exists(MAAS_SA_TOKEN_PATH):
         with open(MAAS_SA_TOKEN_PATH, "r", encoding="utf-8") as fh:
             token = fh.read().strip()
@@ -112,7 +126,11 @@ def should_use_maas(cfg: Dict[str, Any], candidate_kind: str = "local") -> bool:
     return True
 
 
-def chat_model_via_maas(cfg: Dict[str, Any], request_id: Optional[str] = None) -> BaseChatModel:
+def chat_model_via_maas(
+    cfg: Dict[str, Any],
+    request_id: Optional[str] = None,
+    caller_bearer_token: Optional[str] = None,
+) -> BaseChatModel:
     """The exact same `ChatOpenAI` class every direct candidate in
     app/providers.py already uses, pointed at the MaaS gateway's
     OpenAI-compatible endpoint. `maas_model_ref` lets a provider-routing.yaml
@@ -176,7 +194,7 @@ def chat_model_via_maas(cfg: Dict[str, Any], request_id: Optional[str] = None) -
 
     return ChatOpenAI(
         base_url=endpoint,
-        api_key=_maas_bearer_token(),
+        api_key=_maas_bearer_token(caller_bearer_token),
         model=cfg.get("maas_model_ref", cfg.get("model")),
         temperature=cfg.get("temperature", 0.2),
         timeout=cfg.get("timeout_seconds", 60),

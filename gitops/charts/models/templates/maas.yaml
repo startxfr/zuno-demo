@@ -56,6 +56,54 @@ spec:
   gatewayRef:
     name: maas-default-gateway
     namespace: openshift-ingress
+{{- if .Values.maas.externalOIDC.enabled }}
+---
+# Live-verified 2026-09-01: unlike the Tenant CR above, ModelsAsService
+# reconciles for real (owned by DataScienceCluster zuno-dsc -> Config
+# default -> this object, all Ready=True) - it is auto-created once when
+# spec.components.kserve.modelsAsService.managementState is set to
+# Managed in gitops/charts/openshift-ai/templates/datasciencecluster.yaml,
+# but that DSC field is a bare managementState toggle with no externalOIDC
+# passthrough, so this object has to be addressed directly. We only ever
+# declare the two fields we actually need to change (externalOIDC below,
+# plus gatewayRef mirrored verbatim for a complete, self-documenting
+# source rather than an opaque partial patch) - Kuadrant regenerates
+# maas-gateway-auth's AuthPolicy from this spec, adding real Keycloak
+# JWTs as a third identity source alongside its existing api-keys/
+# kubernetesTokenReview methods, so ai-gateway can start forwarding the
+# real caller's own bearer token instead of its fixed ServiceAccount
+# credential (see app/maas_adapter.py) - the point of this whole change:
+# per-group (agent_tekos/sales) MaaSSubscription token budgets, already
+# declared below, start being the ones Limitador actually enforces
+# instead of everything landing in the single shared "ai-gateway" pool.
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: ModelsAsService
+metadata:
+  name: default-modelsasservice
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  gatewayRef:
+    name: maas-default-gateway
+    namespace: openshift-ingress
+  externalOIDC:
+    # UNVERIFIED as of this commit (2026-09-01): whether Authorino
+    # enforces this as a strict token audience match, or only uses it for
+    # discovery/introspection. zuno-admin-api is the closest existing fit
+    # (the platform's one shared, confidential, service-account-enabled
+    # client used for cross-agent internal calls - ADR-0530/WP-091) but no
+    # real end-user login ever carries it as aud/azp, since it's
+    # client-credentials-only (serviceAccountsEnabled: true,
+    # standardFlowEnabled/directAccessGrantsEnabled: false) - every real
+    # user's token instead carries whichever persona frontend client they
+    # logged into (tekos-frontend, arkos-frontend, ...). If live testing
+    # shows audience IS strictly enforced, this needs a shared audience
+    # mapper added to every persona frontend client instead (same fix
+    # class as the 2026-08-30 WP-103 missing-audience-mapper SSO bug) -
+    # do not treat this value as final without that live check.
+    issuerUrl: https://keycloak.{{ .Values.clusterBaseDomain }}/realms/zuno
+    clientId: {{ .Values.maas.externalOIDC.clientId }}
+{{- end }}
 {{- range .Values.maas.models }}
 ---
 {{- $model := . }}

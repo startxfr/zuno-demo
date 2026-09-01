@@ -64,7 +64,7 @@ def _run_stream(candidates, adapter_decl):
     pairs chat_model_for was actually called with."""
     calls = []
 
-    def _spy_chat_model_for(candidate, cfg, request_id=None, adapter=None):
+    def _spy_chat_model_for(candidate, cfg, request_id=None, adapter=None, caller_bearer_token=None):
         calls.append((candidate.name, adapter))
         return _FakeStreamingModel()
 

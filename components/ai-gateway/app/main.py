@@ -290,6 +290,7 @@ async def chat_completions(
         messages,
         caller_sub=identity.sub,
         groups=identity.groups,
+        caller_bearer_token=identity.token,
         local_only=local_only,
         task_id=x_zuno_task,
         requested_model=payload.model,
@@ -418,6 +419,11 @@ async def _invoke_with_fallback(
     tools: Optional[List[Dict[str, Any]]] = None,
     agent: str = "",
     run_id: Optional[str] = None,
+    # 2026-09-01 (identity-per-caller): forwarded to chat_model_for() so
+    # maas_adapter can present the real caller's own Keycloak identity to
+    # the MaaS Gateway instead of ai-gateway's fixed ServiceAccount - see
+    # maas_adapter._maas_bearer_token's own docstring.
+    caller_bearer_token: Optional[str] = None,
 ) -> ChatCompletionResponse:
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
@@ -483,7 +489,10 @@ async def _invoke_with_fallback(
                 # ledger already; this is the first time it reaches a trace.
                 project_id=project_id,
             ) as call:
-                model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
+                model = chat_model_for(
+                    candidate, cfg, request_id=request_id, adapter=adapter_name,
+                    caller_bearer_token=caller_bearer_token,
+                )
                 if tools:
                     model = model.bind_tools(tools)
                 result = await model.ainvoke(messages)
@@ -620,7 +629,10 @@ async def _stream_completion(
                 run_id=run_id, model_kind=candidate.kind,
                 project_id=project_id,  # ADR-0528
             ) as call:
-                model = chat_model_for(candidate, cfg, request_id=request_id, adapter=adapter_name)
+                model = chat_model_for(
+                    candidate, cfg, request_id=request_id, adapter=adapter_name,
+                    caller_bearer_token=identity.token if identity else None,
+                )
                 if tools:
                     model = model.bind_tools(tools)
                 # ADR-0029: accumulate chunks via AIMessageChunk.__add__ so the

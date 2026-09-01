@@ -48,6 +48,7 @@ def chat_model_for(
     cfg: Dict[str, Any],
     request_id: Optional[str] = None,
     adapter: Optional[str] = None,
+    caller_bearer_token: Optional[str] = None,
 ) -> BaseChatModel:
     via_maas = maas_adapter.should_use_maas(cfg, candidate.kind)
     if adapter and (candidate.kind != "local" or via_maas or not cfg.get("serves_adapters", False)):
@@ -74,7 +75,9 @@ def chat_model_for(
         # a header - direct providers already get it on their own
         # model_call_span (app/main.py), which is the only correlation
         # surface Zuno controls for those.
-        return maas_adapter.chat_model_via_maas(cfg, request_id=request_id)
+        return maas_adapter.chat_model_via_maas(
+            cfg, request_id=request_id, caller_bearer_token=caller_bearer_token,
+        )
 
     if candidate.kind == "local":
         from langchain_openai import ChatOpenAI

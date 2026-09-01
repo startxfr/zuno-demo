@@ -496,6 +496,22 @@ platformNamespaces:
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "2Gi" }
+  - name: models-as-a-service
+    displayName: MaaS Governance Plane
+    description: >-
+      The maas-controller's own hardcoded operand namespace
+      (MAAS_SUBSCRIPTION_NAMESPACE, not configurable via any CRD - verified
+      live 2026-09-01) for MaaSSubscription/MaaSAuthPolicy/Tenant CRs -
+      gitops/charts/models' own zuno-models-d1 Application already creates
+      MaaSSubscription/MaaSAuthPolicy objects here (tracked fine in ArgoCD),
+      but relied on the maas-controller having created the namespace first.
+      Created here instead so a from-scratch Day 0/1 install doesn't race
+      the operator for it. Holds CRs only, no pods (verified live) - the
+      default-deny NetworkPolicy baseline below is a no-op today, kept on
+      for defense-in-depth rather than skipped like zuno-ai-run.
+    allowedFromNamespaces: []
+    extraLabels:
+      zuno.io/managed: "true"
 
 # ADR-0351: MIG-aware GPU quota mirroring the permanent node's all-balanced
 # partition (2x 1g.24gb + 1x 2g.48gb on the RTX PRO 6000 Blackwell 96GB) -

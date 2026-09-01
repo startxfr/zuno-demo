@@ -54,3 +54,8 @@
       # sait de nouveau resoudre les subscriptions (WP-076).
       lightspeed:
         enabled: "{{ models_lightspeed_direct | default(true) | bool }}"
+      # 2026-09-01: same REMPLACE-en-bloc trap as lightspeed above - must
+      # be set here, not in gitops/apps/models/application-d1.yaml. Feeds
+      # maas.externalOIDC's derived Keycloak issuer
+      # (gitops/charts/models/templates/maas.yaml).
+      clusterBaseDomain: "{{ cluster_base_domain }}"

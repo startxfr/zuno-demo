@@ -3,6 +3,11 @@
 
 namespace: zuno-ai-run
 
+# Substituted by ansible/tasks/apply_gitops_app.yml (same
+# apps.mycluster.example.com placeholder pattern as gitops/apps/mcp) -
+# feeds maas.externalOIDC's derived Keycloak issuer below.
+clusterBaseDomain: apps.mycluster.example.com
+
 # WP-086: keep the three GPU predictors off the same node when the cluster has
 # more than one MIG node, so losing a node degrades inference instead of killing
 # it outright. Every constraint it gates is
@@ -704,6 +709,17 @@ maas:
   # MaaSAuthPolicy triple (templates/maas.yaml); the Tenant CR stays a
   # singleton (one per namespace, CEL-enforced) outside this list.
   enabled: true
+
+  # 2026-09-01: lets ai-gateway forward the real calling user's Keycloak
+  # identity to the MaaS Gateway instead of its own fixed ServiceAccount
+  # credential, so the per-group MaaSSubscription token budgets below
+  # (agent_tekos/sales) actually get used instead of every call landing in
+  # the single shared "ai-gateway" subscription. See templates/maas.yaml's
+  # own comment on the ModelsAsService block for the clientId caveat still
+  # to verify live.
+  externalOIDC:
+    enabled: true
+    clientId: zuno-admin-api
 
   models:
     # The proven WP-27 reference: gpt-oss-20b, live-verified end-to-end
