@@ -79,14 +79,12 @@ spec:
         {
           "id": 2,
           "title": "Span durations by name & service",
-          "type": "barchart",
+          "type": "timeseries",
           "datasource": {"type": "tempo", "uid": "tempo"},
-          "description": "Every span this run made, grouped/colored by originating service. Spans are independent traces (no cross-service parent/child linking, ADR-0517) - this reconstructs a run's shape without a true connected waterfall.",
+          "description": "Every span this run made, grouped/colored by originating service, one bar per span at its start time. Spans are independent traces (no cross-service parent/child linking, ADR-0517) - this reconstructs a run's shape without a true connected waterfall. Uses timeseries/bars rather than the barchart panel type: barchart throws \"Converting circular structure to JSON\" whenever two spans share the same name within a service (a known Grafana bug in its duplicate-category handling) - timeseries doesn't hit that path, same as the Span timeline panel below.",
           "gridPos": {"h": 10, "w": 24, "x": 0, "y": 4},
-          "fieldConfig": {"defaults": {"unit": "ms", "custom": {"axisLabel": "Duration (ms)"}}, "overrides": []},
+          "fieldConfig": {"defaults": {"unit": "ms", "custom": {"drawStyle": "bars", "fillOpacity": 60, "axisLabel": "Duration (ms)"}}, "overrides": []},
           "options": {
-            "orientation": "horizontal",
-            "xTickLabelRotation": 0,
             "legend": {"displayMode": "list", "placement": "bottom"},
             "tooltip": {"mode": "single"}
           },
