@@ -32,17 +32,22 @@ this tests.
 # .Values.maas.models below. gatewayRef sets the tenant-wide default; each
 # LLMInferenceService's own router.gateway.refs is still explicit for
 # clarity/defense-in-depth.
-# OPEN (2026-08-25, ADR-0201): this Tenant never reconciles. Live it sits
-# with a completely empty .status while the operator-generated
-# models-as-a-service/default-tenant reports Ready=True/Reconciled, and
-# maas-api itself runs with TENANT_NAME=models-as-a-service - so the
-# controller only ever reconciles the tenant in its own managed namespace
-# and this one is inert. Recorded rather than removed because the
-# relationship to the still-open entitlement gap (/v1/models returns an
-# empty list even for a persona in a subscribed group, and the header-form
-# completion returns "no matching subscription found for user") is not yet
-# established; deleting it blind could remove a dependency the
-# MaaSModelRef in this namespace relies on. See ADR-0201's dated notes.
+# RESOLVED (2026-09-01, was OPEN since 2026-08-25/ADR-0201): this Tenant
+# never reconciles - it sits with a completely empty .status while the
+# operator-generated models-as-a-service/default-tenant reports
+# Ready=True/Reconciled, since maas-api runs with
+# TENANT_NAME=models-as-a-service and the controller only ever reconciles
+# the tenant in its own managed namespace. Confirmed live by actually
+# deleting it: every existing MaaSModelRef/MaaSSubscription/MaaSAuthPolicy
+# kept working (the three MaaS validating webhooks - vaitenant,
+# vmaassubscription, vmaasauthpolicy - only fire on CREATE, never UPDATE),
+# but a dry-run CREATE of a new MaaSSubscription in zuno-ai-run was
+# rejected with exactly the admission error above until the Tenant was
+# restored. So it's inert for the entitlement gap (unrelated to that
+# investigation, which stays a separate open item), but a real, working
+# guard for any future MaaSSubscription/MaaSAuthPolicy/AITenant created
+# directly in this namespace - keep it for that reason alone, not for
+# anything it reconciles into.
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: Tenant
 metadata:
