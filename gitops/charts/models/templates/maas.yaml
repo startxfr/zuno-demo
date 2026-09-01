@@ -76,7 +76,7 @@ spec:
 # per-group (agent_tekos/sales) MaaSSubscription token budgets, already
 # declared below, start being the ones Limitador actually enforces
 # instead of everything landing in the single shared "ai-gateway" pool.
-apiVersion: maas.opendatahub.io/v1alpha1
+apiVersion: components.platform.opendatahub.io/v1alpha1
 kind: ModelsAsService
 metadata:
   name: default-modelsasservice
