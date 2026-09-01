@@ -196,6 +196,27 @@ spec:
             {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_table_locks_waited[5m])", "legendFormat": "waited"},
             {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(mysql_global_status_table_locks_immediate[5m])", "legendFormat": "immediate"}
           ]
+        },
+        {
+          "id": 13,
+          "title": "Redis: connected clients",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 44},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "redis_connected_clients"}
+          ]
+        },
+        {
+          "id": 14,
+          "title": "Redis: commands/s",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 18, "x": 6, "y": 44},
+          "fieldConfig": {"defaults": {"unit": "ops"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "rate(redis_commands_processed_total[5m])"}
+          ]
         }
       ]
     }
