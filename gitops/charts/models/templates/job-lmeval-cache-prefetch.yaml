@@ -78,6 +78,34 @@ spec:
       # were landing on ip-10-18-31-92 - the exact node that crossed the
       # eviction threshold 22 seconds after they were created.
       #
+      # MEASURED OUTCOME 2026-09-03: this DOES NOT move them. Recreated
+      # with the affinity applied, all three pods landed on
+      # ip-10-18-31-92 again. ip-10-18-15-25 - the only eligible
+      # non-master in the zone - carries nvidia.com/gpu=true:PreferNoSchedule
+      # (ADR-0351, keeping platform pods off the inference nodes), so the
+      # +100 affinity bonus and the taint penalty apply to that SAME node
+      # and feed one score, while the master carries neither. Affinity
+      # alone cannot win that comparison.
+      #
+      # Making it work needs a toleration for that taint. That was put to
+      # the user and DECLINED: a 36-second no-GPU Job is a weak reason to
+      # erode a taint another ADR placed deliberately, and "it is only a
+      # short job" is how such a taint dies one exception at a time. The
+      # block is kept rather than reverted because it is harmless, costs
+      # nothing, and becomes correct the day the topology gains a second
+      # non-master node in eu-west-2a or that taint is reconsidered on its
+      # own merits.
+      #
+      # Ruled out before concluding: the RWO PVC is NOT pinning them. There
+      # was no live VolumeAttachment and qwen35-9b-mmlu, mounting the same
+      # lmeval-hf-cache, ran on ip-10-18-15-25. The volume moves freely
+      # within the zone.
+      #
+      # The real cause is structural and is recorded, not treated: the
+      # three etcd nodes have the SMALLEST disks in the cluster (99.4 GiB
+      # against 249.4 on the GPU workers) and are the only schedulable ones
+      # with that constraint. See memory diskpressure-master-cascades-into-mesh.
+      #
       # PREFERRED, not required, and the distinction is load-bearing:
       # pvc-lmeval-cache's PV is zone-bound to eu-west-2a, and that zone
       # holds exactly two nodes - the pressured master and one worker. A
