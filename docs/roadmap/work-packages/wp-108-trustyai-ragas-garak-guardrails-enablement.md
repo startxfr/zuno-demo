@@ -1,6 +1,14 @@
 # WP-108: TrustyAI generic RAGAS/Garak enablement and mcpGuardrailsMode flip
 
-- **State:** Not started (2026-09-02)
+- **State:** Done — live-verified 2026-09-02 on demo222, with a major course-correction: the
+  `mcpGuardrailsMode` flip was executed, proven destructive (it kills the LMEvalJob controller -
+  see Live findings), and reverted the same hour; ADR-0534 amended in place. Delivered instead:
+  a Garak smoke scan (operand-shipped image, real run against qwen through mesh TLS origination,
+  report.jsonl+html produced, Job `succeeded=1`) and a standalone built-in guardrails detector
+  (`GuardrailsOrchestrator` Ready/DeploymentReady/RouteReady, live PII detection proven: email +
+  SSN both flagged at score 1.0 with exact offsets). RAGAS: no provider in this release train,
+  moved to WP-109. `make d3 check trustyai-config` reports all of it green in one pass. Commits
+  `fc7b9dd1` (flip), `9c99c3a8` (smoke tests), `806391b0` (revert + ADR amendment).
 - **ADRs:** ADR-0534 (Accepted, Phase 2 - infrastructure half)
 - **Depends on:** WP-107 (Done - baseline health check green, `trustyai-config` scaffold in place)
 - **Related:** ADR-0107/WP-10 (the model quality gate this and WP-109 eventually feed)
