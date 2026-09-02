@@ -11,11 +11,17 @@
 # webhook.namespaceSelector: the webhook ONLY intercepts admission
 # requests in namespaces carrying policy.rhtas.com/include=true (a
 # namespace without it is invisible to this webhook entirely, no audit
-# log either) - gitops/charts/namespaces labels the zuno namespaces that
-# actually run these 14 images with it. Combined with
-# clusterimagepolicy.yaml's spec.mode: warn, this is belt-and-braces
-# audit-only: even a labeled namespace can only ever get a warning, never
-# a reject, in this WP's scope.
+# log either). NOT applied to any zuno namespace yet - live finding,
+# 2026-09-02: this webhook's "container images must be referenced by
+# digest" check is unconditional, NOT governed by clusterimagepolicy.yaml's
+# spec.mode: warn (that only governs the signature-verification RESULT).
+# Every chart in this repo still declares `tag: latest` (ADR-0115 gap 2),
+# so labeling any real zuno namespace makes the webhook actively reject
+# real pods - observed live on a signing Job itself (6 rejected admission
+# attempts before a K8s Job-controller retry happened to succeed).
+# Deployed here dormant (zero namespaces scoped) until that gap closes -
+# see gitops/charts/namespaces/values.yaml's zuno-ai-build/zuno-mlops/
+# zuno-ai-run entries for the full note.
 # Live finding, 2026-09-02: policy-controller-operator's own admission
 # webhook hard-rejects this CR outside a namespace literally named
 # "policy-controller-operator" ("PolicyController objects may only be
