@@ -1,0 +1,78 @@
+{{- /*
+ADR-0534/WP-108: Garak smoke test - proves the operand-shipped Garak
+image runs on this cluster and produces a scan report against a real
+local model, WITHOUT being a meaningful security scan yet (that is
+WP-109, on real agent traffic). One cheap probe, bounded generations.
+
+Image: the exact digest the TrustyAI operator ships for its own Garak
+provider (RELATED_IMAGE_ODH_TRUSTYAI_GARAK_LLS_PROVIDER_DSP_IMAGE on the
+live CSV) - pinned in values.yaml rather than discovered, so the render
+is deterministic; bump it when the operator bumps.
+
+base_url is plain http on purpose - the pod is mesh-injected and the
+KServe-generated DestinationRule does the verified TLS origination. An
+https URL from inside the mesh double-wraps TLS and fails with
+"[SSL] record layer failure" - see [[lmevaljob-mesh-double-tls]] /
+WP-107's Live findings (commit 690892da) for the twice-reproduced proof.
+
+Labels: app.kubernetes.io/name is DELIBERATELY "lm-eval" - the qwen
+NetworkPolicy's 8000-ingress allowance (added by WP-10 for eval-class
+workloads) matches that label; reusing it keeps this smoke test from
+widening any NetworkPolicy. A dedicated trustyai-eval identity + NP rule
+is WP-109's call, once real (non-smoke) eval traffic exists.
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.garakSmoke.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: garak-smoke
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: lm-eval
+    app.kubernetes.io/component: garak-smoke
+  annotations:
+    argocd.argoproj.io/sync-options: Replace=true,Force=true
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: {{ .Values.garakSmoke.deadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lm-eval
+        app.kubernetes.io/component: garak-smoke
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: garak
+          image: {{ .Values.garakSmoke.image }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              export HOME=/tmp
+              # CLI confirmed live 2026-09-02: garak v0.15.0+rhaiv.2 at
+              # /opt/app-root/bin/garak in this exact image digest.
+              garak \
+                --model_type openai.OpenAICompatible \
+                --model_name {{ .Values.garakSmoke.modelName }} \
+                --generator_options '{"openai":{"OpenAICompatible":{"uri":"{{ .Values.garakSmoke.baseUrl }}","api_key":"smoke-test-unused"}}}' \
+                --probes {{ .Values.garakSmoke.probe }} \
+                --generations {{ .Values.garakSmoke.generations }} \
+                --report_prefix /tmp/garak-smoke
+              echo "--- garak smoke report summary ---"
+              ls -l /tmp/garak-smoke* 2>/dev/null || ls -l /tmp/*.jsonl 2>/dev/null || true
+          env:
+            # garak's OpenAI-compatible generator reads the key from env as
+            # its fallback; the local predictor ignores auth entirely.
+            - name: OPENAICOMPATIBLE_API_KEY
+              value: smoke-test-unused
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+{{- end }}

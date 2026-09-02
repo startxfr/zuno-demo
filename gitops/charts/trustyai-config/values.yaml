@@ -1,11 +1,18 @@
-# ADR-0534/WP-107. Scaffold only: this chart renders NOTHING yet on either
-# the -d0 or -d1 side, the same shape gitops/charts/aap-config and
-# gitops/charts/lightspeed-config started from before their first real
-# content landed. WP-108 adds the first templates/ content here (generic
-# RAGAS/Garak smoke-test Jobs, gated behind trustyaiConfig.enabled); WP-109
-# adds the Agent Runtime guardrail wiring and the PEFT/LoRA comparison
-# pipeline. Keeping the gate here now means WP-108/WP-109 only add
-# templates, never touch this file's shape.
+# ADR-0534/WP-107 scaffold, populated by WP-108 with the first real
+# content: two operand-native smoke tests proving the evaluation/guardrails
+# capability runs on this cluster - NOT yet wired to any real agent
+# traffic (that is WP-109). Everything is gated behind
+# trustyaiConfig.enabled so the -d0 Application renders nothing and only
+# -d1 creates resources, same shape aap-config/lightspeed-config use.
+#
+# RAGAS note (WP-108 finding, 2026-09-02): this OpenShift AI release
+# train ships NO RAGAS provider or image - the operand's eval providers
+# are lm_evaluation_harness/lighteval/guidellm/ibm-clear (EvalHub
+# collections + trustyai-service-operator-config, checked live), plus
+# Garak. RAGAS therefore lands in WP-109 against real RAG retrievals
+# (its only meaningful input), via a custom-built image if the operand
+# still lacks it then - preferring shipped frameworks first is exactly
+# ADR-0534's stated rule.
 trustyaiConfig:
   enabled: false
 
@@ -13,3 +20,33 @@ trustyaiConfig:
 # (gitops/charts/models), reused by this component's precheck rather than
 # hardcoded a second time - see ansible/tasks/report_lmevaljobs.yml.
 lmevalNamespace: zuno-ai-run
+
+# Every resource this chart renders lands beside the models it evaluates.
+namespace: zuno-ai-run
+
+# WP-108: standalone built-in guardrails detectors (no orchestrator, no
+# InferenceService wiring - see templates/guardrailsorchestrator.yaml).
+guardrailsSmoke:
+  enabled: true
+  name: zuno-guardrails-smoke
+
+# WP-108: one bounded Garak scan against the local qwen predictor,
+# proving the shipped scanner runs end-to-end and emits a report.
+garakSmoke:
+  enabled: true
+  # The digest the TrustyAI operator's CSV ships as
+  # RELATED_IMAGE_ODH_TRUSTYAI_GARAK_LLS_PROVIDER_DSP_IMAGE (read live
+  # 2026-09-02; garak CLI v0.15.0+rhaiv.2 confirmed inside). Pinned, not
+  # discovered: deterministic render beats auto-tracking here, bump when
+  # the operator does.
+  image: registry.redhat.io/rhoai/odh-trustyai-garak-lls-provider-dsp-rhel9@sha256:85891ce81a3d32df1df8cdc14f4c9bc01bf081a2768baacaa7b452dba2f40652
+  modelName: qwen3.6-27b-instruct
+  # Plain http through the mesh - see the template comment and
+  # [[lmevaljob-mesh-double-tls]].
+  baseUrl: http://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
+  # test.Blank: garak's own connectivity/smoke probe (empty prompts) -
+  # cheap by design. Real security probes (jailbreak, prompt injection)
+  # are WP-109 scope, on real agent traffic.
+  probe: test.Blank
+  generations: 1
+  deadlineSeconds: 1800

@@ -53,3 +53,41 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/report_lmevaljobs.yml"
   vars:
     lmeval_namespace: "{{ trustyai_config_lmeval_namespace | default('zuno-ai-run') }}"
+
+# ADR-0534/WP-108: the two operand-native smoke tests this component now
+# renders. Diagnostic only, same never-gates posture as the blocks above.
+- name: "trustyai-config | look up the Garak smoke-test Job (WP-108)"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ trustyai_config_namespace | default('zuno-ai-run') }}"
+    name: garak-smoke
+  register: _tac_garak
+  ignore_errors: true
+
+- name: "trustyai-config | report Garak smoke-test state"
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'Garak smoke Job absent (trustyaiConfig/garakSmoke disabled or not synced yet).'
+         if (_tac_garak.resources | default([]) | length) == 0
+         else 'Garak smoke Job: succeeded=' + (_tac_garak.resources[0].status.succeeded | default(0) | string)
+              + ' failed=' + (_tac_garak.resources[0].status.failed | default(0) | string) }}
+
+- name: "trustyai-config | look up the guardrails smoke GuardrailsOrchestrator (WP-108)"
+  kubernetes.core.k8s_info:
+    api_version: trustyai.opendatahub.io/v1alpha1
+    kind: GuardrailsOrchestrator
+    namespace: "{{ trustyai_config_namespace | default('zuno-ai-run') }}"
+    name: zuno-guardrails-smoke
+  register: _tac_guardrails
+  ignore_errors: true
+
+- name: "trustyai-config | report guardrails smoke state"
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'GuardrailsOrchestrator zuno-guardrails-smoke absent (disabled or not synced yet).'
+         if (_tac_guardrails.resources | default([]) | length) == 0
+         else 'GuardrailsOrchestrator zuno-guardrails-smoke: phase='
+              + (_tac_guardrails.resources[0].status.phase | default('(none)') | string)
+              + ' conditions=' + (_tac_guardrails.resources[0].status.conditions | default([])
+                | map(attribute='type') | list | join(',') | default('(none)', true)) }}

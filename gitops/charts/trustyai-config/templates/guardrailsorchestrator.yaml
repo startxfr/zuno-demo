@@ -1,0 +1,28 @@
+{{- /*
+ADR-0534/WP-108 step: prove the guardrails half of the TrustyAI operand
+actually runs on this cluster. Standalone built-in detectors mode
+(disableOrchestrator: true): deploys ONLY the built-in detector server
+(regex/heuristic detectors - PII, prompt-injection patterns), no
+orchestrator in front of any InferenceService yet. Wiring an orchestrator
+to real model traffic is WP-109's scope, not this smoke test's.
+
+The CRD was confirmed live on this cluster (guardrailsorchestrators.
+trustyai.opendatahub.io/v1alpha1, `oc explain` 2026-09-02): replicas is
+the only required field; the operator resolves the detector image from
+trustyai-service-operator-config in redhat-ods-applications.
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.guardrailsSmoke.enabled }}
+---
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: GuardrailsOrchestrator
+metadata:
+  name: {{ .Values.guardrailsSmoke.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: trustyai-guardrails
+    app.kubernetes.io/component: guardrails-smoke
+spec:
+  replicas: 1
+  disableOrchestrator: true
+  enableBuiltInDetectors: true
+{{- end }}
