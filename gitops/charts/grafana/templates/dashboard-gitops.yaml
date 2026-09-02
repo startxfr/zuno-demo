@@ -7,6 +7,22 @@
 # namespace" panels but hardcoded to namespace="openshift-gitops" (this
 # dashboard carries no $namespace variable - it's single-namespace by
 # design, unlike the infra dashboard).
+#
+# Layout reworked 2026-09-02 into rows using the CLASSIC schema's native
+# "row" panel type (type: row, collapsed: true/false), NOT Grafana's v2
+# schema - a first attempt at row-grouping via the v2 "Dashboard" schema
+# (elements/layout/vizConfig) broke every one of these dashboards'
+# GitOps sync: grafana-operator v5.24.0 posts spec.json to the classic
+# /api/dashboards/db endpoint, which rejects a v2-format body outright,
+# and even a correctly-wrapped v2 body ({"apiVersion":...,"kind":
+# "Dashboard","spec":{...}}) still gets rejected for any dashboard that
+# already exists ("must not include an id on the root element" - the
+# operator injects the dashboard's known internal id on every update).
+# That whole attempt was reverted (see git history). The classic "row"
+# panel type below was live-verified against this same endpoint first
+# (a throwaway probe dashboard, both an expanded and a collapsed row)
+# before being applied here - no known incompatibility with this
+# operator version.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -27,59 +43,181 @@ spec:
       "uid": "zuno-gitops",
       "title": "GitOps",
       "description": "ADR-0413, split 2026-09-01 from dashboard-infra-data.yaml: ArgoCD application sync/health status and the openshift-gitops control-plane's own resource footprint.",
-      "tags": ["zuno", "gitops", "argocd"],
+      "tags": [
+        "zuno",
+        "gitops",
+        "argocd"
+      ],
       "timezone": "browser",
       "schemaVersion": 39,
-      "time": {"from": "now-6h", "to": "now"},
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
       "refresh": "30s",
       "links": [
-        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
+        {
+          "type": "dashboards",
+          "tags": [
+            "zuno"
+          ],
+          "asDropdown": true,
+          "keepTime": true,
+          "title": "Zuno dashboards"
+        }
       ],
       "panels": [
+        {
+          "id": 1004,
+          "type": "row",
+          "title": "Sync health",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "panels": []
+        },
         {
           "id": 1,
           "title": "ArgoCD application sync/health status",
           "type": "table",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 16, "x": 0, "y": 0},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 16,
+            "x": 0,
+            "y": 1
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (name, sync_status, health_status) (argocd_app_info{namespace=\"openshift-gitops\"})", "format": "table", "instant": true}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (name, sync_status, health_status) (argocd_app_info{namespace=\"openshift-gitops\"})",
+              "format": "table",
+              "instant": true
+            }
           ]
         },
         {
           "id": 2,
           "title": "ArgoCD apps out of sync",
           "type": "stat",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 8, "x": 16, "y": 0},
-          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
-            {"color": "green", "value": null}, {"color": "orange", "value": 1}
-          ]}}},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 8,
+            "x": 16,
+            "y": 1
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 1
+                  }
+                ]
+              }
+            }
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "count(argocd_app_info{namespace=\"openshift-gitops\", sync_status!=\"Synced\"}) or vector(0)"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "count(argocd_app_info{namespace=\"openshift-gitops\", sync_status!=\"Synced\"}) or vector(0)"
+            }
           ]
         },
         {
-          "id": 3,
-          "title": "ArgoCD Deployment availability",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "dashboard-infra-data.yaml's \"Deployment availability\" panel, scoped to namespace=openshift-gitops.",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_deployment_status_replicas_available{namespace=\"openshift-gitops\"} / kube_deployment_spec_replicas{namespace=\"openshift-gitops\"}", "legendFormat": "{{`{{deployment}}`}}"}
-          ]
-        },
-        {
-          "id": 4,
-          "title": "ArgoCD CPU usage",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "dashboard-infra-data.yaml's \"CPU usage by namespace\" panel, scoped to namespace=openshift-gitops.",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=\"openshift-gitops\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}"}
+          "id": 1005,
+          "type": "row",
+          "title": "Control plane",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 9
+          },
+          "panels": [
+            {
+              "id": 3,
+              "title": "ArgoCD Deployment availability",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "description": "dashboard-infra-data.yaml's \"Deployment availability\" panel, scoped to namespace=openshift-gitops.",
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percentunit",
+                  "min": 0,
+                  "max": 1
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "kube_deployment_status_replicas_available{namespace=\"openshift-gitops\"} / kube_deployment_spec_replicas{namespace=\"openshift-gitops\"}",
+                  "legendFormat": "{{`{{deployment}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 4,
+              "title": "ArgoCD CPU usage",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "description": "dashboard-infra-data.yaml's \"CPU usage by namespace\" panel, scoped to namespace=openshift-gitops.",
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=\"openshift-gitops\"}[5m]))",
+                  "legendFormat": "{{`{{namespace}}`}}"
+                }
+              ]
+            }
           ]
         }
       ]
