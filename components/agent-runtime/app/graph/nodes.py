@@ -791,6 +791,87 @@ def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
     return code_node
 
 
+# WP-112 (ADR-0516's own "Accepted risks" section, ADR-0526's 2026-08-29
+# Amendment): qwen3.5-9b-wesh sometimes states it will use a visual tool
+# by name in prose instead of emitting a real tool_call - live-confirmed
+# 2026-09-02 on Comage's "mockup" wording (evaluations/comage/
+# stress_test.py::img-mockup_request), even though the 27-probe
+# tool_calling_conformance eval set (which has no "mockup"-worded probe)
+# measures 0% narration post-ef7b5c43. Detected narrowly - the literal
+# offered tool name appearing in the reply with zero tool_calls - rather
+# than a second classifier call: organic prose is very unlikely to
+# contain "generate_image"/"generate_diagram" verbatim, so this stays
+# cheap and rarely fires instead of taxing every single-shot turn.
+_VISUAL_TOOL_NAMES = {"generate_image", "generate_diagram"}
+_NARRATED_TOOL_NAME_PATTERN = re.compile(
+    "|".join(re.escape(name) for name in _VISUAL_TOOL_NAMES), re.IGNORECASE,
+)
+
+
+async def _retry_narrated_visual_tool_call(
+    state: AgentState,
+    agent: AgentDefinition,
+    task: TaskDefinition,
+    turn_messages: List[Any],
+    assistant_result: Any,
+    provider: Any,
+    visual_schemas: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """One bounded retry (mirrors _resolve_diagram_generation_call's
+    render-failure retry, same hard cap of a single extra round) for the
+    narrated-instead-of-called case. Unlike that precedent, no tool call
+    was ever made here, so there is no real ToolMessage to feed back -
+    the assistant's own narration is fed back as a plain AIMessage
+    alongside an explicit nudge instead of a fabricated tool result.
+    Returns None to tell the caller to fall through to the original
+    narrated reply (a provider failure on the retry, or the retry ALSO
+    narrating with nothing usable, is not treated as an error - the
+    first reply is already a valid answer)."""
+    narrated_reply = assistant_result.content if hasattr(assistant_result, "content") else str(assistant_result)
+    nudge = HumanMessage(
+        content=(
+            "You said you would use a tool but no tool call was actually made. "
+            "If a tool genuinely applies here, call it now through the function-"
+            "calling interface - do not describe using it in prose."
+        )
+    )
+    messages = [*turn_messages, AIMessage(content=narrated_reply), nudge]
+    try:
+        retry_result, retry_provider = await _model_router.invoke_with_fallback(
+            classification=state.get("effective_classification", agent.preferred_classification),
+            messages=messages,
+            bearer_token=state["bearer_token"],
+            local_only=state.get("local_only_required", False),
+            request_id=state.get("request_id"),
+            run_id=state.get("run_id"),
+            agent_name=agent.name,
+            task_name=task.name,
+            project_id=state.get("project_id"),
+            tools=visual_schemas,
+        )
+    except ModelRouterError as exc:
+        logger.error("retry model call after a narrated (uninvoked) tool call failed: %s", exc)
+        return None
+
+    retry_calls = getattr(retry_result, "tool_calls", None) or []
+    retry_image_call = next((tc for tc in retry_calls if tc.get("name") == "generate_image"), None)
+    retry_diagram_call = next((tc for tc in retry_calls if tc.get("name") == "generate_diagram"), None)
+    if retry_image_call:
+        return await _resolve_image_generation_call(
+            state, agent, task, turn_messages, retry_result, retry_image_call, retry_provider,
+        )
+    if retry_diagram_call:
+        return await _resolve_diagram_generation_call(
+            state, agent, task, turn_messages, retry_result, retry_diagram_call, retry_provider,
+        )
+    # The retry also narrated (or answered differently in prose) - one
+    # shot only, same cap _resolve_diagram_generation_call's own retry
+    # uses. Its own words become the final reply, same fallback shape as
+    # that precedent's "if retry_diagram_call is None" branch.
+    retry_text = retry_result.content if hasattr(retry_result, "content") else str(retry_result)
+    return {"reply": retry_text, "provider_used": retry_provider.name}
+
+
 def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
     """Builds a reason_node closure bound to one agent/task pair. Calls the
     AI Inference Gateway (components/ai-gateway, ADR-0009), which resolves
@@ -936,6 +1017,16 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 state, agent, task, turn_messages, result, git_calls, provider, git_tool_schemas,
             )
         reply_text = result.content if hasattr(result, "content") else str(result)
+        # WP-112: a visual tool was offered but nothing was called - check
+        # for the narrate-instead-of-call pattern before accepting the
+        # reply as final.
+        visual_schemas = [s for s in (tool_schemas or []) if s["function"]["name"] in _VISUAL_TOOL_NAMES]
+        if visual_schemas and _NARRATED_TOOL_NAME_PATTERN.search(reply_text):
+            retried = await _retry_narrated_visual_tool_call(
+                state, agent, task, turn_messages, result, provider, visual_schemas,
+            )
+            if retried is not None:
+                return retried
         return {"reply": reply_text, "provider_used": provider.name}
 
     return reason_node
