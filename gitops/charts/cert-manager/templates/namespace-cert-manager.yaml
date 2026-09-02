@@ -1,7 +1,21 @@
 {{- if .Values.certmanager.enabled }}
-# Pre-created as a PreSync hook since this chart's destination.namespace is
-# cert-manager-operator, not cert-manager; the operator would otherwise create
-# it later.
+# Pre-created ahead of every other resource in this chart (wave 19, the rest
+# start at 20) since the Application sets CreateNamespace=false and
+# acme-externalsecret.yaml lands inside it at wave 21.
+#
+# This was a PreSync hook until 2026-09-02. ArgoCD's default hook-delete
+# policy is BeforeHookCreation, so it DELETED and recreated this namespace on
+# every sync attempt, tearing down the cert-manager operand (controller,
+# webhook, cainjector) each time. That stayed invisible while
+# certmanager.enabled was false; the moment ADR-0211's ACME track was restored
+# it cycled Terminating/Active for ~17 minutes before converging, and the
+# churn was briefly suspected of causing an unrelated mesh incident. A
+# sync-wave gives the same ordering guarantee with no deletion at all.
+#
+# Prune=false because the alternative failure is worse than a leaked
+# namespace: if anything ever renders this template away again - a values
+# regression like the one that silently disabled certmanager.enabled for nine
+# days - pruning would take the whole cert-manager operand with it.
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -10,7 +24,8 @@ metadata:
     zuno.io/managed-by: argocd
     openshift.io/cluster-monitoring: "true"
   annotations:
-    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/sync-wave: "19"
+    argocd.argoproj.io/sync-options: Prune=false
     openshift.io/description: "cert-manager operand (controller, webhook, CA injector), configured by Zuno."
     openshift.io/display-name: "Zuno Infra Cert-Manager"
     openshift.io/requester: zuno
