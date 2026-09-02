@@ -40,6 +40,13 @@ sys.path.insert(0, "/opt/app-root/src")
 
 import boto3  # noqa: E402
 import mlflow_tracking as mt  # noqa: E402
+# Imported for its CA helper, not its stages: the tracking server carries an
+# OpenShift service-serving certificate while S3 needs the public roots, so
+# BOTH must be trusted at once. mlops._install_internal_ca() already builds
+# exactly that combined bundle - live-proven when this script first failed
+# with "self-signed certificate in certificate chain" on the MLflow call
+# while S3 worked fine.
+import mlops  # noqa: E402
 
 
 def _s3_client():
@@ -85,6 +92,8 @@ def main(argv=None) -> int:
     if not mt.tracking_uri():
         print("ERROR: MLFLOW_TRACKING_URI is unset - nothing to back fill into")
         return 2
+
+    mlops._install_internal_ca()
 
     client = _s3_client()
     base = f"{args.agent}/{args.run_id}"
