@@ -203,7 +203,10 @@ dataScienceCluster:
           lmeval:
             permitCodeExecution: deny
             permitOnline: deny
-        mcpGuardrailsMode: false
+        # Flipped false -> true by ADR-0534/WP-108 (2026-09-02) - the
+        # guardrails half of the operand, off since install. Observed
+        # effect on this operand version recorded in the WP-108 brief.
+        mcpGuardrailsMode: true
         managementState: Managed
       aipipelines:
         argoWorkflowsControllers:
