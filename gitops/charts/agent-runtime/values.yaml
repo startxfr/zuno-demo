@@ -87,11 +87,16 @@ guardrails:
   # one-value change, and flipping it back is the rollback.
   backend: builtin
   detectorUrl: http://zuno-guardrails-smoke-service.zuno-ai-run.svc:8080
-  # Service name follows the operator's <cr-name>-service convention, the
-  # same shape detectorUrl already uses. Confirmed live before the backend
-  # is flipped - an unset or wrong URL disables the observer rather than
-  # erroring, so a typo here is silent by design.
-  nemoUrl: http://zuno-guardrails-service.zuno-ai-run.svc:8000
+  # CORRECTED 2026-09-03 from a live reading, and the correction is the
+  # point: the operator does NOT follow the <cr-name>-service convention
+  # that detectorUrl uses. Deploying the CR produced Service
+  # `zuno-guardrails` on port 80, not `zuno-guardrails-service` on 8000.
+  # The wrong value was inert only because backend stays "builtin" - and
+  # an unset or wrong URL disables the observer silently rather than
+  # erroring, by design, so this would have surfaced as "guardrails
+  # stopped detecting" long after the flip. Assumed conventions are
+  # exactly what the WP-120 discovery gate exists to catch.
+  nemoUrl: http://zuno-guardrails.zuno-ai-run.svc:80
   # Must match trustyai-config's nemoGuardrails.configId.
   configId: zuno-observe
   timeoutSeconds: "10"

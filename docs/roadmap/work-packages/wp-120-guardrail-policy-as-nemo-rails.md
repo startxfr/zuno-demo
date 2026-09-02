@@ -38,29 +38,47 @@ observe-only, still non-blocking, still emitting `zuno.guardrails_evaluations` a
 - `ansible/roles/trustyai_config/tasks/precheck.yml` reports the CR's conditions, its three CA
   booleans and the `bbrPlugin` flag, plus the ConfigMap's key set.
 
-## The live discovery gate — not yet run
+## The live discovery gate — 2 of 5 answered, at the cost of an incident
 
 ADR-0540's design answers the cost question by construction (no `models:` block, so no
-inference), but five things about the operand cannot be read from the CRD and must be
-established from an `agent-runtime` pod before `guardrails.backend` is flipped:
+inference), but five things about the operand cannot be read from the CRD. The CR was deployed
+on 2026-09-02 to establish them; the node it landed on crossed its eviction threshold before the
+remaining three could be exercised, and the CR was backed out (`4f0d869d`). Two answers survive
+and are recorded here so nobody redeploys to relearn them.
 
-1. the Service name and port the operator creates for the CR — `guardrails.nemoUrl` currently
-   assumes the `<cr-name>-service` convention `detectorUrl` already follows;
+**Answered.**
+
+1. **The Service is `zuno-guardrails` on port 80** — NOT the `<cr-name>-service` on 8000 that
+   `detectorUrl` uses and that this WP originally assumed. `guardrails.nemoUrl` was wrong for
+   exactly that reason and is corrected. The operator also creates a Route.
+4. **Yes, a config with no `models:` block validates and starts.** The CR reached
+   `DeploymentReady=True`, `RouteReady=True`, `ReconcileComplete=True`, with `status.ca` showing
+   `odhTrustedCAFound: true` and `openshiftServingCAFound: true`. **This was the expensive
+   question** — ADR-0540 Decision 2's cost gate. Had it required a model, every observed exchange
+   would have become a GPU-backed inference call on a cluster whose quota is saturated, which was
+   an escalation to the user rather than an implementation detail. It does not. The pattern-only
+   rails design stands.
+
+**Still open** — all three need the server actually answering, so they need a redeployment:
+
 2. whether `GET /v1/rails/configs` lists `zuno-observe`;
 3. whether `POST /v1/chat/completions` with `options.rails: ["input"]` and
    `log.activated_rails: true` returns the activation log **without** generating;
-4. whether a config with no `models:` block validates and starts at all;
 5. the response shape for a triggered rail versus a clean pass, to confirm `_detection_names()`
    parses the real payload rather than the assumed one.
 
-If (4) turns out to require a model, the observe-only path becomes a GPU-backed inference call
-per exchange on a cluster whose quota is saturated. That is a cost decision to escalate, not to
-absorb — see ADR-0540's Decision 2.
+**One trap the deployment surfaced, worth knowing before the next attempt:** the CR reported
+`DeploymentReady=True` while the Deployment was `0/1` and its pod stuck in `Init`. Read the pod,
+not the CR's conditions. (The pod was then evicted for node disk pressure — see memory
+`diskpressure-master-cascades-into-mesh`; the NeMo server image is multi-GB and the node it
+landed on was already over its threshold.)
 
 ## Remaining
 
-1. Run the discovery gate above; correct `nemoUrl` and `_detection_names()` against what the
-   operand actually returns.
+1. Redeploy the CR (`nemoGuardrails.enabled: true`) once the cluster has disk headroom, and
+   answer questions 2, 3 and 5. `nemoUrl` is already corrected from question 1;
+   `_detection_names()` is still written against an assumed payload shape and question 5 is what
+   confirms or corrects it.
 2. Flip `guardrails.backend` to `nemo` and prove, with the Nemo Service scaled to 0, that a real
    agent turn still returns a complete unmodified response and
    `zuno.guardrails_evaluations{outcome="unavailable"}` increments.
