@@ -148,3 +148,12 @@ Makefile placement, mirroring `lightspeed-config`'s slot exactly:
 
 - ADR-0534 stays `Accepted` regardless of this WP's outcome; this WP's own `State` moves to `Done`
   once Steps 1-3 are live-verified and the checklist above passes.
+- **2026-09-02 - Done.** All three steps executed and live-verified on demo222 the same day the
+  brief was authored. Commits: `b44be5e7` (brief + ADR acceptance), `9a7a5120` (the
+  `trustyai-config` scaffold - chart, `-d0`/`-d1` Applications, Ansible role, Makefile wiring,
+  shared `ansible/tasks/report_lmevaljobs.yml` extracted from the `models` precheck), `690892da`
+  (the double-TLS repair of the LM-Eval gate that Step 1's non-regression check exposed - see Live
+  findings #1), `5cb5bde9` (closure). Verified live: `Ready=True`/`TrustyAIReady=True` on
+  `zuno-dsc`, a fresh `qwen36-27b-instruct-mmlu` LMEvalJob back to `Complete/Succeeded`, and
+  `zuno-trustyai-config-d0/-d1` Synced/Healthy. WP-108/WP-109 then filled the scaffold and closed
+  the same day; ADR-0534 ended the day `Implemented`.

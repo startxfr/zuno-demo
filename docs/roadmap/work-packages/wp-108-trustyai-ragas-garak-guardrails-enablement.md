@@ -146,3 +146,13 @@ Builds on WP-107's `trustyai-config` scaffold - no new component, no new Applica
 
 - This WP's own `State` moves to `Done` once Steps 1-4 are live-verified and the checklist above
   passes. ADR-0534 stays `Accepted`.
+- **2026-09-02 - Done, with the brief's central premise refuted by its own Step 1.** Commits:
+  `fc7b9dd1` (the flip - which ArgoCD's `ignoreDifferences` silently dropped), `806391b0` (the
+  same-hour revert plus the in-place ADR-0534 Phase 2 amendment, after the live `oc patch` proved
+  the flag strips the operator down to NEMO_GUARDRAILS-only and kills the LMEvalJob controller -
+  see Live findings #1), `9c99c3a8` (the actual deliverables: Garak smoke Job on the
+  operand-shipped image, `GuardrailsOrchestrator` with built-in detectors, day2/day3 precheck
+  coverage), `a84ae6af` (closure). Verified live: `mcpGuardrailsMode` back at `false` with the
+  full five-service operator, Garak smoke `succeeded=1`, the built-in detector answering on
+  `/api/v1/text/contents`, and the LM-Eval path re-proven unbroken after the revert. RAGAS moved
+  to WP-109 by decision (Live findings #3), not omission.

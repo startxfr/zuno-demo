@@ -198,3 +198,17 @@ Builds on `trustyai-config` (WP-107 scaffold, WP-108 generic frameworks) - no ne
 - This WP's own `State` moves to `Done` once Steps 1-5 are live-verified and the checklist above
   passes, with the observe-only contract explicitly proven (not assumed) for at least one real
   jailbreak/prompt-injection attempt. ADR-0534 stays `Accepted`.
+- **2026-09-02 - Done; ADR-0534 moved to `Implemented` on this closure.** All five steps
+  live-verified against the real stack (details in Live findings). Commits: `a7f3570d` (the
+  observe-only guardrails hook in agent-runtime - both sync and SSE paths - plus
+  `evaluations/peft_regression.py` and the qwen3.5-9b base/wesh LMEvalJob pair), `a7f01bdb`
+  (lmeval PVC dedupe + Replace-sync on the prefetch Jobs), `4f0b6ce4` (jailbreak regex widened
+  after the live miss - Live findings #2), `c399c264`/`1e5eef99`/`afd0c40d`/`7d72e5ee` (the
+  `trustyai-eval` RAGAS image and the four live-diagnosed rounds to real scores - Live findings
+  #6), `289e9544` (closure: this brief, the tracker, ADR-0534 `Implemented`). Final state:
+  `make d3 check trustyai-config` fully green; observe-only proven on PII, jailbreak and MCP
+  exchanges; RAGAS `faithfulness=1.0`/`context_precision≈1.0` on real pgvector retrievals; and
+  two REAL open findings handed to the owner (wesh regression FAIL `-0.12`, Garak
+  MitigationBypass 100% ASR on wesh) - tracked under Out of scope, deliberately not resolved
+  here. The `peft-regression-qwen35-9b-wesh.json` artifact stays uncommitted:
+  `evaluations/benchmarks/*.json` is gitignored by design.
