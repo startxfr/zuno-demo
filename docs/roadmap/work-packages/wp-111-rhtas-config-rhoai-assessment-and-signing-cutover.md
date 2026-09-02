@@ -1,6 +1,66 @@
 # WP-111: RHOAI-integration assessment and RHTAS image-signing cutover
 
-- **State:** Not started (2026-09-02).
+- **State:** Done (2026-09-02) - qualified: the signing cutover is fully
+  live-verified end to end; the Policy Controller is deployed and
+  correct but genuinely dormant (zero namespaces scoped), not the
+  "audit-only, observing real traffic" state the ADR envisioned - see
+  finding 6 below. `make d2 check supply-chain`'s in-cluster verify Job:
+  `RESULT: PASS - all 14 image(s) verified` keyless via RHTAS, each with a
+  real Fulcio certificate + Rekor entry. `supply-chain-signer` (a
+  build-only tool image no `values.yaml` deploys, so outside the
+  auto-discovered set) was also signed and verified manually. Part A
+  finding: the ADR-0535 Non-goal premise was already false when the ADR
+  was written - see the ADR's own Non-goals correction and this brief's
+  Goal section; not folded into Part B, no model/adapter signing work
+  done here.
+
+  Six further live findings, all fixed in-repo the same day:
+  1. **Stale image list.** This brief's original 14-name list included
+     `mcp-sales-db` (never existed) and missed `mcp-aap`/`diagram-render`
+     (added to the platform after WP-104's list was drafted). Corrected
+     in the Goal section above to describe the auto-discovery instead of
+     a fixed list, which is inherently self-correcting.
+  2. **ClusterImagePolicy v1beta1's conversion webhook is mispackaged**
+     (points at a nonexistent Service/namespace) **and, even pointed at
+     the real Service, non-functional** (times out / 404s - the pod
+     doesn't implement `/convert` at all). Fixed by authoring the CR as
+     `v1alpha1` (the CRD's storage version, identical spec, no conversion
+     needed) and, user-approved, patching `spec.conversion.strategy` to
+     `None` on the live CRD (not GitOps-managed - reapplied idempotently
+     by `ansible/roles/rhtas_config`).
+  3. **None of TrustRoot/ClusterImagePolicy/PolicyController ever
+     populate `status.conditions`** - ArgoCD's generic health check hung
+     sync forever on "waiting for healthy state of ...". Fixed with 3 new
+     `resourceHealthChecks` entries on the `ArgoCD` CR (ADR-0312 pattern,
+     `ansible/roles/argocd`), always-Healthy for these 3 kinds.
+  4. **ArgoCD's own admission-webhook calls into `zuno-rhtas` were
+     NetworkPolicy-blocked** - same-namespace debug-pod curl tests always
+     succeeded instantly, masking that ArgoCD's cross-namespace call was
+     the one never allowed, intermittently exceeding the webhook's tight
+     5s timeout. Fixed: `openshift-gitops` added to
+     `allowedFromNamespaces`.
+  5. **policy-controller-operator's own admission webhook hard-rejects
+     its `PolicyController` CR outside a namespace literally named
+     `policy-controller-operator`** - a genuine product-mandated fixed
+     namespace (unlike `rhtas-operator`, AllNamespaces, co-located fine
+     in `zuno-rhtas` per WP-110). Reinstalled there; see
+     `gitops/charts/namespaces/values.yaml`.
+  6. **Critical: the webhook's "container images must be referenced by
+     digest" gate is unconditional, NOT governed by
+     `ClusterImagePolicy.spec.mode: warn`** (that only governs the
+     signature-verification result). Every chart in this repo still
+     declares `tag: latest` (ADR-0115 gap 2), so labeling any real zuno
+     namespace with `policy.rhtas.com/include` made the webhook actively
+     REJECT real pods - observed live on the signing Job itself (6
+     rejected admission attempts before a Job-controller retry happened
+     to succeed; a bare Pod with no retry loop would have stuck). User
+     decision: labels removed from `zuno-ai-build`/`zuno-mlops`/
+     `zuno-ai-run`. The Policy Controller stack (TrustRoot/
+     ClusterImagePolicy/PolicyController) stays deployed and correct but
+     scoped to **zero namespaces** - genuinely dormant, not audit-only in
+     practice - until ADR-0115 gap 2 is actually closed (immutable
+     digests written into `values.yaml`). Re-enabling the namespace
+     labels once that gap closes is a follow-up, not part of this WP.
 - **ADRs:** ADR-0535 (Decision - remaining scope: RHOAI-integration
   assessment, Priority-1 image cutover, Policy Controller audit mode).
 - **Depends on:** WP-110 (RHTAS operator, Trillian storage, and the
@@ -37,11 +97,18 @@ this WP's Part B to cover it.
 `platform/supply-chain/sign_in_cluster.py` and `verify_signatures.py` to
 sign and verify via RHTAS/Cosign keyless (Fulcio certificate + Rekor
 entry, using the `zuno-signer` identity WP-110 established) instead of
-Vault Transit, for the same 14 first-party images
-(`agent-runtime`, `agent-bff`, `agent-frontend`, `ai-gateway`,
-`aiagent-operator`, `mcp-gateway`, `mcp-confluence`, `mcp-git-forge`,
-`mcp-sales-db`, `mcp-salesforce`, `mlops`, `rag-ingestion`, `rag-service`,
-`supply-chain-signer`). Deploy the Sigstore Policy Controller in
+Vault Transit, for the first-party images `verify_signatures.py`
+auto-discovers from `gitops/charts/*/values.yaml` at run time (not a
+fixed list committed here, since it drifts as components are added -
+14 at execution time: `agent-runtime`, `agent-bff`, `agent-frontend`,
+`ai-gateway`, `aiagent-operator`, `diagram-render`, `mcp-aap`,
+`mcp-confluence`, `mcp-gateway`, `mcp-git-forge`, `mcp-salesforce`,
+`mlops`, `rag-ingestion`, `rag-service` - two names in this WP's original
+draft, `mcp-sales-db` and `supply-chain-signer`, turned out stale/wrong:
+`mcp-sales-db` never existed as a component, and `supply-chain-signer` is
+a build-only tool image no `values.yaml` deploys, so the auto-discovery
+correctly excludes it; it was still signed manually as part of this WP's
+live verification). Deploy the Sigstore Policy Controller in
 **audit-only** mode, scoped to the zuno namespaces that consume these
 images - no rejection behavior in this WP. Keep the Vault Transit key
 `zuno-platform-signer` and the committed `agents/zuno-platform-signer.pub`

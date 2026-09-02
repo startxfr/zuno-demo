@@ -304,7 +304,7 @@ Goal: prove the platform's Day 0–3 automation is complete and portable by rede
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | v0.9 | Proposed | Adopt RHTAS as the artifact trust and supply-chain service |
+| [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | v0.9 | Implemented | Adopt RHTAS as the artifact trust and supply-chain service |
 | [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.9 | Proposed | Support self-service agent onboarding |
 | [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.9 | Proposed | Expand the agent catalog beyond the initial five agents |
 

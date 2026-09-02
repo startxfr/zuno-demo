@@ -1,6 +1,18 @@
 # ADR-0535: Adopt RHTAS as the artifact trust and supply-chain service
 
-- **Status:** Proposed
+- **Status:** Implemented (2026-09-02) - qualified. WP-110/WP-111
+  live-verified: RHTAS operational (Fulcio/Rekor/CTLog/Trillian/TUF), the
+  14 Priority-1 first-party images signed and verified keyless
+  (`make d2 check supply-chain`: PASS, real Rekor entries), Vault Transit
+  kept live as the rollback path per this ADR's Scope. The Sigstore
+  Policy Controller is deployed and correct but genuinely dormant (scoped
+  to zero namespaces) rather than the audit-only/observing state this
+  ADR's Decision section describes - its "container images must be
+  referenced by digest" admission gate is unconditional, not governed by
+  `ClusterImagePolicy.spec.mode: warn`, and this platform's own
+  `tag: latest` convention (ADR-0115 gap 2, still open) made it actively
+  reject real pods when scoped to any real namespace. Re-enabling it is a
+  follow-up once that gap closes, not further work under this ADR.
 - **Target:** v0.9
 - **Date:** 2026-08-30
 - **Decision owners:** Zuno Demo architecture team
