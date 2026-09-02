@@ -243,6 +243,25 @@ spec:
               "instant": true,
               "refId": "B"
             }
+          ],
+          "transformations": [
+            {
+              "id": "merge",
+              "options": {}
+            },
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "job_name": "job",
+                  "Value #A": "succeeded",
+                  "Value #B": "failed"
+                }
+              }
+            }
           ]
         },
         {
@@ -269,6 +288,17 @@ spec:
               "expr": "sum by (pod, phase) (kube_pod_status_phase{namespace=\"zuno-ai-run\", pod=~\".*mmlu.*\"} > 0)",
               "format": "table",
               "instant": true
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true,
+                  "Value": true
+                }
+              }
             }
           ]
         },
@@ -333,6 +363,19 @@ spec:
               "format": "table",
               "instant": true
             }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "Value": "score"
+                }
+              }
+            }
           ]
         },
         {
@@ -382,6 +425,19 @@ spec:
               "expr": "max by (probe, detector, model) (last_over_time(zuno_garak_attack_success_rate[30d]))",
               "format": "table",
               "instant": true
+            }
+          ],
+          "transformations": [
+            {
+              "id": "organize",
+              "options": {
+                "excludeByName": {
+                  "Time": true
+                },
+                "renameByName": {
+                  "Value": "attack success rate"
+                }
+              }
             }
           ]
         }
