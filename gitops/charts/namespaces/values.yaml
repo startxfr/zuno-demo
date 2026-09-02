@@ -500,9 +500,17 @@ platformNamespaces:
     # which silently blocked the whole rag-dspa KFP stack
     # (WebhookReady=False) and with it all corpus ingestion. Re-measure
     # and bump requests if that pattern recurs.
+    # limits.cpu 32 -> 40 (2026-09-02, ADR-0538/WP-116): the exact pattern
+    # the paragraph above predicts, hit again. MLflow's Alembic migration
+    # Job asked for 4500m of LIMITS on top of the ~27700m already committed
+    # and was refused ("exceeded quota: zuno-platform-quota"), so the CR sat
+    # in MigrationRunning forever with no pod and no error anywhere except
+    # the Job's events. Limits are overcommit (only requests reserve node
+    # capacity, and requests stay at 12), so this is headroom, not a
+    # reservation - but it does mean every new RHOAI operand lands here.
     resourceQuota:
       requests: { cpu: "12", memory: "20Gi" }
-      limits: { cpu: "32", memory: "48Gi" }
+      limits: { cpu: "40", memory: "56Gi" }
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "1Gi" }
