@@ -45,6 +45,21 @@ metadata:
     # generalization) hard-fails a plain apply. Replace recreates it, and
     # re-running a prefetch is idempotent by construction (it only
     # re-downloads the same files into the same PVC paths).
+    #
+    # Idempotent is not free (2026-09-03). Every sync that finds these three
+    # Jobs OutOfSync deletes and recreates all three, and each recreation
+    # re-pulls a ~318 MB storage-initializer plus the odh-ta-lmes-job image
+    # onto whatever node they land on. On demo222, where the schedulable
+    # masters sit at 85% of a 99.4 GiB image filesystem and kubelet's image GC
+    # can no longer reclaim enough (FreeDiskSpaceFailed, twice, same numbers),
+    # that was measured at 22 seconds from Job creation to EvictionThresholdMet
+    # on ip-10-18-31-92 - one flap of a DiskPressure oscillation that costs the
+    # mesh its istio-csr leader lease. Replace stays: it fixes a real sync wedge
+    # and the pull cost is a symptom of a node too full, not of this annotation.
+    # But do not add Replace to a Job family casually, and if this node class
+    # stays near the eviction threshold the right lever is scheduling these
+    # prefetches away from the masters - a live change, so two-step it per
+    # WP-118. See memory diskpressure-master-cascades-into-mesh.
     argocd.argoproj.io/sync-options: Replace=true,Force=true
 spec:
   backoffLimit: 2
