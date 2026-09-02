@@ -1,0 +1,43 @@
+{{- if .Values.policyOperand.enabled }}
+# ADR-0535/WP-111: activates the actual image-signature admission
+# webhook (the CSV's own controller-manager, already running once the
+# operator installs, only reconciles this CR - same "operator needs an
+# activation/config singleton CR" shape gitops/charts/jobset's
+# JobSetOperator / gitops/charts/kueue's Kueue CR already use). Shape
+# confirmed against this cluster's CSV alm-examples (2026-09-02) -
+# rhtas.charts.redhat.com/v1alpha1 wraps the upstream sigstore
+# policy-controller Helm chart's own values, not a strictly-schema'd CRD.
+#
+# webhook.namespaceSelector: the webhook ONLY intercepts admission
+# requests in namespaces carrying policy.rhtas.com/include=true (a
+# namespace without it is invisible to this webhook entirely, no audit
+# log either) - gitops/charts/namespaces labels the zuno namespaces that
+# actually run these 14 images with it. Combined with
+# clusterimagepolicy.yaml's spec.mode: warn, this is belt-and-braces
+# audit-only: even a labeled namespace can only ever get a warning, never
+# a reject, in this WP's scope.
+apiVersion: rhtas.charts.redhat.com/v1alpha1
+kind: PolicyController
+metadata:
+  name: zuno-policy-controller
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  policy-controller:
+    cosign:
+      webhookName: policy.rhtas.com
+    webhook:
+      failurePolicy: Ignore
+      name: webhook
+      namespaceSelector:
+        matchExpressions:
+          - key: policy.rhtas.com/include
+            operator: In
+            values:
+              - "true"
+      webhookNames:
+        defaulting: defaulting.clusterimagepolicy.rhtas.com
+        validating: validating.clusterimagepolicy.rhtas.com
+{{- end }}

@@ -1,0 +1,20 @@
+{{- if .Values.policyOperand.enabled }}
+# ADR-0535/WP-111: TUF trust root for the Sigstore Policy Controller,
+# mirroring RHTAS's own TUF service. spec.remote.root is the live
+# root.json content, base64-encoded - resolved at Ansible run time
+# (ansible/roles/rhtas_config/tasks/install.yml, cluster-specific,
+# cannot be committed) via gitops_app_extra_helm_values, same "discovered
+# at run time" convention as every operator's channel/catalog (ADR-0048).
+apiVersion: policy.sigstore.dev/v1alpha1
+kind: TrustRoot
+metadata:
+  name: rhtas-trust-root
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  remote:
+    mirror: {{ .Values.policyOperand.trustRoot.tufMirrorUrl | quote }}
+    root: {{ .Values.policyOperand.trustRoot.rootJsonBase64 | quote }}
+{{- end }}

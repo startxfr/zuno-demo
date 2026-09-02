@@ -1,0 +1,34 @@
+{{- if .Values.policyOperand.enabled }}
+# ADR-0535/WP-111: audit-only image policy for the 14 Priority-1
+# first-party images - spec.mode: warn ("allow but warn", confirmed live
+# via `oc explain clusterimagepolicy.spec.mode
+# --api-version=policy.sigstore.dev/v1beta1`, 2026-09-02) is the actual
+# enforcement lever ADR-0535 authorizes; `enforce` (reject) is a
+# deliberate, separate, later decision - this ADR authorizes only
+# observe/verify/audit. keyless identity matches the zuno-signer Fulcio
+# certificate WP-110/WP-111 established (gitops/charts/rhtas's
+# fulcio.oidc block) exactly.
+apiVersion: policy.sigstore.dev/v1beta1
+kind: ClusterImagePolicy
+metadata:
+  name: zuno-first-party-images
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  mode: warn
+  images:
+    - glob: {{ .Values.policyOperand.clusterImagePolicy.imageGlob | quote }}
+  authorities:
+    - name: rhtas-keyless
+      ctlog:
+        trustRootRef: rhtas-trust-root
+        url: {{ .Values.policyOperand.clusterImagePolicy.rekorUrl | quote }}
+      keyless:
+        trustRootRef: rhtas-trust-root
+        url: {{ .Values.policyOperand.clusterImagePolicy.fulcioUrl | quote }}
+        identities:
+          - issuer: {{ .Values.policyOperand.clusterImagePolicy.certIdentityIssuer | quote }}
+            subject: {{ .Values.policyOperand.clusterImagePolicy.certIdentitySubject | quote }}
+{{- end }}

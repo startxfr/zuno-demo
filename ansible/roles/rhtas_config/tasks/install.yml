@@ -67,3 +67,136 @@
               name: "{{ _rhtas_config_catalog_source }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
+
+- name: "rhtas_config | wait for the policy-controller-manager Deployment to become Available"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: zuno-rhtas
+    name: policy-controller-manager
+  register: _rhtas_config_operator_deployment
+  until: >-
+    (_rhtas_config_operator_deployment.resources | default([]) | length) > 0 and
+    (_rhtas_config_operator_deployment.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list
+     | first | default('False')) == 'True'
+  retries: 60
+  delay: 10
+
+# ADR-0535/WP-111: the ansible-managed Keycloak CA ConfigMap - Trust
+# already established for zuno-rhtas by WP-110's rhtas role; the signing
+# Jobs in zuno-ai-build need their own copy for the same reason
+# (secretKeyRef/ConfigMap can't cross namespaces).
+- name: "rhtas_config | publish the Keycloak CA ConfigMap in zuno-ai-build"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/publish_keycloak_ca_configmap.yml"
+  vars:
+    publish_ca_configmap_namespace: zuno-ai-build
+
+- name: "rhtas_config | resolve the cluster base domain (for the Fulcio OIDC issuer)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+# TrustRoot's spec.remote.root is a base64-encoded TUF root.json - cannot
+# be committed (cluster-specific keys), resolved live the same way every
+# other operator's channel/catalog is (ADR-0048). Fetched from inside the
+# cluster (the TUF Service has no Route requirement for this - it also has
+# one, but the in-cluster Service is simpler and matches how
+# ClusterImagePolicy/PolicyController reach Fulcio/Rekor below).
+- name: "rhtas_config | delete any previous TUF-root-fetch pod (idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Pod
+    name: rhtas-tuf-root-fetch
+    namespace: zuno-rhtas
+    wait: true
+
+# None of the RHTAS operand images carry wget/curl (RHEL9-UBI minimal, no
+# shell tooling beyond the binary itself, live finding 2026-09-02) - a
+# throwaway curlimages/curl pod is the reliable way to reach the in-cluster
+# TUF Service from inside the ansible controller (no route/network access
+# to it otherwise).
+- name: "rhtas_config | run a throwaway pod to fetch the TUF root.json"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: rhtas-tuf-root-fetch
+        namespace: zuno-rhtas
+        labels:
+          zuno.io/purpose: wp111-tuf-root-fetch
+      spec:
+        restartPolicy: Never
+        containers:
+          - name: fetch
+            image: registry.redhat.io/openshift4/ose-tools-rhel9@sha256:a3bdc6574db914ec8c4385b6ff8b2c315930f8de9a27a3a9e0204163c85cd6be
+            command: ["sh", "-c", "sleep 300"]
+
+- name: "rhtas_config | wait for the fetch pod to be Running"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: zuno-rhtas
+    name: rhtas-tuf-root-fetch
+  register: _rhtas_config_fetch_pod
+  until: (_rhtas_config_fetch_pod.resources | default([]) | length) > 0 and _rhtas_config_fetch_pod.resources[0].status.phase == 'Running'
+  retries: 30
+  delay: 5
+
+- name: "rhtas_config | fetch the live TUF root.json"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-rhtas
+    pod: rhtas-tuf-root-fetch
+    command: >-
+      sh -c "curl -s http://tuf.zuno-rhtas.svc.cluster.local/root.json | base64 -w0"
+  register: _rhtas_config_tuf_root
+  changed_when: false
+
+- name: "rhtas_config | delete the TUF-root-fetch pod"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Pod
+    name: rhtas-tuf-root-fetch
+    namespace: zuno-rhtas
+    wait: false
+
+- name: "rhtas_config | apply the rhtas-config GitOps Application (d1: Policy Controller operand)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "rhtas-config"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-rhtas-config-d1"
+    gitops_app_extra_helm_values:
+      policyOperand:
+        enabled: true
+        trustRoot:
+          rootJsonBase64: "{{ _rhtas_config_tuf_root.stdout | trim }}"
+        clusterImagePolicy:
+          certIdentityIssuer: "https://keycloak.{{ cluster_base_domain }}/realms/zuno"
+      signerClientMirror:
+        enabled: true
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+- name: "rhtas_config | wait for the ClusterImagePolicy to report Ready"
+  kubernetes.core.k8s_info:
+    api_version: policy.sigstore.dev/v1beta1
+    kind: ClusterImagePolicy
+    name: zuno-first-party-images
+  register: _rhtas_config_cip
+  until: >-
+    (_rhtas_config_cip.resources | default([]) | length) > 0 and
+    (_rhtas_config_cip.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
+     | first | default('False')) == 'True'
+  retries: 30
+  delay: 10
+
+- name: "rhtas_config | install summary"
+  ansible.builtin.debug:
+    msg: >-
+      Policy Controller operator Available, TrustRoot/ClusterImagePolicy
+      (audit-only, spec.mode: warn) Ready, zuno-signer-client-secret
+      mirrored into zuno-ai-build.

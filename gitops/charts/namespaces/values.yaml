@@ -177,6 +177,11 @@ platformNamespaces:
       opendatahub.io/dashboard: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
+      # ADR-0535/WP-111: brings this namespace's Pods into the Sigstore
+      # Policy Controller's admission-webhook scope (audit-only,
+      # ClusterImagePolicy spec.mode: warn - never a reject). Runs
+      # aiagent-operator, mlops, rag-ingestion, supply-chain-signer.
+      policy.rhtas.com/include: "true"
   - name: zuno-mlops
     displayName: Zuno MLOps
     description: >-
@@ -199,6 +204,9 @@ platformNamespaces:
       opendatahub.io/dashboard: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
+      # ADR-0535/WP-111: see zuno-ai-build's identical label above. Runs
+      # the mlops-dspa (mlops image) pipeline.
+      policy.rhtas.com/include: "true"
   - name: zuno-ai-run
     displayName: Zuno AI Run
     description: >-
@@ -227,6 +235,9 @@ platformNamespaces:
       opendatahub.io/dashboard: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
+      # ADR-0535/WP-111: see zuno-ai-build's identical label above. Runs
+      # agent-runtime, agent-bff, agent-frontend, ai-gateway, mcp-*.
+      policy.rhtas.com/include: "true"
   - name: zuno-mesh
     displayName: Zuno Infra Service Mesh
     description: >-

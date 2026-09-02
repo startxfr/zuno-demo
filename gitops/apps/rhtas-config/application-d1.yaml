@@ -1,0 +1,40 @@
+---
+# The Policy Controller operand (PolicyController activation CR,
+# TrustRoot, ClusterImagePolicy in audit-only mode) plus the
+# zuno-signer-client-secret mirror in zuno-ai-build the image-signing Jobs
+# need. Separate from application-d0.yaml (the operator Subscription) so
+# the operand only syncs once the operator's CRDs exist. trustRoot.
+# rootJsonBase64/certIdentityIssuer placeholders below are substituted by
+# ansible/tasks/apply_gitops_app.yml at apply time (ADR-0048 - the TUF
+# root.json and cluster domain are both cluster-specific, resolved live).
+# ADR-0535/WP-111.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-rhtas-config-d1
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-69"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/rhtas-config
+    helm:
+      releaseName: zuno-rhtas-config-d1
+      values: |
+        policyOperand:
+          enabled: true
+        signerClientMirror:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-rhtas
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
