@@ -101,8 +101,9 @@ def main() -> int:
               "for every question; check the corpus and CALLER_GROUPS")
         return 1
 
+    from datasets import Dataset
     from langchain_openai import ChatOpenAI
-    from ragas import EvaluationDataset, SingleTurnSample, evaluate
+    from ragas import evaluate
     from ragas.llms import LangchainLLMWrapper
     from ragas.metrics import Faithfulness, LLMContextPrecisionWithoutReference
 
@@ -110,15 +111,19 @@ def main() -> int:
         base_url=JUDGE_BASE_URL, api_key="in-cluster-unused",
         model=JUDGE_MODEL, temperature=0.0, timeout=180,
     ))
-    dataset = EvaluationDataset(samples=[
-        SingleTurnSample(user_input=s["question"],
-                         retrieved_contexts=s["contexts"],
-                         response=s["answer"])
-        for s in samples
-    ])
+    # Legacy HF-Dataset column API (question/contexts/answer), which ragas
+    # 0.2 maps internally to user_input/retrieved_contexts/response. The
+    # SingleTurnSample/EvaluationDataset path was tried first and failed
+    # live 2026-09-02 - validate_required_columns rejected the dataset with
+    # "requires ['response']" despite response= being set on every sample.
+    dataset = Dataset.from_dict({
+        "question": [s["question"] for s in samples],
+        "contexts": [s["contexts"] for s in samples],
+        "answer": [s["answer"] for s in samples],
+    })
     result = evaluate(dataset=dataset,
-                      metrics=[Faithfulness(llm=judge),
-                               LLMContextPrecisionWithoutReference(llm=judge)])
+                      metrics=[Faithfulness(), LLMContextPrecisionWithoutReference()],
+                      llm=judge)
 
     scores = result.to_pandas().to_dict(orient="records")
     report = {
