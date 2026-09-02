@@ -13,6 +13,7 @@
     zuno_day: d2
     day2_components:
       - lightspeed_config
+      - trustyai_config
       - mlops
       - agents
       - mcp

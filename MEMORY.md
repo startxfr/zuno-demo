@@ -884,6 +884,19 @@ not here.
 - **ADR-0340 (WP-32)**: `confluence-archi-*` groups live under
   `/consultant`; new `cdp` group exists with no members yet (per-agent
   consumption is WP-33+). Implemented.
+- **ADR-0326 (WP-31/33/35/36)**, 2026-08-30, **Implemented/Done**:
+  generalized the Tekos vertical slice to the four remaining agents.
+  Repo work and live acceptance gates ran for all four; Arkos and Comage
+  reached `zuno.status: active`, Advantage and Finage deliberately stayed
+  `placeholder`. Their non-promotion is formalized in **ADR-0533**
+  (2026-08-30, **Implemented**) — a governance-only ADR consolidating
+  what was previously split between ADR-0532 (Advantage) and an inline
+  WP-36 note (Finage's "D10"); its point on possible future promotion of
+  either agent stays explicitly open, tracked at v0.8. WP-31/33/35/36 are
+  all `Done` on their own repo/live-gate criteria; no `evaluations/*/
+  scenarios.yaml` rewrite from placeholder-blocking to active-agent
+  behavior is needed unless a future ADR adopts a real `knowledge.adv`
+  source or a finance RAG domain.
 - **ADR-0349**: Keycloak realm baseline — 27 anonymized personas,
   `ocp-*` RBAC groups, live IdP federation. Live-verified: realm applied,
   ClusterRoleBindings wired, ArgoCD RBAC policy matches, no stale legacy

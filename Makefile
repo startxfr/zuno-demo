@@ -56,15 +56,19 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # tier). "build" only knows how to build the 5 named image groups (mcp,
 # rag, rag-ingestion, agent, mlops - see
 # ansible/roles/{mcp,rag,rag_ingestion,agent,mlops}_build); "check"/
-# "lightspeed-config" (ADR-0524/WP-085) is deliberately LAST among the
-# deployable components: it needs "models" (the MaaS entitlement for its
-# ServiceAccount), "mcp" (the /mcp front-door plus the NetworkPolicy
-# admitting openshift-lightspeed) and "agents" all already live, plus the
-# Day 1 "lightspeed" operator installed before any of it.
-# "install" operate on the 10 deployable components, plus "supply-chain"
+# "trustyai-config" (ADR-0534/WP-107) sits right after "mlops": it depends
+# only on "models" (the zuno-ai-run namespace its LMEvalJob-based health
+# check reads) - TrustyAI itself needs no Day 1 operator, it is already
+# Managed inside the Day 1 "openshift-ai" component. "lightspeed-config"
+# (ADR-0524/WP-085) is deliberately LAST among the deployable components:
+# it needs "models" (the MaaS entitlement for its ServiceAccount), "mcp"
+# (the /mcp front-door plus the NetworkPolicy admitting
+# openshift-lightspeed) and "agents" all already live, plus the Day 1
+# "lightspeed" operator installed before any of it.
+# "install" operate on the 11 deployable components, plus "supply-chain"
 # (ADR-0420/WP-070) for "check" only - it has no install/build of its own,
 # only a signature-verification gate (ansible/roles/supply_chain).
-DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops lightspeed-config supply-chain
+DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops trustyai-config lightspeed-config supply-chain
 DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops
 DAY2_VERBS := check install build uninstall all reinstall
 
@@ -99,7 +103,7 @@ DAY3_SIGN_COMPONENTS := agents
 # "lightspeed-config" are two entries, not one, because the component is split
 # across day tiers - checking only the operator would report healthy while the
 # OLSConfig operand is absent, and vice versa.
-DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config
+DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config
 DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS))
 DAY3_VERBS := test stresstest backup restore check sign scenario-failover-node
 

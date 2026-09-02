@@ -1,6 +1,6 @@
 # ADR-0533: Consolidate Advantage's and Finage's non-promotion into a dedicated decision
 
-- **Status:** Proposed
+- **Status:** Implemented (2026-08-30)
 - **Target:** v0.8
 - **Date:** 2026-08-30
 - **Decision owners:** Zuno Demo architecture team

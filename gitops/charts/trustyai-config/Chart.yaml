@@ -1,0 +1,15 @@
+apiVersion: v2
+name: trustyai-config
+description: >-
+  Extends the platform's existing TrustyAI integration (ADR-0534) from
+  benchmarking-only (ADR-0108/WP-10's LMEvalJob, unaffected) to evaluation
+  and guardrails: generic RAGAS/Garak frameworks (WP-108), then guardrail
+  hooks wired to the Agent Runtime boundary and a PEFT/LoRA model
+  comparison pipeline (WP-109). Day 2, not Day 1 - TrustyAI itself is
+  already Managed by the Day 1 `openshift-ai` component; there is no
+  separate operator for this component to install. WP-107 ships only a
+  scaffold (this chart, empty of evaluation content) plus a health check
+  reusing the existing LMEvalJob lookup pattern.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

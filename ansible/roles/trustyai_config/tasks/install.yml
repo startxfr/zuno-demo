@@ -1,0 +1,21 @@
+---
+# ADR-0534/WP-107: scaffold only. Applies the -d0/-d1 Application pair -
+# both currently render nothing (trustyaiConfig chart has no templates/
+# content yet). WP-108 populates -d1 with generic RAGAS/Garak smoke-test
+# Jobs; WP-109 adds the Agent Runtime guardrail wiring and the PEFT/LoRA
+# comparison pipeline. Unlike lightspeed-config, there is no Day 1
+# operator CRD to verify first - TrustyAI is already Managed by the Day 1
+# `openshift-ai` component.
+- name: "trustyai-config | apply the trustyai-config GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "trustyai-config"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-trustyai-config-d0"
+
+- name: "trustyai-config | apply the trustyai-config GitOps Application (d1, currently no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "trustyai-config"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-trustyai-config-d1"

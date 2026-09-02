@@ -1,0 +1,35 @@
+---
+# ADR-0534/WP-107: scaffold only. Renders nothing yet - trustyaiConfig's
+# chart has no templates/ content until WP-108 adds the first RAGAS/Garak
+# Jobs. Depends only on `models` (the zuno-ai-run namespace and its
+# LMEvalJob resources this component's precheck reads) - WP-109 will add
+# `mcp`/`agents`/`rag` dependencies once the Agent Runtime guardrail hooks
+# land, at which point this Application should move later in the Day 2
+# sync-wave ordering if those dependencies require it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-trustyai-config-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-91"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/trustyai-config
+    helm:
+      releaseName: zuno-trustyai-config-d1
+      values: |
+        trustyaiConfig:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

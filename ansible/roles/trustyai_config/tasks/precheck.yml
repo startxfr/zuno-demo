@@ -1,0 +1,55 @@
+---
+# State detection (never fails). Both Applications currently render
+# nothing (WP-107 scaffold) - -d1 is checked as the meaningful half, same
+# convention lightspeed-config's own precheck.yml follows, ready for
+# WP-108/WP-109 to give it real content.
+- name: "trustyai-config | check the trustyai-config Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-trustyai-config-d1"
+
+- name: "trustyai-config | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ _state_check_result }}"
+
+- name: "trustyai-config | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+# ADR-0534's Phase 1 (WP-107): confirm the TrustyAI operand's health goes
+# beyond the LM-Eval path already exercised by ADR-0108/WP-10. The
+# aggregate DataScienceCluster condition and the component-specific one
+# are both read, since a healthy aggregate can still hide a failing
+# component.
+- name: "trustyai-config | read the DataScienceCluster's aggregate and TrustyAI conditions"
+  kubernetes.core.k8s_info:
+    api_version: datasciencecluster.opendatahub.io/v2
+    kind: DataScienceCluster
+    name: "{{ trustyai_config_dsc_name | default('zuno-dsc') }}"
+  register: _dsc
+  failed_when: false
+
+- name: "trustyai-config | report DataScienceCluster/TrustyAI health"
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'DataScienceCluster/' + (trustyai_config_dsc_name | default('zuno-dsc')) + ' not found.'
+         if (_dsc.resources | default([]) | length) == 0
+         else (
+           'Ready=' + ((_dsc.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first) | default('unknown'))
+           + ', TrustyAIReady=' + ((_dsc.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'TrustyAIReady') | map(attribute='status') | list | first) | default('unknown'))
+         ) }}
+
+# Reuses the exact same LMEvalJob lookup/report logic
+# ansible/roles/models/tasks/precheck.yml uses (extracted to
+# ansible/tasks/report_lmevaljobs.yml for ADR-0534/WP-107), rather than
+# inventing a second implementation - ADR-0534's Operational
+# considerations asks explicitly for this reuse. `models` already reports
+# this under `make d1 check models`; this role reports it again under
+# `make d3 check trustyai-config` so the WP-107/108/109 chain has its own
+# visible signal without requiring the operator to know it lives in
+# `models`.
+- name: "trustyai-config | report LMEvalJob results (ADR-0108 non-regression check)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/report_lmevaljobs.yml"
+  vars:
+    lmeval_namespace: "{{ trustyai_config_lmeval_namespace | default('zuno-ai-run') }}"

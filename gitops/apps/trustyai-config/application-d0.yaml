@@ -1,0 +1,34 @@
+---
+# Placeholder phase - renders nothing (trustyaiConfig.enabled: false). Kept
+# so this component has the same -d0/-d1 shape every other component does,
+# the same convention gitops/apps/lightspeed-config/application-d0.yaml
+# follows. TrustyAI itself has no separate operator for this component to
+# install - it is already Managed by the Day 1 `openshift-ai` component -
+# so -d0 has nothing to ever carry beyond this placeholder.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-trustyai-config-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-92"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/trustyai-config
+    helm:
+      releaseName: zuno-trustyai-config-d0
+      values: |
+        trustyaiConfig:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

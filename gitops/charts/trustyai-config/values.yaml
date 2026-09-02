@@ -1,0 +1,15 @@
+# ADR-0534/WP-107. Scaffold only: this chart renders NOTHING yet on either
+# the -d0 or -d1 side, the same shape gitops/charts/aap-config and
+# gitops/charts/lightspeed-config started from before their first real
+# content landed. WP-108 adds the first templates/ content here (generic
+# RAGAS/Garak smoke-test Jobs, gated behind trustyaiConfig.enabled); WP-109
+# adds the Agent Runtime guardrail wiring and the PEFT/LoRA comparison
+# pipeline. Keeping the gate here now means WP-108/WP-109 only add
+# templates, never touch this file's shape.
+trustyaiConfig:
+  enabled: false
+
+# The namespace TrustyAI's LMEvalJob resources already live in
+# (gitops/charts/models), reused by this component's precheck rather than
+# hardcoded a second time - see ansible/tasks/report_lmevaljobs.yml.
+lmevalNamespace: zuno-ai-run

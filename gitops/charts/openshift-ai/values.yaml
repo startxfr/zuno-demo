@@ -190,6 +190,14 @@ dataScienceCluster:
         managementState: Managed
       feastoperator:
         managementState: Managed
+      # Shared configuration surface for two ADRs (ADR-0534's Operational
+      # considerations, WP-107): eval.lmeval backs ADR-0108/WP-10's
+      # LMEvalJob model-benchmarking gate (Implemented), and
+      # mcpGuardrailsMode is the flag ADR-0534/WP-108 flips to true once
+      # WP-107's baseline verification is green. TrustyAI itself needs no
+      # separate operator install - it is already Managed here, inside
+      # this Day 1 component; the new work both ADRs describe lives in the
+      # Day 2 `trustyai-config` component instead.
       trustyai:
         eval:
           lmeval:
