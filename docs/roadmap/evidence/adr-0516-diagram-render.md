@@ -143,9 +143,12 @@ method rather than from a fresh guess at the allowlist.
 
 - **The egress `NetworkPolicy` is still not written** - see the section
   above for what was tried, what it broke, and how to resume.
-- **Arkos does not reliably call `generate_diagram` at all** - see the
-  follow-up section below. Not a render-service defect, not yet
-  root-caused.
+- ~~**Arkos does not reliably call `generate_diagram` at all**~~ - **fixed
+  2026-09-02**, see the follow-up section below (item 1's addendum).
+- **Comage narrates using `generate_image` instead of invoking it** - see
+  the follow-up section below (item 2's addendum). Design work tracked as
+  [WP-112](../work-packages/wp-112-comage-tool-call-narration-retry.md),
+  targeted v0.9.
 
 ## Follow-up (2026-09-02): two separate defects, not one
 
@@ -196,7 +199,51 @@ fail either bury the diagram ask inside a larger document-drafting request
 decides to actually reach for the tool, not yet compared side by side
 against Arkos's own system prompt/task declaration or against Tekos's and
 Comage's (neither of which shows this gap on their own single diagram
-prompt). Not yet root-caused; no code changed for this item.
+prompt).
+
+**Addendum (2026-09-02, fixed, commit `b0cb07f4`):** root cause confirmed
+architectural, not a bug - `draft_node` binds tools via plain
+`model.bind_tools(tools)` with no `tool_choice` override
+(`components/agent-runtime/app/graph/model_router.py`), so the model is
+always free to answer in prose. The tool's own JSON schema description was
+the only signal telling it to reach for `generate_diagram`;
+`agents/arkos/prompts/draft-architecture-testimonial.md` and
+`workshop-presentation.md` had an explicit instruction for the git-forge
+tools but none for `generate_diagram`/`generate_image`. Fixed by adding the
+same shape of explicit instruction those files already use for git-forge,
+directly telling the model to actually invoke `generate_diagram` when a
+diagram/schema/visual is requested. Re-verified live 2026-09-02: all three
+Arkos diagram stress-test prompts (`diagram-k8s_relations_diagram`,
+`diagram-dat_with_diagram`, `diagram-k8s_relations_schema`) PASS with
+`images=1`, up from 1/3.
+
+**3. OPEN - Comage narrates using `generate_image` instead of invoking
+it.** A separate defect from both of the above, surfaced only after fixing
+a third, now-resolved problem: `_GENERATE_IMAGE_TOOL_SCHEMA`'s description
+listed "mockup" as an unqualified trigger for `generate_image`, directly
+contradicting `agents/comage/prompts/check-deal-status.md`'s own
+instruction to never use photorealistic generation for a mockup/
+visualization of structured deal data. Fixed 2026-09-02 (commit
+`ef7b5c43`) by qualifying the schema wording to distinguish a marketing
+mockup (valid) from a mockup *of* structured data (never valid, use
+`generate_diagram`). Live-verified the model's own reasoning changed
+correctly - its reply now says "pour un visuel marketing j'utilise
+generate_image. C'est le bon outil" - but the stress test
+(`evaluations/comage/stress_test.py::img-mockup_request`) and security
+check (`security_checks.py::
+comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests`)
+both still fail: `images=0`/`images=[]`, because the model narrates that
+sentence instead of actually calling the tool. This is
+`qwen3.5-9b-wesh`'s already-documented narrate-instead-of-call behavior
+(`docs/adr/0526-fine-tune-and-serve-a-french-urban-register-model-variant.md`'s
+2026-08-29 Amendment), now shown to affect image/diagram tool calls too.
+`reason_node` (the single-shot `retrieve_reason_respond` shape's only
+decision point) has no retry for a skipped tool call the way
+`_resolve_diagram_generation_call` retries a failed render. Design work for
+that retry - scoped, since it touches shared runtime behavior for every
+agent on that graph shape, not just Comage - is tracked as
+[WP-112](../work-packages/wp-112-comage-tool-call-narration-retry.md),
+targeted v0.9. No code changed for this item.
 
 ## Related closeout changes
 
