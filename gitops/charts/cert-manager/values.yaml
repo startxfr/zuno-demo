@@ -34,11 +34,15 @@ acme:
   # stripped (api.demo222.startx.fr for apps.demo222.startx.fr).
   clusterBaseDomain: apps.mycluster.example.com
 
+  # PLACEHOLDER (WP-118 B6). The real contact comes from
+  # zuno_certmanager_email in ansible/confidential.yml, merged in by
+  # ansible/roles/cert_manager/tasks/install.yml, which always overrides this.
   # ACME account contact - Let's Encrypt sends expiry warnings here if
   # renewal ever silently stalls (this repo has no cert-manager
   # Certificate-readiness alerting yet; ADR-0211 flags that as future
-  # work, so this mailbox is the only passive safety net).
-  email: dev+zuno-acme@startx.fr
+  # work, so this mailbox is the only passive safety net), so an unset
+  # override is worth noticing rather than defaulting quietly.
+  email: acme-contact@mycluster.example.com
 
   # Which issuer the three Certificate resources reference. Ships as the
   # STAGING issuer (certs untrusted, but the full DNS-01 flow is
@@ -47,12 +51,21 @@ acme:
   certificatesIssuer: letsencrypt-route53-staging
 
   route53:
-    # Environment-specific; these defaults are the values ADR-0211
-    # verified live against this project's own AWS account (startx.fr
-    # public hosted zone). Not secret - the zone and its ID are public
-    # DNS facts; only the IAM access key (Vault: aws/route53-dns01) is.
-    region: eu-west-3
-    hostedZoneID: Z3HY376RT1N9S1
+    # PLACEHOLDERS (WP-118 B6). The real values come from
+    # zuno_certmanager_route53_region / _hosted_zone_id in
+    # ansible/confidential.yml. Not secret - a hosted zone and its ID are
+    # public DNS facts; only the IAM access key (Vault: aws/route53-dns01)
+    # is - but they are per-environment, so a cluster under a different
+    # parent zone needs its own and must not inherit these.
+    #
+    # NOTE the two variable families are one word apart and easy to
+    # confuse: zuno_aws_route53_* are the IAM credentials that WRITE the
+    # DNS records; zuno_certmanager_route53_* say WHERE to write them.
+    # The zone ID must be the same zone the IAM policy is scoped to, or
+    # DNS-01 gets AccessDenied on ChangeResourceRecordSets while every
+    # other check still passes.
+    region: mycluster-route53-region
+    hostedZoneID: MYCLUSTERHOSTEDZONEID
 
   consumers:
     # IngressController/default.spec.defaultCertificate -> the wildcard

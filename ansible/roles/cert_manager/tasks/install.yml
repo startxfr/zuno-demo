@@ -82,11 +82,11 @@
 - name: "cert_manager | resolve the ACME DNS identity (WP-118 B6)"
   ansible.builtin.set_fact:
     _cert_manager_acme_identity:
-      email: "{{ zuno_acme_email | default(_cm_chart_acme['email']) }}"
+      email: "{{ zuno_certmanager_email | default(_cm_chart_acme['email']) }}"
       route53:
-        region: "{{ zuno_acme_route53_region | default(_cm_chart_acme['route53']['region']) }}"
+        region: "{{ zuno_certmanager_route53_region | default(_cm_chart_acme['route53']['region']) }}"
         hostedZoneID: >-
-          {{ zuno_acme_route53_hosted_zone_id
+          {{ zuno_certmanager_route53_hosted_zone_id
              | default(_cm_chart_acme['route53']['hostedZoneID']) }}
   vars:
     _cm_chart_acme: >-

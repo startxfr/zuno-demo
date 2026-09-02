@@ -217,14 +217,14 @@ zuno_aws_route53_secret_access_key: "xxxxxx"
 #                    global, but cert-manager still takes a region, and it is
 #                    NOT necessarily the cluster's own region (demo222 runs in
 #                    eu-west-2 and solves in eu-west-3).
-#   zuno_acme_email  ACME account contact. Let's Encrypt mails expiry warnings
+#   zuno_certmanager_email  ACME account contact. Let's Encrypt mails expiry warnings
 #                    here if renewal ever stalls; this repo has no
 #                    Certificate-readiness alerting yet, so it is the only
 #                    passive safety net (ADR-0211 flags that as future work).
 #
-# zuno_acme_route53_hosted_zone_id: "Z00000000000000000000"
-# zuno_acme_route53_region: "eu-west-3"
-# zuno_acme_email: "dev+zuno-acme@example.org"
+# zuno_certmanager_route53_hosted_zone_id: "Z00000000000000000000"
+# zuno_certmanager_route53_region: "eu-west-3"
+# zuno_certmanager_email: "dev+zuno-acme@example.org"
 
 # --- LLM external provider API keys -----------------------------------------
 # Each optional: leave "xxxxxx" and the ModelRouter fails over to the next

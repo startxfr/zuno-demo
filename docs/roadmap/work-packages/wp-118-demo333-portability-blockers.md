@@ -1,15 +1,13 @@
 # WP-118: Close the demo333 portability blockers recorded in ADR-0517
 
-- **State:** Operator pending (2026-09-03 — eight of nine blockers closed; **B6 needs one
-  operator action**: three non-secret Route53 values into `ansible/confidential.yml` before
-  its chart default can be flipped). B1, B2, B3, B4, B5, B7, B8 and B9 are closed. Steps 2b
-  and 3b were applied live on `demo222` and verified: MachineSets byte-unchanged, all 15
-  PVCs unchanged, the ACME track intact, and every affected Application Synced/Healthy on a
-  revision containing the flip. Three audit errors were corrected along the way: ADR-0517's
-  B7 row described a defect that did not exist in a way that would have caused an outage if
-  acted on; step 2's planned MachineSet selector would have made the role bootstrap from its
-  own output; and step 3's first inertia test passed while comparing two empty renders. No
-  `demo333` cluster exists; nothing here is exercised until one does.
+- **State:** Done (2026-09-03 — all nine blockers closed, every flip applied live on
+  `demo222` and verified inert). B6 closed last: the three Route53 values moved into
+  `ansible/confidential.yml` and the chart flipped to placeholders. Three audit errors were
+  corrected along the way: ADR-0517's B7 row described a defect that did not exist in a way
+  that would have caused an outage if acted on; step 2's planned MachineSet selector would
+  have made the role bootstrap from its own output; and step 3's first inertia test passed
+  while comparing two empty renders. No `demo333` cluster exists, so this closes the known
+  literals, not the claim that the automation bootstraps — that is ADR-0517's own run.
 - **ADRs:** ADR-0517 (Proposed, v0.8)
 - **Depends on:** nothing. Blocked by nothing — the ADR-0517 run itself is blocked on
   an operator provisioning `demo333`, but every blocker below is fixable without it.
@@ -156,7 +154,7 @@ StorageClasses" on a cluster that has exactly one. Use a loop with a quoted subs
 B6 follows the same shape: `cert_manager`'s d1 apply now merges an `acme` identity whose
 three values default to **the chart file itself** rather than being restated in Ansible,
 so there is one source of truth and the apply stays inert until an operator sets
-`zuno_acme_route53_hosted_zone_id` / `_region` / `zuno_acme_email`. Those are documented
+`zuno_certmanager_route53_hosted_zone_id` / `_region` / `zuno_certmanager_email`. Those are documented
 as optional in `confidential.example.yml`, extending the existing Route53 IAM block —
 non-secret (a public hosted zone ID is a published DNS fact) but per-environment.
 
@@ -180,17 +178,22 @@ a PVC that cannot bind is a loud failure where a plausible name would silently b
 wrong storage. Each flipped chart rendered against its own live Application emits `gp3-csi`
 and zero placeholders.
 
-B6: the ACME identity landed (`zuno-cert-manager-d1` carries
+B6 — **DONE 2026-09-03.** The ACME identity landed first (`zuno-cert-manager-d1` carries
 `acme.route53.{hostedZoneID,region}` and `acme.email`; both Let's Encrypt ClusterIssuers
-stayed Ready through the apply, and the production issuer plus both consumer flips are
-intact). **The chart values cannot be flipped yet**, and this is a design consequence, not
-an oversight: the role treats the chart as its *default source* when
-`zuno_acme_route53_hosted_zone_id` / `_region` / `zuno_acme_email` are unset — which is
-what keeps the apply inert — so replacing them with placeholders would make the role inject
-placeholders on the next run. Closing B6 needs those three non-secret values moved into
-`ansible/confidential.yml` first. Until then B6 is closed for `demo333` (an operator sets
-the variables and the chart default is never consulted) but not for the audit (the chart
-still names the `startx.fr` zone).
+stayed Ready through the apply, production issuer and both consumer flips intact). The
+chart could not be flipped while the role still treated it as its default source, so the
+three values moved into `ansible/confidential.yml` — non-secret (a hosted zone ID is a
+published DNS fact) but per-environment. Re-applied: **`changed=0`**, the cleanest possible
+inertia proof — the value now comes from `confidential.yml` and produces a byte-identical
+result. Only then were the chart defaults replaced with placeholders.
+
+The variables were renamed `zuno_acme_*` → `zuno_certmanager_*` before being written, at
+the operator's request and for a reason worth recording: `zuno_aws_route53_*` (the IAM
+credentials that WRITE the DNS records, destined for Vault) and the new keys (which say
+WHERE to write them, destined for the chart) sat one word apart in the same file, and the
+operator had already misread one for the other. The chart comment now names the distinction
+explicitly, along with the trap that the zone ID must match the zone the IAM policy is
+scoped to — otherwise DNS-01 gets AccessDenied while every other check passes.
 
 ### Step 4 — undocumented prerequisites (B7, B8) — **DONE 2026-09-02**
 
