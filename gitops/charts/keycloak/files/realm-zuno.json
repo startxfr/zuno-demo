@@ -1668,6 +1668,17 @@
                     }
                 },
                 {
+                    "name": "zuno-signer-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-signer",
+                        "access.token.claim": "true",
+                        "id.token.claim": "false"
+                    }
+                },
+                {
                     "name": "zuno-signer-email-verified",
                     "protocol": "openid-connect",
                     "protocolMapper": "oidc-hardcoded-claim-mapper",
