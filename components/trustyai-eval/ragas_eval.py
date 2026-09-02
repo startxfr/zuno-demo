@@ -65,7 +65,15 @@ def retrieve(client: httpx.Client, question: str) -> list[str]:
     )
     resp.raise_for_status()
     results = resp.json().get("results", [])
-    return [r.get("content") or r.get("text") or "" for r in results]
+    # SearchResult carries title+snippet (components/rag-service/app/
+    # schemas.py) - NOT content/text; the wrong field names here were
+    # live-diagnosed 2026-09-02 (every context came back "" and every
+    # ragas score was NaN in consequence - garbage in, NaN out).
+    contexts = [
+        f"{r.get('title', '')}\n{r.get('snippet', '')}".strip()
+        for r in results
+    ]
+    return [c for c in contexts if c]
 
 
 def answer(client: httpx.Client, question: str, contexts: list[str]) -> str:
@@ -79,7 +87,14 @@ def answer(client: httpx.Client, question: str, contexts: list[str]) -> str:
               "messages": [{"role": "user", "content": prompt}]},
     )
     resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+    msg = resp.json()["choices"][0]["message"]
+    # qwen can return content=None (e.g. all budget spent on reasoning) -
+    # live-diagnosed 2026-09-02: a None response silently DROPS the
+    # 'response' feature from the ragas dataset, and validation then fails
+    # with "requires ['response']" - the misleading error the first two
+    # runs died on. Fall back to reasoning_content, else empty (the caller
+    # skips empty answers).
+    return msg.get("content") or msg.get("reasoning_content") or ""
 
 
 def main() -> int:
@@ -93,6 +108,9 @@ def main() -> int:
                 print(f"WARNING: no contexts retrieved for {q!r} - skipping")
                 continue
             a = answer(client, q, contexts)
+            if not a.strip():
+                print(f"WARNING: judge produced no answer text for {q!r} - skipping")
+                continue
             samples.append({"question": q, "contexts": contexts, "answer": a})
             print(f"retrieved {len(contexts)} contexts + answered: {q!r}")
 
@@ -101,9 +119,8 @@ def main() -> int:
               "for every question; check the corpus and CALLER_GROUPS")
         return 1
 
-    from datasets import Dataset
     from langchain_openai import ChatOpenAI
-    from ragas import evaluate
+    from ragas import EvaluationDataset, SingleTurnSample, evaluate
     from ragas.llms import LangchainLLMWrapper
     from ragas.metrics import Faithfulness, LLMContextPrecisionWithoutReference
 
@@ -111,19 +128,19 @@ def main() -> int:
         base_url=JUDGE_BASE_URL, api_key="in-cluster-unused",
         model=JUDGE_MODEL, temperature=0.0, timeout=180,
     ))
-    # Legacy HF-Dataset column API (question/contexts/answer), which ragas
-    # 0.2 maps internally to user_input/retrieved_contexts/response. The
-    # SingleTurnSample/EvaluationDataset path was tried first and failed
-    # live 2026-09-02 - validate_required_columns rejected the dataset with
-    # "requires ['response']" despite response= being set on every sample.
-    dataset = Dataset.from_dict({
-        "question": [s["question"] for s in samples],
-        "contexts": [s["contexts"] for s in samples],
-        "answer": [s["answer"] for s in samples],
-    })
+    # Native v2 sample API. An earlier "requires ['response']" validation
+    # failure blamed on this path was actually data: a None answer (see
+    # answer()'s comment) drops the response feature entirely. With real
+    # strings this path validates and runs - proven in-image 2026-09-02.
+    dataset = EvaluationDataset(samples=[
+        SingleTurnSample(user_input=s["question"],
+                         retrieved_contexts=s["contexts"],
+                         response=s["answer"])
+        for s in samples
+    ])
     result = evaluate(dataset=dataset,
-                      metrics=[Faithfulness(), LLMContextPrecisionWithoutReference()],
-                      llm=judge)
+                      metrics=[Faithfulness(llm=judge),
+                               LLMContextPrecisionWithoutReference(llm=judge)])
 
     scores = result.to_pandas().to_dict(orient="records")
     report = {
