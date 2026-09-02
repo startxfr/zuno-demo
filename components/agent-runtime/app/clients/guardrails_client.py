@@ -48,9 +48,13 @@ DETECTOR_PARAMS: Dict[str, List[str]] = {
         "email",
         "us-social-security-number",
         "credit-card",
-        # prompt-injection / jailbreak heuristics
-        r"(?i)ignore\s+(all|any|previous|prior|above)\s+(instructions|prompts|rules)",
-        r"(?i)disregard\s+(your|the|all)\s+(instructions|guidelines|rules)",
+        # prompt-injection / jailbreak heuristics. Up to two filler words
+        # between the verb and its object: the first live test (2026-09-02,
+        # run d9445c2a) proved "ignore all PREVIOUS instructions" slipped a
+        # single-filler pattern - exactly the tuning observe-mode exists to
+        # surface before anything blocks.
+        r"(?i)ignore\s+(?:\w+\s+){0,2}(instructions|prompts|rules)",
+        r"(?i)disregard\s+(?:\w+\s+){0,2}(instructions|guidelines|rules)",
         r"(?i)you\s+are\s+now\s+(DAN|developer\s+mode)",
         r"(?i)pretend\s+(you\s+have\s+no|there\s+are\s+no)\s+(restrictions|rules|guidelines)",
         r"(?i)system\s*prompt\s*[:=]",
