@@ -1,0 +1,61 @@
+---
+# ADR-0347's finding, factored out of ansible/roles/rhtas/tasks/install.yml
+# (WP-110) for reuse by WP-111's rhtas_config role: the live Keycloak
+# route is served by a Vault-PKI-issued cert (root CN=zuno-demo.internal),
+# so any in-cluster client validating it (Fulcio, or a Python client doing
+# its own TLS verification) needs that CA. Cluster-specific data that
+# can't be Helm-rendered - same reasoning and same
+# follow-the-Ingress-secretName logic as
+# ansible/roles/openshift_oauth/tasks/install.yml, so this stays
+# self-correcting if ingress.acmeWildcardTLS ever flips the serving cert.
+# Safe to copy unconditionally on every run.
+#
+# Requires: publish_ca_configmap_namespace (where to write the ConfigMap),
+# publish_ca_configmap_name (defaults to rhtas-keycloak-ca).
+- name: "keycloak-ca | validate required vars are set"
+  ansible.builtin.assert:
+    that:
+      - publish_ca_configmap_namespace is defined
+      - publish_ca_configmap_namespace | length > 0
+    fail_msg: "publish_keycloak_ca_configmap.yml requires 'publish_ca_configmap_namespace' to be set by the including role"
+
+- name: "keycloak-ca | look up the Keycloak Ingress to find its live TLS secret name"
+  kubernetes.core.k8s_info:
+    api_version: networking.k8s.io/v1
+    kind: Ingress
+    namespace: zuno-auth
+  register: _keycloak_ca_ingress
+
+- name: "keycloak-ca | read the Keycloak serving-cert CA from that secret"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-auth
+    name: "{{ _keycloak_ca_ingress.resources[0].spec.tls[0].secretName }}"
+  register: _keycloak_ca_tls
+  when: (_keycloak_ca_ingress.resources | default([]) | length) > 0
+
+- name: "keycloak-ca | fail loudly if no Keycloak Ingress TLS secret was found"
+  ansible.builtin.fail:
+    msg: >-
+      No Ingress with a tls[].secretName was found in zuno-auth, or its
+      Secret has no ca.crt. Check `oc get ingress -n zuno-auth` and the
+      referenced Secret before re-running.
+  when: >-
+    (_keycloak_ca_ingress.resources | default([]) | length) == 0
+    or (_keycloak_ca_tls.resources | default([]) | length) == 0
+    or ('ca.crt' not in (_keycloak_ca_tls.resources[0].data | default({})))
+
+- name: "keycloak-ca | publish the CA ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: "{{ publish_ca_configmap_name | default('rhtas-keycloak-ca') }}"
+        namespace: "{{ publish_ca_configmap_namespace }}"
+        labels:
+          zuno.io/managed-by: ansible
+      data:
+        ca-bundle.crt: "{{ _keycloak_ca_tls.resources[0].data['ca.crt'] | b64decode }}"

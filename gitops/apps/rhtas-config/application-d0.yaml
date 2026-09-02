@@ -1,0 +1,41 @@
+---
+# Sigstore Policy Controller operator install (Red Hat Operators catalog -
+# a SEPARATE operator from rhtas-operator, live finding 2026-09-02:
+# policy-controller-operator, not part of rhtas-operator's CRDs). The
+# TrustRoot/ClusterImagePolicy operand is a separate Application
+# (application-d1.yaml). OwnNamespace-scoped OperatorGroup, co-located in
+# zuno-rhtas (already exists, owned by zuno-namespaces-d0). ADR-0535/WP-111.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-rhtas-config-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-70"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/rhtas-config
+    helm:
+      releaseName: zuno-rhtas-config-d0
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-rhtas
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -148,6 +148,19 @@ precedent rather than RHTAS's own upstream defaults:
   needs a trust chain (WP-34's LoRA/MLOps pipeline is `Operator pending`).
   Revisit when a first model artifact is actually promoted between
   environments.
+  **Correction (2026-09-02, WP-111 Part A):** this premise was already
+  stale the day this ADR was authored - WP-087 (Done 2026-08-29, one day
+  earlier) supersedes WP-34's objective and registered a real promoted
+  artifact, `comage-lora` version `wesh-20260829-145123`
+  (`model_version_id 6`), in the live `zuno` RHOAI Model Registry
+  (`rhoai-model-registries`), with `artifact_uri` pointing at a merged
+  bf16 checkpoint in S3. A model/adapter artifact that needs a trust chain
+  already exists. Per this ADR's own convention (the actual bundle-trust
+  ADR is authored once its sub-scope is being implemented, not
+  pre-declared), this Non-goal stays out of WP-111's scope - Part B is
+  the Priority-1 image cutover only - but a follow-on ADR for
+  model/adapter artifact trust should be authored as its own piece of
+  work, not silently folded into a WP that wasn't scoped for it.
 - **Quay.** Not required by RHTAS adoption. A Quay ADR, if ever written,
   needs its own independent justification (registry lifecycle, replication,
   vulnerability management) unrelated to this decision.

@@ -1,11 +1,26 @@
 #!/usr/bin/env python3
-"""ADR-0420 in-cluster supply-chain signing: authenticates to Vault's
-Transit-backed platform-signer identity via Kubernetes auth, then drives
-cosign's native hashivault:// KMS mode - replacing the GitHub-OIDC/Fulcio/
-Rekor keyless model platform/supply-chain/sign_okf_bundle.py and
-verify_signatures.py still use today (WP-069/070 migrate them onto this).
+"""ADR-0420/ADR-0535 in-cluster supply-chain signing.
 
-Four operations:
+`sign-image`/`verify-images` (WP-111/ADR-0535) sign and verify the 14
+Priority-1 first-party images keyless via RHTAS - a Keycloak
+client-credentials token for the `zuno-signer` identity exchanged for a
+short-lived Fulcio certificate, with the signature recorded in Rekor's
+transparency log. This REPLACES the `hashivault://` Vault Transit mode
+those two operations used before WP-111 (ADR-0420/WP-070) - not because
+Vault Transit was insufficient (it remains valid, sufficient, and live for
+every other operation below), but because demonstrating RHTAS is this
+ADR's actual point (see ADR-0535's Context).
+
+Every OTHER operation (`sign-blob`/`verify-blob`/`sign-okf-bundles`/
+`public-key`/`login`/`dry-run`) is untouched and still uses Vault's
+Transit-backed platform-signer identity via Kubernetes auth, driving
+cosign's native `hashivault://` KMS mode - the GitHub-OIDC/Fulcio/Rekor
+keyless model platform/supply-chain/sign_okf_bundle.py and
+verify_signatures.py's own historical mode is what WP-069/070 replaced
+with this, before RHTAS existed. OKF bundle signing is explicitly out of
+ADR-0535's scope (Non-goals - blocked on ADR-0506/ADR-0507).
+
+Operations:
 
     login       - authenticate to Vault via Kubernetes auth only. Proves the
                   zuno-signer ServiceAccount's role binding actually works
@@ -30,21 +45,34 @@ Four operations:
                   (--kv-mount/--kv-path), where
                   gitops/charts/agent-runtime/templates/
                   externalsecret-okf-signatures.yaml picks them up.
-    verify-images - WP-070: verifies every image in a JSON refs file (the
-                  shape `verify_signatures.py --list-refs`'s "resolved"
-                  array produces) against the public key baked into this
-                  image at build time - no Vault access at all, the whole
-                  point of a verifier. Still needs registry auth (a pull),
-                  built the same way sign-image's push does. Used by
-                  ansible/tasks/verify_image_signatures.yml's in-cluster
-                  Job (make d2 check supply-chain).
+    sign-image  - WP-111/ADR-0535: signs an OCI image by digest keyless via
+                  RHTAS - exchanges the `zuno-signer` Keycloak
+                  client-credentials token for a short-lived Fulcio
+                  certificate (`--fulcio-url`), signs, and records the
+                  signature in Rekor (`--rekor-url`). Replaces the
+                  pre-WP-111 `--key hashivault://<name>` mode for this
+                  operation only.
+    verify-images - WP-111/ADR-0535: verifies every image in a JSON refs
+                  file (the shape `verify_signatures.py --list-refs`'s
+                  "resolved" array produces) keyless via RHTAS - checks
+                  the Fulcio-issued certificate's identity/issuer
+                  (`--certificate-identity`/`--certificate-oidc-issuer`)
+                  against a real Rekor transparency-log entry
+                  (`--rekor-url`), not a static committed public key.
+                  Still needs registry auth (a pull), built the same way
+                  sign-image's push does. Used by ansible/tasks/
+                  verify_image_signatures.yml's in-cluster Job
+                  (make d2 check supply-chain).
 
---tlog-upload=false / --insecure-ignore-tlog=true are load-bearing, not a
-security loosening: there is no self-hosted Rekor here (Vault's own audit
-device is the in-cluster substitute, see ADR-0420's Decision), and omitting
-either flag makes cosign silently reach out to the public
-rekor.sigstore.dev - exactly the external dependency this script exists to
-remove.
+--tlog-upload=false / --insecure-ignore-tlog=true (sign-blob/verify-blob
+only) are load-bearing, not a security loosening: those two operations
+still use Vault's Transit-backed key with no self-hosted Rekor behind
+them (Vault's own audit device is the in-cluster substitute, see
+ADR-0420's Decision), and omitting either flag makes cosign silently
+reach out to the public rekor.sigstore.dev - exactly the external
+dependency those two operations exist to remove. sign-image/verify-images
+are the opposite: RHTAS's self-hosted Rekor (`--rekor-url`) is the whole
+point of ADR-0535, so a real transparency-log entry is expected there.
 
 Run from inside a pod using the zuno-signer ServiceAccount (namespace
 zuno-ai-build), which Vault's platform-signer Kubernetes-auth role is bound
@@ -60,10 +88,12 @@ import json
 import os
 import pathlib
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
 import urllib.error
+import urllib.parse
 import urllib.request
 
 import sign_okf_bundle
@@ -78,6 +108,35 @@ DEFAULT_KV_PATH = "okf-signatures"
 # verifier reads this local file, never Vault, matching ADR-0420's core
 # principle.
 DEFAULT_LOCAL_PUBLIC_KEY_PATH = pathlib.Path("/app/zuno-platform-signer.pub")
+
+# WP-111/ADR-0535: RHTAS keyless signing/verification defaults. All
+# overridable via env (set by ansible/tasks/run_image_signing_job.yml and
+# verify_image_signatures.yml's Job definitions, which resolve the live
+# cluster domain the same way every other domain-bearing Application in
+# this repo does) or CLI flags - never hardcoded to one cluster.
+DEFAULT_FULCIO_URL = os.environ.get("RHTAS_FULCIO_URL", "http://fulcio-server.zuno-rhtas.svc.cluster.local")
+DEFAULT_REKOR_URL = os.environ.get("RHTAS_REKOR_URL", "http://rekor-server.zuno-rhtas.svc.cluster.local")
+DEFAULT_TUF_URL = os.environ.get("RHTAS_TUF_URL", "http://tuf.zuno-rhtas.svc.cluster.local")
+# The zuno-signer client's hardcoded email protocol mappers (ADR-0535/
+# WP-110) - Fulcio's "email" issuer type asserts this as the certificate
+# identity.
+DEFAULT_CERT_IDENTITY = os.environ.get("RHTAS_CERT_IDENTITY", "zuno-signer@zuno-demo.internal")
+# No safe cluster-agnostic default: must match the Securesign CR's
+# fulcio.config.OIDCIssuers[].Issuer exactly (ADR-0535's Design
+# decisions), which is cluster-domain-specific.
+DEFAULT_CERT_OIDC_ISSUER = os.environ.get("RHTAS_CERT_OIDC_ISSUER", "")
+# The EXTERNAL Keycloak route, not the in-cluster Service - Keycloak's
+# `iss` claim reflects the scheme of the request that reached it (no
+# X-Forwarded-Proto through the internal ClusterIP), so a token fetched
+# internally carries `iss: http://...` and Fulcio (configured with the
+# https external issuer) rejects it (live finding, WP-111).
+DEFAULT_KC_TOKEN_URL = os.environ.get("RHTAS_KEYCLOAK_TOKEN_URL", "")
+DEFAULT_KC_CLIENT_ID = os.environ.get("RHTAS_CLIENT_ID", "zuno-signer")
+DEFAULT_KC_CLIENT_SECRET_PATH = os.environ.get("RHTAS_CLIENT_SECRET_PATH", "")
+# CA bundle for the external Keycloak route's Vault-PKI-issued cert
+# (ADR-0347's finding, republished per-namespace by the rhtas/rhtas-config
+# ansible roles as the rhtas-keycloak-ca ConfigMap).
+DEFAULT_KC_CA_FILE = os.environ.get("RHTAS_KC_CA_FILE", "")
 
 
 class SignerError(RuntimeError):
@@ -158,22 +217,82 @@ def _registry_docker_config(image_ref: str, jwt_path: str) -> pathlib.Path:
     return config_dir
 
 
-def sign_image(vault_addr: str, vault_token: str, key_name: str, image_ref: str, jwt_path: str) -> None:
-    """ADR-0420/WP-070: signs an OCI image by digest (image_ref must already
-    be `<repository>@sha256:<digest>` - the caller resolves the live
-    ImageStreamTag digest, this function never does, matching
-    run_okf_signing_job.yml's own "resolve outside, sign inside" split).
-    Unlike sign-blob, plain `cosign sign` gates transparency-log upload
-    behind an opt-in COSIGN_EXPERIMENTAL env var rather than a flag - not
-    setting it (never set anywhere in this repo) is the whole story, no
-    extra flag needed here."""
+def fetch_oidc_token(token_url: str, client_id: str, client_secret: str, ca_file: str = "") -> str:
+    """WP-111/ADR-0535: exchanges the zuno-signer client-credentials grant
+    for an access token whose `iss` Fulcio trusts. Must hit the EXTERNAL
+    Keycloak route (see DEFAULT_KC_TOKEN_URL's comment) - ca_file is the
+    Vault-PKI CA that route's cert chains to, not optional in practice."""
+    data = urllib.parse.urlencode(
+        {"grant_type": "client_credentials", "client_id": client_id, "client_secret": client_secret}
+    ).encode("utf-8")
+    req = urllib.request.Request(token_url, data=data, method="POST")
+    context = ssl.create_default_context(cafile=ca_file) if ca_file else None
+    try:
+        with urllib.request.urlopen(req, timeout=15, context=context) as resp:
+            body = json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        raise SignerError(f"Keycloak token request failed ({exc.code}): {exc.read().decode()}") from exc
+    except urllib.error.URLError as exc:
+        raise SignerError(f"cannot reach Keycloak at {token_url}: {exc.reason}") from exc
+
+    token = body.get("access_token")
+    if not token:
+        raise SignerError(f"Keycloak token response had no access_token: {body}")
+    return token
+
+
+def _cosign_initialize_tuf(tuf_url: str) -> None:
+    """RHTAS's TUF trust root (Fulcio/Rekor/CTLog public keys) - every
+    keyless sign/verify needs this cache initialized first. Re-run on
+    every invocation: this script's callers are ephemeral pods with no
+    persistent $HOME, so nothing survives between runs anyway."""
+    cosign_bin = _cosign_path()
+    env = os.environ.copy()
+    env.setdefault("HOME", tempfile.gettempdir())
+    result = subprocess.run(
+        [cosign_bin, "initialize", "--mirror", tuf_url, "--root", f"{tuf_url}/root.json"],
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if result.returncode != 0:
+        raise SignerError(f"cosign initialize (TUF root, {tuf_url}) failed: {(result.stderr or result.stdout).strip()}")
+
+
+def sign_image(
+    image_ref: str,
+    jwt_path: str,
+    identity_token: str,
+    fulcio_url: str = DEFAULT_FULCIO_URL,
+    rekor_url: str = DEFAULT_REKOR_URL,
+    tuf_url: str = DEFAULT_TUF_URL,
+) -> None:
+    """WP-111/ADR-0535: signs an OCI image by digest keyless via RHTAS
+    (image_ref must already be `<repository>@sha256:<digest>` - the caller
+    resolves the live ImageStreamTag digest, this function never does,
+    matching run_okf_signing_job.yml's own "resolve outside, sign inside"
+    split). Unlike sign-blob, plain `cosign sign` gates transparency-log
+    upload behind an opt-in COSIGN_EXPERIMENTAL env var rather than a
+    flag - not setting it (never set anywhere in this repo) is the whole
+    story; RHTAS's own --rekor-url is what actually records the entry."""
+    _cosign_initialize_tuf(tuf_url)
     cosign_bin = _cosign_path()
     docker_config_dir = _registry_docker_config(image_ref, jwt_path)
+    token_file = pathlib.Path(tempfile.mkstemp(suffix=".tok")[1])
+    token_file.write_text(identity_token)
     try:
-        env = _cosign_env(vault_addr, vault_token)
+        env = os.environ.copy()
         env["DOCKER_CONFIG"] = str(docker_config_dir)
+        env.setdefault("HOME", tempfile.gettempdir())
         result = subprocess.run(
-            [cosign_bin, "sign", "--yes", "--key", f"hashivault://{key_name}", image_ref],
+            [
+                cosign_bin, "sign", "--yes",
+                "--fulcio-url", fulcio_url,
+                "--rekor-url", rekor_url,
+                "--identity-token", str(token_file),
+                image_ref,
+            ],
             env=env,
             capture_output=True,
             text=True,
@@ -181,24 +300,33 @@ def sign_image(vault_addr: str, vault_token: str, key_name: str, image_ref: str,
         )
     finally:
         shutil.rmtree(docker_config_dir, ignore_errors=True)
+        token_file.unlink(missing_ok=True)
     if result.returncode != 0:
-        raise SignerError(f"cosign sign failed for {image_ref}: {(result.stderr or result.stdout).strip()}")
-    print(f"signed {image_ref}")
+        raise SignerError(f"cosign sign (keyless, RHTAS) failed for {image_ref}: {(result.stderr or result.stdout).strip()}")
+    print(f"signed {image_ref} (keyless, RHTAS)")
 
 
-def verify_image(public_key: pathlib.Path, image_ref: str, jwt_path: str) -> None:
-    """ADR-0420/WP-070: verifies an OCI image by digest against a LOCAL
-    public key file - no Vault access needed, matching
-    sign_okf_bundle.py's verify_bundle(). Still needs registry auth (a
-    pull), built the same Docker-config-from-SA-token way sign_image()
-    builds it for a push.
+def verify_image(
+    image_ref: str,
+    jwt_path: str,
+    cert_identity: str = DEFAULT_CERT_IDENTITY,
+    cert_oidc_issuer: str = DEFAULT_CERT_OIDC_ISSUER,
+    rekor_url: str = DEFAULT_REKOR_URL,
+    tuf_url: str = DEFAULT_TUF_URL,
+) -> None:
+    """WP-111/ADR-0535: verifies an OCI image by digest keyless via
+    RHTAS - checks the Fulcio-issued certificate's identity/issuer against
+    a real Rekor transparency-log entry, replacing the pre-WP-111 static
+    committed public key (`--key`). Still needs registry auth (a pull),
+    built the same Docker-config-from-SA-token way sign_image() builds it
+    for a push.
 
-    `cosign verify` (unlike `sign`) always initializes a local Sigstore
-    TUF trust-root cache under $HOME/.sigstore, even in pure --key mode
-    with no tlog contact - defaults HOME to a throwaway writable dir if
-    unset, so this works regardless of the caller's environment (a Job
-    with no HOME set, an interactive debug pod, ...) rather than requiring
-    every caller to remember to set it."""
+    `cosign verify` always initializes a local Sigstore TUF trust-root
+    cache under $HOME/.sigstore - defaults HOME to a throwaway writable
+    dir if unset, so this works regardless of the caller's environment (a
+    Job with no HOME set, an interactive debug pod, ...) rather than
+    requiring every caller to remember to set it."""
+    _cosign_initialize_tuf(tuf_url)
     cosign_bin = _cosign_path()
     docker_config_dir = _registry_docker_config(image_ref, jwt_path)
     try:
@@ -206,7 +334,13 @@ def verify_image(public_key: pathlib.Path, image_ref: str, jwt_path: str) -> Non
         env["DOCKER_CONFIG"] = str(docker_config_dir)
         env.setdefault("HOME", tempfile.gettempdir())
         result = subprocess.run(
-            [cosign_bin, "verify", "--key", str(public_key), image_ref],
+            [
+                cosign_bin, "verify",
+                "--rekor-url", rekor_url,
+                "--certificate-identity", cert_identity,
+                "--certificate-oidc-issuer", cert_oidc_issuer,
+                image_ref,
+            ],
             env=env,
             capture_output=True,
             text=True,
@@ -215,22 +349,31 @@ def verify_image(public_key: pathlib.Path, image_ref: str, jwt_path: str) -> Non
     finally:
         shutil.rmtree(docker_config_dir, ignore_errors=True)
     if result.returncode != 0:
-        raise SignerError(f"cosign verify failed for {image_ref}: {(result.stderr or result.stdout).strip()}")
-    print(f"verified {image_ref}")
+        raise SignerError(f"cosign verify (keyless, RHTAS) failed for {image_ref}: {(result.stderr or result.stdout).strip()}")
+    print(f"verified {image_ref} (keyless, RHTAS)")
 
 
-def verify_images_from_file(refs_path: pathlib.Path, public_key: pathlib.Path, jwt_path: str) -> None:
-    """ADR-0420/WP-070: verifies every ref in a JSON file - the shape
+def verify_images_from_file(
+    refs_path: pathlib.Path,
+    jwt_path: str,
+    cert_identity: str = DEFAULT_CERT_IDENTITY,
+    cert_oidc_issuer: str = DEFAULT_CERT_OIDC_ISSUER,
+    rekor_url: str = DEFAULT_REKOR_URL,
+    tuf_url: str = DEFAULT_TUF_URL,
+) -> None:
+    """WP-111/ADR-0535: verifies every ref in a JSON file - the shape
     `verify_signatures.py --list-refs`'s "resolved" array produces,
-    `[{"name", "repository", "digest"}, ...]` - against a local public
-    key. Used by ansible/tasks/verify_image_signatures.yml's in-cluster
-    Job (make d2 check supply-chain)."""
+    `[{"name", "repository", "digest"}, ...]` - keyless via RHTAS. Used by
+    ansible/tasks/verify_image_signatures.yml's in-cluster Job
+    (make d2 check supply-chain)."""
+    if not cert_oidc_issuer:
+        raise SignerError("--cert-oidc-issuer (or RHTAS_CERT_OIDC_ISSUER) is required and was not set")
     refs = json.loads(refs_path.read_text())
     failures = []
     for ref in refs:
         image_ref = f"{ref['repository']}@{ref['digest']}"
         try:
-            verify_image(public_key, image_ref, jwt_path)
+            verify_image(image_ref, jwt_path, cert_identity, cert_oidc_issuer, rekor_url, tuf_url)
         except SignerError as exc:
             print(f"FAIL {ref['name']}: {exc}")
             failures.append(ref["name"])
@@ -399,8 +542,15 @@ def main() -> int:
     p_sign.add_argument("blob", type=pathlib.Path)
     p_sign.add_argument("--output-signature", required=True, type=pathlib.Path)
 
-    p_sign_image = sub.add_parser("sign-image", help="sign an OCI image by digest with the Transit key")
+    p_sign_image = sub.add_parser("sign-image", help="sign an OCI image by digest keyless via RHTAS (ADR-0535/WP-111)")
     p_sign_image.add_argument("image_ref", help="<repository>@sha256:<digest>")
+    p_sign_image.add_argument("--fulcio-url", default=DEFAULT_FULCIO_URL)
+    p_sign_image.add_argument("--rekor-url", default=DEFAULT_REKOR_URL)
+    p_sign_image.add_argument("--tuf-url", default=DEFAULT_TUF_URL)
+    p_sign_image.add_argument("--kc-token-url", default=DEFAULT_KC_TOKEN_URL, help="external Keycloak token endpoint (RHTAS_KEYCLOAK_TOKEN_URL)")
+    p_sign_image.add_argument("--kc-client-id", default=DEFAULT_KC_CLIENT_ID)
+    p_sign_image.add_argument("--kc-client-secret-path", default=DEFAULT_KC_CLIENT_SECRET_PATH, help="file containing the zuno-signer client secret (RHTAS_CLIENT_SECRET_PATH)")
+    p_sign_image.add_argument("--kc-ca-file", default=DEFAULT_KC_CA_FILE)
 
     p_verify = sub.add_parser("verify-blob", help="verify a blob's signature (no Vault access needed)")
     p_verify.add_argument("blob", type=pathlib.Path)
@@ -414,9 +564,12 @@ def main() -> int:
     p_okf.add_argument("--kv-mount", default=DEFAULT_KV_MOUNT)
     p_okf.add_argument("--kv-path", default=DEFAULT_KV_PATH)
 
-    p_verify_images = sub.add_parser("verify-images", help="verify every image in a JSON refs file (no Vault access needed)")
+    p_verify_images = sub.add_parser("verify-images", help="verify every image in a JSON refs file keyless via RHTAS (ADR-0535/WP-111)")
     p_verify_images.add_argument("--refs-file", required=True, type=pathlib.Path)
-    p_verify_images.add_argument("--public-key", default=DEFAULT_LOCAL_PUBLIC_KEY_PATH, type=pathlib.Path)
+    p_verify_images.add_argument("--cert-identity", default=DEFAULT_CERT_IDENTITY)
+    p_verify_images.add_argument("--cert-oidc-issuer", default=DEFAULT_CERT_OIDC_ISSUER)
+    p_verify_images.add_argument("--rekor-url", default=DEFAULT_REKOR_URL)
+    p_verify_images.add_argument("--tuf-url", default=DEFAULT_TUF_URL)
 
     args = parser.parse_args()
 
@@ -431,8 +584,13 @@ def main() -> int:
             token = vault_login(args.vault_addr, args.role, args.jwt_path)
             sign_blob(args.vault_addr, token, args.key_name, args.blob, args.output_signature)
         elif args.command == "sign-image":
-            token = vault_login(args.vault_addr, args.role, args.jwt_path)
-            sign_image(args.vault_addr, token, args.key_name, args.image_ref, args.jwt_path)
+            if not args.kc_token_url:
+                raise SignerError("--kc-token-url (or RHTAS_KEYCLOAK_TOKEN_URL) is required and was not set")
+            if not args.kc_client_secret_path:
+                raise SignerError("--kc-client-secret-path (or RHTAS_CLIENT_SECRET_PATH) is required and was not set")
+            client_secret = pathlib.Path(args.kc_client_secret_path).read_text().strip()
+            identity_token = fetch_oidc_token(args.kc_token_url, args.kc_client_id, client_secret, args.kc_ca_file)
+            sign_image(args.image_ref, args.jwt_path, identity_token, args.fulcio_url, args.rekor_url, args.tuf_url)
         elif args.command == "verify-blob":
             verify_blob(args.public_key, args.blob, args.signature)
         elif args.command == "dry-run":
@@ -443,7 +601,10 @@ def main() -> int:
                 args.agents_root, args.kv_mount, args.kv_path,
             )
         elif args.command == "verify-images":
-            verify_images_from_file(args.refs_file, args.public_key, args.jwt_path)
+            verify_images_from_file(
+                args.refs_file, args.jwt_path,
+                args.cert_identity, args.cert_oidc_issuer, args.rekor_url, args.tuf_url,
+            )
     except (SignerError, sign_okf_bundle.BundleError) as exc:
         print(f"RESULT: FAIL - {exc}")
         return 1

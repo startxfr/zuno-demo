@@ -1,0 +1,69 @@
+---
+# Package name/default channel confirmed live against this cluster's
+# redhat-operators catalog on 2026-09-02: "policy-controller-operator",
+# defaultChannel "stable" (also published literally), InstallModes
+# OwnNamespace AND AllNamespaces both supported - OwnNamespace chosen,
+# co-located in zuno-rhtas (WP-110's namespace). Still discover
+# catalog/channel from the PackageManifest rather than hardcoding (ADR-0048).
+- name: "rhtas_config | look up the {{ policy_controller_package_name | default('policy-controller-operator') }} PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ policy_controller_package_name | default('policy-controller-operator') }}"
+  register: _rhtas_config_pkg_info
+
+- name: "rhtas_config | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named
+      '{{ policy_controller_package_name | default('policy-controller-operator') }}'
+      was found in openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i policy-controller` for the correct
+      package name on this cluster.
+  when: (_rhtas_config_pkg_info.resources | default([]) | length) == 0
+
+- name: "rhtas_config | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _rhtas_config_catalog_source: "{{ _rhtas_config_pkg_info.resources[0].status.catalogSource }}"
+    _rhtas_config_channel: >-
+      {{
+        'stable'
+        if (_rhtas_config_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_rhtas_config_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "rhtas_config | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ policy_controller_package_name | default('policy-controller-operator') }}'
+      (catalog '{{ _rhtas_config_catalog_source }}') has no "stable"
+      channel and no defaultChannel to fall back to. Published channels:
+      {{ _rhtas_config_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _rhtas_config_channel | length == 0
+
+- name: "rhtas_config | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package
+      '{{ policy_controller_package_name | default('policy-controller-operator') }}',
+      catalog '{{ _rhtas_config_catalog_source }}', channel '{{ _rhtas_config_channel }}'.
+
+- name: "rhtas_config | apply the rhtas-config GitOps Application (d0: Policy Controller operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "rhtas-config"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-rhtas-config-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+        subscription:
+          name: "{{ policy_controller_package_name | default('policy-controller-operator') }}"
+          operator:
+            name: "{{ policy_controller_package_name | default('policy-controller-operator') }}"
+            channel: "{{ _rhtas_config_channel }}"
+            source:
+              name: "{{ _rhtas_config_catalog_source }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15

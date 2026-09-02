@@ -96,54 +96,13 @@
   delay: 10
 
 # ADR-0347's finding, reapplied: the live Keycloak route is served by a
-# Vault-PKI-issued cert (root CN=zuno-demo.internal), and Fulcio's OIDC
-# issuer discovery would reject it without that CA in its trust bundle
-# (Securesign spec.fulcio.trustedCA). Cluster-specific data that can't be
-# Helm-rendered - same reasoning and same Ingress-secretName-following
-# logic as ansible/roles/openshift_oauth/tasks/install.yml, so this stays
-# self-correcting if ingress.acmeWildcardTLS ever flips the serving cert.
-# Safe to copy unconditionally on every run.
-- name: "rhtas | look up the Keycloak Ingress to find its live TLS secret name"
-  kubernetes.core.k8s_info:
-    api_version: networking.k8s.io/v1
-    kind: Ingress
-    namespace: zuno-auth
-  register: _rhtas_keycloak_ingress
-
-- name: "rhtas | read the Keycloak serving-cert CA from that secret"
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Secret
-    namespace: zuno-auth
-    name: "{{ _rhtas_keycloak_ingress.resources[0].spec.tls[0].secretName }}"
-  register: _rhtas_keycloak_tls
-  when: (_rhtas_keycloak_ingress.resources | default([]) | length) > 0
-
-- name: "rhtas | fail loudly if no Keycloak Ingress TLS secret was found"
-  ansible.builtin.fail:
-    msg: >-
-      No Ingress with a tls[].secretName was found in zuno-auth, or its
-      Secret has no ca.crt - Fulcio cannot trust the Keycloak issuer
-      without it. Check `oc get ingress -n zuno-auth` and the referenced
-      Secret before re-running.
-  when: >-
-    (_rhtas_keycloak_ingress.resources | default([]) | length) == 0
-    or (_rhtas_keycloak_tls.resources | default([]) | length) == 0
-    or ('ca.crt' not in (_rhtas_keycloak_tls.resources[0].data | default({})))
-
-- name: "rhtas | publish the CA as the rhtas-keycloak-ca ConfigMap (fulcio.trustedCA)"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: rhtas-keycloak-ca
-        namespace: zuno-rhtas
-        labels:
-          zuno.io/managed-by: ansible
-      data:
-        ca-bundle.crt: "{{ _rhtas_keycloak_tls.resources[0].data['ca.crt'] | b64decode }}"
+# Vault-PKI-issued cert, and Fulcio's OIDC issuer discovery would reject
+# it without that CA in its trust bundle (Securesign spec.fulcio.trustedCA).
+# Shared with WP-111's rhtas_config role (same CA, different namespace).
+- name: "rhtas | publish the Keycloak CA ConfigMap for fulcio.trustedCA"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/publish_keycloak_ca_configmap.yml"
+  vars:
+    publish_ca_configmap_namespace: zuno-rhtas
 
 # WP-110 live finding (2026-09-02): with trillian.database.create=false
 # the operator does NOT create Trillian's schema - only its own embedded

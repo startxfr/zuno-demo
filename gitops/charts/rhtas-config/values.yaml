@@ -1,0 +1,76 @@
+# Three independently-gated blocks, all default false so `helm template`/
+# `helm lint` render nothing:
+#   operator          - policy-controller-operator Subscription/OperatorGroup
+#                        (zuno-rhtas-config-d0).
+#   policyOperand      - PolicyController/TrustRoot/ClusterImagePolicy CRs,
+#                        audit-only (zuno-rhtas-config-d1).
+#   signerClientMirror - the zuno-signer client-secret ExternalSecret in
+#                        zuno-ai-build the image-signing Jobs read
+#                        (zuno-rhtas-config-d1, cross-namespace mirror of
+#                        the same Vault path gitops/charts/keycloak already
+#                        resolves into zuno-auth - secretKeyRef can't cross
+#                        namespaces).
+#
+# subscription.name/operator.name/operator.channel/operator.source.name are
+# discovered at run time by ansible/roles/rhtas_config/tasks/install.yml
+# (ADR-0048), same pattern as every other operator-backed role.
+#
+# Package name/install mode confirmed live against this cluster's
+# redhat-operators catalog on 2026-09-02: "policy-controller-operator",
+# defaultChannel "stable", supports OwnNamespace AND AllNamespaces (unlike
+# rhtas-operator itself, which is AllNamespaces-only - WP-110's live
+# finding). OwnNamespace chosen, co-located in zuno-rhtas (already exists,
+# owned by gitops/charts/namespaces per WP-110) rather than a new
+# namespace, since Policy Controller only ever acts on RHTAS's own trust
+# material - same "operator group, dedicated namespace" shape as
+# gitops/charts/lightspeed, minus the `project` dependency (namespace
+# already exists here, not created by this chart).
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: rhtas-config
+    app: rhtas-config
+  subscription:
+    enabled: true
+    name: ""
+    namespace: zuno-rhtas
+    operator:
+      name: ""
+      channel: ""
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: ""
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    name: policy-controller-operator-group
+    namespace: zuno-rhtas
+    target: zuno-rhtas
+
+# TrustRoot's spec.remote.root is a base64-encoded TUF root.json, resolved
+# live from RHTAS's own TUF service at Ansible run time (cluster-specific,
+# cannot be committed) - see ansible/roles/rhtas_config/tasks/install.yml.
+policyOperand:
+  enabled: false
+  trustRoot:
+    tufMirrorUrl: http://tuf.zuno-rhtas.svc.cluster.local
+    rootJsonBase64: ""
+  clusterImagePolicy:
+    fulcioUrl: http://fulcio-server.zuno-rhtas.svc.cluster.local
+    rekorUrl: http://rekor-server.zuno-rhtas.svc.cluster.local
+    # ADR-0535's Design decisions: the zuno-signer identity, matching
+    # gitops/charts/rhtas/values.yaml's fulcio.oidc block exactly.
+    certIdentityIssuer: https://keycloak.apps.mycluster.example.com/realms/zuno
+    certIdentitySubject: zuno-signer@zuno-demo.internal
+    # First-party images only (ADR-0535 Scope: Priority 1) -
+    # image-registry.../zuno-ai-build/<name> covers all 14.
+    imageGlob: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/**"
+
+signerClientMirror:
+  enabled: false
+  vaultPath: keycloak/zuno-signer-client
+  secretStoreName: vault-backend
+  refreshInterval: 1h

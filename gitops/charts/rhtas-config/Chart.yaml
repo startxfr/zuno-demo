@@ -1,0 +1,17 @@
+apiVersion: v2
+name: rhtas-config
+description: >-
+  WP-111/ADR-0535 Day 2 component: the Sigstore Policy Controller
+  (policy-controller-operator, Red Hat Operators catalog - a SEPARATE
+  operator from rhtas-operator, live finding 2026-09-02, supports both
+  OwnNamespace and AllNamespaces) co-located in zuno-rhtas with an
+  OwnNamespace-scoped OperatorGroup, plus its TrustRoot/ClusterImagePolicy
+  operand in audit-only mode, plus the zuno-signer client-secret mirror
+  ExternalSecret in zuno-ai-build the image-signing Jobs need.
+type: application
+version: 0.1.0
+appVersion: "1.0.2"
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"
