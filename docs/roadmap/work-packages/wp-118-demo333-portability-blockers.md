@@ -1,10 +1,12 @@
 # WP-118: Close the demo333 portability blockers recorded in ADR-0517
 
-- **State:** Repo work merged (steps 1 and 4 of 5, 2026-09-02 — B2/B3/B4 and B7/B8
-  closed; steps 2, 3 and 5 not started). No chart default names `demo222` any more.
-  Step 4 also corrected ADR-0517's own B7 row, which described the defect wrongly in a
-  way that would have caused an outage if acted on. No `demo333` cluster exists; every
-  remaining step is repo-side and can land before one is provisioned.
+- **State:** Repo work merged (steps 1, 4 and 5 of 5, 2026-09-03 — B2/B3/B4, B7/B8 and
+  B9 closed; steps 2 and 3 in progress). No chart default names `demo222` any more.
+  Step 4 corrected ADR-0517's own B7 row, which described the defect wrongly in a way
+  that would have caused an outage if acted on; step 5 closed B9 as a decision to keep
+  the InstallPlan gate and detect the drift earlier, not as a behaviour change. No
+  `demo333` cluster exists; every remaining step is repo-side and can land before one is
+  provisioned.
 - **ADRs:** ADR-0517 (Proposed, v0.8)
 - **Depends on:** nothing. Blocked by nothing — the ADR-0517 run itself is blocked on
   an operator provisioning `demo333`, but every blocker below is fixable without it.
@@ -129,13 +131,31 @@ Also corrected in the same pass: `ansible/roles/mariadb/README.md`'s claim that 
 2026-08-12, false since ADR-0345 added `ansible/tasks/vault_seed_if_missing.yml` the
 next day. The stale paragraph discouraged a now-safe operation.
 
-### Step 5 — RHOAI InstallPlan drift (B9)
+### Step 5 — RHOAI InstallPlan drift (B9) — **DONE 2026-09-03**
 
-`ansible/roles/openshift_ai/tasks/install.yml:90` is the only `auto_fix: "manual only"`
-on the install path. A new cluster's catalog will publish a newer CSV than the pinned
-`startingCSV`, and reconcile refuses to approve drifted InstallPlans. This is the most
-likely blocker of an actual `demo333` run and probably cannot be fully automated — the
-deliverable is a documented decision, not necessarily code.
+The deliverable was a decision, and the decision is **keep the gate**.
+`ansible/roles/openshift_ai/tasks/install.yml:90` refuses to approve an InstallPlan whose
+CSV differs from the pinned `startingCSV`. That refusal is not the blocker, it is the
+reproducibility guarantee this whole ADR exists to establish — auto-approving whatever a
+catalog happens to serve is how a platform stops being redeployable. `beta` is a moving
+channel (it published `3.5.0-ea.2` when ADR-0002 pinned it; `eus-3.5` already carries the
+`3.5.0` GA), so a later-provisioned `demo333` will legitimately be offered something else,
+and choosing which build to run stays a human decision.
+
+What was wrong is *when* the operator finds out: mid-install, after the Subscription has
+landed, an hour into Day 0. Fixed by detecting it in `precheck.yml` instead, from the
+**PackageManifest** — which needs no Subscription and is readable the moment the
+CatalogSource is ready. The pin is read from `gitops/charts/openshift-ai/values.yaml`
+rather than the live Subscription for the same reason: on a fresh cluster there is neither.
+Read-only and never-failing per precheck's contract; it records a finding whose `solution`
+names the exact `subscription.version` value to set. Verified on `demo222`: pin
+`rhods-operator.3.5.0-ea.2` equals the `beta` channel head, so it reports ALIGNED and
+records nothing.
+
+Residual manual step, accepted and bounded: one deliberate version choice before Day 0,
+surfaced by `make d0 check` rather than by a failure. Pinning `subscription.operator.channel`
+to a fixed channel such as `eus-3.5` instead of `beta` is the obvious follow-up if the
+churn ever costs more than it buys.
 
 ## What NOT to touch
 

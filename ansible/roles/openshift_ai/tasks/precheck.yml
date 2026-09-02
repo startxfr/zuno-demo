@@ -255,6 +255,75 @@
       or (_oai_tempo_gateway_unready | default([]) | length) > 0
     - blocked_findings is defined
 
+# --- WP-118 B9: catalog CSV drift, detected BEFORE the install ------------
+# install.yml refuses to auto-approve an InstallPlan whose CSV differs from
+# the pinned startingCSV, and that gate is correct - auto-approving whatever
+# the catalog happens to publish is how a platform stops being
+# reproducible. But it fires LATE: mid-install, after the Subscription has
+# landed, on a cluster the operator has already spent an hour building.
+# ADR-0517's from-scratch demo333 run will hit it, because `beta` is a
+# moving channel (it published 3.5.0-ea.2 when ADR-0002 pinned it; eus-3.5
+# already carries the 3.5.0 GA).
+#
+# So detect it here instead, from the PackageManifest, which needs no
+# Subscription and is readable the moment the CatalogSource is ready. The
+# pin is read from the chart rather than the live Subscription for the same
+# reason - on a fresh cluster there is no Subscription yet. Read-only and
+# never-failing, per precheck's reporting contract: this records a finding
+# so `make d0 check` prints the exact value to paste, it does not gate
+# _state_is_installed.
+- name: "openshift_ai | precheck: read the pinned startingCSV from the chart values"
+  ansible.builtin.set_fact:
+    _oai_pinned_csv: >-
+      {{ (_oai_chart_sub['operator']['csv']) ~ '.' ~ (_oai_chart_sub['version']) }}
+    _oai_pinned_channel: "{{ _oai_chart_sub['operator']['channel'] }}"
+  vars:
+    _oai_chart_sub: >-
+      {{ (lookup('ansible.builtin.file',
+                 zuno_repo_root + '/gitops/charts/openshift-ai/values.yaml')
+          | from_yaml)['cluster-ods']['operator']['subscription'] }}
+
+- name: "openshift_ai | precheck: look up the rhods-operator PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: rhods-operator
+  register: _oai_packagemanifest
+  failed_when: false
+
+- name: "openshift_ai | precheck: read what the pinned channel currently publishes"
+  ansible.builtin.set_fact:
+    _oai_catalog_csv: >-
+      {{ ((_oai_packagemanifest.resources | default([]) | first | default({}))
+           .get('status', {}).get('channels', [])
+          | selectattr('name', 'equalto', _oai_pinned_channel)
+          | map(attribute='currentCSV') | first | default('')) }}
+
+- name: "openshift_ai | precheck: report the pin against the catalog"
+  ansible.builtin.debug:
+    msg: >-
+      RHOAI pin {{ _oai_pinned_csv }} (channel {{ _oai_pinned_channel }});
+      catalog currently publishes
+      {{ _oai_catalog_csv if _oai_catalog_csv | length > 0
+         else 'nothing readable (no PackageManifest yet)' }} -
+      {{ 'ALIGNED' if _oai_catalog_csv == _oai_pinned_csv else 'DRIFTED' }}
+
+- name: "openshift_ai | precheck: record the catalog CSV drift"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "PackageManifest/rhods-operator channel {{ _oai_pinned_channel }} (openshift-marketplace)"
+      state: "catalog publishes {{ _oai_catalog_csv }}, chart pins {{ _oai_pinned_csv }}"
+      cause: "WP-118 B9 - the pinned startingCSV is not what this cluster's catalog serves on that channel. install.yml will refuse to approve the resulting InstallPlan rather than silently install a different build. Expected on a cluster provisioned later than the pin (ADR-0517's demo333 case), and NOT a defect: the refusal is what keeps the platform reproducible."
+      solution: "Decide the version deliberately, then set gitops/charts/openshift-ai/values.yaml cluster-ods.operator.subscription.version to '{{ _oai_catalog_csv | regex_replace('^rhods-operator\\.', '') }}' (and re-check operator.channel) before running the install. Pinning to an older CSV than the channel head is also valid - point subscription.operator.channel at a pinned channel such as eus-3.5 instead."
+      auto_fix: "manual only - choosing a platform version is a decision, not a reconcile"
+  when:
+    - _oai_catalog_csv | length > 0
+    - _oai_catalog_csv != _oai_pinned_csv
+    - blocked_findings is defined
+
 - name: "openshift_ai | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-

@@ -77,7 +77,7 @@ The blockers are exactly the places that bypass that mechanism:
 | B6 | Route53 `hostedZoneID: Z3HY376RT1N9S1`, `region: eu-west-3`, ACME contact email | `gitops/charts/cert-manager/values.yaml:41,54,55` | ACME DNS-01 cannot solve if `demo333` sits under a different parent DNS zone |
 | B7 | Two identically-named tasks wrote `zuno/salesforce/technical` with competing key schemas: `url`/`access_token` (l.940, live) and `instance_url`/`token` (l.1001, inert because its variables were never documented) | `ansible/roles/vault/tasks/install.yml:1001-1014` | `vault kv put` replaces rather than merges, so only one schema can exist. Documenting the missing variables — the obvious fix — would have started the dead task and wiped the keys `mcp-salesforce` serves Comage from |
 | B8 | All five `zuno_mariadb_backup_s3_{bucket,endpoint,region,access_key_id,secret_access_key}` are read but appear nowhere in `confidential.example.yml` | `ansible/roles/mariadb/tasks/install.yml:98-104`, `ansible/roles/vault/tasks/install.yml:1064-1076` | Undocumented prerequisite, and not merely cosmetic: with them unset `backups.s3.enabled` stays false, the ExternalSecret is never rendered, and **no MariaDB backup schedule exists at all** |
-| B9 | Drifted RHOAI InstallPlan — the only `auto_fix: "manual only"` on the install path | `ansible/roles/openshift_ai/tasks/install.yml:90` | Most likely blocker of all: a new cluster's catalog publishes a newer CSV than the pinned `startingCSV`, and reconcile refuses to approve drifted InstallPlans |
+| B9 | Drifted RHOAI InstallPlan — the only `auto_fix: "manual only"` on the install path | `ansible/roles/openshift_ai/tasks/install.yml:90` | A cluster provisioned later than the pin gets a catalog publishing a newer CSV than `startingCSV`, and the install refuses to approve it. **Not a defect — the refusal is the reproducibility guarantee.** Closed as a decision, not a fix (2026-09-03): the gate stays, and the drift is now detected in `precheck.yml` from the PackageManifest, before the install runs |
 
 B7 and B8 were closed by WP-118 step 4 on 2026-09-02, and both rows above were
 rewritten that day. The audit had described B7 as a variable-name mismatch that
@@ -88,6 +88,30 @@ live consumer. B8's effect was understated: it is not only an undocumented
 prerequisite, it is why this cluster has no MariaDB backup schedule. A static
 audit reads intent, not behaviour; both corrections came from tracing the
 consumers rather than re-reading the producer.
+
+B9 was closed by WP-118 step 5 on 2026-09-03, and it is the one blocker whose
+right answer was **not** to change the behaviour. `beta` is a moving channel —
+it published `3.5.0-ea.2` when ADR-0002 pinned it, and `eus-3.5` already
+carries the `3.5.0` GA — so a `demo333` provisioned later will legitimately be
+offered a different build. Auto-approving whatever the catalog serves would
+make the platform unreproducible, which is the thing this ADR exists to
+establish; so the hard refusal in `install.yml` is kept exactly as it is, and
+choosing a version stays a human decision.
+
+What was wrong is only *when* the operator learns of it. The gate fired
+mid-install, after the Subscription had landed, on a cluster already an hour
+into Day 0. The PackageManifest carries the same fact, needs no Subscription,
+and is readable as soon as the CatalogSource is ready — so `precheck.yml` now
+compares the chart's pin against the channel head and records a finding naming
+the exact value to set (the pin is read from the chart, not the live
+Subscription, precisely because a fresh cluster has neither). Read-only and
+never-failing, per precheck's contract. On `demo222` today it reports ALIGNED
+and records nothing.
+
+The residual manual step is therefore accepted and bounded: one deliberate
+version choice before Day 0, surfaced by `make d0 check` instead of by a
+failure. Pinning to a fixed channel such as `eus-3.5` rather than `beta` is the
+obvious follow-up if the churn ever costs more than it buys.
 
 Delivery constraint for B1–B6, which must be respected whenever they are
 fixed: every `gitops/apps/*/application-*.yaml` points at
