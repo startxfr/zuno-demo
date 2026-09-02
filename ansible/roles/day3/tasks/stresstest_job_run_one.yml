@@ -5,6 +5,38 @@
 # in the same container when bulk_interactions > 0 (both need the exact
 # same AGENT/credential/mount setup - a second Job would just duplicate
 # it for no benefit).
+
+# The canonical evaluations/tekos/run_scenarios.py's TASK_NAME defaults to
+# "answer-technical-question" (Tekos's own task) - each agent's own
+# evaluations/<agent>/run_scenarios.py wrapper sets the real default via
+# os.environ.setdefault() before delegating, but day2_stresstest.py
+# imports run_scenarios.py and security_checks.py directly via
+# importlib (platform/testing/day2_stresstest.py), bypassing that
+# wrapper - same reason AGENT is set explicitly below. Without this,
+# every _invoke_tool call in a non-Tekos agent's security_checks.py
+# targets the wrong OKF task and gets a 403 "has no task" response
+# instead of the policy-layer denial the check actually means to test -
+# live-cluster-confirmed 2026-09-02 via arkos's
+# git_forge_never_grants_private_github_access check (the one check
+# that expects a non-403 status, so it's the only one where the wrong
+# task's 403 doesn't coincidentally look like a pass). Same dict as
+# ansible/roles/agents/tasks/run_acceptance_gate.yml's
+# _gate_task_name, plus naveo (day2-stresstest covers every discovered
+# agent, not just the acceptance-gate's current rollout list).
+- name: "day2-stresstest | resolve {{ day2_stress_agent }}'s OKF task name"
+  ansible.builtin.set_fact:
+    _day2_stress_task_name: >-
+      {{
+        {
+          "tekos": "answer-technical-question",
+          "arkos": "draft-architecture-testimonial",
+          "comage": "check-deal-status",
+          "advantage": "answer-project-question",
+          "finage": "answer-finance-question",
+          "naveo": "answer-onboarding-question",
+        }[day2_stress_agent]
+      }}
+
 - name: "day2-stresstest | delete any previous stresstest Job for {{ day2_stress_agent }} (Jobs are immutable, this task is idempotent-by-recreation)"
   kubernetes.core.k8s:
     state: absent
@@ -95,6 +127,8 @@
                     value: /tmp/.pyuser
                   - name: AGENT
                     value: "{{ day2_stress_agent }}"
+                  - name: TASK_NAME
+                    value: "{{ _day2_stress_task_name }}"
                   # Live-cluster-confirmed 2026-08-21: without this,
                   # get_token()/auth_headers() in run_scenarios.py fall
                   # back to that module's placeholder default
