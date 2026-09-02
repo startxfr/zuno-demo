@@ -28,7 +28,7 @@ workload**. Three gaps, all closed here:
 This WP completes the GPU quota against the real MIG topology and makes the TrustyAI evaluation
 Jobs the first genuinely queued, admitted workloads.
 
-## Live findings (2026-09-03, first execution attempt)
+## Live findings (2026-09-03 local / 2026-09-02 22:5x-23:4x UTC, first execution attempt)
 
 Steps 1 and 4 succeeded and are still live. Steps 2 and 3 were applied, observed, and reverted
 within about fifteen minutes (`b4629b56`, `b5730c53`, reverted by `2f36accd`). Two findings, the
@@ -92,10 +92,14 @@ where Kueue manages the Job and accepting manual recreation; or a dedicated name
 evaluation work so the namespace-wide enrolment matches the intent. That is a real design
 decision and is deliberately left open rather than patched live.
 
-**Cluster impact of the attempt: transient and bounded.** Three evaluation Jobs ran a handful of
-extra times over roughly ten minutes. Node filesystems were unchanged afterwards (masters
-60-68%, DiskPressure `False` on all six nodes), because the garak digest was already cached on
-the nodes involved.
+**Cluster impact of the attempt: real but bounded.** Three evaluation Jobs ran a handful of extra
+times over roughly ten minutes. Measured before and after on every node: the busiest master went
+68.0% -> 71.5% of its filesystem (28.3 GiB still free) and a second went 68.3% -> 68.9%; the rest
+were flat, and DiskPressure stayed `False` on all six throughout. So the loop did cost disk -
+about 3.5 GiB on the node that mattered - and would have kept costing it indefinitely had it not
+been stopped. The reason it was not worse is that the garak digest was already cached on the
+nodes involved; a cold cache would have paid 4.22 GiB per iteration, on nodes with roughly 30 GiB
+of headroom.
 
 ## Steps
 
