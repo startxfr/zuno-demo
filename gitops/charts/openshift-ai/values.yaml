@@ -203,10 +203,17 @@ dataScienceCluster:
           lmeval:
             permitCodeExecution: deny
             permitOnline: deny
-        # Flipped false -> true by ADR-0534/WP-108 (2026-09-02) - the
-        # guardrails half of the operand, off since install. Observed
-        # effect on this operand version recorded in the WP-108 brief.
-        mcpGuardrailsMode: true
+        # MUST stay false (ADR-0534/WP-108, live-proven 2026-09-02): on
+        # this operand version `true` is NOT "enable guardrails" - it
+        # redeploys the operator with `--enable-services NEMO_GUARDRAILS`
+        # ONLY, killing the LMEvalJob controller (ADR-0108 regression),
+        # EvalHub, TAS and GuardrailsOrchestrator. At `false` the operator
+        # already runs TAS,LMES,GORCH,NEMO_GUARDRAILS,EVALHUB - the
+        # guardrails capability was never off. Flipped true and reverted
+        # the same hour; ReplicaSet args evidence in the WP-108 brief.
+        # Note: ArgoCD ignores DSC /spec (ignoreDifferences), so changing
+        # this line needs a manual `oc patch` to reach the live cluster.
+        mcpGuardrailsMode: false
         managementState: Managed
       aipipelines:
         argoWorkflowsControllers:

@@ -14,6 +14,42 @@ run correctly on this cluster via smoke-test Jobs - without yet wiring either of
 agent traffic. This is the "configuration basique dans RHOAI" step: infrastructure and platform
 capability, not yet agent-specific behaviour. Zuno-specific wiring is WP-109.
 
+## Live findings (2026-09-02, execution)
+
+1. **`mcpGuardrailsMode: true` is a destructive mode switch, NOT an enablement - flipped and
+   REVERTED the same hour.** Two stacked discoveries:
+   - The flip does not even apply through ArgoCD: `zuno-openshift-ai-d1` carries
+     `ignoreDifferences: DataScienceCluster /spec` (the documented silent-no-op trap) - the values
+     commit (`fc7b9dd1`) synced green and changed nothing. Applied live via
+     `oc patch datasciencecluster zuno-dsc`.
+   - The patch then redeployed the TrustyAI operator with `--enable-services NEMO_GUARDRAILS`
+     **only**, versus `TAS,LMES,GORCH,NEMO_GUARDRAILS,EVALHUB` before (ReplicaSet args, both
+     revisions read live) - i.e. it KILLED the LMEvalJob controller (a direct ADR-0108
+     regression), EvalHub, TrustyAIService and GuardrailsOrchestrator, while `TrustyAIReady`
+     stayed `True` throughout (the condition does not cover which services run). Reverted to
+     `false` at ~13:00Z; the operator returned to the full service list.
+   **Net understanding: the guardrails capability (GORCH + NeMo) was ALWAYS enabled at `false`;
+   ADR-0534's "the guardrails half has never been turned on" premise was wrong.** On this operand
+   version the flag means "run the operand as an MCP-guardrails-only service", and it must stay
+   `false` as long as LM-Eval matters. ADR-0534 amended accordingly.
+2. **The operand is far richer than the ADR assumed.** Live CRDs: `GuardrailsOrchestrator`,
+   `NemoGuardrails`, `EvalHub` (with 8 OOTB benchmark collections incl. `safety-and-fairness-v1`,
+   with weighted pass-criteria), `TrustyAIService`, `LMEvalJob`. The operator CSV ships images
+   for: FMS guardrails orchestrator, built-in detectors, HF detector runtime, NeMo guardrails
+   server, EvalHub (+MCP variant), and **Garak** (`odh-trustyai-garak-lls-provider-dsp`, garak CLI
+   v0.15.0+rhaiv.2 confirmed by running the image live). The smoke tests therefore use
+   operand-shipped components instead of the generic pip-installed Jobs this brief originally
+   sketched.
+3. **RAGAS has NO provider or image anywhere in this release train** - EvalHub collections use
+   `lm_evaluation_harness`/`lighteval` providers, and the operator config adds
+   `guidellm`/`ibm-clear`, nothing RAGAS. Per ADR-0534's own "prefer shipped frameworks" rule,
+   RAGAS moves wholly to WP-109, evaluated against real RAG retrievals (the only input where it
+   is meaningful anyway), via a custom-built image if the operand still lacks one then. This WP's
+   deliverable set is: `mcpGuardrailsMode` on + Garak smoke + built-in guardrails detector smoke.
+4. The Garak smoke Job reuses the `app.kubernetes.io/name: lm-eval` label so WP-10's existing
+   qwen NetworkPolicy 8000-ingress allowance admits it - no NetworkPolicy widened for a smoke
+   test. A dedicated `trustyai-eval` identity + rule is WP-109's call.
+
 ## Why split this from WP-109
 
 RAGAS and Garak are new to this repository (unlike LM-Eval, already proven by ADR-0108/WP-10).

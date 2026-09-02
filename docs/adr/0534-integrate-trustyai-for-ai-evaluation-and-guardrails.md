@@ -74,8 +74,15 @@ installs no new operator, `Subscription` or `OperatorGroup` - the entire TrustyA
 lives inside the existing Day 1 `openshift-ai` component, and this phase touches nothing there
 beyond documentation and a health check.
 
-**Phase 2 - Evaluate and protect the AI chain (informal target: v0.6).** Flip
-`mcpGuardrailsMode` on and wire TrustyAI, observing Agent Runtime's boundary, to progressively
+**Phase 2 - Evaluate and protect the AI chain (informal target: v0.6).**
+*(Amended 2026-09-02, WP-108 live evidence: this phase originally said "flip `mcpGuardrailsMode`
+on". That flip was executed and reverted the same hour - on this operand version the flag
+redeploys the TrustyAI operator with `--enable-services NEMO_GUARDRAILS` only, killing the
+LMEvalJob controller (an ADR-0108 regression), EvalHub, TrustyAIService and
+GuardrailsOrchestrator; at `false` the operator already runs all five services, so the guardrails
+capability this ADR wants was never actually off. `mcpGuardrailsMode` therefore stays `false`,
+and Phase 2 uses the already-enabled `GuardrailsOrchestrator`/NeMo-guardrails/EvalHub surfaces
+instead.)* Wire TrustyAI, observing Agent Runtime's boundary, to progressively
 evaluate or control:
 - RAG quality;
 - response quality;
@@ -138,10 +145,12 @@ fail policies - those are left to later, phase-specific ADRs/WPs as noted below.
 ## Operational considerations
 
 Phase 1 verification reads `spec.components.trustyai` conditions on the `zuno-dsc`
-`DataScienceCluster`, the same object ADR-0108's `LMEvalJob` checks already depend on. Phase 2's
-`mcpGuardrailsMode: true` flip should be validated the same way ADR-0108 validated `LMEvalJob`: a
-live run against this cluster, not just a green sync, given the four upstream operator bugs already
-found in this same operand at the current OpenShift AI version. Day-2/Day-3 check wiring
+`DataScienceCluster`, the same object ADR-0108's `LMEvalJob` checks already depend on. Every
+change to this operand must be validated the same way ADR-0108 validated `LMEvalJob`: a live run
+against this cluster, not just a green sync - a rule WP-108 vindicated twice in one day
+(`TrustyAIReady` stayed `True` while the flag rewrote the operator's whole enabled-services list,
+and ArgoCD's `ignoreDifferences` on the DSC `/spec` means a values commit alone never reaches the
+cluster - a manual `oc patch` is required). Day-2/Day-3 check wiring
 (`make d2/d3 check trustyai` or equivalent) should follow the existing `models`/`trustyai`
 precheck pattern in `ansible/roles/models/tasks/precheck.yml` rather than inventing a new one.
 
@@ -152,8 +161,8 @@ pair). This is distinct from `spec.components.trustyai` itself, which stays insi
 1 `openshift-ai` component - `trustyai-config` has no Day 1 half of its own because there is no
 separate operator to install.
 
-Guardrail enforcement (`mcpGuardrailsMode` and the Agent Runtime evaluation hooks) starts in
-observe/log-only mode: evaluations run and are recorded, but no request is blocked on their
+Guardrail enforcement (the `GuardrailsOrchestrator`/NeMo detectors and the Agent Runtime
+evaluation hooks) starts in observe/log-only mode: evaluations run and are recorded, but no request is blocked on their
 result. Flipping any of this to blocking enforcement is a deliberate, separate decision made once
 observation has produced enough evidence to set thresholds without an unacceptable false-positive
 rate - it is not part of this ADR's initial rollout and is not required for WP-107/WP-108/WP-109 to
@@ -163,8 +172,10 @@ be considered done.
 
 This decision is executed by three WPs: [WP-107](../roadmap/work-packages/wp-107-trustyai-baseline-verification-and-config-scaffold.md)
 (Phase 1 - baseline verification and the `trustyai-config` scaffold), [WP-108](../roadmap/work-packages/wp-108-trustyai-ragas-garak-guardrails-enablement.md)
-(Phase 2, infrastructure half - generic RAGAS/Garak enablement and the `mcpGuardrailsMode` flip,
-observe-only, not yet wired to real agent traffic), and [WP-109](../roadmap/work-packages/wp-109-trustyai-zuno-stack-integration-and-model-comparison.md)
+(Phase 2, infrastructure half - Garak and built-in guardrails-detector smoke enablement,
+observe-only, not yet wired to real agent traffic; its live run is what refuted the
+`mcpGuardrailsMode` premise and found the RAGAS gap - RAGAS moved to WP-109 with the wiring),
+and [WP-109](../roadmap/work-packages/wp-109-trustyai-zuno-stack-integration-and-model-comparison.md)
 (Phase 2's Zuno-specific wiring at the Agent Runtime boundary, merged with Phase 3's PEFT/LoRA
 comparison gate rather than scheduled as a separate WP - a decision made when these WPs were
 authored, since both extend the same evaluation chain onto Zuno-specific content). Concrete
@@ -183,4 +194,4 @@ Security considerations, Acceptance criteria and Review evidence.
   results already feed, and that Phase 2/3's RAGAS/Garak/PEFT-LoRA results should extend.
 - [ADR-0010](0010-introduce-a-central-mcp-gateway.md),
   [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md) - the MCP Gateway boundary
-  Phase 2's `mcpGuardrailsMode` sits alongside, not inside.
+  Phase 2's guardrails sit alongside, not inside.
