@@ -49,7 +49,12 @@ immediately.
    workspace namespace. No CRD backs those resources, so `oc api-resources` does not list them.
    Without a Role a machine caller authenticates and then 403s on every call - and since tracking
    is non-fatal by design, that reads as "no runs appeared" rather than as an error. This is why
-   the chart ships `templates/workspace-rbac.yaml`.
+   the chart ships `templates/workspace-rbac.yaml`, granting both `zuno-mlops-d1-mlops` (the
+   trainer pod's SA, and WP-119's TrainJob pods) and `pipeline-runner-mlops-dspa` (what KFP step
+   pods actually execute as).
+   **Diagnostic rule this leaves behind: a green pipeline run with no rows in the Experiments
+   page means missing RBAC, not a bug in the tracking code.** "Non-fatal" and "invisible" are the
+   same thing here by construction, so check the Role before reading `mlflow_tracking.py`.
 5. **A hand-rolled Job does not get the service CA that KFP step pods get for free** - the
    backfill failed with "self-signed certificate in certificate chain" until its pod projected
    `openshift-service-ca.crt` alongside the ServiceAccount token.
