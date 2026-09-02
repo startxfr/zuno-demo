@@ -30,6 +30,17 @@ server:
   # on the migration Job. These rules are APPENDED to the operator's
   # defaults (networkPolicyAdditionalEgressRules), never replacing them.
   additionalEgressPorts: [15012, 15010, 15014, 443, 6443, 8443]
+  # The operator hardcodes PGSSLMODE=verify-full + PGSSLROOTCERT pointing at
+  # its combined CA bundle, which contains the system + odh-trusted-ca
+  # bundles - NOT the PGO cluster CA that signs zuno-postgresql's serving
+  # cert. Left alone, every connection dies with "certificate verify
+  # failed" (live-diagnosed 2026-09-02; the URI's own ?sslmode=require does
+  # NOT win over this env var in the operand's code path). Overriding the
+  # env keeps the connection encrypted without pinning a rotating CA into
+  # the platform-wide trust bundle.
+  env:
+    - name: PGSSLMODE
+      value: require
   db:
     # The PRIMARY Service, deliberately not -pgbouncer: MLflow's Alembic
     # migrations and SQLAlchemy session state do not survive transaction

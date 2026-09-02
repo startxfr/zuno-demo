@@ -33,6 +33,8 @@ spec:
   workspaceLabelSelector:
     matchLabels:
 {{ toYaml .Values.workspaceLabelSelector | indent 6 }}
+  env:
+{{ toYaml .Values.server.env | indent 4 }}
   networkPolicyAdditionalEgressRules:
     - ports:
 {{- range .Values.server.additionalEgressPorts }}
