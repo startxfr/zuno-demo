@@ -37,6 +37,26 @@
         }[day2_stress_agent]
       }}
 
+# advantage/finage/naveo all declare zuno.status: placeholder (ADR-0011/
+# ADR-0040/ADR-0533 - none is promoted to active yet), so the entitlement
+# gateway correctly 403s every real /api/chat call to them - live-confirmed
+# 2026-09-02: a full BULK=10 run gave each of the three a 100% bulk_load
+# error rate at ~30ms latency (an immediate policy denial, not a slow
+# backend). day2_bulk.py has no way to know this on its own (only
+# tekos's/arkos's own agent.okf.md are ever mounted into a stresstest Job,
+# for gate_checks.py's cross-reads - see the gate-tekos-agent/gate-arkos-
+# agent volumes below), so ansible resolves it here, the same way it
+# already resolves TASK_NAME above.
+- name: "day2-stresstest | resolve {{ day2_stress_agent }}'s zuno.status (skip bulk_load for placeholder agents)"
+  ansible.builtin.set_fact:
+    _day2_stress_agent_status: >-
+      {{
+        (
+          lookup('file', zuno_repo_root + '/agents/' + day2_stress_agent + '/agent.okf.md')
+          .split('---')[1] | from_yaml
+        ).zuno.status
+      }}
+
 - name: "day2-stresstest | delete any previous stresstest Job for {{ day2_stress_agent }} (Jobs are immutable, this task is idempotent-by-recreation)"
   kubernetes.core.k8s:
     state: absent
@@ -151,6 +171,8 @@
                     value: "{{ cluster_base_domain }}"
                   - name: BULK_INTERACTIONS
                     value: "{{ bulk_interactions | default(0) }}"
+                  - name: ZUNO_AGENT_STATUS
+                    value: "{{ _day2_stress_agent_status }}"
                   # Makefile's CLEANUP=<0|1> (default 1) - read by
                   # run_scenarios.py/stress_test.py/day2_bulk.py's own
                   # main()/cleanup_created_runs() call, not branched on

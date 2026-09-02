@@ -47,6 +47,15 @@ from day2_report import Day2Result, log_test_line  # noqa: E402
 
 AGENT = os.getenv("AGENT", "tekos")
 BULK_INTERACTIONS = int(os.getenv("BULK_INTERACTIONS", "0") or "0")
+# advantage/finage/naveo declare zuno.status: placeholder (ADR-0011/
+# ADR-0040/ADR-0533 - none is promoted to active yet), so the entitlement
+# gateway correctly 403s every real /api/chat call to them - live-confirmed
+# 2026-09-02 as a 100% bulk_load error rate at ~30ms latency (an immediate
+# policy denial, not a slow backend or a real defect). Set by ansible
+# (stresstest_job_run_one.yml), which resolves the agent's own
+# agent.okf.md - not available inside every agent's Job (only tekos's/
+# arkos's bundles are ever mounted, for gate_checks.py's cross-reads).
+ZUNO_AGENT_STATUS = os.getenv("ZUNO_AGENT_STATUS", "")
 BFF_URL = os.getenv("BFF_URL", f"http://{AGENT}-bff.zuno-ai-run.svc.cluster.local:8080")
 PERSONA = os.getenv("STRESS_TEST_PERSONA", "consultant-01")
 # Matches the local-provider timeout in platform/ai-gateway/provider-routing.yaml
@@ -139,6 +148,14 @@ def _post_chat(headers: Dict[str, str], message: str, i: int) -> "tuple[bool, bo
 def run() -> List[Day2Result]:
     if BULK_INTERACTIONS <= 0:
         return []
+    if ZUNO_AGENT_STATUS == "placeholder":
+        return [Day2Result(
+            AGENT, "bulk_load", "n/a", "coverage", True,
+            "bulk_load skipped - zuno.status: placeholder (not yet "
+            "promoted, ADR-0011/ADR-0040/ADR-0533); real /api/chat calls "
+            "are correctly denied 403 by the entitlement gateway, not a "
+            "backend failure",
+        )]
 
     corpus = _scenario_prompts() + _tekos_stress_test_prompts()
     if not corpus:
