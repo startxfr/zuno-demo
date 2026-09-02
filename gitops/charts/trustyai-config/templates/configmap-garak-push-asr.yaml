@@ -45,9 +45,15 @@ data:
                     continue
                 etype = entry.get("entry_type", "?")
                 seen_types[etype] = seen_types.get(etype, 0) + 1
-                if etype != "eval" or not entry.get("total"):
+                # This garak build (v0.15.0+rhaiv.2) writes
+                # passed/fails/nones/total_evaluated - not the older
+                # "total" - live-diagnosed 2026-09-02 via the histogram
+                # below. total_evaluated excludes "nones" (unevaluated
+                # generations), which is the right ASR denominator.
+                total = entry.get("total_evaluated") or entry.get("total") or 0
+                if etype != "eval" or not total:
                     continue
-                asr = 1.0 - float(entry["passed"]) / float(entry["total"])
+                asr = 1.0 - float(entry.get("passed", 0)) / float(total)
                 points.append((asr, entry.get("probe", ""), entry.get("detector", "")))
 
     if not points:
