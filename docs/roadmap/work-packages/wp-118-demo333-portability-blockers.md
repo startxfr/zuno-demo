@@ -1,14 +1,15 @@
 # WP-118: Close the demo333 portability blockers recorded in ADR-0517
 
-- **State:** Repo work merged (2026-09-03 — steps 1, 4 and 5 complete; steps 2 and 3
-  landed as their inert "a" halves). B2/B3/B4, B7/B8 and B9 are closed. B1, B5 and B6 are
-  now *discovered* at run time and proven byte-identical on `demo222`, but their chart
-  literals are still in git: flipping those is steps 2b/3b, and the delivery constraint
-  below requires a live apply of the six affected components first — **an operator action,
-  not an agent one**. Two audit errors were corrected along the way: ADR-0517's B7 row
-  described a defect that did not exist in a way that would have caused an outage if acted
-  on, and step 2's planned MachineSet selector would have made the role bootstrap from its
-  own output. No `demo333` cluster exists; nothing here is exercised until one does.
+- **State:** Operator pending (2026-09-03 — eight of nine blockers closed; **B6 needs one
+  operator action**: three non-secret Route53 values into `ansible/confidential.yml` before
+  its chart default can be flipped). B1, B2, B3, B4, B5, B7, B8 and B9 are closed. Steps 2b
+  and 3b were applied live on `demo222` and verified: MachineSets byte-unchanged, all 15
+  PVCs unchanged, the ACME track intact, and every affected Application Synced/Healthy on a
+  revision containing the flip. Three audit errors were corrected along the way: ADR-0517's
+  B7 row described a defect that did not exist in a way that would have caused an outage if
+  acted on; step 2's planned MachineSet selector would have made the role bootstrap from its
+  own output; and step 3's first inertia test passed while comparing two empty renders. No
+  `demo333` cluster exists; nothing here is exercised until one does.
 - **ADRs:** ADR-0517 (Proposed, v0.8)
 - **Depends on:** nothing. Blocked by nothing — the ADR-0517 run itself is blocked on
   an operator provisioning `demo333`, but every blocker below is fixable without it.
@@ -120,8 +121,16 @@ Also avoided: `community.general.json_query` is unusable here (jmespath is not i
 and the filter fails at run time, not at lint time). Same for the dotted-path `selectattr`
 trap recorded under step 3.
 
-**2b (not landed).** Flipping the chart literals to placeholders is a live change and must
-wait until 2a has been applied on `demo222`, per the delivery constraint above.
+**2b — DONE 2026-09-03, live-verified.** `make d0 install machines` ran first
+(`changed=1`, all Synced/Healthy): `zuno-machines-d0` now carries `cluster.id`,
+`cluster.region` and each entry's `ami`/`securityGroupName`/`subnet_name`, with all three
+enable toggles and all three MachineSets intact, and the live MachineSets byte-unchanged
+by the apply. Only then were the chart literals flipped to `mycluster-*` placeholders
+(`8d51c74d`). ArgoCD has since synced `zuno-machines-d0` to a revision containing that
+commit — confirmed with `merge-base --is-ancestor`, because "MachineSets unchanged" proves
+nothing until the new chart has actually rendered — and the three MachineSets still match
+the pre-apply baseline exactly. One `demo222` string survives in the file, in a comment
+recording which installer MachineSet `zuno-gpu-c` replaced.
 
 ### Step 3 — StorageClass and DNS (B5, B6) — **3a DONE 2026-09-03, 3b pending a live apply**
 
@@ -159,10 +168,29 @@ PVC at all, so a naive diff would have "passed" while testing nothing). The cert
 identity resolves to the chart's own `dev+zuno-acme@startx.fr` / `eu-west-3` /
 `Z3HY376RT1N9S1`.
 
-**3b (not landed).** Flipping the four chart defaults to a placeholder is a live change
-and must not be pushed until 3a has been applied on `demo222`, per the delivery constraint
-above. `oc get sc` confirms the annotated default really is `gp3-csi` today, so the flip
-is safe once the applies have run.
+**3b — B5 DONE 2026-09-03, live-verified; B6 blocked on one operator decision.**
+
+B5: the five applies ran (`d0 cert-manager`, `d0 postgresql`, `d1 mariadb`, `d1 grafana`,
+`d2 models`), each Application now carries `gp3-csi` discovered from the annotation, and
+**all 15 PVCs** across `zuno-data`/`zuno-monitoring`/`zuno-ai-run`/`zuno-ai-build` are
+unchanged. The four chart defaults were then flipped (`f4e70bb4`) to
+`mycluster-default-storageclass` — deliberately an *invalid* class name, not a plausible
+one: `storageClassName` is immutable once bound, so if an Application ever lost its values
+a PVC that cannot bind is a loud failure where a plausible name would silently bind to the
+wrong storage. Each flipped chart rendered against its own live Application emits `gp3-csi`
+and zero placeholders.
+
+B6: the ACME identity landed (`zuno-cert-manager-d1` carries
+`acme.route53.{hostedZoneID,region}` and `acme.email`; both Let's Encrypt ClusterIssuers
+stayed Ready through the apply, and the production issuer plus both consumer flips are
+intact). **The chart values cannot be flipped yet**, and this is a design consequence, not
+an oversight: the role treats the chart as its *default source* when
+`zuno_acme_route53_hosted_zone_id` / `_region` / `zuno_acme_email` are unset — which is
+what keeps the apply inert — so replacing them with placeholders would make the role inject
+placeholders on the next run. Closing B6 needs those three non-secret values moved into
+`ansible/confidential.yml` first. Until then B6 is closed for `demo333` (an operator sets
+the variables and the chart default is never consulted) but not for the audit (the chart
+still names the `startx.fr` zone).
 
 ### Step 4 — undocumented prerequisites (B7, B8) — **DONE 2026-09-02**
 

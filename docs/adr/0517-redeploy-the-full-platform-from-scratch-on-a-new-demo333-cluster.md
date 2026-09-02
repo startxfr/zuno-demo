@@ -69,12 +69,12 @@ The blockers are exactly the places that bypass that mechanism:
 
 | # | Blocker | Location | Effect on `demo333` |
 |---|---|---|---|
-| B1 | `cluster.id: demo222-kpkqk`, security group, subnet names, pinned AMI, region | `gitops/charts/machines/values.yaml:27,28,93-96,155-158,197-200` | "no security group found" — zero GPU nodes; Day 0 step 9 (`machines`) hangs waiting for machines to become available |
+| B1 | `cluster.id: demo222-kpkqk`, security group, subnet names, pinned AMI, region | `gitops/charts/machines/values.yaml` | "no security group found" — zero GPU nodes; Day 0 step 9 (`machines`) hangs waiting for machines to become available. **Closed 2026-09-03** (WP-118 steps 2a/2b): discovered from `Infrastructure/cluster` plus any MachineSet lacking `machine.startx.io/group`, injected as Application values, chart flipped to `mycluster-*` placeholders |
 | B2 | Key is `appsDomain`, not `clusterBaseDomain`, so the token substitution never reaches it | `gitops/charts/grafana/values.yaml:74`, `kiali/values.yaml:60`, `tempo/values.yaml:62` | Tempo's Jaeger UI Route rejected (host outside the cluster wildcard); Kiali serves a dead `web_fqdn`; Grafana trace links point at the old cluster |
 | B3 | Full URLs frozen into the acceptance-gate values | `gitops/charts/mlops/values.yaml:135-136` | The ADR-0053 acceptance gate authenticates against the **old** cluster's Keycloak and frontend |
 | B4 | `demoHostname` frozen | `gitops/charts/connectivity-link/values.yaml:61` | Kuadrant quota-demo Route on a hostname that does not exist |
-| B5 | Four `gp3-csi` StorageClass defaults | `models/values.yaml:296`, `postgresql/values.yaml:71`, `mariadb/values.yaml:105`, `grafana/values.yaml:85` | Breaks if `demo333` is not AWS or names its default class differently; PVC `storageClassName` is immutable once bound |
-| B6 | Route53 `hostedZoneID: Z3HY376RT1N9S1`, `region: eu-west-3`, ACME contact email | `gitops/charts/cert-manager/values.yaml:41,54,55` | ACME DNS-01 cannot solve if `demo333` sits under a different parent DNS zone |
+| B5 | Four `gp3-csi` StorageClass defaults | `models`, `postgresql`, `mariadb`, `grafana` `values.yaml` | Breaks if `demo333` is not AWS or names its default class differently; PVC `storageClassName` is immutable once bound. **Closed 2026-09-03** (WP-118 steps 3a/3b): discovered from the `is-default-class` annotation, injected into all five PVC-rendering applies, charts flipped to a deliberately invalid placeholder so a lost value fails loudly instead of binding to the wrong storage |
+| B6 | Route53 `hostedZoneID: Z3HY376RT1N9S1`, `region: eu-west-3`, ACME contact email | `gitops/charts/cert-manager/values.yaml` | ACME DNS-01 cannot solve if `demo333` sits under a different parent DNS zone. **Overridable since 2026-09-03**, chart default not yet flipped: `cert_manager` merges an `acme` identity from `zuno_acme_route53_hosted_zone_id`/`_region`/`zuno_acme_email`, falling back to the chart so the apply stays inert. Flipping the default requires those three values to exist in `ansible/confidential.yml` first — an operator action |
 | B7 | Two identically-named tasks wrote `zuno/salesforce/technical` with competing key schemas: `url`/`access_token` (l.940, live) and `instance_url`/`token` (l.1001, inert because its variables were never documented) | `ansible/roles/vault/tasks/install.yml:1001-1014` | `vault kv put` replaces rather than merges, so only one schema can exist. Documenting the missing variables — the obvious fix — would have started the dead task and wiped the keys `mcp-salesforce` serves Comage from |
 | B8 | All five `zuno_mariadb_backup_s3_{bucket,endpoint,region,access_key_id,secret_access_key}` are read but appear nowhere in `confidential.example.yml` | `ansible/roles/mariadb/tasks/install.yml:98-104`, `ansible/roles/vault/tasks/install.yml:1064-1076` | Undocumented prerequisite, and not merely cosmetic: with them unset `backups.s3.enabled` stays false, the ExternalSecret is never rendered, and **no MariaDB backup schedule exists at all** |
 | B9 | Drifted RHOAI InstallPlan — the only `auto_fix: "manual only"` on the install path | `ansible/roles/openshift_ai/tasks/install.yml:90` | A cluster provisioned later than the pin gets a catalog publishing a newer CSV than `startingCSV`, and the install refuses to approve it. **Not a defect — the refusal is the reproducibility guarantee.** Closed as a decision, not a fix (2026-09-03): the gate stays, and the drift is now detected in `precheck.yml` from the PackageManifest, before the install runs |
@@ -112,6 +112,22 @@ The residual manual step is therefore accepted and bounded: one deliberate
 version choice before Day 0, surfaced by `make d0 check` instead of by a
 failure. Pinning to a fixed channel such as `eus-3.5` rather than `beta` is the
 obvious follow-up if the churn ever costs more than it buys.
+
+B1, B5 and B6's mechanism were closed by WP-118 steps 2 and 3 on 2026-09-03, each in the
+two-step order this constraint demands: apply live so the Application carries the
+discovered value, verify the render is unchanged, only then flip the chart default. The
+verification that mattered was not "the resources are unchanged" but "**ArgoCD has
+actually rendered the placeholder chart** and the resources are still unchanged" —
+checked with `git merge-base --is-ancestor` against each Application's synced revision,
+because an unchanged resource proves nothing while the old chart is still what renders.
+
+Three audit errors surfaced while executing it, all of them things a static read could
+not have caught. The planned selector for B1 (`cluster-api-machine-role=worker`) matches
+our own GPU MachineSets too, so the role would have bootstrapped from its own output. B5's
+first inertia test passed while comparing two *empty* renders — three of the four charts
+render no PVC until their Application's toggle is set. And an obvious-looking
+`selectattr` on the dotted `is-default-class` annotation silently returns `[]`, which
+would have failed all five installs on a cluster that has exactly one default class.
 
 Delivery constraint for B1–B6, which must be respected whenever they are
 fixed: every `gitops/apps/*/application-*.yaml` points at
