@@ -98,21 +98,27 @@ spec:
     name: maas-default-gateway
     namespace: openshift-ingress
   externalOIDC:
-    # RESOLVED 2026-09-02 (WP-112 follow-up, live-cluster-confirmed): this
-    # WAS a strict token audience match, and it broke every real caller -
-    # zuno-admin-api is the platform's one shared, confidential,
-    # service-account-enabled client (ADR-0530/WP-091, client-credentials-
-    # only), never carried as aud/azp by a real end-user login. A sustained
-    # 401 storm across multiple agents (local-wesh-maas/local-gpt-oss-maas)
-    # was traced to exactly this - Authorino rejecting every persona token
-    # for lacking this audience. Fixed the way this comment already
-    # prescribed: `gitops/charts/keycloak/files/realm-zuno.json` now adds a
-    # second "maas-gateway-audience" oidc-audience-mapper (audience:
-    # zuno-admin-api) to every persona frontend client, alongside its
-    # existing self-audience mapper - same fix class as the 2026-08-30
-    # WP-103 missing-audience-mapper SSO bug. clientId itself is
-    # unchanged: it is the correct, real value, the gap was purely on the
-    # token-issuing side.
+    # PARTIALLY ADDRESSED 2026-09-02, STILL BROKEN LIVE: the audience-match
+    # theory this comment used to carry (fixed by adding a
+    # "maas-gateway-audience" mapper for zuno-admin-api to every persona
+    # frontend client in realm-zuno.json, same class as the 2026-08-30
+    # WP-103 fix) was real but turned out to be necessary, not sufficient.
+    # Live-cluster-confirmed the same day: `oc get authpolicy
+    # maas-gateway-auth -n openshift-ingress` shows only two identity
+    # sources under spec.defaults.rules.authentication - api-keys and
+    # openshift-identities (kubernetesTokenReview) - Keycloak/OIDC is NOT
+    # present at all, despite the live ModelsAsService CR correctly
+    # carrying this exact externalOIDC block (clientId/issuerUrl both
+    # match). So Authorino has no path to accept a Keycloak-issued token
+    # in the first place; the mapper fix cannot matter until that's true.
+    # Root cause not yet found - maas-controller
+    # (redhat-ods-applications) is healthy/Ready per its own CR status but
+    # crash-loops on leader-election API-server timeouts every few hours
+    # (51 restarts/7d, unrelated-looking stack trace); whether that ever
+    # actually blocked this one reconcile, or something else entirely
+    # does, is unconfirmed - do not assume the mapper fix alone unblocks
+    # real persona MaaS routing until this AuthPolicy gap is separately
+    # closed.
     issuerUrl: https://keycloak.{{ .Values.clusterBaseDomain }}/realms/zuno
     clientId: {{ .Values.maas.externalOIDC.clientId }}
 {{- end }}
