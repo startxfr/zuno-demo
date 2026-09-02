@@ -192,6 +192,18 @@ maasDatabase:
   owner: maas
   vaultPath: maas/postgresql-app
 
+# Dedicated database/role for the MLflow tracking server (ADR-0538/WP-116 -
+# experiment tracking over the MLOps LoRA pipeline). Un-hyphenated name and
+# owner on purpose: the owner feeds the "<cluster>-pguser-<owner>" Secret
+# name, and the database name is interpolated into a postgresql:// URI by
+# gitops/charts/mlflow. PGO creates this database once - it never recreates
+# a manually dropped one, it error-loops the whole cluster reconcile
+# instead (same caveat every other database here carries).
+mlflowDatabase:
+  name: mlflow
+  owner: mlflow
+  vaultPath: mlflow/postgresql-app
+
 # Dedicated database/role for the Agent Runtime's LangGraph checkpointer
 # (ADR-0103) - resumable workflow state, isolated from every other
 # database on this cluster for the same reason ragTechDatabase/

@@ -394,6 +394,16 @@
         username: maas
         password: "{{ zuno_admin_maas_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      mlflow/postgresql-app:
+        # Dedicated database/role for the MLflow tracking server
+        # (ADR-0538/WP-116 - experiment tracking for the MLOps LoRA
+        # pipeline). Letters/digits-only password matters for the same
+        # reason as maas above: it is interpolated un-encoded into a
+        # postgresql:// URI by
+        # gitops/charts/mlflow/templates/externalsecret-backend-store.yaml.
+        username: mlflow
+        password: "{{ zuno_admin_mlflow_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       agent-runtime/postgresql-app:
         # Dedicated database/role for the Agent Runtime's LangGraph
         # checkpointer (ADR-0103) - resumable workflow state, keeps its

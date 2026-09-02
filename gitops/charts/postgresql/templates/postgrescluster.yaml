@@ -246,6 +246,9 @@ spec:
     - name: {{ .Values.maasDatabase.owner }}
       databases:
         - {{ .Values.maasDatabase.name }}
+    - name: {{ .Values.mlflowDatabase.owner }}
+      databases:
+        - {{ .Values.mlflowDatabase.name }}
     - name: {{ .Values.checkpointDatabase.owner }}
       databases:
         - {{ .Values.checkpointDatabase.name }}

@@ -20,6 +20,7 @@ postgresql_pguser_bootstrap_secrets:
   - {owner: keycloak, vault_path: keycloak/postgresql-app}
   - {owner: ragtech, vault_path: rag/postgresql-app}
   - {owner: maas, vault_path: maas/postgresql-app}
+  - {owner: mlflow, vault_path: mlflow/postgresql-app}
   - {owner: agentcheckpoints, vault_path: agent-runtime/postgresql-app}
   - {owner: agentconversations, vault_path: agent-runtime/conversations-postgresql-app}
   - {owner: ogxserver, vault_path: ogx/postgresql-app}
