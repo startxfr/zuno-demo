@@ -145,6 +145,38 @@
       data:
         ca-bundle.crt: "{{ _rhtas_keycloak_tls.resources[0].data['ca.crt'] | b64decode }}"
 
+# WP-110 live finding (2026-09-02): with trillian.database.create=false
+# the operator does NOT create Trillian's schema - only its own embedded
+# database image does (via /docker-entrypoint-initdb.d/storage.sql), so on
+# an external database the createtree jobs die with "Table trillian.Trees
+# doesn't exist", and their Rekor/CTlog CRs then sit in a TERMINAL
+# "createtree job failed" state the operator never retries (fix: delete
+# the child Rekor/CTlog CRs, the Securesign parent recreates them).
+# files/trillian-storage.sql is that exact schema, extracted from this
+# CSV's own trillian-db relatedImage - re-extract it on operator upgrades.
+# Idempotent (CREATE TABLE IF NOT EXISTS throughout), applied as the
+# trillian user so no extra grants are involved.
+- name: "rhtas | read the Trillian DB password from its ExternalSecret target"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-data
+    name: mariadb-rhtas-trillian-db-password
+  register: _rhtas_trillian_db_pw
+  no_log: true
+
+- name: "rhtas | apply the Trillian schema to the trillian database (idempotent)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-data
+    pod: mariadb-0
+    container: mariadb
+    command: >-
+      sh -c "MYSQL_PWD='{{ _rhtas_trillian_db_pw.resources[0].data.password | b64decode }}'
+      mariadb -u trillian trillian -e {{ lookup('ansible.builtin.file', role_path + '/files/trillian-storage.sql') | quote }}"
+  no_log: true
+  register: _rhtas_schema_apply
+  changed_when: false
+
 # securesignOperand.enabled lives in the same chart, applied via the
 # separate zuno-rhtas-d1 Application after -d0 is Synced+Healthy. The
 # fulcio.oidc.issuerUrl placeholder in application-d1.yaml is substituted

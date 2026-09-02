@@ -316,8 +316,15 @@ platformNamespaces:
       Trillian and TUF (ADR-0535).
     # zuno-ai-build: the supply-chain-signer Job (WP-111) calls Fulcio/
     # Rekor/CTLog in-cluster to sign/verify the 14 first-party images.
+    # openshift-operators: rhtas-operator itself calls back INTO the
+    # operand services it manages (live finding, WP-110: its rekor
+    # reconciler GETs rekor-server's /api/v1/log/publicKey to build the
+    # sharding/TUF config - without this entry that call times out and
+    # RekorAvailable sits at "Creating" forever while every pod is
+    # green).
     allowedFromNamespaces:
       - zuno-ai-build
+      - openshift-operators
     # Deliberately NOT istio-injection: enabled - operator-owned workloads,
     # same posture as zuno-aap/openshift-lightspeed (a sidecar would have
     # to be re-patched on every Securesign reconcile).
