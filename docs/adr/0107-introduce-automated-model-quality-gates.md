@@ -19,6 +19,16 @@ repo-declared model/routing changes; cluster-side promotions consume the
 same artifact via the Day 1 check path. Thresholds are data (per-agent
 configuration), not code.
 
+*Amended 2026-09-02 (WP-114):* the gate gained its fourth input - ADR-0534 Phase 3's PEFT/LoRA
+capability-regression check (`evaluations/peft_regression.py`), wired into
+`evaluations/quality_gate.py` via an optional `peft_regression:` block in the same per-agent
+`gate_config.yaml` (data, not code, unchanged rule). This also discharges ADR-0108's
+long-declared-but-never-wired "LM-Eval results land in the model quality gate as one of its
+inputs": the check compares the base and candidate models' live LMEvalJob results and fails the
+gate on regression beyond the configured threshold, with per-task waivers (mandatory reason,
+reported as WAIVED) as the only sanctioned way to accept a known trade-off -
+never by relaxing the global threshold.
+
 See [Standard clauses](README.md#standard-clauses) for Alternatives
 considered, Consequences, Security/Operational considerations,
 Acceptance criteria and Review evidence.
