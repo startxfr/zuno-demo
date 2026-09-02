@@ -11,6 +11,8 @@ metadata:
   namespace: {{ .Values.hardwareProfiles.namespace }}
   labels:
     zuno.io/managed-by: argocd
+  annotations:
+    opendatahub.io/description: {{ .Values.hardwareProfiles.mig1g24gb.description | quote }}
 spec:
   identifiers:
     - identifier: {{ .Values.hardwareProfiles.mig1g24gb.acceleratorIdentifier }}

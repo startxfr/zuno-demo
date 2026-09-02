@@ -1,0 +1,57 @@
+# ADR-0537 (WP-106, Phase 3): publishes gpt-oss-120b (ADR-0416, OVHcloud AI
+# Endpoints) under MaaS governance (values.yaml's maas.models[]
+# "gpt-oss-120b-ovhcloud-maas" entry, rendered by templates/maas.yaml) via
+# an ExternalModel CR - same endpoint/model ADR-0416 already established,
+# only its governance changes. Finage's existing exclusion from this model
+# (ADR-0416, zuno.model.local_only: true) stays enforced solely in
+# ai-gateway's own routing/classification layer - deliberately NOT
+# duplicated into this entry's MaaSAuthPolicy subjects (see values.yaml's
+# comment on this maas.models[] entry).
+#
+# Mirror ExternalSecret: same Vault path/property as
+# platform/ai-gateway/externalsecret-ovhcloud.yaml (ai-gateway's own
+# direct-call credential, shared with stable-diffusion-xl per ADR-0415), but
+# a SEPARATE target Secret with the data key named literally "api-key" -
+# ExternalModel.spec.credentialRef requires that exact key name, while the
+# existing Secret uses "api_key". ADR-0416/ADR-0415's "one key per account"
+# principle stays intact: this adds a second Kubernetes Secret pointing at
+# the same Vault value, not a new Vault path or credential.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.externalModels.ovhcloudGptOss120b.secretName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    # Must exist before the ExternalModel below references it.
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: {{ .Values.externalModels.ovhcloudGptOss120b.secretName }}
+    creationPolicy: Owner
+  data:
+    - secretKey: api-key
+      remoteRef:
+        key: {{ .Values.externalModels.ovhcloudGptOss120b.vault.path }}
+        property: {{ .Values.externalModels.ovhcloudGptOss120b.vault.property }}
+---
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: ExternalModel
+metadata:
+  name: {{ .Values.externalModels.ovhcloudGptOss120b.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  endpoint: {{ .Values.externalModels.ovhcloudGptOss120b.endpoint }}
+  provider: {{ .Values.externalModels.ovhcloudGptOss120b.provider }}
+  targetModel: {{ .Values.externalModels.ovhcloudGptOss120b.targetModel | quote }}
+  credentialRef:
+    name: {{ .Values.externalModels.ovhcloudGptOss120b.secretName }}

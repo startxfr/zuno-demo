@@ -22,6 +22,12 @@ field (`oc explain maasmodelref.spec --recursive`) - missed by the earlier
 sweep, which only recursed into spec.modelRef. See values.yaml's
 maas.models[].endpointOverride comment and ADR-0201's dated notes for what
 this tests.
+ADR-0537 (WP-106, Phase 3), 2026-09-02: ExternalModel is back, for the
+case its original rejection above never covered - a genuinely external,
+authenticated SaaS backend (mistral-large-latest, gpt-oss-120b via
+OVHcloud), not an internal vLLM Service. `modelRef.kind` below is now
+per-entry (`.modelRefKind`, default LLMInferenceService) rather than
+hardcoded.
 */ -}}
 {{- if .Values.maas.enabled }}
 # MaaSAuthPolicy's admission webhook rejects the whole batch unless a
@@ -112,10 +118,17 @@ spec:
 {{- range .Values.maas.models }}
 ---
 {{- $model := . }}
+{{- if eq .modelRefKind "ExternalModel" }}
+# The published backend is {{ .backendInferenceServiceName }}'s own
+# ExternalModel CR (templates/externalmodel-*.yaml) - a genuinely external
+# SaaS endpoint, not a local workload. This CR only points MaaS's
+# governance plane at it by name (ADR-0537, WP-106 Phase 3).
+{{- else }}
 # The published backend is {{ .backendInferenceServiceName }}'s own
 # LLMInferenceService - no dedicated MaaS-only copy. That template owns
 # its own S3 credentials and GPU resources; this CR only points MaaS's
 # governance plane at it by name.
+{{- end }}
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSModelRef
 metadata:
@@ -128,7 +141,12 @@ spec:
   endpointOverride: {{ .endpointOverride }}
   {{- end }}
   modelRef:
-    kind: LLMInferenceService
+    # ADR-0537 (WP-106, Phase 3): defaults to LLMInferenceService (every
+    # entry before this ADR relied on the implicit default) - the two
+    # ExternalModel-backed entries (mistral-large-maas,
+    # gpt-oss-120b-ovhcloud-maas) set modelRefKind: ExternalModel
+    # explicitly in values.yaml.
+    kind: {{ .modelRefKind | default "LLMInferenceService" }}
     name: {{ .backendInferenceServiceName }}
 ---
 {{- range .subscriptions }}

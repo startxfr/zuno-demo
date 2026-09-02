@@ -1,0 +1,53 @@
+# ADR-0537 (WP-106, Phase 3): publishes mistral-large-latest under MaaS
+# governance (values.yaml's maas.models[] "mistral-large-maas" entry,
+# rendered by templates/maas.yaml) via an ExternalModel CR - Mistral stays
+# on its native api.mistral.ai endpoint, only its governance changes (NOT
+# migrated to OVHcloud, explicit decision).
+#
+# Mirror ExternalSecret: same Vault path/property as
+# platform/ai-gateway/externalsecret-mistral.yaml (ai-gateway's own direct-
+# call credential), but a SEPARATE target Secret with the data key named
+# literally "api-key" - ExternalModel.spec.credentialRef requires that
+# exact key name, while the existing Secret uses "api_key" for ai-gateway's
+# own consumption. ADR-0416/ADR-0415's "one key per account" principle
+# stays intact: this adds a second Kubernetes Secret pointing at the same
+# Vault value, not a new Vault path or credential.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.externalModels.mistral.secretName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    # Must exist before the ExternalModel below references it.
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: vault-backend
+    kind: ClusterSecretStore
+  target:
+    name: {{ .Values.externalModels.mistral.secretName }}
+    creationPolicy: Owner
+  data:
+    - secretKey: api-key
+      remoteRef:
+        key: {{ .Values.externalModels.mistral.vault.path }}
+        property: {{ .Values.externalModels.mistral.vault.property }}
+---
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: ExternalModel
+metadata:
+  name: {{ .Values.externalModels.mistral.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  endpoint: {{ .Values.externalModels.mistral.endpoint }}
+  provider: {{ .Values.externalModels.mistral.provider }}
+  targetModel: {{ .Values.externalModels.mistral.targetModel | quote }}
+  credentialRef:
+    name: {{ .Values.externalModels.mistral.secretName }}

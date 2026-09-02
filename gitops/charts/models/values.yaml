@@ -54,6 +54,10 @@ hardwareProfiles:
   namespace: redhat-ods-applications
   mig1g24gb:
     name: mig-1g-24gb
+    description: >-
+      One NVIDIA MIG 1g.24gb slice, 1-8 CPUs and 4-20 GiB of memory. Sized
+      for qwen35-9b, gpt-oss-20b and the qwen3-embedding-0.6b embedding
+      model on zuno-ai-run's shared GPU nodes.
     acceleratorIdentifier: nvidia.com/mig-1g.24gb
     # 2 slices of this size exist per GPU node.
     acceleratorMaxCount: 2
@@ -61,6 +65,10 @@ hardwareProfiles:
     memory: {min: 4Gi, default: 8Gi, max: 20Gi}
   mig2g48gb:
     name: mig-2g-48gb
+    description: >-
+      One NVIDIA MIG 2g.48gb slice, 1-8 CPUs and 8-48 GiB of memory. Sized
+      for qwen35-9b-wesh and qwen36-27b-instruct on zuno-ai-run's shared GPU
+      nodes.
     acceleratorIdentifier: nvidia.com/mig-2g.48gb
     # Only 1 slice of this size exists per GPU node.
     acceleratorMaxCount: 1
@@ -1002,6 +1010,102 @@ maas:
           priority: 100
       authPolicy:
         name: qwen35-9b-entitlement
+
+    # ADR-0537 (WP-106, Phase 3): mistral-large-latest, published as a
+    # MaaSModelRef backed by an ExternalModel CR (templates/
+    # externalmodel-mistral.yaml) instead of an LLMInferenceService -
+    # modelRefKind below overrides templates/maas.yaml's default. Stays on
+    # its native api.mistral.ai endpoint (explicit decision: NOT migrated
+    # to OVHcloud) - only its governance changes. Same two-persona-group +
+    # ai-gateway-catch-all pattern and rate limits as every model above,
+    # reused verbatim rather than inventing new tiers for this ADR.
+    - publishedName: mistral-large-maas
+      modelRefKind: ExternalModel
+      backendInferenceServiceName: mistral-large
+      subscriptions:
+        - name: mistral-large-tekos
+          group: agent_tekos
+          tokenRateLimits:
+            - limit: 100000
+              window: 1h
+          priority: 10
+        - name: mistral-large-sales
+          group: sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
+        - name: mistral-large-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
+      authPolicy:
+        name: mistral-large-entitlement
+
+    # ADR-0537 (WP-106, Phase 3): gpt-oss-120b via OVHcloud AI Endpoints
+    # (ADR-0416), published the same way as mistral-large-latest above -
+    # see templates/externalmodel-ovhcloud-gpt-oss-120b.yaml. Finage's
+    # existing exclusion from this model (ADR-0416,
+    # zuno.model.local_only: true) stays enforced solely in ai-gateway's
+    # own routing/classification layer - deliberately NOT duplicated into
+    # this entry's authPolicy subjects, per ADR-0537 Decision 3.
+    - publishedName: gpt-oss-120b-ovhcloud-maas
+      modelRefKind: ExternalModel
+      backendInferenceServiceName: gpt-oss-120b-ovhcloud
+      subscriptions:
+        - name: gpt-oss-120b-ovhcloud-tekos
+          group: agent_tekos
+          tokenRateLimits:
+            - limit: 100000
+              window: 1h
+          priority: 10
+        - name: gpt-oss-120b-ovhcloud-sales
+          group: sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
+        - name: gpt-oss-120b-ovhcloud-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
+      authPolicy:
+        name: gpt-oss-120b-ovhcloud-entitlement
+
+# ADR-0537 (WP-106, Phase 3): the two SaaS models published via ExternalModel
+# above. `name` is both the ExternalModel CR's own metadata.name and the
+# `backendInferenceServiceName` each maas.models entry above points at.
+# credentialRef requires the target Secret's data key to be literally
+# "api-key" (verified via the CRD schema) - the existing
+# platform/ai-gateway/externalsecret-{mistral,ovhcloud}.yaml Secrets use
+# "api_key" for ai-gateway's own direct-call consumption, so each entry here
+# gets its own mirror ExternalSecret (same Vault path/property, different
+# target Secret + key name) rather than editing those - ADR-0416/ADR-0415's
+# already-settled "one key per account" principle stays intact; this only
+# adds a second Kubernetes Secret pointing at the same Vault value.
+externalModels:
+  mistral:
+    name: mistral-large
+    endpoint: api.mistral.ai
+    provider: mistral
+    targetModel: mistral-large-latest
+    secretName: llm-provider-mistral-maas
+    vault:
+      path: providers/mistral
+      property: api_key
+  ovhcloudGptOss120b:
+    name: gpt-oss-120b-ovhcloud
+    endpoint: oai.endpoints.kepler.ai.cloud.ovh.net
+    provider: openai-compatible
+    targetModel: gpt-oss-120b
+    secretName: llm-provider-ovhcloud-maas
+    vault:
+      path: providers/ovhcloud
+      property: api_key
 
 lmEval:
   enabled: true
