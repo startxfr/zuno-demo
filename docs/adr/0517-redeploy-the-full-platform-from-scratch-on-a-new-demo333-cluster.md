@@ -35,8 +35,8 @@ genuine from-scratch run.
 5. (Added 2026-09-02.) The remediation work this ADR implies is bounded to
    the nine blockers enumerated under *Known blockers* below. Anything
    found beyond them during the run falls under clause 3 — logged, then
-   fixed or deferred to a follow-up ADR/WP. No work package carries
-   B1–B9 today, and the run itself stays blocked until `demo333` exists.
+   fixed or deferred to a follow-up ADR/WP. B1–B9 are carried by WP-118
+   (added 2026-09-02); the run itself stays blocked until `demo333` exists.
 
 ## Acceptance criteria
 
