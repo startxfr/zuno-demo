@@ -20,6 +20,12 @@ RUN pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm -f /tmp/requirements.txt
 
 COPY components/mlops/src/mlops.py /opt/app-root/src/mlops.py
+# ADR-0538/WP-116. Copied EXPLICITLY, not via `COPY src/`: mlops.py imports
+# this as a flat sibling module (both land in /opt/app-root/src, which is
+# also the entrypoint's working directory), so a missing COPY here is a
+# runtime ModuleNotFoundError inside the pipeline pod that no local test
+# would catch.
+COPY components/mlops/src/mlflow_tracking.py /opt/app-root/src/mlflow_tracking.py
 COPY components/mlops/mlops-run /opt/app-root/src/mlops-run
 RUN chmod 0755 /opt/app-root/src/mlops-run
 COPY evaluations /opt/app-root/src/evaluations

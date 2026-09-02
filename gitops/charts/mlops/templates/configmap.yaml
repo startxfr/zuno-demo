@@ -28,6 +28,12 @@ data:
   PGSCHEMA: {{ .Values.postgres.schema | quote }}
   PGSSLMODE: {{ .Values.postgres.sslmode | quote }}
   MLOPS_EVALUATIONS_DIR: {{ .Values.evaluations.dir | quote }}
+  # ADR-0538/WP-116: MLflow experiment tracking. An empty trackingUri
+  # disables it entirely (components/mlops/src/mlflow_tracking.py no-ops),
+  # which is the intended state on any cluster where the mlflow component
+  # is not installed.
+  MLFLOW_TRACKING_URI: {{ .Values.mlflow.trackingUri | quote }}
+  MLFLOW_WORKSPACE: {{ .Values.mlflow.workspace | quote }}
   # WP-087: the `evaluate` stage runs the agent's real acceptance suite
   # against the live platform - see values.yaml's acceptanceGate block.
   KEYCLOAK_URL: {{ .Values.acceptanceGate.keycloakUrl | quote }}

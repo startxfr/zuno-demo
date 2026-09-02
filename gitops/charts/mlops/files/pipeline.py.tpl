@@ -36,6 +36,13 @@ BASE_CONFIG_KEYS = {
     "PGSCHEMA": "PGSCHEMA",
     "PGSSLMODE": "PGSSLMODE",
     "MLOPS_EVALUATIONS_DIR": "MLOPS_EVALUATIONS_DIR",
+    # ADR-0538/WP-116. A key absent from this map never reaches the step
+    # pod, so tracking would silently no-op. MLFLOW_WORKSPACE is explicit
+    # rather than defaulted to the pod namespace: the KFP steps run in
+    # zuno-mlops today, but WP-119 moves training into a TrainJob pod
+    # whose namespace should not silently change where runs are recorded.
+    "MLFLOW_TRACKING_URI": "MLFLOW_TRACKING_URI",
+    "MLFLOW_WORKSPACE": "MLFLOW_WORKSPACE",
     "MODEL_REGISTRY_NAMESPACE": "MODEL_REGISTRY_NAMESPACE",
     "MODEL_REGISTRY_URL": "MODEL_REGISTRY_URL",
     # ADR-0526 (WP-087). A key absent from this map is NOT a compile

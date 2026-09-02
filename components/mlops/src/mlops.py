@@ -62,6 +62,11 @@ import requests
 import yaml
 from botocore.exceptions import ClientError
 
+# ADR-0538/WP-116. Sibling module in this same src/ directory (the image's
+# entrypoint runs from here), REST-only so the training image gains no
+# mlflow dependency - see its docstring.
+import mlflow_tracking
+
 logger = logging.getLogger("mlops")
 
 # Reproducibility, set at import time because cuBLAS reads this when it
@@ -1548,6 +1553,15 @@ def stage_train_lora(config: MlopsConfig, store: ArtifactStore) -> None:
     logger.info("train-lora: adapter for %s/%s uploaded to %s (%d files)",
                 config.agent, config.run_id, adapter_prefix, len(uploaded))
 
+    # ADR-0538/WP-116: mirror the run into MLflow so the Experiments page
+    # can compare it against previous ones (the manifest above stays the
+    # record of truth - ADR-0302 decision 3). Non-fatal by decision: the
+    # helper swallows everything, and the CA install is needed because the
+    # tracking server carries a service-serving certificate.
+    _install_internal_ca()
+    mlflow_tracking.log_training(
+        agent=config.agent, run_id=config.run_id, manifest=train_manifest)
+
 
 # --------------------------------------------------------------------------
 # merge-export
@@ -1856,6 +1870,10 @@ def stage_evaluate(config: MlopsConfig, store: ArtifactStore) -> None:
             result["tool_calling_failure"] = tool_calling.get("failures")
 
     store.put_json(f"{_run_prefix(config.eval_prefix, config)}/gate_result.json", result)
+    # ADR-0538/WP-116: append the gate verdict to the same MLflow run
+    # train-lora opened (joined on the zuno_run_id tag). _install_internal_ca
+    # already ran above for the gate's own HTTPS calls.
+    mlflow_tracking.log_gate(agent=config.agent, run_id=config.run_id, result=result)
     # A stage that fails must say what failed in its own log. Reading the
     # first end-to-end run meant fetching gate_result.json out of S3 by
     # hand to learn anything past three booleans.

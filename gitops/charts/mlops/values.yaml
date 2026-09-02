@@ -186,7 +186,7 @@ pipeline:
   # v1 was never actually applied - the pipeline has 0 versions and 0 runs -
   # so this rename is free today, and the convention now exists before the
   # first real bump.
-  version: v0-1-1
+  version: v0-2-0
   displayName: "MLOps: dataset-to-model LoRA/PEFT pipeline"
   description: "prepare-dataset -> train-lora -> evaluate -> push-registry (ADR-0301/ADR-0302)"
   createPipelineResource: true
@@ -319,3 +319,19 @@ merge:
 networkPolicy:
   enabled: true
   egressCidrs: []
+
+# ADR-0538/WP-116: MLflow experiment tracking (gitops/charts/mlflow). The
+# URI MUST carry the operand's /mlflow path prefix - it is what the MLflow
+# CR reports in status.address.url, and requests without it answer 404 even
+# with a correct workspace header (live-verified 2026-09-02). Port 8443
+# carries an OpenShift service-serving certificate, which mlops.py's
+# _install_internal_ca() already folds into certifi.
+#
+# Empty trackingUri = tracking disabled, the correct state on a cluster
+# without the mlflow component.
+mlflow:
+  trackingUri: https://mlflow.redhat-ods-applications.svc:8443/mlflow
+  # The multi-tenant server needs this on every request
+  # (X-MLFLOW-WORKSPACE); it must name a namespace the MLflow CR's
+  # workspaceLabelSelector selects.
+  workspace: zuno-mlops
