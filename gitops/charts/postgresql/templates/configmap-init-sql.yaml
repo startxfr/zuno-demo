@@ -53,6 +53,13 @@ data:
     \connect {{ .Values.maasDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.maasDatabase.owner }};
 
+    -- ADR-0538/WP-116: MLflow's Alembic migration creates its whole schema
+    -- in public on first start, so this grant is load-bearing, not
+    -- cosmetic - without it the tracking server fails exactly the way
+    -- Keycloak's Liquibase and maas-api did.
+    \connect {{ .Values.mlflowDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.mlflowDatabase.owner }};
+
     \connect {{ .Values.checkpointDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.checkpointDatabase.owner }};
 
