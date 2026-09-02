@@ -1,6 +1,8 @@
 # WP-116: MLflow experiment tracking for the MLOps pipeline
 
-- **State:** Not started (2026-09-02)
+- **State:** Done — live-verified 2026-09-02/03 on demo222: the tracking server runs
+  PostgreSQL-backed, the pipeline logs to it non-fatally, and the wesh run is visible in the
+  Experiments page
 - **ADRs:** [ADR-0538](../../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md)
   (decisions 1-2), [ADR-0302](../../adr/0302-build-dataset-to-model-mlops-pipelines.md)
   (KFP stays the orchestrator; S3 manifests stay the system of record),
@@ -20,6 +22,44 @@ whose variance ADR-0526 itself documents.
 This WP stands up the tracking server (PostgreSQL-backed), wires the pipeline to log to it
 non-fatally, and backfills the one existing green run so the page shows real history
 immediately.
+
+## Live findings (2026-09-02/03, execution)
+
+1. **Seven distinct defects stood between "operator Managed" and "server Available"**, none of
+   them visible from the CRD: the `zuno` database was wedged (timescaledb 2.27.1 recorded vs
+   2.29.1 shipped) and blocked `make d0 install postgresql` for everyone; the RHOAI namespace's
+   `limits.cpu` quota refused the operator's migration Job with the reason visible only in the
+   Job's events; the operator's own NetworkPolicy allows egress to DNS and the database ONLY,
+   which strands the istio sidecar (i/o timeout to istiod 15012 AND istio-csr 443/6443) so the
+   pod never leaves Init; the pguser Secret carried a stale SCRAM verifier, so the password
+   matched on both sides while Postgres rejected it; `MLflow` and `MLflowConfig` are both
+   singletons the CRD requires to be NAMED `mlflow`; an artifact mode is mandatory; and the
+   migration Job pins `PGSSLMODE=verify-full` against a CA bundle that lacked the PGO cluster CA.
+2. **`spec.env` on the MLflow CR does NOT reach the migration Job** - it applies to the server
+   container only, and setting it there produced a duplicate-key apply failure that blocked the
+   Deployment entirely. The fix was the operator's designed path: the PGO CA in
+   `DSCInitialization.spec.trustedCABundle.customCABundle` (ADR-0538, commit `5992566d`).
+3. **The tracking contract, discovered live because the CRD does not describe it:** base URL
+   `https://mlflow.redhat-ods-applications.svc:8443/mlflow` - the `/mlflow` prefix is
+   load-bearing, without it the server answers 404 even with correct auth; every request needs
+   the header `X-MLFLOW-WORKSPACE` (its name is in the operand's own
+   `mlflow/utils/workspace_utils.py`); auth is a Kubernetes bearer token.
+4. **The server authorizes with Kubernetes RBAC on the virtual API group
+   `mlflow.kubeflow.org`** (resources `experiments`/`datasets`/`registeredmodels`) scoped to the
+   workspace namespace. No CRD backs those resources, so `oc api-resources` does not list them.
+   Without a Role a machine caller authenticates and then 403s on every call - and since tracking
+   is non-fatal by design, that reads as "no runs appeared" rather than as an error. This is why
+   the chart ships `templates/workspace-rbac.yaml`.
+5. **A hand-rolled Job does not get the service CA that KFP step pods get for free** - the
+   backfill failed with "self-signed certificate in certificate chain" until its pod projected
+   `openshift-service-ca.crt` alongside the ServiceAccount token.
+6. **The Containerfile copies `src/mlops.py` by name, not the directory** - so the new
+   `mlflow_tracking.py` would have been absent from the image and failed at runtime in the
+   pipeline pod while every local test passed. Found by a peer session reading the diff cold;
+   an explicit COPY now carries a comment saying why it is explicit.
+7. A wrong turn worth recording: `sslmode=disable` was tried on the theory that the mesh was
+   double-wrapping TLS. A probe pod built from the MLflow image disproved it - TLS was fine and
+   the real failure was authentication. The chart comment says so, so nobody re-tries it.
 
 ## Steps
 
@@ -95,3 +135,13 @@ makes the Experiments page meaningful without re-spending ~2h of burst-node GPU.
 ## Status updates (once live-verified)
 
 - `State` moves to `Done` once the checklist passes, including the visible backfilled run.
+- **2026-09-03 - Done.** Commits: `650b6e3d`/`c8bfde35` (PGO database + grant), `af37d4e9`
+  (the Day 2 component), `fe9fc61c`/`f9ec0edb` (the CRD's singleton-name rules),
+  `d44155cc` (quota), `115fe7a5` (mesh egress), `83079c0f`/`c41aa510`/`c1c34297` (the sslmode
+  and PGSSLMODE round trip), `5992566d` (PGO CA in the trust bundle), `7141a6fa` (phase 4
+  pipeline logging), `6dbee1ed` (phase 5 backfill), `2fe980a6` (workspace RBAC). Live: MLflow
+  `Available=True` v3.13.0 with 50 tables migrated, both MLflowConfigs present, and the
+  `wesh-20260829-145123` run visible in experiment `mlops-comage` with its LoRA parameters and
+  `gate_passed` - re-running the backfill reports "already present", which proves the read path
+  as well as the write. Coordinated with two peer sessions throughout: pipeline.version v0-2-0
+  is this WP's, WP-119 took v0-2-1.
