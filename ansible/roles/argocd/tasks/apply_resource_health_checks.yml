@@ -37,3 +37,32 @@
               hs.status = "Progressing"
               hs.message = "Waiting for OLM to install the Subscription's CSV"
               return hs
+          # ADR-0535/WP-111, user-approved live finding (2026-09-02): none
+          # of policy-controller-operator.v1.0.2's three CRDs (TrustRoot,
+          # ClusterImagePolicy, PolicyController) ever populate a
+          # status.conditions[type=Ready] ArgoCD's generic health check
+          # recognizes - every sync hangs forever on "waiting for healthy
+          # state of ...", and since ArgoCD applies same-wave resources in
+          # order and waits per-resource, later resources (PolicyController)
+          # never even get applied. All three are simple declarative
+          # records with no real "unhealthy" state to detect (existence IS
+          # correctness here) - always Healthy once they exist, same
+          # reasoning as this repo's other CRD-without-status entries.
+          - group: policy.sigstore.dev
+            kind: TrustRoot
+            check: |
+              hs = {}
+              hs.status = "Healthy"
+              return hs
+          - group: policy.sigstore.dev
+            kind: ClusterImagePolicy
+            check: |
+              hs = {}
+              hs.status = "Healthy"
+              return hs
+          - group: rhtas.charts.redhat.com
+            kind: PolicyController
+            check: |
+              hs = {}
+              hs.status = "Healthy"
+              return hs
