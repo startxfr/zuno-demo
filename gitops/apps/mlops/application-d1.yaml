@@ -15,6 +15,18 @@ spec:
     path: gitops/charts/mlops
     helm:
       releaseName: zuno-mlops-d1
+      values: |
+        # ADR-0517 B3 (WP-118 step 1): the acceptance gate used to hardcode
+        # https://keycloak.apps.demo222.startx.fr and
+        # https://comage.apps.demo222.startx.fr, so on any other cluster it
+        # authenticated against the OLD cluster's Keycloak and scored the OLD
+        # cluster's frontend. apps.mycluster.example.com is a token
+        # ansible/tasks/apply_gitops_app.yml rewrites; the `keycloak.` and
+        # `comage.` prefixes are workload names, not cluster identity.
+        # Same shape as gitops/apps/rhtas/application-d1.yaml's issuerUrl.
+        acceptanceGate:
+          keycloakUrl: "https://keycloak.apps.mycluster.example.com"
+          frontendUrl: "https://comage.apps.mycluster.example.com"
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-mlops

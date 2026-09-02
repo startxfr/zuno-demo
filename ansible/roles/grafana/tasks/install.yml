@@ -57,10 +57,22 @@
     gitops_app_name: "zuno-grafana-d1"
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
-    gitops_app_extra_helm_values:
-      grafana:
-        enabled: true
-      prometheusReaderBearer: "Bearer {{ _grafana_prom_token_secret.resources[0].data.token | b64decode }}"
+    # Starts from application-d1.yaml's own values and merges in only the
+    # runtime-minted bearer. This dict REPLACES spec.source.helm.values
+    # wholesale, so the hand-written form it succeeds - {grafana.enabled,
+    # prometheusReaderBearer} - silently dropped appsDomain the moment
+    # WP-118 step 1 added it to the manifest, sending the dashboard's Tempo
+    # trace links back to the chart default. check_docs' gitops_values_clobber
+    # caught exactly that. Subscript ['values'], never .values - dot notation
+    # resolves to the Python dict method of that name.
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/grafana/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+        | combine({'prometheusReaderBearer': 'Bearer ' ~ (_grafana_prom_token_secret.resources[0].data.token | b64decode)},
+                  recursive=True)
+      }}
 
 - name: "grafana | wait for the Grafana Deployment to be ready"
   kubernetes.core.k8s_info:

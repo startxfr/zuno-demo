@@ -33,6 +33,9 @@ spec:
         quotaEnforcement:
           route:
             enabled: true
+          # ADR-0517 B4 (WP-118 step 1): token, substituted by
+          # ansible/tasks/apply_gitops_app.yml.
+          demoHostname: tekos-quota-demo.apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

@@ -21,6 +21,12 @@ spec:
       values: |
         kiali:
           enabled: true
+        # ADR-0517 B2 (WP-118 step 1): substitution token, rewritten to the
+        # live cluster's apps wildcard domain by
+        # ansible/tasks/apply_gitops_app.yml. The chart default is the same
+        # token, so a missing substitution fails visibly rather than
+        # silently deploying another cluster's hostname.
+        appsDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-mesh
