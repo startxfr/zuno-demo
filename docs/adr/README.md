@@ -233,6 +233,7 @@ Goal: make the OpenShift AI MaaS governance plane live and route agent model cal
 | [ADR-0521](0521-route-local-model-traffic-through-maas.md) | v0.5 | Implemented | Route ai-gateway's local model traffic through MaaS |
 | [ADR-0522](0522-enable-openshift-ai-monitoring-stack-side-by-side.md) | v0.5 | Implemented | Enable OpenShift AI's built-in monitoring stack, side-by-side with the existing observability stack |
 | [ADR-0523](0523-dual-export-traces-into-the-rhoai-monitoring-stack.md) | v0.5 | Implemented | Dual-export traces into the RHOAI monitoring stack |
+| [ADR-0537](0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md) | v0.5 | Proposed | Integrate RHOAI HardwareProfiles and MaaS ExternalModels |
 
 ## version 0.6
 
