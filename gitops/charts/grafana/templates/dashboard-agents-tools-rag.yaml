@@ -29,1320 +29,1333 @@ spec:
       dashboards: "grafana"
   uid: zuno-agents-tools-rag
   folder: "Zuno Platform"
+  # grafana-operator posts spec.json to the classic /api/dashboards/db
+  # endpoint, which rejects a bare v2-schema body with a 400
+  # ("dashboard appears to be in v2 format... include an object wrapper
+  # with an explicit apiVersion and move the body into a spec element")
+  # - confirmed live 2026-09-02 by probing that endpoint directly with
+  # both the bare and the wrapped form. The apiVersion/kind/spec
+  # envelope below is that required wrapper, not part of the dashboard
+  # model itself.
   json: |
     {
-      "annotations": [
+      "apiVersion": "dashboard.grafana.app/v2beta1",
+      "kind": "Dashboard",
+      "spec":
         {
-          "kind": "AnnotationQuery",
-          "spec": {
-            "query": {
-              "kind": "DataQuery",
-              "group": "grafana",
-              "version": "v0",
-              "datasource": {
-                "name": "-- Grafana --"
-              },
-              "spec": {}
-            },
-            "enable": true,
-            "hide": true,
-            "iconColor": "rgba(0, 211, 255, 1)",
-            "name": "Annotations & Alerts",
-            "builtIn": true,
-            "legacyOptions": {
-              "type": "dashboard"
-            }
-          }
-        }
-      ],
-      "cursorSync": "Off",
-      "description": "ADR-0102/ADR-0011/ADR-0036/ADR-0050/ADR-0109/ADR-0413: per-agent SLO/error budget, MCP tool authorization outcomes, RAG search and freshness health.",
-      "editable": true,
-      "elements": {
-        "panel-1": {
-          "kind": "Panel",
-          "spec": {
-            "id": 1,
-            "title": "BFF requests by agent/code (rate)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
+          "annotations": [
+            {
+              "kind": "AnnotationQuery",
               "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "sum by (agent, code) (rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))",
-                          "legendFormat": "{{`{{agent}}`}} ({{`{{code}}`}})"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "timeseries",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {},
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-10": {
-          "kind": "Panel",
-          "spec": {
-            "id": 10,
-            "title": "RAG freshness lag by domain",
-            "description": "Same shape as prometheusrule-freshness-lag.yaml's RagFreshnessLagExceeded<Domain> alerts. Per-domain objectives: tech 604800s (7d), sales 14400s (4h), adv 86400s (1d) - sxa-legacy is deliberately exempt.",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "sum by (domain) (rate(zuno_rag_freshness_lag_seconds_sum{domain=~\"$domain\"}[30m])) / sum by (domain) (rate(zuno_rag_freshness_lag_seconds_count{domain=~\"$domain\"}[30m]))",
-                          "legendFormat": "{{`{{domain}}`}}"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "timeseries",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {
-                    "unit": "s"
+                "query": {
+                  "kind": "DataQuery",
+                  "group": "grafana",
+                  "version": "v0",
+                  "datasource": {
+                    "name": "-- Grafana --"
                   },
-                  "overrides": []
+                  "spec": {}
+                },
+                "enable": true,
+                "hide": true,
+                "iconColor": "rgba(0, 211, 255, 1)",
+                "name": "Annotations & Alerts",
+                "builtIn": true,
+                "legacyOptions": {
+                  "type": "dashboard"
                 }
               }
             }
-          }
-        },
-        "panel-11": {
-          "kind": "Panel",
-          "spec": {
-            "id": 11,
-            "title": "Freshness alerts firing",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
+          ],
+          "cursorSync": "Off",
+          "description": "ADR-0102/ADR-0011/ADR-0036/ADR-0050/ADR-0109/ADR-0413: per-agent SLO/error budget, MCP tool authorization outcomes, RAG search and freshness health.",
+          "editable": true,
+          "elements": {
+            "panel-1": {
+              "kind": "Panel",
               "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
+                "id": 1,
+                "title": "BFF requests by agent/code (rate)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
                         "spec": {
-                          "expr": "sum(ALERTS{alertname=~\"RagFreshnessLagExceeded.*\", alertstate=\"firing\"}) or vector(0)"
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum by (agent, code) (rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))",
+                              "legendFormat": "{{`{{agent}}`}} ({{`{{code}}`}})"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
                         }
-                      },
-                      "refId": "A",
-                      "hidden": false
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "timeseries",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {},
+                      "overrides": []
                     }
                   }
-                ],
-                "transformations": [],
-                "queryOptions": {}
+                }
               }
             },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "stat",
-              "version": "",
+            "panel-10": {
+              "kind": "Panel",
               "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {
-                    "unit": "short",
-                    "thresholds": {
-                      "mode": "",
-                      "steps": [
-                        {
-                          "value": null,
-                          "color": "green"
-                        },
-                        {
-                          "value": 1,
-                          "color": "red"
+                "id": 10,
+                "title": "RAG freshness lag by domain",
+                "description": "Same shape as prometheusrule-freshness-lag.yaml's RagFreshnessLagExceeded<Domain> alerts. Per-domain objectives: tech 604800s (7d), sales 14400s (4h), adv 86400s (1d) - sxa-legacy is deliberately exempt.",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum by (domain) (rate(zuno_rag_freshness_lag_seconds_sum{domain=~\"$domain\"}[30m])) / sum by (domain) (rate(zuno_rag_freshness_lag_seconds_count{domain=~\"$domain\"}[30m]))",
+                              "legendFormat": "{{`{{domain}}`}}"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
                         }
-                      ]
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "timeseries",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "s"
+                      },
+                      "overrides": []
                     }
-                  },
-                  "overrides": []
+                  }
+                }
+              }
+            },
+            "panel-11": {
+              "kind": "Panel",
+              "spec": {
+                "id": 11,
+                "title": "Freshness alerts firing",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum(ALERTS{alertname=~\"RagFreshnessLagExceeded.*\", alertstate=\"firing\"}) or vector(0)"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "stat",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "short",
+                        "thresholds": {
+                          "mode": "",
+                          "steps": [
+                            {
+                              "value": null,
+                              "color": "green"
+                            },
+                            {
+                              "value": 1,
+                              "color": "red"
+                            }
+                          ]
+                        }
+                      },
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-12": {
+              "kind": "Panel",
+              "spec": {
+                "id": 12,
+                "title": "RAG search error ratio",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum(rate(zuno_rag_searches_total{outcome=\"error\"}[5m])) / sum(rate(zuno_rag_searches_total[5m]))"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "stat",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "percentunit",
+                        "thresholds": {
+                          "mode": "",
+                          "steps": [
+                            {
+                              "value": null,
+                              "color": "green"
+                            },
+                            {
+                              "value": 0.02,
+                              "color": "orange"
+                            },
+                            {
+                              "value": 0.1,
+                              "color": "red"
+                            }
+                          ]
+                        }
+                      },
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-13": {
+              "kind": "Panel",
+              "spec": {
+                "id": 13,
+                "title": "Traces: slow agent_graph_run (>10s)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "tempo",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "tempo"
+                            },
+                            "spec": {
+                              "limit": 20,
+                              "query": "{name=\"agent_graph_run\" && duration > 10s}",
+                              "queryType": "traceql",
+                              "tableType": "traces"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "table",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {},
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-14": {
+              "kind": "Panel",
+              "spec": {
+                "id": 14,
+                "title": "Traces: tool_invoke errors",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "tempo",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "tempo"
+                            },
+                            "spec": {
+                              "limit": 20,
+                              "query": "{name=\"tool_invoke\" && status=error}",
+                              "queryType": "traceql",
+                              "tableType": "traces"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "table",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {},
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-15": {
+              "kind": "Panel",
+              "spec": {
+                "id": 15,
+                "title": "Traces: slow rag_search (>2s)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "tempo",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "tempo"
+                            },
+                            "spec": {
+                              "limit": 20,
+                              "query": "{name=\"rag_search\" && duration > 2s}",
+                              "queryType": "traceql",
+                              "tableType": "traces"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "table",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {},
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-2": {
+              "kind": "Panel",
+              "spec": {
+                "id": 2,
+                "title": "Per-agent success ratio (ADR-0102 shape)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum by (agent) (rate(zuno_bff_requests_total{agent=~\"$agent\", code!~\"5..\"}[5m])) / sum by (agent) (rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))",
+                              "legendFormat": "{{`{{agent}}`}}"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "timeseries",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "percentunit",
+                        "thresholds": {
+                          "mode": "",
+                          "steps": [
+                            {
+                              "value": null,
+                              "color": "red"
+                            },
+                            {
+                              "value": 0.999,
+                              "color": "green"
+                            }
+                          ]
+                        },
+                        "links": [
+                          {
+                            "targetBlank": true,
+                            "title": "View slow agent_graph_run traces in Tempo",
+                            "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22agent_graph_run%5C%22%20%26%26%20duration%20%3E%2010s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D"
+                          }
+                        ],
+                        "custom": {
+                          "thresholdsStyle": {
+                            "mode": "line"
+                          }
+                        }
+                      },
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-3": {
+              "kind": "Panel",
+              "spec": {
+                "id": 3,
+                "title": "Error budget burn rate (1h vs 6h windows, filtered by agent)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "(1 - (sum(rate(zuno_bff_requests_total{agent=~\"$agent\", code!~\"5..\"}[1h])) / sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[1h])))) / 0.001",
+                              "legendFormat": "burn rate (1h, fast)"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      },
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "(1 - (sum(rate(zuno_bff_requests_total{agent=~\"$agent\", code!~\"5..\"}[6h])) / sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[6h])))) / 0.001",
+                              "legendFormat": "burn rate (6h, slow)"
+                            }
+                          },
+                          "refId": "B",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "timeseries",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "short",
+                        "thresholds": {
+                          "mode": "",
+                          "steps": [
+                            {
+                              "value": null,
+                              "color": "green"
+                            },
+                            {
+                              "value": 6,
+                              "color": "orange"
+                            },
+                            {
+                              "value": 14.4,
+                              "color": "red"
+                            }
+                          ]
+                        },
+                        "custom": {
+                          "thresholdsStyle": {
+                            "mode": "line"
+                          }
+                        }
+                      },
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-4": {
+              "kind": "Panel",
+              "spec": {
+                "id": 4,
+                "title": "MCP tool invocations (rate, by tool/outcome)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum by (tool, outcome) (rate(zuno_tool_invocations_total{tool=~\"$tool\", mcp_server=~\"$mcp_server\"}[5m]))",
+                              "legendFormat": "{{`{{tool}}`}} ({{`{{outcome}}`}})"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "timeseries",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {
+                        "links": [
+                          {
+                            "targetBlank": true,
+                            "title": "View tool_invoke error traces in Tempo",
+                            "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22tool_invoke%5C%22%20%26%26%20status%3Derror%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D"
+                          }
+                        ]
+                      },
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-5": {
+              "kind": "Panel",
+              "spec": {
+                "id": 5,
+                "title": "Denied invocations (rate, by tool/capability)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum by (tool, capability) (rate(zuno_tool_invocations_total{outcome=\"denied\", tool=~\"$tool\", mcp_server=~\"$mcp_server\"}[5m]))",
+                              "legendFormat": "{{`{{tool}}`}} / {{`{{capability}}`}}"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "timeseries",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {},
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-6": {
+              "kind": "Panel",
+              "spec": {
+                "id": 6,
+                "title": "Non-allowed ratio",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum(rate(zuno_tool_invocations_total{outcome=~\"denied|error|unknown_tool\", tool=~\"$tool\", mcp_server=~\"$mcp_server\"}[5m])) / sum(rate(zuno_tool_invocations_total{tool=~\"$tool\", mcp_server=~\"$mcp_server\"}[5m]))"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "stat",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "percentunit",
+                        "thresholds": {
+                          "mode": "",
+                          "steps": [
+                            {
+                              "value": null,
+                              "color": "green"
+                            },
+                            {
+                              "value": 0.02,
+                              "color": "orange"
+                            },
+                            {
+                              "value": 0.1,
+                              "color": "red"
+                            }
+                          ]
+                        }
+                      },
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-7": {
+              "kind": "Panel",
+              "spec": {
+                "id": 7,
+                "title": "Traffic by MCP server (rate)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum by (mcp_server) (rate(zuno_tool_invocations_total{mcp_server=~\"$mcp_server\"}[5m]))",
+                              "legendFormat": "{{`{{mcp_server}}`}}"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "timeseries",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {},
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-8": {
+              "kind": "Panel",
+              "spec": {
+                "id": 8,
+                "title": "RAG searches (rate, by outcome/provider)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "sum by (outcome, provider) (rate(zuno_rag_searches_total[5m]))",
+                              "legendFormat": "{{`{{outcome}}`}} ({{`{{provider}}`}})"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "timeseries",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {
+                        "unit": "reqps",
+                        "links": [
+                          {
+                            "targetBlank": true,
+                            "title": "View slow rag_search traces in Tempo",
+                            "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22rag_search%5C%22%20%26%26%20duration%20%3E%202s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D"
+                          }
+                        ]
+                      },
+                      "overrides": []
+                    }
+                  }
+                }
+              }
+            },
+            "panel-9": {
+              "kind": "Panel",
+              "spec": {
+                "id": 9,
+                "title": "RAG result count (p50/p95)",
+                "description": "",
+                "links": [],
+                "data": {
+                  "kind": "QueryGroup",
+                  "spec": {
+                    "queries": [
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "histogram_quantile(0.50, sum by (le) (rate(zuno_rag_result_count_bucket[5m])))",
+                              "legendFormat": "p50"
+                            }
+                          },
+                          "refId": "A",
+                          "hidden": false
+                        }
+                      },
+                      {
+                        "kind": "PanelQuery",
+                        "spec": {
+                          "query": {
+                            "kind": "DataQuery",
+                            "group": "prometheus",
+                            "version": "v0",
+                            "datasource": {
+                              "name": "prometheus"
+                            },
+                            "spec": {
+                              "expr": "histogram_quantile(0.95, sum by (le) (rate(zuno_rag_result_count_bucket[5m])))",
+                              "legendFormat": "p95"
+                            }
+                          },
+                          "refId": "B",
+                          "hidden": false
+                        }
+                      }
+                    ],
+                    "transformations": [],
+                    "queryOptions": {}
+                  }
+                },
+                "vizConfig": {
+                  "kind": "VizConfig",
+                  "group": "timeseries",
+                  "version": "",
+                  "spec": {
+                    "options": {},
+                    "fieldConfig": {
+                      "defaults": {},
+                      "overrides": []
+                    }
+                  }
                 }
               }
             }
-          }
-        },
-        "panel-12": {
-          "kind": "Panel",
-          "spec": {
-            "id": 12,
-            "title": "RAG search error ratio",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "sum(rate(zuno_rag_searches_total{outcome=\"error\"}[5m])) / sum(rate(zuno_rag_searches_total[5m]))"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "stat",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {
-                    "unit": "percentunit",
-                    "thresholds": {
-                      "mode": "",
-                      "steps": [
-                        {
-                          "value": null,
-                          "color": "green"
-                        },
-                        {
-                          "value": 0.02,
-                          "color": "orange"
-                        },
-                        {
-                          "value": 0.1,
-                          "color": "red"
-                        }
-                      ]
-                    }
-                  },
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-13": {
-          "kind": "Panel",
-          "spec": {
-            "id": 13,
-            "title": "Traces: slow agent_graph_run (>10s)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "tempo",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "tempo"
-                        },
-                        "spec": {
-                          "limit": 20,
-                          "query": "{name=\"agent_graph_run\" && duration > 10s}",
-                          "queryType": "traceql",
-                          "tableType": "traces"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "table",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {},
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-14": {
-          "kind": "Panel",
-          "spec": {
-            "id": 14,
-            "title": "Traces: tool_invoke errors",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "tempo",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "tempo"
-                        },
-                        "spec": {
-                          "limit": 20,
-                          "query": "{name=\"tool_invoke\" && status=error}",
-                          "queryType": "traceql",
-                          "tableType": "traces"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "table",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {},
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-15": {
-          "kind": "Panel",
-          "spec": {
-            "id": 15,
-            "title": "Traces: slow rag_search (>2s)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "tempo",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "tempo"
-                        },
-                        "spec": {
-                          "limit": 20,
-                          "query": "{name=\"rag_search\" && duration > 2s}",
-                          "queryType": "traceql",
-                          "tableType": "traces"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "table",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {},
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-2": {
-          "kind": "Panel",
-          "spec": {
-            "id": 2,
-            "title": "Per-agent success ratio (ADR-0102 shape)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "sum by (agent) (rate(zuno_bff_requests_total{agent=~\"$agent\", code!~\"5..\"}[5m])) / sum by (agent) (rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))",
-                          "legendFormat": "{{`{{agent}}`}}"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "timeseries",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {
-                    "unit": "percentunit",
-                    "thresholds": {
-                      "mode": "",
-                      "steps": [
-                        {
-                          "value": null,
-                          "color": "red"
-                        },
-                        {
-                          "value": 0.999,
-                          "color": "green"
-                        }
-                      ]
+          },
+          "layout": {
+            "kind": "RowsLayout",
+            "spec": {
+              "rows": [
+                {
+                  "kind": "RowsLayoutRow",
+                  "spec": {
+                    "collapse": false,
+                    "layout": {
+                      "kind": "AutoGridLayout",
+                      "spec": {
+                        "columnWidthMode": "standard",
+                        "items": [
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-1"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-2"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-3"
+                              }
+                            }
+                          }
+                        ],
+                        "maxColumnCount": 3,
+                        "rowHeightMode": "standard"
+                      }
                     },
-                    "links": [
-                      {
-                        "targetBlank": true,
-                        "title": "View slow agent_graph_run traces in Tempo",
-                        "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22agent_graph_run%5C%22%20%26%26%20duration%20%3E%2010s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D"
-                      }
-                    ],
-                    "custom": {
-                      "thresholdsStyle": {
-                        "mode": "line"
-                      }
-                    }
-                  },
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-3": {
-          "kind": "Panel",
-          "spec": {
-            "id": 3,
-            "title": "Error budget burn rate (1h vs 6h windows, filtered by agent)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "(1 - (sum(rate(zuno_bff_requests_total{agent=~\"$agent\", code!~\"5..\"}[1h])) / sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[1h])))) / 0.001",
-                          "legendFormat": "burn rate (1h, fast)"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  },
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "(1 - (sum(rate(zuno_bff_requests_total{agent=~\"$agent\", code!~\"5..\"}[6h])) / sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[6h])))) / 0.001",
-                          "legendFormat": "burn rate (6h, slow)"
-                        }
-                      },
-                      "refId": "B",
-                      "hidden": false
-                    }
+                    "title": "Agents"
                   }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "timeseries",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {
-                    "unit": "short",
-                    "thresholds": {
-                      "mode": "",
-                      "steps": [
-                        {
-                          "value": null,
-                          "color": "green"
-                        },
-                        {
-                          "value": 6,
-                          "color": "orange"
-                        },
-                        {
-                          "value": 14.4,
-                          "color": "red"
-                        }
-                      ]
+                },
+                {
+                  "kind": "RowsLayoutRow",
+                  "spec": {
+                    "collapse": true,
+                    "layout": {
+                      "kind": "AutoGridLayout",
+                      "spec": {
+                        "columnWidthMode": "standard",
+                        "items": [
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-4"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-5"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-6"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-7"
+                              }
+                            }
+                          }
+                        ],
+                        "maxColumnCount": 3,
+                        "rowHeightMode": "standard"
+                      }
                     },
-                    "custom": {
-                      "thresholdsStyle": {
-                        "mode": "line"
-                      }
-                    }
-                  },
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-4": {
-          "kind": "Panel",
-          "spec": {
-            "id": 4,
-            "title": "MCP tool invocations (rate, by tool/outcome)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "sum by (tool, outcome) (rate(zuno_tool_invocations_total{tool=~\"$tool\", mcp_server=~\"$mcp_server\"}[5m]))",
-                          "legendFormat": "{{`{{tool}}`}} ({{`{{outcome}}`}})"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "timeseries",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {
-                    "links": [
-                      {
-                        "targetBlank": true,
-                        "title": "View tool_invoke error traces in Tempo",
-                        "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22tool_invoke%5C%22%20%26%26%20status%3Derror%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D"
-                      }
-                    ]
-                  },
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-5": {
-          "kind": "Panel",
-          "spec": {
-            "id": 5,
-            "title": "Denied invocations (rate, by tool/capability)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "sum by (tool, capability) (rate(zuno_tool_invocations_total{outcome=\"denied\", tool=~\"$tool\", mcp_server=~\"$mcp_server\"}[5m]))",
-                          "legendFormat": "{{`{{tool}}`}} / {{`{{capability}}`}}"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "timeseries",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {},
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-6": {
-          "kind": "Panel",
-          "spec": {
-            "id": 6,
-            "title": "Non-allowed ratio",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "sum(rate(zuno_tool_invocations_total{outcome=~\"denied|error|unknown_tool\", tool=~\"$tool\", mcp_server=~\"$mcp_server\"}[5m])) / sum(rate(zuno_tool_invocations_total{tool=~\"$tool\", mcp_server=~\"$mcp_server\"}[5m]))"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "stat",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {
-                    "unit": "percentunit",
-                    "thresholds": {
-                      "mode": "",
-                      "steps": [
-                        {
-                          "value": null,
-                          "color": "green"
-                        },
-                        {
-                          "value": 0.02,
-                          "color": "orange"
-                        },
-                        {
-                          "value": 0.1,
-                          "color": "red"
-                        }
-                      ]
-                    }
-                  },
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-7": {
-          "kind": "Panel",
-          "spec": {
-            "id": 7,
-            "title": "Traffic by MCP server (rate)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "sum by (mcp_server) (rate(zuno_tool_invocations_total{mcp_server=~\"$mcp_server\"}[5m]))",
-                          "legendFormat": "{{`{{mcp_server}}`}}"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "timeseries",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {},
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-8": {
-          "kind": "Panel",
-          "spec": {
-            "id": 8,
-            "title": "RAG searches (rate, by outcome/provider)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "sum by (outcome, provider) (rate(zuno_rag_searches_total[5m]))",
-                          "legendFormat": "{{`{{outcome}}`}} ({{`{{provider}}`}})"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "timeseries",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {
-                    "unit": "reqps",
-                    "links": [
-                      {
-                        "targetBlank": true,
-                        "title": "View slow rag_search traces in Tempo",
-                        "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22rag_search%5C%22%20%26%26%20duration%20%3E%202s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D"
-                      }
-                    ]
-                  },
-                  "overrides": []
-                }
-              }
-            }
-          }
-        },
-        "panel-9": {
-          "kind": "Panel",
-          "spec": {
-            "id": 9,
-            "title": "RAG result count (p50/p95)",
-            "description": "",
-            "links": [],
-            "data": {
-              "kind": "QueryGroup",
-              "spec": {
-                "queries": [
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "histogram_quantile(0.50, sum by (le) (rate(zuno_rag_result_count_bucket[5m])))",
-                          "legendFormat": "p50"
-                        }
-                      },
-                      "refId": "A",
-                      "hidden": false
-                    }
-                  },
-                  {
-                    "kind": "PanelQuery",
-                    "spec": {
-                      "query": {
-                        "kind": "DataQuery",
-                        "group": "prometheus",
-                        "version": "v0",
-                        "datasource": {
-                          "name": "prometheus"
-                        },
-                        "spec": {
-                          "expr": "histogram_quantile(0.95, sum by (le) (rate(zuno_rag_result_count_bucket[5m])))",
-                          "legendFormat": "p95"
-                        }
-                      },
-                      "refId": "B",
-                      "hidden": false
-                    }
-                  }
-                ],
-                "transformations": [],
-                "queryOptions": {}
-              }
-            },
-            "vizConfig": {
-              "kind": "VizConfig",
-              "group": "timeseries",
-              "version": "",
-              "spec": {
-                "options": {},
-                "fieldConfig": {
-                  "defaults": {},
-                  "overrides": []
-                }
-              }
-            }
-          }
-        }
-      },
-      "layout": {
-        "kind": "RowsLayout",
-        "spec": {
-          "rows": [
-            {
-              "kind": "RowsLayoutRow",
-              "spec": {
-                "collapse": false,
-                "layout": {
-                  "kind": "AutoGridLayout",
-                  "spec": {
-                    "columnWidthMode": "standard",
-                    "items": [
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-1"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-2"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-3"
-                          }
-                        }
-                      }
-                    ],
-                    "maxColumnCount": 3,
-                    "rowHeightMode": "standard"
+                    "title": "MCP tools"
                   }
                 },
-                "title": "Agents"
+                {
+                  "kind": "RowsLayoutRow",
+                  "spec": {
+                    "collapse": true,
+                    "layout": {
+                      "kind": "AutoGridLayout",
+                      "spec": {
+                        "columnWidthMode": "standard",
+                        "items": [
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-8"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-9"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-10"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-11"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-12"
+                              }
+                            }
+                          }
+                        ],
+                        "maxColumnCount": 3,
+                        "rowHeightMode": "standard"
+                      }
+                    },
+                    "title": "RAG"
+                  }
+                },
+                {
+                  "kind": "RowsLayoutRow",
+                  "spec": {
+                    "collapse": true,
+                    "layout": {
+                      "kind": "AutoGridLayout",
+                      "spec": {
+                        "columnWidthMode": "standard",
+                        "items": [
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-13"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-14"
+                              }
+                            }
+                          },
+                          {
+                            "kind": "AutoGridLayoutItem",
+                            "spec": {
+                              "element": {
+                                "kind": "ElementReference",
+                                "name": "panel-15"
+                              }
+                            }
+                          }
+                        ],
+                        "maxColumnCount": 3,
+                        "rowHeightMode": "standard"
+                      }
+                    },
+                    "title": "Traces"
+                  }
+                }
+              ]
+            }
+          },
+          "links": [
+            {
+              "title": "Zuno dashboards",
+              "type": "dashboards",
+              "icon": "",
+              "tooltip": "",
+              "tags": [
+                "zuno"
+              ],
+              "asDropdown": true,
+              "targetBlank": false,
+              "includeVars": false,
+              "keepTime": true
+            }
+          ],
+          "liveNow": false,
+          "preload": false,
+          "tags": [
+            "zuno",
+            "agents",
+            "mcp",
+            "rag",
+            "slo"
+          ],
+          "timeSettings": {
+            "timezone": "browser",
+            "from": "now-6h",
+            "to": "now",
+            "autoRefresh": "30s",
+            "autoRefreshIntervals": [
+              "5s",
+              "10s",
+              "30s",
+              "1m",
+              "5m",
+              "15m",
+              "30m",
+              "1h",
+              "2h",
+              "1d"
+            ],
+            "hideTimepicker": false,
+            "fiscalYearStartMonth": 0
+          },
+          "title": "Agents, tools & RAG",
+          "variables": [
+            {
+              "kind": "QueryVariable",
+              "spec": {
+                "name": "agent",
+                "current": {
+                  "text": "All",
+                  "value": "$__all"
+                },
+                "hide": "dontHide",
+                "refresh": "onTimeRangeChanged",
+                "skipUrlSync": false,
+                "query": {
+                  "kind": "DataQuery",
+                  "group": "prometheus",
+                  "version": "v0",
+                  "datasource": {
+                    "name": "prometheus"
+                  },
+                  "spec": {
+                    "__legacyStringValue": "label_values(zuno_bff_requests_total, agent)"
+                  }
+                },
+                "regex": "",
+                "sort": "alphabeticalAsc",
+                "definition": "label_values(zuno_bff_requests_total, agent)",
+                "options": [],
+                "multi": true,
+                "includeAll": true,
+                "allValue": ".*",
+                "allowCustomValue": true
               }
             },
             {
-              "kind": "RowsLayoutRow",
+              "kind": "QueryVariable",
               "spec": {
-                "collapse": true,
-                "layout": {
-                  "kind": "AutoGridLayout",
+                "name": "tool",
+                "current": {
+                  "text": "All",
+                  "value": "$__all"
+                },
+                "hide": "dontHide",
+                "refresh": "onTimeRangeChanged",
+                "skipUrlSync": false,
+                "query": {
+                  "kind": "DataQuery",
+                  "group": "prometheus",
+                  "version": "v0",
+                  "datasource": {
+                    "name": "prometheus"
+                  },
                   "spec": {
-                    "columnWidthMode": "standard",
-                    "items": [
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-4"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-5"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-6"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-7"
-                          }
-                        }
-                      }
-                    ],
-                    "maxColumnCount": 3,
-                    "rowHeightMode": "standard"
+                    "__legacyStringValue": "label_values(zuno_tool_invocations_total, tool)"
                   }
                 },
-                "title": "MCP tools"
+                "regex": "",
+                "sort": "alphabeticalAsc",
+                "definition": "label_values(zuno_tool_invocations_total, tool)",
+                "options": [],
+                "multi": true,
+                "includeAll": true,
+                "allValue": ".*",
+                "allowCustomValue": true
               }
             },
             {
-              "kind": "RowsLayoutRow",
+              "kind": "QueryVariable",
               "spec": {
-                "collapse": true,
-                "layout": {
-                  "kind": "AutoGridLayout",
+                "name": "mcp_server",
+                "current": {
+                  "text": "All",
+                  "value": "$__all"
+                },
+                "hide": "dontHide",
+                "refresh": "onTimeRangeChanged",
+                "skipUrlSync": false,
+                "query": {
+                  "kind": "DataQuery",
+                  "group": "prometheus",
+                  "version": "v0",
+                  "datasource": {
+                    "name": "prometheus"
+                  },
                   "spec": {
-                    "columnWidthMode": "standard",
-                    "items": [
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-8"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-9"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-10"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-11"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-12"
-                          }
-                        }
-                      }
-                    ],
-                    "maxColumnCount": 3,
-                    "rowHeightMode": "standard"
+                    "__legacyStringValue": "label_values(zuno_tool_invocations_total, mcp_server)"
                   }
                 },
-                "title": "RAG"
+                "regex": "",
+                "sort": "alphabeticalAsc",
+                "definition": "label_values(zuno_tool_invocations_total, mcp_server)",
+                "options": [],
+                "multi": true,
+                "includeAll": true,
+                "allValue": ".*",
+                "allowCustomValue": true
               }
             },
             {
-              "kind": "RowsLayoutRow",
+              "kind": "QueryVariable",
               "spec": {
-                "collapse": true,
-                "layout": {
-                  "kind": "AutoGridLayout",
+                "name": "domain",
+                "current": {
+                  "text": "All",
+                  "value": "$__all"
+                },
+                "hide": "dontHide",
+                "refresh": "onTimeRangeChanged",
+                "skipUrlSync": false,
+                "query": {
+                  "kind": "DataQuery",
+                  "group": "prometheus",
+                  "version": "v0",
+                  "datasource": {
+                    "name": "prometheus"
+                  },
                   "spec": {
-                    "columnWidthMode": "standard",
-                    "items": [
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-13"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-14"
-                          }
-                        }
-                      },
-                      {
-                        "kind": "AutoGridLayoutItem",
-                        "spec": {
-                          "element": {
-                            "kind": "ElementReference",
-                            "name": "panel-15"
-                          }
-                        }
-                      }
-                    ],
-                    "maxColumnCount": 3,
-                    "rowHeightMode": "standard"
+                    "__legacyStringValue": "label_values(zuno_rag_freshness_lag_seconds_count, domain)"
                   }
                 },
-                "title": "Traces"
+                "regex": "",
+                "sort": "alphabeticalAsc",
+                "definition": "label_values(zuno_rag_freshness_lag_seconds_count, domain)",
+                "options": [],
+                "multi": true,
+                "includeAll": true,
+                "allValue": ".*",
+                "allowCustomValue": true
               }
             }
           ]
         }
-      },
-      "links": [
-        {
-          "title": "Zuno dashboards",
-          "type": "dashboards",
-          "icon": "",
-          "tooltip": "",
-          "tags": [
-            "zuno"
-          ],
-          "asDropdown": true,
-          "targetBlank": false,
-          "includeVars": false,
-          "keepTime": true
-        }
-      ],
-      "liveNow": false,
-      "preload": false,
-      "tags": [
-        "zuno",
-        "agents",
-        "mcp",
-        "rag",
-        "slo"
-      ],
-      "timeSettings": {
-        "timezone": "browser",
-        "from": "now-6h",
-        "to": "now",
-        "autoRefresh": "30s",
-        "autoRefreshIntervals": [
-          "5s",
-          "10s",
-          "30s",
-          "1m",
-          "5m",
-          "15m",
-          "30m",
-          "1h",
-          "2h",
-          "1d"
-        ],
-        "hideTimepicker": false,
-        "fiscalYearStartMonth": 0
-      },
-      "title": "Agents, tools & RAG",
-      "variables": [
-        {
-          "kind": "QueryVariable",
-          "spec": {
-            "name": "agent",
-            "current": {
-              "text": "All",
-              "value": "$__all"
-            },
-            "hide": "dontHide",
-            "refresh": "onTimeRangeChanged",
-            "skipUrlSync": false,
-            "query": {
-              "kind": "DataQuery",
-              "group": "prometheus",
-              "version": "v0",
-              "datasource": {
-                "name": "prometheus"
-              },
-              "spec": {
-                "__legacyStringValue": "label_values(zuno_bff_requests_total, agent)"
-              }
-            },
-            "regex": "",
-            "sort": "alphabeticalAsc",
-            "definition": "label_values(zuno_bff_requests_total, agent)",
-            "options": [],
-            "multi": true,
-            "includeAll": true,
-            "allValue": ".*",
-            "allowCustomValue": true
-          }
-        },
-        {
-          "kind": "QueryVariable",
-          "spec": {
-            "name": "tool",
-            "current": {
-              "text": "All",
-              "value": "$__all"
-            },
-            "hide": "dontHide",
-            "refresh": "onTimeRangeChanged",
-            "skipUrlSync": false,
-            "query": {
-              "kind": "DataQuery",
-              "group": "prometheus",
-              "version": "v0",
-              "datasource": {
-                "name": "prometheus"
-              },
-              "spec": {
-                "__legacyStringValue": "label_values(zuno_tool_invocations_total, tool)"
-              }
-            },
-            "regex": "",
-            "sort": "alphabeticalAsc",
-            "definition": "label_values(zuno_tool_invocations_total, tool)",
-            "options": [],
-            "multi": true,
-            "includeAll": true,
-            "allValue": ".*",
-            "allowCustomValue": true
-          }
-        },
-        {
-          "kind": "QueryVariable",
-          "spec": {
-            "name": "mcp_server",
-            "current": {
-              "text": "All",
-              "value": "$__all"
-            },
-            "hide": "dontHide",
-            "refresh": "onTimeRangeChanged",
-            "skipUrlSync": false,
-            "query": {
-              "kind": "DataQuery",
-              "group": "prometheus",
-              "version": "v0",
-              "datasource": {
-                "name": "prometheus"
-              },
-              "spec": {
-                "__legacyStringValue": "label_values(zuno_tool_invocations_total, mcp_server)"
-              }
-            },
-            "regex": "",
-            "sort": "alphabeticalAsc",
-            "definition": "label_values(zuno_tool_invocations_total, mcp_server)",
-            "options": [],
-            "multi": true,
-            "includeAll": true,
-            "allValue": ".*",
-            "allowCustomValue": true
-          }
-        },
-        {
-          "kind": "QueryVariable",
-          "spec": {
-            "name": "domain",
-            "current": {
-              "text": "All",
-              "value": "$__all"
-            },
-            "hide": "dontHide",
-            "refresh": "onTimeRangeChanged",
-            "skipUrlSync": false,
-            "query": {
-              "kind": "DataQuery",
-              "group": "prometheus",
-              "version": "v0",
-              "datasource": {
-                "name": "prometheus"
-              },
-              "spec": {
-                "__legacyStringValue": "label_values(zuno_rag_freshness_lag_seconds_count, domain)"
-              }
-            },
-            "regex": "",
-            "sort": "alphabeticalAsc",
-            "definition": "label_values(zuno_rag_freshness_lag_seconds_count, domain)",
-            "options": [],
-            "multi": true,
-            "includeAll": true,
-            "allValue": ".*",
-            "allowCustomValue": true
-          }
-        }
-      ]
     }
 {{- end }}
