@@ -124,6 +124,21 @@
   register: _rhtas_trillian_db_pw
   no_log: true
 
+# Recurring "Unknown error" from k8s_exec (no_log-masked, several live
+# runs 2026-09-02) traced to shipping the whole 6.5KB schema inline as a
+# single quoted -e argument over the exec websocket. postgresql's role
+# hits the same "can't mix multi-statement SQL into one CLI arg" problem
+# and never flakes because it ships the script into the pod first
+# (k8s_cp) and runs a short, fixed-length command against it - same fix
+# applied here instead of guessing at the transport-level root cause.
+- name: "rhtas | copy the Trillian schema into the mariadb pod"
+  kubernetes.core.k8s_cp:
+    namespace: zuno-data
+    pod: mariadb-0
+    container: mariadb
+    remote_path: /tmp/trillian-storage.sql
+    content: "{{ lookup('ansible.builtin.file', role_path + '/files/trillian-storage.sql') }}"
+
 - name: "rhtas | apply the Trillian schema to the trillian database (idempotent)"
   kubernetes.core.k8s_exec:
     namespace: zuno-data
@@ -131,7 +146,7 @@
     container: mariadb
     command: >-
       sh -c "MYSQL_PWD='{{ _rhtas_trillian_db_pw.resources[0].data.password | b64decode }}'
-      mariadb -u trillian trillian -e {{ lookup('ansible.builtin.file', role_path + '/files/trillian-storage.sql') | quote }}"
+      mariadb -u trillian trillian < /tmp/trillian-storage.sql"
   no_log: true
   register: _rhtas_schema_apply
   changed_when: false
