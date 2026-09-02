@@ -2,13 +2,24 @@
 # ADR-0535/WP-111: audit-only image policy for the 14 Priority-1
 # first-party images - spec.mode: warn ("allow but warn", confirmed live
 # via `oc explain clusterimagepolicy.spec.mode
-# --api-version=policy.sigstore.dev/v1beta1`, 2026-09-02) is the actual
+# --api-version=policy.sigstore.dev/v1alpha1`, 2026-09-02) is the actual
 # enforcement lever ADR-0535 authorizes; `enforce` (reject) is a
 # deliberate, separate, later decision - this ADR authorizes only
 # observe/verify/audit. keyless identity matches the zuno-signer Fulcio
 # certificate WP-110/WP-111 established (gitops/charts/rhtas's
 # fulcio.oidc block) exactly.
-apiVersion: policy.sigstore.dev/v1beta1
+#
+# v1alpha1, NOT v1beta1: live finding 2026-09-02 - this CRD's conversion
+# webhook (needed to write v1beta1, a non-storage version) is
+# mispackaged (clientConfig points at a Service/namespace
+# - webhook.policy-controller-operator - that doesn't match what this
+# CSV actually deploys - policy-controller-manager-webhook-service in
+# whatever namespace it's installed into - so every v1beta1 apply fails
+# with "service not found", regardless of install namespace). v1alpha1 is
+# the CRD's storage version (`oc get crd ... -o jsonpath='{.spec.versions}'`)
+# with an identical spec shape, so writing it directly needs no
+# conversion at all.
+apiVersion: policy.sigstore.dev/v1alpha1
 kind: ClusterImagePolicy
 metadata:
   name: zuno-first-party-images

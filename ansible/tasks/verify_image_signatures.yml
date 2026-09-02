@@ -1,12 +1,15 @@
 ---
-# ADR-0420/WP-070: verifies every first-party image's signature against
-# the committed Vault Transit public key (make d2 check supply-chain).
-# Same "resolve outside, verify inside" split as run_image_signing_job.yml:
-# ansible resolves refs+digests here (needs cluster API access only, which
-# it already has - confirmed `oc get istag` works from outside the
-# cluster), a Job does the actual cosign verify (needs registry network,
-# which only a pod has - confirmed the registry pull does NOT work from
-# outside the cluster).
+# ADR-0535/WP-111: verifies every first-party image's signature keyless
+# via RHTAS (replaces the committed Vault Transit public key WP-070
+# originally wired here - make d2 check supply-chain). Same "resolve
+# outside, verify inside" split as run_image_signing_job.yml: ansible
+# resolves refs+digests here (needs cluster API access only, which it
+# already has - confirmed `oc get istag` works from outside the cluster),
+# a Job does the actual cosign verify (needs registry AND Fulcio/Rekor
+# network, which only a pod has).
+- name: "supply-chain-check | resolve the cluster base domain (for the Fulcio OIDC issuer)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
 - name: "supply-chain-check | scan and resolve every first-party image's live digest"
   ansible.builtin.command:
     cmd: python3 platform/supply-chain/verify_signatures.py --list-refs
@@ -88,14 +91,15 @@
                   # issued by the cluster's own service-serving CA.
                   - name: SSL_CERT_FILE
                     value: /etc/ssl/openshift-service-ca/service-ca.crt
-                  # `cosign verify` (unlike `sign`) always initializes a
-                  # local Sigstore TUF trust-root cache under $HOME/.sigstore
-                  # even in pure --key mode with no tlog contact - HOME is
+                  # `cosign verify` always initializes a local Sigstore
+                  # TUF trust-root cache under $HOME/.sigstore - HOME is
                   # unset by default in this non-root image, so it tries
                   # (and fails) to write to `/`. /tmp is writable and this
                   # Job's pod is ephemeral, so nothing needs to persist it.
                   - name: HOME
                     value: /tmp
+                  - name: RHTAS_CERT_OIDC_ISSUER
+                    value: "https://keycloak.{{ cluster_base_domain }}/realms/zuno"
                 volumeMounts:
                   - name: openshift-service-ca
                     mountPath: /etc/ssl/openshift-service-ca

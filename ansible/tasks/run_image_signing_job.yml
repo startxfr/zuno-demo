@@ -1,18 +1,23 @@
 ---
-# ADR-0420/WP-070: signs one component's just-built image by digest with
-# the in-cluster Vault Transit key. Included from apply_openshift_build.yml
-# right after a genuinely fresh Build completes (day1_verb: build only -
-# never on a routine "ensure this image exists" install), so every
-# component built this way gets signed, not just agent-runtime (WP-069
-# covers OKF bundles specifically; this covers every image uniformly).
+# ADR-0535/WP-111: signs one component's just-built image by digest
+# keyless via RHTAS (replaces the Vault Transit `--key hashivault://`
+# mode WP-070 originally wired here). Included from
+# apply_openshift_build.yml right after a genuinely fresh Build completes
+# (day1_verb: build only - never on a routine "ensure this image exists"
+# install), so every component built this way gets signed, not just
+# agent-runtime (WP-069 covers OKF bundles specifically, untouched by
+# this WP - still Vault Transit).
 #
 # The digest is resolved here, outside the signing container (same
 # "resolve outside, sign inside" split as run_okf_signing_job.yml's
 # initContainer) - the minimal supply-chain-signer image carries no oc/
 # kubectl binary, only cosign, so it can never need cluster API access
-# beyond talking to Vault.
+# beyond talking to Keycloak/Fulcio/Rekor.
 #
 # Requires: sign_image_name set by the caller (e.g. "agent-runtime").
+# Requires: cluster_base_domain resolved (ansible/tasks/
+# resolve_cluster_base_domain.yml) by the including role - the Fulcio
+# OIDC issuer is the external Keycloak route, cluster-specific.
 - name: "image-signing | resolve {{ sign_image_name }}'s live ImageStreamTag digest"
   kubernetes.core.k8s_info:
     api_version: image.openshift.io/v1
@@ -31,6 +36,9 @@
     _image_signing_ref: >-
       image-registry.openshift-image-registry.svc:5000/zuno-ai-build/{{ sign_image_name }}@{{
         _image_signing_istag.resources[0].image.metadata.name }}
+
+- name: "image-signing | resolve the cluster base domain (for the Fulcio OIDC issuer)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
 - name: "image-signing | delete any previous signing Job for {{ sign_image_name }} (idempotent-by-recreation)"
   kubernetes.core.k8s:
@@ -81,11 +89,29 @@
                 env:
                   - name: SSL_CERT_FILE
                     value: /etc/ssl/openshift-service-ca/service-ca.crt
+                  - name: RHTAS_KEYCLOAK_TOKEN_URL
+                    value: "https://keycloak.{{ cluster_base_domain }}/realms/zuno/protocol/openid-connect/token"
+                  - name: RHTAS_CLIENT_SECRET_PATH
+                    value: /etc/rhtas/signer-client-secret/client_secret
+                  - name: RHTAS_KC_CA_FILE
+                    value: /etc/rhtas/keycloak-ca/ca-bundle.crt
                 volumeMounts:
                   - name: openshift-service-ca
                     mountPath: /etc/ssl/openshift-service-ca
                     readOnly: true
+                  - name: signer-client-secret
+                    mountPath: /etc/rhtas/signer-client-secret
+                    readOnly: true
+                  - name: keycloak-ca
+                    mountPath: /etc/rhtas/keycloak-ca
+                    readOnly: true
             volumes:
+              - name: signer-client-secret
+                secret:
+                  secretName: zuno-signer-client-secret
+              - name: keycloak-ca
+                configMap:
+                  name: rhtas-keycloak-ca
               - name: openshift-service-ca
                 configMap:
                   name: openshift-service-ca.crt

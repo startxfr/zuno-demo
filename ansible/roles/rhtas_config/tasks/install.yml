@@ -181,8 +181,11 @@
     gitops_app_wait_delay: 15
 
 - name: "rhtas_config | wait for the ClusterImagePolicy to report Ready"
+  # v1alpha1, not v1beta1 - see templates/clusterimagepolicy.yaml's header
+  # comment (live finding: this CRD's v1beta1 conversion webhook is
+  # mispackaged; v1alpha1 is the storage version and needs no conversion).
   kubernetes.core.k8s_info:
-    api_version: policy.sigstore.dev/v1beta1
+    api_version: policy.sigstore.dev/v1alpha1
     kind: ClusterImagePolicy
     name: zuno-first-party-images
   register: _rhtas_config_cip

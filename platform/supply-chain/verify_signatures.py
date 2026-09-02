@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""ADR-0115/ADR-0420 policy-as-code check: "signature verification is
-exercised as part of trusted promotion/deployment." Walks every
-`gitops/charts/*/values.yaml` for first-party image references (anything
-published under the internal `image-registry...svc:5000/zuno-ai-build/`
-registry - what every chart actually deploys, per RELEASING.md), resolves
-each one's LIVE `ImageStreamTag` digest (`oc get istag`), and runs
-`cosign verify --key` against it using the committed Vault Transit public
-key (`agents/zuno-platform-signer.pub`) - not a keyless GitHub OIDC
-identity.
+"""ADR-0115/ADR-0420/ADR-0535 policy-as-code check: "signature
+verification is exercised as part of trusted promotion/deployment."
+Walks every `gitops/charts/*/values.yaml` for first-party image
+references (anything published under the internal
+`image-registry...svc:5000/zuno-ai-build/` registry - what every chart
+actually deploys, per RELEASING.md), resolves each one's LIVE
+`ImageStreamTag` digest (`oc get istag`), and (WP-111) runs `cosign
+verify` keyless against it - a Fulcio-issued certificate identity/issuer
+checked against a real Rekor entry, replacing the pre-WP-111 `--key`
+mode against the committed Vault Transit public key
+(`agents/zuno-platform-signer.pub`).
 
 Resolving the live digest rather than expecting an already-pinned one in
 `values.yaml` is deliberate: every chart still declares `tag: latest`
@@ -40,6 +42,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import shutil
 import subprocess
@@ -57,7 +60,17 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 FIRST_PARTY_REGISTRY_PREFIX = "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/"
 BUILD_NAMESPACE = "zuno-ai-build"
 
-DEFAULT_PUBLIC_KEY_PATH = REPO_ROOT / "agents" / "zuno-platform-signer.pub"
+# WP-111/ADR-0535: this direct-verify path (unlike --list-refs, which
+# only needs cluster API access) needs network reachability to Fulcio/
+# Rekor/TUF from wherever it runs - the in-cluster Service names
+# sign_in_cluster.py's Jobs use aren't reachable from outside the
+# cluster, so this defaults to RHTAS's external Routes instead. Override
+# via env if running from somewhere with a different network path.
+DEFAULT_FULCIO_URL = os.environ.get("RHTAS_FULCIO_URL", "https://fulcio-server-zuno-rhtas.apps.mycluster.example.com")
+DEFAULT_REKOR_URL = os.environ.get("RHTAS_REKOR_URL", "https://rekor-server-zuno-rhtas.apps.mycluster.example.com")
+DEFAULT_TUF_URL = os.environ.get("RHTAS_TUF_URL", "https://tuf-zuno-rhtas.apps.mycluster.example.com")
+DEFAULT_CERT_IDENTITY = os.environ.get("RHTAS_CERT_IDENTITY", "zuno-signer@zuno-demo.internal")
+DEFAULT_CERT_OIDC_ISSUER = os.environ.get("RHTAS_CERT_OIDC_ISSUER", "")
 
 IGNORED_TAG_VALUES = {""}
 
@@ -209,9 +222,23 @@ def list_refs() -> int:
     return 0
 
 
-def _verify_one(cosign_bin: str, public_key: pathlib.Path, ref: "ImageRef") -> Optional[str]:
-    """Returns None on success, an error message on failure. Never raises -
-    a registry/cluster problem is reported as a finding, not a crash."""
+def _cosign_initialize_tuf(cosign_bin: str, tuf_url: str) -> Optional[str]:
+    """Returns None on success, an error message on failure."""
+    result = subprocess.run(
+        [cosign_bin, "initialize", "--mirror", tuf_url, "--root", f"{tuf_url}/root.json"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if result.returncode != 0:
+        return f"cosign initialize (TUF root, {tuf_url}) failed: {(result.stderr or result.stdout).strip()}"
+    return None
+
+
+def _verify_one(cosign_bin: str, ref: "ImageRef", cert_identity: str, cert_oidc_issuer: str, rekor_url: str) -> Optional[str]:
+    """WP-111/ADR-0535: verifies keyless via RHTAS. Returns None on
+    success, an error message on failure. Never raises - a registry/
+    cluster problem is reported as a finding, not a crash."""
     repository = ref.image.rsplit(":", 1)[0]
     try:
         digest = _resolve_live_digest(ref.image)
@@ -220,18 +247,13 @@ def _verify_one(cosign_bin: str, public_key: pathlib.Path, ref: "ImageRef") -> O
 
     image_at_digest = f"{repository}@{digest}"
     try:
-        # Unlike `cosign sign-blob`/`verify-blob` (which default to
-        # touching Rekor unless told --tlog-upload=false/
-        # --insecure-ignore-tlog=true), plain `cosign sign`/`verify` for
-        # OCI images gate transparency-log use behind an opt-in
-        # COSIGN_EXPERIMENTAL=1 env var instead - simply not setting it
-        # (never set anywhere in this repo) is the whole story here.
         result = subprocess.run(
             [
                 cosign_bin,
                 "verify",
-                "--key",
-                str(public_key),
+                "--rekor-url", rekor_url,
+                "--certificate-identity", cert_identity,
+                "--certificate-oidc-issuer", cert_oidc_issuer,
                 image_at_digest,
             ],
             capture_output=True,
@@ -281,28 +303,30 @@ def main() -> int:
         print("\nRESULT: FAIL - install cosign to actually verify these signatures.")
         return 1
 
-    if not DEFAULT_PUBLIC_KEY_PATH.is_file():
-        print(f"\nRESULT: FAIL - trust anchor not found at {DEFAULT_PUBLIC_KEY_PATH} (see WP-068).")
+    if not DEFAULT_CERT_OIDC_ISSUER:
+        print("\nRESULT: FAIL - RHTAS_CERT_OIDC_ISSUER is not set (the Fulcio/Keycloak issuer URL, see WP-111).")
+        return 1
+
+    tuf_error = _cosign_initialize_tuf(cosign_bin, DEFAULT_TUF_URL)
+    if tuf_error:
+        print(f"\nRESULT: FAIL - {tuf_error}")
         return 1
 
     findings: List[Finding] = []
     for ref in refs:
         print(f"Verifying {ref.image} (from {ref.file}: {ref.path}) ...")
-        error = _verify_one(cosign_bin, DEFAULT_PUBLIC_KEY_PATH, ref)
+        error = _verify_one(cosign_bin, ref, DEFAULT_CERT_IDENTITY, DEFAULT_CERT_OIDC_ISSUER, DEFAULT_REKOR_URL)
         if error:
             findings.append(Finding(error))
 
     if not findings:
-        print(f"\nRESULT: PASS - all {len(refs)} first-party image(s) verified against {DEFAULT_PUBLIC_KEY_PATH.name}.")
+        print(f"\nRESULT: PASS - all {len(refs)} first-party image(s) verified keyless via RHTAS.")
         return 0
 
     print(f"\n{len(findings)} signature verification failure(s):")
     for f in findings:
         print(f"  ✗ {f.message}")
-    print(
-        "\nRESULT: FAIL - a first-party image did not verify against "
-        f"{DEFAULT_PUBLIC_KEY_PATH.name}."
-    )
+    print("\nRESULT: FAIL - a first-party image did not verify keyless via RHTAS.")
     return 1
 
 
