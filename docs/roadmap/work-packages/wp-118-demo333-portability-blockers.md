@@ -1,12 +1,14 @@
 # WP-118: Close the demo333 portability blockers recorded in ADR-0517
 
-- **State:** Repo work merged (steps 1, 4 and 5 of 5, 2026-09-03 — B2/B3/B4, B7/B8 and
-  B9 closed; steps 2 and 3 in progress). No chart default names `demo222` any more.
-  Step 4 corrected ADR-0517's own B7 row, which described the defect wrongly in a way
-  that would have caused an outage if acted on; step 5 closed B9 as a decision to keep
-  the InstallPlan gate and detect the drift earlier, not as a behaviour change. No
-  `demo333` cluster exists; every remaining step is repo-side and can land before one is
-  provisioned.
+- **State:** Repo work merged (2026-09-03 — steps 1, 4 and 5 complete; steps 2 and 3
+  landed as their inert "a" halves). B2/B3/B4, B7/B8 and B9 are closed. B1, B5 and B6 are
+  now *discovered* at run time and proven byte-identical on `demo222`, but their chart
+  literals are still in git: flipping those is steps 2b/3b, and the delivery constraint
+  below requires a live apply of the six affected components first — **an operator action,
+  not an agent one**. Two audit errors were corrected along the way: ADR-0517's B7 row
+  described a defect that did not exist in a way that would have caused an outage if acted
+  on, and step 2's planned MachineSet selector would have made the role bootstrap from its
+  own output. No `demo333` cluster exists; nothing here is exercised until one does.
 - **ADRs:** ADR-0517 (Proposed, v0.8)
 - **Depends on:** nothing. Blocked by nothing — the ADR-0517 run itself is blocked on
   an operator provisioning `demo333`, but every blocker below is fixable without it.
@@ -242,6 +244,25 @@ demo data, not cluster identity, and stay.
   Step 3 — PVC `storageClassName` is immutable once bound.
 - `make d0 install machines --check --diff`, plus before/after comparison of
   `oc get applications.argoproj.io zuno-machines-d0 -o jsonpath='{.spec.source.helm.values}'`.
+
+### Live applies that gate steps 2b and 3b (operator action — ask first)
+
+Each makes an Application carry the discovered value, so the chart default stops being
+what renders. Verified day mapping (this repo puts `cert-manager`, `machines` and
+`postgresql` in Day 0, not Day 1):
+
+| Blocker | Command |
+|---|---|
+| B1 | `make d0 install machines` |
+| B6 | `make d0 install cert-manager` |
+| B5 | `make d0 install postgresql`, `make d1 install grafana`, `make d1 install mariadb`, `make d2 install models` |
+
+**Sequence `make d2 install models` deliberately, or defer it.** Re-syncing
+`zuno-models-d1` recreates the three `Replace=true` lmeval cache-prefetch Jobs, each
+re-pulling ~318 MB plus the lmes-job image onto whatever node they land on. On 2026-09-03
+that was measured at 22 seconds from Job creation to `EvictionThresholdMet` on a
+schedulable master already at 85% of its image filesystem. Run it when the cluster is not
+under disk pressure.
 - `python3 platform/docs/check_docs.py` passes.
 
 ## Risks and known unknowns
