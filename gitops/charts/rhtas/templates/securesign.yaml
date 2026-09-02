@@ -1,0 +1,85 @@
+{{- if .Values.securesignOperand.enabled }}
+# ADR-0535/WP-110: the Securesign operand - Fulcio (CA), Rekor
+# (transparency log), CTLog, Trillian (Merkle-tree store) and TUF (trust
+# root distribution). Spec shape confirmed live against
+# rhtas-operator.v1.4.3's CRD (`oc explain securesign.spec...`,
+# 2026-09-02) before authoring, per this repo's standing WP convention.
+#
+# - trillian.database.create: false + databaseSecretRef - ADR-0535's
+#   Design decision: the dedicated `trillian` database on the shared Day 1
+#   MariaDB operand (gitops/charts/mariadb), not the operator's own
+#   self-managed MySQL. The connection Secret is rendered by
+#   templates/externalsecret-trillian-db.yaml.
+# - fulcio.config.OIDCIssuers: the zuno-signer Keycloak client
+#   (client-credentials service account, ADR-0530 reconcile path). Type
+#   "email": the client hardcodes email/email_verified claims via protocol
+#   mappers because the auto-created service-account user has no email.
+# - fulcio.trustedCA: the Keycloak route is served by a Vault-PKI-issued
+#   cert (root CN=zuno-demo.internal, ADR-0347's finding) that Fulcio's
+#   issuer discovery would otherwise reject. The ConfigMap is created at
+#   Ansible run time (cluster-specific data, same reasoning as
+#   ansible/roles/openshift_oauth) by ansible/roles/rhtas/tasks/install.yml.
+# - tsa is omitted: cosign keyless sign/verify needs Fulcio+Rekor+CTLog+
+#   TUF only; a timestamp authority is additive and out of WP-110's scope.
+#   tuf.keys therefore lists only the three managed keys - the operator's
+#   default list would include tsa.certchain.pem and wait for a TSA that
+#   never comes.
+apiVersion: rhtas.redhat.com/v1alpha1
+kind: Securesign
+metadata:
+  name: zuno-securesign
+  namespace: {{ .Values.securesignOperand.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    app.kubernetes.io/part-of: trusted-artifact-signer
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  fulcio:
+    certificate:
+      commonName: {{ .Values.fulcio.certificate.commonName | quote }}
+      organizationName: {{ .Values.fulcio.certificate.organizationName | quote }}
+      organizationEmail: {{ .Values.fulcio.certificate.organizationEmail | quote }}
+    config:
+      OIDCIssuers:
+        - ClientID: {{ .Values.fulcio.oidc.clientId | quote }}
+          Issuer: {{ .Values.fulcio.oidc.issuerUrl | quote }}
+          IssuerURL: {{ .Values.fulcio.oidc.issuerUrl | quote }}
+          Type: email
+    trustedCA:
+      name: {{ .Values.fulcio.trustedCAConfigMapName | quote }}
+    externalAccess:
+      enabled: true
+    monitoring:
+      enabled: false
+  rekor:
+    externalAccess:
+      enabled: true
+    monitoring:
+      enabled: false
+  ctlog:
+    monitoring:
+      enabled: false
+  trillian:
+    database:
+      create: false
+      provider: mysql
+      databaseSecretRef:
+        name: rhtas-trillian-db
+    server:
+      replicas: 1
+    signer:
+      replicas: 1
+  tuf:
+    externalAccess:
+      enabled: true
+    keys:
+      - name: rekor.pub
+      - name: ctfe.pub
+      - name: fulcio_v1.crt.pem
+    pvc:
+      accessModes:
+        - ReadWriteOnce
+      retain: true
+      size: 100Mi
+{{- end }}

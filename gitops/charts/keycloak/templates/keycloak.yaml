@@ -185,6 +185,16 @@ spec:
                     items:
                       - key: client_secret
                         path: zuno_admin__api__client__secret
+                - secret:
+                    # ADR-0535/WP-110: zuno-signer, RHTAS Fulcio's OIDC
+                    # signing identity. Same underscore-escaping rule as
+                    # zuno-admin-api above: ${vault.signer_client_secret}
+                    # resolves to file zuno_signer__client__secret.
+                    name: zuno-signer-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_signer__client__secret
         containers:
           - name: keycloak
             securityContext:

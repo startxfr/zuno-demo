@@ -4,6 +4,35 @@
 # `helm template`/`helm lint` render nothing.
 securesignOperand:
   enabled: false
+  namespace: zuno-rhtas
+
+# The Securesign CR's Fulcio configuration. issuerUrl carries the
+# apps.mycluster.example.com placeholder, substituted at apply time by
+# ansible/tasks/apply_gitops_app.yml (same mechanism every other
+# domain-bearing Application here uses) - it must match the `iss` claim of
+# the tokens Keycloak actually issues (the EXTERNAL route URL, not the
+# in-cluster Service URL). trustedCAConfigMapName is created at Ansible
+# run time from the live Keycloak Ingress's TLS secret (see
+# ansible/roles/rhtas/tasks/install.yml).
+fulcio:
+  certificate:
+    commonName: fulcio.zuno-demo.internal
+    organizationName: Zuno Demo
+    organizationEmail: zuno-signer@zuno-demo.internal
+  oidc:
+    clientId: zuno-signer
+    issuerUrl: https://keycloak.apps.mycluster.example.com/realms/zuno
+  trustedCAConfigMapName: rhtas-keycloak-ca
+
+# Connection details for Trillian's dedicated database on the shared Day 1
+# MariaDB operand (gitops/charts/mariadb's rhtasTrillianDatabase - name/
+# owner/vaultPath must stay in step with that block).
+trillianDatabase:
+  host: mariadb.zuno-data.svc.cluster.local
+  port: "3306"
+  user: trillian
+  database: trillian
+  vaultPath: rhtas/trillian-mysql
 
 # subscription.name/operator.name/operator.channel/operator.source.name are
 # all discovered at run time by ansible/roles/rhtas/tasks/install.yml and

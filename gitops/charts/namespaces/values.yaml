@@ -87,6 +87,10 @@ platformNamespaces:
       - redhat-ods-applications
       - zuno-ai-build
       - zuno-mlops
+      # ADR-0535/WP-110: RHTAS Trillian's log-server/log-signer reach
+      # their dedicated trillian database on the shared MariaDB (see
+      # gitops/charts/mariadb/templates/database-rhtas-trillian.yaml).
+      - zuno-rhtas
     # mariadb-operator's admission webhook (vmariadb-v1alpha1.kb.io etc.)
     # lives here and is called synchronously by the API server on every
     # MariaDB/Grant/User write - without this, the webhook call times out

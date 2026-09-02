@@ -1635,6 +1635,55 @@
             ],
             "secret": "${vault.admin_api_client_secret}",
             "clientAuthenticatorType": "client-secret"
+        },
+        {
+            "clientId": "zuno-signer",
+            "name": "RHTAS Fulcio signing identity (ADR-0535/WP-110)",
+            "description": "Confidential client-credentials client whose service-account token is the OIDC identity Fulcio issues short-lived signing certificates against (RHTAS keyless signing, WP-110/WP-111). Not a login client. No realm-management roles - Fulcio only consumes the token, never the Admin API. The email/email_verified claims are hardcoded protocol mappers because Fulcio's email issuer type requires them and the auto-created service-account user has no email of its own.",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "standardFlowEnabled": false,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": true,
+            "redirectUris": [],
+            "webOrigins": [],
+            "defaultClientScopes": [
+                "basic"
+            ],
+            "protocolMappers": [
+                {
+                    "name": "zuno-signer-email",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-hardcoded-claim-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "claim.name": "email",
+                        "claim.value": "zuno-signer@zuno-demo.internal",
+                        "jsonType.label": "String",
+                        "access.token.claim": "true",
+                        "id.token.claim": "true",
+                        "userinfo.token.claim": "false"
+                    }
+                },
+                {
+                    "name": "zuno-signer-email-verified",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-hardcoded-claim-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "claim.name": "email_verified",
+                        "claim.value": "true",
+                        "jsonType.label": "boolean",
+                        "access.token.claim": "true",
+                        "id.token.claim": "true",
+                        "userinfo.token.claim": "false"
+                    }
+                }
+            ],
+            "secret": "${vault.signer_client_secret}",
+            "clientAuthenticatorType": "client-secret"
         }
     ],
     "identityProviders": [{

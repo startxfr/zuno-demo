@@ -1,0 +1,39 @@
+---
+# The Securesign operand (Fulcio/Rekor/CTLog/Trillian/TUF) in zuno-rhtas.
+# Separate from application-d0.yaml (the operator Subscription) so the
+# operand only syncs once the operator's CRDs exist - same two-Application
+# split as mariadb/aap/lightspeed. The fulcio.oidc.issuerUrl below carries
+# the apps.mycluster.example.com placeholder; ansible/tasks/
+# apply_gitops_app.yml substitutes the real cluster domain at apply time.
+# ADR-0535/WP-110.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-rhtas-d1
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-89"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/rhtas
+    helm:
+      releaseName: zuno-rhtas-d1
+      values: |
+        securesignOperand:
+          enabled: true
+        fulcio:
+          oidc:
+            issuerUrl: https://keycloak.apps.mycluster.example.com/realms/zuno
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-rhtas
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

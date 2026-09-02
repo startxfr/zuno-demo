@@ -1,11 +1,18 @@
 ---
-# State detection (never fails). d1 (Securesign operand) not yet covered -
-# WP-110's operand steps are added to install.yml/precheck.yml in a
-# follow-up commit once the CRD schema is inspected live.
+# State detection (never fails).
 - name: "rhtas | check the rhtas Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   vars:
     gitops_app_name: "zuno-rhtas-d0"
+
+- name: "rhtas | save the d0 check result"
+  ansible.builtin.set_fact:
+    _rhtas_d0_installed: "{{ _state_check_result }}"
+
+- name: "rhtas | check the rhtas Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-rhtas-d1"
 
 - name: "rhtas | look up the rhtas-operator controller-manager"
   kubernetes.core.k8s_info:
@@ -15,14 +22,27 @@
     name: rhtas-operator-controller-manager
   register: _rhtas_operator_deployment_lookup
 
+- name: "rhtas | look up the zuno-securesign Securesign CR"
+  kubernetes.core.k8s_info:
+    api_version: rhtas.redhat.com/v1alpha1
+    kind: Securesign
+    namespace: zuno-rhtas
+    name: zuno-securesign
+  register: _rhtas_securesign_lookup
+
 - name: "rhtas | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-
       {{
-        _state_check_result
+        _rhtas_d0_installed
+        and _state_check_result
         and (_rhtas_operator_deployment_lookup.resources | default([]) | length) > 0
         and (_rhtas_operator_deployment_lookup.resources[0].status.conditions | default([])
              | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list
+             | first | default('False')) == 'True'
+        and (_rhtas_securesign_lookup.resources | default([]) | length) > 0
+        and (_rhtas_securesign_lookup.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
              | first | default('False')) == 'True'
       }}
 
