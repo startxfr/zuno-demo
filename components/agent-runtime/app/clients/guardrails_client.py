@@ -30,6 +30,8 @@ from typing import Any, Dict, List, Optional, Set
 
 import httpx
 
+from ..telemetry import record_guardrails_evaluation
+
 logger = logging.getLogger("agent_runtime.guardrails")
 
 # Empty URL = feature off (the chart leaves it unset until trustyai-config
@@ -90,6 +92,7 @@ async def _evaluate(
             "guardrails evaluation unavailable (observe-only, response unaffected): "
             "run_id=%s agent=%s: %s", run_id, agent, exc,
         )
+        record_guardrails_evaluation(agent, "unavailable")
         return
 
     detections = [
@@ -107,11 +110,15 @@ async def _evaluate(
             "run_id=%s agent=%s project_id=%s detections=%s tools=%s retrieved_docs=%d",
             run_id, agent, project_id or "", detections, tool_names, retrieved_doc_count,
         )
+        record_guardrails_evaluation(
+            agent, "detected", [str(d.get("detection")) for d in detections]
+        )
     else:
         logger.info(
             "guardrails clean: run_id=%s agent=%s contents=%d tools=%s retrieved_docs=%d",
             run_id, agent, len(contents), tool_names, retrieved_doc_count,
         )
+        record_guardrails_evaluation(agent, "clean")
 
 
 def observe_exchange(

@@ -9,6 +9,11 @@ span helper (graph_run_span, WP-24) around the LangGraph workflow itself -
 ADR-0205's acceptance bullet "traces show whether a response used indexed
 knowledge, live verification, or both" needs a span attribute the
 non-streaming chat handler can set once the graph run completes.
+
+ADR-0534/WP-113 adds this service's ONE metrics concern: guardrails
+observation counters. Model-call metrics stay in ai-gateway per the split
+above; the observe-only guardrails hook (app/clients/guardrails_client.py)
+is agent-runtime's own boundary, so its counters live here.
 """
 from __future__ import annotations
 
@@ -16,10 +21,13 @@ import logging
 import os
 import time
 from contextlib import contextmanager
-from typing import Iterator, Optional
+from typing import Iterable, Iterator, Optional
 
-from opentelemetry import trace
+from opentelemetry import metrics, trace
+from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -32,10 +40,12 @@ OTEL_ENDPOINT = os.getenv(
 )
 
 _tracer: Optional[trace.Tracer] = None
+_guardrails_eval_counter = None
+_guardrails_detection_counter = None
 
 
 def init_telemetry(service_name: str = "agent-runtime") -> None:
-    global _tracer
+    global _tracer, _guardrails_eval_counter, _guardrails_detection_counter
 
     resource = Resource.create({"service.name": service_name})
 
@@ -46,7 +56,47 @@ def init_telemetry(service_name: str = "agent-runtime") -> None:
     trace.set_tracer_provider(tracer_provider)
     _tracer = trace.get_tracer(service_name)
 
+    meter_provider = MeterProvider(
+        resource=resource,
+        metric_readers=[
+            PeriodicExportingMetricReader(
+                OTLPMetricExporter(endpoint=f"{OTEL_ENDPOINT}/v1/metrics")
+            )
+        ],
+    )
+    metrics.set_meter_provider(meter_provider)
+    meter = metrics.get_meter(service_name)
+    _guardrails_eval_counter = meter.create_counter(
+        "zuno.guardrails_evaluations",
+        description="Observe-only guardrails evaluations of agent exchanges, "
+        "by agent and outcome (clean/detected/unavailable) - ADR-0534/WP-113",
+    )
+    _guardrails_detection_counter = meter.create_counter(
+        "zuno.guardrails_detections",
+        description="Individual guardrails detections (observe-only, response "
+        "never altered), by agent and detection name - ADR-0534/WP-113",
+    )
+
     logger.info("telemetry initialized: service=%s otlp_endpoint=%s", service_name, OTEL_ENDPOINT)
+
+
+def record_guardrails_evaluation(
+    agent: str, outcome: str, detections: Iterable[str] = ()
+) -> None:
+    """`outcome` is one of "clean", "detected", "unavailable"; `detections`
+    the detection names of a "detected" outcome ("email_address",
+    "custom-regex", ...) - a bounded set, the detector's own vocabulary.
+    Never raises: the observe-only contract extends to its own metrics."""
+    try:
+        if _guardrails_eval_counter is not None:
+            _guardrails_eval_counter.add(1, {"agent": agent, "outcome": outcome})
+        if _guardrails_detection_counter is not None:
+            for name in detections:
+                _guardrails_detection_counter.add(
+                    1, {"agent": agent, "detection": name or "unknown"}
+                )
+    except Exception:  # noqa: BLE001 - metrics must never affect a response
+        logger.debug("guardrails metric recording failed", exc_info=True)
 
 
 class GraphRunRecorder:
