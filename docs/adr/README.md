@@ -38,6 +38,15 @@ moves from `Proposed` to `Accepted` - its three implementing phases now have con
 and [versions.md](../roadmap/versions.md)'s v0.7 band). None of the three has started execution
 yet. Numbering and `Target` (v0.7) are unchanged; only `Status` moves.
 
+**Retargeting note (2026-09-02):** ADR-0352 (v0.7 -> v0.9) - the day-0
+internal/external-mode tiering effort is still `Proposed` and not yet
+started (no work package exists for it). It leaves v0.7's long-term/harder
+band, whose remaining occupants (ADR-0111, ADR-0115, the OKF v0.2/v0.3
+chain) stay blocked on the external GitHub-billing/Quay-cutover decision
+and the `zuno-okf` repository provisioning respectively - neither of which
+touches ADR-0352. It joins ADR-0307/ADR-0410/ADR-0535 in v0.9. Numbering is
+unchanged; only `Target` moves.
+
 ## version 0
 
 | ADR | Target | Status | Decision |
@@ -265,7 +274,7 @@ Also carried in v0.7, as a separate large-scope effort unrelated to the GitHub-A
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
-| [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.7 | Proposed | Run day-0 platform services in internal or external mode |
+| [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.9 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | v0.7 | Accepted | Integrate TrustyAI for AI evaluation and guardrails |
 | [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | v0.7 | Proposed | Extract OKF content into a standalone zuno-okf repository |
 | [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | v0.7 | Proposed | Consume the zuno-okf repository through a single pinned reference |
