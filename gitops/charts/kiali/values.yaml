@@ -57,4 +57,11 @@ kiali:
   enabled: false
 
 meshNamespace: zuno-mesh
-appsDomain: apps.demo222.startx.fr
+# ADR-0517 B2 (WP-118 step 1b, 2026-09-02): a substitution token, not a
+# real hostname. It used to hardcode apps.demo222.startx.fr, which made
+# this chart undeployable on any other cluster. The live value is pinned
+# at the Application level (gitops/apps/<c>/application-d1.yaml) and
+# rewritten by ansible/tasks/apply_gitops_app.yml, so this default only
+# ever renders if that substitution did not happen - which is meant to
+# fail visibly rather than silently deploy another cluster's hostname.
+appsDomain: apps.mycluster.example.com

@@ -132,8 +132,8 @@ evaluations:
 # ansible/roles/agents/tasks/run_acceptance_gate.yml already uses to put
 # it in zuno-ai-run) rather than invented here.
 acceptanceGate:
-  keycloakUrl: "https://keycloak.apps.demo222.startx.fr"
-  frontendUrl: "https://comage.apps.demo222.startx.fr"
+  keycloakUrl: "https://keycloak.apps.mycluster.example.com"
+  frontendUrl: "https://comage.apps.mycluster.example.com"
   credentialsSecretName: acceptance-gate-credentials
   # Holds ca.crt only. Mirrored from openshift-config/keycloak-serving-ca
   # by ansible/roles/mlops/tasks/install.yml - the chart cannot know a

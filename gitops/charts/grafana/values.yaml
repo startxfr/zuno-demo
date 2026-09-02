@@ -67,11 +67,18 @@ grafana:
 
 monitoringNamespace: zuno-monitoring
 
-# ADR-0517: builds the Jaeger UI trace-link URLs in
-# templates/dashboard-run-trace.yaml - same hardcoded-per-chart convention
-# gitops/charts/kiali/values.yaml and gitops/charts/tempo/values.yaml
-# already use for their own Route hosts, rather than a shared/global value.
-appsDomain: apps.demo222.startx.fr
+# Builds the Jaeger UI trace-link URLs in
+# templates/dashboard-run-trace.yaml. Each chart carries its own copy rather
+# than a shared/global value; kiali and tempo do the same for their Route
+# hosts. That is a duplication, not a licence to hardcode - see below.
+# ADR-0517 B2 (WP-118 step 1b, 2026-09-02): a substitution token, not a
+# real hostname. It used to hardcode apps.demo222.startx.fr, which made
+# this chart undeployable on any other cluster. The live value is pinned
+# at the Application level (gitops/apps/<c>/application-d1.yaml) and
+# rewritten by ansible/tasks/apply_gitops_app.yml, so this default only
+# ever renders if that substitution did not happen - which is meant to
+# fail visibly rather than silently deploy another cluster's hostname.
+appsDomain: apps.mycluster.example.com
 
 # Backs spec.persistentVolumeClaim in templates/grafana.yaml - without this,
 # Grafana's SQLite state (datasources, dashboards, admin user) lives in the

@@ -58,7 +58,7 @@ quotaEnforcement:
     enabled: false
   routeName: tekos-quota-demo
   routeNamespace: zuno-ai-run
-  demoHostname: tekos-quota-demo.apps.demo222.startx.fr
+  demoHostname: tekos-quota-demo.apps.mycluster.example.com
   demoBackendService: tekos-frontend
   demoBackendPort: 8080
   # jwksUrl, not issuerUrl (OIDC discovery) - Authorino runs in-cluster and
