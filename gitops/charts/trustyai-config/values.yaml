@@ -42,7 +42,14 @@ namespace: zuno-ai-run
 # diskpressure-master-cascades-into-mesh memory, and commit 6c55a5b7).
 # Turn it on when someone is watching node disk, not incidentally.
 kueue:
-  queueName: ""
+  # Flipped on 2026-09-03 as a deliberate, measured action (WP-117 live
+  # verification), not as part of the feature commit: nodefs was 60-68% on
+  # the masters with ~31 GiB free, DiskPressure False on all six nodes, and
+  # both garak Jobs share ONE image digest, so the worst case was a single
+  # 4.22 GiB pull per node rather than three. Reverting is setting this
+  # back to "" - and doing that costs another Replace cycle, so revert for
+  # a real reason, not for tidiness.
+  queueName: default
 
 # WP-108: standalone built-in guardrails detectors (no orchestrator, no
 # InferenceService wiring - see templates/guardrailsorchestrator.yaml).
