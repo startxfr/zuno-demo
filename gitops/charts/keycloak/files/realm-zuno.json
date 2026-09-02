@@ -1639,7 +1639,7 @@
         {
             "clientId": "zuno-signer",
             "name": "RHTAS Fulcio signing identity (ADR-0535/WP-110)",
-            "description": "Confidential client-credentials client whose service-account token is the OIDC identity Fulcio issues short-lived signing certificates against (RHTAS keyless signing, WP-110/WP-111). Not a login client. No realm-management roles - Fulcio only consumes the token, never the Admin API. The email/email_verified claims are hardcoded protocol mappers because Fulcio's email issuer type requires them and the auto-created service-account user has no email of its own.",
+            "description": "Client-credentials client whose service-account token is the OIDC identity Fulcio signs against (RHTAS keyless, WP-110/WP-111). Not a login client, no realm-management roles. email claims are hardcoded mappers - see ADR-0535.",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,
