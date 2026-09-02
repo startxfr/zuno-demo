@@ -989,29 +989,25 @@
     zuno_gitlab_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-# ADR-0204/ADR-0105 (WP-22): source credentials for the knowledge.sales
-# ingestion adapter (gitops/charts/rag-ingestion's
-# domains.sales.salesforce ExternalSecret). Property names
-# (instance_url/token) match that ExternalSecret's remoteRef properties.
-# Operator-supplied in ansible/confidential.yml; skipped while
-# placeholders remain - the domain ships enabled: false until then.
-# ADR-0218 (2026-08-26): the companion Aramis seed (zuno/aramis/technical)
-# was removed with the fetch-aramis adapter; the Salesforce batch cadence
-# is deferred to v0.7 but its credential path stays here.
-- name: "vault | seed the Salesforce technical credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/salesforce/technical
-      instance_url={{ zuno_salesforce_instance_url | quote }}
-      token={{ zuno_salesforce_token | quote }}
-      enabled={{ (zuno_salesforce_enabled | default(false)) | quote }}"
-  when: >-
-    zuno_salesforce_instance_url | default('xxxxxx') != 'xxxxxx'
-    and zuno_salesforce_token | default('xxxxxx') != 'xxxxxx'
-  no_log: true
+# ADR-0204/ADR-0105 (WP-22): the knowledge.sales ingestion adapter
+# (gitops/charts/rag-ingestion's domains.sales.salesforce ExternalSecret)
+# reads this same zuno/salesforce/technical path - it does NOT get a seed
+# task of its own.
+#
+# It used to. A second task here wrote instance_url/token to this path while
+# the task above writes url/access_token, and `vault kv put` REPLACES the
+# whole secret rather than merging, so the two could never coexist. It stayed
+# harmless only because its variables (zuno_salesforce_instance_url /
+# zuno_salesforce_token) were never documented in confidential.example.yml,
+# so its guard never passed and it never ran. Documenting them - the obvious
+# reading of WP-118's B7 - would have started it and wiped the url/
+# access_token keys that mcp-salesforce serves Comage from today.
+#
+# Removed 2026-09-02 (WP-118 step 4). url/access_token is the canonical
+# schema; rag-ingestion's values.yaml now points its instanceUrlProperty/
+# tokenProperty at it, keeping its own SALESFORCE_INSTANCE_URL/
+# SALESFORCE_TOKEN env names. ADR-0218 defers the Salesforce batch cadence to
+# v0.7 and the domain ships enabled: false, so nothing consumes it yet.
 
 # ADR-0201 (WP-27): the ai-gateway MaaS adapter's programmatic-client API
 # key (components/ai-gateway/app/maas_adapter.py,

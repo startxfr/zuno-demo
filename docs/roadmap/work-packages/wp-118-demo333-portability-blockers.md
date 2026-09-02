@@ -1,8 +1,10 @@
 # WP-118: Close the demo333 portability blockers recorded in ADR-0517
 
-- **State:** Not started (2026-09-02) — the nine blockers are enumerated in ADR-0517's
-  *Known blockers* section from a static audit; none is fixed. No `demo333` cluster
-  exists, so this WP is entirely repo-side and can land before one is provisioned.
+- **State:** Repo work merged (step 4 of 5, 2026-09-02 — B7 and B8 closed; steps 1, 2,
+  3 and 5 not started). Step 4 also corrected ADR-0517's own B7 row, which described
+  the defect wrongly in a way that would have caused an outage if acted on. No
+  `demo333` cluster exists; every remaining step is repo-side and can land before one
+  is provisioned.
 - **ADRs:** ADR-0517 (Proposed, v0.8)
 - **Depends on:** nothing. Blocked by nothing — the ADR-0517 run itself is blocked on
   an operator provisioning `demo333`, but every blocker below is fixable without it.
@@ -80,15 +82,41 @@ existing `gitops_app_extra_helm_values` — including **both** blocks in postgre
 `restore.yml`, or the restore path silently reverts it. The Route53 facts are operator
 configuration and belong in `ansible/confidential.yml`.
 
-### Step 4 — undocumented prerequisites (B7, B8)
+### Step 4 — undocumented prerequisites (B7, B8) — **DONE 2026-09-02**
 
-`ansible/roles/vault/tasks/install.yml:998-1003` reads `zuno_salesforce_instance_url` /
-`zuno_salesforce_token` while `confidential.example.yml:81-82` supplies
-`zuno_salesforce_url` / `zuno_salesforce_access_token`, so the
-`zuno/salesforce/technical` seed silently never runs — the `!= 'xxxxxx'` guard sees an
-undefined variable and skips without error. And `install.yml:1061-1065` reads MariaDB
-backup S3 keys that appear nowhere in the example file. Both are pure documentation and
-naming fixes, and both affect `demo222` today, not only a future `demo333`.
+The audit's description of B7 was wrong, and following it would have caused an
+outage. `ansible/roles/vault/tasks/install.yml` held **two identically-named tasks**
+writing `zuno/salesforce/technical`: one at l.940 with keys `url`/`access_token`,
+reading the documented variables and running fine; one at l.1001 with keys
+`instance_url`/`token`, reading undocumented variables and therefore inert. Because
+`vault kv put` replaces rather than merges, documenting the missing variables would
+have started the dead task and wiped the keys `mcp-salesforce` serves Comage from.
+The two consumers disagreed: `gitops/charts/mcp-salesforce` (live) expects
+`url`/`access_token`; `rag-ingestion`'s `domains.sales` (`enabled: false`, deferred to
+v0.7 by ADR-0218) expected `instance_url`/`token`.
+
+Resolved by making `url`/`access_token` the single canonical schema: the duplicate seed
+task is gone, and `gitops/charts/rag-ingestion/values.yaml`'s `instanceUrlProperty` /
+`tokenProperty` now point at it. The ExternalSecret template was already parameterised
+on those two values, so it did not change, and the `SALESFORCE_INSTANCE_URL` /
+`SALESFORCE_TOKEN` env names are preserved — `components/rag-ingestion` is untouched.
+Nothing needed re-running live: Vault already holds the right keys.
+
+B8 was understated rather than wrong. All **five** `zuno_mariadb_backup_s3_*` variables
+are undocumented (`ansible/roles/mariadb/tasks/install.yml:98-104`), not just the two
+secrets, and none is present in the live `confidential.yml` — so `backups.s3.enabled`
+is false, the ExternalSecret is never rendered, and **no MariaDB backup schedule
+exists**. Documented as a full block in `confidential.example.yml`, next to the
+PostgreSQL repo2 family, naming both traps that family does not share: the
+`_access_key_id`/`_secret_access_key` variable suffixes, and the camelCase Vault
+properties. `mariadb/s3` was deliberately **not** added to the expected-paths loop at
+`install.yml:1167` — the placeholder writer after it would stamp `_placeholder=true`,
+and the five sibling S3 paths are absent from it for the same reason.
+
+Also corrected in the same pass: `ansible/roles/mariadb/README.md`'s claim that a
+`make d0 install vault` re-run rotates every generated secret. True when written
+2026-08-12, false since ADR-0345 added `ansible/tasks/vault_seed_if_missing.yml` the
+next day. The stale paragraph discouraged a now-safe operation.
 
 ### Step 5 — RHOAI InstallPlan drift (B9)
 

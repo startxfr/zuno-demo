@@ -75,9 +75,19 @@ The blockers are exactly the places that bypass that mechanism:
 | B4 | `demoHostname` frozen | `gitops/charts/connectivity-link/values.yaml:61` | Kuadrant quota-demo Route on a hostname that does not exist |
 | B5 | Four `gp3-csi` StorageClass defaults | `models/values.yaml:296`, `postgresql/values.yaml:71`, `mariadb/values.yaml:105`, `grafana/values.yaml:85` | Breaks if `demo333` is not AWS or names its default class differently; PVC `storageClassName` is immutable once bound |
 | B6 | Route53 `hostedZoneID: Z3HY376RT1N9S1`, `region: eu-west-3`, ACME contact email | `gitops/charts/cert-manager/values.yaml:41,54,55` | ACME DNS-01 cannot solve if `demo333` sits under a different parent DNS zone |
-| B7 | The vault role reads `zuno_salesforce_instance_url` / `zuno_salesforce_token`; `confidential.example.yml:81-82` supplies `zuno_salesforce_url` / `zuno_salesforce_access_token` | `ansible/roles/vault/tasks/install.yml:998-1003` | The `zuno/salesforce/technical` seed **silently never runs** — the `!= 'xxxxxx'` guard sees an undefined variable, so there is no error, just an unpopulated Vault path |
-| B8 | `zuno_mariadb_backup_s3_access_key_id` / `_secret_access_key` are read but appear nowhere in `confidential.example.yml` | `ansible/roles/vault/tasks/install.yml:1061-1065` | Undocumented prerequisite; a fresh install has no way to know the keys exist |
+| B7 | Two identically-named tasks wrote `zuno/salesforce/technical` with competing key schemas: `url`/`access_token` (l.940, live) and `instance_url`/`token` (l.1001, inert because its variables were never documented) | `ansible/roles/vault/tasks/install.yml:1001-1014` | `vault kv put` replaces rather than merges, so only one schema can exist. Documenting the missing variables — the obvious fix — would have started the dead task and wiped the keys `mcp-salesforce` serves Comage from |
+| B8 | All five `zuno_mariadb_backup_s3_{bucket,endpoint,region,access_key_id,secret_access_key}` are read but appear nowhere in `confidential.example.yml` | `ansible/roles/mariadb/tasks/install.yml:98-104`, `ansible/roles/vault/tasks/install.yml:1064-1076` | Undocumented prerequisite, and not merely cosmetic: with them unset `backups.s3.enabled` stays false, the ExternalSecret is never rendered, and **no MariaDB backup schedule exists at all** |
 | B9 | Drifted RHOAI InstallPlan — the only `auto_fix: "manual only"` on the install path | `ansible/roles/openshift_ai/tasks/install.yml:90` | Most likely blocker of all: a new cluster's catalog publishes a newer CSV than the pinned `startingCSV`, and reconcile refuses to approve drifted InstallPlans |
+
+B7 and B8 were closed by WP-118 step 4 on 2026-09-02, and both rows above were
+rewritten that day. The audit had described B7 as a variable-name mismatch that
+made the Salesforce seed "silently never run"; acting on it would have been
+actively harmful. The seed does run — a *duplicate* task was dead, and the
+enumerated fix (documenting its variables) would have made it run and clobber a
+live consumer. B8's effect was understated: it is not only an undocumented
+prerequisite, it is why this cluster has no MariaDB backup schedule. A static
+audit reads intent, not behaviour; both corrections came from tracing the
+consumers rather than re-reading the producer.
 
 Delivery constraint for B1–B6, which must be respected whenever they are
 fixed: every `gitops/apps/*/application-*.yaml` points at

@@ -96,15 +96,30 @@ which only runs via `make d0 install vault` (or `all`) - a targeted
 `make d0 install mariadb` on a cluster where `vault` hasn't been re-run
 since this component was added will hang retrying
 `gitops | wait for zuno-mariadb-d1 to become Synced and Healthy` forever,
-because the `mariadb-root-password` `ExternalSecret` can never sync. Note
-that **`vault`'s per-secret password generation is not idempotent**
-(`lookup('ansible.builtin.password', '/dev/null', ...)` can't persist/read
-back a prior value), so a full `make d0 install vault` re-run regenerates
-*every* secret it seeds, not just this component's - risky against a
-cluster with other components already relying on their current values. To
-seed just the new path without touching anything else, run a scoped
-`vault kv put zuno/mariadb/root password=<random>` directly against the
-`zuno-vault-0` pod instead.
+because the `mariadb-root-password` `ExternalSecret` can never sync. The fix
+is simply to re-run `make d0 install vault`.
+
+**Corrected 2026-09-02 (WP-118 step 4).** This paragraph used to say the
+opposite - that `vault`'s per-secret password generation is not idempotent
+(`lookup('ansible.builtin.password', '/dev/null', ...)` can't read back a
+prior value), so a re-run regenerates *every* secret it seeds, and that you
+should therefore `vault kv put` the single path by hand instead. That was
+true when written on 2026-08-12, and stopped being true the next day:
+ADR-0345 introduced `ansible/tasks/vault_seed_if_missing.yml`, a check-first
+guard that all 44 generated Vault paths now go through, after an unguarded
+re-run rotated `zuno/maas/postgresql-app` and CrashLoopBackOff'd `maas-api`
+live. A re-run now writes only the paths that are *missing*, which makes it
+the correct way to add a newly-introduced one. The stale warning survived a
+year of re-reads and actively discouraged a safe operation.
+
+Real residual risks of a `make d0 install vault` re-run, which are not about
+secret rotation: `ansible/roles/vault/tasks/install.yml:335-341` runs
+`git add` + `git commit` in the operator's working tree when the live Transit
+public key differs from `agents/zuno-platform-signer.pub` - on a repository
+several sessions share, that is the one to watch. It also deletes and
+recreates the `vault-unseal-configure` Job on every run (idempotent, but it
+re-runs the whole PKI/policy configuration), and hard-fails if
+`ansible/confidential.yml` is absent.
 
 Separately: if ArgoCD's automated sync already exhausted its retry
 budget (5 attempts), a plain `argocd.argoproj.io/refresh=hard`

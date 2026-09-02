@@ -56,6 +56,29 @@ zuno_postgresql_backup_s3_region: "xxxxxx"
 zuno_postgresql_backup_s3_access_key: "xxxxxx"
 zuno_postgresql_backup_s3_secret_key: "xxxxxx"
 
+# --- MariaDB PhysicalBackup, S3 storage (WP-118 B7/B8) ---------------------
+# Optional, same shape as the PostgreSQL repo2 above: MariaDB has no local
+# backup repo, so leaving these as placeholders means backups.s3.enabled stays
+# false, the ExternalSecret is never rendered, and NO MariaDB backup schedule
+# exists at all. Enabled automatically once all five are real.
+#   1. Create/reuse a bucket on your S3-compatible provider.
+#   2. Create an access key/secret key pair scoped to that bucket - a
+#      dedicated, bucket-scoped IAM user, never the account's admin keys.
+#   3. zuno_mariadb_backup_s3_endpoint is the S3 API endpoint host.
+# Two naming traps this family does NOT share with the PostgreSQL block above:
+# the variable suffixes are _access_key_id/_secret_access_key (not
+# _access_key/_secret_key), and the Vault properties are camelCase
+# accessKeyId/secretAccessKey (not snake_case) - see
+# gitops/charts/mariadb/templates/externalsecret-backup-s3.yaml, which is what
+# consumes them, and ansible/roles/mariadb/README.md for the full mapping.
+# Undocumented here until 2026-09-02, which is why this cluster has been
+# running with MariaDB backups silently off.
+zuno_mariadb_backup_s3_bucket: "xxxxxx"
+zuno_mariadb_backup_s3_endpoint: "xxxxxx"
+zuno_mariadb_backup_s3_region: "xxxxxx"
+zuno_mariadb_backup_s3_access_key_id: "xxxxxx"
+zuno_mariadb_backup_s3_secret_access_key: "xxxxxx"
+
 # --- Quay.io registry (stored in Vault for future cluster-side use, e.g. an
 # image pull secret; NOT the same credential ADR-0115's build-publish.yml CI
 # workflow uses - that one is QUAY_USERNAME/QUAY_PASSWORD as a GitHub Actions

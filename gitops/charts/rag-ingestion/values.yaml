@@ -1515,12 +1515,20 @@ domains:
         passwordProperty: password
     salesforce:
       # Operator-supplied: instance URL + token at Vault zuno/salesforce/technical
-      # ({instance_url, token}), consumed via the ExternalSecret below.
+      # ({url, access_token, enabled}), consumed via the ExternalSecret below.
+      #
+      # WP-118 step 4 (2026-09-02): these two properties used to read
+      # {instance_url, token}, a second key schema that a now-deleted seed task
+      # in ansible/roles/vault wrote to the same path. `vault kv put` replaces
+      # rather than merges, so only one schema can ever exist there, and the
+      # live one is url/access_token - what mcp-salesforce serves Comage from.
+      # The secretKey names below stay SALESFORCE_INSTANCE_URL/SALESFORCE_TOKEN,
+      # so components/rag-ingestion reads the same env vars as before.
       secretName: rag-salesforce
       externalSecret:
         remoteKey: "salesforce/technical"
-        instanceUrlProperty: instance_url
-        tokenProperty: token
+        instanceUrlProperty: url
+        tokenProperty: access_token
       # One entry per queried object; fields render in this order into the
       # indexed text. dealType/statusField feed ADR-0202's sales metadata
       # extensions. requiredGroups -> acl_groups, same as confluence[].
