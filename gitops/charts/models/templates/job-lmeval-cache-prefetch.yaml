@@ -40,6 +40,12 @@ metadata:
     app.kubernetes.io/component: model-quality-gate
   annotations:
     argocd.argoproj.io/sync-wave: "-15"
+    # WP-109: Job specs are immutable - any template change to an
+    # already-completed prefetch Job (e.g. the per-job s3ModelName
+    # generalization) hard-fails a plain apply. Replace recreates it, and
+    # re-running a prefetch is idempotent by construction (it only
+    # re-downloads the same files into the same PVC paths).
+    argocd.argoproj.io/sync-options: Replace=true,Force=true
 spec:
   backoffLimit: 2
   activeDeadlineSeconds: 600

@@ -11,8 +11,13 @@ ArgoCD applies the PVC before the Job (kind ordering), the Job's pod
 schedules, the PVC binds, and the wave turns healthy.
 */ -}}
 {{- if .Values.lmEval.enabled }}
+{{- /* WP-109: several jobs now share one datasetCachePvc - dedupe so the
+PVC renders exactly once per distinct claim name (rendering it per job
+made ArgoCD flag RepeatedResourceWarning and diff nondeterministically). */ -}}
+{{- $seen := dict }}
 {{- range .Values.lmEval.jobs }}
-{{- if .datasetCachePvc }}
+{{- if and .datasetCachePvc (not (hasKey $seen .datasetCachePvc)) }}
+{{- $_ := set $seen .datasetCachePvc true }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
