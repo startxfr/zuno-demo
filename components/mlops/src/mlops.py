@@ -97,6 +97,11 @@ os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", _CUBLAS_DETERMINISTIC_WORKSPACE
 STAGES = (
     "prepare-dataset",
     "train-lora",
+    # ADR-0539/WP-119: the in-process training path, unchanged. "train-lora"
+    # is now a dispatcher that either delegates to a TrainJob or calls this;
+    # the TrainJob's own pod runs THIS stage, which is why it needs its own
+    # name rather than a flag - a flag would make the trainer pod recurse.
+    "train-lora-local",
     # ADR-0526 (WP-087) decision 1: merges the adapter into a standalone
     # bf16 checkpoint. Between train and evaluate because the registered
     # artifact URI must be the merged checkpoint, not the adapter.
@@ -1491,6 +1496,36 @@ def _generate_held_out(model, tokenizer, held_out: List[Dict[str, Any]], *, cpu_
 
 
 def stage_train_lora(config: MlopsConfig, store: ArtifactStore) -> None:
+    """Dispatcher (ADR-0539/WP-119). KFP still orchestrates; only the
+    compute moves.
+
+    With MLOPS_TRAINJOB_ENABLED=true this submits a TrainJob and blocks on
+    it, so the KFP step's failure contract is unchanged: a failed or
+    timed-out TrainJob raises SystemExit, the step exits non-zero, and
+    `.after()` stops merge-export. Otherwise it runs in-process exactly as
+    before, which is also what the TrainJob's own pod does via the
+    `train-lora-local` stage.
+    """
+    import trainjob
+
+    if trainjob.enabled():
+        trainjob.submit_and_wait(run_id=config.run_id, agent=config.agent)
+        # The TrainJob wrote the manifest and the adapter from inside its
+        # own pod. Verify rather than trust: a Complete TrainJob whose
+        # artifacts are missing is a silent data-loss bug, and merge-export
+        # would fail later and further from the cause.
+        manifest_key = f"{_run_prefix(config.model_prefix, config)}/train_manifest.json"
+        if store.get_bytes(manifest_key) is None:
+            raise SystemExit(
+                f"TrainJob completed but {manifest_key} is absent from S3 - "
+                "the trainer pod did not write its manifest, so merge-export "
+                "would consume nothing. Check the trainer pod's logs."
+            )
+        return
+    stage_train_lora_local(config, store)
+
+
+def stage_train_lora_local(config: MlopsConfig, store: ArtifactStore) -> None:
     import tempfile
 
     manifest = _load_dataset_manifest(config, store)
@@ -2108,6 +2143,7 @@ def stage_push_registry(config: MlopsConfig, store: ArtifactStore) -> None:
 STAGE_FUNCTIONS = {
     "prepare-dataset": stage_prepare_dataset,
     "train-lora": stage_train_lora,
+    "train-lora-local": stage_train_lora_local,
     "merge-export": stage_merge_export,
     "evaluate": stage_evaluate,
     "push-registry": stage_push_registry,

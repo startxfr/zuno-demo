@@ -186,7 +186,7 @@ pipeline:
   # v1 was never actually applied - the pipeline has 0 versions and 0 runs -
   # so this rename is free today, and the convention now exists before the
   # first real bump.
-  version: v0-2-0
+  version: v0-2-1
   displayName: "MLOps: dataset-to-model LoRA/PEFT pipeline"
   description: "prepare-dataset -> train-lora -> evaluate -> push-registry (ADR-0301/ADR-0302)"
   createPipelineResource: true
@@ -258,6 +258,35 @@ agents:
 # any node and mlops.py's `torch.cuda.is_available()` fallback would
 # silently train on CPU even with MIG slices free.
 training:
+  # ADR-0539/WP-119: run the LoRA step's compute as a Kubeflow TrainJob
+  # that the KFP step submits and waits on. KFP still owns the DAG, the
+  # ordering, the caching and the ADR-0107 gate (ADR-0302 decision 1 is
+  # unchanged) - only this one step's compute moves off the KFP pod.
+  #
+  # Disabled by default: enabling it is a live change whose scale-from-zero
+  # behaviour for a JobSet-owned pod is not yet proven on this cluster. At
+  # false, train-lora runs in-process exactly as before, so this is a
+  # one-value rollback.
+  #
+  # The gpu:/resources: blocks below are now read by
+  # templates/trainingruntime.yaml instead of by six KFP SDK calls inside
+  # files/pipeline.py.tpl. Same values, same comments, visible in the chart.
+  trainJob:
+    enabled: false
+    runtimeName: mlops-lora
+    # ~2h for the one green wesh run; a training pod that outlives this is
+    # a step failure, not necessarily a job failure - see trainjob.py's
+    # timeout message.
+    timeoutSeconds: 14400
+    pollSeconds: 15
+    # The KFP step when trainJob is on: it submits, polls and prints. It
+    # must NOT carry the training GPU request, or it would hold the burst
+    # node for the whole run in addition to the trainer pod.
+    submitter:
+      cpuRequest: "100m"
+      cpuLimit: "500m"
+      memoryRequest: 256Mi
+      memoryLimit: 512Mi
   gpu:
     # A WHOLE GPU, not a MIG slice, on purpose: the burst node is
     # MIG-disabled (gitops/charts/machines' zuno-gpu-burst-a) because the

@@ -26,6 +26,12 @@ COPY components/mlops/src/mlops.py /opt/app-root/src/mlops.py
 # runtime ModuleNotFoundError inside the pipeline pod that no local test
 # would catch.
 COPY components/mlops/src/mlflow_tracking.py /opt/app-root/src/mlflow_tracking.py
+# ADR-0539/WP-119, same reason as the line above and the same trap: the
+# COPYs here are per-file, not `COPY src/`, so a new module that is not
+# named here simply does not exist in the image. mlops.py's train-lora
+# dispatcher imports this one, so a missing COPY would fail at runtime in
+# the pipeline pod while every local test passed.
+COPY components/mlops/src/trainjob.py /opt/app-root/src/trainjob.py
 COPY components/mlops/mlops-run /opt/app-root/src/mlops-run
 RUN chmod 0755 /opt/app-root/src/mlops-run
 COPY evaluations /opt/app-root/src/evaluations

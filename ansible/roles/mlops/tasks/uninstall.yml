@@ -8,3 +8,29 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-mlops-d0"
+
+# ADR-0539/WP-119: TrainJobs are created by the pipeline at run time, not
+# by ArgoCD, so nothing else reclaims them. Their pods hold a whole GPU on
+# the burst node, which blocks its scale-down - leaving one behind is not
+# cosmetic, it is a standing bill.
+- name: "mlops | list TrainJobs created by the pipeline"
+  kubernetes.core.k8s_info:
+    api_version: trainer.kubeflow.org/v1alpha1
+    kind: TrainJob
+    namespace: "{{ mlops_namespace | default('zuno-mlops') }}"
+    label_selectors:
+      - app.kubernetes.io/part-of=mlops
+  register: _mlops_uninstall_trainjobs
+  ignore_errors: true
+
+- name: "mlops | remove them"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: trainer.kubeflow.org/v1alpha1
+    kind: TrainJob
+    namespace: "{{ mlops_namespace | default('zuno-mlops') }}"
+    name: "{{ item }}"
+  loop: >-
+    {{ _mlops_uninstall_trainjobs.resources | default([])
+       | map(attribute='metadata.name') | list }}
+  ignore_errors: true

@@ -43,6 +43,15 @@ BASE_CONFIG_KEYS = {
     # whose namespace should not silently change where runs are recorded.
     "MLFLOW_TRACKING_URI": "MLFLOW_TRACKING_URI",
     "MLFLOW_WORKSPACE": "MLFLOW_WORKSPACE",
+    # ADR-0539/WP-119. Same rule as above: a key absent here never reaches
+    # the step pod, so the dispatcher would silently take the in-process
+    # path and the TrainJob would never be submitted.
+    "MLOPS_TRAINJOB_ENABLED": "MLOPS_TRAINJOB_ENABLED",
+    "MLOPS_TRAINJOB_RUNTIME": "MLOPS_TRAINJOB_RUNTIME",
+    "MLOPS_TRAINJOB_TIMEOUT_SECONDS": "MLOPS_TRAINJOB_TIMEOUT_SECONDS",
+    "MLOPS_TRAINJOB_POLL_SECONDS": "MLOPS_TRAINJOB_POLL_SECONDS",
+    "MLOPS_TRAINJOB_S3_SECRET": "MLOPS_TRAINJOB_S3_SECRET",
+    "MLOPS_TRAINJOB_PG_SECRET": "MLOPS_TRAINJOB_PG_SECRET",
     "MODEL_REGISTRY_NAMESPACE": "MODEL_REGISTRY_NAMESPACE",
     "MODEL_REGISTRY_URL": "MODEL_REGISTRY_URL",
     # ADR-0526 (WP-087). A key absent from this map is NOT a compile
@@ -160,6 +169,19 @@ PIPELINES = {}
 def mlops_pipeline_{{ $name | replace "-" "_" }}(run_id: str):
     dataset = configure(prepare_dataset(run_id=run_id), agent="{{ $name }}")
     trained = configure(train_lora(run_id=run_id).after(dataset), agent="{{ $name }}")
+{{- if $root.Values.training.trainJob.enabled }}
+    # ADR-0539/WP-119: with the TrainJob path on, this step SUBMITS and
+    # waits - it does no training itself, so it must not hold a GPU or the
+    # burst node for the duration. The GPU request, node selector and
+    # toleration moved to templates/trainingruntime.yaml, where they are
+    # readable chart configuration instead of KFP SDK calls compiled into
+    # a DAG. Deliberately no node selector here: the submitter is a
+    # long-lived but tiny pod and belongs anywhere.
+    trained.set_cpu_request("{{ $root.Values.training.trainJob.submitter.cpuRequest }}")
+    trained.set_cpu_limit("{{ $root.Values.training.trainJob.submitter.cpuLimit }}")
+    trained.set_memory_request("{{ $root.Values.training.trainJob.submitter.memoryRequest }}")
+    trained.set_memory_limit("{{ $root.Values.training.trainJob.submitter.memoryLimit }}")
+{{- else }}
     # ADR-0351: train-lora is the only stage that needs a GPU. It requests
     # a whole nvidia.com/gpu, which only the scale-from-zero gpu-burst
     # MachineSet provides (the permanent inference node is MIG-partitioned
@@ -167,6 +189,11 @@ def mlops_pipeline_{{ $name | replace "-" "_" }}(run_id: str):
     # 0->1 node scale-up and the node is reclaimed ~10min after the stage
     # completes. The toleration matches the burst node's taint, which keeps
     # every non-training pod off it so scale-down is never blocked.
+    #
+    # ADR-0539/WP-119: this is the in-process fallback path. It is kept
+    # rather than deleted because training.trainJob.enabled is false by
+    # default and is the documented one-value rollback - deleting this
+    # block would make the rollback silently GPU-less.
     trained.set_accelerator_type("{{ $root.Values.training.gpu.resource }}")
     trained.set_accelerator_limit("{{ $root.Values.training.gpu.count }}")
     trained.set_cpu_request("{{ $root.Values.training.resources.cpuRequest }}")
@@ -185,6 +212,7 @@ def mlops_pipeline_{{ $name | replace "-" "_" }}(run_id: str):
         value="{{ $root.Values.training.gpu.toleration.value }}",
         effect="{{ $root.Values.training.gpu.toleration.effect }}",
     )
+{{- end }}
     # ADR-0302 point 5: evaluate must run (and pass) before push-registry
     # is even attempted - .after() enforces the DAG ordering; evaluate's
     # own non-zero exit on a failing gate (components/mlops/src/mlops.py)

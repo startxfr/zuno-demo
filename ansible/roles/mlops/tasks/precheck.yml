@@ -38,3 +38,37 @@
 
 - name: "mlops | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+# ADR-0539/WP-119: the TrainJob path. Reported, never asserted - the
+# runtime is absent by design while training.trainJob.enabled is false.
+- name: "mlops | look up the LoRA TrainingRuntime (WP-119)"
+  kubernetes.core.k8s_info:
+    api_version: trainer.kubeflow.org/v1alpha1
+    kind: TrainingRuntime
+    namespace: "{{ mlops_namespace | default('zuno-mlops') }}"
+    name: "{{ mlops_trainjob_runtime | default('mlops-lora') }}"
+  register: _mlops_runtime
+  ignore_errors: true
+
+- name: "mlops | look up recent TrainJobs"
+  kubernetes.core.k8s_info:
+    api_version: trainer.kubeflow.org/v1alpha1
+    kind: TrainJob
+    namespace: "{{ mlops_namespace | default('zuno-mlops') }}"
+    label_selectors:
+      - app.kubernetes.io/part-of=mlops
+  register: _mlops_trainjobs
+  ignore_errors: true
+
+# A TrainingRuntime that is absent while trainJob is ENABLED is the
+# failure that matters: spec.runtimeRef is immutable, so every TrainJob
+# would be rejected at admission rather than failing visibly later.
+- name: "mlops | report the TrainJob path"
+  ansible.builtin.debug:
+    msg: >-
+      TrainingRuntime {{ mlops_trainjob_runtime | default('mlops-lora') }}:
+      {{ 'absent (training.trainJob.enabled is false, or not synced yet)'
+         if (_mlops_runtime.resources | default([]) | length) == 0 else 'present' }}
+      | TrainJobs: {{ _mlops_trainjobs.resources | default([]) | length }}
+      {{ (_mlops_trainjobs.resources | default([])
+          | map(attribute='metadata.name') | list | join(', ')) | default('', true) }}

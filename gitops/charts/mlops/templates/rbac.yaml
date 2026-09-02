@@ -9,7 +9,24 @@ metadata:
   namespace: {{ .Values.platform.namespace }}
   labels:
     {{- include "mlops.labels" . | nindent 4 }}
-rules: []
+rules:
+  # ADR-0539/WP-119: the train-lora step submits a TrainJob and waits on
+  # it. Everything else this Role grants is read-only - the step creates
+  # exactly one kind of object and reads the rest to report progress.
+  - apiGroups: ["trainer.kubeflow.org"]
+    resources: ["trainjobs"]
+    verbs: ["create", "get", "list", "watch", "delete"]
+  - apiGroups: ["trainer.kubeflow.org"]
+    resources: ["trainingruntimes"]
+    verbs: ["get", "list", "watch"]
+  # The TrainJob controller materialises a JobSet; reading it is how the
+  # submitter reports per-job progress rather than a bare "still running".
+  - apiGroups: ["jobset.x-k8s.io"]
+    resources: ["jobsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "events"]
+    verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -25,4 +42,11 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "mlops.serviceAccountName" . }}
+    namespace: {{ .Values.platform.namespace }}
+  # The SA the KFP task pods actually run as. The chart's own SA above is
+  # not the one the DSPA gives a pipeline step, so binding only that one
+  # would leave the TrainJob submission 403 at runtime while the chart
+  # looked correct.
+  - kind: ServiceAccount
+    name: {{ .Values.trainJobRunnerServiceAccount | default "pipeline-runner-mlops-dspa" }}
     namespace: {{ .Values.platform.namespace }}

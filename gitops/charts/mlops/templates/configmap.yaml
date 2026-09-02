@@ -34,6 +34,16 @@ data:
   # is not installed.
   MLFLOW_TRACKING_URI: {{ .Values.mlflow.trackingUri | quote }}
   MLFLOW_WORKSPACE: {{ .Values.mlflow.workspace | quote }}
+  # ADR-0539/WP-119. The secret NAMES, not their contents: the submitter
+  # forwards credentials to the TrainJob as valueFrom.secretKeyRef, never
+  # as literal values - a plaintext credential in a TrainJob spec would sit
+  # in etcd readable by anyone with `get trainjobs` in this namespace.
+  MLOPS_TRAINJOB_ENABLED: {{ .Values.training.trainJob.enabled | quote }}
+  MLOPS_TRAINJOB_RUNTIME: {{ .Values.training.trainJob.runtimeName | quote }}
+  MLOPS_TRAINJOB_TIMEOUT_SECONDS: {{ .Values.training.trainJob.timeoutSeconds | quote }}
+  MLOPS_TRAINJOB_POLL_SECONDS: {{ .Values.training.trainJob.pollSeconds | quote }}
+  MLOPS_TRAINJOB_S3_SECRET: {{ .Values.s3.secretName | quote }}
+  MLOPS_TRAINJOB_PG_SECRET: {{ .Values.postgres.secretName | quote }}
   # WP-087: the `evaluate` stage runs the agent's real acceptance suite
   # against the live platform - see values.yaml's acceptanceGate block.
   KEYCLOAK_URL: {{ .Values.acceptanceGate.keycloakUrl | quote }}
