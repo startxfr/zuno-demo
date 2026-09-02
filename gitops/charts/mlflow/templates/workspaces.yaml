@@ -1,0 +1,61 @@
+{{- /*
+Per-workspace artifact wiring. Two objects per namespace:
+
+  * the artifact-connection Secret - MLflowConfig's CRD CEL-validates the
+    name, so it must stay `mlflow-artifact-connection`; keys are the AWS_*
+    set the operand expects, filled from the same Vault S3 credential mlops
+    and rag-ingestion use;
+  * the MLflowConfig itself - NOTE the API group is mlflow.kubeflow.org,
+    NOT mlflow.opendatahub.io like the server CR above. Verified live; an
+    assumed group renders an unappliable manifest.
+*/ -}}
+{{- if .Values.mlflowConfig.enabled }}
+{{- range $ws := .Values.workspaces }}
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ $.Values.artifact.secretName }}
+  namespace: {{ $ws }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  refreshInterval: {{ $.Values.credentials.refreshInterval }}
+  secretStoreRef:
+    name: {{ $.Values.credentials.secretStoreName }}
+    kind: ClusterSecretStore
+  target:
+    name: {{ $.Values.artifact.secretName }}
+    template:
+      data:
+        AWS_ACCESS_KEY_ID: "{{ `{{ .accessKeyId }}` }}"
+        AWS_SECRET_ACCESS_KEY: "{{ `{{ .secretAccessKey }}` }}"
+        AWS_S3_BUCKET: {{ $.Values.artifact.bucket | quote }}
+        AWS_S3_ENDPOINT: {{ $.Values.artifact.endpoint | quote }}
+        AWS_DEFAULT_REGION: {{ $.Values.artifact.region | quote }}
+  data:
+    - secretKey: accessKeyId
+      remoteRef:
+        key: {{ $.Values.artifact.vaultPath }}
+        property: accessKeyId
+    - secretKey: secretAccessKey
+      remoteRef:
+        key: {{ $.Values.artifact.vaultPath }}
+        property: secretAccessKey
+---
+apiVersion: mlflow.kubeflow.org/v1
+kind: MLflowConfig
+metadata:
+  name: default
+  namespace: {{ $ws }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  artifactRootSecret: {{ $.Values.artifact.secretName }}
+  artifactRootPath: {{ $.Values.artifact.rootPath }}/{{ $ws }}
+{{- end }}
+{{- end }}

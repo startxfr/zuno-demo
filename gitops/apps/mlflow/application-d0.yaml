@@ -1,0 +1,33 @@
+---
+# ADR-0538/WP-116 placeholder phase - renders nothing (mlflowConfig.enabled:
+# false). Kept for symmetry with every other component's -d0/-d1 pair: there
+# is no operator for this component to install (the `mlflowoperator`
+# DataScienceCluster component is already Managed by the Day 1 `openshift-ai`
+# component), so the whole payload lives in -d1.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mlflow-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-90"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/mlflow
+    helm:
+      releaseName: zuno-mlflow-d0
+      values: |
+        mlflowConfig:
+          enabled: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: redhat-ods-applications
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

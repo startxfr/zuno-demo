@@ -1,0 +1,15 @@
+---
+# Reverse of install.yml. The cluster-scoped MLflow CR is pruned with the
+# -d1 Application; the PGO `mlflow` database and its Vault credential are
+# deliberately NOT removed here - they belong to the postgresql/vault Day 0
+# components, and dropping the database would wedge the whole PGO reconcile
+# (PGO never recreates a dropped database).
+- name: "mlflow | delete the mlflow GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-mlflow-d1"
+
+- name: "mlflow | delete the mlflow GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-mlflow-d0"

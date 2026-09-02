@@ -467,7 +467,15 @@ platformNamespaces:
       OpenShift AI control plane: KServe, MLflow, Trainer, Ray, Dashboard,
       AI Gateway, OGX, Spark Operator, Feast Operator, TrustyAI, Data
       Science Pipelines controllers.
-    allowedFromNamespaces: []
+    # ADR-0538/WP-116: the MLflow tracking server runs here (the operator
+    # hardcodes this namespace), and the MLOps pipeline steps that log to it
+    # run in zuno-mlops / zuno-ai-run. Without these two entries every
+    # tracking call times out SILENTLY - ADR-0538 decision 2 makes the
+    # client best-effort on purpose, so a blocked call looks like "no runs
+    # recorded", never like an error.
+    allowedFromNamespaces:
+      - zuno-mlops
+      - zuno-ai-run
     # VERIFIED: trainer's ValidatingWebhookConfiguration targets
     # kubeflow-trainer-controller-manager.redhat-ods-applications.svc
     # directly (confirmed live during mlflow-operator crash debugging) -

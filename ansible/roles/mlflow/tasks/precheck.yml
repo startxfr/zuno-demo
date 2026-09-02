@@ -1,0 +1,48 @@
+---
+# State detection (never fails). -d1 is the meaningful half; -d0 renders
+# nothing by design.
+- name: "mlflow | check the mlflow Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-mlflow-d1"
+
+- name: "mlflow | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ _state_check_result }}"
+
+- name: "mlflow | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+# The CR reaching Ready is not the same as the server serving: report both
+# the instance and its workspace configs, the pair an operator needs to see
+# before trusting the dashboard's Experiments page.
+- name: "mlflow | read the MLflow server instance"
+  kubernetes.core.k8s_info:
+    api_version: mlflow.opendatahub.io/v1
+    kind: MLflow
+    name: "{{ mlflow_server_name | default('zuno') }}"
+  register: _mlflow_cr
+  failed_when: false
+
+- name: "mlflow | report the MLflow server state"
+  ansible.builtin.debug:
+    msg: >-
+      MLflow server '{{ mlflow_server_name | default('zuno') }}':
+      {{ (_mlflow_cr.resources | default([]) | length) > 0
+         | ternary('conditions=' ~ ((_mlflow_cr.resources | default([{}]))[0].status | default({})
+                   | json_query('conditions[].type') | default([]) | join(',')),
+                   'ABSENT') }}
+
+- name: "mlflow | read the per-workspace MLflowConfigs"
+  kubernetes.core.k8s_info:
+    api_version: mlflow.kubeflow.org/v1
+    kind: MLflowConfig
+  register: _mlflow_configs
+  failed_when: false
+
+- name: "mlflow | report the configured workspaces"
+  ansible.builtin.debug:
+    msg: >-
+      MLflow workspaces configured:
+      {{ (_mlflow_configs.resources | default([]))
+         | map(attribute='metadata.namespace') | list | join(', ') | default('none', true) }}

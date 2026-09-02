@@ -1,0 +1,14 @@
+apiVersion: v2
+name: mlflow
+description: >-
+  MLflow experiment tracking for the MLOps LoRA pipeline (ADR-0538/WP-116).
+  Day 2, not Day 1: the `mlflowoperator` component is already Managed by the
+  Day 1 `openshift-ai` component via the DataScienceCluster - there is no
+  operator for this chart to install. It renders the cluster-scoped MLflow
+  server instance (PostgreSQL-backed, PGO), its backend-store credential,
+  and the per-workspace MLflowConfig + artifact-connection Secret the RHOAI
+  dashboard's Experiments page needs. Same `*-config` shape as
+  trustyai-config and lightspeed-config.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

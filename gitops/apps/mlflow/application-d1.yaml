@@ -1,0 +1,33 @@
+---
+# ADR-0538/WP-116: the MLflow tracking server (cluster-scoped CR,
+# PostgreSQL-backed via the dedicated PGO mlflow database) plus the
+# per-workspace MLflowConfig/artifact-connection pair the RHOAI dashboard's
+# Experiments page needs. Runs after postgresql (Day 0) - the backend-store
+# ExternalSecret resolves a credential PGO must already have adopted.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mlflow-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-89"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/mlflow
+    helm:
+      releaseName: zuno-mlflow-d1
+      values: |
+        mlflowConfig:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: redhat-ods-applications
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

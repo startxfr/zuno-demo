@@ -27,6 +27,7 @@
       - agents
       - mlops
       - trustyai_config
+      - mlflow
       - lightspeed_config
       - supply_chain
   tasks:

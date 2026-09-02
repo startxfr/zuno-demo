@@ -1,0 +1,45 @@
+---
+# ADR-0538/WP-116. Applies the -d0/-d1 Application pair, then waits for the
+# operator to actually bring the tracking server up: the CR alone proves
+# nothing (the operator starts an Alembic migration Job against the PGO
+# database, and that is the step that fails if the backend-store credential
+# or the public-schema grant is missing). There is no Day 1 operator to
+# install here - `mlflowoperator` is already Managed by the Day 1
+# `openshift-ai` component via the DataScienceCluster.
+- name: "mlflow | apply the mlflow GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mlflow"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-mlflow-d0"
+
+- name: "mlflow | apply the mlflow GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mlflow"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-mlflow-d1"
+
+- name: "mlflow | wait for the MLflow server Deployment to become available"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ mlflow_namespace | default('redhat-ods-applications') }}"
+    label_selectors:
+      - "app.kubernetes.io/name=mlflow"
+  register: _mlflow_deploy
+  until: >-
+    (_mlflow_deploy.resources | default([]) | length) > 0 and
+    (_mlflow_deploy.resources | map(attribute='status.availableReplicas', default=0) | sum) > 0
+  retries: 40
+  delay: 15
+  failed_when: false
+
+- name: "mlflow | install summary"
+  ansible.builtin.debug:
+    msg: >-
+      MLflow tracking server:
+      {{ (_mlflow_deploy.resources | default([]) | length) > 0
+         | ternary('deployment present, available replicas=' ~
+                   (_mlflow_deploy.resources | map(attribute='status.availableReplicas', default=0) | sum),
+                   'NO deployment found - check the MLflow CR status and the operator log') }}

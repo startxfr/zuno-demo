@@ -1,0 +1,53 @@
+# ADR-0538/WP-116. Everything is gated behind mlflowConfig.enabled so the
+# -d0 Application renders nothing and only -d1 creates resources, the same
+# shape aap-config/lightspeed-config/trustyai-config use.
+mlflowConfig:
+  enabled: false
+
+server:
+  # The cluster-scoped MLflow CR's name. The operator hardcodes
+  # --namespace=redhat-ods-applications for the workloads it creates
+  # (ADR-0331's constraint family), so this chart never chooses where the
+  # server pod lands.
+  name: zuno
+  namespace: redhat-ods-applications
+  replicas: 1
+  backendStoreSecretName: mlflow-backend-store
+  db:
+    # The PRIMARY Service, deliberately not -pgbouncer: MLflow's Alembic
+    # migrations and SQLAlchemy session state do not survive transaction
+    # pooling. Same documented choice as openshift-ai's maasDb.host.
+    host: zuno-postgresql-primary.zuno-data.svc
+    port: 5432
+    database: mlflow
+    # Seeded by ansible/roles/vault; the same credential PGO adopts for the
+    # dedicated mlflow role (gitops/charts/postgresql). Letters/digits-only
+    # password: it is interpolated un-encoded into the postgresql:// URI.
+    vaultPath: mlflow/postgresql-app
+
+# Namespaces exposed as MLflow workspaces. The server selects them by label
+# (workspaceLabelSelector below); each one additionally needs an
+# MLflowConfig + artifact Secret, which is what this list renders.
+workspaces:
+  - zuno-mlops
+  - zuno-ai-run
+
+# Which namespaces the server treats as workspaces. Every zuno AI namespace
+# already carries opendatahub.io/dashboard=true (the namespaces chart), so
+# this needs no new labelling.
+workspaceLabelSelector:
+  opendatahub.io/dashboard: "true"
+
+artifact:
+  # The MLflowConfig CRD CEL-validates this name; keep it as-is.
+  secretName: mlflow-artifact-connection
+  bucket: zuno-corpus
+  endpoint: https://s3.us-east-1.amazonaws.com
+  region: us-east-1
+  # The same S3 credential mlops and rag-ingestion already use.
+  vaultPath: rag/s3
+  rootPath: mlflow-artifacts
+
+credentials:
+  secretStoreName: vault-backend
+  refreshInterval: 1h

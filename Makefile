@@ -68,7 +68,7 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # "install" operate on the 11 deployable components, plus "supply-chain"
 # (ADR-0420/WP-070) for "check" only - it has no install/build of its own,
 # only a signature-verification gate (ansible/roles/supply_chain).
-DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops trustyai-config lightspeed-config supply-chain
+DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops trustyai-config mlflow lightspeed-config supply-chain
 DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops trustyai-eval
 DAY2_VERBS := check install build uninstall all reinstall
 
@@ -103,7 +103,7 @@ DAY3_SIGN_COMPONENTS := agents
 # "lightspeed-config" are two entries, not one, because the component is split
 # across day tiers - checking only the operator would report healthy while the
 # OLSConfig operand is absent, and vice versa.
-DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config
+DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow
 DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS))
 DAY3_VERBS := test stresstest backup restore check sign scenario-failover-node
 

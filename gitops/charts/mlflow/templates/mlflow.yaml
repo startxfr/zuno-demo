@@ -1,0 +1,29 @@
+{{- /*
+The cluster-scoped MLflow server instance (ADR-0538 decision 1). Field names
+verified against the live CRD (mlflows.mlflow.opendatahub.io/v1) rather than
+assumed: backendStoreUriFrom takes a {name,key} Secret reference, and
+workspaceLabelSelector is a standard label selector deciding which namespaces
+appear as MLflow workspaces in the dashboard.
+
+No `storage` block: that is the SQLite/file-artifact path. Artifacts live in
+S3 per workspace, configured by the MLflowConfig CRs beside this file.
+*/ -}}
+{{- if .Values.mlflowConfig.enabled }}
+---
+apiVersion: mlflow.opendatahub.io/v1
+kind: MLflow
+metadata:
+  name: {{ .Values.server.name }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  replicas: {{ .Values.server.replicas }}
+  backendStoreUriFrom:
+    name: {{ .Values.server.backendStoreSecretName }}
+    key: uri
+  workspaceLabelSelector:
+    matchLabels:
+{{ toYaml .Values.workspaceLabelSelector | indent 6 }}
+{{- end }}

@@ -32,6 +32,7 @@
       - agents
       - mlops
       - trustyai_config
+      - mlflow
       - lightspeed_config
   tasks:
     - name: Resolve cluster API credentials
