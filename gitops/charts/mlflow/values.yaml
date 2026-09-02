@@ -22,6 +22,14 @@ server:
   # defaultArtifactRoot; it validates this, the schema does not show it.
   serveArtifacts: true
   artifactsDestination: s3://zuno-corpus/mlflow-artifacts
+  # redhat-ods-applications is mesh-injected, so every MLflow pod gets an
+  # istio sidecar - but the operator's own NetworkPolicies only allow egress
+  # to DNS and the database, which strands that sidecar: it cannot reach
+  # istiod's XDS (15012) or cert-manager-istio-csr (443/6443) and loops on
+  # "i/o timeout", so the pod never leaves Init. Live-diagnosed 2026-09-02
+  # on the migration Job. These rules are APPENDED to the operator's
+  # defaults (networkPolicyAdditionalEgressRules), never replacing them.
+  additionalEgressPorts: [15012, 15010, 15014, 443, 6443, 8443]
   db:
     # The PRIMARY Service, deliberately not -pgbouncer: MLflow's Alembic
     # migrations and SQLAlchemy session state do not survive transaction
