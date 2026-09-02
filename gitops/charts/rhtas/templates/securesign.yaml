@@ -14,11 +14,18 @@
 #   (client-credentials service account, ADR-0530 reconcile path). Type
 #   "email": the client hardcodes email/email_verified claims via protocol
 #   mappers because the auto-created service-account user has no email.
-# - fulcio.trustedCA: the Keycloak route is served by a Vault-PKI-issued
-#   cert (root CN=zuno-demo.internal, ADR-0347's finding) that Fulcio's
-#   issuer discovery would otherwise reject. The ConfigMap is created at
-#   Ansible run time (cluster-specific data, same reasoning as
-#   ansible/roles/openshift_oauth) by ansible/roles/rhtas/tasks/install.yml.
+# - fulcio.trustedCA: only set while the Keycloak route is served by a
+#   Vault-PKI-issued cert (root CN=zuno-demo.internal, ADR-0347's finding)
+#   that Fulcio's issuer discovery would otherwise reject - the ConfigMap
+#   is created at Ansible run time (cluster-specific data, same reasoning
+#   as ansible/roles/openshift_oauth) by ansible/roles/rhtas/tasks/
+#   install.yml. Omitted entirely once that route moves to a
+#   publicly-trusted CA (Let's Encrypt, ADR-0211): Fulcio's own default
+#   trust store already trusts ISRG Root X1, and pointing at a stale or
+#   nonexistent ConfigMap would break issuer discovery instead of fixing
+#   it - trustedCAConfigMapName is empty in that case (coordinated live
+#   finding, 2026-09-02, with the session landing the keycloak
+#   ingress.acmeWildcardTLS flip).
 # - tsa is omitted: cosign keyless sign/verify needs Fulcio+Rekor+CTLog+
 #   TUF only; a timestamp authority is additive and out of WP-110's scope.
 #   tuf.keys therefore lists only the three managed keys - the operator's
@@ -46,8 +53,10 @@ spec:
           Issuer: {{ .Values.fulcio.oidc.issuerUrl | quote }}
           IssuerURL: {{ .Values.fulcio.oidc.issuerUrl | quote }}
           Type: email
+    {{- if .Values.fulcio.trustedCAConfigMapName }}
     trustedCA:
       name: {{ .Values.fulcio.trustedCAConfigMapName | quote }}
+    {{- end }}
     externalAccess:
       enabled: true
     monitoring:

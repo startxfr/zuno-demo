@@ -140,12 +140,34 @@
 # separate zuno-rhtas-d1 Application after -d0 is Synced+Healthy. The
 # fulcio.oidc.issuerUrl placeholder in application-d1.yaml is substituted
 # with the real cluster domain by apply_gitops_app.yml itself.
+# gitops_app_extra_helm_values REPLACES spec.source.helm.values wholesale
+# rather than merging (values is a YAML *string* key, combine(recursive=
+# True) cannot descend into it - the exact trap 17e4117c fixed for
+# cert-manager and application-d1.yaml here has its own static
+# securesignOperand.enabled/fulcio.oidc.issuerUrl block that a naive
+# extra_helm_values would silently delete, rendering nothing). Start from
+# the manifest's own values, merge in only fulcio.trustedCAConfigMapName -
+# empty string when the Keycloak serving cert has no ca.crt (a
+# publicly-trusted CA, e.g. Let's Encrypt post-ADR-0211 flip):
+# templates/securesign.yaml then omits fulcio.trustedCA entirely, so
+# Fulcio falls back to its own default trust store (already trusts ISRG
+# Root X1) instead of pointing at a stale or nonexistent ConfigMap.
 - name: "rhtas | apply the RHTAS GitOps Application (d1: Securesign operand)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "rhtas"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-rhtas-d1"
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/rhtas/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml).spec.source.helm['values'] | from_yaml)
+        | combine(
+            {'fulcio': {'trustedCAConfigMapName': 'rhtas-keycloak-ca' if (keycloak_ca_configmap_published | bool) else ''}},
+            recursive=True
+          )
+      }}
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

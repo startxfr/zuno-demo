@@ -40,6 +40,21 @@
 - name: "image-signing | resolve the cluster base domain (for the Fulcio OIDC issuer)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
+# Live lookup, not a fact carried over from another role's run: this task
+# is included from many different Day 1 build roles via
+# apply_openshift_build.yml, potentially in a completely separate
+# ansible-playbook invocation from the one that last ran
+# ansible/roles/rhtas_config (which publishes/removes this ConfigMap).
+# Absent once the Keycloak serving cert is a publicly-trusted CA (Let's
+# Encrypt, ADR-0211) - see ansible/tasks/publish_keycloak_ca_configmap.yml.
+- name: "image-signing | check whether the rhtas-keycloak-ca ConfigMap exists"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    namespace: zuno-ai-build
+    name: rhtas-keycloak-ca
+  register: _image_signing_kc_ca
+
 - name: "image-signing | delete any previous signing Job for {{ sign_image_name }} (idempotent-by-recreation)"
   kubernetes.core.k8s:
     state: absent
@@ -86,35 +101,37 @@
                 # needed) instead of disabling verification. SSL_CERT_FILE
                 # (not SSL_CERT_DIR) since this is one PEM bundle file, not
                 # a hashed-symlink directory Go's loader would expect.
-                env:
-                  - name: SSL_CERT_FILE
-                    value: /etc/ssl/openshift-service-ca/service-ca.crt
-                  - name: RHTAS_KEYCLOAK_TOKEN_URL
-                    value: "https://keycloak.{{ cluster_base_domain }}/realms/zuno/protocol/openid-connect/token"
-                  - name: RHTAS_CLIENT_SECRET_PATH
-                    value: /etc/rhtas/signer-client-secret/client_secret
-                  - name: RHTAS_KC_CA_FILE
-                    value: /etc/rhtas/keycloak-ca/ca-bundle.crt
-                volumeMounts:
-                  - name: openshift-service-ca
-                    mountPath: /etc/ssl/openshift-service-ca
-                    readOnly: true
-                  - name: signer-client-secret
-                    mountPath: /etc/rhtas/signer-client-secret
-                    readOnly: true
-                  - name: keycloak-ca
-                    mountPath: /etc/rhtas/keycloak-ca
-                    readOnly: true
-            volumes:
-              - name: signer-client-secret
-                secret:
-                  secretName: zuno-signer-client-secret
-              - name: keycloak-ca
-                configMap:
-                  name: rhtas-keycloak-ca
-              - name: openshift-service-ca
-                configMap:
-                  name: openshift-service-ca.crt
+                env: >-
+                  {{
+                    [
+                      {'name': 'SSL_CERT_FILE', 'value': '/etc/ssl/openshift-service-ca/service-ca.crt'},
+                      {'name': 'RHTAS_KEYCLOAK_TOKEN_URL', 'value': 'https://keycloak.' + cluster_base_domain + '/realms/zuno/protocol/openid-connect/token'},
+                      {'name': 'RHTAS_CLIENT_SECRET_PATH', 'value': '/etc/rhtas/signer-client-secret/client_secret'}
+                    ]
+                    +
+                    ([{'name': 'RHTAS_KC_CA_FILE', 'value': '/etc/rhtas/keycloak-ca/ca-bundle.crt'}]
+                     if (_image_signing_kc_ca.resources | default([]) | length) > 0 else [])
+                  }}
+                volumeMounts: >-
+                  {{
+                    [
+                      {'name': 'openshift-service-ca', 'mountPath': '/etc/ssl/openshift-service-ca', 'readOnly': true},
+                      {'name': 'signer-client-secret', 'mountPath': '/etc/rhtas/signer-client-secret', 'readOnly': true}
+                    ]
+                    +
+                    ([{'name': 'keycloak-ca', 'mountPath': '/etc/rhtas/keycloak-ca', 'readOnly': true}]
+                     if (_image_signing_kc_ca.resources | default([]) | length) > 0 else [])
+                  }}
+            volumes: >-
+              {{
+                [
+                  {'name': 'signer-client-secret', 'secret': {'secretName': 'zuno-signer-client-secret'}},
+                  {'name': 'openshift-service-ca', 'configMap': {'name': 'openshift-service-ca.crt'}}
+                ]
+                +
+                ([{'name': 'keycloak-ca', 'configMap': {'name': 'rhtas-keycloak-ca'}}]
+                 if (_image_signing_kc_ca.resources | default([]) | length) > 0 else [])
+              }}
 
 - name: "image-signing | wait for the signing Job to reach a terminal state"
   # Checks status.conditions (type Complete/Failed), not raw succeeded/

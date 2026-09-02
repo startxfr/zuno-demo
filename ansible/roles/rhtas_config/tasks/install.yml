@@ -198,21 +198,36 @@
     namespace: zuno-rhtas
     wait: false
 
+# gitops_app_extra_helm_values REPLACES spec.source.helm.values wholesale
+# rather than merging (17e4117c's finding for cert-manager - values is a
+# YAML *string* key, combine(recursive=True) cannot descend into it).
+# This role's own extra_helm_values already re-declares everything
+# application-d1.yaml's static block has today (policyOperand.enabled/
+# signerClientMirror.enabled), so nothing is currently lost - but that's
+# duplication waiting to drift, not a fix. Start from the manifest's own
+# values instead, same pattern as ansible/roles/cert_manager and
+# ansible/roles/rhtas.
 - name: "rhtas_config | apply the rhtas-config GitOps Application (d1: Policy Controller operand)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "rhtas-config"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-rhtas-config-d1"
-    gitops_app_extra_helm_values:
-      policyOperand:
-        enabled: true
-        trustRoot:
-          rootJsonBase64: "{{ _rhtas_config_tuf_root.stdout | trim }}"
-        clusterImagePolicy:
-          certIdentityIssuer: "https://keycloak.{{ cluster_base_domain }}/realms/zuno"
-      signerClientMirror:
-        enabled: true
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/rhtas-config/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml).spec.source.helm['values'] | from_yaml)
+        | combine(
+            {
+              'policyOperand': {
+                'trustRoot': {'rootJsonBase64': _rhtas_config_tuf_root.stdout | trim},
+                'clusterImagePolicy': {'certIdentityIssuer': 'https://keycloak.' + cluster_base_domain + '/realms/zuno'}
+              }
+            },
+            recursive=True
+          )
+      }}
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

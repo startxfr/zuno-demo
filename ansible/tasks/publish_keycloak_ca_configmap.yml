@@ -1,17 +1,29 @@
 ---
 # ADR-0347's finding, factored out of ansible/roles/rhtas/tasks/install.yml
-# (WP-110) for reuse by WP-111's rhtas_config role: the live Keycloak
-# route is served by a Vault-PKI-issued cert (root CN=zuno-demo.internal),
-# so any in-cluster client validating it (Fulcio, or a Python client doing
-# its own TLS verification) needs that CA. Cluster-specific data that
-# can't be Helm-rendered - same reasoning and same
-# follow-the-Ingress-secretName logic as
-# ansible/roles/openshift_oauth/tasks/install.yml, so this stays
-# self-correcting if ingress.acmeWildcardTLS ever flips the serving cert.
-# Safe to copy unconditionally on every run.
+# (WP-110) for reuse by WP-111's rhtas_config role: while the live
+# Keycloak route is served by a Vault-PKI-issued cert (root
+# CN=zuno-demo.internal), any in-cluster client validating it (Fulcio, or
+# a Python client doing its own TLS verification) needs that CA pinned -
+# it isn't in any default trust store. Cluster-specific data that can't
+# be Helm-rendered - same reasoning and same follow-the-Ingress-secretName
+# logic as ansible/roles/openshift_oauth/tasks/install.yml.
 #
-# Requires: publish_ca_configmap_namespace (where to write the ConfigMap),
-# publish_ca_configmap_name (defaults to rhtas-keycloak-ca).
+# Tolerant of a Secret with NO ca.crt (live finding, coordinated with the
+# session landing ADR-0211's keycloak.ingress.acmeWildcardTLS flip,
+# 2026-09-02): once that lands, the serving cert is a Let's Encrypt leaf
+# with no bundled ca.crt in its Secret - a publicly-trusted CA needs no
+# pinned bundle at all (every default trust store, including Fulcio's and
+# Python's ssl.create_default_context(), already trusts ISRG Root X1).
+# Deliberately NOT synthesizing one from the LE intermediate: that would
+# re-pin a chain that rotates every ~90 days, trading today's non-problem
+# for a scheduled renewal-time outage. In that case this task DELETES any
+# previously-published ConfigMap (stale Vault-PKI data would otherwise
+# linger) and sets keycloak_ca_configmap_published: false so callers omit
+# the CA reference entirely rather than pointing at empty/stale data.
+#
+# Requires: publish_ca_configmap_namespace (where to write/remove the
+# ConfigMap), publish_ca_configmap_name (defaults to rhtas-keycloak-ca).
+# Sets: keycloak_ca_configmap_published (bool).
 - name: "keycloak-ca | validate required vars are set"
   ansible.builtin.assert:
     that:
@@ -26,27 +38,37 @@
     namespace: zuno-auth
   register: _keycloak_ca_ingress
 
-- name: "keycloak-ca | read the Keycloak serving-cert CA from that secret"
+- name: "keycloak-ca | fail loudly if no Ingress with a TLS secret was found at all"
+  ansible.builtin.fail:
+    msg: >-
+      No Ingress with a tls[].secretName was found in zuno-auth. Check
+      `oc get ingress -n zuno-auth` before re-running - this is a
+      genuinely missing prerequisite, unlike a Secret with no ca.crt
+      (tolerated below).
+  when: (_keycloak_ca_ingress.resources | default([]) | length) == 0
+
+- name: "keycloak-ca | read the Keycloak serving-cert secret"
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret
     namespace: zuno-auth
     name: "{{ _keycloak_ca_ingress.resources[0].spec.tls[0].secretName }}"
   register: _keycloak_ca_tls
-  when: (_keycloak_ca_ingress.resources | default([]) | length) > 0
 
-- name: "keycloak-ca | fail loudly if no Keycloak Ingress TLS secret was found"
+- name: "keycloak-ca | fail loudly if the referenced Secret doesn't exist"
   ansible.builtin.fail:
     msg: >-
-      No Ingress with a tls[].secretName was found in zuno-auth, or its
-      Secret has no ca.crt. Check `oc get ingress -n zuno-auth` and the
-      referenced Secret before re-running.
-  when: >-
-    (_keycloak_ca_ingress.resources | default([]) | length) == 0
-    or (_keycloak_ca_tls.resources | default([]) | length) == 0
-    or ('ca.crt' not in (_keycloak_ca_tls.resources[0].data | default({})))
+      Ingress in zuno-auth references TLS secret
+      '{{ _keycloak_ca_ingress.resources[0].spec.tls[0].secretName }}',
+      which does not exist. Check `oc get secret -n zuno-auth` before
+      re-running.
+  when: (_keycloak_ca_tls.resources | default([]) | length) == 0
 
-- name: "keycloak-ca | publish the CA ConfigMap"
+- name: "keycloak-ca | determine whether this cert bundles its own ca.crt"
+  ansible.builtin.set_fact:
+    keycloak_ca_configmap_published: "{{ 'ca.crt' in (_keycloak_ca_tls.resources[0].data | default({})) }}"
+
+- name: "keycloak-ca | publish the CA ConfigMap (cert bundles a ca.crt - e.g. Vault PKI)"
   kubernetes.core.k8s:
     state: present
     definition:
@@ -59,3 +81,13 @@
           zuno.io/managed-by: ansible
       data:
         ca-bundle.crt: "{{ _keycloak_ca_tls.resources[0].data['ca.crt'] | b64decode }}"
+  when: keycloak_ca_configmap_published | bool
+
+- name: "keycloak-ca | remove any stale CA ConfigMap (cert has no ca.crt - e.g. Let's Encrypt)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    name: "{{ publish_ca_configmap_name | default('rhtas-keycloak-ca') }}"
+    namespace: "{{ publish_ca_configmap_namespace }}"
+  when: not (keycloak_ca_configmap_published | bool)
