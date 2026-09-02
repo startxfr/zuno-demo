@@ -64,6 +64,29 @@ workspaces:
 workspaceLabelSelector:
   opendatahub.io/dashboard: "true"
 
+# ADR-0538/WP-116: which ServiceAccounts may write to each workspace. The
+# server checks Kubernetes RBAC on the mlflow.kubeflow.org group in the
+# workspace namespace, so a caller with no binding here authenticates and
+# then 403s on every call - silently, because tracking is non-fatal.
+#
+# zuno-mlops: the MLOps pipeline's own SA plus the KFP runner SA the step
+# pods actually execute as (they differ - the second is what a DSPA-launched
+# pod carries), and WP-119's TrainJob pods inherit the same pair.
+workspaceServiceAccounts:
+  zuno-mlops:
+    - zuno-mlops-d1-mlops
+    - pipeline-runner-mlops-dspa
+  # zuno-ai-run has no machine writer yet - the agents do not log runs.
+  zuno-ai-run: []
+
+# The virtual resources the auth plugin recognizes (its ALLOWED_RESOURCES).
+# Only the three the pipeline can plausibly need; the gateway* set is
+# deliberately excluded - nothing here touches the AI-gateway surface.
+workspaceResources:
+  - experiments
+  - datasets
+  - registeredmodels
+
 artifact:
   # The MLflowConfig CRD CEL-validates this name; keep it as-is.
   secretName: mlflow-artifact-connection

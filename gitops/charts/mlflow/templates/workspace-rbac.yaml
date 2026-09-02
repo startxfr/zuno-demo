@@ -1,0 +1,60 @@
+{{- /*
+ADR-0538/WP-116: the RBAC that makes a workspace usable by machine callers.
+
+The MLflow server authorizes every request with a Kubernetes
+SubjectAccessReview against the API group mlflow.kubeflow.org, scoped to
+the WORKSPACE namespace (verified live in the operand's own
+mlflow_kubernetes_plugins/auth/constants.py). Without this Role, a pipeline
+pod authenticates successfully and then gets 403 on every call - and because
+tracking is deliberately non-fatal (ADR-0538 decision 2), that shows up as
+"no runs appeared" rather than as an error. Live-hit 2026-09-03 by the
+backfill Job before this template existed.
+
+These are virtual resources: no CRD backs `experiments`, they exist only as
+SubjectAccessReview subjects. `oc api-resources` will not list them, which
+is why this file spells out why it is correct.
+*/ -}}
+{{- if .Values.mlflowConfig.enabled }}
+{{- range $ws := .Values.workspaces }}
+{{- $accounts := index $.Values.workspaceServiceAccounts $ws | default (list) }}
+{{- if $accounts }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mlflow-workspace-writer
+  namespace: {{ $ws }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+rules:
+  - apiGroups: ["mlflow.kubeflow.org"]
+    resources:
+{{- range $.Values.workspaceResources }}
+      - {{ . }}
+{{- end }}
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mlflow-workspace-writer
+  namespace: {{ $ws }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: mlflow-workspace-writer
+subjects:
+{{- range $sa := $accounts }}
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ $ws }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
