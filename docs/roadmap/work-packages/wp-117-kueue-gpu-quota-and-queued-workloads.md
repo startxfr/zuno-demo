@@ -35,18 +35,48 @@ cluster-wide totals - kept separate from the cpu/memory group because a Kueue re
 belong to only one group. Note `nvidia.com/gpu` allocatable is **zero** on these nodes:
 quotaing it would gate nothing.
 
+Quota re-read live 2026-09-03 before authoring, and it matched: both
+`machine.startx.io/group=gpu` nodes allocate `mig-1g.24gb: 2` + `mig-2g.48gb: 1`, giving the 4
+and 2 above, with `nvidia.com/gpu: 0` confirmed on both.
+
+**ADR-0351's taint belongs in `spec.tolerations`, not `spec.nodeTaints`.** `oc explain
+resourceflavor.spec` states that only `NoSchedule` and `NoExecute` are evaluated during
+admission and that `PreferNoSchedule` is *ignored* - and the GPU taint is exactly
+`nvidia.com/gpu=true:PreferNoSchedule`. Declared as a `nodeTaint` it would have been silently
+inert. As a toleration it is not: Kueue injects it into the admitted Workload's pods, so the
+soft preference keeps working for a queued GPU consumer, and nothing needs revisiting if that
+taint is ever hardened.
+
 ### Step 2 - LocalQueue and namespace opt-in
 LocalQueue `default` rendered per configured namespace (`zuno-ai-build` keeps its existing one,
 `zuno-ai-run` gains one - name `default` matches the DSC's `defaultLocalQueueName`, so the
 dashboard auto-detects it). Namespace label `kueue.openshift.io/managed: "true"` on
-`zuno-ai-run` via the namespaces chart. `zuno-mlops` deliberately gets neither: the operand
-integrates the `BatchJob` framework only, and its workloads are KFP-launched Pods.
+`zuno-ai-run` via the namespaces chart - **and on `zuno-ai-build` too**: it has carried a
+LocalQueue since ADR-0321 without ever carrying the label, so that queue could never have
+admitted anything. Labelling it is free (nothing there sets a queue-name) and removes a
+standing inconsistency. `zuno-mlops` deliberately gets neither: the operand integrates the
+`BatchJob` framework only, and its workloads are KFP-launched Pods.
 
 ### Step 3 - opt the evaluation Jobs in
 `kueue.x-k8s.io/queue-name: default` on the **Job** metadata of `garak-smoke`,
 `garak-security` and `ragas-eval`, behind a values flag so it is revertible without a template
 edit. Safe by construction: the operand runs `manageJobsWithoutQueueName: false`, so every
 other Job in the namespace is untouched.
+
+**The flag ships empty (unqueued), and turning it on is a deliberate operator action.** All
+three Jobs carry `argocd.argoproj.io/sync-options: Replace=true,Force=true` - they must, a
+Job's `spec.template` is immutable - so *any* change to their rendered metadata deletes and
+recreates all three and re-pulls their images, Garak's alone being 4.22 GiB. A peer session
+measured exactly that pattern on the models chart's prefetch Jobs the same day: 22 seconds
+from Replace-recreation to `EvictionThresholdMet` on a control-plane node already at 85% image
+-filesystem usage ([[diskpressure-master-cascades-into-mesh]], commit `6c55a5b7`). Shipping the
+label on by default would have made the *push itself* the trigger, on a cluster whose etcd
+nodes have the smallest disks and are schedulable. Empty-by-default separates "the code is
+merged" from "the churn happens", so the second can be timed.
+
+There is an upside worth stating: once queued, these three Jobs are serialised through a quota
+instead of all landing at once. The disk-pressure incident is a churn problem, so this WP is
+plausibly a small part of the remedy rather than a contributor to it.
 
 ### Step 4 - the training-jobs dashboard flag
 `trainingJobs: true` on `OdhDashboardConfig` (live patch - operator-created CR, ADR-0538
@@ -78,8 +108,13 @@ decision 5). No workload moves off KFP; this only makes the page usable.
    which is the correct failure mode but worth recognizing quickly.
 2. `activeDeadlineSeconds` is safe: a suspended Job has no `startTime`, and the Job controller
    resets it on unsuspend, so the 1800s/3600s budgets start at admission.
-3. The mesh sidecar's requests count toward the admitted Workload's usage - quota sizing must
-   not assume the app container alone.
+3. Whether the mesh sidecar's requests count toward the admitted Workload's usage is **open,
+   and was asserted here without proof**. Kueue's webhook builds the Workload from the Job's
+   pod template, while istio injection is a pod-creation webhook - so the sidecar plausibly is
+   NOT counted, which would mean real usage exceeds admitted usage. Read the Workload's
+   `spec.podSets[].template` at verification time and record the answer rather than assuming
+   it. Either way it is not a sizing risk here: the three Jobs request 1.25 CPU / 2.5Gi in
+   total against an 8 CPU / 32Gi quota, so even a 3x undercount admits comfortably.
 4. Stray live ResourceFlavors `default-flavor` and `nvidia-gpu-flavor` (empty spec, not in git,
    unreferenced) should be deleted once confirmed unused - cleanup, not a blocker.
 5. GPU quota interacts with ADR-0351's scale-from-zero if a GPU workload is ever queued: a

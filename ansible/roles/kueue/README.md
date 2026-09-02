@@ -32,10 +32,19 @@ CR; `templates/queue-resources.yaml` renders the default
 config already assumes exist, gated separately (`queueResources.enabled`)
 so operator installation and Zuno's own quota policy stay decoupled.
 
-No GPU `ResourceFlavor`/quota exists yet - required "before distributed
-training or queued model workloads are enabled," and none exist in this
-repository yet (same "prerequisite ahead of any consumer" shape used
-elsewhere for `nfd`/Custom Metrics Autoscaler/JobSet).
+ADR-0538/WP-117 discharged the GPU precondition ADR-0321 set for itself
+("must account for GPU `ResourceFlavor` and quotas before distributed
+training or queued model workloads are enabled"): a `gpu-mig` flavor
+selects the `machine.startx.io/group=gpu` nodes and the `ClusterQueue`
+gained a second `resourceGroup` holding the MIG resources, sized to the
+live cluster totals (`nvidia.com/mig-1g.24gb: 4`,
+`nvidia.com/mig-2g.48gb: 2`). `nvidia.com/gpu` is deliberately unquotaed -
+allocatable is zero on MIG-partitioned nodes.
+
+Enabling quota does not enable interception. The operand runs
+`manageJobsWithoutQueueName: false`, so a Job is queued only if it carries
+`kueue.x-k8s.io/queue-name` **and** lives in a namespace labelled
+`kueue.openshift.io/managed=true`. Both opt-ins are explicit.
 
 ## Package name and install mode
 

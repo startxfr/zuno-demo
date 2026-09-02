@@ -13,17 +13,24 @@
 # normally, so the d1 delete below only has to prune the operand CR itself.
 #
 # api_version v1beta2 is the CRDs' storage version (avoids a conversion-webhook
-# round-trip, same reasoning as precheck.yml). Names/namespace are hardcoded to
+# round-trip, same reasoning as precheck.yml). Names/namespaces are hardcoded to
 # match gitops/charts/kueue/values.yaml's queueResources defaults (this role has
 # no defaults/main.yml); `state: absent` is a safe no-op if never enabled.
-- name: "kueue | delete the default LocalQueue (queue resources, before the operand)"
+# ADR-0538/WP-117 widened that list: two LocalQueue namespaces, and a second
+# ResourceFlavor for the GPU/MIG quota. Both are listed here rather than looped
+# over a variable for the same reason the names are hardcoded - keeping the
+# teardown readable and independent of the chart's values at uninstall time.
+- name: "kueue | delete the default LocalQueues (queue resources, before the operand)"
   kubernetes.core.k8s:
     state: absent
     api_version: kueue.x-k8s.io/v1beta2
     kind: LocalQueue
     name: default
-    namespace: zuno-ai-build
+    namespace: "{{ item }}"
     wait: true
+  loop:
+    - zuno-ai-build
+    - zuno-ai-run
 
 - name: "kueue | delete the default ClusterQueue (queue resources, before the operand)"
   kubernetes.core.k8s:
@@ -33,13 +40,19 @@
     name: default
     wait: true
 
-- name: "kueue | delete the default ResourceFlavor (queue resources, before the operand)"
+# ResourceFlavors last of the three: a flavor referenced by a live ClusterQueue
+# carries the same `resource-in-use` finalizer the header describes, so the
+# queue above must go first.
+- name: "kueue | delete the ResourceFlavors (queue resources, before the operand)"
   kubernetes.core.k8s:
     state: absent
     api_version: kueue.x-k8s.io/v1beta2
     kind: ResourceFlavor
-    name: default
+    name: "{{ item }}"
     wait: true
+  loop:
+    - default
+    - gpu-mig
 
 - name: "kueue | delete the kueue GitOps Application (d1: operand CR + queue resources)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"

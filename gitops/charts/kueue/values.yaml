@@ -95,22 +95,60 @@ kueueOperand:
 # gitops/charts/openshift-ai/values.yaml's DataScienceCluster
 # `kueue.defaultClusterQueueName`/`defaultLocalQueueName: default`, so
 # that declared default queue name actually resolves to something.
-# GPU-aware ResourceFlavor/quota is deliberately NOT added yet (ADR-0321's
-# Operational considerations: "must account for GPU ResourceFlavor and
-# quotas before distributed training or queued model workloads are
-# enabled" - none exist in this repository yet, same "prerequisite ahead
-# of any consumer" shape as ADR-0317/ADR-0318).
+#
+# ADR-0538/WP-117 discharges ADR-0321's own Operational-considerations
+# precondition ("must account for GPU ResourceFlavor and quotas before
+# distributed training or queued model workloads are enabled") by adding
+# the gpuFlavor block below, now that WP-113's evaluation Jobs are real
+# consumers.
 queueResources:
   enabled: false
-  # zuno-ai-build, not zuno-ai-run: distributed training
-  # (trainer/trainingoperator, Kubeflow Trainer v2) is the only Kueue
-  # consumer named so far (see gitops/charts/jobset's Chart.yaml), and
-  # gitops/charts/openshift-ai/values.yaml's `workbenchNamespace` already
-  # puts build/training-side work in zuno-ai-build, not the runtime-side
-  # zuno-ai-run.
-  namespace: zuno-ai-build
+  # One LocalQueue per entry, all pointing at the single ClusterQueue.
+  # zuno-ai-build was the original (and until WP-117 the only) entry:
+  # distributed training (trainer/trainingoperator, Kubeflow Trainer v2)
+  # was the only Kueue consumer named at the time, and
+  # gitops/charts/openshift-ai/values.yaml's `workbenchNamespace` puts
+  # build/training-side work there. zuno-ai-run joins it for WP-117: the
+  # TrustyAI evaluation Jobs (garak, ragas) are the first workloads Kueue
+  # has ever actually admitted on this cluster.
+  #
+  # zuno-mlops is deliberately NOT here. kueueOperand.integrationFrameworks
+  # above is BatchJob-only, and the mlops training work runs as KFP-launched
+  # Pods, not Jobs - a LocalQueue there would be dormant by construction.
+  # Queueing that path is a Kubeflow-Trainer question (ADR-0538 decision 4),
+  # not a quota one.
+  namespaces:
+    - zuno-ai-build
+    - zuno-ai-run
   resourceFlavorName: default
   clusterQueueName: default
   localQueueName: default
   cpuQuota: "8"
   memoryQuota: 32Gi
+  # GPU quota, against the real MIG topology (ADR-0351). Read live from
+  # both `machine.startx.io/group=gpu` nodes 2026-09-03: each allocates
+  # mig-1g.24gb: 2 and mig-2g.48gb: 1, so the cluster-wide totals are 4
+  # and 2. `nvidia.com/gpu` allocatable is ZERO on these nodes (the MIG
+  # profiles replace the whole-GPU resource) - quotaing it would gate
+  # nothing, so it is deliberately absent.
+  gpuFlavor:
+    enabled: true
+    name: gpu-mig
+    nodeLabels:
+      machine.startx.io/group: gpu
+    # NOT expressed as spec.nodeTaints: `oc explain resourceflavor.spec`
+    # states that only NoSchedule and NoExecute are evaluated during
+    # admission and PreferNoSchedule is IGNORED - and ADR-0351's taint is
+    # exactly nvidia.com/gpu=true:PreferNoSchedule. Declaring it there
+    # would be inert. As a toleration it is not inert: Kueue injects it
+    # into the admitted Workload's pods, so a queued GPU consumer keeps
+    # the soft preference working in its favour, and this keeps working
+    # unchanged if that taint is ever hardened to NoSchedule.
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Equal
+        value: "true"
+        effect: PreferNoSchedule
+    resources:
+      nvidia.com/mig-1g.24gb: "4"
+      nvidia.com/mig-2g.48gb: "2"

@@ -177,6 +177,15 @@ platformNamespaces:
       opendatahub.io/dashboard: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
+      # ADR-0538/WP-117: opts this namespace into Kueue's admission webhook
+      # (`namespaceSelector: kueue.openshift.io/managed=true`). This
+      # namespace has carried a LocalQueue since ADR-0321 but the label was
+      # never set, so that queue was dormant by construction - nothing here
+      # could ever be admitted. Still fully opt-in per workload: with
+      # `manageJobsWithoutQueueName: false`, only a Job carrying
+      # `kueue.x-k8s.io/queue-name` is intercepted, and no build-side
+      # workload sets it today.
+      kueue.openshift.io/managed: "true"
       # ADR-0535/WP-111: policy.rhtas.com/include deliberately NOT set here.
       # Live finding, same day it was added then removed: the webhook's
       # "must be an image digest" check is unconditional - independent of
@@ -263,6 +272,17 @@ platformNamespaces:
       opendatahub.io/dashboard: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
+      # ADR-0538/WP-117: opts this namespace into Kueue's admission
+      # webhook, which the operand gates on this exact label
+      # (`namespaceSelector: kueue.openshift.io/managed=true`). Necessary
+      # but NOT sufficient to queue anything: with
+      # `manageJobsWithoutQueueName: false` a workload here is still only
+      # intercepted if it ALSO carries `kueue.x-k8s.io/queue-name`, which
+      # only the three TrustyAI evaluation Jobs do. Every other
+      # zuno-ai-run workload is unaffected by this label.
+      # zuno-mlops deliberately does not get it: its work is KFP-launched
+      # Pods, and the operand integrates the BatchJob framework only.
+      kueue.openshift.io/managed: "true"
       # ADR-0535/WP-111: see zuno-ai-build's identical comment above -
       # policy.rhtas.com/include deliberately not set (live finding: the
       # webhook's digest-format gate isn't governed by spec.mode: warn).
