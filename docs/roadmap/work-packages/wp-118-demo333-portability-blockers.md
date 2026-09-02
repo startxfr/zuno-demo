@@ -1,10 +1,10 @@
 # WP-118: Close the demo333 portability blockers recorded in ADR-0517
 
-- **State:** Repo work merged (step 4 of 5, 2026-09-02 — B7 and B8 closed; steps 1, 2,
-  3 and 5 not started). Step 4 also corrected ADR-0517's own B7 row, which described
-  the defect wrongly in a way that would have caused an outage if acted on. No
-  `demo333` cluster exists; every remaining step is repo-side and can land before one
-  is provisioned.
+- **State:** Repo work merged (steps 1 and 4 of 5, 2026-09-02 — B2/B3/B4 and B7/B8
+  closed; steps 2, 3 and 5 not started). No chart default names `demo222` any more.
+  Step 4 also corrected ADR-0517's own B7 row, which described the defect wrongly in a
+  way that would have caused an outage if acted on. No `demo333` cluster exists; every
+  remaining step is repo-side and can land before one is provisioned.
 - **ADRs:** ADR-0517 (Proposed, v0.8)
 - **Depends on:** nothing. Blocked by nothing — the ADR-0517 run itself is blocked on
   an operator provisioning `demo333`, but every blocker below is fixable without it.
@@ -43,7 +43,7 @@ Doing it in the other order rewrites live Route hosts, which are effectively imm
 
 ## Steps
 
-### Step 1 — domain literals (B2, B3, B4)
+### Step 1 — domain literals (B2, B3, B4) — **DONE 2026-09-02**
 
 Five charts bypass the token because they use a differently-named key or embed the
 domain mid-string: `grafana/values.yaml:74`, `kiali/values.yaml:60`,
@@ -55,8 +55,19 @@ their `gitops_app_extra_helm_values` replaces the block wholesale: `connectivity
 d1 apply, and `grafana`, which applies d1 **twice** — factor a shared base-values fact,
 as `lightspeed_config/tasks/install.yml:99` already does.
 
-Also rewrite the comments in `grafana/values.yaml:70-73` and `tempo/values.yaml:59-61`:
-they currently advertise the anti-pattern this step removes.
+Also rewrite the comments in `grafana/values.yaml` and `tempo/values.yaml`: they
+advertised the anti-pattern this step removes, and cited ADR-0517 for it — wrong twice,
+since the citing code belongs to the run_id tracing work whose ADR was never written.
+
+Landed as two commits, in the order the delivery constraint demands: `5c7ca097`
+(step 1a, tokens at the Application level, proven inert — all five substitute to
+exactly the value the chart default already carried), then the five Applications
+re-applied live (`make d1 install` for kiali/tempo/grafana, `make d2 install mlops`,
+`make d2 install agents` for connectivity-link-quota, all five Synced/Healthy after),
+then `b749d384` (step 1b, chart defaults flipped). grafana needed a role change too:
+it applies d1 twice and the second apply replaces the values block, so it dropped
+`appsDomain` the moment the manifest declared it — caught by this morning's
+`gitops_values_clobber` check, its first real save.
 
 ### Step 2 — AWS infra identity (B1)
 
