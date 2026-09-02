@@ -57,7 +57,25 @@ spec:
   model:
     uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.gptOssModel.servedModelName }}/"
     name: {{ .Values.gptOssModel.servedModelName | quote }}
+  {{- /*
+  ADR-0542/WP-121. spec.scaling and spec.replicas are mutually exclusive
+  in intent: scaling hands replica count to the autoscaler, replicas pins
+  it. Which one the controller honours when BOTH are set is not knowable
+  from the CRD schema, so this renders exactly one of them and never both
+  - the ambiguity is designed out rather than discovered in production.
+  maxReplicas is required by the schema; minReplicas is not.
+  */ -}}
+  {{- if .Values.gptOssModel.scaling.enabled }}
+  scaling:
+    minReplicas: {{ .Values.gptOssModel.minReplicas }}
+    maxReplicas: {{ .Values.gptOssModel.maxReplicas }}
+    {{- with .Values.gptOssModel.scaling.wva }}
+    wva:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- else }}
   replicas: {{ .Values.gptOssModel.minReplicas }}
+  {{- end }}
   template:
     # Same generic GPU-family guard the other GPU workloads use; the
     # resources request's mig-1g.24gb type is the real scheduling steer

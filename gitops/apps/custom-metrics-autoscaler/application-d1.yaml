@@ -3,6 +3,11 @@
 # application-d0.yaml). Empty spec - no ScaledObject/TriggerAuthentication
 # exists yet for it to act on (ADR-0318 installs the operator ahead of
 # any consumer).
+#
+# ADR-0542/WP-121: this Application still renders no ScaledObject, and
+# should not. The first one on this cluster is created BY KServe from
+# LLMInferenceService.spec.scaling (gitops/charts/models), not authored
+# here - so this stays empty while KEDA finally has an object to act on.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

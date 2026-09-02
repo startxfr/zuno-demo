@@ -576,6 +576,34 @@ gptOssModel:
       nvidia.com/mig-1g.24gb: "1"
   minReplicas: 1
   maxReplicas: 1
+  # ADR-0542/WP-121: the ONLY model carrying spec.scaling, and the only
+  # one that could ever carry it today.
+  #
+  # min == max == 1 is deliberate, not a placeholder. It makes the KServe
+  # controller create its autoscaling object (VariantAutoscaling +
+  # ScaledObject) - which is the point: the workload-variant-autoscaler
+  # has never had one, and ADR-0318's KEDA install has had zero
+  # ScaledObjects since it landed. With min == max nothing can actually
+  # scale, so the object exists without any exposure to the quota below.
+  #
+  # Raising maxReplicas is NOT a values edit. ResourceQuota
+  # zuno-ai-run-gpu-cap is saturated (requests.nvidia.com/mig-1g.24gb 3/3,
+  # mig-2g.48gb 2/2), so no model in this namespace can reach two replicas
+  # at all. Going to 2 means first raising that quota 3 -> 4, which spends
+  # the last physically free 24GB slice on the cluster and leaves ZERO
+  # rolling-update surge headroom - after which every 24GB-model rollout
+  # hits ProgressDeadlineExceeded unless surge is handled explicitly
+  # (ADR-0201's documented "Rollout hazard"). That is a separate,
+  # separately-approved change.
+  #
+  # NOT authored as a raw llmd.ai/VariantAutoscaling: the API server
+  # returns "VariantAutoscaling is deprecated and will be removed in a
+  # future release. Migrate to the annotation-based path" on every read.
+  # spec.scaling is the supported surface that creates it.
+  scaling:
+    enabled: true
+    # wva left empty: hpa/keda tuning is meaningless while min == max.
+    wva: {}
 
 # ADR-0526 (WP-087): the French urban-register variant, and the SAME
 # unmodified base it was fine-tuned from, served side by side.

@@ -160,3 +160,45 @@
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
   vars:
     _state_is_installed: "{{ _models_d0_installed and _state_check_result }}"
+
+# ADR-0542/WP-121: the autoscaling objects KServe derives from
+# LLMInferenceService.spec.scaling. Reported, never asserted - this is a
+# precheck, and the whole point of min == max == 1 is that the objects
+# exist without anything being able to scale.
+- name: "models | look up the autoscaling objects derived from spec.scaling (WP-121)"
+  kubernetes.core.k8s_info:
+    api_version: "{{ item.api }}"
+    kind: "{{ item.kind }}"
+    namespace: "{{ models_namespace | default('zuno-ai-run') }}"
+  register: _models_autoscaling
+  ignore_errors: true
+  loop:
+    - { api: llmd.ai/v1alpha1, kind: VariantAutoscaling }
+    - { api: keda.sh/v1alpha1, kind: ScaledObject }
+    - { api: autoscaling/v2, kind: HorizontalPodAutoscaler }
+  loop_control:
+    label: "{{ item.kind }}"
+
+# A ResourceQuota at its ceiling is why maxReplicas cannot be raised; show
+# it beside the objects so the two facts are never read apart.
+- name: "models | read the GPU ResourceQuota"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ResourceQuota
+    namespace: "{{ models_namespace | default('zuno-ai-run') }}"
+    name: "{{ models_gpu_quota_name | default('zuno-ai-run-gpu-cap') }}"
+  register: _models_gpu_quota
+  ignore_errors: true
+
+- name: "models | report autoscaling objects and GPU headroom"
+  ansible.builtin.debug:
+    msg: >-
+      VariantAutoscaling={{ _models_autoscaling.results[0].resources | default([]) | length }},
+      ScaledObject={{ _models_autoscaling.results[1].resources | default([]) | length }},
+      HorizontalPodAutoscaler={{ _models_autoscaling.results[2].resources | default([]) | length }}
+      | GPU quota
+      {{ 'not found'
+         if (_models_gpu_quota.resources | default([]) | length) == 0
+         else (_models_gpu_quota.resources[0].status.used | default({}) | to_json)
+              + ' used of '
+              + (_models_gpu_quota.resources[0].status.hard | default({}) | to_json) }}
