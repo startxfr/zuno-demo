@@ -93,7 +93,7 @@ repo.
 `ExternalSecret`s only resolve once their Vault path actually exists.
 `zuno/mariadb/root` is seeded by `ansible/roles/vault/tasks/install.yml`,
 which only runs via `make d0 install vault` (or `all`) - a targeted
-`make d0 install mariadb` on a cluster where `vault` hasn't been re-run
+`make d1 install mariadb` on a cluster where `vault` hasn't been re-run
 since this component was added will hang retrying
 `gitops | wait for zuno-mariadb-d1 to become Synced and Healthy` forever,
 because the `mariadb-root-password` `ExternalSecret` can never sync. The fix
@@ -130,8 +130,10 @@ openshift-gitops --type merge -p
 '{"operation":{"sync":{"revision":"HEAD","prune":true}}}'`, what the
 `argocd` CLI's `app sync` does under the hood).
 
-Run `make d0 check mariadb` → `make d0 install mariadb` again after any of
-the above to pick up wherever it left off.
+Run `make d1 check mariadb` → `make d1 install mariadb` again after any of
+the above to pick up wherever it left off. (`mariadb` is a Day 1 component -
+it is in the Makefile's `DAY1_RUN_COMPONENTS`, not `DAY0_COMPONENTS`, so a
+`make d0` form is rejected outright with "Unsupported day0 component".)
 
 ## Credentials
 

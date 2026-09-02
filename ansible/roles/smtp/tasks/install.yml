@@ -37,5 +37,5 @@
     msg: >-
       zuno_smtp_enabled is false in ansible/confidential.yml - skipping
       both smtp GitOps Applications. Set it to true (or remove it) and
-      re-run `make d0 install smtp` to enable the technical mail identity.
+      re-run `make d1 install smtp` to enable the technical mail identity.
   when: not (zuno_smtp_enabled | default(true) | bool)

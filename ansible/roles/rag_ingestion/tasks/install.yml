@@ -61,7 +61,7 @@
 # KFP v2beta1 HTTP API behind the DSPA's own OAuth-proxied Route - the same
 # path the OpenShift AI dashboard itself uses to create a schedule. Every
 # step below is wrapped so a failure here only skips scheduling, never
-# fails the rest of `make d1 install rag-ingestion`: the pipeline itself is
+# fails the rest of `make d2 install rag-ingestion`: the pipeline itself is
 # already usable via manual/dashboard-triggered runs regardless of whether
 # this succeeds. Re-verify each assumption below against a real cluster
 # (`oc get route -n zuno-ai-build | grep ds-pipeline`, a real `curl` against
@@ -98,7 +98,7 @@
       Skipping KFP recurring-run activation: could not resolve
       {{ 'the DSPA Route' if _rag_ingestion_kfp_api_base == '' else 'an OpenShift bearer token (oc whoami -t)' }}.
       Create the schedule manually via the OpenShift AI dashboard, or
-      re-run `make d1 install rag-ingestion` once `oc login` is active
+      re-run `make d2 install rag-ingestion` once `oc login` is active
       and the Route exists.
   when: _rag_ingestion_kfp_api_base == '' or _rag_ingestion_kfp_token == ''
 
@@ -167,7 +167,7 @@
           for the actual HTTP error). This does not block the rest of the
           install - create the schedule manually via the OpenShift AI
           dashboard instead, or correct the issue below and re-run
-          `make d1 install rag-ingestion`.
+          `make d2 install rag-ingestion`.
 
           Possible causes (unverified assumptions this block depends on -
           check each against the target cluster):

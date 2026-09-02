@@ -7,7 +7,7 @@ component contract, `platform_profile.yaml`'s declared version intent).
 No live cluster or registry needed - pure static text/YAML inspection,
 same style as `platform/supply-chain/check_build_matrix.py`.
 
-Eight checks, each independent (a failure in one doesn't block the others
+Nine checks, each independent (a failure in one doesn't block the others
 from reporting):
   - make_commands: every literal `make day0|d0|day1|d1 ...` example in
     README.md uses a verb/component this repository's actual Makefile
@@ -27,6 +27,11 @@ from reporting):
     real drift live 2026-08-30 - see ADR-0326/WP-31);
   - day0_day1_roles: every Makefile DAY0_COMPONENTS/DAY1_RUN_COMPONENTS/
     DAY1_BUILD_COMPONENTS entry has a matching ansible/roles/<name> role;
+  - debug_make_commands: every `make dN <verb> <component>` a debug task
+    prints to the operator is one the Makefile accepts - the auto_fix check
+    one surface further out (an operator types a printed instruction
+    verbatim; five were unrunnable when this was added, including the
+    mariadb role's own "how to enable backups" message);
   - gitops_values_clobber: no role's gitops_app_extra_helm_values dict drops
     a key its Application manifest declares - that variable REPLACES
     spec.source.helm.values wholesale (a YAML string key combine() cannot
@@ -249,6 +254,72 @@ def check_auto_fix_commands() -> List[Finding]:
                     component = ""
                 findings += _check_one_make_command(
                     day, verb, component, lists, f"{rel}: auto_fix", "auto_fix")
+    return findings
+
+
+DEBUG_PLACEHOLDER_RE = re.compile(r"[<\[{|]")
+
+
+def _debug_tasks(tasks) -> List[dict]:
+    """Every debug task in a playbook, including inside block/rescue/always."""
+    found: List[dict] = []
+    for task in tasks or []:
+        if not isinstance(task, dict):
+            continue
+        debug = task.get("ansible.builtin.debug") or task.get("debug")
+        if isinstance(debug, dict):
+            found.append(debug)
+        for key in ("block", "rescue", "always"):
+            if isinstance(task.get(key), list):
+                found += _debug_tasks(task[key])
+    return found
+
+
+def check_debug_make_commands() -> List[Finding]:
+    """Every `make dN <verb> <component>` printed by a debug task must be runnable.
+
+    Same rationale as check_auto_fix_commands, one surface further out: a
+    debug `msg` is printed straight to the operator mid-run, and they type it
+    verbatim. Nothing executes it, so a wrong day survives indefinitely while
+    looking authoritative.
+
+    Found five live instances when added 2026-09-02, all rejected by the
+    Makefile with "Unsupported dayN component": the mariadb role told the
+    operator to run `make d0 install mariadb` (Day 1) in the very message
+    printed when its S3 backup keys are unset - so the one instruction an
+    operator would follow to enable backups could not work. Also
+    `make d0 install smtp` (Day 1), `make d1 install mlops` and
+    `make d1 install rag-ingestion` (both Day 2), and `make d0 configure
+    keycloak` (no such verb).
+
+    Deliberately NOT extended to role READMEs: prose there is full of
+    placeholders (`<component>`, `[agents|platform|all]`, `make d1 build X`)
+    and alternation notation, which drowns the signal - a scan of them
+    produced 124 hits, nearly all punctuation artefacts. A component
+    containing a placeholder character is skipped here for the same reason.
+    """
+    findings: List[Finding] = []
+    lists = _parse_makefile_lists()
+    for path in sorted((REPO_ROOT / "ansible").rglob("*.yml")):
+        if path.name == "confidential.yml":
+            continue
+        try:
+            document = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(document, list):
+            continue
+        rel = path.relative_to(REPO_ROOT)
+        for debug in _debug_tasks(document):
+            text = f"{debug.get('msg', '')} {debug.get('var', '')}"
+            for day, verb, component in MAKE_COMMAND_RE.findall(text):
+                if "{{" in day or "{{" in verb:
+                    continue
+                component = (component or "").split("#", 1)[0].strip().strip("`\"',.:;)").strip()
+                if DEBUG_PLACEHOLDER_RE.search(component) or "{{" in component:
+                    component = ""
+                findings += _check_one_make_command(
+                    day, verb, component, lists, f"{rel}: debug msg", "debug_make_commands")
     return findings
 
 
@@ -611,6 +682,7 @@ def main() -> int:
         + check_wp_state()
         + check_agent_status_vs_adr()
         + check_day0_day1_roles()
+        + check_debug_make_commands()
         + check_gitops_values_clobber()
         + check_version_consistency(profile)
     )
@@ -618,7 +690,7 @@ def main() -> int:
     print("Checked README.md Make commands, Ansible auto_fix commands, "
           "docs/adr/README.md index, work-package state vs the roadmap trackers, "
           "agent zuno.status vs its governing ADR(s), Makefile/ansible role "
-          "consistency, GitOps Application values against the roles that replace them, "
+          "consistency, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
           f"and platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")

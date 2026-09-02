@@ -109,9 +109,10 @@
     msg: >-
       zuno_mariadb_backup_s3_* fields are not all set in
       ansible/confidential.yml - the mariadb MariaDB will not get a
-      PhysicalBackup schedule. Fill in the bucket/endpoint/region/
-      access_key_id/secret_access_key fields and re-run
-      `make d0 install mariadb` to add it.
+      PhysicalBackup schedule. Fill in all five of the bucket/endpoint/
+      region/access_key_id/secret_access_key fields (all five are required
+      together), then run `make d0 install vault` to seed zuno/mariadb/s3
+      followed by `make d1 install mariadb` to render the schedule.
   when: not (_mariadb_backup_s3_enabled | bool)
 
 # mariadbOperand.enabled/backups.s3.* live in the same chart, applied via

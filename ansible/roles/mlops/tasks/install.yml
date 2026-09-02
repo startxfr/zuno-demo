@@ -168,7 +168,7 @@
       acceptance-gate-ca ConfigMap. The evaluate stage will reach Keycloak
       and the agent frontends but fail every HTTPS call with
       CERTIFICATE_VERIFY_FAILED, which scores as an agent failure rather
-      than as the trust gap it is. Run `make d0 install openshift-oauth`
+      than as the trust gap it is. Run `make d1 install openshift-oauth`
       first, then re-run.
   when: (_mlops_gate_ca_cm.resources | default([]) | length) == 0
 
@@ -201,7 +201,7 @@
       demo-personas-password / <agent>-frontend-client-secret not found in
       zuno-auth, so zuno-mlops has no acceptance-gate-credentials Secret.
       Every pipeline stage will fail to start (the KFP task references that
-      Secret by name). Run `make d0 configure keycloak` first, then re-run.
+      Secret by name). Re-run `make d0 install keycloak` first, then re-run this.
   when: >-
     (_mlops_demo_password_secret.resources | default([]) | length) == 0 or
     (_mlops_client_secrets | default([]) | length) == 0
@@ -225,7 +225,7 @@
 # DSPA's own v2beta1 HTTP API - the "KFP pipeline upload" half of this
 # WP's own Goal statement - without creating a recurring run (see the
 # debug message above for why). A failure here only skips this
-# confirmation step, never fails the rest of `make d1 install mlops`.
+# confirmation step, never fails the rest of `make d2 install mlops`.
 - name: "mlops | resolve the caller's OpenShift bearer token for the DSPA API"
   ansible.builtin.command: oc whoami -t
   environment: "{{ k8s_auth_environment | default({}) }}"
@@ -305,8 +305,8 @@
     msg: >-
       Skipping pipeline-registration confirmation: could not resolve
       {{ 'the DSPA Route' if (_mlops_dspa_route.resources | default([]) | length) == 0 else 'an OpenShift bearer token (oc whoami -t)' }}.
-      Confirm manually via the OpenShift AI dashboard, or re-run `make d1
-      install mlops` once `oc login` is active and the Route exists.
+      Confirm manually via the OpenShift AI dashboard, or re-run
+      `make d2 install mlops` once `oc login` is active and the Route exists.
   when: >-
     (_mlops_dspa_route.resources | default([]) | length) == 0 or
     (_mlops_oc_token.stdout | default('') | trim) == ''
