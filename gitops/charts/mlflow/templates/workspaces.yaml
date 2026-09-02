@@ -48,7 +48,11 @@ spec:
 apiVersion: mlflow.kubeflow.org/v1
 kind: MLflowConfig
 metadata:
-  name: default
+  # Same singleton rule as the MLflow CR: the CRD rejects any other name
+  # ("MLflowConfig resource name must be 'mlflow'") - one config per
+  # namespace, not a named set. Learned from a rejected apply, not the
+  # schema.
+  name: mlflow
   namespace: {{ $ws }}
   labels:
     zuno.io/managed-by: argocd
