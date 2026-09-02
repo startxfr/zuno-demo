@@ -37,6 +37,12 @@ server:
     host: zuno-postgresql-primary.zuno-data.svc
     port: 5432
     database: mlflow
+    # PGO serves TLS with its own cluster CA, which MLflow's psycopg2 does
+    # not trust - the migration Job failed live with "SSL error: certificate
+    # verify failed". `require` keeps the connection encrypted without
+    # certificate verification, the same choice agent-runtime and mlops
+    # already make against this cluster.
+    sslmode: require
     # Seeded by ansible/roles/vault; the same credential PGO adopts for the
     # dedicated mlflow role (gitops/charts/postgresql). Letters/digits-only
     # password: it is interpolated un-encoded into the postgresql:// URI.
