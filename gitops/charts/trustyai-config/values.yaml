@@ -49,7 +49,7 @@ kueue:
   # 4.22 GiB pull per node rather than three. Reverting is setting this
   # back to "" - and doing that costs another Replace cycle, so revert for
   # a real reason, not for tidiness.
-  queueName: default
+  queueName: ""
 
 # WP-108: standalone built-in guardrails detectors (no orchestrator, no
 # InferenceService wiring - see templates/guardrailsorchestrator.yaml).
