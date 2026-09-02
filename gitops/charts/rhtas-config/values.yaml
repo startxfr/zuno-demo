@@ -17,14 +17,16 @@
 #
 # Package name/install mode confirmed live against this cluster's
 # redhat-operators catalog on 2026-09-02: "policy-controller-operator",
-# defaultChannel "stable", supports OwnNamespace AND AllNamespaces (unlike
-# rhtas-operator itself, which is AllNamespaces-only - WP-110's live
-# finding). OwnNamespace chosen, co-located in zuno-rhtas (already exists,
-# owned by gitops/charts/namespaces per WP-110) rather than a new
-# namespace, since Policy Controller only ever acts on RHTAS's own trust
-# material - same "operator group, dedicated namespace" shape as
-# gitops/charts/lightspeed, minus the `project` dependency (namespace
-# already exists here, not created by this chart).
+# defaultChannel "stable", CSV supports OwnNamespace AND AllNamespaces
+# (unlike rhtas-operator itself, which is AllNamespaces-only - WP-110's
+# live finding). BUT this operator's own admission webhook HARD-REJECTS
+# its PolicyController CR outside a namespace literally named
+# "policy-controller-operator" (second live finding, same day - originally
+# co-located in zuno-rhtas, which timed out/denied every sync until this
+# was found). Not a convention this repo chose - a fixed requirement, so
+# the namespace is declared in gitops/charts/namespaces, not this chart's
+# (disabled) `project` fallback - same "product-mandated namespace" shape
+# as openshift-lightspeed.
 operator:
   enabled: false
   context:
@@ -36,7 +38,7 @@ operator:
   subscription:
     enabled: true
     name: ""
-    namespace: zuno-rhtas
+    namespace: policy-controller-operator
     operator:
       name: ""
       channel: ""
@@ -47,8 +49,8 @@ operator:
   operatorGroup:
     enabled: true
     name: policy-controller-operator-group
-    namespace: zuno-rhtas
-    target: zuno-rhtas
+    namespace: policy-controller-operator
+    target: policy-controller-operator
 
 # TrustRoot's spec.remote.root is a base64-encoded TUF root.json, resolved
 # live from RHTAS's own TUF service at Ansible run time (cluster-specific,

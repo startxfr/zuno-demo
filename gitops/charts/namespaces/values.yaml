@@ -182,6 +182,26 @@ platformNamespaces:
       # ClusterImagePolicy spec.mode: warn - never a reject). Runs
       # aiagent-operator, mlops, rag-ingestion, supply-chain-signer.
       policy.rhtas.com/include: "true"
+
+  # ADR-0535/WP-111: policy-controller-operator's own admission webhook
+  # HARD-REJECTS its PolicyController CR unless created in a namespace
+  # literally named "policy-controller-operator" (live finding
+  # 2026-09-02: "PolicyController objects may only be created in the
+  # \"policy-controller-operator\" namespace" - not configurable, not a
+  # convention this repo chose). Unlike rhtas-operator (WP-110,
+  # AllNamespaces, no namespace constraint), this operator's Subscription/
+  # OperatorGroup and its PolicyController CR both go here - a genuine
+  # CSV-mandated fixed namespace, same category as openshift-lightspeed
+  # below, just with a name this repo didn't pick.
+  - name: policy-controller-operator
+    displayName: Sigstore Policy Controller
+    description: >-
+      policy-controller-operator (Red Hat Operators) and its
+      PolicyController activation CR - the Sigstore admission webhook
+      backing ADR-0535's audit-only ClusterImagePolicy (WP-111).
+    extraLabels:
+      zuno.io/managed: "true"
+
   - name: zuno-mlops
     displayName: Zuno MLOps
     description: >-

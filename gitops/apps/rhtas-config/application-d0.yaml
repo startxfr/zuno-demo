@@ -3,8 +3,12 @@
 # a SEPARATE operator from rhtas-operator, live finding 2026-09-02:
 # policy-controller-operator, not part of rhtas-operator's CRDs). The
 # TrustRoot/ClusterImagePolicy operand is a separate Application
-# (application-d1.yaml). OwnNamespace-scoped OperatorGroup, co-located in
-# zuno-rhtas (already exists, owned by zuno-namespaces-d0). ADR-0535/WP-111.
+# (application-d1.yaml). OwnNamespace-scoped OperatorGroup in
+# policy-controller-operator - a second live finding the same day: this
+# operator's own admission webhook hard-rejects its PolicyController CR
+# outside a namespace with that exact name, so (unlike WP-110's rhtas,
+# co-located in zuno-rhtas) this one gets its own product-mandated
+# namespace (owned by zuno-namespaces-d0). ADR-0535/WP-111.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -26,7 +30,7 @@ spec:
           enabled: true
   destination:
     server: https://kubernetes.default.svc
-    namespace: zuno-rhtas
+    namespace: policy-controller-operator
   ignoreDifferences:
     # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
     - group: operators.coreos.com

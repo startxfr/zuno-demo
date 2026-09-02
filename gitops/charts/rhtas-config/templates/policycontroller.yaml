@@ -16,10 +16,19 @@
 # clusterimagepolicy.yaml's spec.mode: warn, this is belt-and-braces
 # audit-only: even a labeled namespace can only ever get a warning, never
 # a reject, in this WP's scope.
+# Live finding, 2026-09-02: policy-controller-operator's own admission
+# webhook hard-rejects this CR outside a namespace literally named
+# "policy-controller-operator" ("PolicyController objects may only be
+# created in the \"policy-controller-operator\" namespace") - explicit
+# namespace here, not the Application's destination.namespace (zuno-rhtas,
+# still correct for the operator Subscription/OperatorGroup - see
+# application-d0.yaml - and for nothing else in this chart, since
+# TrustRoot/ClusterImagePolicy are Cluster-scoped).
 apiVersion: rhtas.charts.redhat.com/v1alpha1
 kind: PolicyController
 metadata:
   name: zuno-policy-controller
+  namespace: policy-controller-operator
   labels:
     zuno.io/managed-by: argocd
   annotations:
