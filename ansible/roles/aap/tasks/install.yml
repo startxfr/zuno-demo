@@ -65,14 +65,24 @@
     gitops_component_name: "aap"
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-aap-d0"
-    gitops_app_extra_helm_values:
-      operator:
-        enabled: true
-        subscription:
-          operator:
-            channel: "{{ _aap_channel }}"
-            source:
-              name: "{{ _aap_catalog_source }}"
+    # Starts from the manifest's own values and merges in only the
+    # runtime-discovered catalog/channel. This dict REPLACES
+    # spec.source.helm.values wholesale, so listing keys by hand silently drops
+    # whatever application-d0.yaml declares - `namespace` today, anything added
+    # later. Harmless so far only because the chart defaults happen to match;
+    # the same shape deleted ADR-0211's whole ACME track from cert-manager for
+    # nine days (2026-09-02). Subscript ['values'], never .values - dot
+    # notation resolves to the Python dict method of that name.
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/aap/application-d0.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+        | combine({'operator': {'enabled': true,
+                                'subscription': {'operator': {'channel': _aap_channel,
+                                                              'source': {'name': _aap_catalog_source}}}}},
+                  recursive=True)
+      }}
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 
@@ -189,16 +199,20 @@
     gitops_component_name: "aap"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-aap-d1"
-    gitops_app_extra_helm_values:
-      # clusterBaseDomain must be re-supplied here even though
-      # application-d1.yaml already sets it: apply_gitops_app.yml's
-      # gitops_app_extra_helm_values REPLACES spec.source.helm.values
-      # wholesale rather than merging (same gotcha keycloak's install.yml
-      # documents), so omitting it would silently fall back to the
-      # placeholder example domain.
-      aap:
-        enabled: true
-      clusterBaseDomain: "{{ cluster_base_domain }}"
+    # Reads application-d1.yaml rather than restating it. The hand-written
+    # dict this replaces supplied aap.enabled and clusterBaseDomain but not
+    # namespace/crName/adminSecretName, which the manifest also declares -
+    # they fell back to chart defaults that happen to be identical, so nothing
+    # broke, but the next manifest-only edit would have been silently ignored.
+    # Nothing here is runtime-discovered: clusterBaseDomain rides the
+    # apps.mycluster.example.com token substituted below, so there is nothing
+    # left to merge in.
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/aap/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+      }}
     gitops_app_wait_retries: 90
     gitops_app_wait_delay: 20
 

@@ -7,7 +7,7 @@ component contract, `platform_profile.yaml`'s declared version intent).
 No live cluster or registry needed - pure static text/YAML inspection,
 same style as `platform/supply-chain/check_build_matrix.py`.
 
-Seven checks, each independent (a failure in one doesn't block the others
+Eight checks, each independent (a failure in one doesn't block the others
 from reporting):
   - make_commands: every literal `make day0|d0|day1|d1 ...` example in
     README.md uses a verb/component this repository's actual Makefile
@@ -27,6 +27,13 @@ from reporting):
     real drift live 2026-08-30 - see ADR-0326/WP-31);
   - day0_day1_roles: every Makefile DAY0_COMPONENTS/DAY1_RUN_COMPONENTS/
     DAY1_BUILD_COMPONENTS entry has a matching ansible/roles/<name> role;
+  - gitops_values_clobber: no role's gitops_app_extra_helm_values dict drops
+    a key its Application manifest declares - that variable REPLACES
+    spec.source.helm.values wholesale (a YAML string key combine() cannot
+    merge into), so a missing key silently falls back to the chart default
+    while the Application still reports Synced/Healthy. This deleted
+    ADR-0211's entire ACME track from demo222 for nine days, found
+    2026-09-02 only by reading the live Application;
   - version_consistency: README.md/MEMORY.md/docs/architecture/*.md/
     docs/platform/*.md/platform/*/README.md don't state an OpenShift or
     OpenShift AI version other than platform_profile.yaml's declared
@@ -492,6 +499,75 @@ def check_day0_day1_roles() -> List[Finding]:
     return findings
 
 
+def check_gitops_values_clobber() -> List[Finding]:
+    """Catch roles whose gitops_app_extra_helm_values silently drops manifest keys.
+
+    apply_gitops_app.yml injects that variable as spec.source.helm.values, which
+    is a YAML *string* key - so combine(recursive=True) cannot merge into it and
+    the dict REPLACES the Application manifest's own values wholesale. Any key
+    declared in gitops/apps/<c>/application-<phase>.yaml but absent from the
+    role's dict therefore falls back to the chart default, with no error and the
+    Application still reporting Synced/Healthy.
+
+    This is not theoretical. It deleted ADR-0211's entire ACME track from
+    demo222 for nine days (cert_manager dropped certmanager.enabled and the acme
+    block; prune+selfHeal removed the ClusterIssuers, the Certificates and the
+    IngressController/APIServer patches), and separately kept the Keycloak
+    Ingress on its Vault-issued certificate by dropping ingress.acmeWildcardTLS.
+    Both were found on 2026-09-02 only by reading the live Application.
+
+    A role that passes a string instead of a dict is exempt: that is the fixed
+    form, which reads the manifest and merges in runtime-discovered values.
+    """
+    findings: List[Finding] = []
+    for tasks_file in sorted((REPO_ROOT / "ansible" / "roles").glob("*/tasks/*.yml")):
+        try:
+            tasks = yaml.safe_load(tasks_file.read_text())
+        except Exception:
+            continue
+        if not isinstance(tasks, list):
+            continue
+        for task in tasks:
+            if not isinstance(task, dict):
+                continue
+            include = task.get("ansible.builtin.include_tasks") or task.get("include_tasks") or ""
+            if "apply_gitops_app.yml" not in str(include):
+                continue
+            task_vars = task.get("vars") or {}
+            extra = task_vars.get("gitops_app_extra_helm_values")
+            # None: the manifest is applied verbatim, nothing can be dropped.
+            # str: the fixed form (a Jinja expression reading the manifest).
+            if extra is None or isinstance(extra, str):
+                continue
+            component = task_vars.get("gitops_component_name")
+            phase = task_vars.get("gitops_app_phase")
+            if not component or not phase or "{{" in str(component) or "{{" in str(phase):
+                continue
+            manifest = REPO_ROOT / "gitops" / "apps" / str(component) / f"application-{phase}.yaml"
+            if not manifest.exists():
+                continue
+            try:
+                declared = yaml.safe_load(
+                    yaml.safe_load(manifest.read_text())["spec"]["source"]["helm"]["values"]
+                )
+            except Exception:
+                continue
+            if not isinstance(declared, dict):
+                continue
+            dropped = [key for key in declared if key not in extra]
+            if dropped:
+                findings.append(Finding(
+                    "gitops_values_clobber",
+                    f"{tasks_file.relative_to(REPO_ROOT)}: the {component}/{phase} apply's "
+                    f"gitops_app_extra_helm_values drops {', '.join(sorted(dropped))} declared in "
+                    f"gitops/apps/{component}/application-{phase}.yaml - that dict REPLACES "
+                    f"spec.source.helm.values, so those keys silently fall back to chart defaults. "
+                    f"Read the manifest and merge in only runtime-discovered values instead "
+                    f"(see ansible/roles/cert_manager/tasks/install.yml)",
+                ))
+    return findings
+
+
 def check_version_consistency(profile: dict) -> List[Finding]:
     findings: List[Finding] = []
     target = profile["openshift"]["target"]
@@ -535,13 +611,15 @@ def main() -> int:
         + check_wp_state()
         + check_agent_status_vs_adr()
         + check_day0_day1_roles()
+        + check_gitops_values_clobber()
         + check_version_consistency(profile)
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
           "docs/adr/README.md index, work-package state vs the roadmap trackers, "
           "agent zuno.status vs its governing ADR(s), Makefile/ansible role "
-          f"consistency, and platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}.")
+          "consistency, GitOps Application values against the roles that replace them, "
+          f"and platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")
         return 0
