@@ -161,6 +161,19 @@ pair). This is distinct from `spec.components.trustyai` itself, which stays insi
 1 `openshift-ai` component - `trustyai-config` has no Day 1 half of its own because there is no
 separate operator to install.
 
+Two visibility clarifications from the 2026-09-02 human live test (which failed on exactly this
+point - the chain worked but was invisible in every UI, spawning WP-113):
+- The RHOAI dashboard's only TrustyAI surface, the per-project "Model monitoring bias" card
+  ("Configure TrustyAI service"), configures a `TrustyAIService` CR - the predictive-model
+  bias/fairness monitoring service. It is **deliberately left unconfigured**: it is unrelated to
+  this ADR's generative evaluation/guardrails scope, and configuring it would only make the card
+  look populated while monitoring nothing. Do not "fix" the empty card.
+- None of this ADR's real artifacts (`LMEvalJob`, `GuardrailsOrchestrator`, the Garak/RAGAS Jobs,
+  the observe-only detections) appear anywhere in the RHOAI dashboard on this release train. The
+  intended observability surface is the `zuno-trustyai` Grafana dashboard (WP-113): guardrails
+  and evaluation results pushed as metrics through the platform's standard OTLP pipeline
+  (ADR-0029), alongside CLI/`make d3 check trustyai-config`.
+
 Guardrail enforcement (the `GuardrailsOrchestrator`/NeMo detectors and the Agent Runtime
 evaluation hooks) starts in observe/log-only mode: evaluations run and are recorded, but no request is blocked on their
 result. Flipping any of this to blocking enforcement is a deliberate, separate decision made once
@@ -178,7 +191,10 @@ observe-only, not yet wired to real agent traffic; its live run is what refuted 
 and [WP-109](../roadmap/work-packages/wp-109-trustyai-zuno-stack-integration-and-model-comparison.md)
 (Phase 2's Zuno-specific wiring at the Agent Runtime boundary, merged with Phase 3's PEFT/LoRA
 comparison gate rather than scheduled as a separate WP - a decision made when these WPs were
-authored, since both extend the same evaluation chain onto Zuno-specific content). Concrete
+authored, since both extend the same evaluation chain onto Zuno-specific content). A fourth WP,
+[WP-113](../roadmap/work-packages/wp-113-trustyai-observability-dashboard.md), was added
+2026-09-02 after the human live test of the implemented chain failed on UI visibility: it gives
+the chain its Grafana observability surface (see Operational considerations). Concrete
 evaluation datasets, thresholds and evaluation policies beyond what these three WPs establish are
 still left to later ADRs/WPs as the Zuno architecture matures, as is any move from observe-only to
 blocking guardrail enforcement.
