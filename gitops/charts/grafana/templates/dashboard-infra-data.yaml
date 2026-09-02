@@ -14,6 +14,22 @@
 # kube_node_info), so those panels are deliberately left unfiltered by
 # $node; only the node-readiness table (kube_node_status_condition, which
 # DOES carry a "node" label) honors it.
+#
+# Layout reworked 2026-09-02 into rows using the CLASSIC schema's native
+# "row" panel type (type: row, collapsed: true/false), NOT Grafana's v2
+# schema - a first attempt at row-grouping via the v2 "Dashboard" schema
+# (elements/layout/vizConfig) broke every one of these dashboards'
+# GitOps sync: grafana-operator v5.24.0 posts spec.json to the classic
+# /api/dashboards/db endpoint, which rejects a v2-format body outright,
+# and even a correctly-wrapped v2 body ({"apiVersion":...,"kind":
+# "Dashboard","spec":{...}}) still gets rejected for any dashboard that
+# already exists ("must not include an id on the root element" - the
+# operator injects the dashboard's known internal id on every update).
+# That whole attempt was reverted (see git history). The classic "row"
+# panel type below was live-verified against this same endpoint first
+# (a throwaway probe dashboard, both an expanded and a collapsed row)
+# before being applied here - no known incompatibility with this
+# operator version.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -34,241 +50,712 @@ spec:
       "uid": "zuno-infra-data",
       "title": "Infrastructure",
       "description": "ADR-0413: node/pod/deployment health, node and pod resource consumption (CPU/RAM/GPU/disk/network/errors). Database exporters moved to dashboard-data.yaml and ArgoCD sync health to dashboard-gitops.yaml on 2026-09-01.",
-      "tags": ["zuno", "infra", "kubernetes"],
+      "tags": [
+        "zuno",
+        "infra",
+        "kubernetes"
+      ],
       "timezone": "browser",
       "schemaVersion": 39,
-      "time": {"from": "now-6h", "to": "now"},
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
       "refresh": "30s",
       "links": [
-        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
-      ],
-      "templating": {"list": [
         {
-          "current": {"text": "zuno-.*", "value": "zuno-.*"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)",
-          "hide": 0, "includeAll": true, "allValue": "zuno-.*", "multi": true,
-          "name": "namespace", "options": [],
-          "query": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(kube_node_info, node)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "node", "options": [],
-          "query": "label_values(kube_node_info, node)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "pod", "options": [],
-          "query": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+          "type": "dashboards",
+          "tags": [
+            "zuno"
+          ],
+          "asDropdown": true,
+          "keepTime": true,
+          "title": "Zuno dashboards"
         }
-      ]},
+      ],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "text": "zuno-.*",
+              "value": "zuno-.*"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": "zuno-.*",
+            "multi": true,
+            "name": "namespace",
+            "options": [],
+            "query": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(kube_node_info, node)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "node",
+            "options": [],
+            "query": "label_values(kube_node_info, node)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "pod",
+            "options": [],
+            "query": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
       "panels": [
+        {
+          "id": 1018,
+          "type": "row",
+          "title": "Cluster health",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "panels": []
+        },
         {
           "id": 1,
           "title": "Pod status by namespace",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 1
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, phase) (kube_pod_status_phase{namespace=~\"$namespace\"})", "legendFormat": "{{`{{namespace}}`}} ({{`{{phase}}`}})"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (namespace, phase) (kube_pod_status_phase{namespace=~\"$namespace\"})",
+              "legendFormat": "{{`{{namespace}}`}} ({{`{{phase}}`}})"
+            }
           ]
         },
         {
           "id": 2,
           "title": "Pod restarts (last hour)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 1
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[1h])) > 0", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[1h])) > 0",
+              "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"
+            }
           ]
         },
         {
           "id": 3,
           "title": "Deployment availability",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 9
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1
+            }
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_deployment_status_replicas_available{namespace=~\"$namespace\"} / kube_deployment_spec_replicas{namespace=~\"$namespace\"}", "legendFormat": "{{`{{namespace}}`}}/{{`{{deployment}}`}}"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "kube_deployment_status_replicas_available{namespace=~\"$namespace\"} / kube_deployment_spec_replicas{namespace=~\"$namespace\"}",
+              "legendFormat": "{{`{{namespace}}`}}/{{`{{deployment}}`}}"
+            }
           ]
         },
         {
           "id": 4,
           "title": "Component status (pod-health + BFF error-rate approximation)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 9
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (agent) (rate(zuno_bff_requests_total{code=~\"5..\"}[5m]))", "legendFormat": "bff errors: {{`{{agent}}`}}"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Failed\"})", "legendFormat": "failed pods: {{`{{namespace}}`}}"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (agent) (rate(zuno_bff_requests_total{code=~\"5..\"}[5m]))",
+              "legendFormat": "bff errors: {{`{{agent}}`}}"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (namespace) (kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Failed\"})",
+              "legendFormat": "failed pods: {{`{{namespace}}`}}"
+            }
           ]
         },
         {
           "id": 5,
           "title": "Node readiness / schedulability",
           "type": "table",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 17
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_node_status_condition{condition=\"Ready\", node=~\"$node\"} == 1", "format": "table", "instant": true},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_node_spec_unschedulable{node=~\"$node\"}", "format": "table", "instant": true}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "kube_node_status_condition{condition=\"Ready\", node=~\"$node\"} == 1",
+              "format": "table",
+              "instant": true
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "kube_node_spec_unschedulable{node=~\"$node\"}",
+              "format": "table",
+              "instant": true
+            }
           ]
         },
         {
-          "id": 6,
-          "title": "Node CPU utilization",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
-          "fieldConfig": {"defaults": {"unit": "percentunit"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))", "legendFormat": "{{`{{instance}}`}}"}
+          "id": 1019,
+          "type": "row",
+          "title": "Node resources",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 25
+          },
+          "panels": [
+            {
+              "id": 6,
+              "title": "Node CPU utilization",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percentunit"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))",
+                  "legendFormat": "{{`{{instance}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 7,
+              "title": "Node memory utilization",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percentunit"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+                  "legendFormat": "{{`{{instance}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 8,
+              "title": "Node disk IO",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "Bps"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (instance) (rate(node_disk_read_bytes_total[5m]))",
+                  "legendFormat": "{{`{{instance}}`}} (read)"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (instance) (rate(node_disk_written_bytes_total[5m]))",
+                  "legendFormat": "{{`{{instance}}`}} (write)"
+                }
+              ]
+            },
+            {
+              "id": 9,
+              "title": "Node network IO",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "Bps"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (instance) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*\"}[5m]))",
+                  "legendFormat": "{{`{{instance}}`}} (rx)"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{device!~\"lo|veth.*\"}[5m]))",
+                  "legendFormat": "{{`{{instance}}`}} (tx)"
+                }
+              ]
+            },
+            {
+              "id": 10,
+              "title": "GPU utilization by node",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "description": "Summary view - see dashboard-ai-models.yaml for full GPU/DCGM detail.",
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percent"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL)",
+                  "legendFormat": "{{`{{Hostname}}`}}"
+                }
+              ]
+            }
           ]
         },
         {
-          "id": 7,
-          "title": "Node memory utilization",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
-          "fieldConfig": {"defaults": {"unit": "percentunit"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{`{{instance}}`}}"}
+          "id": 1020,
+          "type": "row",
+          "title": "Namespace resources",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 26
+          },
+          "panels": [
+            {
+              "id": 11,
+              "title": "CPU usage by namespace",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}[5m]))",
+                  "legendFormat": "{{`{{namespace}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 12,
+              "title": "Memory working set by namespace",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "bytes"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\"})",
+                  "legendFormat": "{{`{{namespace}}`}}"
+                }
+              ]
+            }
           ]
         },
         {
-          "id": 8,
-          "title": "Node disk IO",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
-          "fieldConfig": {"defaults": {"unit": "Bps"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_disk_read_bytes_total[5m]))", "legendFormat": "{{`{{instance}}`}} (read)"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_disk_written_bytes_total[5m]))", "legendFormat": "{{`{{instance}}`}} (write)"}
-          ]
-        },
-        {
-          "id": 9,
-          "title": "Node network IO",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
-          "fieldConfig": {"defaults": {"unit": "Bps"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*\"}[5m]))", "legendFormat": "{{`{{instance}}`}} (rx)"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{device!~\"lo|veth.*\"}[5m]))", "legendFormat": "{{`{{instance}}`}} (tx)"}
-          ]
-        },
-        {
-          "id": 10,
-          "title": "GPU utilization by node",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "Summary view - see dashboard-ai-models.yaml for full GPU/DCGM detail.",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
-          "fieldConfig": {"defaults": {"unit": "percent"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL)", "legendFormat": "{{`{{Hostname}}`}}"}
-          ]
-        },
-        {
-          "id": 11,
-          "title": "CPU usage by namespace",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}"}
-          ]
-        },
-        {
-          "id": 12,
-          "title": "Memory working set by namespace",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
-          "fieldConfig": {"defaults": {"unit": "bytes"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\"})", "legendFormat": "{{`{{namespace}}`}}"}
-          ]
-        },
-        {
-          "id": 13,
-          "title": "CPU usage by pod",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
-          ]
-        },
-        {
-          "id": 14,
-          "title": "Memory working set by pod",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48},
-          "fieldConfig": {"defaults": {"unit": "bytes"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"})", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
-          ]
-        },
-        {
-          "id": 15,
-          "title": "Pod network IO",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "Raw pod/NIC counters (cAdvisor) - moved from the retired dashboard-network-mesh.yaml, which kept this separate from mesh-attributed Istio bandwidth (different Prometheus stack, dashboard-mesh-gateway.yaml).",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56},
-          "fieldConfig": {"defaults": {"unit": "Bps"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_receive_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (rx)"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_transmit_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (tx)"}
-          ]
-        },
-        {
-          "id": 16,
-          "title": "Pod network errors / drops",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 56},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_receive_errors_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_errors_total{namespace=~\"$namespace\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (errors)"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_receive_packets_dropped_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_packets_dropped_total{namespace=~\"$namespace\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (drops)"}
-          ]
-        },
-        {
-          "id": 17,
-          "title": "Container disk IO",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 64},
-          "fieldConfig": {"defaults": {"unit": "Bps"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_fs_reads_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]) + rate(container_fs_writes_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
-          ]
-        },
-        {
-          "id": 18,
-          "title": "PVC usage",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 64},
-          "fieldConfig": {"defaults": {"unit": "percentunit"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kubelet_volume_stats_used_bytes{namespace=~\"$namespace\"} / kubelet_volume_stats_capacity_bytes{namespace=~\"$namespace\"}", "legendFormat": "{{`{{namespace}}`}}/{{`{{persistentvolumeclaim}}`}}"}
+          "id": 1021,
+          "type": "row",
+          "title": "Pod & container resources",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 27
+          },
+          "panels": [
+            {
+              "id": 13,
+              "title": "CPU usage by pod",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"}[5m]))",
+                  "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 14,
+              "title": "Memory working set by pod",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "bytes"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"})",
+                  "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 15,
+              "title": "Pod network IO",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "description": "Raw pod/NIC counters (cAdvisor) - moved from the retired dashboard-network-mesh.yaml, which kept this separate from mesh-attributed Istio bandwidth (different Prometheus stack, dashboard-mesh-gateway.yaml).",
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "Bps"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace, pod) (rate(container_network_receive_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))",
+                  "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (rx)"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace, pod) (rate(container_network_transmit_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))",
+                  "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (tx)"
+                }
+              ]
+            },
+            {
+              "id": 16,
+              "title": "Pod network errors / drops",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace, pod) (rate(container_network_receive_errors_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_errors_total{namespace=~\"$namespace\"}[5m]))",
+                  "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (errors)"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace, pod) (rate(container_network_receive_packets_dropped_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_packets_dropped_total{namespace=~\"$namespace\"}[5m]))",
+                  "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (drops)"
+                }
+              ]
+            },
+            {
+              "id": 17,
+              "title": "Container disk IO",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "Bps"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (namespace, pod) (rate(container_fs_reads_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]) + rate(container_fs_writes_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))",
+                  "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 18,
+              "title": "PVC usage",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 16
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percentunit"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "kubelet_volume_stats_used_bytes{namespace=~\"$namespace\"} / kubelet_volume_stats_capacity_bytes{namespace=~\"$namespace\"}",
+                  "legendFormat": "{{`{{namespace}}`}}/{{`{{persistentvolumeclaim}}`}}"
+                }
+              ]
+            }
           ]
         }
       ]

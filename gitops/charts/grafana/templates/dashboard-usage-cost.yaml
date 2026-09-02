@@ -21,6 +21,22 @@
 # X-Zuno-Agent header agent-runtime already sends on every call (only used
 # for routing/adapter lookups until now). Requires the same rebuild/
 # redeploy of ai-gateway as any other telemetry.py change.
+#
+# Layout reworked 2026-09-02 into rows using the CLASSIC schema's native
+# "row" panel type (type: row, collapsed: true/false), NOT Grafana's v2
+# schema - a first attempt at row-grouping via the v2 "Dashboard" schema
+# (elements/layout/vizConfig) broke every one of these dashboards'
+# GitOps sync: grafana-operator v5.24.0 posts spec.json to the classic
+# /api/dashboards/db endpoint, which rejects a v2-format body outright,
+# and even a correctly-wrapped v2 body ({"apiVersion":...,"kind":
+# "Dashboard","spec":{...}}) still gets rejected for any dashboard that
+# already exists ("must not include an id on the root element" - the
+# operator injects the dashboard's known internal id on every update).
+# That whole attempt was reverted (see git history). The classic "row"
+# panel type below was live-verified against this same endpoint first
+# (a throwaway probe dashboard, both an expanded and a collapsed row)
+# before being applied here - no known incompatibility with this
+# operator version.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -41,175 +57,481 @@ spec:
       "uid": "zuno-usage-cost",
       "title": "Usage & cost",
       "description": "ADR-0029/ADR-0413: model calls/tokens/cost and API requests by user and Keycloak group, filterable by user/group/agent/model/provider.",
-      "tags": ["zuno", "usage", "cost"],
+      "tags": [
+        "zuno",
+        "usage",
+        "cost"
+      ],
       "timezone": "browser",
       "schemaVersion": 39,
-      "time": {"from": "now-24h", "to": "now"},
+      "time": {
+        "from": "now-24h",
+        "to": "now"
+      },
       "refresh": "30s",
       "links": [
-        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
-      ],
-      "templating": {"list": [
         {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(zuno_model_calls_total, user)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "user", "options": [],
-          "query": "label_values(zuno_model_calls_total, user)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(zuno_model_calls_total, group)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "group", "options": [],
-          "query": "label_values(zuno_model_calls_total, group)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(zuno_bff_requests_total, agent)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "agent", "options": [],
-          "query": "label_values(zuno_bff_requests_total, agent)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(zuno_model_calls_total, model)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "model", "options": [],
-          "query": "label_values(zuno_model_calls_total, model)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(zuno_model_calls_total, provider)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "provider", "options": [],
-          "query": "label_values(zuno_model_calls_total, provider)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+          "type": "dashboards",
+          "tags": [
+            "zuno"
+          ],
+          "asDropdown": true,
+          "keepTime": true,
+          "title": "Zuno dashboards"
         }
-      ]},
+      ],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(zuno_model_calls_total, user)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "user",
+            "options": [],
+            "query": "label_values(zuno_model_calls_total, user)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(zuno_model_calls_total, group)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "group",
+            "options": [],
+            "query": "label_values(zuno_model_calls_total, group)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(zuno_bff_requests_total, agent)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "agent",
+            "options": [],
+            "query": "label_values(zuno_bff_requests_total, agent)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(zuno_model_calls_total, model)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "model",
+            "options": [],
+            "query": "label_values(zuno_model_calls_total, model)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(zuno_model_calls_total, provider)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "provider",
+            "options": [],
+            "query": "label_values(zuno_model_calls_total, provider)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
       "panels": [
+        {
+          "id": 1011,
+          "type": "row",
+          "title": "By user",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "panels": []
+        },
         {
           "id": 1,
           "title": "Model calls (top 20 users, over range)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 1
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(20, sum by (user) (increase(zuno_model_calls_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range])))", "legendFormat": "{{`{{user}}`}}"}
-          ]
-        },
-        {
-          "id": 2,
-          "title": "Model calls (by group, over range)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (group) (increase(zuno_model_calls_total{group=~\"$group\", model=~\"$model\", provider=~\"$provider\"}[$__range]))", "legendFormat": "{{`{{group}}`}}"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "topk(20, sum by (user) (increase(zuno_model_calls_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range])))",
+              "legendFormat": "{{`{{user}}`}}"
+            }
           ]
         },
         {
           "id": 3,
           "title": "Estimated cost (top 20 users, over range)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 1
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD"
+            }
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(20, sum by (user) (increase(zuno_model_cost_usd_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range])))", "legendFormat": "{{`{{user}}`}}"}
-          ]
-        },
-        {
-          "id": 4,
-          "title": "Tokens consumed (by group/kind, over range)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (group, kind) (increase(zuno_model_tokens_total{group=~\"$group\", model=~\"$model\", provider=~\"$provider\"}[$__range]))", "legendFormat": "{{`{{group}}`}} ({{`{{kind}}`}})"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "topk(20, sum by (user) (increase(zuno_model_cost_usd_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range])))",
+              "legendFormat": "{{`{{user}}`}}"
+            }
           ]
         },
         {
           "id": 5,
           "title": "API requests (top 20 users, over range)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 9
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(20, sum by (user) (increase(zuno_bff_requests_total{user=~\"$user\", agent=~\"$agent\"}[$__range])))", "legendFormat": "{{`{{user}}`}}"}
-          ]
-        },
-        {
-          "id": 6,
-          "title": "API requests (by group/agent, over range)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (group, agent) (increase(zuno_bff_requests_total{group=~\"$group\", agent=~\"$agent\"}[$__range]))", "legendFormat": "{{`{{group}}`}} / {{`{{agent}}`}}"}
-          ]
-        },
-        {
-          "id": 7,
-          "title": "Cost by provider/model (over range)",
-          "type": "piechart",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
-          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (provider, model) (increase(zuno_model_cost_usd_total{provider=~\"$provider\", model=~\"$model\"}[$__range]))", "legendFormat": "{{`{{provider}}`}}/{{`{{model}}`}}"}
-          ]
-        },
-        {
-          "id": 8,
-          "title": "Hourly spend (by provider)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
-          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (provider) (increase(zuno_model_cost_usd_total{provider=~\"$provider\"}[1h]))", "legendFormat": "{{`{{provider}}`}}"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "topk(20, sum by (user) (increase(zuno_bff_requests_total{user=~\"$user\", agent=~\"$agent\"}[$__range])))",
+              "legendFormat": "{{`{{user}}`}}"
+            }
           ]
         },
         {
           "id": 9,
           "title": "Top token consumers (over range)",
           "type": "table",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 17
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(20, sum by (user) (increase(zuno_model_tokens_total{user=~\"$user\"}[$__range])))", "format": "table", "instant": true}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "topk(20, sum by (user) (increase(zuno_model_tokens_total{user=~\"$user\"}[$__range])))",
+              "format": "table",
+              "instant": true
+            }
           ]
         },
         {
-          "id": 10,
-          "title": "Model cost by user & agent (top 20, over range)",
-          "type": "table",
-          "description": "zuno_model_cost_usd_total's agent label (ADR-0029) - populated once ai-gateway forwards X-Zuno-Agent into model_call_span, same redeploy this dashboard's other panels needed.",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
-          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "topk(20, sum by (user, agent) (increase(zuno_model_cost_usd_total{user=~\"$user\", agent=~\"$agent\"}[$__range])))", "format": "table", "instant": true}
+          "id": 1012,
+          "type": "row",
+          "title": "By group & agent",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 25
+          },
+          "panels": [
+            {
+              "id": 2,
+              "title": "Model calls (by group, over range)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (group) (increase(zuno_model_calls_total{group=~\"$group\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
+                  "legendFormat": "{{`{{group}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 4,
+              "title": "Tokens consumed (by group/kind, over range)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (group, kind) (increase(zuno_model_tokens_total{group=~\"$group\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
+                  "legendFormat": "{{`{{group}}`}} ({{`{{kind}}`}})"
+                }
+              ]
+            },
+            {
+              "id": 6,
+              "title": "API requests (by group/agent, over range)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (group, agent) (increase(zuno_bff_requests_total{group=~\"$group\", agent=~\"$agent\"}[$__range]))",
+                  "legendFormat": "{{`{{group}}`}} / {{`{{agent}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 10,
+              "title": "Model cost by user & agent (top 20, over range)",
+              "type": "table",
+              "description": "zuno_model_cost_usd_total's agent label (ADR-0029) - populated once ai-gateway forwards X-Zuno-Agent into model_call_span, same redeploy this dashboard's other panels needed.",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "currencyUSD"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "topk(20, sum by (user, agent) (increase(zuno_model_cost_usd_total{user=~\"$user\", agent=~\"$agent\"}[$__range])))",
+                  "format": "table",
+                  "instant": true
+                }
+              ]
+            },
+            {
+              "id": 11,
+              "title": "Tokens by agent (over range)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (agent, kind) (increase(zuno_model_tokens_total{agent=~\"$agent\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
+                  "legendFormat": "{{`{{agent}}`}} ({{`{{kind}}`}})"
+                }
+              ]
+            }
           ]
         },
         {
-          "id": 11,
-          "title": "Tokens by agent (over range)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (agent, kind) (increase(zuno_model_tokens_total{agent=~\"$agent\", model=~\"$model\", provider=~\"$provider\"}[$__range]))", "legendFormat": "{{`{{agent}}`}} ({{`{{kind}}`}})"}
+          "id": 1013,
+          "type": "row",
+          "title": "By provider & model",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 26
+          },
+          "panels": [
+            {
+              "id": 7,
+              "title": "Cost by provider/model (over range)",
+              "type": "piechart",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "currencyUSD"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (provider, model) (increase(zuno_model_cost_usd_total{provider=~\"$provider\", model=~\"$model\"}[$__range]))",
+                  "legendFormat": "{{`{{provider}}`}}/{{`{{model}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 8,
+              "title": "Hourly spend (by provider)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "currencyUSD"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (provider) (increase(zuno_model_cost_usd_total{provider=~\"$provider\"}[1h]))",
+                  "legendFormat": "{{`{{provider}}`}}"
+                }
+              ]
+            }
           ]
         }
       ]

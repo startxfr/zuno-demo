@@ -17,6 +17,22 @@
 #   gap; Limitador's per-limit counters need a RateLimitPolicy (none
 #   attached). Both populate with zero further Grafana work once those two
 #   gaps close upstream.
+#
+# Layout reworked 2026-09-02 into rows using the CLASSIC schema's native
+# "row" panel type (type: row, collapsed: true/false), NOT Grafana's v2
+# schema - a first attempt at row-grouping via the v2 "Dashboard" schema
+# (elements/layout/vizConfig) broke every one of these dashboards'
+# GitOps sync: grafana-operator v5.24.0 posts spec.json to the classic
+# /api/dashboards/db endpoint, which rejects a v2-format body outright,
+# and even a correctly-wrapped v2 body ({"apiVersion":...,"kind":
+# "Dashboard","spec":{...}}) still gets rejected for any dashboard that
+# already exists ("must not include an id on the root element" - the
+# operator injects the dashboard's known internal id on every update).
+# That whole attempt was reverted (see git history). The classic "row"
+# panel type below was live-verified against this same endpoint first
+# (a throwaway probe dashboard, both an expanded and a collapsed row)
+# before being applied here - no known incompatibility with this
+# operator version.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -37,180 +53,526 @@ spec:
       "uid": "zuno-mesh-gateway",
       "title": "Mesh & gateway",
       "description": "ADR-0413: Istio/Envoy mesh traffic (mesh-prometheus datasource) and Kuadrant Authorino/Limitador (prometheus datasource) - empty-by-design until ADR-0201's MaaS AuthPolicy gap closes.",
-      "tags": ["zuno", "network", "mesh", "kuadrant", "maas"],
+      "tags": [
+        "zuno",
+        "network",
+        "mesh",
+        "kuadrant",
+        "maas"
+      ],
       "timezone": "browser",
       "schemaVersion": 39,
-      "time": {"from": "now-6h", "to": "now"},
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
       "refresh": "30s",
       "links": [
-        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
-      ],
-      "templating": {"list": [
         {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "definition": "label_values(istio_requests_total, destination_service_name)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "dest_service", "options": [],
-          "query": "label_values(istio_requests_total, destination_service_name)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "definition": "label_values(istio_requests_total, source_workload)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "source_workload", "options": [],
-          "query": "label_values(istio_requests_total, source_workload)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "definition": "label_values(istio_requests_total, destination_service_namespace)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "mesh_namespace", "options": [],
-          "query": "label_values(istio_requests_total, destination_service_namespace)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+          "type": "dashboards",
+          "tags": [
+            "zuno"
+          ],
+          "asDropdown": true,
+          "keepTime": true,
+          "title": "Zuno dashboards"
         }
-      ]},
+      ],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "mesh-prometheus"
+            },
+            "definition": "label_values(istio_requests_total, destination_service_name)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "dest_service",
+            "options": [],
+            "query": "label_values(istio_requests_total, destination_service_name)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "mesh-prometheus"
+            },
+            "definition": "label_values(istio_requests_total, source_workload)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "source_workload",
+            "options": [],
+            "query": "label_values(istio_requests_total, source_workload)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "mesh-prometheus"
+            },
+            "definition": "label_values(istio_requests_total, destination_service_namespace)",
+            "hide": 0,
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "mesh_namespace",
+            "options": [],
+            "query": "label_values(istio_requests_total, destination_service_namespace)",
+            "refresh": 2,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
       "panels": [
+        {
+          "id": 1013,
+          "type": "row",
+          "title": "Mesh traffic & control plane",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "panels": []
+        },
         {
           "id": 1,
           "title": "Mesh requests (rate, by destination service/response code)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mesh-prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 1
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "mesh-prometheus"}, "expr": "sum by (destination_service_name, response_code) (rate(istio_requests_total{destination_service_name=~\"$dest_service\", destination_service_namespace=~\"$mesh_namespace\"}[5m]))", "legendFormat": "{{`{{destination_service_name}}`}} ({{`{{response_code}}`}})"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mesh-prometheus"
+              },
+              "expr": "sum by (destination_service_name, response_code) (rate(istio_requests_total{destination_service_name=~\"$dest_service\", destination_service_namespace=~\"$mesh_namespace\"}[5m]))",
+              "legendFormat": "{{`{{destination_service_name}}`}} ({{`{{response_code}}`}})"
+            }
           ]
         },
         {
           "id": 2,
           "title": "Mesh request latency p50/p95 (by destination service)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-          "fieldConfig": {"defaults": {"unit": "ms"}},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mesh-prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 1
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            }
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "mesh-prometheus"}, "expr": "histogram_quantile(0.50, sum by (le, destination_service_name) (rate(istio_request_duration_milliseconds_bucket{destination_service_name=~\"$dest_service\", destination_service_namespace=~\"$mesh_namespace\"}[5m])))", "legendFormat": "p50 {{`{{destination_service_name}}`}}"},
-            {"datasource": {"type": "prometheus", "uid": "mesh-prometheus"}, "expr": "histogram_quantile(0.95, sum by (le, destination_service_name) (rate(istio_request_duration_milliseconds_bucket{destination_service_name=~\"$dest_service\", destination_service_namespace=~\"$mesh_namespace\"}[5m])))", "legendFormat": "p95 {{`{{destination_service_name}}`}}"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mesh-prometheus"
+              },
+              "expr": "histogram_quantile(0.50, sum by (le, destination_service_name) (rate(istio_request_duration_milliseconds_bucket{destination_service_name=~\"$dest_service\", destination_service_namespace=~\"$mesh_namespace\"}[5m])))",
+              "legendFormat": "p50 {{`{{destination_service_name}}`}}"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mesh-prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum by (le, destination_service_name) (rate(istio_request_duration_milliseconds_bucket{destination_service_name=~\"$dest_service\", destination_service_namespace=~\"$mesh_namespace\"}[5m])))",
+              "legendFormat": "p95 {{`{{destination_service_name}}`}}"
+            }
           ]
         },
         {
           "id": 3,
           "title": "mTLS coverage (rate, by connection security policy)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mesh-prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 9
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "mesh-prometheus"}, "expr": "sum by (connection_security_policy) (rate(istio_requests_total{destination_service_namespace=~\"$mesh_namespace\"}[5m]))", "legendFormat": "{{`{{connection_security_policy}}`}}"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mesh-prometheus"
+              },
+              "expr": "sum by (connection_security_policy) (rate(istio_requests_total{destination_service_namespace=~\"$mesh_namespace\"}[5m]))",
+              "legendFormat": "{{`{{connection_security_policy}}`}}"
+            }
           ]
         },
         {
           "id": 4,
           "title": "Mesh-attributed bandwidth (TCP bytes/s, by source->destination workload)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mesh-prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 9
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "Bps"
+            }
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "mesh-prometheus"}, "expr": "sum by (source_workload, destination_workload) (rate(istio_tcp_sent_bytes_total{source_workload=~\"$source_workload\"}[5m]))", "legendFormat": "{{`{{source_workload}}`}} -> {{`{{destination_workload}}`}} (sent)"},
-            {"datasource": {"type": "prometheus", "uid": "mesh-prometheus"}, "expr": "sum by (source_workload, destination_workload) (rate(istio_tcp_received_bytes_total{source_workload=~\"$source_workload\"}[5m]))", "legendFormat": "{{`{{source_workload}}`}} -> {{`{{destination_workload}}`}} (received)"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mesh-prometheus"
+              },
+              "expr": "sum by (source_workload, destination_workload) (rate(istio_tcp_sent_bytes_total{source_workload=~\"$source_workload\"}[5m]))",
+              "legendFormat": "{{`{{source_workload}}`}} -> {{`{{destination_workload}}`}} (sent)"
+            },
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mesh-prometheus"
+              },
+              "expr": "sum by (source_workload, destination_workload) (rate(istio_tcp_received_bytes_total{source_workload=~\"$source_workload\"}[5m]))",
+              "legendFormat": "{{`{{source_workload}}`}} -> {{`{{destination_workload}}`}} (received)"
+            }
           ]
         },
         {
           "id": 5,
           "title": "Mesh control plane health (istiod)",
           "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mesh-prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 17
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "mesh-prometheus"}, "expr": "sum(rate(pilot_xds_pushes[5m]))", "legendFormat": "xds pushes/s"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mesh-prometheus"
+              },
+              "expr": "sum(rate(pilot_xds_pushes[5m]))",
+              "legendFormat": "xds pushes/s"
+            }
           ]
         },
         {
           "id": 6,
           "title": "Mesh 5xx ratio",
           "type": "stat",
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 16},
-          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [
-            {"color": "green", "value": null}, {"color": "orange", "value": 0.02}, {"color": "red", "value": 0.1}
-          ]}}},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mesh-prometheus"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 12,
+            "y": 17
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "thresholds": {
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "orange",
+                    "value": 0.02
+                  },
+                  {
+                    "color": "red",
+                    "value": 0.1
+                  }
+                ]
+              }
+            }
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "mesh-prometheus"}, "expr": "sum(rate(istio_requests_total{response_code=~\"5..\"}[5m])) / sum(rate(istio_requests_total[5m]))"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mesh-prometheus"
+              },
+              "expr": "sum(rate(istio_requests_total{response_code=~\"5..\"}[5m])) / sum(rate(istio_requests_total[5m]))"
+            }
           ]
         },
         {
           "id": 7,
           "title": "Total mesh RPS",
           "type": "stat",
-          "datasource": {"type": "prometheus", "uid": "mesh-prometheus"},
-          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 16},
-          "fieldConfig": {"defaults": {"unit": "reqps"}},
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mesh-prometheus"
+          },
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 17
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps"
+            }
+          },
           "targets": [
-            {"datasource": {"type": "prometheus", "uid": "mesh-prometheus"}, "expr": "sum(rate(istio_requests_total[5m]))"}
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mesh-prometheus"
+              },
+              "expr": "sum(rate(istio_requests_total[5m]))"
+            }
           ]
         },
         {
-          "id": 8,
-          "title": "Authorino: auth decisions (rate, by authconfig/status)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (authconfig, status) (rate(auth_server_response_status[5m]))", "legendFormat": "{{`{{authconfig}}`}} ({{`{{status}}`}})"}
+          "id": 1014,
+          "type": "row",
+          "title": "Kuadrant (Authorino/Limitador)",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 25
+          },
+          "panels": [
+            {
+              "id": 8,
+              "title": "Authorino: auth decisions (rate, by authconfig/status)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (authconfig, status) (rate(auth_server_response_status[5m]))",
+                  "legendFormat": "{{`{{authconfig}}`}} ({{`{{status}}`}})"
+                }
+              ]
+            },
+            {
+              "id": 9,
+              "title": "Authorino: controller health (reconcile errors, rate)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (controller) (rate(controller_runtime_reconcile_errors_total{namespace=\"kuadrant-system\"}[5m]))",
+                  "legendFormat": "{{`{{controller}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 10,
+              "title": "Limitador: authorized vs limited calls (rate, by namespace)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (limitador_namespace) (rate(authorized_calls[5m]))",
+                  "legendFormat": "authorized: {{`{{limitador_namespace}}`}}"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (limitador_namespace) (rate(limited_calls[5m]))",
+                  "legendFormat": "limited: {{`{{limitador_namespace}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 11,
+              "title": "Limitador: up / datastore partitioned",
+              "type": "stat",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 12,
+                "y": 8
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "limitador_up",
+                  "legendFormat": "up"
+                },
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "datastore_partitioned",
+                  "legendFormat": "datastore_partitioned"
+                }
+              ]
+            },
+            {
+              "id": 12,
+              "title": "Why is this empty?",
+              "type": "text",
+              "gridPos": {
+                "h": 4,
+                "w": 6,
+                "x": 18,
+                "y": 8
+              },
+              "options": {
+                "mode": "markdown",
+                "content": "Panels 8-11 are empty by design: Authorino needs real traffic past the `maas-gateway-auth` AuthPolicy, blocked by ADR-0201's mTLS gap; Limitador needs a RateLimitPolicy (none attached). Both populate automatically once those close."
+              }
+            }
           ]
         },
         {
-          "id": 9,
-          "title": "Authorino: controller health (reconcile errors, rate)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (controller) (rate(controller_runtime_reconcile_errors_total{namespace=\"kuadrant-system\"}[5m]))", "legendFormat": "{{`{{controller}}`}}"}
-          ]
-        },
-        {
-          "id": 10,
-          "title": "Limitador: authorized vs limited calls (rate, by namespace)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (limitador_namespace) (rate(authorized_calls[5m]))", "legendFormat": "authorized: {{`{{limitador_namespace}}`}}"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (limitador_namespace) (rate(limited_calls[5m]))", "legendFormat": "limited: {{`{{limitador_namespace}}`}}"}
-          ]
-        },
-        {
-          "id": 11,
-          "title": "Limitador: up / datastore partitioned",
-          "type": "stat",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 32},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "limitador_up", "legendFormat": "up"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "datastore_partitioned", "legendFormat": "datastore_partitioned"}
-          ]
-        },
-        {
-          "id": 12,
-          "title": "Why is this empty?",
-          "type": "text",
-          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 32},
-          "options": {"mode": "markdown", "content": "Panels 8-11 are empty by design: Authorino needs real traffic past the `maas-gateway-auth` AuthPolicy, blocked by ADR-0201's mTLS gap; Limitador needs a RateLimitPolicy (none attached). Both populate automatically once those close."}
-        },
-        {
-          "id": 13,
-          "title": "Traces: mesh errors",
-          "type": "table",
-          "datasource": {"type": "tempo", "uid": "tempo"},
-          "description": "Istio mesh spans are exported at 100% sampling (gitops/charts/service-mesh's telemetry.yaml) - recent error traces across every meshed service, not scoped to one span name.",
-          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 40},
-          "targets": [
-            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{status=error}", "limit": 20, "tableType": "traces", "refId": "A"}
+          "id": 1015,
+          "type": "row",
+          "title": "Traces",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 26
+          },
+          "panels": [
+            {
+              "id": 13,
+              "title": "Traces: mesh errors",
+              "type": "table",
+              "datasource": {
+                "type": "tempo",
+                "uid": "tempo"
+              },
+              "description": "Istio mesh spans are exported at 100% sampling (gitops/charts/service-mesh's telemetry.yaml) - recent error traces across every meshed service, not scoped to one span name.",
+              "gridPos": {
+                "h": 8,
+                "w": 24,
+                "x": 0,
+                "y": 0
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "tempo",
+                    "uid": "tempo"
+                  },
+                  "queryType": "traceql",
+                  "query": "{status=error}",
+                  "limit": 20,
+                  "tableType": "traces",
+                  "refId": "A"
+                }
+              ]
+            }
           ]
         }
       ]
