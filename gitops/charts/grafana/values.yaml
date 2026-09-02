@@ -84,12 +84,22 @@ appsDomain: apps.mycluster.example.com
 # Grafana's SQLite state (datasources, dashboards, admin user) lives in the
 # operator's default emptyDir and is wiped on every pod restart, forcing
 # grafana-operator to re-provision every GrafanaDatasource/GrafanaDashboard
-# from scratch. gp3-csi is this cluster's default StorageClass, named
-# explicitly per this repo's convention
-# (gitops/charts/mariadb/values.yaml's own storageClassName).
+# from scratch. The class is named explicitly rather than left unset, per
+# this repo's convention (gitops/charts/mariadb/values.yaml does the same):
+# grafana-operator does not pass an empty string through to the PVC.
 storage:
   size: 2Gi
-  storageClassName: gp3-csi
+  # PLACEHOLDER (WP-118 B5). The real class is discovered at apply time by
+  # ansible/tasks/resolve_cluster_default_storage_class.yml - the one
+  # annotated storageclass.kubernetes.io/is-default-class - and injected as
+  # an Application-level value by this component's role, which always
+  # overrides this. Nothing here renders on a cluster installed via `make`.
+  # Left as an obviously-invalid name on purpose: if the Application ever
+  # lost its values, a PVC that cannot bind is a loud failure, where a
+  # plausible-looking class name would silently bind to the wrong storage.
+  # PVC storageClassName is immutable once bound, so wrong is unrecoverable
+  # by re-sync.
+  storageClassName: mycluster-default-storageclass
 
 # Runtime-discovered (ADR-0048 gitops_app_extra_helm_values), not
 # hand-edited into this checked-in file: the Prometheus GrafanaDatasource's

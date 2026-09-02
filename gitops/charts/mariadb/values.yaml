@@ -102,7 +102,17 @@ mariadbOperatorActivation:
 # Single-node MariaDB (k8s.mariadb.com/v1alpha1 MariaDB CR).
 cluster:
   replicas: 1
-  storageClassName: gp3-csi
+  # PLACEHOLDER (WP-118 B5). The real class is discovered at apply time by
+  # ansible/tasks/resolve_cluster_default_storage_class.yml - the one
+  # annotated storageclass.kubernetes.io/is-default-class - and injected as
+  # an Application-level value by this component's role, which always
+  # overrides this. Nothing here renders on a cluster installed via `make`.
+  # Left as an obviously-invalid name on purpose: if the Application ever
+  # lost its values, a PVC that cannot bind is a loud failure, where a
+  # plausible-looking class name would silently bind to the wrong storage.
+  # PVC storageClassName is immutable once bound, so wrong is unrecoverable
+  # by re-sync.
+  storageClassName: mycluster-default-storageclass
   storageSize: 100Gi
   resources:
     requests:

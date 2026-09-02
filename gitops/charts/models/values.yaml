@@ -293,7 +293,17 @@ loraAdapters: []
 # templates/pvc-lmeval-cache.yaml and templates/job-lmeval-cache-prefetch.yaml
 # for the (unrelated) lm-eval tokenizer cache.
 modelStorage:
-  storageClassName: gp3-csi
+  # PLACEHOLDER (WP-118 B5). The real class is discovered at apply time by
+  # ansible/tasks/resolve_cluster_default_storage_class.yml - the one
+  # annotated storageclass.kubernetes.io/is-default-class - and injected as
+  # an Application-level value by this component's role, which always
+  # overrides this. Nothing here renders on a cluster installed via `make`.
+  # Left as an obviously-invalid name on purpose: if the Application ever
+  # lost its values, a PVC that cannot bind is a loud failure, where a
+  # plausible-looking class name would silently bind to the wrong storage.
+  # PVC storageClassName is immutable once bound, so wrong is unrecoverable
+  # by re-sync.
+  storageClassName: mycluster-default-storageclass
   # Pinned to the odh-kserve-storage-initializer image this cluster's own
   # KServe controller generates for hf:// init containers (read off a live
   # generated pod spec) - unlike image.vllm (ADR-0048), this is not (yet)
