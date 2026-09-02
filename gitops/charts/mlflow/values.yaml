@@ -37,12 +37,16 @@ server:
     host: zuno-postgresql-primary.zuno-data.svc
     port: 5432
     database: mlflow
-    # PGO serves TLS with its own cluster CA, which MLflow's psycopg2 does
-    # not trust - the migration Job failed live with "SSL error: certificate
-    # verify failed". `require` keeps the connection encrypted without
-    # certificate verification, the same choice agent-runtime and mlops
-    # already make against this cluster.
-    sslmode: require
+    # `disable`, deliberately - and it does NOT mean unencrypted. This pod
+    # is mesh-injected, so Envoy intercepts 5432 and originates TLS to
+    # zuno-data itself; a client that ALSO negotiates TLS ends up doing
+    # TLS-inside-TLS and fails with "SSL error: certificate verify failed"
+    # (live-diagnosed 2026-09-02: sslmode=require failed exactly that way
+    # even though the URI reached the pod correctly). Same rule as
+    # [[lmevaljob-mesh-double-tls]]: mesh clients speak plaintext and let
+    # the sidecar do the verified TLS. agent-runtime/mlops use `require`
+    # because they go through PgBouncer, a different path.
+    sslmode: disable
     # Seeded by ansible/roles/vault; the same credential PGO adopts for the
     # dedicated mlflow role (gitops/charts/postgresql). Letters/digits-only
     # password: it is interpolated un-encoded into the postgresql:// URI.
