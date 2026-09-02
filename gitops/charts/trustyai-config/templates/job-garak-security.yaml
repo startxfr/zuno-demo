@@ -1,0 +1,61 @@
+{{- /*
+ADR-0534/WP-109: REAL security probes (jailbreak resistance), unlike
+job-garak-smoke.yaml's connectivity-only test.Blank. Bounded probe set
+against the configured model - by default the newest PEFT/LoRA fine-tune
+(qwen3.5-9b-wesh, ADR-0526), because a fine-tune is exactly where
+jailbreak resistance regresses unnoticed (ADR-0534 Phase 3). Observe-only:
+the report is evidence, not a gate; folding garak scores into
+evaluations/peft_regression.py's artifact is recorded as deferred in the
+WP-109 brief.
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.garakSecurity.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: garak-security
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: lm-eval
+    app.kubernetes.io/component: garak-security
+  annotations:
+    argocd.argoproj.io/sync-options: Replace=true,Force=true
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: {{ .Values.garakSecurity.deadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lm-eval
+        app.kubernetes.io/component: garak-security
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: garak
+          image: {{ .Values.garakSmoke.image }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              export HOME=/tmp
+              garak \
+                --model_type openai.OpenAICompatible \
+                --model_name {{ .Values.garakSecurity.modelName }} \
+                --generator_options '{"openai":{"OpenAICompatible":{"uri":"{{ .Values.garakSecurity.baseUrl }}","api_key":"eval-unused"}}}' \
+                --probes {{ .Values.garakSecurity.probes }} \
+                --generations {{ .Values.garakSecurity.generations }} \
+                --report_prefix /tmp/garak-security
+              echo "--- garak security report ---"
+              ls -l /tmp/garak-security* 2>/dev/null || true
+          env:
+            - name: OPENAICOMPATIBLE_API_KEY
+              value: eval-unused
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+{{- end }}

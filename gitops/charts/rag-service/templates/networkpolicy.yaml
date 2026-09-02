@@ -26,3 +26,18 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+    # ADR-0534/WP-109: admits the eval-class Jobs from
+    # gitops/charts/trustyai-config (RAGAS retrieval-quality evaluation
+    # needs the REAL /v1/search path - evaluating a copy would measure
+    # nothing). Same lm-eval label convention the qwen NetworkPolicies
+    # have admitted since ADR-0108/WP-10.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: zuno-ai-run
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: lm-eval
+      ports:
+        - protocol: TCP
+          port: 8080

@@ -1,0 +1,12 @@
+---
+# ADR-0534/WP-109 "trustyai-eval" build component: builds the RAGAS
+# evaluation image (components/trustyai-eval) - the one evaluation
+# framework ADR-0534 names that this OpenShift AI release train ships no
+# image for (WP-108 finding). Consumed by gitops/charts/trustyai-config's
+# ragas Job as zuno-ai-build/trustyai-eval:latest.
+- name: "trustyai_eval_build | build trustyai-eval"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: trustyai-eval
+    build_dockerfile_path: components/trustyai-eval/Dockerfile
+    build_context_dir: "."

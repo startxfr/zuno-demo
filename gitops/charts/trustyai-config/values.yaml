@@ -45,8 +45,38 @@ garakSmoke:
   # [[lmevaljob-mesh-double-tls]].
   baseUrl: http://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
   # test.Blank: garak's own connectivity/smoke probe (empty prompts) -
-  # cheap by design. Real security probes (jailbreak, prompt injection)
-  # are WP-109 scope, on real agent traffic.
+  # cheap by design. Real security probes are garakSecurity below.
   probe: test.Blank
   generations: 1
   deadlineSeconds: 1800
+
+# WP-109: real jailbreak probes, bounded, against the newest PEFT/LoRA
+# fine-tune by default - a fine-tune is exactly where jailbreak
+# resistance regresses unnoticed (ADR-0534 Phase 3). Plain http through
+# the mesh, same rule as everything else here.
+garakSecurity:
+  enabled: true
+  modelName: qwen3.5-9b-wesh
+  baseUrl: http://qwen35-9b-wesh-kserve-workload-svc.zuno-ai-run.svc:8000/v1
+  # Two DAN-family jailbreak probes: single-prompt each, so cost is
+  # generations-bound, not corpus-bound (promptinject-style probes are
+  # hundreds of prompts - too heavy for this shared-GPU demo cluster).
+  probes: dan.Dan_11_0,dan.DUDE
+  generations: 5
+  deadlineSeconds: 3600
+
+# WP-109: RAGAS retrieval-quality evaluation against the REAL rag-service
+# /v1/search path, judged by the local qwen3.6 model. Image built
+# in-cluster (`make d2 build trustyai-eval`, components/trustyai-eval) -
+# no vendor RAGAS image exists in this release train (WP-108 finding).
+ragasEval:
+  enabled: true
+  image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/trustyai-eval:latest
+  ragServiceUrl: http://rag-service.zuno-data.svc:8080
+  judgeBaseUrl: http://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
+  judgeModel: qwen3.6-27b-instruct
+  # rag-service fails closed on empty caller_groups (ADR-0046): retrieval
+  # quality must be measured as a realistic caller, not an entitlement-less
+  # one that only ever sees ACL-unrestricted documents.
+  callerGroups: consultant
+  deadlineSeconds: 3600

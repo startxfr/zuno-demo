@@ -69,7 +69,7 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (ADR-0420/WP-070) for "check" only - it has no install/build of its own,
 # only a signature-verification gate (ansible/roles/supply_chain).
 DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops trustyai-config lightspeed-config supply-chain
-DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops
+DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops trustyai-eval
 DAY2_VERBS := check install build uninstall all reinstall
 
 # ADR-0057/ADR-0058: Day 3 was originally agent test/stresstest operations

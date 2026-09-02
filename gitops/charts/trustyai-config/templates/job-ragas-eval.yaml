@@ -1,0 +1,52 @@
+{{- /*
+ADR-0534/WP-109: RAGAS evaluation against the REAL rag-service retrieval
+path. The image is built in-cluster (components/trustyai-eval,
+`make d2 build trustyai-eval`) because this OpenShift AI release train
+ships no RAGAS image (WP-108 finding). Scores only - thresholds/pass-fail
+policy are deferred by ADR-0534's Non-goals.
+
+lm-eval label: same eval-class NetworkPolicy identity as the other Jobs
+here - it is what rag-service's and the qwen predictors' policies admit.
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.ragasEval.enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ragas-eval
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: lm-eval
+    app.kubernetes.io/component: ragas-eval
+  annotations:
+    argocd.argoproj.io/sync-options: Replace=true,Force=true
+spec:
+  backoffLimit: 1
+  activeDeadlineSeconds: {{ .Values.ragasEval.deadlineSeconds }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: lm-eval
+        app.kubernetes.io/component: ragas-eval
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: ragas
+          image: {{ .Values.ragasEval.image }}
+          env:
+            - name: RAG_SERVICE_URL
+              value: {{ .Values.ragasEval.ragServiceUrl | quote }}
+            - name: JUDGE_BASE_URL
+              value: {{ .Values.ragasEval.judgeBaseUrl | quote }}
+            - name: JUDGE_MODEL
+              value: {{ .Values.ragasEval.judgeModel | quote }}
+            - name: CALLER_GROUPS
+              value: {{ .Values.ragasEval.callerGroups | quote }}
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+{{- end }}

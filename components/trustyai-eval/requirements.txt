@@ -1,0 +1,8 @@
+# ADR-0534/WP-109. ragas is the standard TrustyAI/OpenShift AI RAG
+# evaluation framework ADR-0534 names; pinned to the 0.2 line whose
+# SingleTurnSample/EvaluationDataset/LangchainLLMWrapper API this image's
+# ragas_eval.py uses. langchain-openai provides the OpenAI-compatible
+# judge wrapper pointed at the in-cluster qwen predictor.
+ragas==0.2.15
+langchain-openai==0.2.14
+httpx==0.27.2
