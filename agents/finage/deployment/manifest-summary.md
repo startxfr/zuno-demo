@@ -14,5 +14,6 @@ Every object `gitops/charts/finage` renders (raw-manifest chart - not CR-managed
 | Service | `finage-bff` | — |
 | Deployment | `finage-frontend` | `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-frontend:latest` |
 | Deployment | `finage-bff` | `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-bff:latest` |
+| ExternalSecret | `finage-bff-admin-secret` | — |
 | ExternalSecret | `finage-frontend-secrets` | — |
 | Route | `finage-frontend` | — |

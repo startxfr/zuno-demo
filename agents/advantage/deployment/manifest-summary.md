@@ -14,5 +14,6 @@ Every object `gitops/charts/advantage` renders (raw-manifest chart - not CR-mana
 | Service | `advantage-bff` | — |
 | Deployment | `advantage-frontend` | `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-frontend:latest` |
 | Deployment | `advantage-bff` | `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-bff:latest` |
+| ExternalSecret | `advantage-bff-admin-secret` | — |
 | ExternalSecret | `advantage-frontend-secrets` | — |
 | Route | `advantage-frontend` | — |

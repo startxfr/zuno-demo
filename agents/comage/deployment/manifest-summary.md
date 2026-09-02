@@ -14,5 +14,6 @@ Every object `gitops/charts/comage` renders (raw-manifest chart - not CR-managed
 | Service | `comage-bff` | — |
 | Deployment | `comage-frontend` | `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-frontend:latest` |
 | Deployment | `comage-bff` | `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-bff:latest` |
+| ExternalSecret | `comage-bff-admin-secret` | — |
 | ExternalSecret | `comage-frontend-secrets` | — |
 | Route | `comage-frontend` | — |

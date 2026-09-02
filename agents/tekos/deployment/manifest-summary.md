@@ -14,5 +14,6 @@ Every object `gitops/charts/tekos` renders (raw-manifest chart - not CR-managed;
 | Service | `tekos-bff` | — |
 | Deployment | `tekos-frontend` | `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-frontend:latest` |
 | Deployment | `tekos-bff` | `image-registry.openshift-image-registry.svc:5000/zuno-ai-build/agent-bff:latest` |
+| ExternalSecret | `tekos-bff-admin-secret` | — |
 | ExternalSecret | `tekos-frontend-secrets` | — |
 | Route | `tekos-frontend` | — |
