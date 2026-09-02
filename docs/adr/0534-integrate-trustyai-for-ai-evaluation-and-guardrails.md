@@ -173,6 +173,15 @@ point - the chain worked but was invisible in every UI, spawning WP-113):
   intended observability surface is the `zuno-trustyai` Grafana dashboard (WP-113): guardrails
   and evaluation results pushed as metrics through the platform's standard OTLP pipeline
   (ADR-0029), alongside CLI/`make d3 check trustyai-config`.
+- *(Amended 2026-09-02, WP-115.)* The RHOAI dashboard DOES have TrustyAI surfaces - they are
+  hidden by default. `OdhDashboardConfig/odh-dashboard-config` (operator-created, **not**
+  GitOps-managed) gates them: `disableLMEval: false` unlocks the Evaluations page and
+  `guardrails: true` the guardrails surface. Both are applied live by `oc patch` and recorded
+  here as the authoritative list; ADR-0538 adds `trainingJobs: true` under the same posture.
+  Evaluations additionally needs a per-project `EvalHub` instance - now rendered by
+  `gitops/charts/trustyai-config` (WP-115). Note its runs are plain `batch/v1` Jobs launched by
+  EvalHub itself: this ADR's ArgoCD-managed `LMEvalJob`/garak/ragas path is parallel and does
+  not appear in that page's run list.
 
 **Human live test: OK - operator sign-off 2026-09-02.** After WP-113 delivered the dashboard, the
 human operator verified the chain end-to-end in the browser: live guardrails detections
