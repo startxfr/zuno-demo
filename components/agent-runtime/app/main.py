@@ -1094,7 +1094,7 @@ async def agent_chat(
     initial_state = _initial_state(payload, identity, request_id)
     conversations_pool = request.app.state.conversations_pool
     run_id = await _resolve_run_id(graph, payload, identity, conversations_pool)
-    # ADR-0517: threaded through graph node calls (app/graph/nodes.py,
+    # ADR-0543: threaded through graph node calls (app/graph/nodes.py,
     # arkos_nodes.py) so their MCP/RAG/model-router clients can forward it
     # as X-Zuno-Run-Id, distinct from the request_id above (one HTTP call
     # vs. the whole conversation turn) - needed for the per-run resource
@@ -1321,7 +1321,7 @@ async def _stream_chat(
     ~10 seconds rather than one per token, and a failed renewal ends the
     stream with an error event rather than continuing unprotected.
 
-    ADR-0517: wraps this whole generator's execution in api_request_span,
+    ADR-0543: wraps this whole generator's execution in api_request_span,
     the streaming-path equivalent of the sync path's span in agent_chat -
     errors are handled internally here (an SSE "error" event, not a raised
     exception), so the two `except` branches below call

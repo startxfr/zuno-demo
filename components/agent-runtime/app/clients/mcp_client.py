@@ -53,7 +53,7 @@ async def invoke_tool(
         "X-Zuno-Task": task_name,
     }
     if run_id:
-        # ADR-0517: lets mcp-gateway tag its tool_invoke span with the
+        # ADR-0543: lets mcp-gateway tag its tool_invoke span with the
         # calling chat turn's run_id, so a run's resource-consumption
         # dashboard can find every tool call it made.
         headers["X-Zuno-Run-Id"] = run_id

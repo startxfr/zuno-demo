@@ -239,7 +239,7 @@ def model_call_span(
     `group` label sometimes held an `agent_<name>` placeholder for
     service-account callers, but that's a different, unrelated fallback).
 
-    ADR-0517: `run_id` (distinct from request_id - the whole conversation
+    ADR-0543: `run_id` (distinct from request_id - the whole conversation
     turn, not just this one HTTP call) and `model_kind` (candidate.kind,
     "local"/"saas" - app/routing.py) are span attributes only, never added
     to the Prometheus counters above (run_id is unbounded cardinality;

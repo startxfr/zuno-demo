@@ -10,7 +10,7 @@
 # Route is created for the OTLP/query ports). Revisit with a TempoStack if
 # this ever needs to be multi-tenant.
 #
-# ADR-0517: Jaeger UI's own read path IS now externally reachable (see
+# ADR-0543: Jaeger UI's own read path IS now externally reachable (see
 # spec.jaegerui.route/authentication below) - unlike the ingest/query ports
 # above, the operator puts its own oauth-proxy in front of it, so this
 # doesn't reopen the "no auth" gap the ASSUMPTION above is about. Kiali

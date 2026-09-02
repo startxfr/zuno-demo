@@ -75,7 +75,7 @@ async def readyz():
 @app.post("/v1/search", response_model=SearchResponse)
 async def search(
     payload: SearchRequest,
-    # ADR-0517: optional - only agent-runtime's rag_client sends this today
+    # ADR-0543: optional - only agent-runtime's rag_client sends this today
     # (the calling chat turn's run_id), tagged on the search span so the
     # per-run resource dashboard can find this call.
     x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),

@@ -71,7 +71,7 @@ async def search(
 
     headers: Dict[str, str] = {}
     if run_id:
-        # ADR-0517: lets rag-service tag its rag_search span with the
+        # ADR-0543: lets rag-service tag its rag_search span with the
         # calling chat turn's run_id, so a run's resource-consumption
         # dashboard can find every search it made.
         headers["X-Zuno-Run-Id"] = run_id

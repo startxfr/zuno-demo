@@ -108,7 +108,7 @@ class ModelRouter:
             # this header is present (ADR-0511 clause 2's precedence).
             headers["X-Zuno-Project-Id"] = project_id
         if run_id:
-            # ADR-0517: lets ai-gateway tag its model_call span with the
+            # ADR-0543: lets ai-gateway tag its model_call span with the
             # calling chat turn's run_id, distinct from X-Zuno-Request-Id
             # (per-call correlation id) - run_id is the whole conversation
             # turn's identifier, needed for the per-run resource dashboard.

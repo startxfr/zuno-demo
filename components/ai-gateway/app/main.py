@@ -213,7 +213,7 @@ async def chat_completions(
     # span still carries a stable id even for a caller that never sends
     # one (never blank, always joinable to something).
     x_zuno_request_id: str = Header(default="", alias="X-Zuno-Request-Id"),
-    # ADR-0517: the calling chat turn's id (distinct from request_id, one
+    # ADR-0543: the calling chat turn's id (distinct from request_id, one
     # HTTP call) - agent-runtime's model_router forwards this so the
     # model_call span can be found by the per-run resource dashboard.
     x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),

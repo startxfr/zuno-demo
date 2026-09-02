@@ -112,7 +112,7 @@ func main() {
 type requestIdentity struct {
 	sub    string
 	groups []string
-	// runID (ADR-0517): the chat turn's run_id, once chatHandler/proxySSE
+	// runID (ADR-0543): the chat turn's run_id, once chatHandler/proxySSE
 	// learns it - empty for non-chat endpoints or a chat call that never
 	// resolved one (rejected/failed before a run_id was known). Read back
 	// by metricsMiddleware after the handler returns, to tag the
@@ -142,7 +142,7 @@ func metricsMiddleware(agent string, next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), ctxKeyIdentity{}, identity)
 		r = r.WithContext(ctx)
 
-		// ADR-0517: opened before the handler runs and closed after it
+		// ADR-0543: opened before the handler runs and closed after it
 		// returns, so it covers the whole request regardless of which
 		// exit path the handler took - identity.runID is populated (when
 		// known at all) by chatHandler or proxySSE during ServeHTTP, and
@@ -465,7 +465,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			writeError(w, http.StatusUnauthorized, "invalid or expired token")
 			return
 		}
-		// ADR-0517: kept in this outer scope (rather than the if-block's
+		// ADR-0543: kept in this outer scope (rather than the if-block's
 		// own shadowed variable) so the run_id/streaming branches below
 		// can also set identity.runID once they learn it.
 		identity, _ := r.Context().Value(ctxKeyIdentity{}).(*requestIdentity)
@@ -510,7 +510,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			ProjectID: req.ProjectID, // ADR-0209: forwarded as-is, this BFF does not validate project membership
 			RunID:     req.RunID,     // ADR-0212: forwarded as-is, the Agent Runtime enforces ownership
 		}
-		// ADR-0517: a resumed conversation already knows its run_id
+		// ADR-0543: a resumed conversation already knows its run_id
 		// upfront - a brand-new one doesn't until agent-runtime's first
 		// SSE "start" event (streaming) or its JSON response (non-
 		// streaming), handled at each of those points below.
@@ -565,7 +565,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 
 		resp, err := runtimeClient.Chat(ctx, token, runtimeReq)
 		if identity != nil && resp != nil {
-			// ADR-0517: always populated by the time a non-streaming call
+			// ADR-0543: always populated by the time a non-streaming call
 			// returns successfully, whether this was a brand-new or
 			// resumed conversation.
 			identity.runID = resp.RunID
@@ -608,7 +608,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 // ("start", always emitted before any token - see
 // components/agent-runtime/app/main.go's `_stream_chat`). Deliberately a
 // simple substring scan rather than parsing SSE framing/JSON properly:
-// this is a best-effort peek (ADR-0517), not a protocol implementation -
+// this is a best-effort peek (ADR-0543), not a protocol implementation -
 // see proxySSE's own comment on why a miss here is never fatal.
 var runIDFromSSE = regexp.MustCompile(`"run_id"\s*:\s*"([^"]+)"`)
 
@@ -625,7 +625,7 @@ var projectIDFromSSE = regexp.MustCompile(`"project_id"\s*:\s*"([^"]*)"`)
 // function for the next hop down and the same client-cancellation
 // reasoning.
 //
-// ADR-0517: also peeks the first few reads for run_id, when identity
+// ADR-0543: also peeks the first few reads for run_id, when identity
 // doesn't already have one (a brand-new, not resumed, conversation) - so
 // metricsMiddleware's bff_request span still gets tagged with run_id even
 // on this path, where chatHandler itself never sees the value (it's inside

@@ -138,7 +138,7 @@ def graph_run_span(
     must record which graph shape served a given request, alongside the
     existing agent/task identifiers."
 
-    ADR-0517: run_id (distinct from session_id, the caller-supplied value
+    ADR-0543: run_id (distinct from session_id, the caller-supplied value
     above) is the LangGraph thread id - tagging it here is what lets the
     per-run resource dashboard find this span via TraceQL.
     """
@@ -192,7 +192,7 @@ def api_request_span(
     request_id: Optional[str] = None,
     project_id: Optional[str] = None,  # ADR-0528
 ) -> Iterator[ApiRequestRecorder]:
-    """ADR-0517: wraps the whole agent_chat handler body (from run_id
+    """ADR-0543: wraps the whole agent_chat handler body (from run_id
     resolution through the response), enclosing agent_graph_run on the
     non-streaming path and _stream_chat's execution on the streaming path.
     Distinguishes "time spent in agent-runtime's own request handling

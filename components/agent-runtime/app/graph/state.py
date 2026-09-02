@@ -56,7 +56,7 @@ class AgentState(TypedDict, total=False):
     # the MaaS adapter) as X-Zuno-Request-Id for usage/trace correlation -
     # see app/main.py's _request_id and app/clients/model_router.py.
     request_id: str
-    # ADR-0517: forwarded to mcp-gateway/rag-service/ai-gateway as
+    # ADR-0543: forwarded to mcp-gateway/rag-service/ai-gateway as
     # X-Zuno-Run-Id so their tool_invoke/rag_search/model_call spans can be
     # correlated back to this run - see app/main.py's agent_chat and
     # app/clients/{mcp_client,rag_client,model_router}.py. Distinct from

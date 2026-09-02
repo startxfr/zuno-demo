@@ -1,5 +1,5 @@
 {{- if .Values.grafana.enabled }}
-# ADR-0517: per-run drill-down - pick an agent, paste a run_id, see every
+# ADR-0543: per-run drill-down - pick an agent, paste a run_id, see every
 # MCP tool call / RAG search / model call / BFF hop / API-layer hop that
 # run made, with cost/tokens/latency/outcome. Tempo-only by design (plus
 # one Prometheus sanity stat) - Prometheus can't filter by run_id
@@ -61,7 +61,7 @@ spec:
     {
       "uid": "zuno-run-trace",
       "title": "Run Trace (per-run drill-down)",
-      "description": "ADR-0517: select an agent, paste a run_id, see every MCP/RAG/model/BFF/API hop that run consumed - cost, tokens, latency, outcomes.",
+      "description": "ADR-0543: select an agent, paste a run_id, see every MCP/RAG/model/BFF/API hop that run consumed - cost, tokens, latency, outcomes.",
       "tags": [
         "zuno",
         "agents",

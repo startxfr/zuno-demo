@@ -90,7 +90,7 @@ def record_freshness_lag(domain: str, lag_seconds: float) -> None:
 def search_span(
     query: str, top_k: int, run_id: Optional[str] = None
 ) -> Iterator["SearchRecorder"]:
-    """ADR-0517: run_id (the calling chat turn's id, forwarded by
+    """ADR-0543: run_id (the calling chat turn's id, forwarded by
     agent-runtime's rag_client as X-Zuno-Run-Id) is a span attribute only,
     never added to the zuno.rag_searches counter - unbounded cardinality.
     """

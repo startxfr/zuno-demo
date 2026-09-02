@@ -76,7 +76,7 @@ def tool_invoke_span(
     call): records a `tool_invoke` span and the zuno.tool_invocations
     counter once the caller sets `.outcome`/`.mcp_server` on the recorder.
 
-    ADR-0517: run_id (the calling chat turn's id, forwarded by
+    ADR-0543: run_id (the calling chat turn's id, forwarded by
     agent-runtime's mcp_client as X-Zuno-Run-Id) is a span attribute only,
     never added to the zuno.tool_invocations counter - unbounded
     cardinality on a Prometheus counter.

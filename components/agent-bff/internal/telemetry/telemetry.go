@@ -40,7 +40,7 @@ var (
 // (best-effort - a missed final flush loses at most one export interval's
 // worth of data, never previously-exported data).
 //
-// ADR-0517: agent-bff previously had metrics only (no OTel tracer at all) -
+// ADR-0543: agent-bff previously had metrics only (no OTel tracer at all) -
 // added here so its `bff_request` span can join the per-run resource
 // dashboard alongside every other service's spans (agent-runtime,
 // mcp-gateway, rag-service, ai-gateway all already had a tracer).
@@ -167,7 +167,7 @@ func StartBFFRequestSpan(ctx context.Context, agent string) trace.Span {
 }
 
 // EndBFFRequestSpan closes a span opened by StartBFFRequestSpan, tagging
-// it with the final status code and (ADR-0517) run_id once known - runID
+// it with the final status code and (ADR-0543) run_id once known - runID
 // is empty for a request that never resolved one (e.g. a rejected/failed
 // chat call, or a non-chat conversation-management endpoint), in which
 // case the span is still recorded, just not joinable to a specific run in
