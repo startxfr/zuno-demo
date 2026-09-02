@@ -332,10 +332,18 @@ platformNamespaces:
     # reconciler GETs rekor-server's /api/v1/log/publicKey to build the
     # sharding/TUF config - without this entry that call times out and
     # RekorAvailable sits at "Creating" forever while every pod is
-    # green).
+    # green). openshift-gitops: live finding, WP-111 - ArgoCD's
+    # application-controller calls policy-controller-manager-service's
+    # validating admission webhook (for the PolicyController CR itself,
+    # co-located here since WP-111 put policy-controller-operator in this
+    # namespace) on every sync; same-namespace-only debug-pod curl tests
+    # succeeded instantly while ArgoCD's own cross-namespace calls
+    # intermittently hit the webhook's tight 5s timeout - NetworkPolicy,
+    # not the webhook server, was the real bottleneck.
     allowedFromNamespaces:
       - zuno-ai-build
       - openshift-operators
+      - openshift-gitops
     # Deliberately NOT istio-injection: enabled - operator-owned workloads,
     # same posture as zuno-aap/openshift-lightspeed (a sidecar would have
     # to be re-patched on every Securesign reconcile).
