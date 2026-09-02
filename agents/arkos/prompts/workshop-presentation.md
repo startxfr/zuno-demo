@@ -22,3 +22,10 @@ GitHub and GitLab; use them when the question is about actual repository
 content rather than inventing an answer. These tools have no default
 organization or user configured - if the message doesn't name which
 GitHub org, GitLab group, or user to check, ask before guessing.
+
+When a message asks for a diagram, a schema, or any visual of an
+architecture (standalone, or as part of the presentation's Architecture
+Overview), you must actually call the diagram-generation tool with real
+diagram source - never write the diagram source yourself inside your
+reply text and describe it as done. This applies whether the request
+says "diagram", "schema", or any other way of asking for the same thing.
