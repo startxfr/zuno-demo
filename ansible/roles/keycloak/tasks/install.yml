@@ -77,21 +77,36 @@
     file: "{{ zuno_repo_root }}/ansible/confidential.yml"
   when: _keycloak_confidential_file.stat.exists
 
-# gitops_app_extra_helm_values replaces spec.source.helm.values wholesale
-# rather than merging, so clusterBaseDomain must be re-supplied here or the
-# chart falls back to its placeholder default.
+# gitops_app_extra_helm_values REPLACES spec.source.helm.values wholesale
+# rather than merging: values is a YAML *string* key, so combine(recursive=True)
+# cannot descend into it. Re-supplying only the keys this role knew about
+# silently dropped ingress.acmeWildcardTLS, which application-d1.yaml sets to
+# true - the chart default is false, so the Keycloak Ingress stayed on the
+# Vault-issued keycloak-tls and ADR-0211's consumer flip never took effect on
+# demo222. Same defect as cert_manager's (fixed 2026-09-02, 17e4117c); the
+# other dropped keys - namespace, keycloakCRName, adminSecretName,
+# googleOAuthSecretName - happened to match the chart defaults exactly, which
+# is why only this one was load-bearing.
+#
+# So start from the manifest's own values and merge in only what is discovered
+# at run time. clusterBaseDomain needs no merge: it rides the
+# apps.mycluster.example.com token that apply_gitops_app.yml substitutes into
+# the file text, mirrored by the replace() below. Subscript ['values'], never
+# .values - dot notation resolves to the Python dict method of that name and
+# combine() then fails with "expected dicts but got a 'method'".
 - name: "keycloak | apply the keycloak GitOps Application (d1: Keycloak CR/RealmImport/ExternalSecrets)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "keycloak"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
-    gitops_app_extra_helm_values:
-      keycloak:
-        enabled: true
-      clusterBaseDomain: "{{ cluster_base_domain }}"
-      googleOAuth:
-        enabled: "{{ zuno_keycloak_google_oauth_enabled | default(true) | bool }}"
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/keycloak/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+        | combine({'googleOAuth': {'enabled': (zuno_keycloak_google_oauth_enabled | default(true) | bool)}}, recursive=True)
+      }}
     gitops_app_wait_retries: 60
 
 - name: "keycloak | wait for the Keycloak CR to report Ready"
