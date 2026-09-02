@@ -69,6 +69,29 @@ garakSecurity:
   # it. Best-effort - a push failure never fails the scan.
   otelMetricsUrl: http://zuno-otel-collector-collector.zuno-monitoring.svc:4318/v1/metrics
 
+# WP-115: the per-project evaluation service the RHOAI dashboard's
+# "Evaluations" page requires (its nav entry is unlocked by the
+# disableLMEval:false / guardrails:true OdhDashboardConfig flags, applied
+# live - that CR is operator-created and not in this repo). sqlite =
+# demo-light, history lost on pod restart; a postgresql upgrade needs a
+# dedicated Crunchy PGO database + pre-composed db-url Secret (mind
+# [[pgo-does-not-recreate-dropped-database]]).
+evalHub:
+  enabled: true
+  name: zuno-evalhub
+  # Must match the operator ConfigMaps' evalhub-collection-name /
+  # evalhub-provider-name labels in redhat-ods-applications (live-checked
+  # 2026-09-02; full sets: 8 collections, 6 providers).
+  collections:
+    - standard-llm-evals-v1
+    - safety-and-fairness-v1
+    - reasoning-v1
+    - leaderboard-v2
+  providers:
+    - lm-evaluation-harness
+    - garak
+  otelEndpoint: http://zuno-otel-collector-collector.zuno-monitoring.svc:4318
+
 # WP-109: RAGAS retrieval-quality evaluation against the REAL rag-service
 # /v1/search path, judged by the local qwen3.6 model. Image built
 # in-cluster (`make d2 build trustyai-eval`, components/trustyai-eval) -

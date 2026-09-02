@@ -1,0 +1,43 @@
+{{- /*
+WP-115: the EvalHub instance backing the RHOAI dashboard's "Evaluations"
+page (Develop & train -> Evaluations). The page was unlocked by flipping
+`disableLMEval: false` on OdhDashboardConfig (live patch, not
+GitOps-managed - see ADR-0534 Operational considerations) but stays
+"Evaluations unavailable" until a project carries an EvalHub CR - the
+operator's EVALHUB controller was always running (WP-108 finding #2),
+just never instantiated.
+
+Collection/provider names must match the collection-name/provider-name
+labels on the operator's ConfigMaps in redhat-ods-applications (checked
+live 2026-09-02: 8 collections, 6 providers). sqlite keeps this
+demo-light (per-pod storage, evaluations history does not survive a pod
+restart); switching to postgresql needs a dedicated PGO database + a
+pre-composed db-url Secret - see values.yaml.
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.evalHub.enabled }}
+---
+apiVersion: trustyai.opendatahub.io/v1
+kind: EvalHub
+metadata:
+  name: {{ .Values.evalHub.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: lm-eval
+    app.kubernetes.io/component: evalhub
+spec:
+  database:
+    type: sqlite
+  collections:
+{{- range .Values.evalHub.collections }}
+    - {{ . }}
+{{- end }}
+  providers:
+{{- range .Values.evalHub.providers }}
+    - {{ . }}
+{{- end }}
+  otel:
+    enableMetrics: true
+    exporterType: otlp-http
+    exporterEndpoint: {{ .Values.evalHub.otelEndpoint }}
+    exporterInsecure: true
+{{- end }}
