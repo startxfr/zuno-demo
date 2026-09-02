@@ -19,19 +19,39 @@ clusterBaseDomain: apps.mycluster.example.com
 # clusters, or a deliberate consolidation) without editing templates.
 spreadAcrossGpuNodes: true
 
-# ADR-0537 (WP-106, Phase 1): RHOAI HardwareProfile CRs (
+# ADR-0537 (WP-106, Phase 1/2): RHOAI HardwareProfile CRs (
 # infrastructure.opendatahub.io/v1), one per MIG tier already in use below,
 # so the Dashboard shows a hardware profile for these models the same way
 # it does for a manually-deployed one (e.g. granite-7b-redhat-lab) - that
 # model's own crash traced to a Dashboard-assigned profile with NO
 # Accelerator identifier, so it never requested a GPU at all. Referenced by
-# name from Phase 2's annotations (opendatahub.io/hardware-profile-name),
-# not yet added in this phase. min/default/max counts are declarative
-# Dashboard metadata only - no live admission webhook enforces them against
-# a pod's actual `resources` (confirmed on-cluster via dry-run), so keep
-# these ranges honest against each model's own `resources` block below by
-# convention.
+# name+namespace from Phase 2's annotations
+# (opendatahub.io/hardware-profile-name/-namespace) on each model below.
+#
+# Correction, 2026-09-02 (live-verified): the CPU/Memory/Accelerator
+# min/default/max counts ARE declarative Dashboard-only metadata (no live
+# admission check enforces them against a pod's actual `resources`,
+# confirmed via dry-run) - but the annotation referencing this profile is
+# NOT purely declarative: a live RHOAI mutating path resolves
+# `spec.scheduling.node.nodeSelector` below and injects it into the
+# annotated model's pod template. Live-caught the hard way: annotating
+# `embeddings` (previously no nodeSelector at all) produced a new pod
+# template hash, a RollingUpdate surge pod, and a `zuno-ai-run-gpu-cap`
+# quota rejection (this chart's 5 GPU models keep zero MIG headroom by
+# design, WP-105's own documented trap). Keep the ranges below honest
+# against each model's own `resources` block by convention regardless.
+#
+# `namespace` is deliberately `redhat-ods-applications`, NOT
+# `.Values.namespace` (zuno-ai-run) - live-verified 2026-09-02: the
+# Dashboard's Settings > Hardware profiles page is RBAC-scoped to that one
+# namespace (`fetch-hardware-profiles-role`/`hardware-profile-role-binding`
+# in `redhat-ods-applications`, granted to `system:authenticated`, with NO
+# equivalent grant elsewhere) - a profile created in any other namespace is
+# invisible to that page even though the mutating path above still honors
+# it correctly cross-namespace. `default-profile` (the operator-seeded one
+# granite uses) already lives there for the same reason.
 hardwareProfiles:
+  namespace: redhat-ods-applications
   mig1g24gb:
     name: mig-1g-24gb
     acceleratorIdentifier: nvidia.com/mig-1g.24gb

@@ -3,8 +3,11 @@
 - **Status:** Proposed
 - **Target:** v0.5
 - **Date:** 2026-09-01
-- **Amended:** 2026-09-02 (Decision 2's "no live webhook" claim was wrong -
-  live-verified there is one, see Decision 2 and Consequences)
+- **Amended:** 2026-09-02 (two corrections: Decision 2's "no live webhook"
+  claim was wrong, see Decision 2 and Consequences; Decision 1's
+  `HardwareProfile` namespace moved from `zuno-ai-run` to `redhat-ods-
+  applications` - the Dashboard's admin page can't see profiles anywhere
+  else, see Decision 1)
 - **Decision owners:** Zuno Demo architecture team
 
 ## Context
@@ -85,11 +88,29 @@ Live verification during this ADR's preparation confirmed:
 
 1. **Create two GitOps-managed `HardwareProfile` CRs**, matching the two MIG
    tiers already in production use, as new Helm templates in
-   `gitops/charts/models/templates/`. Placed in the `zuno-ai-run` namespace
-   (not `redhat-ods-applications`) to stay owned by the same ArgoCD
-   Application as the models they describe, consistent with this chart's
-   existing preference for namespace-scoped over cluster-wide resources
-   (e.g. `servingruntime-embedding.yaml`'s own namespace-scoped choice).
+   `gitops/charts/models/templates/`.
+
+   **Correction, 2026-09-02 (live-verified):** originally placed in the
+   `zuno-ai-run` namespace to stay owned by the same ArgoCD Application as
+   the models they describe. This broke the ADR's own goal: the Dashboard's
+   Settings > Hardware profiles page is RBAC-scoped to `redhat-ods-
+   applications` only (`fetch-hardware-profiles-role`/`hardware-profile-
+   role-binding`, granted to `system:authenticated`, with no equivalent
+   grant in any other namespace) - a `HardwareProfile` anywhere else is
+   invisible to that page, even though the mutating scheduling path
+   (Decision 2's correction) still honors it correctly cross-namespace.
+   `default-profile` (the operator-seeded profile Granite uses) already
+   lives in `redhat-ods-applications` for this reason. Both CRs now target
+   `redhat-ods-applications` instead - confirmed live: the `zuno` AppProject
+   allows it (`destinations: [{namespace: "*"}]`,
+   `namespaceResourceWhitelist: [{group: "*", kind: "*"}]`), so the same
+   `zuno-models-d1` Application can own a resource outside its own
+   destination namespace without a second Application. Verified via
+   `helm template` diff before applying: this move changes only
+   `metadata.namespace` on both CRs and the `opendatahub.io/hardware-
+   profile-namespace` annotation value on the five models - the resolved
+   `nodeSelector` on every model is byte-identical before and after, so it
+   does not re-trigger the Decision 2 rollout risk.
 
    ```yaml
    apiVersion: infrastructure.opendatahub.io/v1

@@ -6,7 +6,7 @@ apiVersion: infrastructure.opendatahub.io/v1
 kind: HardwareProfile
 metadata:
   name: {{ .Values.hardwareProfiles.mig2g48gb.name }}
-  namespace: {{ .Values.namespace }}
+  namespace: {{ .Values.hardwareProfiles.namespace }}
   labels:
     zuno.io/managed-by: argocd
 spec:

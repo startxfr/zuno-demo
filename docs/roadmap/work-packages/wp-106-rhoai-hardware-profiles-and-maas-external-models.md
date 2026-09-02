@@ -44,7 +44,10 @@ Finage's exclusion stays in `ai-gateway`, not duplicated into MaaS).
 
 - New templates: `gitops/charts/models/templates/hardwareprofile-mig-1g-24gb.yaml`,
   `hardwareprofile-mig-2g-48gb.yaml`, rendering the two CRs from ADR-0537's
-  YAML verbatim (namespace `zuno-ai-run`).
+  YAML verbatim, namespace `redhat-ods-applications` (corrected 2026-09-02
+  from an initial `zuno-ai-run` placement - the Dashboard's Settings >
+  Hardware profiles page is RBAC-scoped to `redhat-ods-applications` only,
+  see ADR-0537 Decision 1's correction).
 - Live check: `oc apply --dry-run=server` against the live cluster schema
   before merging (the schema was confirmed live during ADR authoring, but
   operator versions can drift).
