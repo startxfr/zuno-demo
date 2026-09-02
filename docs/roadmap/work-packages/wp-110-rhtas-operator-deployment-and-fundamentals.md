@@ -1,6 +1,35 @@
 # WP-110: Deploy the RHTAS operator and fundamentals
 
-- **State:** Not started (2026-09-02).
+- **State:** Done (2026-09-02) - live-verified end to end on demo222:
+  operator v1.4.3 installed, Securesign CR `Ready` (Fulcio/Rekor/CTLog/
+  Trillian-on-shared-MariaDB/TUF, TSA deliberately omitted), `zuno-signer`
+  token live-tested, and a real keyless sign+verify smoke test passed with
+  a Rekor transparency-log entry (logIndex 0, logID `876f72444af5fee8...`).
+  Five live findings, all fixed in-repo the same day:
+  1. rhtas-operator's CSV is **AllNamespaces-only** - subscribed into
+     `openshift-operators` (mariadb/postgresql Pattern B), not the
+     dedicated-namespace/OperatorGroup shape this brief anticipated;
+     `zuno-rhtas` holds only the operand.
+  2. With `trillian.database.create: false` the operator **never creates
+     Trillian's schema** (only its embedded DB image does) - the role now
+     vendors that image's own `storage.sql` and applies it idempotently
+     before the operand syncs (`ansible/roles/rhtas/files/`).
+  3. Failed createtree jobs leave Rekor/CTlog CRs in a **terminal state
+     the operator never retries** - delete the child CRs, the Securesign
+     parent recreates them.
+  4. rhtas-operator **calls back INTO its operand** (GET rekor-server
+     `/api/v1/log/publicKey` from `openshift-operators`) - zuno-rhtas's
+     default-deny left `RekorAvailable` at "Creating" forever with every
+     pod green; `openshift-operators` added to `allowedFromNamespaces`.
+  5. Keycloak service-account tokens carry **no `aud` claim** by default -
+     Fulcio rejects them (`expected audience "zuno-signer" got []`); fixed
+     with an `oidc-audience-mapper` on the client (same class as WP-103's
+     AAP finding). Also hit live: client `description` > varchar(255)
+     kills the reconcile hook's create with an opaque `[unknown_error]`,
+     and the ADR-0530 reconcile hook does NOT re-fire on automated/
+     selfHeal syncs (same class as the open zuno-postgresql-d1 hook bug) -
+     an explicit `spec.operation` sync is required after every
+     realm-zuno.json client change.
 - **ADRs:** ADR-0535 (Decision - partial scope: operator install and
   fundamentals only; the cutover itself is WP-111).
 - **Depends on:** `mariadb` (Day 1 - Trillian's storage backend),
