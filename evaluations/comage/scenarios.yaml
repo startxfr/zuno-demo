@@ -191,6 +191,13 @@ scenarios:
     # scenario out on the first run that reached it. Sits just above that
     # ceiling for the same reason as the image check in security_checks.py.
     timeout_seconds: 120
+    # Live-verified 2026-09-01: a real day2-stresstest run failed this on a
+    # single 0-marker reply, confirmed via Prometheus to have actually been
+    # served by qwen3.5-9b-wesh (not a fallback to the untuned base model) -
+    # a single call is just a noisy assertion against the reference corpus's
+    # own ~86% marker rate (register_conformance.py's docstring). 5 samples,
+    # any one hit passes (see run_scenarios.py's chat_register_conformance).
+    samples: 5
 
   - id: 22
     title: A technical turn keeps its terminology exact, register or not

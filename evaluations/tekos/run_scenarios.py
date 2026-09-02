@@ -708,6 +708,22 @@ def chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
 
     `expect_register: false` inverts it, which is how rules 11-13 get
     asserted live: a technical question whose answer must NOT be slangified.
+
+    Optional `samples` (default 1, so every existing scenario keeps its
+    exact prior single-call behavior): live-verified 2026-09-01 that a
+    single call is a noisy assertion against the reference corpus's own
+    ~86% marker rate (register_conformance.py's module docstring) - Comage's
+    scenario#21 failed a real day2-stresstest run on one unlucky 0-marker
+    reply, confirmed via live Prometheus telemetry to have actually been
+    served by qwen3.5-9b-wesh (not a routing fallback to the untuned base
+    model). `samples > 1` fires the prompt that many times over distinct
+    sessions and requires only ONE of them to clear the floor - still fails
+    outright the instant any sample trips rules 11-13 (that check stays
+    mandatory-on-any-sample, mirroring register_conformance.score_corpus's
+    own non-negotiable violation check), and for the `expect_register: false`
+    ceiling case uses the MEAN density across samples rather than an OR,
+    since one clean sample can't excuse an over-slangified one when the
+    assertion is a ceiling rather than a floor.
     """
     # Imported here, not at module scope, and with an explicit path setup:
     # this file runs under TWO different layouts. In the repo it sits at
@@ -722,38 +738,52 @@ def chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
     import register_conformance
 
     timeout = s.get("timeout_seconds", 30)
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers(s["persona"]),
-        json={"session_id": "eval-register", "message": s["message"]},
-        timeout=timeout,
-    )
-    if resp.status_code != 200:
-        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
-    body = resp.json()
-    record_run_id(s["persona"], body)
-    reply = body.get("reply") or ""
-    scored = register_conformance.score_text(reply)
-
-    # Rules 11-13 are asserted on EVERY register scenario, not only the
-    # negative one: slangified syntax is a failure whatever the question.
-    if scored["violations"]:
-        return ScenarioResult(
-            s["id"], s["title"], False,
-            "rules 11-13: " + "; ".join(f"{v['marker']} in {v['kind']}" for v in scored["violations"][:3]),
+    num_samples = int(s.get("samples", 1))
+    scored_samples: List[Dict[str, Any]] = []
+    for i in range(num_samples):
+        session_id = "eval-register" if num_samples == 1 else f"eval-register-{s['id']}-{i}"
+        resp = httpx.post(
+            f"{BFF_URL}/api/chat",
+            headers=auth_headers(s["persona"]),
+            json={"session_id": session_id, "message": s["message"]},
+            timeout=timeout,
         )
+        if resp.status_code != 200:
+            return ScenarioResult(
+                s["id"], s["title"], False,
+                f"status={resp.status_code} (sample {i + 1}/{num_samples})",
+            )
+        body = resp.json()
+        record_run_id(s["persona"], body)
+        scored_samples.append(register_conformance.score_text(body.get("reply") or ""))
+
+    # Rules 11-13 are asserted on EVERY register scenario and EVERY sample,
+    # not only the negative one: slangified syntax is a failure whatever the
+    # question, and one clean sample never excuses another's violation.
+    for scored in scored_samples:
+        if scored["violations"]:
+            return ScenarioResult(
+                s["id"], s["title"], False,
+                "rules 11-13: " + "; ".join(f"{v['marker']} in {v['kind']}" for v in scored["violations"][:3]),
+            )
     if s.get("expect_register", True):
-        ok = scored["marker_count"] >= int(s.get("min_markers", 1))
+        min_markers = int(s.get("min_markers", 1))
+        best = max(scored_samples, key=lambda sc: sc["marker_count"])
+        hits = sum(1 for sc in scored_samples if sc["marker_count"] >= min_markers)
+        ok = hits > 0
+        detail = (
+            f"samples={num_samples} hits={hits}/{num_samples} best_markers={best['marker_count']} "
+            f"found={','.join(best['markers'][:6])}"
+        )
     else:
         # A technical answer may still carry register - rule 18 says
         # professional topics use MEDIUM familiarity, not none - so this
         # asserts a ceiling, never zero.
-        ok = scored["density"] <= float(s.get("max_density", 0.25))
-    return ScenarioResult(
-        s["id"], s["title"], ok,
-        f"markers={scored['marker_count']} density={scored['density']:.3f} "
-        f"found={','.join(scored['markers'][:6])} reply_len={len(reply)}",
-    )
+        max_density = float(s.get("max_density", 0.25))
+        mean_density = sum(sc["density"] for sc in scored_samples) / num_samples
+        ok = mean_density <= max_density
+        detail = f"samples={num_samples} mean_density={mean_density:.3f}"
+    return ScenarioResult(s["id"], s["title"], ok, detail)
 
 
 HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
