@@ -13,6 +13,11 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
     # RawDeployment: this always-on model has no need for Serverless/Knative.
     serving.kserve.io/deploymentMode: Standard
+    # ADR-0537 (WP-106, Phase 2): Dashboard-only metadata, does not affect
+    # scheduling - the predictor.model.resources below (mig-1g.24gb) is what
+    # actually reserves the GPU. See hardwareprofile-mig-1g-24gb.yaml.
+    opendatahub.io/hardware-profile-name: {{ .Values.hardwareProfiles.mig1g24gb.name }}
+    opendatahub.io/hardware-profile-namespace: {{ .Values.namespace }}
 spec:
   predictor:
     {{- if .Values.embeddingModel.podAnnotations }}

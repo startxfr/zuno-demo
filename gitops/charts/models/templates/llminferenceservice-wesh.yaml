@@ -39,6 +39,11 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
+    # ADR-0537 (WP-106, Phase 2): Dashboard-only metadata, does not affect
+    # scheduling - the resources block above (mig-2g.48gb) is what actually
+    # reserves the GPU. See hardwareprofile-mig-2g-48gb.yaml.
+    opendatahub.io/hardware-profile-name: {{ .Values.hardwareProfiles.mig2g48gb.name }}
+    opendatahub.io/hardware-profile-namespace: {{ .Values.namespace }}
 spec:
   {{- if .Values.weshModel.llmInferenceService.podAnnotations }}
   annotations:
