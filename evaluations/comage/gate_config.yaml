@@ -108,4 +108,18 @@ peft_regression:
   candidate_job: qwen35-9b-wesh-mmlu
   namespace: zuno-ai-run
   max_regression: 0.05
-  waivers: []
+  # Operator decision 2026-09-02 (WP-114): wesh's real -0.12 mmlu
+  # regression is ACCEPTED as the cost of its register specialization
+  # (ADR-0526 adopted the model knowing quality trade-offs existed; the
+  # first live gate run quantified this one). The waiver keeps the gate
+  # PASS for the adopted model while every report still shows the metric
+  # as WAIVED, and any FURTHER decay (below 0.67-0.15=0.52) or any other
+  # task/metric regression still fails the gate at the normal 0.05.
+  waivers:
+    - task: mmlu_abstract_algebra
+      metric: acc,none
+      max_regression: 0.15
+      reason: >-
+        ADR-0526 register-specialization trade-off, accepted by operator
+        decision 2026-09-02 (WP-114) - wesh 0.55 vs base 0.67 on the
+        standing LMEvalJob pair; revisit at the next wesh retrain

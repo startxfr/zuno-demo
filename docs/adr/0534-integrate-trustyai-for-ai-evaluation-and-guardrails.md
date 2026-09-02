@@ -202,7 +202,13 @@ comparison gate rather than scheduled as a separate WP - a decision made when th
 authored, since both extend the same evaluation chain onto Zuno-specific content). A fourth WP,
 [WP-113](../roadmap/work-packages/wp-113-trustyai-observability-dashboard.md), was added
 2026-09-02 after the human live test of the implemented chain failed on UI visibility: it gives
-the chain its Grafana observability surface (see Operational considerations). Concrete
+the chain its Grafana observability surface (see Operational considerations). A fifth,
+[WP-114](../roadmap/work-packages/wp-114-peft-regression-gate-input-and-trustyai-alerting.md)
+(same day), made Phase 3 enforceable - the PEFT regression check is now a hard, config-driven
+input of ADR-0107's promotion gate, and WP-109's two open findings were settled: the wesh
+`-0.12` regression is formally ACCEPTED via a reasoned waiver (visible as WAIVED in every gate
+report, revisit at the next retrain), and the MitigationBypass finding is a live-firing
+`GarakAttackSuccessHigh` alert rather than a note in a brief. Concrete
 evaluation datasets, thresholds and evaluation policies beyond what these three WPs establish are
 still left to later ADRs/WPs as the Zuno architecture matures, as is any move from observe-only to
 blocking guardrail enforcement.

@@ -1,6 +1,10 @@
 # WP-114: PEFT regression as a hard promotion-gate input + TrustyAI alerting
 
-- **State:** Not started (2026-09-02)
+- **State:** Done — live-verified 2026-09-02 on demo222, closed the same day with BOTH operator
+  decisions taken: the wesh waiver granted (documented trade-off, gate PASS restored with the
+  regression visibly WAIVED) and the full comage acceptance-suite rerun declined as unnecessary
+  (the new half proven live in isolation, the other three inputs unchanged and already
+  live-proven by WP-10/WP-087)
 - **ADRs:** [ADR-0107](../../adr/0107-introduce-automated-model-quality-gates.md) (the gate this
   extends), [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md)
   (Phase 3 - the regression rule being enforced), [ADR-0108](../../adr/0108-automate-model-evaluation-with-lm-eval.md)
@@ -100,7 +104,37 @@ a retrain decision.
 3. Alert thresholds (0.5 ASR, 0.7 RAGAS) are first-pass engineering values, expected to be tuned
    as observation accumulates - same posture as WP-087's tool-calling floors.
 
+## Live findings (2026-09-02, execution)
+
+1. **The wired gate produced the intended live FAIL on first contact with real data**: reading
+   the real `qwen35-9b-mmlu`/`qwen35-9b-wesh-mmlu` LMEvalJobs via `oc`, the peft half returned
+   `overall: FAIL` (delta `-0.12` vs threshold `0.05`) - a model already serving Comage's
+   primary traffic would now be blocked from promotion. That forced the deferred WP-109
+   decision, exactly as designed.
+2. **Operator decision: waiver granted.** `evaluations/comage/gate_config.yaml` carries the
+   waiver (task `mmlu_abstract_algebra`, metric `acc,none`, bound `0.15`, reason referencing
+   ADR-0526's register-specialization trade-off, revisit at next retrain). Live rerun:
+   `overall: PASS` with the metric marked `waived: true` + reason in the report. Any decay
+   below `0.52` or any OTHER regression still fails at the normal `0.05`.
+3. **`GarakAttackSuccessHigh` fired live** ~10 minutes after the PrometheusRule synced: both
+   probes (`dan.Dan_11_0`, `dan.DUDE`) active with detector `mitigation.MitigationBypass` on
+   `qwen3.5-9b-wesh` - the WP-109 finding is now an ACTIVE alert, not a note in a brief.
+   `RagasScoreLow` and `TrustyAIEvalJobFailed` correctly `inactive` (scores 1.0, Jobs green).
+   Rules first showed `state: unknown` for a couple of evaluation cycles after load - normal,
+   not a defect.
+4. The full comage acceptance-suite rerun was declined by the operator (its own README requires
+   explicit operator say-so for live runs): the three pre-existing inputs are code-unchanged
+   and were live-proven by WP-10 (2026-08-21, 19/20) and WP-087; the unit suite proves the
+   AND-ing; the new half was live-proven in isolation. First full-gate proof will come with the
+   next real candidate through mlops.
+5. Behavior guarantee for other agents: no `peft_regression:` block = no new keys, no new
+   checks - covered by a dedicated regression test, and tekos/arkos/etc. configs untouched.
+
 ## Status updates (once live-verified)
 
 - This WP's `State` moves to `Done` once the checklist passes, including the demonstrated live
   FAIL and the operator's wesh decision recorded (waiver or not).
+- **2026-09-02 - Done.** Commits: `c16b9806` (brief + ADR-0107 amendment + tracker), `77dc7689`
+  (gate wiring + waivers + 21 unit tests), `2e554076` (PrometheusRule), plus the waiver commit
+  closing this WP. Checklist: tests green (16 gate / 16 peft), live FAIL then live WAIVED PASS
+  on real LMEvalJob data, `GarakAttackSuccessHigh` firing, no-block agents byte-identical.
