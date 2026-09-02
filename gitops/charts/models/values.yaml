@@ -1121,12 +1121,25 @@ lmEval:
     - name: qwen36-27b-instruct-mmlu
       model: local-completions
       # ADR-0521: qwen is an LLMInferenceService now, no more
-      # -predictor Service - https on port 8000 like gpt-oss-20b's own
-      # -kserve-workload-svc, hence trustLocalCA below.
-      trustLocalCA: true
+      # -predictor Service - it terminates real TLS on port 8000.
+      #
+      # WP-107 (2026-09-02): base_url is deliberately http, NOT https, and
+      # trustLocalCA is off. The job pod is mesh-injected, and the KServe
+      # controller auto-generates a DestinationRule (mode SIMPLE,
+      # service-ca, correct SNI) for this Service - so the sidecar
+      # originates TLS for plaintext client traffic. An https base_url
+      # makes the client do its own TLS INSIDE that origination
+      # (double-TLS), which fails deterministically as "[SSL] record layer
+      # failure" on the first request - reproduced twice live. ai-gateway
+      # avoids this with traffic.sidecar.istio.io/excludeOutboundPorts:
+      # "8000" on its own pod, but the LMEvalJob CRD's spec.pod exposes no
+      # annotations field (checked via oc explain, 3.5.0-ea.2), so the
+      # mesh-origination path is the only one available here. From the
+      # predictor's point of view both paths deliver identical plain TLS.
+      trustLocalCA: false
       modelArgs:
         - name: base_url
-          value: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1/completions
+          value: http://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1/completions
         - name: model
           value: qwen3.6-27b-instruct
         # lm-eval-harness's TemplateAPI defaults to
