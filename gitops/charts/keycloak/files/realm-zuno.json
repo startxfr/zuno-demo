@@ -1125,6 +1125,16 @@
                     "access.token.claim": "true"
                 }
             }, {
+                "name": "maas-gateway-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "zuno-admin-api",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1176,6 +1186,16 @@
                 "consentRequired": false,
                 "config": {
                     "included.client.audience": "tekos-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
+                "name": "maas-gateway-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "zuno-admin-api",
                     "id.token.claim": "false",
                     "access.token.claim": "true"
                 }
@@ -1235,6 +1255,16 @@
                     "access.token.claim": "true"
                 }
             }, {
+                "name": "maas-gateway-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "zuno-admin-api",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1286,6 +1316,16 @@
                 "consentRequired": false,
                 "config": {
                     "included.client.audience": "finage-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
+                "name": "maas-gateway-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "zuno-admin-api",
                     "id.token.claim": "false",
                     "access.token.claim": "true"
                 }
@@ -1345,6 +1385,16 @@
                     "access.token.claim": "true"
                 }
             }, {
+                "name": "maas-gateway-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "zuno-admin-api",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1396,6 +1446,16 @@
                 "consentRequired": false,
                 "config": {
                     "included.client.audience": "naveo-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
+                "name": "maas-gateway-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "zuno-admin-api",
                     "id.token.claim": "false",
                     "access.token.claim": "true"
                 }
@@ -1455,6 +1515,16 @@
                     "access.token.claim": "true"
                 }
             }, {
+                "name": "maas-gateway-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "zuno-admin-api",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
                 "name": "groups",
                 "protocol": "openid-connect",
                 "protocolMapper": "oidc-group-membership-mapper",
@@ -1504,6 +1574,16 @@
                 "consentRequired": false,
                 "config": {
                     "included.client.audience": "cognos-frontend",
+                    "id.token.claim": "false",
+                    "access.token.claim": "true"
+                }
+            }, {
+                "name": "maas-gateway-audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": false,
+                "config": {
+                    "included.client.audience": "zuno-admin-api",
                     "id.token.claim": "false",
                     "access.token.claim": "true"
                 }

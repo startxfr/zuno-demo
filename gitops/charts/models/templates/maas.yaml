@@ -98,20 +98,21 @@ spec:
     name: maas-default-gateway
     namespace: openshift-ingress
   externalOIDC:
-    # UNVERIFIED as of this commit (2026-09-01): whether Authorino
-    # enforces this as a strict token audience match, or only uses it for
-    # discovery/introspection. zuno-admin-api is the closest existing fit
-    # (the platform's one shared, confidential, service-account-enabled
-    # client used for cross-agent internal calls - ADR-0530/WP-091) but no
-    # real end-user login ever carries it as aud/azp, since it's
-    # client-credentials-only (serviceAccountsEnabled: true,
-    # standardFlowEnabled/directAccessGrantsEnabled: false) - every real
-    # user's token instead carries whichever persona frontend client they
-    # logged into (tekos-frontend, arkos-frontend, ...). If live testing
-    # shows audience IS strictly enforced, this needs a shared audience
-    # mapper added to every persona frontend client instead (same fix
-    # class as the 2026-08-30 WP-103 missing-audience-mapper SSO bug) -
-    # do not treat this value as final without that live check.
+    # RESOLVED 2026-09-02 (WP-112 follow-up, live-cluster-confirmed): this
+    # WAS a strict token audience match, and it broke every real caller -
+    # zuno-admin-api is the platform's one shared, confidential,
+    # service-account-enabled client (ADR-0530/WP-091, client-credentials-
+    # only), never carried as aud/azp by a real end-user login. A sustained
+    # 401 storm across multiple agents (local-wesh-maas/local-gpt-oss-maas)
+    # was traced to exactly this - Authorino rejecting every persona token
+    # for lacking this audience. Fixed the way this comment already
+    # prescribed: `gitops/charts/keycloak/files/realm-zuno.json` now adds a
+    # second "maas-gateway-audience" oidc-audience-mapper (audience:
+    # zuno-admin-api) to every persona frontend client, alongside its
+    # existing self-audience mapper - same fix class as the 2026-08-30
+    # WP-103 missing-audience-mapper SSO bug. clientId itself is
+    # unchanged: it is the correct, real value, the gap was purely on the
+    # token-issuing side.
     issuerUrl: https://keycloak.{{ .Values.clusterBaseDomain }}/realms/zuno
     clientId: {{ .Values.maas.externalOIDC.clientId }}
 {{- end }}
