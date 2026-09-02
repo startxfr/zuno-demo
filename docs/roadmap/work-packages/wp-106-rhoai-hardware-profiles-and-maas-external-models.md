@@ -84,7 +84,35 @@ Finage's exclusion stays in `ai-gateway`, not duplicated into MaaS).
   `maas-controller` actually publishes/keys on for an `ExternalModel`
   backend - do not assume it matches the `LLMInferenceService` case).
 
-### Phase 4 - ai-gateway cutover (ADR-0537 Decision 4)
+  **Result, 2026-09-02: FAILED, blocked upstream.** Repo work (templates,
+  Secrets, values.yaml) merged and deployed clean (`helm lint`/`template`
+  and a full server-side dry-run against the live cluster both passed with
+  zero errors), but the live check above failed: both
+  `mistral-large-maas`/`gpt-oss-120b-ovhcloud-maas` `MaaSModelRef`s report
+  `phase: Failed` - `maas-controller` attaches their auto-generated
+  `HTTPRoute` to a non-existent `Gateway/default-gateway` instead of the
+  real `maas-default-gateway`. Confirmed as a known, currently-open
+  upstream defect in `opendatahub-io/models-as-a-service`
+  ([#1417](https://github.com/opendatahub-io/models-as-a-service/issues/1417),
+  [#1399](https://github.com/opendatahub-io/models-as-a-service/issues/1399)
+  - fix labelled `3.6-EA2`,
+  [#1240](https://github.com/opendatahub-io/models-as-a-service/issues/1240)),
+  not a manifest or config error on our side - no field in
+  `ExternalModel.spec`/`MaaSModelRef.spec`/the cluster-wide `Config` CRD
+  offers a workaround, and renaming an existing Gateway (`zuno-agent-
+  gateway`) to either candidate name was evaluated and ruled out (would
+  only mask the symptom, not attach Kuadrant's actual `AuthPolicy`/
+  `TokenRateLimitPolicy`). See ADR-0537 Decision 3's `2026-09-02`
+  correction for the full evidence. **Phase 4 does not proceed** - see
+  below.
+
+### Phase 4 - ai-gateway cutover (ADR-0537 Decision 4) - BLOCKED, not started
+
+**Do not execute this phase.** Its precondition (Phase 3's live check) is
+FAILED, not passed - see above. Switching `ai-gateway` to `via_maas` for
+`mistral`/`ovhcloud-gpt-oss-120b` today would break them outright (no
+working `MaaSModelRef` to route to). The plan below stays recorded for when
+this unblocks, unchanged:
 
 - `provider-routing.yaml`: add `via_maas: true` + `maas_model_ref` to the
   `mistral` and `ovhcloud-gpt-oss-120b` entries.
@@ -97,6 +125,12 @@ Finage's exclusion stays in `ai-gateway`, not duplicated into MaaS).
 - Only after all of the above pass: remove the old direct-call branches for
   these two providers from `components/ai-gateway/app/providers.py`. This
   is the point at which ADR-0537 can move to `Implemented`.
+
+**Re-entry condition**: this platform is upgraded to RHOAI 3.6-EA2 (or
+later, carrying opendatahub-io/models-as-a-service#1399), and Phase 3's
+live check is re-run and passes. Until then, `mistral`/`ovhcloud-gpt-
+oss-120b` in `provider-routing.yaml` stay untouched - the pre-existing
+direct-call path remains the only functional one for these two providers.
 
 ## What NOT to touch
 

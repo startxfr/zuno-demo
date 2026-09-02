@@ -3,11 +3,14 @@
 - **Status:** Proposed
 - **Target:** v0.5
 - **Date:** 2026-09-01
-- **Amended:** 2026-09-02 (two corrections: Decision 2's "no live webhook"
+- **Amended:** 2026-09-02 (three corrections: Decision 2's "no live webhook"
   claim was wrong, see Decision 2 and Consequences; Decision 1's
   `HardwareProfile` namespace moved from `zuno-ai-run` to `redhat-ods-
   applications` - the Dashboard's admin page can't see profiles anywhere
-  else, see Decision 1)
+  else, see Decision 1; Decision 3/4's `ExternalModel` route-identity
+  question answered negatively - blocked on an upstream `maas-controller`
+  defect, Decision 4's cutover deferred to RHOAI 3.6-EA2, see Decision 3,
+  Decision 4 and Acceptance criteria)
 - **Decision owners:** Zuno Demo architecture team
 
 ## Context
@@ -284,46 +287,116 @@ Live verification during this ADR's preparation confirmed:
    duplicating the exclusion into MaaS would create a second source of
    truth that can silently drift from the first.
 
-   **Known unresolved risk, inherited from ADR-0201**: MaaS's subscription
-   selection keys on `<modelRef namespace>/<modelRef name>`, while KServe's
-   own adopted-Gateway publication used `publishers/<ns>/<model>` for a
-   local `LLMInferenceService` - a mismatch that cost two days to debug for
+   **Route-identity risk (inherited from ADR-0201) - now resolved, negatively,
+   2026-09-02.** MaaS's subscription selection keys on `<modelRef
+   namespace>/<modelRef name>`, while KServe's own adopted-Gateway
+   publication used `publishers/<ns>/<model>` for a local
+   `LLMInferenceService` - a mismatch that cost two days to debug for
    `gpt-oss-20b`. An `ExternalModel` has no KServe workload to adopt a route
-   from, so it is **not known** whether the same mismatch class applies, or
-   whether `maas-controller` computes route identity differently for this
-   backend kind. This must be verified live (see Acceptance criteria) before
-   either `MaaSSubscription` can be trusted to actually gate traffic.
+   from, so whether the same mismatch class applies here was an open
+   question. Live-verified after deploying both `ExternalModel`s: it is
+   **worse than a naming mismatch** - `MaaSModelRef` for both
+   `mistral-large-maas` and `gpt-oss-120b-ovhcloud-maas` reports `phase:
+   Failed`, `reason: ReconcileFailed`, `message: 'Failed to reconcile
+   HTTPRoute: HTTPRoute zuno-ai-run/<name> does not reference gateway
+   openshift-ingress/maas-default-gateway (found: openshift-ingress/
+   default-gateway)'`. The `HTTPRoute` `maas-controller` auto-generates for
+   an `ExternalModel` backend attaches to a Gateway literally named
+   `default-gateway` - which does not exist as a `Gateway` object on this
+   cluster at all (it is the name of RHOAI's own `GatewayConfig`, a
+   different resource kind that generates the actual `Gateway/
+   data-science-gateway`) - instead of `maas-default-gateway`, the Gateway
+   `maas-controller`'s own `--gateway-name`/`--gateway-namespace` flags
+   correctly declare (confirmed live: `maas-controller`'s Deployment passes
+   exactly `--gateway-name=maas-default-gateway
+   --gateway-namespace=openshift-ingress`). `MaaSSubscription` fails in
+   cascade (`TokenRateLimitPolicies` cannot attach to an unprogrammed
+   route). No field in `ExternalModel.spec`, `MaaSModelRef.spec`, or the
+   cluster-wide `Config` CRD (`maas.opendatahub.io`, `spec` is reserved/
+   empty in v1alpha1) exposes a way to override this from our side - it is
+   a `maas-controller` defect, not a configuration gap.
+
+   **Confirmed as a known, currently-open upstream gap** (not something
+   specific to this cluster), via `opendatahub-io/models-as-a-service`:
+   - [Issue #1417](https://github.com/opendatahub-io/models-as-a-service/issues/1417)
+     ("stop legacy ExternalModel reconciler when inference CRD exists")
+     confirms the `maas.opendatahub.io` `ExternalModel` API this ADR uses is
+     explicitly termed **legacy**, being superseded by a separate
+     `inference.opendatahub.io` reconciler; the two can create duplicate/
+     conflicting networking resources for the same model when both exist.
+   - [Issue #1399](https://github.com/opendatahub-io/models-as-a-service/issues/1399)
+     ("auto-resolve tenantRef from HTTPRoute gateway", RHOAIENG-87566) is
+     the actual fix: a reverse-lookup against every `AITenant`'s
+     `status.gatewayRef` to resolve which Gateway an `ExternalModel`'s
+     route should really attach to - exactly the missing step here (our
+     `AITenant/models-as-a-service` already correctly declares
+     `spec.gateway.name: maas-default-gateway`; nothing consults it today).
+     **Labelled `3.6-EA2`** - the next RHOAI release, not yet in the `3.5
+     EA2` this platform runs (ADR-0002).
+   - [Issue #1240](https://github.com/opendatahub-io/models-as-a-service/issues/1240)
+     ("ExternalModel discovery still returns path-based status.endpoint
+     instead of BBR gateway URL"), labelled `bug`/`3.5`, independently
+     confirms `ExternalModel` routing/discovery is known-incomplete in our
+     exact deployed version.
+
+   **Conclusion: blocked upstream, not a configuration or workaround
+   problem.** No rename, annotation, or manifest change on our side can fix
+   this (see the live investigation that ruled out renaming
+   `zuno-agent-gateway` to `default-gateway`/`maas-default-gateway` - it
+   would only mask the symptom, since Kuadrant's `AuthPolicy`/
+   `TokenRateLimitPolicy` for MaaS governance are bound to
+   `maas-default-gateway` specifically, not to whichever object holds a
+   given name). Re-evaluate once this platform upgrades to RHOAI 3.6-EA2 or
+   later (tracking #1399), not before.
 
 4. **Activate the existing `via_maas` SaaS path in `ai-gateway`, then retire
-   the direct-call branches (full cutover).** Set
-   `MAAS_EXTERNAL_EGRESS_ENABLED=true`; add `via_maas: true` and
-   `maas_model_ref: <published-name>` to the `mistral` and
+   the direct-call branches (full cutover) - BLOCKED, do not execute yet.**
+   The plan: set `MAAS_EXTERNAL_EGRESS_ENABLED=true`; add `via_maas: true`
+   and `maas_model_ref: <published-name>` to the `mistral` and
    `ovhcloud-gpt-oss-120b` entries in `platform/ai-gateway/
-   provider-routing.yaml`. `maas_adapter.py`'s existing `chat_model_via_maas`
-   transport (already proven for local models under ADR-0521) requires no
-   new adapter code - only its third, currently-closed gate needs opening.
-   Once a live smoke test confirms both models answer correctly through
-   MaaS (Acceptance criteria), remove the old direct-`ChatOpenAI`/
+   provider-routing.yaml`; once a live smoke test confirms both models
+   answer correctly through MaaS, remove the old direct-`ChatOpenAI`/
    `ChatMistralAI` branches for these two providers from
-   `components/ai-gateway/app/providers.py` in a follow-up phase of the same
-   WP-106 - this is a full cutover, not a permanent dual path (unlike
-   ADR-0521's own local-model fallback, which is direct-Service, not a
-   second SaaS credential path, and is explicitly kept).
+   `components/ai-gateway/app/providers.py` - a full cutover, not a
+   permanent dual path (unlike ADR-0521's own local-model fallback).
+
+   **Status, 2026-09-02: blocked upstream, not attempted.** Decision 3's
+   correction above establishes that `mistral-large-maas` and
+   `gpt-oss-120b-ovhcloud-maas` cannot pass real traffic today - their
+   `MaaSModelRef`/`MaaSSubscription` never leave `Failed`. Switching
+   `ai-gateway` to `via_maas` for either provider now would break them
+   outright (no working backend to route to). **The current direct-call
+   path (`mistral`/`ovhcloud-gpt-oss-120b` in `provider-routing.yaml`,
+   unchanged since before this ADR) stays the only functional path for
+   these two providers** - `provider-routing.yaml` is deliberately left
+   untouched by this ADR's implementation. Re-evaluate this Decision once
+   RHOAI 3.6-EA2 (or later, carrying opendatahub-io/models-as-a-service#1399)
+   is deployed and a live smoke test confirms `Ready`/successful completions
+   through MaaS for both models - only then does "full cutover" become
+   executable as originally planned.
 
 ## Consequences
 
 Local models gain the same Dashboard hardware-profile display as manually
 deployed ones, closing a real operator-confusion gap (this ADR's own
 trigger: Granite's crash was invisible as a GPU problem until the profile's
-`spec.identifiers` were read directly). `mistral` and `gpt-oss-120b` gain
-group-based access control and rate limiting equivalent to local models,
-removing the last two SaaS providers that bypassed MaaS governance
-entirely. The cost: a mirror Secret per externally-published model (until/
-unless the `api-key` key-naming requirement is relaxed upstream), and a
-firm dependency on `maas-controller`'s undocumented route-identity behavior
-for a backend kind (`ExternalModel`) this platform has never exercised
-before - the live verification in Acceptance criteria is not optional
-diligence, it is this ADR's central open question.
+`spec.identifiers` were read directly). `mistral` and `gpt-oss-120b` were
+meant to gain group-based access control and rate limiting equivalent to
+local models, removing the last two SaaS providers that bypass MaaS
+governance - **this part did not land**: Decision 3's `ExternalModel`
+route-identity correction below found both `MaaSModelRef`s permanently
+`Failed` on a confirmed upstream `maas-controller` defect (RHOAI 3.5 EA2),
+not a configuration issue this repo can fix. Net effect of this ADR on
+governance, as of 2026-09-02: zero change for `mistral`/`gpt-oss-120b` -
+they keep bypassing MaaS exactly as before, on their pre-existing
+direct-call path, with two now-inert `ExternalModel`/`MaaSModelRef` objects
+sitting in `Failed` state until a fixed RHOAI version is deployed. The cost
+in the meantime: a mirror Secret per externally-published model (dormant,
+harmless), and `MaaSSubscription`/`MaaSAuthPolicy` objects in
+`models-as-a-service` that report `Failed` (visible clutter, not a security
+gap - Zuno's own C1/C2/C3 classification, unaffected by any of this, is
+still the actual gate on these two providers per ADR-0021/ADR-0521's
+"stricter outer policy" framing).
 
 **Live incident, 2026-09-02 (WP-106 Phase 2 rollout):** Decision 2's
 annotation triggered the mutating path corrected above, which produced a new
@@ -382,21 +455,46 @@ can move to `Implemented`:
 - The exact Secret key name (`api-key`) is confirmed live by a successful,
   real completion request through each `MaaSModelRef` - not just a `Ready`
   status.
-- The MaaS route-identity question flagged in Decision 3 is resolved by
-  observation (inspect the generated route/subscription-selection identity
-  for each `ExternalModel`-backed `MaaSModelRef` and confirm it matches what
-  `MaaSAuthPolicy`/`MaaSSubscription` actually key on).
+- ~~The MaaS route-identity question flagged in Decision 3 is resolved by
+  observation~~ - **answered, negatively, 2026-09-02**: both
+  `ExternalModel`-backed `MaaSModelRef`s are `Failed` -
+  `maas-controller` attaches their auto-generated `HTTPRoute` to a
+  non-existent `Gateway/default-gateway` instead of the tenant's real
+  `maas-default-gateway`. Confirmed as a known, currently-open upstream gap
+  (`opendatahub-io/models-as-a-service`
+  [#1417](https://github.com/opendatahub-io/models-as-a-service/issues/1417),
+  [#1399](https://github.com/opendatahub-io/models-as-a-service/issues/1399)
+  - the fix, labelled `3.6-EA2`,
+  [#1240](https://github.com/opendatahub-io/models-as-a-service/issues/1240)),
+  not a configuration gap on our side - no field in `ExternalModel.spec`,
+  `MaaSModelRef.spec`, or the cluster-wide `Config` CRD exposes a
+  workaround. **This criterion cannot be satisfied on RHOAI 3.5 EA2** -
+  carried forward as a blocking pending item, not closed.
+- **Blocked upstream - not satisfiable today, tracked for RHOAI 3.6-EA2**:
+  a live smoke test confirming real completions through
+  `mistral-large-maas`/`gpt-oss-120b-ovhcloud-maas`, the Finage
+  negative test, and the per-persona-group quota test below all require the
+  route-identity defect above to be fixed first. None of the three can be
+  attempted until then.
 - A live negative test confirms Finage is still denied `gpt-oss-120b` after
-  cutover.
+  cutover (blocked - see above).
 - A live test per persona group (`agent_tekos`, `sales`, catch-all) confirms
   the expected `MaaSSubscription` priority/quota is the one actually
-  enforced.
-- The direct-call branches for `mistral`/`ovhcloud-gpt-oss-120b` are removed
-  from `providers.py` only after the above pass - not before.
+  enforced (blocked - see above).
+- The direct-call branches for `mistral`/`ovhcloud-gpt-oss-120b` in
+  `providers.py` are **not touched by this ADR** - they remain the only
+  functional path for these two providers until the above unblocks (see
+  Decision 4's `2026-09-02` status note). Removing them is now a future
+  Decision-4 follow-up, not part of this WP's current scope.
 
 ## References
 
 - Work package: [WP-106](../roadmap/work-packages/wp-106-rhoai-hardware-profiles-and-maas-external-models.md).
+- `opendatahub-io/models-as-a-service` [#1417](https://github.com/opendatahub-io/models-as-a-service/issues/1417),
+  [#1399](https://github.com/opendatahub-io/models-as-a-service/issues/1399),
+  [#1240](https://github.com/opendatahub-io/models-as-a-service/issues/1240)
+  - the upstream `ExternalModel`/`maas-controller` route-identity defect
+    blocking Decision 3/4, and its tracked fix (target RHOAI 3.6-EA2).
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives
 considered, Migration/evolution and Review evidence.
