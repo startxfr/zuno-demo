@@ -24,6 +24,13 @@ spec:
       values: |
         trustyaiConfig:
           enabled: true
+        # ADR-0540/WP-120: deploy the NeMo rails server so its
+        # request/response contract can be established live. This does NOT
+        # switch agent-runtime over - gitops/charts/agent-runtime's
+        # guardrails.backend stays "builtin" until the discovery gate
+        # passes, so the observer in the request path is unchanged.
+        nemoGuardrails:
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
