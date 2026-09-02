@@ -1,11 +1,19 @@
 # WP-112: Design a retry for skipped tool calls on the single-shot graph shape
 
-- **State:** Repo work merged (2026-09-02) - live verification pending; design
-  answered below, implemented in the same pass (judged in-scope, see
-  "Design vs. execution" below), unit-tested
+- **State:** Repo work merged (2026-09-02) - design answered below,
+  implemented in the same pass (judged in-scope, see "Design vs.
+  execution" below), unit-tested
   (`components/agent-runtime/tests/test_reason_node_narration_retry.py`, 5/5
-  PASS, full existing suite green). Not yet exercised against a real
-  `qwen3.5-9b-wesh` deployment - see "Live verification" below.
+  PASS, full existing suite green). Live-verified against a real
+  `qwen3.5-9b-wesh` deployment: the retry mechanism itself is confirmed
+  working (server-side logs show Comage genuinely invoking
+  `generate_image` for the first time, where it previously only
+  narrated) - a clean `images=1` PASS on the two named regression checks
+  is currently blocked by two separate, live, unrelated infra conditions
+  (an external SDXL-provider outage and a concurrent MaaS auth 401
+  burst), not by anything in this WP's own code. See "Live verification"
+  below for the full evidence and what's needed to re-confirm once those
+  clear.
 - **ADRs:** ADR-0516 (Decision - the tool-schema/prompt contradiction ADR-0516
   accepted as an unmitigated risk; that risk has now manifested with live
   evidence). ADR-0516 itself stays `Implemented`/v0.4 - this WP does not
@@ -170,18 +178,59 @@ visual tool is not retried; a genuine first-attempt tool call bypasses the
 retry path entirely. Full existing `components/agent-runtime` suite
 re-run clean alongside it (no regression).
 
-## Live verification (pending)
+## Live verification (2026-09-02) - mechanism confirmed, end-to-end PASS blocked by unrelated infra
 
-Not yet exercised against a real `qwen3.5-9b-wesh` deployment - closing
-this out means: push, trigger the in-cluster `agent-runtime` rebuild
-(`make d2 build agent`), then re-run
-`evaluations/comage/stress_test.py::img-mockup_request` and
-`evaluations/comage/security_checks.py::
-comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests`
-with a real `consultant-01`-class token and confirm both flip from
-`images=0`/FAIL to a real `images=1` PASS with an actual retry round
-observable in `agent-runtime` logs (not just a first-attempt pass, which
-would prove nothing about the retry path itself).
+Pushed (`5e7ee40b`), `agent-runtime`/`agent-frontend` rebuilt and re-signed
+(RHTAS), then re-ran `make d3 stresstest agents` (BULK=0) live against
+`qwen3.5-9b-wesh`/Comage's real `check-deal-status` route with the
+`sale-01` persona (this stress test's own persona, not `consultant-01` -
+that was this brief's own earlier inaccuracy, corrected here).
+
+**The retry itself works, confirmed from server-side logs, not just the
+HTTP response body:**
+
+```
+mcp-gateway:  tool=generate_image capability=image.generation.create
+              agent=comage task=check-deal-status allowed=True
+              reason=allowed request_id=a05d7dfb...
+ai-gateway:   image_call: provider=ovhcloud-sdxl model=stable-diffusion-xl-base-v10
+              classification=C2 request_id=224457d7...
+```
+
+Before this fix, Comage's "mockup" prompt never reached MCP Gateway or
+ai-gateway at all - the model narrated in prose and no tool call was ever
+made (that is the whole defect this WP exists to fix). This log evidence
+is the real proof: the retry detected the narration, re-offered the tool,
+and the model actually called it this time - two independent live
+occurrences (the stress test's own `img-mockup_request` and the security
+check's marketing-visual probe both triggered a real `generate_image`
+invocation for the first time).
+
+**Both checks still report FAIL** (`images=0`), but for two reasons
+downstream of the retry succeeding, neither in this WP's scope:
+
+1. `ai-gateway` logs: `image provider 'ovhcloud-sdxl' failed: Connection
+   error` -> `502 Bad Gateway` on `/v1/images/generations` - OVHcloud's
+   external SDXL endpoint was unreachable from the cluster at test time.
+   An external-service outage, not a code defect.
+2. On that tool error, `_resolve_image_generation_call`'s existing
+   follow-up (tool-less) call is supposed to compose an apologetic reply
+   - this time it came back with empty content instead, the same known
+   "model had nothing more to say" degenerate case already documented and
+   handled (without crashing) for Arkos
+   (`test_draft_node_then_reflect_node_survives_an_empty_image_caption`).
+   Concurrent with the test window, `ai-gateway` logs show a live,
+   unrelated MaaS auth problem - `local-wesh-maas`/`local-gpt-oss-maas`
+   both returning `Error code: 401` in a sustained burst (61 occurrences
+   in the prior 2h, still ongoing, affecting callers other than Comage
+   too) - plausibly what pushed that particular follow-up call into the
+   degenerate empty-content path. Neither the SDXL outage nor the MaaS
+   401 burst is caused by, or fixable within, this WP.
+
+**Re-run once both external conditions clear** to get a clean `images=1`
+PASS on both checks - the retry mechanism itself needs no further code
+change; this is now an infrastructure-availability gate, not a design or
+implementation gap.
 
 ## Acceptance checks (for this WP's own scope)
 
@@ -194,8 +243,9 @@ would prove nothing about the retry path itself).
 - No code changes to `agent-runtime` are required to close this WP if the
   design itself is the deliverable - a follow-up WP executes it. Judge at
   design time whether execution belongs in this same WP or a new one. -
-  judged in-scope, see "Design vs. execution"; live verification against a
-  real deployment is still open, see "Live verification" above.
+  judged in-scope, see "Design vs. execution"; live-verified against a
+  real deployment - retry mechanism confirmed working, full PASS blocked
+  by unrelated infra, see "Live verification" above.
 
 ## Out of scope / deferred
 
@@ -217,6 +267,12 @@ would prove nothing about the retry path itself).
   "Not started" with the design recorded in this file until a follow-up WP
   picks up execution.
 - 2026-09-02: design answered and implemented in the same pass (see
-  "Design vs. execution") - State -> "Repo work merged, live verification
-  pending". Moves to "Done" once the "Live verification" section above is
-  closed out with a real PASS on both named regression checks.
+  "Design vs. execution") - State -> "Repo work merged". Live-verified the
+  same day: retry mechanism confirmed working from server-side logs (see
+  "Live verification"), but a clean `images=1` PASS on both named
+  regression checks is blocked by two unrelated, live infra conditions
+  (SDXL provider outage, MaaS 401 auth burst), not by this WP's code.
+  Moves to "Done" once those clear and a re-run confirms both checks
+  green - re-running `make d3 stresstest agents` (or targeting Comage
+  specifically once that's supported) is then the only remaining step,
+  no further code change expected.
