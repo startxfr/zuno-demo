@@ -3,6 +3,8 @@
 - **Status:** Proposed
 - **Target:** v0.5
 - **Date:** 2026-09-01
+- **Amended:** 2026-09-02 (Decision 2's "no live webhook" claim was wrong -
+  live-verified there is one, see Decision 2 and Consequences)
 - **Decision owners:** Zuno Demo architecture team
 
 ## Context
@@ -176,13 +178,25 @@ Live verification during this ADR's preparation confirmed:
 
    applied to `llminferenceservice-qwen35.yaml`, `-gptoss.yaml`,
    `inferenceservice-embedding.yaml` (→ `mig-1g-24gb`) and
-   `llminferenceservice-wesh.yaml`, `-qwen.yaml` (→ `mig-2g-48gb`). This
-   annotation is purely declarative metadata for the Dashboard - it does not
-   inject or validate `resources` at admission time (confirmed: no
-   HardwareProfile-related mutating/validating webhook exists on
-   `InferenceService`/`LLMInferenceService`). The chart's own `resources`
-   values remain the actual source of truth and must be kept within the
-   matching profile's min/max by convention, not enforcement.
+   `llminferenceservice-wesh.yaml`, `-qwen.yaml` (→ `mig-2g-48gb`).
+
+   **Correction, 2026-09-02 (live-verified, WP-106 Phase 2 rollout):** this
+   annotation is **not** purely declarative Dashboard metadata as first
+   assumed here. A live RHOAI mutating admission path (fired on
+   `InferenceService`/`LLMInferenceService` create/update) reads
+   `opendatahub.io/hardware-profile-name`/`-namespace`, resolves the
+   referenced `HardwareProfile`, and injects its
+   `spec.scheduling.node.nodeSelector` into the generated pod template.
+   Proven live: annotating `embeddings` (the one model with no pre-existing
+   `nodeSelector`) produced a NEW pod template hash
+   (`nodeSelector: {nvidia.com/gpu.present: "true"}` appearing where the old
+   ReplicaSet had none) - a real Deployment rollout, not a no-op. The
+   `resources` block remains the actual GPU-slice reservation (unaffected -
+   confirmed identical between old/new pod templates); what this correction
+   retracts is only the claim that the annotation has **no** live effect.
+   The 4 other models were unaffected by this same mechanism only because
+   they already carried an identical, hand-authored `nodeSelector` - the
+   webhook's output happened to match, so no new pod template hash resulted.
 
 3. **Publish `mistral-large-latest` and `gpt-oss-120b` as `ExternalModel` +
    `MaaSModelRef`**, bringing both under the same governance plane as local
@@ -290,6 +304,25 @@ for a backend kind (`ExternalModel`) this platform has never exercised
 before - the live verification in Acceptance criteria is not optional
 diligence, it is this ADR's central open question.
 
+**Live incident, 2026-09-02 (WP-106 Phase 2 rollout):** Decision 2's
+annotation triggered the mutating path corrected above, which produced a new
+`embeddings` pod template and a `RollingUpdate` surge pod - rejected by the
+`zuno-ai-run-gpu-cap` `ResourceQuota` (`mig-1g.24gb` already at 3/3: the
+other two co-resident models plus `embeddings`' own running pod), leaving
+`embeddings` `Progressing` and the whole `zuno-models-d1` Argo Application
+stuck `Healthy: Progressing` (sync itself still succeeded). This is the
+exact recurring trap WP-105 already documented for this chart's
+GPU-saturated, single-replica, default-`RollingUpdate` models - not a new
+failure mode, but the first time it was triggered by a metadata-only
+annotation rather than a resources/image change. Recovered manually: scale
+the stale ReplicaSet to 0 (frees the quota slot), then nudge the new
+ReplicaSet `0→1` to bypass its exponential backoff. **Any future
+`HardwareProfile`/annotation change to one of these five models carries the
+same risk** - Operational considerations below now calls this out
+explicitly; WP-105's own long-standing recommendation (`strategy:
+{type: Recreate}`) would remove the trap at its root but is out of scope
+here, same as it was there.
+
 ## Security considerations
 
 No new Vault path is introduced - both mirror Secrets source from the
@@ -306,6 +339,15 @@ Granite's `HardwareProfile` correction is a one-time manual Dashboard
 action (select `mig-1g-24gb` at redeploy), not a GitOps change - it carries
 no ArgoCD drift-detection and must be re-applied by hand if the deployment
 is ever recreated from scratch.
+
+Any future edit to a `HardwareProfile`-annotated model's manifest - not
+just a `resources`/image change, an annotation edit is enough, per the live
+incident above - can trigger a `RollingUpdate` surge pod against these five
+permanently GPU-quota-saturated models. Before merging such a change,
+check whether the target model's own `nodeSelector` output would actually
+change (a same-value mutation is a no-op); if it would, expect a stuck
+rollout and be ready to run the WP-105 remedy: scale the stale ReplicaSet
+to 0, then nudge the new one `0→1` past its exponential backoff.
 
 ## Acceptance criteria
 
