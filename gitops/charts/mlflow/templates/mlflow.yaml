@@ -5,6 +5,11 @@ assumed: backendStoreUriFrom takes a {name,key} Secret reference, and
 workspaceLabelSelector is a standard label selector deciding which namespaces
 appear as MLflow workspaces in the dashboard.
 
+Two rules the CRD enforces but does not advertise in its schema, both learned
+from a rejected apply: the resource name must be exactly "mlflow" (cluster
+singleton), and either serveArtifacts+artifactsDestination or
+defaultArtifactRoot must be set.
+
 No `storage` block: that is the SQLite/file-artifact path. Artifacts live in
 S3 per workspace, configured by the MLflowConfig CRs beside this file.
 */ -}}
@@ -20,6 +25,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   replicas: {{ .Values.server.replicas }}
+  serveArtifacts: {{ .Values.server.serveArtifacts }}
+  artifactsDestination: {{ .Values.server.artifactsDestination | quote }}
   backendStoreUriFrom:
     name: {{ .Values.server.backendStoreSecretName }}
     key: uri

@@ -5,14 +5,23 @@ mlflowConfig:
   enabled: false
 
 server:
-  # The cluster-scoped MLflow CR's name. The operator hardcodes
+  # MUST be "mlflow": the CRD rejects any other name outright ("MLflow
+  # resource name must be 'mlflow'") - it is a cluster singleton, not a
+  # named instance. The operator also hardcodes
   # --namespace=redhat-ods-applications for the workloads it creates
   # (ADR-0331's constraint family), so this chart never chooses where the
-  # server pod lands.
-  name: zuno
+  # server pod lands either.
+  name: mlflow
   namespace: redhat-ods-applications
   replicas: 1
   backendStoreSecretName: mlflow-backend-store
+  # serveArtifacts routes artifact reads/writes through the server's REST
+  # API instead of requiring every client to hold S3 credentials - the mode
+  # that fits the operand's per-workspace MLflowConfig design. The CRD
+  # requires one of serveArtifacts+artifactsDestination or
+  # defaultArtifactRoot; it validates this, the schema does not show it.
+  serveArtifacts: true
+  artifactsDestination: s3://zuno-corpus/mlflow-artifacts
   db:
     # The PRIMARY Service, deliberately not -pgbouncer: MLflow's Alembic
     # migrations and SQLAlchemy session state do not survive transaction
