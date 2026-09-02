@@ -78,7 +78,7 @@ Registry
   CI/build service identities, not human signers for ordinary platform
   builds - the same "who signs" boundary ADR-0420 already drew for its
   `zuno-signer` ServiceAccount. The concrete OIDC/Fulcio identity-issuer
-  wiring is left to the implementing WP (WP-104), not decided here.
+  wiring is decided below (Design decisions) and implemented by WP-110.
 - **Registry**: the OpenShift internal registry stays the artifact store.
   RHTAS adoption does **not** imply Quay - that remains a separate,
   independently-justified decision (see Non-goals).
@@ -91,8 +91,49 @@ Registry
 - **Scope (this ADR)**: Priority 1 only - the container images ADR-0420/
   WP-070 already signs (agent frontend/BFF, agent-runtime, ai-gateway,
   MCP servers, shared AI backend components, `supply-chain-signer` itself).
-  Cutting these over from Vault Transit to RHTAS/Cosign keyless signing,
-  and standing up the Policy Controller in audit-only mode, is WP-104.
+  Deploying the operator and fundamentals is WP-110; cutting these images
+  over from Vault Transit to RHTAS/Cosign keyless signing, assessing
+  whether RHOAI needs any direct integration, and standing up the Policy
+  Controller in audit-only mode, is WP-111.
+
+### Design decisions
+
+Three questions this ADR would otherwise leave open for WP-110 to resolve
+live are settled here instead, each following an existing in-repo
+precedent rather than RHTAS's own upstream defaults:
+
+- **Namespace.** RHTAS's own upstream default/CSV-fixed namespace (exact
+  string confirmed live against the installed CSV's `installModes` before
+  WP-110 authors any CR - do not assume it matches the upstream docs
+  without checking this cluster's actual PackageManifest), owned by
+  `gitops/charts/namespaces` (`zuno-namespaces-d0`) rather than by the
+  `rhtas` chart itself. This mirrors `openshift-lightspeed` and
+  `redhat-ods-operator`: a mandatory, CSV-fixed singleton-operand
+  namespace is a permanent part of the platform topology, not an install
+  artifact of the component that happens to run inside it.
+- **Trillian storage backend.** Reuse the shared `mariadb` Day 1 operand
+  with a dedicated `Database`/`User`/`Grant` triple for Trillian (BYO
+  password via Vault/ExternalSecret), the same shared-instance-plus-
+  dedicated-role shape ADR-0315 already established for Postgres and this
+  platform's Day 1 MariaDB pattern uses uniformly - not a dedicated
+  MySQL StatefulSet, not a dedicated `PostgresCluster`. Because Trillian
+  speaks MySQL's server-first wire protocol, WP-110 applies this
+  platform's already-documented Istio-sniffing workaround
+  (`excludeInboundPorts`/`excludeOutboundPorts` annotations plus a
+  `DestinationRule` disabling client-side mTLS on the MySQL port) from
+  the start, rather than rediscovering it live the way MariaDB's own
+  chart originally did.
+- **OIDC signing identity.** A new Keycloak client, `zuno-signer`
+  (`serviceAccountsEnabled: true`; standard/implicit/direct-grant flows
+  disabled; secret from Vault; no `realm-management` client roles, since
+  Fulcio only needs the client's own service-account token as an OIDC
+  identity, not Keycloak admin API access), added the same way ADR-0530
+  added `zuno-admin-api`: a `realm-zuno.json` client block reconciled into
+  the already-live realm through the existing `zuno-keycloak-client-
+  reconcile` Sync-hook Job, because realm import stays create-only.
+  This is the deliberate, documented `serviceAccountsEnabled: true`
+  exception to ADR-0032's platform-wide posture that WP-104's original
+  Design section anticipated needing.
 
 ## Non-goals
 
@@ -146,9 +187,19 @@ material difference from ADR-0420's rejection of a hand-rolled equivalent.
 
 ## Migration / evolution
 
-1. **v0.9 (this ADR, WP-104)**: deploy RHTAS, wire Keycloak/OIDC signing
-   identities, cut Priority-1 image signing from Vault Transit to RHTAS/
-   Cosign keyless, deploy the Policy Controller in audit-only mode.
+1. **v0.9 (this ADR)**: two WPs, each committed/pushed/live-tested
+   independently, following this platform's Day 1/Day 2 split -
+   **WP-110** deploys the RHTAS operator and fundamentals (namespace,
+   Trillian storage, Keycloak OIDC signing identity, a smoke-test keyless
+   signature) as the new Day 1 `rhtas` component; **WP-111** assesses
+   whether RHOAI needs any direct integration (expected to conclude "not
+   applicable for v0.9" per this ADR's AI/model Non-goal, confirmed live
+   rather than assumed) and then cuts Priority-1 image signing over from
+   Vault Transit to RHTAS/Cosign keyless and deploys the Policy Controller
+   in audit-only mode, as the new Day 2 `rhtas-config` component - mirroring
+   the `aap`/`aap-config` and `lightspeed`/`lightspeed-config` split.
+   (WP-104 covered this same scope as a single WP; it is superseded by
+   WP-110/WP-111 - see WP-104's own State for the pointer.)
 2. **Once ADR-0506/ADR-0507 (OKF extraction) are Implemented**: author the
    OKF/agent-bundle trust ADR and its WP(s), establishing the trust chain
    from a Git revision in `zuno-okf` through to a loaded agent bundle.
@@ -165,7 +216,15 @@ Security considerations, Acceptance criteria and Review evidence.
 
 - [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) -
   superseded by this decision; its Vault Transit signing mechanism is what
-  WP-104 cuts over from.
+  WP-111 cuts over from.
+- [ADR-0315](0315-dedicated-keycloak-postgresql-database.md) - the
+  shared-instance-plus-dedicated-role precedent this ADR's Trillian
+  storage-backend decision follows (rejects a dedicated database instance
+  per component).
+- [ADR-0530](0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) -
+  the `zuno-admin-api` machine-identity Keycloak client this ADR's
+  `zuno-signer` client mirrors, including the create-only-realm-import
+  reconcile-Job mechanics.
 - [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md),
   [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) -
   the original keyless Cosign/GitHub-OIDC/Fulcio/Rekor decisions ADR-0420

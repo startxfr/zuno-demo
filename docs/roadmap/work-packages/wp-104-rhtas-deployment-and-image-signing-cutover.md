@@ -1,6 +1,6 @@
 # WP-104: Deploy RHTAS and cut Priority-1 image signing over from Vault Transit
 
-- **State:** Not started (2026-08-30).
+- **State:** Cancelled — superseded by [WP-110](wp-110-rhtas-operator-deployment-and-fundamentals.md)/[WP-111](wp-111-rhtas-config-rhoai-assessment-and-signing-cutover.md) (2026-09-02). This WP's scope is unchanged and correct - it is split in two rather than dropped, to commit/push/test each half (operator+fundamentals, then RHOAI-assessment+cutover) independently along this platform's Day 1/Day 2 convention. The Design/Acceptance-checks/Out-of-scope content below stays as the historical record of the open questions WP-110/WP-111 resolve; do not execute this brief directly.
 - **ADRs:** ADR-0535 (Decision - full scope of this WP).
 - **Depends on:** none in-repo. RHTAS is a new component; the images it will
   sign are already built and already signed by the Vault Transit mechanism

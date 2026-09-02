@@ -8,8 +8,9 @@
   `ZUNO_REQUIRE_SIGNED_BUNDLES=true` live on the real Deployment), and
   WP-070 (image signing, all 14 first-party images signed and an
   automated `make d2 check supply-chain` gate live) are all Done and stay
-  Done - see the 2026-08-22 implementation notes below - until WP-104 cuts
-  Priority-1 image signing over to RHTAS.
+  Done - see the 2026-08-22 implementation notes below - until WP-111 cuts
+  Priority-1 image signing over to RHTAS (WP-104's original scope, split
+  2026-09-02 into WP-110/WP-111).
 - **Target:** v0.4
 - **Date:** 2026-08-22
 - **Decision owners:** Zuno Demo architecture team

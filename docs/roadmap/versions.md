@@ -51,9 +51,12 @@ Vault Transit signing) — a product-demonstration decision (showing Red
 Hat's own trusted-software-supply-chain product on this platform), not a
 reversal of ADR-0420's technical reasoning, which remains valid: Vault
 Transit is smaller, cheaper and fully sufficient for the signing problem on
-its own. WP-104 deploys RHTAS, wires Keycloak/OIDC signing identities, cuts
-the existing 14 signed first-party images over to RHTAS/Cosign keyless
-signing, and deploys the Sigstore Policy Controller in audit-only mode.
+its own. Originally scoped as one WP (WP-104), this is now split
+2026-09-02 into WP-110 (Day 1 `rhtas`: operator, fundamentals, Keycloak/
+OIDC signing identity) and WP-111 (Day 2 `rhtas-config`: RHOAI-integration
+assessment, then cutting the existing 14 signed first-party images over
+to RHTAS/Cosign keyless signing and deploying the Sigstore Policy
+Controller in audit-only mode).
 OKF bundle trust (blocked on ADR-0506/ADR-0507's still-`Proposed` `zuno-okf`
 extraction), AI/model artifact trust, and admission enforcement (reject
 mode) are deliberately left for later ADRs/WPs, authored once each is
