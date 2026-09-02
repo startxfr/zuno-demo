@@ -19,13 +19,24 @@ cluster-machine:
     app: machines
 
   cluster:
-    # REAL infra id (`oc get infrastructure cluster -o jsonpath
-    # '{.status.infrastructureName}'`) - the IAM instance profile
-    # ({id}-worker-profile) and the kubernetes.io/cluster/
-    # {id}=owned AWS tag are derived from this by the subchart, and both
-    # match what the working IPI machinesets use.
-    id: demo222-kpkqk
-    region: eu-west-2
+    # PLACEHOLDERS (WP-118 B1). The real values are discovered at apply time
+    # by ansible/tasks/resolve_cluster_aws_identity.yml - the id and region
+    # from Infrastructure/cluster - and injected as Application-level values
+    # by ansible/roles/machines/tasks/install.yml, which always overrides
+    # these. Nothing here renders on a cluster installed through `make`.
+    #
+    # They cannot use apply_gitops_app.yml's token substitution: that rewrites
+    # the Application MANIFEST, and these are values of a vendored dependency
+    # subchart, which Helm does not template.
+    #
+    # The infra id is what `oc get infrastructure cluster -o jsonpath
+    # '{.status.infrastructureName}'` reports. The IAM instance profile
+    # ({id}-worker-profile) and the kubernetes.io/cluster/{id}=owned AWS tag
+    # are derived from it by the subchart, and both must match what the
+    # installer's own machinesets use - which is why it is read from the
+    # cluster rather than written down.
+    id: mycluster-infraid
+    region: mycluster-region
     autoscaler:
       enabled: false # flipped by zuno-machines-d0
       # ClusterAutoscaler "default" (cluster singleton). Raw YAML string per
@@ -45,17 +56,30 @@ cluster-machine:
 
   machineSet:
     enabled: false # flipped by zuno-machines-d0
+    # ami / securityGroupName / subnet_name below are PLACEHOLDERS
+    # (WP-118 B1) - resolve_cluster_aws_identity.yml reads the real ones off
+    # an installer-created MachineSet and the role replaces all three on
+    # every entry. They are READ rather than derived from a pattern because
+    # the installer's naming has changed across OCP versions, and a live
+    # MachineSet is a fact where a pattern is a guess:
+    # - AMI: the same RHCOS AMI the installer's own workergpu machinesets
+    #   use, so it is region- and OCP-version-scoped.
+    # - securityGroupName: the OCP 4.16+ CAPA installer names worker SGs
+    #   "{id}-node" (+ a second "{id}-lb"); there is NO "{id}-worker-sg"
+    #   (the subchart's default) on a cluster of that vintage. The subchart
+    #   renders exactly one SG filter per group - the -lb SG only carries
+    #   6443/22623 ingress used by API-target machines, so workers ride on
+    #   -node alone (validated at first boot of zuno-gpu-a on demo222).
+    # - subnet_name: ditto, the subchart's default ("{id}-private-...") did
+    #   not exist there either. The role maps each entry's `az` to the
+    #   subnet of the installer MachineSet in that zone, and FAILS if no
+    #   installer set exists there rather than inventing a name.
+    #
+    # Everything else in each entry - instance type, block devices, labels,
+    # taints, replicas - is real configuration and this file stays its
+    # source of truth: the role re-reads this list on every run.
+    #
     # Common facts for all three groups, verified live against AWS:
-    # - AMI ami-00667f67a54be771a: same RHCOS AMI the IPI workergpu
-    #   machinesets use.
-    # - securityGroupName demo222-kpkqk-node: the OCP 4.16+ CAPA installer
-    #   names worker SGs "{id}-node" (+ a second "{id}-lb" SG); there is NO
-    #   "{id}-worker-sg" (the subchart's default) on this cluster. The
-    #   subchart renders exactly one SG filter per group - the -lb SG only
-    #   carries 6443/22623 ingress used by API-target machines, so workers
-    #   ride on -node alone (validated at first boot of zuno-gpu-a).
-    # - subnet_name {id}-subnet-private-...: ditto, the subchart's default
-    #   ("{id}-private-...") does not exist here.
     # - g7e exists ONLY in eu-west-2a and eu-west-2c (verified
     #   describe-instance-type-offerings) - hence no "b" group anywhere.
     # - 150GB gp3 root: the GPU-node lesson from gitops/charts/models
@@ -90,10 +114,10 @@ cluster-machine:
         az: a
         type: worker
         group: gpu
-        ami: ami-00667f67a54be771a
+        ami: ami-mycluster-placeholder
         instanceType: g7e.4xlarge
-        securityGroupName: demo222-kpkqk-node
-        subnet_name: demo222-kpkqk-subnet-private-eu-west-2a
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-a
         blockDevices: |-
           - ebs:
               encrypted: true
@@ -152,10 +176,10 @@ cluster-machine:
         az: c
         type: worker
         group: gpu
-        ami: ami-00667f67a54be771a
+        ami: ami-mycluster-placeholder
         instanceType: g7e.4xlarge
-        securityGroupName: demo222-kpkqk-node
-        subnet_name: demo222-kpkqk-subnet-private-eu-west-2c
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-c
         blockDevices: |-
           - ebs:
               encrypted: true
@@ -194,10 +218,10 @@ cluster-machine:
         az: a
         type: worker
         group: gpu-burst
-        ami: ami-00667f67a54be771a
+        ami: ami-mycluster-placeholder
         instanceType: g7e.2xlarge
-        securityGroupName: demo222-kpkqk-node
-        subnet_name: demo222-kpkqk-subnet-private-eu-west-2a
+        securityGroupName: mycluster-infraid-node
+        subnet_name: mycluster-infraid-subnet-private-a
         blockDevices: |-
           - ebs:
               encrypted: true
