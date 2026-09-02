@@ -1,6 +1,12 @@
 # WP-107: TrustyAI baseline verification and the trustyai-config scaffold
 
-- **State:** Not started (2026-09-02)
+- **State:** Done — live-verified 2026-09-02 on demo222. `Ready=True`/`TrustyAIReady=True` on
+  `zuno-dsc`; `make d2 install trustyai-config` and `make d3 check trustyai-config` both green
+  (scaffold Applications Synced/Healthy, shared LMEvalJob report wired); the ADR-0108
+  non-regression check found and FIXED a real regression (see Live findings below - the LM-Eval
+  gate had been silently broken since ADR-0521's https cutover), closing on a fresh
+  `Complete`/`Succeeded` run: `mmlu_abstract_algebra acc=0.72` over 100 samples, 29.2s eval time,
+  through mesh TLS origination. Commits `9a7a5120` (scaffold) and `690892da` (double-TLS fix).
 - **ADRs:** ADR-0534 (Accepted, Phase 1)
 - **Depends on:** ADR-0108/WP-10 (Implemented - the existing LMEvalJob model-benchmarking gate this
   WP verifies rather than re-does)
@@ -109,6 +115,26 @@ Makefile placement, mirroring `lightspeed-config`'s slot exactly:
 - `make d3 check trustyai-config` passes (health-check Job succeeds).
 - `python3 platform/docs/check_docs.py` passes (ADR/WP status and tracker rows stay consistent).
 - Commit, push, and record the live results above before marking this WP `Done`.
+
+## Live findings (2026-09-02)
+
+1. **The LMEvalJob path WAS regressed - Step 1's non-regression check caught a real defect.** The
+   standing `qwen36-27b-instruct-mmlu` result was a stale `Complete/Failed`
+   (`ContainerStatusUnknown`, a node disruption relic from 2026-08-26). Two fresh runs then failed
+   deterministically with `[SSL] record layer failure` on the very first request: since ADR-0521
+   moved qwen to an `LLMInferenceService` (TLS on 8000), the KServe controller auto-generates a
+   `DestinationRule` (mode SIMPLE, service-ca, SNI) and the mesh-injected job pod's sidecar
+   originates TLS on top of the client's own https handshake - double-TLS. `ai-gateway` avoids
+   this via `traffic.sidecar.istio.io/excludeOutboundPorts: "8000"` on its own pod, but the
+   LMEvalJob CRD's `spec.pod` exposes no annotations field (verified via `oc explain`,
+   3.5.0-ea.2), so the exclusion path is unavailable. Fix (commit `690892da`): the job's
+   `base_url` is now plain `http://` with `trustLocalCA` off, letting the sidecar do the verified
+   TLS origination - the mesh-native path. This means the LM-Eval gate had been silently broken
+   since the 2026-08-25/26 ADR-0521 cutover; nothing re-ran it until this WP.
+2. The `zuno-trustyai-config-d0` Application's first apply failed with `app path does not exist` -
+   ArgoCD clones `origin/main`, and the chart existed only locally. Commit and push BEFORE
+   `make d2 install trustyai-config`, the same [[push-before-incluster-build]] rule that governs
+   BuildConfigs.
 
 ## Risks and known unknowns
 
