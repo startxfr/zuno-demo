@@ -1,0 +1,36 @@
+# ADR-0537 (WP-106, Phase 1): declarative Dashboard hardware profile for the
+# larger MIG tier. Covers qwen35-9b-wesh and qwen36-27b-instruct - see
+# hardwareprofile-mig-1g-24gb.yaml's header comment for the full rationale
+# shared by both profiles.
+apiVersion: infrastructure.opendatahub.io/v1
+kind: HardwareProfile
+metadata:
+  name: {{ .Values.hardwareProfiles.mig2g48gb.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  identifiers:
+    - identifier: {{ .Values.hardwareProfiles.mig2g48gb.acceleratorIdentifier }}
+      displayName: GPU (2g.48gb MIG slice)
+      resourceType: Accelerator
+      minCount: 1
+      defaultCount: 1
+      maxCount: {{ .Values.hardwareProfiles.mig2g48gb.acceleratorMaxCount }}
+    - identifier: cpu
+      displayName: CPU
+      resourceType: CPU
+      minCount: {{ .Values.hardwareProfiles.mig2g48gb.cpu.min }}
+      defaultCount: {{ .Values.hardwareProfiles.mig2g48gb.cpu.default }}
+      maxCount: {{ .Values.hardwareProfiles.mig2g48gb.cpu.max }}
+    - identifier: memory
+      displayName: Memory
+      resourceType: Memory
+      minCount: {{ .Values.hardwareProfiles.mig2g48gb.memory.min }}
+      defaultCount: {{ .Values.hardwareProfiles.mig2g48gb.memory.default }}
+      maxCount: {{ .Values.hardwareProfiles.mig2g48gb.memory.max }}
+  scheduling:
+    type: Node
+    node:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"

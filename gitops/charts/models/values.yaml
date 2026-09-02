@@ -19,6 +19,34 @@ clusterBaseDomain: apps.mycluster.example.com
 # clusters, or a deliberate consolidation) without editing templates.
 spreadAcrossGpuNodes: true
 
+# ADR-0537 (WP-106, Phase 1): RHOAI HardwareProfile CRs (
+# infrastructure.opendatahub.io/v1), one per MIG tier already in use below,
+# so the Dashboard shows a hardware profile for these models the same way
+# it does for a manually-deployed one (e.g. granite-7b-redhat-lab) - that
+# model's own crash traced to a Dashboard-assigned profile with NO
+# Accelerator identifier, so it never requested a GPU at all. Referenced by
+# name from Phase 2's annotations (opendatahub.io/hardware-profile-name),
+# not yet added in this phase. min/default/max counts are declarative
+# Dashboard metadata only - no live admission webhook enforces them against
+# a pod's actual `resources` (confirmed on-cluster via dry-run), so keep
+# these ranges honest against each model's own `resources` block below by
+# convention.
+hardwareProfiles:
+  mig1g24gb:
+    name: mig-1g-24gb
+    acceleratorIdentifier: nvidia.com/mig-1g.24gb
+    # 2 slices of this size exist per GPU node.
+    acceleratorMaxCount: 2
+    cpu: {min: 1, default: 2, max: 8}
+    memory: {min: 4Gi, default: 8Gi, max: 20Gi}
+  mig2g48gb:
+    name: mig-2g-48gb
+    acceleratorIdentifier: nvidia.com/mig-2g.48gb
+    # Only 1 slice of this size exists per GPU node.
+    acceleratorMaxCount: 1
+    cpu: {min: 1, default: 2, max: 8}
+    memory: {min: 8Gi, default: 16Gi, max: 48Gi}
+
 # Scrapes each predictor's own vLLM /metrics endpoint (the vllm:* series -
 # queue depth, TTFT, KV-cache usage, token throughput) for
 # dashboard-ai-models.yaml (ADR-0413). Gates both
