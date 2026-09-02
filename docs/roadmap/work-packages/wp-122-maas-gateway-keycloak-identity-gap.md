@@ -1,6 +1,9 @@
 # WP-122: Close the MaaS gateway's missing Keycloak identity source
 
-- **State:** Not started (2026-09-03).
+- **State:** Repo work in review (2026-09-03) - two real, distinct root
+  causes found and fixed live, a third suspected and under investigation;
+  not yet a clean end-to-end pass. See "Live verification (2026-09-03)"
+  below.
 - **ADRs:** ADR-0537 (Decision 3/4 - the same `maas-controller` operator
   immaturity class this WP extends with a second, distinct symptom); ADR-0521
   (the local-model MaaS cutover whose per-group `MaaSSubscription`
@@ -193,11 +196,70 @@ broken governance control undocumented.
   (real completions still succeed via the non-MaaS path); this WP is
   about restoring the governance layer, not the completion path itself.
 
+## Live verification (2026-09-03)
+
+Preconditions cleared first: `DiskPressure=False` on all 6 nodes,
+`authorino-operator` 0 restarts/44m, `limitador-operator` 1 restart but
+none new since - confirmed independently, not just taken from the peer
+report that first flagged the window (zuno-demo-64).
+
+1. **`Tenant.spec.externalOIDC` patched live** on the real,
+   operator-managed `Tenant` (`models-as-a-service/default-tenant`) - the
+   `ModelsAsService`-side field the operator never acted on (see "Live
+   evidence already gathered" above) was the wrong CR entirely.
+   `maas-gateway-auth`'s `Enforced` condition timestamp moved 14 seconds
+   after the patch, and `spec.defaults.rules.authentication` gained a
+   real third `oidc-identities` source (`issuerUrl` matching Keycloak) -
+   confirms this is the correct, real fix for the original 401.
+2. **A fresh, real persona token (`consultant-01` via `tekos-frontend`,
+   Resource Owner Password Credentials grant against the external
+   Keycloak route) got past Authorino authentication** - no more 401.
+   Confirmed via an isolated debug pod
+   (`app.kubernetes.io/name: acceptance-gate` label, external Keycloak
+   route for the token per [[isolated-endpoint-repro-method-20260821]]),
+   calling the real MaaS gateway route.
+3. **Second, distinct root cause found and fixed**: every call still
+   403'd, `"no matching subscription found for user"`. Cause: Keycloak's
+   shared `groups` protocol mapper (`realm-zuno.json`) emits full group
+   paths (`full.path: true`, e.g. `/agent_tekos`), but
+   `maas.models[].subscriptions[].group` in `values.yaml` declared bare
+   names (`agent_tekos`) - maas-controller's generated `MaaSAuthPolicy`
+   compares the raw claim with no normalization.
+   `components/mcp-gateway/app/auth.py` already handles this exact same
+   claim shape (`g.lstrip("/")`) - MaaS never got the same treatment.
+   Fixed in `values.yaml` (leading `/` added to every `group:` entry,
+   commit `9439e3b8`) rather than the shared Keycloak mapper: flipping
+   `full.path` globally would also flatten nested groups
+   (`/consultant/confluence-archi-*`) other consumers may rely on for
+   disambiguation - this fix is MaaS-only, zero blast radius elsewhere.
+   Live-confirmed the fix propagated correctly: `MaaSSubscription`'s
+   `spec.owner.groups[].name` and the regenerated `MaaSAuthPolicy`'s own
+   `require-group-membership` OPA rego both show `/agent_tekos`.
+4. **Still 403, same message, after fix #3 confirmed propagated** - not
+   yet a clean pass. `oc exec` into `maas-api`'s own pod to query
+   `/internal/v1/subscriptions/select` directly (bypassing the gateway,
+   to isolate the failure to maas-api's own matching logic vs. an
+   upstream layer) was blocked by the permission classifier before a
+   result was obtained. Suspected next cause, untested: `maas-api`
+   (`redhat-ods-applications`, 6d9h uptime) may cache its subscription
+   index from a periodic poll rather than a live CR watch, so it has not
+   yet observed the `MaaSSubscription` update the CRD-level API server
+   already reflects. A scoped `oc rollout restart deployment/maas-api -n
+   redhat-ods-applications` would test this cheaply but touches a
+   shared, operator-owned platform component outside this repo's GitOps
+   ownership - holding for explicit go-ahead before doing it, per this
+   WP's own coordination precondition.
+
 ## Status updates
 
-- On the Tenant-side test's outcome (fix confirmed live, or upstream gap
-  confirmed and documented): State -> "Repo work merged" if any repo-side
-  change lands (e.g. a values.yaml/chart change to template the fix
-  declaratively), otherwise "Done" if the outcome is purely a live
-  operational action + ADR amendment with nothing to merge, or "Closed -
+- 2026-09-03: two of (at least) three root causes in the 401/403 chain
+  found and fixed live and via a merged repo change; a third is suspected
+  (`maas-api` subscription-cache staleness) but untested pending user
+  approval for a `maas-api` restart. State stays "Repo work in review"
+  until a real, fresh persona token gets a genuine `200` with model
+  output through `local-wesh-maas` - not just "no longer 401".
+- On the eventual full pass (or a confirmed, undocumented-upstream dead
+  end for cause #3): State -> "Repo work merged" if any further repo-side
+  change lands, otherwise "Done" if the remainder is a live operational
+  action + ADR amendment with nothing further to merge, or "Closed -
   deferred" if blocked upstream with no interim mitigation available.
