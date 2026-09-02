@@ -29,8 +29,14 @@ spec:
         # switch agent-runtime over - gitops/charts/agent-runtime's
         # guardrails.backend stays "builtin" until the discovery gate
         # passes, so the observer in the request path is unchanged.
+        # DISABLED 2026-09-03: enabling it coincided with node
+        # ip-10-18-31-92 hitting DiskPressure (the ~multi-GB NeMo server
+        # image pull started 22:11:26Z, DiskPressure at 22:15:42Z, 43 pods
+        # evicted cluster-wide). Backed out to stop the pull-retry loop
+        # while the node is under pressure. Re-enable once the node has
+        # headroom - the chart and the CR shape are unchanged and proven.
         nemoGuardrails:
-          enabled: true
+          enabled: false
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
