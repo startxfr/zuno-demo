@@ -35,9 +35,9 @@ spec:
 {{- range .Values.evalHub.providers }}
     - {{ . }}
 {{- end }}
-  otel:
-    enableMetrics: true
-    exporterType: otlp-http
-    exporterEndpoint: {{ .Values.evalHub.otelEndpoint }}
-    exporterInsecure: true
+  # NO otel block on purpose: this ea build's server exits with
+  # "Failed to setup OTEL: Not implemented" when OTEL is configured
+  # (live-diagnosed 2026-09-02, CrashLoop on first deploy). The CRD
+  # documents omitted = OTEL disabled; re-add once the operand implements
+  # the exporter.
 {{- end }}
