@@ -56,6 +56,26 @@ broken governance control undocumented.
   timeouts, ~51 restarts/7d, but this specific reconcile ran to a status
   write 66s after its most recent restart - too clean a run to be an
   interrupted write).
+- **CAVEAT, flagged by a peer session 2026-09-03: re-confirm this
+  conclusion before treating it as final.** Node `ip-10-18-31-92` hit
+  `DiskPressure=True` at `22:15:42Z` (2026-09-02) and evicted 46 pods
+  cluster-wide, including `openshift-operators/authorino-operator` and
+  `limitador-operator` (evicted `22:18:45Z`) - both directly relevant to
+  this WP's own subject (Authorino is what evaluates `maas-gateway-auth`;
+  Limitador is Kuadrant's companion rate-limit component). Any
+  observation of Authorino's live behavior from roughly `22:15Z` onward
+  - which includes part of the discriminating test above - happened on a
+  cluster shedding the exact operator this WP is investigating. "Missing
+  capability" and "operator was not running" look identical from the
+  outside. Still `DiskPressure=True` as of this note (confirmed live);
+  `authorino-operator`/`limitador-operator` each have a fresh pod running
+  but the evicted ones remain stuck `ContainerStatusUnknown`, and
+  `limitador-operator`'s new pod has already restarted once. **Do not
+  re-run or extend the discriminating test, or attempt the Tenant patch
+  below, until the node is confirmed clear of DiskPressure and both
+  operators have been stable for a reasonable interval** - re-confirm the
+  AuthPolicy's identity sources first, unaffected by outage noise, before
+  spending more effort on this WP.
 - **New lead, not yet tested live (permission-gated, see Preconditions):**
   the `Tenant` CRD (`maas.opendatahub.io/v1alpha1`) has its own
   `spec.externalOIDC.{issuerUrl,clientId,ttl}` - same shape as
@@ -75,6 +95,13 @@ broken governance control undocumented.
 
 ## Preconditions (verify/complete before further live changes)
 
+- **Node DiskPressure incident (2026-09-02, see the caveat above) must be
+  confirmed cleared first**: `oc get node ip-10-18-31-92... -o
+  jsonpath='{.status.conditions[?(@.type=="DiskPressure")]}'` reports
+  `status: "False"`, and both `authorino-operator`/`limitador-operator`
+  have been `Running`/stable (no new restarts) for a reasonable interval
+  - not just freshly restarted. Do not re-run the discriminating test or
+  the Tenant patch below until this is true.
 - Read `gitops/charts/models/templates/maas.yaml` in full (both the
   `Tenant` and `ModelsAsService` blocks and their accumulated comments)
   and `docs/adr/0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md`
