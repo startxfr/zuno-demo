@@ -44,6 +44,9 @@
 # sync is disabled live (unlike most other Applications) - a values-only
 # re-apply would otherwise just sit OutOfSync until someone syncs it by
 # hand, defeating the point of an automated restore.
+- name: "postgresql | resolve the cluster's default StorageClass (WP-118 B5)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_default_storage_class.yml"
+
 - name: "postgresql | apply the PostgreSQL GitOps Application (d1: restore from repo2)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -55,6 +58,12 @@
       postgresCluster:
         enabled: true
         restoreFromRepo: repo2
+      # WP-118 B5. Both applies in this file need it: each REPLACES
+      # spec.source.helm.values wholesale, so omitting it here would revert
+      # install.yml's value and silently send the restored cluster back to
+      # the chart default - the exact drift gitops_values_clobber exists for.
+      cluster:
+        storageClassName: "{{ cluster_default_storage_class }}"
       backups:
         s3:
           enabled: true
@@ -108,6 +117,9 @@
     gitops_app_extra_helm_values:
       postgresCluster:
         enabled: true
+      # WP-118 B5 - see the comment on the restore apply above.
+      cluster:
+        storageClassName: "{{ cluster_default_storage_class }}"
       backups:
         s3:
           enabled: true

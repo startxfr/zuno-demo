@@ -24,6 +24,9 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
 
+- name: "models | resolve the cluster's default StorageClass (WP-118 B5)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_default_storage_class.yml"
+
 - name: "models | apply the model serving GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -35,6 +38,10 @@
     # Overrides the chart's hardcoded values.yaml default with the image
     # discovered above (or an explicit models_vllm_image_override).
     gitops_app_extra_helm_values:
+      # WP-118 B5: the chart default is this cluster's name for it;
+      # discovered here so a new cluster gets its own.
+      modelStorage:
+        storageClassName: "{{ cluster_default_storage_class }}"
       image:
         vllm: "{{ _models_discovered_vllm_image }}"
       # Which bucket/directory contain the model weights

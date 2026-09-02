@@ -1,0 +1,86 @@
+---
+# WP-118 B5: discovers the cluster's default StorageClass from the OpenShift
+# API instead of hardcoding `gp3-csi` in four chart values.yaml files.
+# Idempotent via the `is not defined` guard, exactly like
+# resolve_cluster_base_domain.yml, which this deliberately mirrors.
+#
+# The default class is the one annotated
+# storageclass.kubernetes.io/is-default-class: "true" - the same annotation
+# the cluster itself uses to satisfy a PVC that names no class, so a PVC
+# created with this value is by construction the one that would have been
+# created with no storageClassName at all. Leaving the field unset would
+# have been the other way to get that, but the charts need a concrete name:
+# these PVCs are rendered into CRs (PostgresCluster, MariaDB, GrafanaSpec)
+# whose operators do not all pass an empty string through to the PVC.
+#
+# `storageClassName` is IMMUTABLE once a PVC is bound, so this must resolve
+# to the same value an existing cluster already used or nothing rebinds -
+# hence the hard failure below rather than a silent fallback. Set
+# zuno_cluster_storage_class in the inventory to override (a cluster with
+# no annotated default, or one where the default is not the class this
+# platform should use).
+- name: "cluster-storage | discover the default StorageClass"
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+  register: _resolve_cluster_storage_classes
+  when:
+    - cluster_default_storage_class is not defined
+    - zuno_cluster_storage_class is not defined
+
+# Subscript access with a quoted key, NOT selectattr on a dotted path: the
+# annotation name itself contains dots, and Jinja's selectattr splits its
+# attribute argument on "." with no escape that Ansible honours. The
+# backslash-escaped form reads perfectly and silently returns [] - verified
+# 2026-09-03 - which here would have failed all four installs with
+# "found 0 default StorageClasses" on a cluster that has exactly one.
+# `| string` because the annotation may deserialize as a bool.
+- name: "cluster-storage | collect the classes annotated as default"
+  ansible.builtin.set_fact:
+    _resolve_cluster_default_scs: >-
+      {{ (_resolve_cluster_default_scs | default([])) + [item.metadata.name] }}
+  loop: "{{ _resolve_cluster_storage_classes.resources | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when:
+    - cluster_default_storage_class is not defined
+    - zuno_cluster_storage_class is not defined
+    - >-
+      (item.metadata.annotations | default({}))
+      ['storageclass.kubernetes.io/is-default-class']
+      | default('false') | string == 'true'
+
+- name: "cluster-storage | fail if there is no single default StorageClass"
+  ansible.builtin.fail:
+    msg: >-
+      Expected exactly one StorageClass annotated
+      storageclass.kubernetes.io/is-default-class=true, found
+      {{ _resolve_cluster_default_scs | length }}
+      ({{ _resolve_cluster_default_scs | join(', ') if (_resolve_cluster_default_scs | length) > 0
+          else 'none' }})
+      among [{{ (_resolve_cluster_storage_classes.resources | default([]))
+                | map(attribute='metadata.name') | join(', ') }}].
+      Annotate one, or set zuno_cluster_storage_class explicitly. This is
+      not auto-guessable: PVC storageClassName is immutable once bound, so
+      picking the wrong class here strands every volume this platform
+      creates.
+  when:
+    - cluster_default_storage_class is not defined
+    - zuno_cluster_storage_class is not defined
+    - (_resolve_cluster_default_scs | default([]) | length) != 1
+
+- name: "cluster-storage | set the cluster_default_storage_class fact"
+  ansible.builtin.set_fact:
+    cluster_default_storage_class: >-
+      {{ zuno_cluster_storage_class
+         if zuno_cluster_storage_class is defined
+         else (_resolve_cluster_default_scs | first) }}
+  when: cluster_default_storage_class is not defined
+
+- name: "cluster-storage | report the resolved default StorageClass"
+  ansible.builtin.debug:
+    msg: >-
+      Default StorageClass resolved to '{{ cluster_default_storage_class }}'
+      {{ '(zuno_cluster_storage_class override)'
+         if zuno_cluster_storage_class is defined
+         else '(discovered from the is-default-class annotation)' }}

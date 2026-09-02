@@ -195,6 +195,9 @@
 # Skipped when restore.yml (above) already applied d1 with the restore
 # trigger and cleared it again - re-applying here would be redundant, not
 # wrong, but there's no reason to.
+- name: "postgresql | resolve the cluster's default StorageClass (WP-118 B5)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_default_storage_class.yml"
+
 - name: "postgresql | apply the PostgreSQL GitOps Application (d1: PostgresCluster)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -204,6 +207,10 @@
     gitops_app_extra_helm_values:
       postgresCluster:
         enabled: true
+      # WP-118 B5, and it must be repeated in restore.yml's two blocks
+      # too - each REPLACES spec.source.helm.values wholesale.
+      cluster:
+        storageClassName: "{{ cluster_default_storage_class }}"
       backups:
         s3:
           enabled: "{{ _postgresql_backup_s3_enabled | bool }}"

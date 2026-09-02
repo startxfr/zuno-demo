@@ -197,6 +197,34 @@ zuno_models_s3_prefix: "models"
 #   3. Create an access key -> copy both values (secret shown once).
 zuno_aws_route53_access_key_id: "xxxxxx"
 zuno_aws_route53_secret_access_key: "xxxxxx"
+#
+# WP-118 B6 - which zone, which region, which mailbox. NOT secret: a public
+# hosted zone and its ID are published DNS facts, and the contact address is
+# printed in every issued certificate's ACME account. They live here anyway
+# because they are per-environment operator configuration, exactly like the
+# S3 endpoints above, and ADR-0517's from-scratch cluster needs its own.
+#
+# All three are OPTIONAL and default to gitops/charts/cert-manager/values.yaml
+# (ansible/roles/cert_manager/tasks/install.yml reads the chart rather than
+# restating the values, so there is one source of truth). Set them only when
+# the target cluster sits under a different parent zone than startx.fr.
+#
+#   _hosted_zone_id  the Route53 hosted zone that answers for the cluster's
+#                    parent domain - must be the SAME zone the IAM policy
+#                    above is scoped to, or DNS-01 gets AccessDenied on
+#                    ChangeResourceRecordSets while every other check passes.
+#   _region          the Route53 API region for the DNS-01 solver. Route53 is
+#                    global, but cert-manager still takes a region, and it is
+#                    NOT necessarily the cluster's own region (demo222 runs in
+#                    eu-west-2 and solves in eu-west-3).
+#   zuno_acme_email  ACME account contact. Let's Encrypt mails expiry warnings
+#                    here if renewal ever stalls; this repo has no
+#                    Certificate-readiness alerting yet, so it is the only
+#                    passive safety net (ADR-0211 flags that as future work).
+#
+# zuno_acme_route53_hosted_zone_id: "Z00000000000000000000"
+# zuno_acme_route53_region: "eu-west-3"
+# zuno_acme_email: "dev+zuno-acme@example.org"
 
 # --- LLM external provider API keys -----------------------------------------
 # Each optional: leave "xxxxxx" and the ModelRouter fails over to the next

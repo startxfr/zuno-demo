@@ -86,14 +86,46 @@ The dict must re-state the `cluster-machine.{cluster.autoscaler,machineSet,machi
 toggles from `application-d0.yaml`, or `machineSet.enabled` falls back to false and
 ArgoCD prunes all three GPU MachineSets. **This is the most dangerous edit in the WP.**
 
-### Step 3 — StorageClass and DNS (B5, B6)
+### Step 3 — StorageClass and DNS (B5, B6) — **3a DONE 2026-09-03, 3b pending a live apply**
 
-Four `gp3-csi` defaults (`models:296`, `postgresql:71`, `mariadb:105`, `grafana:85`) and
-cert-manager's Route53 `hostedZoneID`/`region`/ACME email. The storage classes get a
-shared `resolve_cluster_default_storage_class.yml` discovery task feeding the four roles'
-existing `gitops_app_extra_helm_values` — including **both** blocks in postgresql's
-`restore.yml`, or the restore path silently reverts it. The Route53 facts are operator
-configuration and belong in `ansible/confidential.yml`.
+Four `gp3-csi` defaults (`models:296`, `postgresql:71`, `mariadb:105`, `grafana:92` — the
+audit said 85) and cert-manager's Route53 `hostedZoneID`/`region`/ACME email.
+
+**3a (landed).** New `ansible/tasks/resolve_cluster_default_storage_class.yml`, mirroring
+`resolve_cluster_base_domain.yml`: it reads the class annotated
+`storageclass.kubernetes.io/is-default-class`, fails hard rather than guessing when there
+is not exactly one (PVC `storageClassName` is immutable once bound), and takes a
+`zuno_cluster_storage_class` override. Wired into the five applies that render PVCs —
+models d1, postgresql d1, mariadb d1, grafana's second d1, and **both** blocks in
+postgresql's `restore.yml`, since each replaces `spec.source.helm.values` wholesale and
+omitting it there would silently revert the install value.
+
+One trap cost a rewrite and is worth recording: the obvious
+`selectattr('metadata.annotations.storageclass\.kubernetes\.io/is-default-class', ...)`
+**silently returns `[]`**. Jinja splits a `selectattr` path on `.` and Ansible honours no
+escape, so an annotation whose own name contains dots is unreachable that way. It reads
+correctly, raises nothing, and would have failed all five installs with "found 0 default
+StorageClasses" on a cluster that has exactly one. Use a loop with a quoted subscript.
+
+B6 follows the same shape: `cert_manager`'s d1 apply now merges an `acme` identity whose
+three values default to **the chart file itself** rather than being restated in Ansible,
+so there is one source of truth and the apply stays inert until an operator sets
+`zuno_acme_route53_hosted_zone_id` / `_region` / `zuno_acme_email`. Those are documented
+as optional in `confidential.example.yml`, extending the existing Route53 IAM block —
+non-secret (a public hosted zone ID is a published DNS fact) but per-environment.
+
+Inertia proven before commit: the discovery task run live against `demo222` returns
+exactly `gp3-csi`; `helm template` with each key injected, **with the Application's own
+toggle enabled**, is byte-identical to the current render on all four charts (3+1+1+1
+`storageClassName` lines actually rendered — with the toggles off the charts render no
+PVC at all, so a naive diff would have "passed" while testing nothing). The cert-manager
+identity resolves to the chart's own `dev+zuno-acme@startx.fr` / `eu-west-3` /
+`Z3HY376RT1N9S1`.
+
+**3b (not landed).** Flipping the four chart defaults to a placeholder is a live change
+and must not be pushed until 3a has been applied on `demo222`, per the delivery constraint
+above. `oc get sc` confirms the annotated default really is `gp3-csi` today, so the flip
+is safe once the applies have run.
 
 ### Step 4 — undocumented prerequisites (B7, B8) — **DONE 2026-09-02**
 

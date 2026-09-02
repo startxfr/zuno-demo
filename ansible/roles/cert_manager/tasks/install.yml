@@ -69,6 +69,31 @@
 # Subscript ['values'], never .values: dot notation resolves to the Python dict
 # method of that name, and combine() then fails with "expected dicts but got a
 # 'method'" (hit live on the first run of this task, 2026-09-02).
+# WP-118 B6: the ACME DNS-01 identity is per-environment, not per-repo - a
+# demo333 under a different parent zone needs its own hosted zone, its own
+# Route53 region and its own contact mailbox. None of it is secret (a public
+# hosted zone and its ID are published DNS facts; only the IAM key, in Vault
+# at aws/route53-dns01, is), but all of it is operator configuration, so it
+# is declared in ansible/confidential.yml alongside the S3 endpoints.
+#
+# Defaults come from the chart file itself rather than being restated here:
+# one source of truth, and this apply stays byte-identical on demo222 until
+# an operator actually sets the variables. Subscript ['acme'], never .acme.
+- name: "cert_manager | resolve the ACME DNS identity (WP-118 B6)"
+  ansible.builtin.set_fact:
+    _cert_manager_acme_identity:
+      email: "{{ zuno_acme_email | default(_cm_chart_acme['email']) }}"
+      route53:
+        region: "{{ zuno_acme_route53_region | default(_cm_chart_acme['route53']['region']) }}"
+        hostedZoneID: >-
+          {{ zuno_acme_route53_hosted_zone_id
+             | default(_cm_chart_acme['route53']['hostedZoneID']) }}
+  vars:
+    _cm_chart_acme: >-
+      {{ (lookup('ansible.builtin.file',
+                 zuno_repo_root + '/gitops/charts/cert-manager/values.yaml')
+          | from_yaml)['acme'] }}
+
 - name: "cert_manager | apply the cert-manager GitOps Application (d1: Vault-backed ClusterIssuer + ADR-0211 ACME track)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -81,6 +106,7 @@
           | replace('apps.mycluster.example.com', cluster_base_domain)
           | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
         | combine({'vaultServiceName': _cert_manager_vault_service_name}, recursive=True)
+        | combine({'acme': _cert_manager_acme_identity}, recursive=True)
       }}
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10

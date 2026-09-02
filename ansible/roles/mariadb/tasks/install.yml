@@ -117,6 +117,9 @@
 
 # mariadbOperand.enabled/backups.s3.* live in the same chart, applied via
 # the separate zuno-mariadb-d1 Application after -d0 is Synced+Healthy.
+- name: "mariadb | resolve the cluster's default StorageClass (WP-118 B5)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_default_storage_class.yml"
+
 - name: "mariadb | apply the MariaDB GitOps Application (d1: MariaDB/PhysicalBackup)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -126,6 +129,9 @@
     gitops_app_extra_helm_values:
       mariadbOperand:
         enabled: true
+      # WP-118 B5.
+      cluster:
+        storageClassName: "{{ cluster_default_storage_class }}"
       backups:
         s3:
           enabled: "{{ _mariadb_backup_s3_enabled | bool }}"
