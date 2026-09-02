@@ -96,6 +96,33 @@ cluster-ods:
     # non-pv backend, so it's deliberately absent here.
     spec: |
       applicationsNamespace: redhat-ods-applications
+      # ADR-0538/WP-116: the Crunchy PGO cluster CA, added so RHOAI operands
+      # can verify zuno-postgresql's serving certificate. Load-bearing for
+      # MLflow: the operator hardcodes PGSSLMODE=verify-full on its Alembic
+      # migration Job and points PGSSLROOTCERT at a bundle combined from the
+      # system store plus THIS bundle - without the PGO CA the migration
+      # dies on "certificate verify failed", and spec.env on the MLflow CR
+      # does NOT reach that Job (verified live 2026-09-02).
+      #
+      # Pinning a certificate in git is acceptable here because this one is
+      # the PGO cluster's self-signed root, valid 2026-08-24 -> 2036-08-21.
+      # It is public key material, not a secret. If the PGO cluster is ever
+      # rebuilt, this value must be refreshed from
+      # `oc get secret zuno-postgresql-cluster-cert -n zuno-data -o jsonpath='{.data.ca\.crt}' | base64 -d`.
+      trustedCABundle:
+        managementState: Managed
+        customCABundle: |
+          -----BEGIN CERTIFICATE-----
+          MIIBgTCCASigAwIBAgIRAKBF4htl4S+VJw0iaws8BcowCgYIKoZIzj0EAwMwHzEd
+          MBsGA1UEAxMUcG9zdGdyZXMtb3BlcmF0b3ItY2EwHhcNMjYwODI0MTcxMzAyWhcN
+          MzYwODIxMTgxMzAyWjAfMR0wGwYDVQQDExRwb3N0Z3Jlcy1vcGVyYXRvci1jYTBZ
+          MBMGByqGSM49AgEGCCqGSM49AwEHA0IABMsiEzes2k1qRCLzU3Snpcc83NSySxZS
+          u2LW/57sRJU9TLxNGXo6UcR4JMT9y49PFw643+FgNUMco0TsLyx0wwajRTBDMA4G
+          A1UdDwEB/wQEAwIBBjASBgNVHRMBAf8ECDAGAQH/AgEAMB0GA1UdDgQWBBTy1Fwm
+          3rOd9k60h4/+FX+j5MmYOjAKBggqhkjOPQQDAwNHADBEAiAKWriY0ao+bGGvFNZ3
+          on7UaTFEabZOc+SJZVbXKjm1mQIgQ+i0EwGqZ3ZXxPGZub/EwR2rvpOG9duusuqL
+          I9nrZYI=
+          -----END CERTIFICATE-----
       monitoring:
         managementState: Managed
         namespace: redhat-ods-monitoring
