@@ -114,13 +114,20 @@ spec:
       g, ocp-paas-ops, role:admin
     scopes: '[groups]'
   repo:
+    # repo-server was repeatedly OOMKilled at the old 1Gi limit (11
+    # restarts within a few hours, 2026-09-02) while rendering
+    # gitops/charts/grafana - that chart's dashboard JSON blobs grew
+    # large enough (run-trace.yaml alone is ~70KB) that `helm template`
+    # now needs more headroom than 1Gi under real cluster load. Same
+    # class of problem as the application-controller bump below, same
+    # fix shape.
     resources:
       limits:
         cpu: '2'
-        memory: 1Gi
+        memory: 2Gi
       requests:
         cpu: 300m
-        memory: 256Mi
+        memory: 512Mi
   resourceExclusions: |
     - apiGroups:
       - ""
