@@ -1,6 +1,6 @@
 # ADR-0534: Integrate TrustyAI for AI evaluation and guardrails
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.7
 - **Date:** 2026-08-30
 - **Decision owners:** Zuno Demo architecture team
@@ -69,7 +69,10 @@ The integration proceeds in three phases.
   the shared configuration surface this ADR will extend, rather than re-declaring it;
 - introduces no agent-specific evaluation logic yet.
 
-This phase is a platform-readiness check on top of what already exists, not a new enablement.
+This phase is a platform-readiness check on top of what already exists, not a new enablement: it
+installs no new operator, `Subscription` or `OperatorGroup` - the entire TrustyAI operand already
+lives inside the existing Day 1 `openshift-ai` component, and this phase touches nothing there
+beyond documentation and a health check.
 
 **Phase 2 - Evaluate and protect the AI chain (informal target: v0.6).** Flip
 `mcpGuardrailsMode` on and wire TrustyAI, observing Agent Runtime's boundary, to progressively
@@ -142,12 +145,32 @@ found in this same operand at the current OpenShift AI version. Day-2/Day-3 chec
 (`make d2/d3 check trustyai` or equivalent) should follow the existing `models`/`trustyai`
 precheck pattern in `ansible/roles/models/tasks/precheck.yml` rather than inventing a new one.
 
+The new frameworks and wiring this ADR introduces (RAGAS, Garak, the Agent Runtime guardrail
+hooks) are carried by a new Day 2 component, `trustyai-config`, mirroring the `aap`/`aap-config`
+and `lightspeed`/`lightspeed-config` split (own chart, own Ansible role, own `-d0`/`-d1` Application
+pair). This is distinct from `spec.components.trustyai` itself, which stays inside the existing Day
+1 `openshift-ai` component - `trustyai-config` has no Day 1 half of its own because there is no
+separate operator to install.
+
+Guardrail enforcement (`mcpGuardrailsMode` and the Agent Runtime evaluation hooks) starts in
+observe/log-only mode: evaluations run and are recorded, but no request is blocked on their
+result. Flipping any of this to blocking enforcement is a deliberate, separate decision made once
+observation has produced enough evidence to set thresholds without an unacceptable false-positive
+rate - it is not part of this ADR's initial rollout and is not required for WP-107/WP-108/WP-109 to
+be considered done.
+
 ## Migration / evolution
 
-Concrete evaluation datasets, thresholds, evaluation policies, and the WP brief(s) that execute
-each phase are deliberately left to later ADRs/WPs as the Zuno architecture matures and this
-decision moves past `Proposed`. Phase 2's RAGAS/Garak adoption and Phase 3's PEFT/LoRA comparison
-gate each warrant their own WP once scheduled.
+This decision is executed by three WPs: [WP-107](../roadmap/work-packages/wp-107-trustyai-baseline-verification-and-config-scaffold.md)
+(Phase 1 - baseline verification and the `trustyai-config` scaffold), [WP-108](../roadmap/work-packages/wp-108-trustyai-ragas-garak-guardrails-enablement.md)
+(Phase 2, infrastructure half - generic RAGAS/Garak enablement and the `mcpGuardrailsMode` flip,
+observe-only, not yet wired to real agent traffic), and [WP-109](../roadmap/work-packages/wp-109-trustyai-zuno-stack-integration-and-model-comparison.md)
+(Phase 2's Zuno-specific wiring at the Agent Runtime boundary, merged with Phase 3's PEFT/LoRA
+comparison gate rather than scheduled as a separate WP - a decision made when these WPs were
+authored, since both extend the same evaluation chain onto Zuno-specific content). Concrete
+evaluation datasets, thresholds and evaluation policies beyond what these three WPs establish are
+still left to later ADRs/WPs as the Zuno architecture matures, as is any move from observe-only to
+blocking guardrail enforcement.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Consequences,
 Security considerations, Acceptance criteria and Review evidence.

@@ -32,6 +32,12 @@ Implementation sequencing for the open v0.1/v0.2/v0.3 ADRs is tracked in the [v0
 
 **Retargeting note (2026-08-24, evening):** ADR-0354 (Add Ansible Automation Platform as a new Day 0 component, v0.3) is amended in place - it was never implemented, so this is a correction rather than a superseding decision. Placement moves from a Day 0 sequence ADR-0060 has since retired (`... keycloak → aap → machines ...`) to Day 1, immediately after `openshift_oauth`; scope is split into two components (`aap` for the platform itself, `aap-config` for repository/Job-Template registration, mechanism decided from a live CRD inventory rather than assumed); sizing is explicitly non-HA; `Target` moves v0.3 -> v0.2. The file is renamed to `0354-add-ansible-automation-platform-as-a-day-1-component.md` to keep the filename in sync with the corrected title. ADR-0355 is a new companion ADR (v0.3) covering the follow-on `mcp-aap` server that lets agents launch/read AAP. ADR-0418 (execute Day 0/Day 1 operations as AAP Job Templates, v0.4) is unchanged.
 
+**Acceptance note (2026-09-02):** ADR-0534 (Integrate TrustyAI for AI evaluation and guardrails)
+moves from `Proposed` to `Accepted` - its three implementing phases now have concrete WP briefs
+(WP-107, WP-108, WP-109; see the [roadmap](../roadmap/v0.1-v0.3-implementation-roadmap.md) Phase 28
+and [versions.md](../roadmap/versions.md)'s v0.7 band). None of the three has started execution
+yet. Numbering and `Target` (v0.7) are unchanged; only `Status` moves.
+
 ## version 0
 
 | ADR | Target | Status | Decision |
@@ -260,7 +266,7 @@ Also carried in v0.7, as a separate large-scope effort unrelated to the GitHub-A
 | ADR | Target | Status | Decision |
 |---|---|---|---|
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.7 | Proposed | Run day-0 platform services in internal or external mode |
-| [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | v0.7 | Proposed | Integrate TrustyAI for AI evaluation and guardrails |
+| [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | v0.7 | Accepted | Integrate TrustyAI for AI evaluation and guardrails |
 | [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | v0.7 | Proposed | Extract OKF content into a standalone zuno-okf repository |
 | [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | v0.7 | Proposed | Consume the zuno-okf repository through a single pinned reference |
 | [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | v0.7 | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
