@@ -1,0 +1,126 @@
+---
+# WP-118 B1: discovers this cluster's AWS infra identity, so
+# gitops/charts/machines stops hardcoding demo222's. Idempotent via the
+# `is not defined` guard, like resolve_cluster_base_domain.yml.
+#
+# Everything here is read from resources the INSTALLER created, never from
+# resources this repo creates. The distinguishing label is
+# machine.startx.io/group, which the cluster-machine subchart stamps on every
+# MachineSet it renders: rejecting it is what stops the role bootstrapping
+# from its own previous output and freezing a mistake in place. Selecting on
+# machine.openshift.io/cluster-api-machine-role=worker instead would NOT work
+# - our own GPU sets carry that label too.
+#
+# The AMI, the security-group name and the subnet names are read rather than
+# derived from a pattern on purpose: the installer's naming has changed
+# across OCP versions (4.16+ CAPA names the worker SG "{id}-node"; older
+# installs used "{id}-worker-sg", which is still the subchart's default and
+# does not exist here), so a pattern is a guess and a live MachineSet is a
+# fact.
+- name: "cluster-aws | read the cluster Infrastructure"
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Infrastructure
+    name: cluster
+  register: _resolve_cluster_infra
+  when: cluster_aws_identity is not defined
+
+- name: "cluster-aws | fail if this is not an AWS cluster"
+  ansible.builtin.fail:
+    msg: >-
+      gitops/charts/machines provisions AWS MachineSets, but
+      Infrastructure/cluster reports platform
+      '{{ (_resolve_cluster_infra.resources[0].status.platformStatus.type | default('unknown'))
+          if (_resolve_cluster_infra.resources | default([]) | length) > 0
+          else 'no Infrastructure resource' }}'.
+      Skip the machines component on this cluster, or port the chart.
+  when:
+    - cluster_aws_identity is not defined
+    - (_resolve_cluster_infra.resources | default([]) | length) == 0
+      or (_resolve_cluster_infra.resources[0].status.platformStatus.type | default('')) != 'AWS'
+
+- name: "cluster-aws | list the MachineSets this repo did NOT create"
+  kubernetes.core.k8s_info:
+    api_version: machine.openshift.io/v1beta1
+    kind: MachineSet
+    namespace: openshift-machine-api
+  register: _resolve_cluster_machinesets
+  when: cluster_aws_identity is not defined
+
+- name: "cluster-aws | keep only installer-created MachineSets"
+  ansible.builtin.set_fact:
+    _resolve_cluster_installer_ms: >-
+      {{ (_resolve_cluster_installer_ms | default([])) + [item] }}
+  loop: "{{ _resolve_cluster_machinesets.resources | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when:
+    - cluster_aws_identity is not defined
+    - "'machine.startx.io/group' not in (item.metadata.labels | default({}))"
+
+- name: "cluster-aws | fail if no installer MachineSet survives the filter"
+  ansible.builtin.fail:
+    msg: >-
+      Found no MachineSet in openshift-machine-api without the
+      machine.startx.io/group label, so there is nothing to read this
+      cluster's AMI, security group and subnets from. Either the cluster
+      has no installer-created worker MachineSets (UPI?), or every set
+      present was created by this repo. Set zuno_machines_ami,
+      zuno_machines_security_group_name and zuno_machines_subnet_by_az
+      explicitly.
+  when:
+    - cluster_aws_identity is not defined
+    - (_resolve_cluster_installer_ms | default([]) | length) == 0
+
+# Plain loop, not json_query: the community.general.json_query filter needs
+# jmespath installed, which it is not here, and it fails at run time rather
+# than at lint time. Subscripts throughout, for the same reason the
+# StorageClass resolver uses them (WP-118 step 3a).
+- name: "cluster-aws | map each installer set's availability zone to its subnet"
+  ansible.builtin.set_fact:
+    _resolve_cluster_subnet_by_az: >-
+      {{ (_resolve_cluster_subnet_by_az | default({}))
+         | combine({ _ps['placement']['availabilityZone']:
+                     _ps['subnet']['filters'][0]['values'][0] }) }}
+  loop: "{{ _resolve_cluster_installer_ms | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  vars:
+    _ps: "{{ item['spec']['template']['spec']['providerSpec']['value'] }}"
+  when:
+    - cluster_aws_identity is not defined
+    - zuno_machines_subnet_by_az is not defined
+
+- name: "cluster-aws | build the identity from Infrastructure plus the installer sets"
+  ansible.builtin.set_fact:
+    cluster_aws_identity:
+      id: "{{ _resolve_cluster_infra.resources[0].status.infrastructureName }}"
+      region: "{{ _resolve_cluster_infra.resources[0].status.platformStatus.aws.region }}"
+      # First securityGroups entry, deliberately: the installer attaches
+      # "{id}-node" first and "{id}-lb" second, and only the -lb SG carries
+      # the 6443/22623 ingress that API-target machines need. The subchart
+      # renders exactly one SG filter per group, so workers ride on -node
+      # alone (validated at first boot of zuno-gpu-a).
+      securityGroupName: >-
+        {{ zuno_machines_security_group_name
+           | default(_ms0['spec']['template']['spec']['providerSpec']['value']
+                     ['securityGroups'][0]['filters'][0]['values'][0]) }}
+      ami: >-
+        {{ zuno_machines_ami
+           | default(_ms0['spec']['template']['spec']['providerSpec']['value']['ami']['id']) }}
+      # availabilityZone -> subnet tag:Name, one entry per installer set.
+      # An AZ with no installer MachineSet is simply absent, and the caller
+      # is expected to fail loudly rather than invent a name.
+      subnetByAz: "{{ zuno_machines_subnet_by_az | default(_resolve_cluster_subnet_by_az) }}"
+  vars:
+    _ms0: "{{ _resolve_cluster_installer_ms | first }}"
+  when: cluster_aws_identity is not defined
+
+- name: "cluster-aws | report the resolved AWS identity"
+  ansible.builtin.debug:
+    msg: >-
+      AWS identity: id={{ cluster_aws_identity.id }}
+      region={{ cluster_aws_identity.region }}
+      sg={{ cluster_aws_identity.securityGroupName }}
+      ami={{ cluster_aws_identity.ami }}
+      subnets={{ cluster_aws_identity.subnetByAz }}

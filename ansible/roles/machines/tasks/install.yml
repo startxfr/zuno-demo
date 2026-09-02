@@ -3,12 +3,103 @@
 # via gitops/charts/machines. Ordered before nfd/nvidia_gpu in
 # day0_install.yml so the permanent GPU node exists (or is provisioning) by
 # the time nvidia_gpu waits for its ClusterPolicy to go ready.
+# --- WP-118 B1: this cluster's AWS identity, not demo222's ------------------
+# gitops/charts/machines/values.yaml cannot use apply_gitops_app.yml's token
+# substitution: that rewrites the Application MANIFEST, and these values live
+# in a chart that ArgoCD renders straight from git. Nor can the chart template
+# them - they are values of a vendored dependency subchart, and Helm does not
+# template values.yaml. So they have to arrive as Application-level values,
+# which is what this does.
+#
+# The chart stays the authoring surface: the list below is READ from
+# values.yaml on every run, so editing an instance type or a taint there still
+# works exactly as before. Only the four identity fields are replaced.
+- name: "machines | resolve this cluster's AWS identity (WP-118 B1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_aws_identity.yml"
+
+- name: "machines | read the MachineSet list the chart declares"
+  ansible.builtin.set_fact:
+    _machines_chart_list: >-
+      {{ (lookup('ansible.builtin.file',
+                 zuno_repo_root + '/gitops/charts/machines/values.yaml')
+          | from_yaml)['cluster-machine']['machineSet']['list'] }}
+
+# Fail BEFORE building anything if an AZ the chart wants has no installer
+# MachineSet to read a subnet from. This is the case ADR-0517's risk list
+# calls out: deriving from a live MachineSet is correct for an AZ that has
+# one and says nothing about an AZ that does not. Inventing
+# "{id}-subnet-private-{az}" here would render a MachineSet that AWS rejects
+# at first boot with a message about the subnet, hours later.
+- name: "machines | fail if any declared AZ has no discovered subnet"
+  ansible.builtin.fail:
+    msg: >-
+      MachineSet '{{ item.name }}' wants availability zone
+      '{{ cluster_aws_identity.region }}{{ item.az }}', but no installer
+      MachineSet exists there to read the subnet name from - discovered
+      zones are {{ cluster_aws_identity.subnetByAz.keys() | list }}.
+      Create an installer MachineSet in that zone, move the group to a
+      zone that has one, or set zuno_machines_subnet_by_az explicitly.
+  loop: "{{ _machines_chart_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: (cluster_aws_identity.region ~ item.az) not in cluster_aws_identity.subnetByAz
+
+- name: "machines | substitute the cluster identity into each declared MachineSet"
+  ansible.builtin.set_fact:
+    _machines_set_list: >-
+      {{ (_machines_set_list | default([])) + [item | combine({
+           'ami': cluster_aws_identity.ami,
+           'securityGroupName': cluster_aws_identity.securityGroupName,
+           'subnet_name': cluster_aws_identity.subnetByAz[cluster_aws_identity.region ~ item.az]
+         })] }}
+  loop: "{{ _machines_chart_list }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# Starts from application-d0.yaml's own values, exactly like cert_manager and
+# grafana: gitops_app_extra_helm_values REPLACES spec.source.helm.values
+# wholesale, and the values it replaces are the three `enabled` toggles that
+# turn this chart on. Dropping them would set machineSet.enabled back to the
+# chart default of false, and prune+selfHeal would then delete all three GPU
+# MachineSets - the most destructive edit in WP-118. The assertion below
+# refuses to apply if that ever stops holding.
+- name: "machines | build the d0 values from the manifest plus the resolved identity"
+  ansible.builtin.set_fact:
+    _machines_d0_values: >-
+      {{
+        ((lookup('ansible.builtin.file',
+                 zuno_repo_root + '/gitops/apps/machines/application-d0.yaml')
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+        | combine({'cluster-machine': {
+            'cluster': {'id': cluster_aws_identity.id,
+                        'region': cluster_aws_identity.region},
+            'machineSet': {'list': _machines_set_list}}},
+          recursive=True)
+      }}
+
+- name: "machines | refuse to apply if the enable toggles did not survive the merge"
+  ansible.builtin.assert:
+    that:
+      - _machines_d0_values['cluster-machine']['machineSet']['enabled'] | bool
+      - _machines_d0_values['cluster-machine']['machineAutoscaler']['enabled'] | bool
+      - _machines_d0_values['cluster-machine']['cluster']['autoscaler']['enabled'] | bool
+      - (_machines_d0_values['cluster-machine']['machineSet']['list'] | length)
+        == (_machines_chart_list | length)
+    fail_msg: >-
+      The d0 values lost an enable toggle or a MachineSet. Applying this
+      would prune live GPU MachineSets. Values built:
+      {{ _machines_d0_values }}
+    success_msg: >-
+      d0 values carry all three enable toggles and
+      {{ _machines_set_list | length }} MachineSets.
+
 - name: "machines | apply the machines GitOps Application (d0: MachineSets/autoscalers)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "machines"
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-machines-d0"
+    gitops_app_extra_helm_values: "{{ _machines_d0_values }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

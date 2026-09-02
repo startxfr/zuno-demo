@@ -71,20 +71,55 @@ it applies d1 twice and the second apply replaces the values block, so it droppe
 `appsDomain` the moment the manifest declared it — caught by this morning's
 `gitops_values_clobber` check, its first real save.
 
-### Step 2 — AWS infra identity (B1)
+### Step 2 — AWS infra identity (B1) — **2a DONE 2026-09-03, 2b pending a live apply**
 
 `gitops/charts/machines/values.yaml` hardcodes `cluster.id: demo222-kpkqk`, the security
 group, three subnet names, a pinned AMI and the region. This one cannot use token
 substitution: `machineSet.list` is a list (Helm replaces lists wholesale) and Helm cannot
-template a dependency subchart's `values.yaml`. It must come from the role via
-`gitops_app_extra_helm_values`, derived at run time from an installer-created worker
-MachineSet in `openshift-machine-api` (select on
-`machine.openshift.io/cluster-api-machine-role=worker`, **rejecting** anything carrying
-`machine.startx.io/group` so the role never bootstraps from its own output).
+template a dependency subchart's `values.yaml`. It comes from the role via
+`gitops_app_extra_helm_values` instead.
 
-The dict must re-state the `cluster-machine.{cluster.autoscaler,machineSet,machineAutoscaler}.enabled`
-toggles from `application-d0.yaml`, or `machineSet.enabled` falls back to false and
-ArgoCD prunes all three GPU MachineSets. **This is the most dangerous edit in the WP.**
+**Correction to the audit's plan.** It said to select installer MachineSets on
+`machine.openshift.io/cluster-api-machine-role=worker`. That is wrong — our own GPU sets
+carry that label too, so the role would have bootstrapped from its own output. The
+distinguishing label is `machine.startx.io/group`, which the `cluster-machine` subchart
+stamps on everything it renders; the correct source is `Infrastructure/cluster` for the id
+and region, plus **any MachineSet lacking** that label. Verified live: four installer sets
+lack it, our three carry it.
+
+**2a (landed).** New `ansible/tasks/resolve_cluster_aws_identity.yml` reads the id and
+region from `Infrastructure/cluster`, and the AMI, security-group name and an
+availability-zone→subnet map from the installer sets. Read, not derived from a pattern:
+the installer's naming changed across OCP versions (4.16+ CAPA names the worker SG
+`{id}-node`; older installs used `{id}-worker-sg`, still the subchart's default and absent
+here), so a pattern is a guess and a live MachineSet is a fact. The first `securityGroups`
+entry is taken deliberately — the second is `{id}-lb`, which only API-target machines need.
+
+The chart stays the authoring surface: `machines/tasks/install.yml` **reads
+`machineSet.list` from `values.yaml` on every run** and replaces only the four identity
+fields per entry, so editing an instance type or a taint in the chart still works.
+
+Three guards, because this is the edit that can prune live GPU MachineSets:
+1. the d0 values start from `application-d0.yaml`'s own values, so the three
+   `enabled` toggles come along by construction;
+2. an explicit `assert` refuses to apply unless all three toggles are true **and** the
+   list still has as many entries as the chart declares;
+3. a pre-flight failure if any declared AZ has no installer MachineSet to read a subnet
+   from — the gap ADR-0517's risk list calls out. Inventing `{id}-subnet-private-{az}`
+   would render a MachineSet AWS rejects at first boot, hours later.
+
+Inertia proven before commit, and this is the test that matters: `helm template` of the
+chart with the role-built values is **byte-identical** to the render with the manifest
+values alone — 5 resources, 3 MachineSets, ClusterAutoscaler, MachineAutoscaler. Discovery
+returns `demo222-kpkqk` / `eu-west-2` / `demo222-kpkqk-node` / `ami-00667f67a54be771a` and
+the two subnets, each equal to the literal it replaces.
+
+Also avoided: `community.general.json_query` is unusable here (jmespath is not installed
+and the filter fails at run time, not at lint time). Same for the dotted-path `selectattr`
+trap recorded under step 3.
+
+**2b (not landed).** Flipping the chart literals to placeholders is a live change and must
+wait until 2a has been applied on `demo222`, per the delivery constraint above.
 
 ### Step 3 — StorageClass and DNS (B5, B6) — **3a DONE 2026-09-03, 3b pending a live apply**
 
