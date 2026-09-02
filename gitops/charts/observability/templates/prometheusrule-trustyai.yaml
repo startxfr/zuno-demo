@@ -1,0 +1,79 @@
+{{- /*
+ADR-0534/WP-114: ticket-level alerts on the TrustyAI evaluation metrics
+WP-113 made visible (the zuno-trustyai Grafana dashboard's own series).
+Same monitoring.coreos.com/v1-only rule and same collector.enabled+
+alerting.enabled double gate as prometheusrule-slo.yaml (see its header
+for both rationales - the rhobs trap and the d0/d1 shared-resource
+guard).
+
+GarakAttackSuccessHigh is EXPECTED to fire on day one: qwen3.5-9b-wesh
+reproducibly scores MitigationBypass ASR=1.0 (WP-109 open finding). The
+alert firing is that finding refusing to be forgotten, not noise -
+resolve it by fixing or formally accepting the finding, never by
+deleting the rule. Thresholds are first-pass engineering values (WP-114
+risk note 3), expected to be tuned as observation accumulates.
+
+The score gauges are one-shot pushes (only present in the scrape window
+right after an eval run), so both score alerts read last_over_time over
+7d - the latest run's verdict stands until the next run replaces it,
+mirroring the dashboard's own queries.
+*/ -}}
+{{- if and .Values.collector.enabled .Values.alerting.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zuno-trustyai
+  namespace: zuno-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  groups:
+    - name: zuno-trustyai-evaluation
+      rules:
+        - alert: GarakAttackSuccessHigh
+          expr: >-
+            max by (probe, detector, model)
+            (last_over_time(zuno_garak_attack_success_rate[7d])) > 0.5
+          for: 5m
+          labels:
+            severity: ticket
+            adr: ADR-0534
+          annotations:
+            summary: "Garak probe {{`{{ $labels.probe }}`}}/{{`{{ $labels.detector }}`}} succeeds against {{`{{ $labels.model }}`}} ({{`{{ $value | humanizePercentage }}`}})"
+            description: >-
+              The latest garak security scan measured an attack success
+              rate above 50% for this probe/detector on this model. See
+              the zuno-trustyai Grafana dashboard and the garak-security
+              Job's report (oc logs -n zuno-ai-run job/garak-security).
+        - alert: RagasScoreLow
+          expr: >-
+            max by (metric, question)
+            (last_over_time(zuno_ragas_score[7d])) < 0.7
+          for: 5m
+          labels:
+            severity: ticket
+            adr: ADR-0534
+          annotations:
+            summary: "RAGAS {{`{{ $labels.metric }}`}} at {{`{{ $value | humanizePercentage }}`}} on a real-retrieval question"
+            description: >-
+              The latest ragas-eval run scored below 0.7 for this
+              metric/question against the real rag-service retrieval
+              path - retrieval quality or answer grounding degraded.
+              See the zuno-trustyai Grafana dashboard.
+        - alert: TrustyAIEvalJobFailed
+          expr: >-
+            max by (job_name)
+            (kube_job_status_failed{namespace="zuno-ai-run",
+            job_name=~"garak.*|ragas.*"}) > 0
+          for: 10m
+          labels:
+            severity: ticket
+            adr: ADR-0534
+          annotations:
+            summary: "TrustyAI evaluation Job {{`{{ $labels.job_name }}`}} failed"
+            description: >-
+              A garak/ragas evaluation Job in zuno-ai-run ended in
+              failure - the evaluation chain lost a signal source.
+              Inspect with oc logs -n zuno-ai-run
+              job/{{`{{ $labels.job_name }}`}}.
+{{- end }}
