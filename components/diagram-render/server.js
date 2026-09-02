@@ -151,15 +151,31 @@ app.post("/render", async (req, res) => {
       mime_type: "image/svg+xml",
     });
   } catch (err) {
-    // Full detail server-side only - mirrors agent-runtime's own
-    // "log the real exception, never leak it to the caller verbatim"
-    // posture adopted this session (components/agent-runtime/app/main.py's
-    // _CLIENT_FACING_STREAM_ERROR). Invalid Mermaid syntax is the
-    // overwhelmingly common failure mode here (an LLM's own generation
-    // mistake, not a system fault), so the caller-facing message says so
-    // plainly rather than echoing a raw puppeteer/parser stack trace.
+    // Full stack stays server-side only (still logged below) - mirrors
+    // agent-runtime's own "log the real exception, never leak it to the
+    // caller verbatim" posture (components/agent-runtime/app/main.py's
+    // _CLIENT_FACING_STREAM_ERROR). But err.message itself, unlike
+    // err.stack, is mermaid-cli's own parser diagnostic (line number,
+    // offending token, a caret at the exact column) - no puppeteer
+    // internals or file:// paths in it, safe to return as-is.
+    //
+    // 2026-09-02: this used to be replaced wholesale with a generic
+    // "invalid or unrenderable Mermaid source" string. That broke the one
+    // thing consuming this field - agent-runtime's
+    // _resolve_diagram_generation_call makes exactly one retry model call,
+    // offering the model this exact error so it can self-correct
+    // mermaid_source. A real parse error (confirmed live: unescaped
+    // parentheses inside a node label, e.g. `C[Scale New RS Up (new
+    // Pods)]`) gave the retry nothing specific to act on, so it failed the
+    // same way twice across 3 agents (day2-stresstest, 2026-09-02). The
+    // generic string also conflated a genuine timeout ("render timed out")
+    // with a syntax problem, which actively misdirects a retry.
     console.error(`[${requestId}] render failed:`, err);
-    return res.status(422).json({ error: "invalid or unrenderable Mermaid source", request_id: requestId });
+    let detail = (err && err.message) ? String(err.message).slice(0, 500) : "invalid or unrenderable Mermaid source";
+    if (/parse error/i.test(detail) || /\bExpecting\b/.test(detail)) {
+      detail += " Hint: if a node label contains parentheses, commas, or other special characters, wrap the whole label in double quotes, e.g. id[\"label (with parens)\"].";
+    }
+    return res.status(422).json({ error: detail, request_id: requestId });
   }
 });
 
