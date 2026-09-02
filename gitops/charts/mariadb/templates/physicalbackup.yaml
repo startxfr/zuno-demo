@@ -12,6 +12,26 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-30"
 spec:
+  # Opts the backup pod out of Istio sidecar injection, for the reason
+  # gitops/charts/postgresql/templates/job-monitoring-role.yaml records after
+  # live-verifying it on 2026-08-24: Kubernetes only orders a native-sidecar
+  # init container on having *started*, not on passing its readiness probe, so
+  # a short-lived Job's app container regularly wins the race and fails before
+  # Envoy can proxy anything. Confirmed here on the very first scheduled run
+  # (2026-09-02): istio-proxy's startup probe was still failing while the
+  # mariadb container went BackOff, and the Job hit BackoffLimitExceeded.
+  #
+  # Safe because both of that comment's premises hold in this namespace too:
+  # there is no PeerAuthentication anywhere, so mesh-wide mTLS is PERMISSIVE,
+  # and the MariaDB CR already carries
+  # traffic.sidecar.istio.io/excludeInboundPorts: "3306" so inbound MySQL
+  # bypasses Envoy regardless. zuno-data has no Egress NetworkPolicy, so the
+  # S3 upload is unaffected. A backup job needs neither mTLS nor telemetry.
+  podMetadata:
+    annotations:
+      sidecar.istio.io/inject: "false"
+    labels:
+      sidecar.istio.io/inject: "false"
   mariaDbRef:
     name: mariadb
     # Important for a single-node MariaDB. Do not require another ready
