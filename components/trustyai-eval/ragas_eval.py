@@ -83,7 +83,12 @@ def answer(client: httpx.Client, question: str, contexts: list[str]) -> str:
     )
     resp = client.post(
         f"{JUDGE_BASE_URL}/chat/completions",
-        json={"model": JUDGE_MODEL, "max_tokens": 400,
+        json={"model": JUDGE_MODEL, "max_tokens": 600,
+              # qwen3.6 is a thinking model: without this it spends the
+              # whole token budget reasoning and returns content=None
+              # (2 of 3 questions on the first scored run). vLLM ignores
+              # the kwarg harmlessly if a template has no such switch.
+              "chat_template_kwargs": {"enable_thinking": False},
               "messages": [{"role": "user", "content": prompt}]},
     )
     resp.raise_for_status()
@@ -124,9 +129,16 @@ def main() -> int:
     from ragas.llms import LangchainLLMWrapper
     from ragas.metrics import Faithfulness, LLMContextPrecisionWithoutReference
 
+    from ragas.run_config import RunConfig
+
     judge = LangchainLLMWrapper(ChatOpenAI(
         base_url=JUDGE_BASE_URL, api_key="in-cluster-unused",
-        model=JUDGE_MODEL, temperature=0.0, timeout=180,
+        model=JUDGE_MODEL, temperature=0.0, timeout=300,
+        # Same thinking-mode switch as answer(): judged verdicts must be
+        # emitted as content within the timeout, not silently spent on
+        # reasoning (the TimeoutError -> NaN failure of the first scored
+        # run, 2026-09-02).
+        extra_body={"chat_template_kwargs": {"enable_thinking": False}},
     ))
     # Native v2 sample API. An earlier "requires ['response']" validation
     # failure blamed on this path was actually data: a None answer (see
@@ -140,7 +152,10 @@ def main() -> int:
     ])
     result = evaluate(dataset=dataset,
                       metrics=[Faithfulness(llm=judge),
-                               LLMContextPrecisionWithoutReference(llm=judge)])
+                               LLMContextPrecisionWithoutReference(llm=judge)],
+                      # Generous per-call budget, low parallelism: one
+                      # shared-GPU judge, not an API fleet.
+                      run_config=RunConfig(timeout=600, max_workers=2))
 
     scores = result.to_pandas().to_dict(orient="records")
     report = {
