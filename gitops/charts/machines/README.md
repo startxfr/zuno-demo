@@ -41,7 +41,13 @@ burst-taint toleration for the NVIDIA daemonsets) comes from
   `demo222-kpkqk-lb`); the `-lb` SG only carries API-LB ingress
   (6443/22623), so worker nodes ride on `-node` alone. There is no
   `{id}-worker-sg` (the subchart's default) on OCP 4.16+ CAPA-installer
-  clusters - every group sets `securityGroupName`/`subnet_name` explicitly.
+  clusters, so every group must set `securityGroupName`/`subnet_name`
+  rather than rely on the subchart. Since WP-118 B1 (2026-09-03) the
+  values in `values.yaml` are **placeholders**: the real ones are read off
+  an installer-created MachineSet by
+  `ansible/tasks/resolve_cluster_aws_identity.yml` and injected as
+  Application values, so the names above are what *this* cluster happens
+  to use, not what the chart ships.
 - **No eu-west-2b group anywhere**: AWS does not offer g7e in that zone
   (`aws ec2 describe-instance-type-offerings`, 2026-08-17).
 - **ArgoCD must not own `spec.replicas`**: `application-d0.yaml` carries
@@ -111,7 +117,10 @@ deleted as part of the ADR-0351 rollout (the two apps owning
 MachineConfig(Pool)s had their finalizers stripped first - cascade-deleting
 those would have deleted the live `worker` MachineConfigPool). The IPI
 `demo222-kpkqk-workergpu-*` machinesets stay live at replicas 0 as an
-installer-native escape hatch, deliberately unmanaged by this chart.
+installer-native escape hatch, deliberately unmanaged by this chart - and
+since WP-118 B1 they are also what the role *reads* to discover the AMI,
+security group and subnets, selecting any MachineSet that lacks the
+`machine.startx.io/group` label this chart stamps on its own.
 
 WP-083 note (2026-08-26): that was aspirational for a while.
 `demo222-kpkqk-workergpu-eu-west-2a` had been running at replicas 1 since
