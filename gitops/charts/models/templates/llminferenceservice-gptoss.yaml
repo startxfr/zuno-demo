@@ -69,10 +69,19 @@ spec:
   scaling:
     minReplicas: {{ .Values.gptOssModel.minReplicas }}
     maxReplicas: {{ .Values.gptOssModel.maxReplicas }}
-    {{- with .Values.gptOssModel.scaling.wva }}
+    # The CRD's own CEL rules make this mandatory, and a rendered-but-empty
+    # wva is NOT enough: `has(self.wva)` requires the key to be present, and
+    # `has(self.hpa) || has(self.keda)` requires exactly one mechanism inside
+    # it (never both). An empty map silently disappears through `with`, which
+    # is how the first attempt shipped an invalid CR that helm template
+    # rendered happily and the API server rejected - hence the explicit
+    # default rather than a values-hygiene assumption.
+    #
+    # keda, not hpa: ADR-0318 installed the Custom Metrics Autoscaler ahead
+    # of any consumer and it has had zero ScaledObjects since. This is that
+    # consumer.
     wva:
-      {{- toYaml . | nindent 6 }}
-    {{- end }}
+      {{- toYaml (.Values.gptOssModel.scaling.wva | default (dict "keda" dict)) | nindent 6 }}
   {{- else }}
   replicas: {{ .Values.gptOssModel.minReplicas }}
   {{- end }}

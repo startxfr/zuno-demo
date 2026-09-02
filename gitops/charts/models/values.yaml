@@ -602,8 +602,14 @@ gptOssModel:
   # spec.scaling is the supported surface that creates it.
   scaling:
     enabled: true
-    # wva left empty: hpa/keda tuning is meaningless while min == max.
-    wva: {}
+    # NOT optional and NOT empty-able: the CRD's CEL requires wva to be
+    # present AND to carry exactly one of hpa/keda. `wva: {}` renders to
+    # nothing and the API server rejects the CR - live-caught 2026-09-03,
+    # after helm template had happily rendered it. keda because ADR-0318's
+    # KEDA install has had zero ScaledObjects since it landed; no tuning
+    # keys, which stay meaningless while min == max.
+    wva:
+      keda: {}
 
 # ADR-0526 (WP-087): the French urban-register variant, and the SAME
 # unmodified base it was fine-tuned from, served side by side.
