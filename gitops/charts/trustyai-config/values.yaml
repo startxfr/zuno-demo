@@ -24,6 +24,26 @@ lmevalNamespace: zuno-ai-run
 # Every resource this chart renders lands beside the models it evaluates.
 namespace: zuno-ai-run
 
+# ADR-0538/WP-117: route the three evaluation Jobs through Kueue. Setting
+# this stamps `kueue.x-k8s.io/queue-name` on their Job metadata, which is
+# what makes them the platform's first genuinely admitted workloads and
+# fills the RHOAI dashboard's Workload metrics page. Empty = not queued,
+# and an empty value is the correct revert: removing the label restores
+# the pre-WP-117 behaviour exactly, no template edit needed.
+#
+# Ships EMPTY on purpose, and flipping it is a deliberate operator action,
+# not a routine value bump. All three Jobs carry
+# `argocd.argoproj.io/sync-options: Replace=true,Force=true` (they must -
+# a Job's spec.template is immutable), so ANY change to their rendered
+# metadata deletes and recreates all three, re-pulling their images. Garak
+# alone is 4.22 GiB. On 2026-09-03 exactly that pattern on the models
+# chart's prefetch Jobs took a control-plane node from 85% image-filesystem
+# usage to DiskPressure in 22 seconds (see the
+# diskpressure-master-cascades-into-mesh memory, and commit 6c55a5b7).
+# Turn it on when someone is watching node disk, not incidentally.
+kueue:
+  queueName: ""
+
 # WP-108: standalone built-in guardrails detectors (no orchestrator, no
 # InferenceService wiring - see templates/guardrailsorchestrator.yaml).
 guardrailsSmoke:

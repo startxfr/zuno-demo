@@ -31,6 +31,13 @@ metadata:
   labels:
     app.kubernetes.io/name: lm-eval
     app.kubernetes.io/component: garak-smoke
+    {{- with .Values.kueue.queueName }}
+    # ADR-0538/WP-117. On the JOB metadata, not the pod template: Kueue's
+    # BatchJob integration reads the label off the Job and suspends it,
+    # then creates the pods itself once quota is granted. On the pod
+    # template it would be inert.
+    kueue.x-k8s.io/queue-name: {{ . | quote }}
+    {{- end }}
   annotations:
     argocd.argoproj.io/sync-options: Replace=true,Force=true
 spec:
