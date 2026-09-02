@@ -48,16 +48,36 @@
 # The pki/ engine and auth role/policy this ClusterIssuer depends on are
 # prepared by the vault role; this role only points at that backend, never
 # writes to Vault directly.
-- name: "cert_manager | apply the cert-manager GitOps Application (d1: Vault-backed ClusterIssuer)"
+# gitops_app_extra_helm_values REPLACES spec.source.helm.values wholesale rather
+# than merging: values is a YAML *string* key, so combine(recursive=True) cannot
+# descend into it. Passing only the two values this role knows about therefore
+# DELETED everything application-d1.yaml declares - certmanager.enabled and the
+# whole acme: block - and prune+selfHeal then removed the ADR-0211 ACME track
+# from the cluster. That is not hypothetical: the production cutover landed in
+# git on 2026-08-16 (bc064f56) and was silently reverted by a later
+# `make d1 install cert-manager`, leaving the router and API server on the
+# internal Vault PKI cert while git said Let's Encrypt. The Application stayed
+# Synced/Healthy throughout, so nothing surfaced it (found 2026-09-02).
+#
+# So start from the manifest's own values - git stays the source of truth for the
+# ADR-0211 staged rollout, which application-d1.yaml documents as an operator git
+# flip - and merge in only what must be discovered at run time. The replace()
+# mirrors apply_gitops_app.yml's token substitution, which acts on the file it
+# reads and cannot reach this dict. Lazily evaluated inside the include, so
+# cluster_base_domain is already resolved by the time it renders.
+- name: "cert_manager | apply the cert-manager GitOps Application (d1: Vault-backed ClusterIssuer + ADR-0211 ACME track)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "cert-manager"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
-    gitops_app_extra_helm_values:
-      issuer:
-        enabled: true
-      vaultServiceName: "{{ _cert_manager_vault_service_name }}"
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/cert-manager/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml).spec.source.helm.values | from_yaml)
+        | combine({'vaultServiceName': _cert_manager_vault_service_name}, recursive=True)
+      }}
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
 
