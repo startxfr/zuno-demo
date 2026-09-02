@@ -174,6 +174,14 @@ point - the chain worked but was invisible in every UI, spawning WP-113):
   and evaluation results pushed as metrics through the platform's standard OTLP pipeline
   (ADR-0029), alongside CLI/`make d3 check trustyai-config`.
 
+**Human live test: OK - operator sign-off 2026-09-02.** After WP-113 delivered the dashboard, the
+human operator verified the chain end-to-end in the browser: live guardrails detections
+(jailbreak + PII flagged on real chats, responses delivered unmodified), evaluation Job outcomes,
+the latest RAGAS scores and the Garak attack-success-rate table (including the WP-109
+MitigationBypass finding, now permanently visible). One adjustment round was needed first
+(transient kube-state-metrics zeros plus a missing table-merge transformation read as empty
+panels); the second pass was validated as OK.
+
 Guardrail enforcement (the `GuardrailsOrchestrator`/NeMo detectors and the Agent Runtime
 evaluation hooks) starts in observe/log-only mode: evaluations run and are recorded, but no request is blocked on their
 result. Flipping any of this to blocking enforcement is a deliberate, separate decision made once

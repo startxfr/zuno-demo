@@ -1,6 +1,8 @@
 # WP-113: TrustyAI observability dashboard (Grafana surface for the evaluation/guardrails chain)
 
-- **State:** Not started (2026-09-02)
+- **State:** Done — live-verified 2026-09-02 on demo222, closed the same day it was authored, with
+  the HUMAN live test explicitly validated (the failed human test that spawned this WP, re-run on
+  the delivered dashboard, came back OK after one adjustment round - see Live findings)
 - **ADRs:** [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md)
   (primary), [ADR-0413](../../adr/0413-consolidate-grafana-dashboards-into-six-platform-views.md)
   (dashboard conventions), [ADR-0029](../../adr/0029-instrument-model-usage-costs-and-distributed-traces.md)
@@ -36,6 +38,39 @@ explicit user decision (2026-09-02), as was NOT configuring the RHOAI bias-monit
 
 LMEvalJob `status.results` (the benchmark scores themselves) stays CLI-only: no CR-field-to-
 Prometheus exporter exists on this platform and building one is out of this WP's scope.
+
+## Live findings (2026-09-02, execution)
+
+1. **All four metric families verified live in Thanos with the dashboard's own queries** before
+   the human test: guardrails counters from 3 fresh real chats (jailbreak -> `custom-regex`, PII
+   -> `email_address`, clean question -> `clean`, responses delivered unmodified every time),
+   `zuno_ragas_score` (6 points, faithfulness/context_precision = 1.0 on all 3 questions),
+   `zuno_garak_attack_success_rate` (dan.DAN 0.0, dan.DUDE 0.0, **MitigationBypass 1.0 on both
+   probes** - the WP-109 open finding is now permanently visible in red), and the kube job/pod
+   tables.
+2. **This garak build's report.jsonl eval entries use `passed`/`fails`/`nones`/`total_evaluated`,
+   NOT the older `total`** - the first push parsed nothing. Diagnosed by making the push script
+   print an entry_type histogram + a sample entry on no-match (kept in the script: cheap
+   permanent diagnosability), then fixed the denominator to `total_evaluated` (excludes
+   unevaluated "nones" - the right ASR denominator).
+3. **A Job created while its image build is still running silently runs the OLD image.** The
+   first post-sync `ragas-eval` raced the `trustyai-eval` build and produced no push line;
+   deleting the Jobs and resyncing after the build completed ran the new code. Same family as
+   [[push-before-incluster-build]], one hop further down.
+4. **The human's "empty/0 panels" report had two stacked causes, both real:** (a)
+   `kube_job_status_succeeded` reads 0 for a minute after a Replace-recreated Job completes
+   (kube-state-metrics lag) - precisely when a human looks; (b) a table panel with two instant
+   targets (succeeded + failed) shows only frame A without an explicit `merge` transformation -
+   refId B was invisible. Fixed with merge + organize transforms (rename `Value #A/#B`, hide
+   `Time`).
+5. No NetworkPolicy change was needed: the collector's operator-generated policy admits 4317/
+   4318/8889 from any source, and zuno-ai-run has no egress policies - verified, not assumed.
+6. ArgoCD's `Replace=true` on the eval Jobs means every sync re-runs them - convenient for
+   "rerun the suite" (delete Jobs + sync) but worth knowing: a plain drift-sync also re-triggers
+   evaluation load on the shared GPU.
+7. The guardrails counters ride agent-runtime's existing OTel wiring with a 60s periodic export:
+   a detection is queryable in Thanos roughly a minute after the chat, which the live test
+   confirmed end-to-end (log line -> series -> dashboard panel).
 
 ## Steps
 
@@ -102,3 +137,10 @@ record the dated human sign-off in ADR-0534.
 - This WP's `State` moves to `Done` once the checklist passes and the human live test verdict is
   recorded. ADR-0534 stays `Implemented` throughout; only its notes gain the visibility
   clarification and (if OK) the human sign-off.
+- **2026-09-02 - Done, human sign-off recorded.** Commits: `1d63f089` (this brief + ADR-0534
+  visibility clarifications), `6d4a03bf` (agent-runtime guardrails counters), `117c48e3`
+  (RAGAS/garak OTLP score push), `efd1768f` (the zuno-trustyai dashboard), `ea44b34b`/`c1d70476`
+  (garak report-format diagnosis + fix, Live findings #2), `c2c6f3ee` (table merge/organize
+  fixes, Live findings #4). Full checklist passed live; the human operator's verdict went
+  KO (invisible) -> "visible but adjust" -> **OK - validated**, and the sign-off is recorded in
+  ADR-0534's Operational considerations.
