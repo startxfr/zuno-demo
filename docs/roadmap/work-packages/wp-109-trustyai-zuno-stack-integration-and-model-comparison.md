@@ -1,6 +1,14 @@
 # WP-109: Wire TrustyAI to the Zuno agent stack and add PEFT/LoRA model comparison
 
-- **State:** Not started (2026-09-02)
+- **State:** Done — live-verified 2026-09-02 on demo222, every step against the real stack (see
+  Live findings): observe-only guardrails on live agent traffic (PII + jailbreak flagged, response
+  delivered unmodified, MCP tool exchange observed), RAGAS scoring real pgvector retrievals
+  (`faithfulness=1.0`, `context_precision≈1.0` on 3 questions after four live-diagnosed fix
+  rounds), reproducible Garak jailbreak evidence on the wesh fine-tune (MitigationBypass 0/5,
+  ASR 100% on DAN+DUDE), and a PEFT regression gate whose FIRST live run produced a real FAIL
+  (wesh `acc=0.55` vs base `0.67`, `-0.12` beyond the `0.05` threshold,
+  `evaluations/benchmarks/peft-regression-qwen35-9b-wesh.json`). Commits `a7f3570d`, `4f0b6ce4`,
+  `a7f01bdb`, `c399c264`, `1e5eef99`, `afd0c40d` + the thinking-mode fix.
 - **ADRs:** ADR-0534 (Accepted, Phase 2 Zuno-specific wiring + Phase 3 PEFT/LoRA comparison, merged
   into a single WP by decision - see Migration/evolution in the ADR)
 - **Depends on:** WP-108 (Done - `mcpGuardrailsMode: true` live, RAGAS/Garak proven as generic
@@ -23,6 +31,54 @@ These two pieces are merged into one WP (rather than a separate Phase-3 WP, as A
 suggested) because both extend the same TrustyAI evaluation chain onto Zuno-specific content -
 Zuno's live agent traffic in one case, Zuno's fine-tuned models in the other - and share the same
 `trustyai-config` component and precheck machinery.
+
+## Live findings (2026-09-02, execution)
+
+1. **Observe-only proven both ways, twice.** Real chat requests as `consultant-01` through the
+   live stack: a PII prompt logged `guardrails DETECTED (observe-only, response delivered
+   unmodified)` with `email_address` at score 1.0 (run `d9445c2a`), and a deliberate
+   jailbreak ("Ignore all previous instructions...") was flagged `custom-regex` at score 1.0
+   (run `f3bed571`) - in both cases the reply reached the caller unmodified (the model's own
+   refusal, not a guardrail block). A third run proved MCP observation:
+   `tools=['search_confluence']` recorded on a real tool exchange, with mcp-gateway's
+   `evaluate()` authorization path untouched (run `9a97ec76`).
+2. **The first jailbreak regex was too narrow - observe-mode caught its own gap on day one.**
+   "ignore all previous instructions" (two filler words) slipped
+   `ignore\s+(all|...)\s+(instructions|...)`; widened to `(?:\w+\s+){0,2}` (commit `4f0b6ce4`),
+   re-proven live.
+3. **The PEFT/LoRA regression gate produced a REAL FAIL on its first live run.**
+   `qwen3.5-9b` base scored `acc=0.67` and `qwen3.5-9b-wesh` scored `acc=0.55` on
+   `mmlu_abstract_algebra` (100 samples each, live GPU LMEvalJobs) - a `-0.12` regression
+   against the `0.05` threshold. `evaluations/benchmarks/peft-regression-qwen35-9b-wesh.json`
+   is the first artifact, and it is exactly the evidence ADR-0534 Phase 3 exists to produce:
+   the wesh fine-tune (ADR-0526) traded general capability for its register specialization.
+   Feeding this into ADR-0107's promotion gate as a hard input is follow-up work, deliberately
+   not retrofitted onto the already-adopted wesh model in this WP.
+4. **Garak on the fine-tune found a real security signal.** `dan.Dan_11_0` against
+   `qwen3.5-9b-wesh`: detector `dan.DAN` PASS 5/5 (no DAN-mode output), but
+   `mitigation.MitigationBypass` FAIL 0/5 (100% attack success rate) - the fine-tune never
+   voices an explicit refusal to the jailbreak. The base-model comparison run was
+   inconclusive (empty generations, garak SKIP 0/0 - likely template/EOS behavior); rerunning
+   it and folding garak scores into the regression artifact is recorded under Out of scope.
+5. **Both fresh qwen35 LMEvalJobs failed transiently on first simultaneous launch** (exit 2,
+   logs GC'd) and both succeeded on individual rerun - schedule the pair sequentially on this
+   shared-GPU cluster.
+6. **RAGAS needed four rounds to produce real scores, every defect live-diagnosed and none of
+   them RAGAS's fault:** the SingleTurnSample "requires ['response']" error was DATA, not API
+   (a `None` answer silently drops the response feature); `/v1/search` results carry
+   `title`+`snippet`, not `content` (every context was empty and every score NaN in
+   consequence); and qwen3.6 is a THINKING model - it spent its whole token budget reasoning,
+   returning `content=None` on answers and `TimeoutError` on judge verdicts. Fixed with
+   `chat_template_kwargs: {enable_thinking: false}` on both hops plus
+   `RunConfig(timeout=600, max_workers=2)`. Final run: all 3 questions retrieved (4 real
+   pgvector contexts each), answered, and scored - `faithfulness=1.0` and
+   `llm_context_precision≈1.0` across the board, Job `succeeded=1`. The in-cluster probe pod
+   (same image, inline snippet) was what isolated the field-name and None-answer defects -
+   the Job's own logs never showed the empty strings.
+7. Operational traps re-hit and handled: ArgoCD RepeatedResourceWarning (shared PVC rendered
+   per-job - deduped), immutable Job spec wedging a sync in retries pinned to the OLD revision
+   (Replace=true + operation termination - and `oc patch application` hits the decoy CRD,
+   `applications.argoproj.io` required).
 
 ## Why observe-only first
 
@@ -119,6 +175,11 @@ Builds on `trustyai-config` (WP-107 scaffold, WP-108 generic frameworks) - no ne
 - **Concrete evaluation datasets, thresholds and pass/fail policies** beyond what this WP's smoke
   and comparison pipelines establish - left to later ADRs/WPs per ADR-0534's Migration/evolution
   clause.
+- **Acting on the two real findings this WP produced** (added at closeout, 2026-09-02): wiring the
+  PEFT regression FAIL into ADR-0107's promotion gate as a hard input (the wesh model is already
+  adopted - retrofitting a gate onto it is a decision, not a mechanical step), folding garak
+  scores into the regression artifact, and rerunning the inconclusive base-model garak scan.
+  All three need an owner's scheduling call, not more code in this WP.
 
 ## Risks and known unknowns
 

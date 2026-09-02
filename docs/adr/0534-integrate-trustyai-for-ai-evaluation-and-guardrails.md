@@ -1,6 +1,6 @@
 # ADR-0534: Integrate TrustyAI for AI evaluation and guardrails
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.7
 - **Date:** 2026-08-30
 - **Decision owners:** Zuno Demo architecture team
