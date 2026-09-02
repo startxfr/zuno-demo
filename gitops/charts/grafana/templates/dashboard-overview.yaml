@@ -17,13 +17,6 @@
 # AgentPathErrorBudgetBurnFast/Slow alerts already evaluate (14.4x/6x
 # thresholds) - this dashboard visualizes the same numbers those alerts
 # fire on, it doesn't invent a new definition.
-#
-# Layout reworked 2026-09-02 into collapsible rows (same treatment as
-# dashboard-data.yaml, exported from Grafana's UI and converted to its
-# "Dashboard v2" schema by Grafana's own v2beta1 API - see dashboard-
-# data.yaml's header for why that's safe against this cluster's
-# grafana-operator v5.24.0 / Grafana 13.0.1). Row grouping and panel
-# content otherwise unchanged from the classic-schema version.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -39,1180 +32,202 @@ spec:
       dashboards: "grafana"
   uid: zuno-overview
   folder: "Zuno Platform"
-  # grafana-operator posts spec.json to the classic /api/dashboards/db
-  # endpoint, which rejects a bare v2-schema body with a 400
-  # ("dashboard appears to be in v2 format... include an object wrapper
-  # with an explicit apiVersion and move the body into a spec element")
-  # - confirmed live 2026-09-02 by probing that endpoint directly with
-  # both the bare and the wrapped form. The apiVersion/kind/spec
-  # envelope below is that required wrapper, not part of the dashboard
-  # model itself.
   json: |
     {
-      "apiVersion": "dashboard.grafana.app/v2beta1",
-      "kind": "Dashboard",
-      "spec":
+      "uid": "zuno-overview",
+      "title": "Zuno overview",
+      "description": "ADR-0413: platform landing page - SLO/error budget, component health, headline usage KPIs, links to the other Zuno dashboards.",
+      "tags": ["zuno", "overview", "slo"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "time": {"from": "now-6h", "to": "now"},
+      "refresh": "30s",
+      "links": [
+        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
+      ],
+      "panels": [
         {
-          "annotations": [
-            {
-              "kind": "AnnotationQuery",
-              "spec": {
-                "query": {
-                  "kind": "DataQuery",
-                  "group": "grafana",
-                  "version": "v0",
-                  "datasource": {
-                    "name": "-- Grafana --"
-                  },
-                  "spec": {}
-                },
-                "enable": true,
-                "hide": true,
-                "iconColor": "rgba(0, 211, 255, 1)",
-                "name": "Annotations & Alerts",
-                "builtIn": true,
-                "legacyOptions": {
-                  "type": "dashboard"
-                }
-              }
-            }
-          ],
-          "cursorSync": "Off",
-          "description": "ADR-0413: platform landing page - SLO/error budget, component health, headline usage KPIs, links to the other Zuno dashboards.",
-          "editable": true,
-          "elements": {
-            "panel-1": {
-              "kind": "Panel",
-              "spec": {
-                "id": 1,
-                "title": "Agent-path availability (5m)",
-                "description": "docs/platform/slo.md measurement query - successful (non-5xx) ratio at the BFF boundary.",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum(rate(zuno_bff_requests_total{code!~\"5..\"}[5m])) / sum(rate(zuno_bff_requests_total[5m]))"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percentunit",
-                        "thresholds": {
-                          "mode": "",
-                          "steps": [
-                            {
-                              "value": null,
-                              "color": "red"
-                            },
-                            {
-                              "value": 0.999,
-                              "color": "green"
-                            }
-                          ]
-                        }
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-10": {
-              "kind": "Panel",
-              "spec": {
-                "id": 10,
-                "title": "Model error ratio",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum(rate(zuno_model_calls_total{outcome=\"error\"}[5m])) / sum(rate(zuno_model_calls_total[5m]))"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percentunit",
-                        "thresholds": {
-                          "mode": "",
-                          "steps": [
-                            {
-                              "value": null,
-                              "color": "green"
-                            },
-                            {
-                              "value": 0.02,
-                              "color": "orange"
-                            },
-                            {
-                              "value": 0.1,
-                              "color": "red"
-                            }
-                          ]
-                        }
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-11": {
-              "kind": "Panel",
-              "spec": {
-                "id": 11,
-                "title": "Model cost (24h)",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum(increase(zuno_model_cost_usd_total[24h]))"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "currencyUSD"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-12": {
-              "kind": "Panel",
-              "spec": {
-                "id": 12,
-                "title": "Tool denials/s",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum(rate(zuno_tool_invocations_total{outcome=\"denied\"}[5m])) or vector(0)"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "reqps"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-13": {
-              "kind": "Panel",
-              "spec": {
-                "id": 13,
-                "title": "BFF requests by agent (rate)",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (agent) (rate(zuno_bff_requests_total[5m]))",
-                              "legendFormat": "{{`{{agent}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {},
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-14": {
-              "kind": "Panel",
-              "spec": {
-                "id": 14,
-                "title": "RAG search errors/s",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum(rate(zuno_rag_searches_total{outcome=\"error\"}[5m])) or vector(0)"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "reqps"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-15": {
-              "kind": "Panel",
-              "spec": {
-                "id": 15,
-                "title": "Zuno dashboards",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "dashlist",
-                  "version": "",
-                  "spec": {
-                    "options": {
-                      "headings": false,
-                      "includeVars": false,
-                      "keepTime": true,
-                      "starred": false,
-                      "tags": [
-                        "zuno"
-                      ]
-                    },
-                    "fieldConfig": {
-                      "defaults": {},
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-2": {
-              "kind": "Panel",
-              "spec": {
-                "id": 2,
-                "title": "Agent-path availability (30d)",
-                "description": "ADR-0102 objective: 99.9% over a rolling 30-day window.",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum(increase(zuno_bff_requests_total{code!~\"5..\"}[30d])) / sum(increase(zuno_bff_requests_total[30d]))"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percentunit",
-                        "thresholds": {
-                          "mode": "",
-                          "steps": [
-                            {
-                              "value": null,
-                              "color": "red"
-                            },
-                            {
-                              "value": 0.999,
-                              "color": "green"
-                            }
-                          ]
-                        }
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-3": {
-              "kind": "Panel",
-              "spec": {
-                "id": 3,
-                "title": "Error budget remaining (30d)",
-                "description": "1 - (budget consumed / 0.1% budget). Negative means the 30-day error budget is exhausted.",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "1 - ((1 - (sum(increase(zuno_bff_requests_total{code!~\"5..\"}[30d])) / sum(increase(zuno_bff_requests_total[30d])))) / 0.001)"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "gauge",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percentunit",
-                        "min": -1,
-                        "max": 1,
-                        "thresholds": {
-                          "mode": "",
-                          "steps": [
-                            {
-                              "value": null,
-                              "color": "red"
-                            },
-                            {
-                              "value": 0,
-                              "color": "green"
-                            }
-                          ]
-                        }
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-4": {
-              "kind": "Panel",
-              "spec": {
-                "id": 4,
-                "title": "Firing zuno alerts",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum(ALERTS{alertname=~\"AgentPathErrorBudgetBurn.*|RagFreshnessLagExceeded.*\", alertstate=\"firing\"}) or vector(0)"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "short",
-                        "thresholds": {
-                          "mode": "",
-                          "steps": [
-                            {
-                              "value": null,
-                              "color": "green"
-                            },
-                            {
-                              "value": 1,
-                              "color": "red"
-                            }
-                          ]
-                        }
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-5": {
-              "kind": "Panel",
-              "spec": {
-                "id": 5,
-                "title": "Error budget burn rate (1h vs 6h windows)",
-                "description": "Same multi-window shape as AgentPathErrorBudgetBurnFast (1h, pages at 14.4x) / AgentPathErrorBudgetBurnSlow (6h, tickets at 6x) - prometheusrule-slo.yaml.",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "(1 - (sum(rate(zuno_bff_requests_total{code!~\"5..\"}[1h])) / sum(rate(zuno_bff_requests_total[1h])))) / 0.001",
-                              "legendFormat": "burn rate (1h, fast)"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      },
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "(1 - (sum(rate(zuno_bff_requests_total{code!~\"5..\"}[6h])) / sum(rate(zuno_bff_requests_total[6h])))) / 0.001",
-                              "legendFormat": "burn rate (6h, slow)"
-                            }
-                          },
-                          "refId": "B",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "short",
-                        "thresholds": {
-                          "mode": "",
-                          "steps": [
-                            {
-                              "value": null,
-                              "color": "green"
-                            },
-                            {
-                              "value": 6,
-                              "color": "orange"
-                            },
-                            {
-                              "value": 14.4,
-                              "color": "red"
-                            }
-                          ]
-                        },
-                        "custom": {
-                          "thresholdsStyle": {
-                            "mode": "line"
-                          }
-                        }
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-6": {
-              "kind": "Panel",
-              "spec": {
-                "id": 6,
-                "title": "Deployment availability (zuno-*)",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "min by (namespace, deployment) (kube_deployment_status_replicas_available{namespace=~\"zuno-.*\"} / kube_deployment_spec_replicas{namespace=~\"zuno-.*\"})",
-                              "format": "table",
-                              "instant": true
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "table",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percentunit"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-7": {
-              "kind": "Panel",
-              "spec": {
-                "id": 7,
-                "title": "Failed / pending pods (zuno-*)",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum(kube_pod_status_phase{namespace=~\"zuno-.*\", phase=~\"Failed|Pending\"})"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "short",
-                        "thresholds": {
-                          "mode": "",
-                          "steps": [
-                            {
-                              "value": null,
-                              "color": "green"
-                            },
-                            {
-                              "value": 1,
-                              "color": "red"
-                            }
-                          ]
-                        }
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-8": {
-              "kind": "Panel",
-              "spec": {
-                "id": 8,
-                "title": "Telemetry pipeline up (OTel collector)",
-                "description": "up{job=\"zuno-otel-collector-collector\"} - the series docs/platform/slo.md confirmed live as the collector's own scrape health.",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "up{job=\"zuno-otel-collector-collector\"}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "short",
-                        "thresholds": {
-                          "mode": "",
-                          "steps": [
-                            {
-                              "value": null,
-                              "color": "red"
-                            },
-                            {
-                              "value": 1,
-                              "color": "green"
-                            }
-                          ]
-                        }
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-9": {
-              "kind": "Panel",
-              "spec": {
-                "id": 9,
-                "title": "Model calls/s",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum(rate(zuno_model_calls_total[5m]))"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "stat",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "reqps"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "layout": {
-            "kind": "RowsLayout",
-            "spec": {
-              "rows": [
-                {
-                  "kind": "RowsLayoutRow",
-                  "spec": {
-                    "collapse": false,
-                    "layout": {
-                      "kind": "AutoGridLayout",
-                      "spec": {
-                        "columnWidthMode": "standard",
-                        "items": [
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-1"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-2"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-3"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-4"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-5"
-                              }
-                            }
-                          }
-                        ],
-                        "maxColumnCount": 3,
-                        "rowHeightMode": "standard"
-                      }
-                    },
-                    "title": "SLO & error budget"
-                  }
-                },
-                {
-                  "kind": "RowsLayoutRow",
-                  "spec": {
-                    "collapse": false,
-                    "layout": {
-                      "kind": "AutoGridLayout",
-                      "spec": {
-                        "columnWidthMode": "standard",
-                        "items": [
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-6"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-7"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-8"
-                              }
-                            }
-                          }
-                        ],
-                        "maxColumnCount": 3,
-                        "rowHeightMode": "standard"
-                      }
-                    },
-                    "title": "Platform health"
-                  }
-                },
-                {
-                  "kind": "RowsLayoutRow",
-                  "spec": {
-                    "collapse": false,
-                    "layout": {
-                      "kind": "AutoGridLayout",
-                      "spec": {
-                        "columnWidthMode": "standard",
-                        "items": [
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-9"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-10"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-11"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-12"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-13"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-14"
-                              }
-                            }
-                          }
-                        ],
-                        "maxColumnCount": 3,
-                        "rowHeightMode": "standard"
-                      }
-                    },
-                    "title": "Usage KPIs"
-                  }
-                },
-                {
-                  "kind": "RowsLayoutRow",
-                  "spec": {
-                    "collapse": false,
-                    "layout": {
-                      "kind": "AutoGridLayout",
-                      "spec": {
-                        "columnWidthMode": "standard",
-                        "items": [
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-15"
-                              }
-                            }
-                          }
-                        ],
-                        "maxColumnCount": 1,
-                        "rowHeightMode": "standard"
-                      }
-                    },
-                    "title": "Navigation"
-                  }
-                }
-              ]
-            }
-          },
-          "links": [
-            {
-              "title": "Zuno dashboards",
-              "type": "dashboards",
-              "icon": "",
-              "tooltip": "",
-              "tags": [
-                "zuno"
-              ],
-              "asDropdown": true,
-              "targetBlank": false,
-              "includeVars": false,
-              "keepTime": true
-            }
-          ],
-          "liveNow": false,
-          "preload": false,
-          "tags": [
-            "zuno",
-            "overview",
-            "slo"
-          ],
-          "timeSettings": {
-            "timezone": "browser",
-            "from": "now-6h",
-            "to": "now",
-            "autoRefresh": "30s",
-            "autoRefreshIntervals": [
-              "5s",
-              "10s",
-              "30s",
-              "1m",
-              "5m",
-              "15m",
-              "30m",
-              "1h",
-              "2h",
-              "1d"
-            ],
-            "hideTimepicker": false,
-            "fiscalYearStartMonth": 0
-          },
-          "title": "Zuno overview",
-          "variables": []
+          "id": 1,
+          "title": "Agent-path availability (5m)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "docs/platform/slo.md measurement query - successful (non-5xx) ratio at the BFF boundary.",
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 0.999}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_bff_requests_total{code!~\"5..\"}[5m])) / sum(rate(zuno_bff_requests_total[5m]))"}
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Agent-path availability (30d)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "ADR-0102 objective: 99.9% over a rolling 30-day window.",
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 0.999}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(zuno_bff_requests_total{code!~\"5..\"}[30d])) / sum(increase(zuno_bff_requests_total[30d]))"}
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Error budget remaining (30d)",
+          "type": "gauge",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "1 - (budget consumed / 0.1% budget). Negative means the 30-day error budget is exhausted.",
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": -1, "max": 1, "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 0}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - ((1 - (sum(increase(zuno_bff_requests_total{code!~\"5..\"}[30d])) / sum(increase(zuno_bff_requests_total[30d])))) / 0.001)"}
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Firing zuno alerts",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "red", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(ALERTS{alertname=~\"AgentPathErrorBudgetBurn.*|RagFreshnessLagExceeded.*\", alertstate=\"firing\"}) or vector(0)"}
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Error budget burn rate (1h vs 6h windows)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Same multi-window shape as AgentPathErrorBudgetBurnFast (1h, pages at 14.4x) / AgentPathErrorBudgetBurnSlow (6h, tickets at 6x) - prometheusrule-slo.yaml.",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+          "fieldConfig": {"defaults": {"unit": "short", "custom": {"thresholdsStyle": {"mode": "line"}}, "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "orange", "value": 6}, {"color": "red", "value": 14.4}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(1 - (sum(rate(zuno_bff_requests_total{code!~\"5..\"}[1h])) / sum(rate(zuno_bff_requests_total[1h])))) / 0.001", "legendFormat": "burn rate (1h, fast)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "(1 - (sum(rate(zuno_bff_requests_total{code!~\"5..\"}[6h])) / sum(rate(zuno_bff_requests_total[6h])))) / 0.001", "legendFormat": "burn rate (6h, slow)"}
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Deployment availability (zuno-*)",
+          "type": "table",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "min by (namespace, deployment) (kube_deployment_status_replicas_available{namespace=~\"zuno-.*\"} / kube_deployment_spec_replicas{namespace=~\"zuno-.*\"})", "format": "table", "instant": true}
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Failed / pending pods (zuno-*)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 12, "x": 12, "y": 12},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "red", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(kube_pod_status_phase{namespace=~\"zuno-.*\", phase=~\"Failed|Pending\"})"}
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Telemetry pipeline up (OTel collector)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "up{job=\"zuno-otel-collector-collector\"} - the series docs/platform/slo.md confirmed live as the collector's own scrape health.",
+          "gridPos": {"h": 4, "w": 12, "x": 12, "y": 16},
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [
+            {"color": "red", "value": null}, {"color": "green", "value": 1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "up{job=\"zuno-otel-collector-collector\"}"}
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Model calls/s",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 20},
+          "fieldConfig": {"defaults": {"unit": "reqps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_model_calls_total[5m]))"}
+          ]
+        },
+        {
+          "id": 10,
+          "title": "Model error ratio",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 20},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [
+            {"color": "green", "value": null}, {"color": "orange", "value": 0.02}, {"color": "red", "value": 0.1}
+          ]}}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_model_calls_total{outcome=\"error\"}[5m])) / sum(rate(zuno_model_calls_total[5m]))"}
+          ]
+        },
+        {
+          "id": 11,
+          "title": "Model cost (24h)",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 20},
+          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(increase(zuno_model_cost_usd_total[24h]))"}
+          ]
+        },
+        {
+          "id": 12,
+          "title": "Tool denials/s",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 20},
+          "fieldConfig": {"defaults": {"unit": "reqps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_tool_invocations_total{outcome=\"denied\"}[5m])) or vector(0)"}
+          ]
+        },
+        {
+          "id": 13,
+          "title": "BFF requests by agent (rate)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 16, "x": 0, "y": 24},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (agent) (rate(zuno_bff_requests_total[5m]))", "legendFormat": "{{`{{agent}}`}}"}
+          ]
+        },
+        {
+          "id": 14,
+          "title": "RAG search errors/s",
+          "type": "stat",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 4, "w": 8, "x": 16, "y": 24},
+          "fieldConfig": {"defaults": {"unit": "reqps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_rag_searches_total{outcome=\"error\"}[5m])) or vector(0)"}
+          ]
+        },
+        {
+          "id": 15,
+          "title": "Zuno dashboards",
+          "type": "dashlist",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 32},
+          "options": {"tags": ["zuno"], "includeVars": false, "keepTime": true, "starred": false, "headings": false}
         }
+      ]
     }
 {{- end }}

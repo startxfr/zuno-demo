@@ -14,13 +14,6 @@
 # kube_node_info), so those panels are deliberately left unfiltered by
 # $node; only the node-readiness table (kube_node_status_condition, which
 # DOES carry a "node" label) honors it.
-#
-# Layout reworked 2026-09-02 into collapsible rows (same treatment as
-# dashboard-data.yaml, exported from Grafana's UI and converted to its
-# "Dashboard v2" schema by Grafana's own v2beta1 API - see dashboard-
-# data.yaml's header for why that's safe against this cluster's
-# grafana-operator v5.24.0 / Grafana 13.0.1). Row grouping and panel
-# content otherwise unchanged from the classic-schema version.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -36,1449 +29,248 @@ spec:
       dashboards: "grafana"
   uid: zuno-infra-data
   folder: "Zuno Platform"
-  # grafana-operator posts spec.json to the classic /api/dashboards/db
-  # endpoint, which rejects a bare v2-schema body with a 400
-  # ("dashboard appears to be in v2 format... include an object wrapper
-  # with an explicit apiVersion and move the body into a spec element")
-  # - confirmed live 2026-09-02 by probing that endpoint directly with
-  # both the bare and the wrapped form. The apiVersion/kind/spec
-  # envelope below is that required wrapper, not part of the dashboard
-  # model itself.
   json: |
     {
-      "apiVersion": "dashboard.grafana.app/v2beta1",
-      "kind": "Dashboard",
-      "spec":
+      "uid": "zuno-infra-data",
+      "title": "Infrastructure",
+      "description": "ADR-0413: node/pod/deployment health, node and pod resource consumption (CPU/RAM/GPU/disk/network/errors). Database exporters moved to dashboard-data.yaml and ArgoCD sync health to dashboard-gitops.yaml on 2026-09-01.",
+      "tags": ["zuno", "infra", "kubernetes"],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "time": {"from": "now-6h", "to": "now"},
+      "refresh": "30s",
+      "links": [
+        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
+      ],
+      "templating": {"list": [
         {
-          "annotations": [
-            {
-              "kind": "AnnotationQuery",
-              "spec": {
-                "query": {
-                  "kind": "DataQuery",
-                  "group": "grafana",
-                  "version": "v0",
-                  "datasource": {
-                    "name": "-- Grafana --"
-                  },
-                  "spec": {}
-                },
-                "enable": true,
-                "hide": true,
-                "iconColor": "rgba(0, 211, 255, 1)",
-                "name": "Annotations & Alerts",
-                "builtIn": true,
-                "legacyOptions": {
-                  "type": "dashboard"
-                }
-              }
-            }
-          ],
-          "cursorSync": "Off",
-          "description": "ADR-0413: node/pod/deployment health, node and pod resource consumption (CPU/RAM/GPU/disk/network/errors). Database exporters moved to dashboard-data.yaml and ArgoCD sync health to dashboard-gitops.yaml on 2026-09-01.",
-          "editable": true,
-          "elements": {
-            "panel-1": {
-              "kind": "Panel",
-              "spec": {
-                "id": 1,
-                "title": "Pod status by namespace",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace, phase) (kube_pod_status_phase{namespace=~\"$namespace\"})",
-                              "legendFormat": "{{`{{namespace}}`}} ({{`{{phase}}`}})"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {},
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-10": {
-              "kind": "Panel",
-              "spec": {
-                "id": 10,
-                "title": "GPU utilization by node",
-                "description": "Summary view - see dashboard-ai-models.yaml for full GPU/DCGM detail.",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL)",
-                              "legendFormat": "{{`{{Hostname}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percent"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-11": {
-              "kind": "Panel",
-              "spec": {
-                "id": 11,
-                "title": "CPU usage by namespace",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}[5m]))",
-                              "legendFormat": "{{`{{namespace}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {},
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-12": {
-              "kind": "Panel",
-              "spec": {
-                "id": 12,
-                "title": "Memory working set by namespace",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\"})",
-                              "legendFormat": "{{`{{namespace}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "bytes"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-13": {
-              "kind": "Panel",
-              "spec": {
-                "id": 13,
-                "title": "CPU usage by pod",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"}[5m]))",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {},
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-14": {
-              "kind": "Panel",
-              "spec": {
-                "id": 14,
-                "title": "Memory working set by pod",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"})",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "bytes"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-15": {
-              "kind": "Panel",
-              "spec": {
-                "id": 15,
-                "title": "Pod network IO",
-                "description": "Raw pod/NIC counters (cAdvisor) - moved from the retired dashboard-network-mesh.yaml, which kept this separate from mesh-attributed Istio bandwidth (different Prometheus stack, dashboard-mesh-gateway.yaml).",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace, pod) (rate(container_network_receive_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (rx)"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      },
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace, pod) (rate(container_network_transmit_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (tx)"
-                            }
-                          },
-                          "refId": "B",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "Bps"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-16": {
-              "kind": "Panel",
-              "spec": {
-                "id": 16,
-                "title": "Pod network errors / drops",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace, pod) (rate(container_network_receive_errors_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_errors_total{namespace=~\"$namespace\"}[5m]))",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (errors)"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      },
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace, pod) (rate(container_network_receive_packets_dropped_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_packets_dropped_total{namespace=~\"$namespace\"}[5m]))",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (drops)"
-                            }
-                          },
-                          "refId": "B",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {},
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-17": {
-              "kind": "Panel",
-              "spec": {
-                "id": 17,
-                "title": "Container disk IO",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace, pod) (rate(container_fs_reads_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]) + rate(container_fs_writes_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "Bps"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-18": {
-              "kind": "Panel",
-              "spec": {
-                "id": 18,
-                "title": "PVC usage",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "kubelet_volume_stats_used_bytes{namespace=~\"$namespace\"} / kubelet_volume_stats_capacity_bytes{namespace=~\"$namespace\"}",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{persistentvolumeclaim}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percentunit"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-2": {
-              "kind": "Panel",
-              "spec": {
-                "id": 2,
-                "title": "Pod restarts (last hour)",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[1h])) > 0",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {},
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-3": {
-              "kind": "Panel",
-              "spec": {
-                "id": 3,
-                "title": "Deployment availability",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "kube_deployment_status_replicas_available{namespace=~\"$namespace\"} / kube_deployment_spec_replicas{namespace=~\"$namespace\"}",
-                              "legendFormat": "{{`{{namespace}}`}}/{{`{{deployment}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percentunit",
-                        "min": 0,
-                        "max": 1
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-4": {
-              "kind": "Panel",
-              "spec": {
-                "id": 4,
-                "title": "Component status (pod-health + BFF error-rate approximation)",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (agent) (rate(zuno_bff_requests_total{code=~\"5..\"}[5m]))",
-                              "legendFormat": "bff errors: {{`{{agent}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      },
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (namespace) (kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Failed\"})",
-                              "legendFormat": "failed pods: {{`{{namespace}}`}}"
-                            }
-                          },
-                          "refId": "B",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {},
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-5": {
-              "kind": "Panel",
-              "spec": {
-                "id": 5,
-                "title": "Node readiness / schedulability",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "kube_node_status_condition{condition=\"Ready\", node=~\"$node\"} == 1",
-                              "format": "table",
-                              "instant": true
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      },
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "kube_node_spec_unschedulable{node=~\"$node\"}",
-                              "format": "table",
-                              "instant": true
-                            }
-                          },
-                          "refId": "B",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "table",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {},
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-6": {
-              "kind": "Panel",
-              "spec": {
-                "id": 6,
-                "title": "Node CPU utilization",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))",
-                              "legendFormat": "{{`{{instance}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percentunit"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-7": {
-              "kind": "Panel",
-              "spec": {
-                "id": 7,
-                "title": "Node memory utilization",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
-                              "legendFormat": "{{`{{instance}}`}}"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "percentunit"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-8": {
-              "kind": "Panel",
-              "spec": {
-                "id": 8,
-                "title": "Node disk IO",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (instance) (rate(node_disk_read_bytes_total[5m]))",
-                              "legendFormat": "{{`{{instance}}`}} (read)"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      },
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (instance) (rate(node_disk_written_bytes_total[5m]))",
-                              "legendFormat": "{{`{{instance}}`}} (write)"
-                            }
-                          },
-                          "refId": "B",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "Bps"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            },
-            "panel-9": {
-              "kind": "Panel",
-              "spec": {
-                "id": 9,
-                "title": "Node network IO",
-                "description": "",
-                "links": [],
-                "data": {
-                  "kind": "QueryGroup",
-                  "spec": {
-                    "queries": [
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (instance) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*\"}[5m]))",
-                              "legendFormat": "{{`{{instance}}`}} (rx)"
-                            }
-                          },
-                          "refId": "A",
-                          "hidden": false
-                        }
-                      },
-                      {
-                        "kind": "PanelQuery",
-                        "spec": {
-                          "query": {
-                            "kind": "DataQuery",
-                            "group": "prometheus",
-                            "version": "v0",
-                            "datasource": {
-                              "name": "prometheus"
-                            },
-                            "spec": {
-                              "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{device!~\"lo|veth.*\"}[5m]))",
-                              "legendFormat": "{{`{{instance}}`}} (tx)"
-                            }
-                          },
-                          "refId": "B",
-                          "hidden": false
-                        }
-                      }
-                    ],
-                    "transformations": [],
-                    "queryOptions": {}
-                  }
-                },
-                "vizConfig": {
-                  "kind": "VizConfig",
-                  "group": "timeseries",
-                  "version": "",
-                  "spec": {
-                    "options": {},
-                    "fieldConfig": {
-                      "defaults": {
-                        "unit": "Bps"
-                      },
-                      "overrides": []
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "layout": {
-            "kind": "RowsLayout",
-            "spec": {
-              "rows": [
-                {
-                  "kind": "RowsLayoutRow",
-                  "spec": {
-                    "collapse": false,
-                    "layout": {
-                      "kind": "AutoGridLayout",
-                      "spec": {
-                        "columnWidthMode": "standard",
-                        "items": [
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-1"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-2"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-3"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-4"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-5"
-                              }
-                            }
-                          }
-                        ],
-                        "maxColumnCount": 3,
-                        "rowHeightMode": "standard"
-                      }
-                    },
-                    "title": "Cluster health"
-                  }
-                },
-                {
-                  "kind": "RowsLayoutRow",
-                  "spec": {
-                    "collapse": true,
-                    "layout": {
-                      "kind": "AutoGridLayout",
-                      "spec": {
-                        "columnWidthMode": "standard",
-                        "items": [
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-6"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-7"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-8"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-9"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-10"
-                              }
-                            }
-                          }
-                        ],
-                        "maxColumnCount": 3,
-                        "rowHeightMode": "standard"
-                      }
-                    },
-                    "title": "Node resources"
-                  }
-                },
-                {
-                  "kind": "RowsLayoutRow",
-                  "spec": {
-                    "collapse": true,
-                    "layout": {
-                      "kind": "AutoGridLayout",
-                      "spec": {
-                        "columnWidthMode": "standard",
-                        "items": [
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-11"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-12"
-                              }
-                            }
-                          }
-                        ],
-                        "maxColumnCount": 2,
-                        "rowHeightMode": "standard"
-                      }
-                    },
-                    "title": "Namespace resources"
-                  }
-                },
-                {
-                  "kind": "RowsLayoutRow",
-                  "spec": {
-                    "collapse": true,
-                    "layout": {
-                      "kind": "AutoGridLayout",
-                      "spec": {
-                        "columnWidthMode": "standard",
-                        "items": [
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-13"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-14"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-15"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-16"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-17"
-                              }
-                            }
-                          },
-                          {
-                            "kind": "AutoGridLayoutItem",
-                            "spec": {
-                              "element": {
-                                "kind": "ElementReference",
-                                "name": "panel-18"
-                              }
-                            }
-                          }
-                        ],
-                        "maxColumnCount": 3,
-                        "rowHeightMode": "standard"
-                      }
-                    },
-                    "title": "Pod & container resources"
-                  }
-                }
-              ]
-            }
-          },
-          "links": [
-            {
-              "title": "Zuno dashboards",
-              "type": "dashboards",
-              "icon": "",
-              "tooltip": "",
-              "tags": [
-                "zuno"
-              ],
-              "asDropdown": true,
-              "targetBlank": false,
-              "includeVars": false,
-              "keepTime": true
-            }
-          ],
-          "liveNow": false,
-          "preload": false,
-          "tags": [
-            "zuno",
-            "infra",
-            "kubernetes"
-          ],
-          "timeSettings": {
-            "timezone": "browser",
-            "from": "now-6h",
-            "to": "now",
-            "autoRefresh": "30s",
-            "autoRefreshIntervals": [
-              "5s",
-              "10s",
-              "30s",
-              "1m",
-              "5m",
-              "15m",
-              "30m",
-              "1h",
-              "2h",
-              "1d"
-            ],
-            "hideTimepicker": false,
-            "fiscalYearStartMonth": 0
-          },
-          "title": "Infrastructure",
-          "variables": [
-            {
-              "kind": "QueryVariable",
-              "spec": {
-                "name": "namespace",
-                "current": {
-                  "text": "zuno-.*",
-                  "value": "zuno-.*"
-                },
-                "hide": "dontHide",
-                "refresh": "onTimeRangeChanged",
-                "skipUrlSync": false,
-                "query": {
-                  "kind": "DataQuery",
-                  "group": "prometheus",
-                  "version": "v0",
-                  "datasource": {
-                    "name": "prometheus"
-                  },
-                  "spec": {
-                    "__legacyStringValue": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)"
-                  }
-                },
-                "regex": "",
-                "sort": "alphabeticalAsc",
-                "definition": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)",
-                "options": [],
-                "multi": true,
-                "includeAll": true,
-                "allValue": "zuno-.*",
-                "allowCustomValue": true
-              }
-            },
-            {
-              "kind": "QueryVariable",
-              "spec": {
-                "name": "node",
-                "current": {
-                  "text": "All",
-                  "value": "$__all"
-                },
-                "hide": "dontHide",
-                "refresh": "onTimeRangeChanged",
-                "skipUrlSync": false,
-                "query": {
-                  "kind": "DataQuery",
-                  "group": "prometheus",
-                  "version": "v0",
-                  "datasource": {
-                    "name": "prometheus"
-                  },
-                  "spec": {
-                    "__legacyStringValue": "label_values(kube_node_info, node)"
-                  }
-                },
-                "regex": "",
-                "sort": "alphabeticalAsc",
-                "definition": "label_values(kube_node_info, node)",
-                "options": [],
-                "multi": true,
-                "includeAll": true,
-                "allValue": ".*",
-                "allowCustomValue": true
-              }
-            },
-            {
-              "kind": "QueryVariable",
-              "spec": {
-                "name": "pod",
-                "current": {
-                  "text": "All",
-                  "value": "$__all"
-                },
-                "hide": "dontHide",
-                "refresh": "onTimeRangeChanged",
-                "skipUrlSync": false,
-                "query": {
-                  "kind": "DataQuery",
-                  "group": "prometheus",
-                  "version": "v0",
-                  "datasource": {
-                    "name": "prometheus"
-                  },
-                  "spec": {
-                    "__legacyStringValue": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)"
-                  }
-                },
-                "regex": "",
-                "sort": "alphabeticalAsc",
-                "definition": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)",
-                "options": [],
-                "multi": true,
-                "includeAll": true,
-                "allValue": ".*",
-                "allowCustomValue": true
-              }
-            }
+          "current": {"text": "zuno-.*", "value": "zuno-.*"},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "definition": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)",
+          "hide": 0, "includeAll": true, "allValue": "zuno-.*", "multi": true,
+          "name": "namespace", "options": [],
+          "query": "label_values(kube_pod_status_phase{namespace=~\"zuno-.*\"}, namespace)",
+          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+        },
+        {
+          "current": {"text": "All", "value": "$__all"},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "definition": "label_values(kube_node_info, node)",
+          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
+          "name": "node", "options": [],
+          "query": "label_values(kube_node_info, node)",
+          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+        },
+        {
+          "current": {"text": "All", "value": "$__all"},
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "definition": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)",
+          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
+          "name": "pod", "options": [],
+          "query": "label_values(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}, pod)",
+          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+        }
+      ]},
+      "panels": [
+        {
+          "id": 1,
+          "title": "Pod status by namespace",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, phase) (kube_pod_status_phase{namespace=~\"$namespace\"})", "legendFormat": "{{`{{namespace}}`}} ({{`{{phase}}`}})"}
+          ]
+        },
+        {
+          "id": 2,
+          "title": "Pod restarts (last hour)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total{namespace=~\"$namespace\"}[1h])) > 0", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Deployment availability",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+          "fieldConfig": {"defaults": {"unit": "percentunit", "min": 0, "max": 1}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_deployment_status_replicas_available{namespace=~\"$namespace\"} / kube_deployment_spec_replicas{namespace=~\"$namespace\"}", "legendFormat": "{{`{{namespace}}`}}/{{`{{deployment}}`}}"}
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Component status (pod-health + BFF error-rate approximation)",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (agent) (rate(zuno_bff_requests_total{code=~\"5..\"}[5m]))", "legendFormat": "bff errors: {{`{{agent}}`}}"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (kube_pod_status_phase{namespace=~\"$namespace\", phase=\"Failed\"})", "legendFormat": "failed pods: {{`{{namespace}}`}}"}
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Node readiness / schedulability",
+          "type": "table",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_node_status_condition{condition=\"Ready\", node=~\"$node\"} == 1", "format": "table", "instant": true},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kube_node_spec_unschedulable{node=~\"$node\"}", "format": "table", "instant": true}
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Node CPU utilization",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m]))", "legendFormat": "{{`{{instance}}`}}"}
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Node memory utilization",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)", "legendFormat": "{{`{{instance}}`}}"}
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Node disk IO",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_disk_read_bytes_total[5m]))", "legendFormat": "{{`{{instance}}`}} (read)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_disk_written_bytes_total[5m]))", "legendFormat": "{{`{{instance}}`}} (write)"}
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Node network IO",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_network_receive_bytes_total{device!~\"lo|veth.*\"}[5m]))", "legendFormat": "{{`{{instance}}`}} (rx)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{device!~\"lo|veth.*\"}[5m]))", "legendFormat": "{{`{{instance}}`}} (tx)"}
+          ]
+        },
+        {
+          "id": 10,
+          "title": "GPU utilization by node",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Summary view - see dashboard-ai-models.yaml for full GPU/DCGM detail.",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
+          "fieldConfig": {"defaults": {"unit": "percent"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL)", "legendFormat": "{{`{{Hostname}}`}}"}
+          ]
+        },
+        {
+          "id": 11,
+          "title": "CPU usage by namespace",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}"}
+          ]
+        },
+        {
+          "id": 12,
+          "title": "Memory working set by namespace",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
+          "fieldConfig": {"defaults": {"unit": "bytes"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace) (container_memory_working_set_bytes{namespace=~\"$namespace\", container!=\"\"})", "legendFormat": "{{`{{namespace}}`}}"}
+          ]
+        },
+        {
+          "id": 13,
+          "title": "CPU usage by pod",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 48},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 14,
+          "title": "Memory working set by pod",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 48},
+          "fieldConfig": {"defaults": {"unit": "bytes"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (container_memory_working_set_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container!=\"\"})", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 15,
+          "title": "Pod network IO",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "description": "Raw pod/NIC counters (cAdvisor) - moved from the retired dashboard-network-mesh.yaml, which kept this separate from mesh-attributed Istio bandwidth (different Prometheus stack, dashboard-mesh-gateway.yaml).",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_receive_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (rx)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_transmit_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (tx)"}
+          ]
+        },
+        {
+          "id": 16,
+          "title": "Pod network errors / drops",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 56},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_receive_errors_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_errors_total{namespace=~\"$namespace\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (errors)"},
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_network_receive_packets_dropped_total{namespace=~\"$namespace\"}[5m]) + rate(container_network_transmit_packets_dropped_total{namespace=~\"$namespace\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}} (drops)"}
+          ]
+        },
+        {
+          "id": 17,
+          "title": "Container disk IO",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 64},
+          "fieldConfig": {"defaults": {"unit": "Bps"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (namespace, pod) (rate(container_fs_reads_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]) + rate(container_fs_writes_bytes_total{namespace=~\"$namespace\", pod=~\"$pod\"}[5m]))", "legendFormat": "{{`{{namespace}}`}}/{{`{{pod}}`}}"}
+          ]
+        },
+        {
+          "id": 18,
+          "title": "PVC usage",
+          "type": "timeseries",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 64},
+          "fieldConfig": {"defaults": {"unit": "percentunit"}},
+          "targets": [
+            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "kubelet_volume_stats_used_bytes{namespace=~\"$namespace\"} / kubelet_volume_stats_capacity_bytes{namespace=~\"$namespace\"}", "legendFormat": "{{`{{namespace}}`}}/{{`{{persistentvolumeclaim}}`}}"}
           ]
         }
+      ]
     }
 {{- end }}
