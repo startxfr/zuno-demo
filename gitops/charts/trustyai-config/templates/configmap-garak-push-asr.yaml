@@ -35,6 +35,7 @@ data:
 
 
     points = []
+    seen_types = {}
     for path in sorted(glob.glob("/tmp/garak-security*.report.jsonl")):
         with open(path) as fh:
             for line in fh:
@@ -42,12 +43,23 @@ data:
                     entry = json.loads(line)
                 except ValueError:
                     continue
-                if entry.get("entry_type") != "eval" or not entry.get("total"):
+                etype = entry.get("entry_type", "?")
+                seen_types[etype] = seen_types.get(etype, 0) + 1
+                if etype != "eval" or not entry.get("total"):
                     continue
                 asr = 1.0 - float(entry["passed"]) / float(entry["total"])
                 points.append((asr, entry.get("probe", ""), entry.get("detector", "")))
 
     if not points:
+        # Diagnosability: show what the report actually contains, and one
+        # sample of the closest-looking entry, before giving up.
+        print("entry_type histogram: %s" % seen_types)
+        for path in sorted(glob.glob("/tmp/garak-security*.report.jsonl")):
+            with open(path) as fh:
+                for line in fh:
+                    if '"eval"' in line or '"passed"' in line:
+                        print("sample entry: %s" % line.strip()[:500])
+                        break
         raise SystemExit("no eval entries found in the garak report - nothing to push")
 
     now = str(time.time_ns())
