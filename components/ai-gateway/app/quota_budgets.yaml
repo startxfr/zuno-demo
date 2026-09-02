@@ -8,13 +8,13 @@ classes:
     fail_mode: open
     tokens:
       user:
-        budget: 200000
+        budget: 3000000
         window: 24h
       group:
-        budget: 2000000
+        budget: 30000000
         window: 24h
       project:
-        budget: 1000000
+        budget: 15000000
         window: 24h
   intensive:
     fail_mode: closed

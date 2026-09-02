@@ -79,9 +79,20 @@ classes:
       group:   { limit: 600,  window: 5m }
       project: { limit: 300,  window: 5m }
     tokens:
-      user:    { budget: 200000,   window: 24h }
-      group:   { budget: 2000000,  window: 24h }
-      project: { budget: 1000000,  window: 24h }
+      # Raised 2026-09-02: a live day2-stresstest run against Tekos (the one
+      # fully live agent) was measured via Prometheus
+      # (sum by (outcome) (increase(zuno_model_tokens_total{agent="tekos"}[3h])))
+      # to consume ~1,218,231 tokens for ONE test persona in under 2h - 6x
+      # the prior 200000 ceiling, and well above `intensive`'s 500000 too.
+      # These personas are the SAME accounts used for live human demos
+      # (evaluations/tekos/run_scenarios.py's own comment on
+      # cleanup_created_runs), not dedicated test-only identities, so this
+      # is a genuine per-user daily ceiling, not just a stresstest knob.
+      # New values keep the prior 1 : 10 : 5 (user : group : project) ratio,
+      # sized with ~2.5x headroom over the observed run.
+      user:    { budget: 3000000,   window: 24h }
+      group:   { budget: 30000000,  window: 24h }
+      project: { budget: 15000000,  window: 24h }
 
   intensive:
     description: >-
