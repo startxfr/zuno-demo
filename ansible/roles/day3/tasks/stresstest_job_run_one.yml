@@ -301,6 +301,15 @@
                 configMap:
                   name: day2-stresstest-ca
 
+# retries/delay give a 2400s/40min budget, not 900s/15min like
+# run_acceptance_gate.yml's identical-looking wait - that Job never runs
+# day2_bulk.py, this one does when BULK_INTERACTIONS>0. Arkos's own
+# DAT-drafting bulk_load calls legitimately take ~21-22 minutes end to end
+# (live-confirmed 2026-09-02, twice: `make d3 stresstest agents` died here
+# both times, exit code 2, while the Job itself kept running and completed
+# normally minutes later - recovered manually via oc logs/oc apply both
+# times since this task gave up too early, not because anything was
+# actually stuck).
 - name: "day2-stresstest | wait for the {{ day2_stress_agent }} Job to reach a terminal state"
   kubernetes.core.k8s_info:
     api_version: batch/v1
@@ -311,7 +320,7 @@
   until: >-
     (_day2_stress_job.resources[0].status.succeeded | default(0)) > 0 or
     (_day2_stress_job.resources[0].status.failed | default(0)) > 0
-  retries: 60
+  retries: 160
   delay: 15
 
 # Selects on controller-uid (unique per Job instance), not job-name
