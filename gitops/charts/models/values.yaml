@@ -873,13 +873,13 @@ maas:
       # lower one to make the difference obvious in a live comparison.
       subscriptions:
         - name: gpt-oss-20b-tekos
-          group: agent_tekos
+          group: /agent_tekos
           tokenRateLimits:
             - limit: 100000
               window: 1h
           priority: 10
         - name: gpt-oss-20b-sales
-          group: sales
+          group: /sales
           tokenRateLimits:
             - limit: 5000
               window: 1h
@@ -926,13 +926,13 @@ maas:
       endpointOverride: ""
       subscriptions:
         - name: qwen36-27b-instruct-tekos
-          group: agent_tekos
+          group: /agent_tekos
           tokenRateLimits:
             - limit: 100000
               window: 1h
           priority: 10
         - name: qwen36-27b-instruct-sales
-          group: sales
+          group: /sales
           tokenRateLimits:
             - limit: 5000
               window: 1h
@@ -988,13 +988,13 @@ maas:
       endpointOverride: ""
       subscriptions:
         - name: qwen35-9b-wesh-tekos
-          group: agent_tekos
+          group: /agent_tekos
           tokenRateLimits:
             - limit: 100000
               window: 1h
           priority: 10
         - name: qwen35-9b-wesh-sales
-          group: sales
+          group: /sales
           tokenRateLimits:
             - limit: 5000
               window: 1h
@@ -1029,13 +1029,13 @@ maas:
       endpointOverride: ""
       subscriptions:
         - name: qwen35-9b-tekos
-          group: agent_tekos
+          group: /agent_tekos
           tokenRateLimits:
             - limit: 100000
               window: 1h
           priority: 10
         - name: qwen35-9b-sales
-          group: sales
+          group: /sales
           tokenRateLimits:
             - limit: 5000
               window: 1h
@@ -1068,13 +1068,13 @@ maas:
       backendInferenceServiceName: mistral-large
       subscriptions:
         - name: mistral-large-tekos
-          group: agent_tekos
+          group: /agent_tekos
           tokenRateLimits:
             - limit: 100000
               window: 1h
           priority: 10
         - name: mistral-large-sales
-          group: sales
+          group: /sales
           tokenRateLimits:
             - limit: 5000
               window: 1h
@@ -1100,13 +1100,13 @@ maas:
       backendInferenceServiceName: gpt-oss-120b-ovhcloud
       subscriptions:
         - name: gpt-oss-120b-ovhcloud-tekos
-          group: agent_tekos
+          group: /agent_tekos
           tokenRateLimits:
             - limit: 100000
               window: 1h
           priority: 10
         - name: gpt-oss-120b-ovhcloud-sales
-          group: sales
+          group: /sales
           tokenRateLimits:
             - limit: 5000
               window: 1h

@@ -197,6 +197,18 @@ spec:
         {{- toYaml .tokenRateLimits | nindent 8 }}
 ---
 {{- end }}
+# Live-verified 2026-09-03 (WP-122): values.yaml's maas.models[].subscriptions[].group
+# entries carry a leading "/" (e.g. "/agent_tekos") - not cosmetic. Keycloak's shared
+# "groups" protocol mapper (realm-zuno.json) emits full group paths
+# (full.path: true) in every persona token; maas-controller's generated
+# MaaSAuthPolicy compares that raw claim against this exact string with no
+# normalization (unlike components/mcp-gateway/app/auth.py's own groups
+# claim consumer, which does `g.lstrip("/")` on the same claim - MaaS never
+# got that same treatment). Flipping full.path to false on the shared
+# mapper was rejected as the fix: it also carries nested groups
+# (/consultant/confluence-archi-*) whose parent-path context other
+# consumers may depend on for disambiguation - this MaaS-only values.yaml
+# fix has zero blast radius on anything else reading the same claim.
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSAuthPolicy
 metadata:
