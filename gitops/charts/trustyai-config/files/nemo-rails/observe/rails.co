@@ -1,0 +1,12 @@
+# ADR-0540/WP-120: observe-only rails.
+#
+# Each flow runs zuno_scan and stores the result. Neither flow stops the
+# exchange, refuses, or alters a message - a `stop` here would turn
+# observation into enforcement, which ADR-0534 defers to a later decision.
+# The detection names surface to the caller in the activated-rails log.
+
+define subflow zuno scan input
+  $zuno_input_detections = execute zuno_scan(text=$user_message)
+
+define subflow zuno scan output
+  $zuno_output_detections = execute zuno_scan(text=$bot_message)

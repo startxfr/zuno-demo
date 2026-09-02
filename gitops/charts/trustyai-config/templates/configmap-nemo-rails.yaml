@@ -1,0 +1,36 @@
+{{- /*
+ADR-0540/WP-120: the NeMo Guardrails server config, as a ConfigMap.
+
+The CRD mounts every file of every ConfigMap named in
+spec.nemoConfigs[].configMaps at /app/config/$name, so the three keys
+below become that directory's contents verbatim.
+
+Canonical source is files/nemo-rails/observe/ in this chart, NOT
+policies/guardrails/. Helm's .Files.Get is chart-root-relative and cannot
+traverse out of the chart (the same constraint rag-service's
+configmap-schema.yaml documents), and rendering from the chart keeps the
+policy under ArgoCD rather than applied out-of-band by Ansible
+(ADR-0311/ADR-0312). policies/guardrails/README.md is the human-readable
+specification and points here.
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.nemoGuardrails.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.nemoGuardrails.configMapName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: trustyai-guardrails
+    app.kubernetes.io/component: nemo-rails-config
+  annotations:
+    # Ahead of the CR, so the server never starts against a missing mount.
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  config.yml: |
+{{ .Files.Get "files/nemo-rails/observe/config.yml" | indent 4 }}
+  rails.co: |
+{{ .Files.Get "files/nemo-rails/observe/rails.co" | indent 4 }}
+  actions.py: |
+{{ .Files.Get "files/nemo-rails/observe/actions.py" | indent 4 }}
+{{- end }}

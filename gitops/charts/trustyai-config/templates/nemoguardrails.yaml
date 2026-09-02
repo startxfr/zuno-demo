@@ -1,0 +1,42 @@
+{{- /*
+ADR-0540/WP-120: guardrail policy expressed as NeMo rails instead of a
+dict literal in the agent-runtime image.
+
+This does NOT replace the GuardrailsOrchestrator beside it
+(templates/guardrailsorchestrator.yaml): that instance stays as ADR-0534's
+proof and as the fallback backend the client selects with
+GUARDRAILS_BACKEND=builtin. The two coexist; the client picks one.
+
+No DataScienceCluster change is needed or wanted. The TrustyAI operator
+already runs with `--enable-services TAS,LMES,GORCH,NEMO_GUARDRAILS,
+EVALHUB` while spec.components.trustyai.mcpGuardrailsMode is false
+(argv read live 2026-09-02) - the NeMo controller has been running all
+along. Setting that flag true redeploys the operator with
+`--enable-services NEMO_GUARDRAILS` ONLY, killing the LMEvalJob
+controller, EvalHub, TrustyAIService and GuardrailsOrchestrator; it was
+flipped and reverted the same hour (ADR-0534, WP-108). It stays false.
+
+Fields verified against the live CRD (nemoguardrails.trustyai.
+opendatahub.io/v1alpha1, `oc explain` 2026-09-02): nemoConfigs is the only
+required field; replicas, env, caBundleConfig and template are optional.
+The operator resolves the server image from `nemo-guardrails-image` in
+trustyai-service-operator-config.
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.nemoGuardrails.enabled }}
+---
+apiVersion: trustyai.opendatahub.io/v1alpha1
+kind: NemoGuardrails
+metadata:
+  name: {{ .Values.nemoGuardrails.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: trustyai-guardrails
+    app.kubernetes.io/component: nemo-guardrails
+spec:
+  replicas: {{ .Values.nemoGuardrails.replicas }}
+  nemoConfigs:
+    - name: {{ .Values.nemoGuardrails.configId }}
+      default: true
+      configMaps:
+        - {{ .Values.nemoGuardrails.configMapName }}
+{{- end }}

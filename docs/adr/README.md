@@ -285,6 +285,7 @@ Also carried in v0.7, as a separate large-scope effort unrelated to the GitHub-A
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | v0.9 | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | v0.7 | Implemented | Integrate TrustyAI for AI evaluation and guardrails |
 | [ADR-0538](0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md) | v0.7 | Accepted | Adopt RHOAI 3.5 workload surfaces - MLflow tracking, queued workloads, training-jobs UI |
+| [ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md) | v0.7 | Accepted | Express guardrail policy as NeMo rails configuration, not in-image detector parameters |
 | [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | v0.7 | Proposed | Extract OKF content into a standalone zuno-okf repository |
 | [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | v0.7 | Proposed | Consume the zuno-okf repository through a single pinned reference |
 | [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | v0.7 | Proposed | Isolate OKF parsing behind per-component adaptation hooks |

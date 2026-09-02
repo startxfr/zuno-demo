@@ -79,7 +79,21 @@ aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
 # LOGGED only; nothing is ever blocked on them (the observe-to-block
 # transition is a separate, later decision per ADR-0534).
 guardrails:
+  # ADR-0540/WP-120: which observer answers. "builtin" = the
+  # GuardrailsOrchestrator detector below, with its patterns compiled into
+  # this image. "nemo" = the NemoGuardrails server, whose patterns are
+  # data in a ConfigMap (gitops/charts/trustyai-config/files/nemo-rails/).
+  # Stays "builtin" until the nemo path is live-proven; flipping it is a
+  # one-value change, and flipping it back is the rollback.
+  backend: builtin
   detectorUrl: http://zuno-guardrails-smoke-service.zuno-ai-run.svc:8080
+  # Service name follows the operator's <cr-name>-service convention, the
+  # same shape detectorUrl already uses. Confirmed live before the backend
+  # is flipped - an unset or wrong URL disables the observer rather than
+  # erroring, so a typo here is silent by design.
+  nemoUrl: http://zuno-guardrails-service.zuno-ai-run.svc:8000
+  # Must match trustyai-config's nemoGuardrails.configId.
+  configId: zuno-observe
   timeoutSeconds: "10"
 
 # ADR-0103: LangGraph PostgreSQL checkpointer, for resumable workflow runs.

@@ -1,0 +1,55 @@
+# ADR-0540/WP-120: the guardrail POLICY, as data.
+#
+# These patterns are the whole of what used to be DETECTOR_PARAMS, a dict
+# literal in components/agent-runtime/app/clients/guardrails_client.py.
+# Moving them here is the point of this work package: policy that a
+# reviewer can read and change without touching, rebuilding and
+# redeploying the agent-runtime image.
+#
+# DELIBERATELY NO `models:` BLOCK. NeMo Guardrails only needs an LLM for
+# rails that reason (self-check, fact-checking, topical rails). Every rail
+# below is a pattern match executed by actions.py, so this config starts
+# and runs with no model attached. That is not an optimisation - the GPU
+# quota on this cluster is fully saturated (mig-1g.24gb 3/3, mig-2g.48gb
+# 2/2, ADR-0351/ADR-0537), so an LLM-backed observation on every exchange
+# would have no slice to run on. If a future rail genuinely needs a model,
+# that is an ADR-level cost decision, not a config edit.
+models: []
+
+rails:
+  input:
+    flows:
+      - zuno scan input
+  output:
+    flows:
+      - zuno scan output
+
+# Consumed by actions.py. Each entry is one detection class; `name` is
+# what surfaces as the detection label in zuno.guardrails_detections, so
+# these strings are a metrics contract - renaming one splits its series.
+custom_data:
+  zuno_patterns:
+    # --- PII. Named equivalents of the built-in detector's "email",
+    # "us-social-security-number" and "credit-card" classes, spelled out
+    # here so the definition is visible rather than hidden in an image.
+    - name: email
+      pattern: "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}"
+    - name: us-social-security-number
+      pattern: "\\b(?!000|666|9\\d\\d)\\d{3}-(?!00)\\d{2}-(?!0000)\\d{4}\\b"
+    - name: credit-card
+      pattern: "\\b(?:4\\d{12}(?:\\d{3})?|5[1-5]\\d{14}|3[47]\\d{13}|6(?:011|5\\d{2})\\d{12})\\b"
+
+    # --- Prompt-injection / jailbreak heuristics, carried over verbatim.
+    # The {0,2} filler window is load-bearing: the 2026-09-02 live test
+    # (run d9445c2a) proved "ignore all PREVIOUS instructions" slipped a
+    # single-filler pattern. Do not tighten it without re-running that.
+    - name: injection-ignore-instructions
+      pattern: "(?i)ignore\\s+(?:\\w+\\s+){0,2}(instructions|prompts|rules)"
+    - name: injection-disregard-rules
+      pattern: "(?i)disregard\\s+(?:\\w+\\s+){0,2}(instructions|guidelines|rules)"
+    - name: injection-persona-override
+      pattern: "(?i)you\\s+are\\s+now\\s+(DAN|developer\\s+mode)"
+    - name: injection-pretend-unrestricted
+      pattern: "(?i)pretend\\s+(you\\s+have\\s+no|there\\s+are\\s+no)\\s+(restrictions|rules|guidelines)"
+    - name: injection-system-prompt-leak
+      pattern: "(?i)system\\s*prompt\\s*[:=]"

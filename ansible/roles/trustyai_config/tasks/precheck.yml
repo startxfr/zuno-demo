@@ -91,3 +91,54 @@
               + (_tac_guardrails.resources[0].status.phase | default('(none)') | string)
               + ' conditions=' + (_tac_guardrails.resources[0].status.conditions | default([])
                 | map(attribute='type') | list | join(',') | default('(none)', true)) }}
+
+# ADR-0540/WP-120: the NeMo rails observer. Reported beside the
+# GuardrailsOrchestrator above rather than replacing it - the two coexist
+# and agent-runtime's guardrails.backend picks which one answers.
+- name: "trustyai-config | look up the NemoGuardrails rails server (WP-120)"
+  kubernetes.core.k8s_info:
+    api_version: trustyai.opendatahub.io/v1alpha1
+    kind: NemoGuardrails
+    namespace: "{{ trustyai_config_namespace | default('zuno-ai-run') }}"
+    name: "{{ trustyai_config_nemo_name | default('zuno-guardrails') }}"
+  register: _tac_nemo
+  ignore_errors: true
+
+# status.ca carries three independent CA-discovery booleans and
+# status.bbrPlugin one more; a NemoGuardrails that never becomes ready
+# usually says why there rather than in conditions, so surface them.
+- name: "trustyai-config | report NemoGuardrails state"
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'NemoGuardrails ' + (trustyai_config_nemo_name | default('zuno-guardrails'))
+         + ' absent (nemoGuardrails disabled or not synced yet).'
+         if (_tac_nemo.resources | default([]) | length) == 0
+         else 'NemoGuardrails ' + (trustyai_config_nemo_name | default('zuno-guardrails'))
+              + ': conditions=' + (_tac_nemo.resources[0].status.conditions | default([])
+                | map(attribute='type') | list | join(',') | default('(none)', true))
+              + ' odhTrustedCA=' + (_tac_nemo.resources[0].status.ca.odhTrustedCAFound
+                | default('unknown') | string)
+              + ' servingCA=' + (_tac_nemo.resources[0].status.ca.openshiftServingCAFound
+                | default('unknown') | string)
+              + ' bbrPlugin=' + (_tac_nemo.resources[0].status.bbrPlugin.bbrPluginFound
+                | default('unknown') | string) }}
+
+- name: "trustyai-config | look up the rails policy ConfigMap (WP-120)"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    namespace: "{{ trustyai_config_namespace | default('zuno-ai-run') }}"
+    name: "{{ trustyai_config_nemo_configmap | default('zuno-nemo-rails-observe') }}"
+  register: _tac_nemo_cm
+  ignore_errors: true
+
+# A NemoGuardrails whose ConfigMap is missing mounts an empty /app/config
+# and detects nothing, silently - exactly the failure an observer must not
+# hide. Report the key set, not just presence.
+- name: "trustyai-config | report rails policy ConfigMap state"
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'Rails policy ConfigMap absent - NemoGuardrails would mount an empty config and detect NOTHING.'
+         if (_tac_nemo_cm.resources | default([]) | length) == 0
+         else 'Rails policy ConfigMap keys: '
+              + (_tac_nemo_cm.resources[0].data | default({}) | list | sort | join(',')) }}

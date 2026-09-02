@@ -39,6 +39,25 @@ logger = logging.getLogger("agent_runtime.guardrails")
 GUARDRAILS_DETECTOR_URL = os.getenv("GUARDRAILS_DETECTOR_URL", "")
 GUARDRAILS_TIMEOUT_SECONDS = float(os.getenv("GUARDRAILS_TIMEOUT_SECONDS", "10"))
 
+# ADR-0540/WP-120. "builtin" = the GuardrailsOrchestrator built-in
+# detector with DETECTOR_PARAMS below; "nemo" = the NemoGuardrails server,
+# whose policy lives in a ConfigMap rendered from
+# gitops/charts/trustyai-config/files/nemo-rails/observe/. Default stays
+# "builtin" until the nemo path is live-proven: ADR-0534's whole posture
+# is measure-before-trust, and that applies to the observer too.
+GUARDRAILS_BACKEND = os.getenv("GUARDRAILS_BACKEND", "builtin").strip().lower()
+GUARDRAILS_NEMO_URL = os.getenv("GUARDRAILS_NEMO_URL", "")
+GUARDRAILS_CONFIG_ID = os.getenv("GUARDRAILS_CONFIG_ID", "zuno-observe")
+
+# BUILTIN BACKEND ONLY. ADR-0540 moves this policy into NeMo rails
+# config (custom_data.zuno_patterns); this dict is kept ONLY because
+# "builtin" remains the fallback backend and deleting it now would drop
+# the injection heuristics from that path - a real loss of coverage while
+# nemo is still unproven. It is deleted in the same commit that flips
+# guardrails.backend to "nemo" by default, once the live proof passes.
+# Until then the two must be kept in step: an edit here needs the same
+# edit in files/nemo-rails/observe/config.yml.
+#
 # Built-in detector params, live-verified 2026-09-02 against this
 # cluster's detector (quay.io/trustyai/guardrails-detector-built-in via
 # the operator): named PII patterns plus custom regexes for
@@ -101,6 +120,29 @@ async def _evaluate(
         for i, dets in enumerate(per_content) if isinstance(dets, list)
         for d in dets
     ]
+    _report(
+        detections=detections, contents=contents, run_id=run_id, agent=agent,
+        project_id=project_id, tool_names=tool_names,
+        retrieved_doc_count=retrieved_doc_count,
+    )
+
+
+def _report(
+    *,
+    detections: List[Dict[str, Any]],
+    contents: List[str],
+    run_id: str,
+    agent: str,
+    project_id: Optional[str],
+    tool_names: List[str],
+    retrieved_doc_count: int,
+) -> None:
+    """Log + record one evaluation outcome. Shared by every backend.
+
+    Both backends route through here so a backend switch can never change
+    the log shape or the metric semantics - only where the detections came
+    from.
+    """
     if detections:
         # WARNING on a hit so real-traffic detections are impossible to
         # miss in the log stream; the flagged exchange still reached the
@@ -121,6 +163,83 @@ async def _evaluate(
         record_guardrails_evaluation(agent, "clean")
 
 
+async def _evaluate_nemo(
+    *,
+    contents: List[str],
+    run_id: str,
+    agent: str,
+    project_id: Optional[str],
+    tool_names: List[str],
+    retrieved_doc_count: int,
+) -> None:
+    """Same contract as _evaluate, against the NemoGuardrails server.
+
+    The rails are pattern-only (config.yml carries no `models:` block), so
+    this costs no LLM inference - which matters, because the GPU quota on
+    this cluster is fully saturated. `options.rails` restricts execution
+    to the input rail and `log.activated_rails` is what carries the
+    detection names back; the generated message is ignored entirely.
+
+    Never raises: every failure path funnels to outcome "unavailable",
+    exactly as the builtin backend does.
+    """
+    detections: List[Dict[str, Any]] = []
+    try:
+        async with httpx.AsyncClient(timeout=GUARDRAILS_TIMEOUT_SECONDS) as client:
+            for index, content in enumerate(contents):
+                resp = await client.post(
+                    f"{GUARDRAILS_NEMO_URL}/v1/chat/completions",
+                    json={
+                        "config_id": GUARDRAILS_CONFIG_ID,
+                        "messages": [{"role": "user", "content": content}],
+                        "options": {
+                            "rails": ["input"],
+                            "log": {"activated_rails": True},
+                        },
+                    },
+                )
+                resp.raise_for_status()
+                detections.extend(
+                    {"content_index": index, "detection": name,
+                     "detection_type": "nemo-rail", "score": None}
+                    for name in _detection_names(resp.json())
+                )
+    except Exception as exc:  # noqa: BLE001 - observe-only: log, never propagate
+        logger.warning(
+            "guardrails evaluation unavailable (observe-only, response unaffected): "
+            "backend=nemo run_id=%s agent=%s: %s", run_id, agent, exc,
+        )
+        record_guardrails_evaluation(agent, "unavailable")
+        return
+
+    _report(
+        detections=detections, contents=contents, run_id=run_id, agent=agent,
+        project_id=project_id, tool_names=tool_names,
+        retrieved_doc_count=retrieved_doc_count,
+    )
+
+
+def _detection_names(payload: Any) -> List[str]:
+    """Pull zuno_scan's matched pattern names out of an activated-rails log.
+
+    Tolerant by design: the operand's log shape is not pinned by the CRD,
+    so an unrecognised payload yields no detections rather than an
+    exception. A silent zero here is visible as a flat detections series
+    on the zuno-trustyai dashboard, which is the intended failure mode for
+    an observer.
+    """
+    names: List[str] = []
+    log_block = (payload or {}).get("log") or {}
+    for rail in log_block.get("activated_rails") or []:
+        for executed in (rail or {}).get("executed_actions") or []:
+            if (executed or {}).get("action_name") != "zuno_scan":
+                continue
+            result = executed.get("return_value")
+            if isinstance(result, list):
+                names.extend(str(item) for item in result)
+    return names
+
+
 def observe_exchange(
     *,
     message: str,
@@ -134,15 +253,19 @@ def observe_exchange(
     """Fire-and-forget entry point for both chat paths (sync + SSE).
 
     Spawned AFTER the response is already being returned/streamed, so it
-    can never delay or alter it. A no-op when GUARDRAILS_DETECTOR_URL is
-    unset or there is nothing to evaluate.
+    can never delay or alter it. A no-op when the selected backend's URL
+    is unset or there is nothing to evaluate - so an unconfigured or
+    half-configured backend disables the observer instead of erroring on
+    every exchange.
     """
-    if not GUARDRAILS_DETECTOR_URL:
+    backend = _evaluate_nemo if GUARDRAILS_BACKEND == "nemo" else _evaluate
+    endpoint = GUARDRAILS_NEMO_URL if backend is _evaluate_nemo else GUARDRAILS_DETECTOR_URL
+    if not endpoint:
         return
     contents = [c for c in (message, reply) if c and c.strip()]
     if not contents:
         return
-    task = asyncio.create_task(_evaluate(
+    task = asyncio.create_task(backend(
         contents=contents,
         run_id=run_id,
         agent=agent,

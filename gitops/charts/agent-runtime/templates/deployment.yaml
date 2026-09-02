@@ -65,6 +65,14 @@ spec:
               value: {{ .Values.guardrails.detectorUrl | quote }}
             - name: GUARDRAILS_TIMEOUT_SECONDS
               value: {{ .Values.guardrails.timeoutSeconds | quote }}
+            # ADR-0540/WP-120: backend selector. "nemo" reads its policy
+            # from a ConfigMap instead of this image.
+            - name: GUARDRAILS_BACKEND
+              value: {{ .Values.guardrails.backend | quote }}
+            - name: GUARDRAILS_NEMO_URL
+              value: {{ .Values.guardrails.nemoUrl | quote }}
+            - name: GUARDRAILS_CONFIG_ID
+              value: {{ .Values.guardrails.configId | quote }}
             # ADR-0103: resumable-workflow checkpointing, optional -
             # secretKeyRef optional: true so the Deployment still comes up
             # before the ExternalSecret has synced, exactly like

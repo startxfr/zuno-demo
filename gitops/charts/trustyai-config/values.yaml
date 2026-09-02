@@ -30,6 +30,22 @@ guardrailsSmoke:
   enabled: true
   name: zuno-guardrails-smoke
 
+# ADR-0540/WP-120: the same guardrail policy the agent-runtime image
+# used to carry as a Python dict, expressed as NeMo rails config.
+# Disabled by default: flipping it on is a two-step change - deploy the
+# CR, prove the server answers, THEN point agent-runtime at it with
+# gitops/charts/agent-runtime/values.yaml guardrails.backend=nemo.
+# The GuardrailsOrchestrator smoke instance above is unaffected and
+# remains the fallback backend.
+nemoGuardrails:
+  enabled: false
+  name: zuno-guardrails
+  # Mounted at /app/config/<configId>; also the config_id the client
+  # sends on every request.
+  configId: zuno-observe
+  configMapName: zuno-nemo-rails-observe
+  replicas: 1
+
 # WP-108: one bounded Garak scan against the local qwen predictor,
 # proving the shipped scanner runs end-to-end and emits a report.
 garakSmoke:
