@@ -135,6 +135,96 @@ def test_run_acceptance_gate_reports_unparseable_output_loudly() -> None:
                 assert "could not parse" in str(exc)
 
 
+def _peft_agent(tmpdir: str, candidate_acc: float, waivers_yaml: str = "  waivers: []\n") -> pathlib.Path:
+    """A synthetic agent whose gate_config carries a file-based
+    peft_regression block (WP-114) - the repo-testable path, no oc."""
+    agent_dir = pathlib.Path(tmpdir) / "peft-agent"
+    agent_dir.mkdir()
+    base_f = pathlib.Path(tmpdir) / "base.json"
+    cand_f = pathlib.Path(tmpdir) / "cand.json"
+    base_f.write_text('{"results": {"mmlu_abstract_algebra": {"acc,none": 0.67}}}')
+    cand_f.write_text('{"results": {"mmlu_abstract_algebra": {"acc,none": %s}}}' % candidate_acc)
+    (agent_dir / "gate_config.yaml").write_text(
+        "scenario_threshold: 0.75\n"
+        "peft_regression:\n"
+        f"  base_file: {base_f}\n"
+        f"  candidate_file: {cand_f}\n"
+        "  max_regression: 0.05\n"
+        "  candidate_label: synthetic\n"
+        + waivers_yaml
+    )
+    (agent_dir / "run_acceptance_gate.py").write_text("# stub - mocked\n")
+    return pathlib.Path(tmpdir)
+
+
+def test_evaluate_fails_on_peft_regression_even_when_all_else_passes() -> None:
+    """WP-114: the wesh shape - acceptance suite perfect, capability
+    regression -0.12 - must now FAIL the gate."""
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = _peft_agent(tmpdir, candidate_acc=0.55)
+        with mock.patch.object(quality_gate, "EVALUATIONS_DIR", root), \
+             mock.patch.object(quality_gate, "run_acceptance_gate", return_value=_summary(1.0)):
+            result = quality_gate.evaluate("peft-agent")
+    assert result["peft_regression_ok"] is False
+    assert result["overall"] == "FAIL"
+    assert result["peft_regression"]["tasks"]["mmlu_abstract_algebra"]["ok"] is False
+
+
+def test_evaluate_passes_peft_within_threshold_and_reports_it() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = _peft_agent(tmpdir, candidate_acc=0.65)
+        with mock.patch.object(quality_gate, "EVALUATIONS_DIR", root), \
+             mock.patch.object(quality_gate, "run_acceptance_gate", return_value=_summary(1.0)):
+            result = quality_gate.evaluate("peft-agent")
+    assert result["peft_regression_ok"] is True
+    assert result["overall"] == "PASS"
+
+
+def test_evaluate_without_peft_block_carries_no_peft_keys() -> None:
+    """Absent block = byte-identical pre-WP-114 behavior for every agent."""
+    with mock.patch.object(quality_gate, "run_acceptance_gate", return_value=_summary(0.75)):
+        result = quality_gate.evaluate("tekos")
+    assert "peft_regression_ok" not in result
+    assert "peft_regression" not in result
+
+
+def test_evaluate_waiver_restores_pass_and_is_visible() -> None:
+    """The only sanctioned trade-off mechanism: a reasoned waiver flips the
+    metric to ok WITH a visible waived marker - never silently."""
+    waivers = (
+        "  waivers:\n"
+        "    - task: mmlu_abstract_algebra\n"
+        "      metric: acc,none\n"
+        "      max_regression: 0.15\n"
+        "      reason: accepted trade-off (test)\n"
+    )
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = _peft_agent(tmpdir, candidate_acc=0.55, waivers_yaml=waivers)
+        with mock.patch.object(quality_gate, "EVALUATIONS_DIR", root), \
+             mock.patch.object(quality_gate, "run_acceptance_gate", return_value=_summary(1.0)):
+            result = quality_gate.evaluate("peft-agent")
+    assert result["overall"] == "PASS"
+    metric = result["peft_regression"]["tasks"]["mmlu_abstract_algebra"]["metrics"]["acc,none"]
+    assert metric["waived"] is True and "trade-off" in metric["waiver_reason"]
+
+
+def test_evaluate_peft_load_failure_fails_closed() -> None:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = _peft_agent(tmpdir, candidate_acc=0.65)
+        cfg = pathlib.Path(root) / "peft-agent" / "gate_config.yaml"
+        cfg.write_text(cfg.read_text().replace("base_file", "base_job").replace(
+            str(pathlib.Path(tmpdir) / "base.json"), "no-such-lmevaljob"))
+        with mock.patch.object(quality_gate, "EVALUATIONS_DIR", root), \
+             mock.patch.object(quality_gate, "run_acceptance_gate", return_value=_summary(1.0)), \
+             mock.patch.object(quality_gate.peft_regression, "load_results_live",
+                               side_effect=RuntimeError("no such job")):
+            try:
+                quality_gate.evaluate("peft-agent")
+                raise AssertionError("expected QualityGateError")
+            except quality_gate.QualityGateError as exc:
+                assert "could not load base" in str(exc)
+
+
 TESTS = [
     test_load_gate_config_reads_the_real_tekos_config,
     test_load_gate_config_fails_closed_for_an_unknown_agent,
@@ -147,6 +237,11 @@ TESTS = [
     test_main_exits_2_for_an_unknown_agent,
     test_main_exits_0_on_pass_and_1_on_fail,
     test_run_acceptance_gate_reports_unparseable_output_loudly,
+    test_evaluate_fails_on_peft_regression_even_when_all_else_passes,
+    test_evaluate_passes_peft_within_threshold_and_reports_it,
+    test_evaluate_without_peft_block_carries_no_peft_keys,
+    test_evaluate_waiver_restores_pass_and_is_visible,
+    test_evaluate_peft_load_failure_fails_closed,
 ]
 
 

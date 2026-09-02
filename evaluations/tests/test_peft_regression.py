@@ -78,6 +78,48 @@ class CompareRules(unittest.TestCase):
         self.assertEqual(report["overall"], "FAIL")
 
 
+class Waivers(unittest.TestCase):
+    """WP-114: the only sanctioned way to accept a known regression."""
+
+    CAND = {"mmlu_abstract_algebra": {"acc,none": 0.60}}  # delta -0.12
+
+    def _waiver(self, **overrides):
+        w = {"task": "mmlu_abstract_algebra", "metric": "acc,none",
+             "max_regression": 0.15, "reason": "accepted trade-off (test)"}
+        w.update(overrides)
+        return w
+
+    def test_reasoned_waiver_flips_ok_and_stays_visible(self):
+        report = peft_regression.compare(BASE, self.CAND, 0.05,
+                                         waivers=[self._waiver()])
+        self.assertEqual(report["overall"], "PASS")
+        m = report["tasks"]["mmlu_abstract_algebra"]["metrics"]["acc,none"]
+        self.assertTrue(m["waived"])
+        self.assertIn("trade-off", m["waiver_reason"])
+
+    def test_waiver_without_reason_is_ignored(self):
+        report = peft_regression.compare(BASE, self.CAND, 0.05,
+                                         waivers=[self._waiver(reason="")])
+        self.assertEqual(report["overall"], "FAIL")
+
+    def test_delta_beyond_waiver_bound_still_fails(self):
+        report = peft_regression.compare(BASE, self.CAND, 0.05,
+                                         waivers=[self._waiver(max_regression=0.10)])
+        self.assertEqual(report["overall"], "FAIL")
+
+    def test_waiver_for_another_metric_has_no_effect(self):
+        report = peft_regression.compare(BASE, self.CAND, 0.05,
+                                         waivers=[self._waiver(metric="f1,none")])
+        self.assertEqual(report["overall"], "FAIL")
+
+    def test_waiver_never_touches_a_passing_metric(self):
+        cand = {"mmlu_abstract_algebra": {"acc,none": 0.70}}
+        report = peft_regression.compare(BASE, cand, 0.05,
+                                         waivers=[self._waiver()])
+        m = report["tasks"]["mmlu_abstract_algebra"]["metrics"]["acc,none"]
+        self.assertNotIn("waived", m)
+
+
 class EndToEnd(unittest.TestCase):
     def test_file_inputs_write_artifact_and_exit_code(self):
         with tempfile.TemporaryDirectory() as td:

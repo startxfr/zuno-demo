@@ -98,8 +98,26 @@ def load_results_live(job_name: str, namespace: str) -> dict:
     return _parse_results_payload(results)
 
 
-def compare(base: dict, candidate: dict, max_regression: float) -> dict:
-    """Task-by-task regression verdicts. Pure function, fully testable."""
+def _find_waiver(waivers, task: str, metric: str):
+    for w in waivers or []:
+        if w.get("task") == task and w.get("metric") == metric:
+            return w
+    return None
+
+
+def compare(base: dict, candidate: dict, max_regression: float,
+            waivers: list | None = None) -> dict:
+    """Task-by-task regression verdicts. Pure function, fully testable.
+
+    `waivers` (WP-114): [{task, metric, max_regression, reason}] - the only
+    sanctioned way to accept a known regression on an adopted model. A
+    failing metric matched by a waiver whose own (larger) max_regression
+    covers the delta becomes ok=True and is reported `waived` with its
+    reason - visible in every report, unlike a relaxed global threshold.
+    A waiver without a reason is invalid and ignored (an undocumented
+    trade-off is not an accepted one). Deltas beyond even the waiver's
+    bound still fail.
+    """
     tasks = {}
     overall_ok = True
     for task, base_metrics in sorted(base.items()):
@@ -122,10 +140,19 @@ def compare(base: dict, candidate: dict, max_regression: float) -> dict:
                 continue
             delta = cand_val - base_val
             ok = delta >= -max_regression
-            metrics[name] = {
+            entry = {
                 "base": base_val, "candidate": cand_val,
                 "delta": round(delta, 6), "ok": ok,
             }
+            if not ok:
+                waiver = _find_waiver(waivers, task, name)
+                if waiver and waiver.get("reason") and \
+                        delta >= -float(waiver.get("max_regression", 0.0)):
+                    entry["ok"] = True
+                    entry["waived"] = True
+                    entry["waiver_reason"] = waiver["reason"]
+                    ok = True
+            metrics[name] = entry
             task_ok = task_ok and ok
         tasks[task] = {"status": "COMPARED", "ok": task_ok, "metrics": metrics}
         overall_ok = overall_ok and task_ok

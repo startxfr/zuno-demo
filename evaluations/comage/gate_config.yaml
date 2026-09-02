@@ -89,3 +89,23 @@ tool_max_hallucination_rate: 0.10
 # A one-sided probe set makes both rates meaningless and is the easiest
 # way to end up with a scorer that always passes.
 tool_min_probes_per_side: 5
+
+# WP-114 (ADR-0534 Phase 3 / ADR-0107 fourth input): base-vs-candidate
+# capability-regression check, read by quality_gate.run_peft_regression
+# through the same load_gate_config dict as everything above. Comage
+# carries this block because it is wesh's primary consumer (ADR-0526
+# decision 7); tekos has none - its primary model IS the base. The jobs
+# are the standing LMEvalJob pair gitops/charts/models/values.yaml
+# maintains for exactly this comparison. Read failures fail the gate
+# closed (exit 2) - a configured check that cannot run never passes.
+#
+# Waivers are the ONLY sanctioned way to accept a known regression:
+# per-task/metric, with a mandatory reason, reported as WAIVED in every
+# gate run - never by raising max_regression itself.
+peft_regression:
+  candidate_label: qwen35-9b-wesh
+  base_job: qwen35-9b-mmlu
+  candidate_job: qwen35-9b-wesh-mmlu
+  namespace: zuno-ai-run
+  max_regression: 0.05
+  waivers: []

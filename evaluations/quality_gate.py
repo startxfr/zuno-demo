@@ -52,10 +52,47 @@ from typing import Any, Dict, Optional
 import yaml
 
 EVALUATIONS_DIR = pathlib.Path(__file__).resolve().parent
+sys.path.insert(0, str(EVALUATIONS_DIR))
+
+import peft_regression  # noqa: E402  (WP-114: the ADR-0534 Phase 3 half)
 
 
 class QualityGateError(Exception):
     pass
+
+
+def run_peft_regression(cfg: Dict[str, Any]) -> Dict[str, Any]:
+    """WP-114 (ADR-0534 Phase 3 / ADR-0108's declared LM-Eval input): runs
+    the base-vs-candidate capability-regression comparison from a
+    `peft_regression:` gate_config block. Config is data, not code - the
+    block names the LMEvalJobs (live path) or result files (repo-testable
+    path), the threshold, and any per-task waivers. Any failure to LOAD
+    either side raises QualityGateError: a configured check that cannot
+    run must fail closed (exit 2), never silently pass.
+    """
+    def _load(side: str) -> Dict[str, Any]:
+        file_key, job_key = f"{side}_file", f"{side}_job"
+        try:
+            if cfg.get(file_key):
+                return peft_regression.load_results_file(cfg[file_key])
+            if cfg.get(job_key):
+                return peft_regression.load_results_live(
+                    cfg[job_key], cfg.get("namespace", "zuno-ai-run"))
+        except Exception as exc:  # noqa: BLE001 - re-raised as gate wiring error
+            raise QualityGateError(
+                f"peft_regression: could not load {side} results "
+                f"({cfg.get(file_key) or cfg.get(job_key)!r}): {exc}"
+            ) from exc
+        raise QualityGateError(
+            f"peft_regression config block needs '{file_key}' or '{job_key}'")
+
+    report = peft_regression.compare(
+        _load("base"), _load("candidate"),
+        float(cfg.get("max_regression", peft_regression.DEFAULT_MAX_REGRESSION)),
+        waivers=cfg.get("waivers"),
+    )
+    report["candidate"] = cfg.get("candidate_label")
+    return report
 
 
 def load_gate_config(agent: str) -> Dict[str, Any]:
@@ -115,9 +152,21 @@ def evaluate(agent: str, candidate: Optional[str] = None) -> Dict[str, Any]:
     scenario_ok = scenario_rate >= threshold
     security_ok = summary.get("security_checks", {}).get("result") == "PASS"
     gate_checks_ok = summary.get("gate_checks", {}).get("result") == "PASS"
-    overall_ok = scenario_ok and security_ok and gate_checks_ok
 
-    return {
+    # WP-114: the optional fourth input - ADR-0534 Phase 3's capability-
+    # regression check. Absent block = check not configured = no effect
+    # (every pre-WP-114 agent config is untouched); present block = the
+    # verdict is AND-ed like the three inputs above, and mlops's
+    # stage_evaluate inherits it through this same function.
+    peft_report = None
+    peft_ok = True
+    if config.get("peft_regression"):
+        peft_report = run_peft_regression(config["peft_regression"])
+        peft_ok = peft_report["overall"] == "PASS"
+
+    overall_ok = scenario_ok and security_ok and gate_checks_ok and peft_ok
+
+    result = {
         "agent": agent,
         "candidate": candidate,
         "scenario_rate": scenario_rate,
@@ -136,6 +185,10 @@ def evaluate(agent: str, candidate: Optional[str] = None) -> Dict[str, Any]:
         # through is additive: no existing key changes meaning.
         "summary": summary,
     }
+    if peft_report is not None:
+        result["peft_regression_ok"] = peft_ok
+        result["peft_regression"] = peft_report
+    return result
 
 
 def main() -> int:
@@ -160,6 +213,15 @@ def main() -> int:
     )
     print(f"  security_checks: {'PASS' if result['security_ok'] else 'FAIL'} (100% mandatory)")
     print(f"  gate_checks: {'PASS' if result['gate_checks_ok'] else 'FAIL'} (100% mandatory)")
+    if "peft_regression_ok" in result:
+        waived = sum(
+            1 for t in result["peft_regression"]["tasks"].values()
+            for m in (t.get("metrics") or {}).values() if m.get("waived"))
+        note = f", {waived} waived" if waived else ""
+        print(
+            f"  peft_regression: {'PASS' if result['peft_regression_ok'] else 'FAIL'} "
+            f"(ADR-0534 Phase 3{note})"
+        )
     print(f"OVERALL: {result['overall']}")
     print(json.dumps(result))
 
