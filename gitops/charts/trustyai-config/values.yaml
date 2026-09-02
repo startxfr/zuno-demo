@@ -64,6 +64,10 @@ garakSecurity:
   probes: dan.Dan_11_0,dan.DUDE
   generations: 5
   deadlineSeconds: 3600
+  # WP-113: end-of-scan push of per-probe/detector attack success rate to
+  # the shared collector so the zuno-trustyai Grafana dashboard can show
+  # it. Best-effort - a push failure never fails the scan.
+  otelMetricsUrl: http://zuno-otel-collector-collector.zuno-monitoring.svc:4318/v1/metrics
 
 # WP-109: RAGAS retrieval-quality evaluation against the REAL rag-service
 # /v1/search path, judged by the local qwen3.6 model. Image built

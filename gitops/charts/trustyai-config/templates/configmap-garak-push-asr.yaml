@@ -1,0 +1,87 @@
+{{- /*
+WP-113: parses garak's report.jsonl after a security scan and pushes the
+per-probe/detector attack success rate (1 - passed/total) as a one-shot
+OTLP/HTTP JSON gauge to the shared collector, so the zuno-trustyai
+Grafana dashboard can render the security signal. Mounted as a file
+rather than inlined in the Job's shell heredoc: python braces and Helm
+templating coexist badly. stdlib-only (urllib) - the garak image carries
+no OTel SDK. Best-effort by contract: the Job invokes it with
+`|| echo WARNING` so a push failure never fails the scan.
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.garakSecurity.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: garak-push-asr
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: lm-eval
+    app.kubernetes.io/component: garak-security
+data:
+  push_asr.py: |
+    import glob
+    import json
+    import os
+    import time
+    import urllib.request
+
+    URL = os.environ["OTEL_METRICS_URL"]
+    MODEL = os.environ.get("GARAK_MODEL_NAME", "unknown")
+
+
+    def attr(key, value):
+        return {"key": key, "value": {"stringValue": str(value)} }
+
+
+    points = []
+    for path in sorted(glob.glob("/tmp/garak-security*.report.jsonl")):
+        with open(path) as fh:
+            for line in fh:
+                try:
+                    entry = json.loads(line)
+                except ValueError:
+                    continue
+                if entry.get("entry_type") != "eval" or not entry.get("total"):
+                    continue
+                asr = 1.0 - float(entry["passed"]) / float(entry["total"])
+                points.append((asr, entry.get("probe", ""), entry.get("detector", "")))
+
+    if not points:
+        raise SystemExit("no eval entries found in the garak report - nothing to push")
+
+    now = str(time.time_ns())
+    data_points = [
+        {
+            "timeUnixNano": now,
+            "asDouble": asr,
+            "attributes": [attr("probe", probe), attr("detector", detector), attr("model", MODEL)],
+        }
+        for asr, probe, detector in points
+    ]
+    body = {
+        "resourceMetrics": [
+            {
+                "resource": {"attributes": [attr("service.name", "garak")]},
+                "scopeMetrics": [
+                    {
+                        "scope": {"name": "garak"},
+                        "metrics": [
+                            {
+                                "name": "zuno.garak_attack_success_rate",
+                                "gauge": {"dataPoints": data_points},
+                            }
+                        ],
+                    }
+                ],
+            }
+        ]
+    }
+    req = urllib.request.Request(
+        URL,
+        data=json.dumps(body).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    urllib.request.urlopen(req, timeout=10)
+    print("pushed %d zuno.garak_attack_success_rate points" % len(points))
+{{- end }}

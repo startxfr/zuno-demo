@@ -48,9 +48,26 @@ spec:
                 --report_prefix /tmp/garak-security
               echo "--- garak security report ---"
               ls -l /tmp/garak-security* 2>/dev/null || true
+              # WP-113: push per-probe/detector attack success rate as a
+              # one-shot OTLP gauge so the zuno-trustyai Grafana dashboard
+              # can render it. Best-effort: a push failure never fails the
+              # scan (the report above stays the source of truth).
+              python3 /tmp/push_asr.py || echo "WARNING: ASR metric push failed (scan unaffected)"
           env:
             - name: OPENAICOMPATIBLE_API_KEY
               value: eval-unused
+            - name: OTEL_METRICS_URL
+              value: {{ .Values.garakSecurity.otelMetricsUrl | quote }}
+            - name: GARAK_MODEL_NAME
+              value: {{ .Values.garakSecurity.modelName | quote }}
+          volumeMounts:
+            - name: push-asr
+              mountPath: /tmp/push_asr.py
+              subPath: push_asr.py
+      volumes:
+        - name: push-asr
+          configMap:
+            name: garak-push-asr
           resources:
             requests:
               cpu: 500m

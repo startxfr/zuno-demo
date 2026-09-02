@@ -28,12 +28,18 @@ Env (all have working in-cluster defaults):
   QUESTIONS         "||"-separated override of the built-in question set
   TOP_K             default 4
   REPORT_PATH       default /tmp/ragas-report.json
+  OTEL_EXPORTER_OTLP_ENDPOINT
+                    default the shared zuno-monitoring collector; scores
+                    are pushed as one-shot OTLP gauges (WP-113) so the
+                    zuno-trustyai Grafana dashboard can render them -
+                    best-effort, a push failure never fails the run
 """
 from __future__ import annotations
 
 import json
 import os
 import sys
+import time
 
 import httpx
 
@@ -56,6 +62,44 @@ DEFAULT_QUESTIONS = [
     "Comment fonctionne l'authentification Keycloak ?",
 ]
 QUESTIONS = [q for q in os.getenv("QUESTIONS", "").split("||") if q.strip()] or DEFAULT_QUESTIONS
+
+OTEL_ENDPOINT = os.getenv(
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "http://zuno-otel-collector-collector.zuno-monitoring.svc:4318",
+)
+
+
+def push_gauges_otlp(gauge_name: str, points: list[tuple[float, dict[str, str]]]) -> None:
+    """WP-113: one-shot OTLP/HTTP JSON gauge push to the shared collector,
+    hand-rolled because this image carries no OTel SDK. Best-effort by
+    contract: a push failure logs and returns - it never fails the eval.
+    The collector's prometheus exporter re-exposes the gauge (dots become
+    underscores: zuno.ragas_score -> zuno_ragas_score) for the scrape
+    window; dashboards read it back with last_over_time()."""
+    now = str(time.time_ns())
+    body = {"resourceMetrics": [{
+        "resource": {"attributes": [
+            {"key": "service.name", "value": {"stringValue": "trustyai-eval"}},
+        ]},
+        "scopeMetrics": [{
+            "scope": {"name": "trustyai-eval"},
+            "metrics": [{
+                "name": gauge_name,
+                "gauge": {"dataPoints": [
+                    {"timeUnixNano": now, "asDouble": float(value),
+                     "attributes": [{"key": k, "value": {"stringValue": str(v)}}
+                                    for k, v in attrs.items()]}
+                    for value, attrs in points
+                ]},
+            }],
+        }],
+    }]}
+    try:
+        resp = httpx.post(f"{OTEL_ENDPOINT}/v1/metrics", json=body, timeout=10)
+        resp.raise_for_status()
+        print(f"pushed {len(points)} {gauge_name} gauge points to {OTEL_ENDPOINT}")
+    except Exception as exc:  # noqa: BLE001 - observe-only, never fail the run
+        print(f"WARNING: OTLP metric push failed (run unaffected): {exc}")
 
 
 def retrieve(client: httpx.Client, question: str) -> list[str]:
@@ -174,6 +218,18 @@ def main() -> int:
     with open(REPORT_PATH, "w") as f:
         f.write(out + "\n")
     print(f"ragas report written to {REPORT_PATH}")
+
+    # WP-113: surface the same scores on the zuno-trustyai Grafana
+    # dashboard. Labels stay bounded: the metric name vocabulary is
+    # ragas's own, and questions come from the small configured set.
+    points = [
+        (score, {"metric": metric_name, "question": s["question"][:80]})
+        for s, row in zip(samples, scores)
+        for metric_name, score in row.items()
+        if isinstance(score, (int, float)) and score == score  # drop NaN
+    ]
+    if points:
+        push_gauges_otlp("zuno.ragas_score", points)
     return 0
 
 
