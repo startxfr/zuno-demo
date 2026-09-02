@@ -23,7 +23,11 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    # Same wave as trustroot.yaml/clusterimagepolicy.yaml - see that
+    # file's comment (live finding: none of these three CR types
+    # populate a health-check-recognizable status, so wave-splitting
+    # them hangs ArgoCD's sync on a Progressing wait that never resolves).
+    argocd.argoproj.io/sync-wave: "-5"
 spec:
   policy-controller:
     cosign:

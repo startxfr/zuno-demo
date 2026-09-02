@@ -83,6 +83,42 @@
   retries: 60
   delay: 10
 
+# Live finding, WP-111 (2026-09-02): policy-controller-operator.v1.0.2's
+# ClusterImagePolicy CRD ships a broken conversion webhook - its
+# clientConfig points at a Service/namespace ("webhook.policy-controller-
+# operator") that never exists, and even patched to the real Service
+# (policy-controller-manager-service, same pod as the "-webhook-service"
+# Service, same cert) the pod's webhook server doesn't actually implement
+# the /convert route (context-deadline-exceeded / "resource not found").
+# v1alpha1 (this CRD's storage version) and v1beta1 have IDENTICAL spec
+# shapes, so there is nothing to actually convert - switching the
+# strategy to None serves both versions as-is with no transformation,
+# sidestepping the non-functional webhook entirely. User-approved cluster
+# mutation (2026-09-02); not GitOps-managed (a CRD's conversion strategy
+# isn't something gitops/charts/rhtas-config can own), so reapplied here
+# idempotently on every install - a fresh deploy or an operator
+# reconcile that resets the CRD would otherwise silently reintroduce the
+# trap.
+- name: "rhtas_config | check the ClusterImagePolicy CRD's current conversion strategy"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: clusterimagepolicies.policy.sigstore.dev
+  register: _rhtas_config_cip_crd
+
+- name: "rhtas_config | fix the ClusterImagePolicy CRD's broken conversion webhook (strategy: None)"
+  kubernetes.core.k8s_json_patch:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: clusterimagepolicies.policy.sigstore.dev
+    patch:
+      - op: replace
+        path: /spec/conversion/strategy
+        value: None
+      - op: remove
+        path: /spec/conversion/webhook
+  when: (_rhtas_config_cip_crd.resources[0].spec.conversion.strategy | default('')) != 'None'
+
 # ADR-0535/WP-111: the ansible-managed Keycloak CA ConfigMap - Trust
 # already established for zuno-rhtas by WP-110's rhtas role; the signing
 # Jobs in zuno-ai-build need their own copy for the same reason

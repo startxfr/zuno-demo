@@ -12,7 +12,14 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-10"
+    # Same wave as clusterimagepolicy.yaml/policycontroller.yaml -
+    # deliberately NOT sequential. Live finding, WP-111: neither this
+    # operator's TrustRoot nor ClusterImagePolicy CR ever populates
+    # status.conditions, so ArgoCD's wave-boundary health wait ("waiting
+    # for healthy state of...") blocks forever on Progressing if these
+    # are split across waves - there's no real ordering dependency
+    # (trustRootRef only needs the object to exist, not be "healthy").
+    argocd.argoproj.io/sync-wave: "-5"
 spec:
   remote:
     mirror: {{ .Values.policyOperand.trustRoot.tufMirrorUrl | quote }}
