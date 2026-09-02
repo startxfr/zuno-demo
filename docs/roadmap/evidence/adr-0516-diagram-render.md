@@ -143,6 +143,60 @@ method rather than from a fresh guess at the allowlist.
 
 - **The egress `NetworkPolicy` is still not written** - see the section
   above for what was tried, what it broke, and how to resume.
+- **Arkos does not reliably call `generate_diagram` at all** - see the
+  follow-up section below. Not a render-service defect, not yet
+  root-caused.
+
+## Follow-up (2026-09-02): two separate defects, not one
+
+The 2026-09-01/02 day2-stresstest runs surfaced two distinct problems under
+`diagram_generation`, only the first of which is the render-failure defect
+above.
+
+**1. A real parse-error message gap (fixed, `83c59185`).** Confirmed live in
+`components/diagram-render/server.js` logs: a *hard* Mermaid grammar parse
+exception (e.g. unescaped parentheses inside a node label -
+`C[Scale New RS Up (new Pods)]`) throws synchronously from
+`mermaid-cli`/Puppeteer rather than producing a rendered error placeholder -
+`findRenderIssue()` above was built for that OTHER failure shape (a clean
+HTTP 200 carrying a picture of an error), not this one, so a hard parse
+exception fell straight into the generic catch-all, which replaced the real
+diagnostic with `"invalid or unrenderable Mermaid source"`. The one-shot
+self-correction retry in `components/agent-runtime/app/graph/nodes.py`
+(`_resolve_diagram_generation_call`) had nothing specific to act on and
+failed the same way twice. Fixed by returning `err.message` (mermaid-cli's
+own parser diagnostic - line, offending token, a caret at the column; no
+puppeteer internals or file paths in it, confirmed safe to expose) plus a
+static hint on parse-error-shaped messages ("wrap the label in double
+quotes"). Re-verified live: Tekos's `diagram-k8s_relations` and Comage's
+`diagram-sales_process_flow` both went from FAIL to PASS on the next
+stresstest run.
+
+**2. OPEN - Arkos does not reliably call `generate_diagram` at all.**
+Unrelated to the fix above, and not a render-service defect - confirmed live
+2026-09-02 by replaying, with a real `consultant-01` token, the two Arkos
+prompts that have now failed the same way across three separate stresstest
+runs (`diagram-dat_with_diagram`, `diagram-k8s_relations_schema` -
+`evaluations/arkos/stress_test.py::DIAGRAM_GENERATION_PROMPTS`). Both calls
+return `HTTP 200`, `images: []`, and a reply containing a hand-written
+` ```mermaid ` fenced block - complete with its own "Alt text" line mimicking
+the tool's own output shape - meaning the model wrote what `generate_diagram`
+would have returned instead of ever invoking it. No tool call means no
+error and no retry, and nothing in `agent-runtime`/`arkos-bff` logs, which
+is why a log search across the whole stresstest window (both an earlier and
+a later run) came back completely empty for Arkos while Comage's and Tekos's
+calls left a normal trace.
+
+The one Arkos diagram prompt that passes consistently
+(`diagram-k8s_relations_diagram`) is phrased as an imperative ("Draw a
+precise diagram... Use boxes and arrows with legible labels"); the two that
+fail either bury the diagram ask inside a larger document-drafting request
+(`dat_with_diagram`) or say "schema" instead of "diagram"
+(`k8s_relations_schema`) - suggestive of a wording sensitivity in whatever
+decides to actually reach for the tool, not yet compared side by side
+against Arkos's own system prompt/task declaration or against Tekos's and
+Comage's (neither of which shows this gap on their own single diagram
+prompt). Not yet root-caused; no code changed for this item.
 
 ## Related closeout changes
 
