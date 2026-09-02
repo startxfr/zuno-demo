@@ -84,8 +84,15 @@ spec:
       # non-master in the zone - carries nvidia.com/gpu=true:PreferNoSchedule
       # (ADR-0351, keeping platform pods off the inference nodes), so the
       # +100 affinity bonus and the taint penalty apply to that SAME node
-      # and feed one score, while the master carries neither. Affinity
-      # alone cannot win that comparison.
+      # and feed one score, while the master carries neither.
+      #
+      # DO NOT try raising the weight. It is already at the maximum
+      # (preferredDuringScheduling caps at 100), and the weight is not the
+      # ceiling anyway: the two signals are scored by DIFFERENT scheduler
+      # plugins, and in kube-scheduler's defaults TaintToleration outranks
+      # NodeAffinity. A PreferNoSchedule taint on the only alternative node
+      # therefore beats any node-affinity preference expressible, at any
+      # weight. This is structural, not a tuning knob.
       #
       # Making it work needs a toleration for that taint. That was put to
       # the user and DECLINED: a 36-second no-GPU Job is a weak reason to
