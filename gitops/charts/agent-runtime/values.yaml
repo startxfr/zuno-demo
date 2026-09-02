@@ -72,6 +72,16 @@ mcpGatewayUrl: http://mcp-gateway.zuno-ai-run.svc:8080
 # ai-gateway chart; this service only needs its URL.
 aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
 
+# ADR-0534/WP-109: observe-only guardrails. The URL is the TrustyAI
+# built-in detector Service the trustyai-config chart's
+# GuardrailsOrchestrator deploys (same namespace). Empty = feature off -
+# agent-runtime then never calls out and logs nothing. Detections are
+# LOGGED only; nothing is ever blocked on them (the observe-to-block
+# transition is a separate, later decision per ADR-0534).
+guardrails:
+  detectorUrl: http://zuno-guardrails-smoke-service.zuno-ai-run.svc:8080
+  timeoutSeconds: "10"
+
 # ADR-0103: LangGraph PostgreSQL checkpointer, for resumable workflow runs.
 # Unset/empty CHECKPOINT_PG* falls back to in-memory checkpointing (not
 # resumable across restarts) - see app/main.py's own fallback logic. Once

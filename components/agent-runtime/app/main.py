@@ -24,7 +24,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from app import conversations, project_binding, projects
 from app.auth import CallerIdentity, validate_token
-from app.clients import project_memory_client
+from app.clients import guardrails_client, project_memory_client
 from app.graph import history as history_mod
 from app.graph.build import GraphFactory, validate_shapes
 from app.graph.classification import _escalate
@@ -1230,6 +1230,20 @@ async def agent_chat(
         if write_lock_holder is not None:
             await conversations.release_write_lock(conversations_pool, run_id=run_id, holder_sub=write_lock_holder)
 
+    # ADR-0534/WP-109: observe-only guardrails evaluation of the converged
+    # exchange, spawned fire-and-forget AFTER the response below is already
+    # decided - it can never delay, block or alter it. Detections land in
+    # the agent_runtime.guardrails log stream only.
+    guardrails_client.observe_exchange(
+        message=final_state.get("message", ""),
+        reply=final_state.get("reply", ""),
+        run_id=run_id,
+        agent=agent_def.name,
+        project_id=resolved_project_id,
+        tool_results=final_state.get("tool_results"),
+        retrieved_doc_count=len(final_state.get("retrieved_docs") or []),
+    )
+
     return ChatResponse(
         reply=final_state.get("reply", ""),
         citations=final_state.get("citations", []),
@@ -1463,6 +1477,32 @@ async def _stream_chat(
                 graph_recorder.source_mode = source_mode
 
             yield _sse("done", {"citations": citations, "images": images, "source_mode": source_mode})
+
+            # ADR-0534/WP-109: observe-only guardrails on the streaming
+            # path - the common one in production, so skipping it would
+            # leave guardrails observing almost no real traffic. The
+            # stream never materializes final_state, so the converged
+            # exchange is read back from the checkpoint (same
+            # channel_values pattern extract_memory_endpoint uses). The
+            # "done" event above is already sent: nothing here can delay
+            # or alter what the client received. Failures only log.
+            try:
+                tuple_ = await graph.checkpointer.aget_tuple(config)
+                channel_values = (tuple_.checkpoint.get("channel_values") or {}) if tuple_ else {}
+                guardrails_client.observe_exchange(
+                    message=channel_values.get("message", ""),
+                    reply=channel_values.get("reply", ""),
+                    run_id=run_id,
+                    agent=agent,
+                    project_id=project_id,
+                    tool_results=channel_values.get("tool_results"),
+                    retrieved_doc_count=len(channel_values.get("retrieved_docs") or []),
+                )
+            except Exception as exc:  # noqa: BLE001 - observe-only
+                logger.warning(
+                    "guardrails checkpoint read failed (observe-only, stream unaffected): "
+                    "run_id=%s: %s", run_id, exc,
+                )
         finally:
             if conversations_pool is not None and write_lock_holder is not None:
                 await conversations.release_write_lock(

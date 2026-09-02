@@ -62,7 +62,12 @@ spec:
               from botocore.config import Config
 
               bucket = {{ $.Values.modelsS3.bucket | quote }}
-              prefix = {{ printf "%s/%s" $.Values.modelsS3.prefix $.Values.servedModelName | quote }}
+              # ADR-0534/WP-109: per-job S3 model dir (jobs now benchmark
+              # more than the chart's own primary model - qwen3.5-9b and
+              # its wesh PEFT variant for the base-vs-candidate
+              # comparison); falls back to the chart-wide servedModelName
+              # for the original qwen3.6 job.
+              prefix = {{ printf "%s/%s" $.Values.modelsS3.prefix (.s3ModelName | default $.Values.servedModelName) | quote }}
               dest = {{ $tokenizerDir | quote }}
               files = ["tokenizer.json", "tokenizer_config.json", "vocab.json", "merges.txt"]
 

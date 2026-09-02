@@ -232,6 +232,8 @@ rather than a runtime service credential.
 | `AGENTS_DIR` | `/app/agents` | Directory of `<name>/agent.okf.md` OKF bundles, loaded by `app/registry.py`'s `AgentRegistry` at import time |
 | `CHECKPOINT_PGHOST` / `CHECKPOINT_PGPORT` / `CHECKPOINT_PGDATABASE` / `CHECKPOINT_PGUSER` / `CHECKPOINT_PGPASSWORD` | unset | LangGraph checkpointer DSN (separate vars, never a combined URI - see `app/main.py:_checkpoint_conninfo`). All four of host/database/user/password must be set or the app falls back to in-memory checkpointing (not resumable across restarts) - the documented default for local dev and every test. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318` | where `app/telemetry.py` sends traces |
+| `GUARDRAILS_DETECTOR_URL` | unset (feature off) | ADR-0534/WP-109 observe-only guardrails: the TrustyAI built-in detector Service the converged exchange (prompt + reply) is POSTed to, fire-and-forget, after the response is already on its way. Detections are logged (`agent_runtime.guardrails`), never blocked on. |
+| `GUARDRAILS_TIMEOUT_SECONDS` | `10` | timeout for that detector call (a hang costs the user nothing - the task is detached) |
 
 ## Observability
 

@@ -52,3 +52,16 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
+{{- if .Values.lmEval.enabled }}
+    # ADR-0534/WP-109: admits eval-class pods (LMEvalJob + the Garak/eval
+    # Jobs in gitops/charts/trustyai-config, all labeled lm-eval) so the
+    # PEFT/LoRA base-vs-candidate comparison can benchmark this model -
+    # same rule networkpolicy-qwen.yaml has carried since ADR-0108/WP-10.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: lm-eval
+      ports:
+        - protocol: TCP
+          port: 8000
+{{- end }}

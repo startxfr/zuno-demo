@@ -155,6 +155,7 @@ jobs:
           python3 tests/test_auth.py
           python3 tests/test_bundle_signing.py
           python3 tests/test_checkpointing.py
+          python3 tests/test_guardrails.py
       - name: mcp-gateway tests
         working-directory: components/mcp-gateway
         run: |
@@ -239,6 +240,9 @@ jobs:
       - name: evaluations routing report tests (ADR-0304)
         working-directory: evaluations
         run: python3 tests/test_routing_report.py
+      - name: evaluations PEFT regression gate tests (ADR-0534/WP-109)
+        working-directory: evaluations
+        run: python3 tests/test_peft_regression.py
 
   quality-gate:
     # ADR-0107 (roadmap WP-10): a real PASS/FAIL quality verdict needs a

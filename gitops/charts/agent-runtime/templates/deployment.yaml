@@ -59,6 +59,12 @@ spec:
               value: {{ .Values.mcpGatewayUrl | quote }}
             - name: AI_GATEWAY_URL
               value: {{ .Values.aiGatewayUrl | quote }}
+            # ADR-0534/WP-109: observe-only guardrails detector (empty
+            # value disables the hook entirely - see values.yaml).
+            - name: GUARDRAILS_DETECTOR_URL
+              value: {{ .Values.guardrails.detectorUrl | quote }}
+            - name: GUARDRAILS_TIMEOUT_SECONDS
+              value: {{ .Values.guardrails.timeoutSeconds | quote }}
             # ADR-0103: resumable-workflow checkpointing, optional -
             # secretKeyRef optional: true so the Deployment still comes up
             # before the ExternalSecret has synced, exactly like

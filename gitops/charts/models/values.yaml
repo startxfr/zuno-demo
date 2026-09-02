@@ -1204,6 +1204,49 @@ lmEval:
       datasetHfRepo: hails/mmlu_no_train
       datasetHfConfig: abstract_algebra
 
+    # ADR-0534/WP-109 (Phase 3): the PEFT/LoRA base-vs-candidate pair.
+    # Same task, same bounded scope, same mesh-native http rule as the
+    # qwen3.6 job above - two runs whose status.results feed
+    # evaluations/peft_regression.py to prove the wesh fine-tune
+    # (ADR-0526) did not regress the base's general capability. s3ModelName
+    # points the tokenizer prefetch at each model's own S3 dir (the wesh
+    # dir carries the same tokenizer family, prefetched separately so
+    # neither job depends on the other's cache).
+    - name: qwen35-9b-mmlu
+      model: local-completions
+      trustLocalCA: false
+      s3ModelName: qwen3.5-9b
+      modelArgs:
+        - name: base_url
+          value: http://qwen35-9b-kserve-workload-svc.zuno-ai-run.svc:8000/v1/completions
+        - name: model
+          value: qwen3.5-9b
+        - name: tokenizer
+          value: /cache/tokenizers/qwen3.5-9b
+      taskNames: [mmlu_abstract_algebra]
+      allowOnline: false
+      allowCodeExecution: false
+      datasetCachePvc: lmeval-hf-cache
+      datasetHfRepo: hails/mmlu_no_train
+      datasetHfConfig: abstract_algebra
+    - name: qwen35-9b-wesh-mmlu
+      model: local-completions
+      trustLocalCA: false
+      s3ModelName: qwen3.5-9b-wesh
+      modelArgs:
+        - name: base_url
+          value: http://qwen35-9b-wesh-kserve-workload-svc.zuno-ai-run.svc:8000/v1/completions
+        - name: model
+          value: qwen3.5-9b-wesh
+        - name: tokenizer
+          value: /cache/tokenizers/qwen3.5-9b-wesh
+      taskNames: [mmlu_abstract_algebra]
+      allowOnline: false
+      allowCodeExecution: false
+      datasetCachePvc: lmeval-hf-cache
+      datasetHfRepo: hails/mmlu_no_train
+      datasetHfConfig: abstract_algebra
+
 # ADR-0524 (WP-085), TEMPORAIRE: autorise OpenShift Lightspeed a appeler le
 # predictor qwen directement, pendant que le plan de controle MaaS ne sait plus
 # rapprocher une identite d'une MaaSSubscription (403, WP-076). Regression
