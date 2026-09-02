@@ -70,6 +70,29 @@ spec:
         app.kubernetes.io/name: lm-eval
         app.kubernetes.io/component: model-quality-gate
     spec:
+      # Keep these prefetches off the control-plane nodes (2026-09-03).
+      # This is the lever the Replace=true comment above names: on demo222
+      # the masters are schedulable (control-plane,master,worker) on 99.4
+      # GiB devices while the plain workers have 249 GiB, so ordinary
+      # workload images share a disk with etcd. All three prefetch Jobs
+      # were landing on ip-10-18-31-92 - the exact node that crossed the
+      # eviction threshold 22 seconds after they were created.
+      #
+      # PREFERRED, not required, and the distinction is load-bearing:
+      # pvc-lmeval-cache's PV is zone-bound to eu-west-2a, and that zone
+      # holds exactly two nodes - the pressured master and one worker. A
+      # required rule would make all three Jobs unschedulable the moment
+      # that single worker is unavailable, trading a disk problem for an
+      # availability one. A preference moves them in practice and keeps
+      # the master as fallback.
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: DoesNotExist
       restartPolicy: Never
       initContainers:
         - name: tokenizer-prefetch
