@@ -1,0 +1,22 @@
+apiVersion: v2
+name: rhtas
+description: >-
+  Red Hat Trusted Artifact Signer operator (rhtas-operator, Red Hat
+  Operators catalog - OLM Subscription, channel/catalog discovered at
+  Ansible run time - ADR-0048) and its Securesign operand
+  (Fulcio/Rekor/CTLog/Trillian/TUF, WP-110/ADR-0535). rhtas-operator's CSV
+  supports AllNamespaces only (confirmed live against this cluster's
+  PackageManifest: OwnNamespace/SingleNamespace/MultiNamespace all
+  unsupported) - so unlike gitops/charts/lightspeed this chart has no
+  `project` dependency and no dedicated OperatorGroup: the operator is
+  subscribed into the shared openshift-operators namespace, same Pattern B
+  shape as gitops/charts/mariadb and gitops/charts/postgresql. The
+  Securesign operand lives in the dedicated zuno-rhtas namespace instead
+  (owned by gitops/charts/namespaces, not this chart).
+type: application
+version: 0.1.0
+appVersion: "1.4.3"
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"

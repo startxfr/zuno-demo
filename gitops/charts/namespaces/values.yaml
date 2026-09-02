@@ -297,6 +297,29 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
 
+  # ADR-0535/WP-110: rhtas-operator's CSV supports AllNamespaces only (no
+  # OwnNamespace/SingleNamespace/MultiNamespace - confirmed live against
+  # this cluster's PackageManifest), so unlike openshift-lightspeed below
+  # there is no CSV-mandated operand namespace to mirror. The operator
+  # subscription itself is subscribed into the shared openshift-operators
+  # namespace (Pattern B, same shape as gitops/charts/mariadb/postgresql);
+  # this namespace holds only the Securesign operand (Fulcio/Rekor/CTLog/
+  # Trillian/TUF) and is repo-owned the same way zuno-aap is.
+  - name: zuno-rhtas
+    displayName: Zuno Infra RHTAS
+    description: >-
+      Red Hat Trusted Artifact Signer operand - Fulcio, Rekor, CTLog,
+      Trillian and TUF (ADR-0535).
+    # zuno-ai-build: the supply-chain-signer Job (WP-111) calls Fulcio/
+    # Rekor/CTLog in-cluster to sign/verify the 14 first-party images.
+    allowedFromNamespaces:
+      - zuno-ai-build
+    # Deliberately NOT istio-injection: enabled - operator-owned workloads,
+    # same posture as zuno-aap/openshift-lightspeed (a sidecar would have
+    # to be re-patched on every Securesign reconcile).
+    extraLabels:
+      zuno.io/managed: "true"
+
   # ADR-0524: OpenShift Lightspeed's operator namespace. The operator's CSV
   # is OwnNamespace-only and its OLSConfig operand is a mandatory singleton
   # that lives here, so the namespace is a permanent, CR-bearing part of the

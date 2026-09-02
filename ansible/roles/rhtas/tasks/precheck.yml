@@ -1,0 +1,30 @@
+---
+# State detection (never fails). d1 (Securesign operand) not yet covered -
+# WP-110's operand steps are added to install.yml/precheck.yml in a
+# follow-up commit once the CRD schema is inspected live.
+- name: "rhtas | check the rhtas Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-rhtas-d0"
+
+- name: "rhtas | look up the rhtas-operator controller-manager"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: openshift-operators
+    name: rhtas-operator-controller-manager
+  register: _rhtas_operator_deployment_lookup
+
+- name: "rhtas | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _state_check_result
+        and (_rhtas_operator_deployment_lookup.resources | default([]) | length) > 0
+        and (_rhtas_operator_deployment_lookup.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list
+             | first | default('False')) == 'True'
+      }}
+
+- name: "rhtas | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

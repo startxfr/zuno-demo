@@ -1,0 +1,36 @@
+---
+# Red Hat Trusted Artifact Signer operator install (Red Hat Operators
+# catalog); the Securesign operand (Fulcio/Rekor/CTLog/Trillian/TUF) is a
+# separate Application (application-d1.yaml). No dedicated OperatorGroup:
+# rhtas-operator's CSV supports AllNamespaces only (confirmed live
+# 2026-09-02), subscribed into the shared openshift-operators namespace -
+# same Pattern B shape as gitops/apps/mariadb/postgresql, see
+# gitops/charts/rhtas/values.yaml. ADR-0535/WP-110.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-rhtas-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
+    argocd.argoproj.io/sync-wave: "-90"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/rhtas
+    helm:
+      releaseName: zuno-rhtas-d0
+      values: |
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-rhtas
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

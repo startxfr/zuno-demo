@@ -1,0 +1,46 @@
+# Shared by two ArgoCD Applications: operator (zuno-rhtas-d0) renders the
+# rhtas-operator Subscription, securesignOperand (zuno-rhtas-d1) renders
+# the Securesign CR and its supporting resources. Both default false so
+# `helm template`/`helm lint` render nothing.
+securesignOperand:
+  enabled: false
+
+# subscription.name/operator.name/operator.channel/operator.source.name are
+# all discovered at run time by ansible/roles/rhtas/tasks/install.yml and
+# set via gitops_app_extra_helm_values (ADR-0048) - the known package name
+# is "rhtas-operator" (Red Hat Operators catalog), but it's still resolved
+# from the live cluster's PackageManifest rather than hardcoded here, same
+# as mariadb/postgresql/jobset/kueue. templates/checks.yaml fails the
+# render if any is still empty once operator.enabled is true.
+#
+# No OperatorGroup: rhtas-operator's CSV supports AllNamespaces ONLY
+# (OwnNamespace/SingleNamespace/MultiNamespace all confirmed unsupported
+# against a live cluster's PackageManifest, 2026-09-02) - so, same as
+# gitops/charts/mariadb and gitops/charts/postgresql, it's subscribed into
+# the shared openshift-operators namespace and relies on OpenShift's own
+# default global OperatorGroup there rather than a dedicated one. Unlike
+# gitops/charts/lightspeed, this chart has no `project` dependency: the
+# Securesign operand's own namespace (zuno-rhtas) is declared and owned by
+# gitops/charts/namespaces instead (ADR-0535's Design decisions).
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: rhtas
+    app: rhtas
+  subscription:
+    enabled: true
+    name: ""
+    namespace: openshift-operators
+    operator:
+      # Must be set explicitly, same name as subscription.name: the vendored
+      # `operator` chart defaults this to "codeready-workspaces", silently
+      # suppressing the fallback to subscription.name.
+      name: ""
+      channel: ""
+      installPlanApproval: Automatic  # startx chart defaults to Manual
+      source:
+        name: ""
+        namespace: openshift-marketplace

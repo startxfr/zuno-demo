@@ -1,0 +1,102 @@
+---
+# Package name/default channel confirmed live against this cluster's
+# redhat-operators catalog on 2026-09-02: "rhtas-operator", defaultChannel
+# "stable" (also published literally as its own channel name), InstallModes
+# AllNamespaces only (OwnNamespace/SingleNamespace/MultiNamespace all
+# unsupported) - so, unlike ansible/roles/lightspeed/tasks/install.yml,
+# this role has no dedicated namespace/OperatorGroup step: subscribed into
+# the shared openshift-operators namespace, same Pattern B shape as
+# ansible/roles/mariadb/tasks/install.yml. Still discover catalog/channel
+# from the PackageManifest rather than hardcoding them (ADR-0048).
+- name: "rhtas | look up the {{ rhtas_package_name | default('rhtas-operator') }} PackageManifest"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ rhtas_package_name | default('rhtas-operator') }}"
+  register: _rhtas_pkg_info
+
+- name: "rhtas | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named '{{ rhtas_package_name | default('rhtas-operator') }}'
+      was found in openshift-marketplace. Check `oc get packagemanifest -n
+      openshift-marketplace | grep -i rhtas` for the correct package name on
+      this cluster (it must be published by the Red Hat Operators catalog).
+      Re-run with `-e rhtas_package_name=<name>` or update this role's
+      default if the catalog on this cluster differs.
+  when: (_rhtas_pkg_info.resources | default([]) | length) == 0
+
+- name: "rhtas | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    _rhtas_catalog_source: "{{ _rhtas_pkg_info.resources[0].status.catalogSource }}"
+    _rhtas_channel: >-
+      {{
+        'stable'
+        if (_rhtas_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
+        else (_rhtas_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+
+- name: "rhtas | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ rhtas_package_name | default('rhtas-operator') }}'
+      (catalog '{{ _rhtas_catalog_source }}') has no "stable" channel and
+      no defaultChannel to fall back to. Published channels:
+      {{ _rhtas_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when: _rhtas_channel | length == 0
+
+- name: "rhtas | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ rhtas_package_name | default('rhtas-operator') }}',
+      catalog '{{ _rhtas_catalog_source }}', channel '{{ _rhtas_channel }}'.
+
+# The Subscription (operator.enabled) lives in gitops/charts/rhtas, applied
+# via the separate zuno-rhtas-d0 Application. No dedicated OperatorGroup:
+# same reasoning as mariadb/postgresql (AllNamespaces-only CSV).
+- name: "rhtas | apply the RHTAS GitOps Application (d0: operator)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "rhtas"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-rhtas-d0"
+    gitops_app_extra_helm_values:
+      operator:
+        enabled: true
+        subscription:
+          name: "{{ rhtas_package_name | default('rhtas-operator') }}"
+          operator:
+            name: "{{ rhtas_package_name | default('rhtas-operator') }}"
+            channel: "{{ _rhtas_channel }}"
+            source:
+              name: "{{ _rhtas_catalog_source }}"
+    gitops_app_wait_retries: 60
+    gitops_app_wait_delay: 15
+
+# rhtas-operator is a native (non-Helm-operator) controller - its CSV
+# Deployment IS the real controller-manager, no MariadbOperator-style
+# activation CR needed before Securesign CRs can be reconciled. Confirm
+# its Deployment name live rather than assuming - the CSV's own strategy
+# spec names it; this was confirmed against this cluster as
+# "rhtas-operator-controller-manager".
+- name: "rhtas | wait for the rhtas-operator controller-manager to become Available"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: openshift-operators
+    name: rhtas-operator-controller-manager
+  register: _rhtas_operator_deployment
+  until: >-
+    (_rhtas_operator_deployment.resources | default([]) | length) > 0 and
+    (_rhtas_operator_deployment.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list
+     | first | default('False')) == 'True'
+  retries: 60
+  delay: 10
+
+- name: "rhtas | operator install summary"
+  ansible.builtin.debug:
+    msg: >-
+      rhtas-operator controller-manager is Available in openshift-operators.
+      Securesign operand steps (WP-110 d1) not yet run by this role version.

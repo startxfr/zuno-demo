@@ -1,0 +1,27 @@
+---
+# Reverse of install.yml. Subscription name is runtime-discovered (listed
+# below), not a fixed constant. d1 (Securesign operand) not yet covered -
+# added in a follow-up commit alongside install.yml's d1 steps.
+- name: "rhtas | find the rhtas-operator Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    namespace: openshift-operators
+  register: _rhtas_subscriptions
+
+- name: "rhtas | remove the discovered operator(s) (owned CRDs, then CSV, then Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: "{{ _rhtas_subscription.metadata.name }}"
+    operator_namespace: openshift-operators
+  loop: >-
+    {{ _rhtas_subscriptions.resources | default([])
+       | selectattr('metadata.name', 'search', 'rhtas') | list }}
+  loop_control:
+    loop_var: _rhtas_subscription
+    label: "{{ _rhtas_subscription.metadata.name }}"
+
+- name: "rhtas | delete the rhtas ArgoCD Application (d0: cascades the remaining operator install)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-rhtas-d0"
