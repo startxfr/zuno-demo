@@ -86,6 +86,14 @@ scenarios:
     # streaming-shape assertion, now real capability coverage instead of
     # an incidental "summarize" ask.
     message: "Structure a demo for the OpenShift AI GPU sizing project"
+    # 2026-09-02: demo_node itself is a single, tool-less model call (light,
+    # not the heavy draft/reflect chain) - but it shares the same model-
+    # serving path as everything else, including DAT-drafting bulk traffic,
+    # and the handler's 30s default repeatedly raced that contention. A
+    # comment in run_scenarios.py's chat_streaming_sse already (incorrectly)
+    # claimed this scenario "declares 180s for exactly this reason" - it
+    # never actually did until now. Matches scenarios 7/10's own value.
+    timeout_seconds: 180
 
   - id: 10
     title: Drafting a DAT includes live Confluence context in its citations
