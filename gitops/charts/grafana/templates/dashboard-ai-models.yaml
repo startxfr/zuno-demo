@@ -18,6 +18,13 @@
 # that panel's own description for detail. The "BFF requests by agent" panel that dashboard also carried moved to
 # dashboard-agents-tools-rag.yaml, which is the more natural home for
 # per-agent traffic once that dashboard exists.
+#
+# Layout reworked 2026-09-02 into collapsible rows (same treatment as
+# dashboard-data.yaml, exported from Grafana's UI and converted to its
+# "Dashboard v2" schema by Grafana's own v2beta1 API - see dashboard-
+# data.yaml's header for why that's safe against this cluster's
+# grafana-operator v5.24.0 / Grafana 13.0.1). Row grouping and panel
+# content otherwise unchanged from the classic-schema version.
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -35,303 +42,1724 @@ spec:
   folder: "Zuno Platform"
   json: |
     {
-      "uid": "zuno-ai-models",
-      "title": "AI models & serving",
-      "description": "ADR-0029/ADR-0413: gateway model traffic, semantic cache, vLLM serving internals and GPU (DCGM) health, filterable by provider/model/outcome.",
-      "tags": ["zuno", "models", "vllm", "gpu"],
-      "timezone": "browser",
-      "schemaVersion": 39,
-      "time": {"from": "now-6h", "to": "now"},
-      "refresh": "30s",
-      "links": [
-        {"type": "dashboards", "tags": ["zuno"], "asDropdown": true, "keepTime": true, "title": "Zuno dashboards"}
-      ],
-      "templating": {"list": [
+      "annotations": [
         {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(zuno_model_calls_total, provider)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "provider", "options": [],
-          "query": "label_values(zuno_model_calls_total, provider)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(zuno_model_calls_total{provider=~\"$provider\"}, model)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "model", "options": [],
-          "query": "label_values(zuno_model_calls_total{provider=~\"$provider\"}, model)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(zuno_model_calls_total, outcome)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "outcome", "options": [],
-          "query": "label_values(zuno_model_calls_total, outcome)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
-        },
-        {
-          "current": {"text": "All", "value": "$__all"},
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "definition": "label_values(vllm:num_requests_running, model_name)",
-          "hide": 0, "includeAll": true, "allValue": ".*", "multi": true,
-          "name": "served_model", "options": [],
-          "query": "label_values(vllm:num_requests_running, model_name)",
-          "refresh": 2, "regex": "", "sort": 1, "type": "query"
+          "kind": "AnnotationQuery",
+          "spec": {
+            "query": {
+              "kind": "DataQuery",
+              "group": "grafana",
+              "version": "v0",
+              "datasource": {
+                "name": "-- Grafana --"
+              },
+              "spec": {}
+            },
+            "enable": true,
+            "hide": true,
+            "iconColor": "rgba(0, 211, 255, 1)",
+            "name": "Annotations & Alerts",
+            "builtIn": true,
+            "legacyOptions": {
+              "type": "dashboard"
+            }
+          }
         }
-      ]},
-      "panels": [
-        {
-          "id": 1,
-          "title": "Model calls (rate, by provider/model/outcome)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (provider, model, outcome) (rate(zuno_model_calls_total{provider=~\"$provider\", model=~\"$model\", outcome=~\"$outcome\"}[5m]))", "legendFormat": "{{`{{provider}}`}}/{{`{{model}}`}} ({{`{{outcome}}`}})"}
+      ],
+      "cursorSync": "Off",
+      "description": "ADR-0029/ADR-0413: gateway model traffic, semantic cache, vLLM serving internals and GPU (DCGM) health, filterable by provider/model/outcome.",
+      "editable": true,
+      "elements": {
+        "panel-1": {
+          "kind": "Panel",
+          "spec": {
+            "id": 1,
+            "title": "Model calls (rate, by provider/model/outcome)",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum by (provider, model, outcome) (rate(zuno_model_calls_total{provider=~\"$provider\", model=~\"$model\", outcome=~\"$outcome\"}[5m]))",
+                          "legendFormat": "{{`{{provider}}`}}/{{`{{model}}`}} ({{`{{outcome}}`}})"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {},
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-10": {
+          "kind": "Panel",
+          "spec": {
+            "id": 10,
+            "title": "vLLM: time to first token (p50/p95)",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "histogram_quantile(0.50, sum by (le, model_name) (rate(vllm:time_to_first_token_seconds_bucket{model_name=~\"$served_model\"}[5m])))",
+                          "legendFormat": "p50 {{`{{model_name}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  },
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:time_to_first_token_seconds_bucket{model_name=~\"$served_model\"}[5m])))",
+                          "legendFormat": "p95 {{`{{model_name}}`}}"
+                        }
+                      },
+                      "refId": "B",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "s"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-11": {
+          "kind": "Panel",
+          "spec": {
+            "id": 11,
+            "title": "vLLM: time per output token (p95)",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:time_per_output_token_seconds_bucket{model_name=~\"$served_model\"}[5m])))",
+                          "legendFormat": "{{`{{model_name}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "s"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-12": {
+          "kind": "Panel",
+          "spec": {
+            "id": 12,
+            "title": "vLLM: end-to-end request latency (p95)",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:e2e_request_latency_seconds_bucket{model_name=~\"$served_model\"}[5m])))",
+                          "legendFormat": "{{`{{model_name}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "s"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-13": {
+          "kind": "Panel",
+          "spec": {
+            "id": 13,
+            "title": "vLLM: token throughput (prompt + generation)",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum by (model_name) (rate(vllm:prompt_tokens_total{model_name=~\"$served_model\"}[5m]))",
+                          "legendFormat": "{{`{{model_name}}`}} (prompt)"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  },
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum by (model_name) (rate(vllm:generation_tokens_total{model_name=~\"$served_model\"}[5m]))",
+                          "legendFormat": "{{`{{model_name}}`}} (generation)"
+                        }
+                      },
+                      "refId": "B",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {},
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-14": {
+          "kind": "Panel",
+          "spec": {
+            "id": 14,
+            "title": "vLLM: KV-cache usage",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "vllm:gpu_cache_usage_perc{model_name=~\"$served_model\"}",
+                          "legendFormat": "{{`{{model_name}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "percentunit"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-15": {
+          "kind": "Panel",
+          "spec": {
+            "id": 15,
+            "title": "vLLM: completed requests by finish reason",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum by (model_name, finished_reason) (rate(vllm:request_success_total{model_name=~\"$served_model\"}[5m]))",
+                          "legendFormat": "{{`{{model_name}}`}} ({{`{{finished_reason}}`}})"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "reqps"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-16": {
+          "kind": "Panel",
+          "spec": {
+            "id": 16,
+            "title": "GPU utilization",
+            "description": "gpu-operator's own nvidia-dcgm-exporter ServiceMonitor - single full GPU (no MIG slicing active on this cluster today).",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_UTIL)",
+                          "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "percent"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-17": {
+          "kind": "Panel",
+          "spec": {
+            "id": 17,
+            "title": "GPU framebuffer used / free",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_USED)",
+                          "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (used)"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  },
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE)",
+                          "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (free)"
+                        }
+                      },
+                      "refId": "B",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "decmbytes"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-18": {
+          "kind": "Panel",
+          "spec": {
+            "id": 18,
+            "title": "GPU temperature",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP)",
+                          "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "celsius"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-19": {
+          "kind": "Panel",
+          "spec": {
+            "id": 19,
+            "title": "GPU power draw",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_POWER_USAGE)",
+                          "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "watt"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-2": {
+          "kind": "Panel",
+          "spec": {
+            "id": 2,
+            "title": "Tokens consumed (rate, by kind)",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum by (provider, model, kind) (rate(zuno_model_tokens_total{provider=~\"$provider\", model=~\"$model\"}[5m]))",
+                          "legendFormat": "{{`{{provider}}`}}/{{`{{model}}`}} ({{`{{kind}}`}})"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {},
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-20": {
+          "kind": "Panel",
+          "spec": {
+            "id": 20,
+            "title": "Traces: slow model_call (>2s)",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "tempo",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "tempo"
+                        },
+                        "spec": {
+                          "limit": 20,
+                          "query": "{name=\"model_call\" && duration > 2s}",
+                          "queryType": "traceql",
+                          "tableType": "traces"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "table",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {},
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-21": {
+          "kind": "Panel",
+          "spec": {
+            "id": 21,
+            "title": "Traces: model_call errors",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "tempo",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "tempo"
+                        },
+                        "spec": {
+                          "limit": 20,
+                          "query": "{name=\"model_call\" && status=error}",
+                          "queryType": "traceql",
+                          "tableType": "traces"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "table",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {},
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-22": {
+          "kind": "Panel",
+          "spec": {
+            "id": 22,
+            "title": "Estimated $ saved by semantic cache",
+            "description": "Cache hit rate x average cost per call - known-empty by design until SEMANTIC_CACHE_ENABLED=true is set on the ai-gateway Deployment (confirmed live 2026-08-22: currently false, zero zuno_semantic_cache_lookups_total series). Flipping that flag is a real behavior change (response freshness/cost trade-off) outside this dashboard's scope.",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum(rate(zuno_semantic_cache_lookups_total{outcome=\"hit\"}[5m])) * (sum(rate(zuno_model_cost_usd_total[5m])) / sum(rate(zuno_model_calls_total[5m])))"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "currencyUSD"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-3": {
+          "kind": "Panel",
+          "spec": {
+            "id": 3,
+            "title": "Estimated cost (USD/s, by provider and model)",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum by (provider, model) (rate(zuno_model_cost_usd_total{provider=~\"$provider\", model=~\"$model\"}[5m]))",
+                          "legendFormat": "{{`{{provider}}`}}/{{`{{model}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "currencyUSD"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-4": {
+          "kind": "Panel",
+          "spec": {
+            "id": 4,
+            "title": "Latency p50/p95 (by provider/model)",
+            "description": "The histogram is live (ai-gateway/app/telemetry.py's create_histogram(\"zuno.model_call_duration_ms\", unit=\"ms\", ...)), but the OTel-to-Prometheus translator appends a unit suffix on top of the already-unit-suffixed name, so the real series is zuno_model_call_duration_ms_milliseconds_bucket, not the _ms_bucket name you'd expect - verified live against Thanos 2026-08-22.",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "histogram_quantile(0.50, sum by (le, provider, model) (rate(zuno_model_call_duration_ms_milliseconds_bucket{provider=~\"$provider\", model=~\"$model\"}[5m])))",
+                          "legendFormat": "p50 {{`{{provider}}`}}/{{`{{model}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  },
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "histogram_quantile(0.95, sum by (le, provider, model) (rate(zuno_model_call_duration_ms_milliseconds_bucket{provider=~\"$provider\", model=~\"$model\"}[5m])))",
+                          "legendFormat": "p95 {{`{{provider}}`}}/{{`{{model}}`}}"
+                        }
+                      },
+                      "refId": "B",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "ms",
+                    "links": [
+                      {
+                        "targetBlank": true,
+                        "title": "View slow model_call traces in Tempo",
+                        "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22model_call%5C%22%20%26%26%20duration%20%3E%202s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D"
+                      }
+                    ]
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-5": {
+          "kind": "Panel",
+          "spec": {
+            "id": 5,
+            "title": "Semantic cache lookups (rate, by outcome)",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum by (outcome) (rate(zuno_semantic_cache_lookups_total{model=~\"$model\"}[5m]))",
+                          "legendFormat": "{{`{{outcome}}`}}"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {},
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-6": {
+          "kind": "Panel",
+          "spec": {
+            "id": 6,
+            "title": "Semantic cache hit ratio",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum(rate(zuno_semantic_cache_lookups_total{outcome=\"hit\", model=~\"$model\"}[5m])) / sum(rate(zuno_semantic_cache_lookups_total{model=~\"$model\"}[5m]))"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "stat",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "percentunit"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-7": {
+          "kind": "Panel",
+          "spec": {
+            "id": 7,
+            "title": "Error ratio",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum(rate(zuno_model_calls_total{outcome=\"error\", provider=~\"$provider\", model=~\"$model\"}[5m])) / sum(rate(zuno_model_calls_total{provider=~\"$provider\", model=~\"$model\"}[5m]))"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "stat",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "percentunit",
+                    "thresholds": {
+                      "mode": "",
+                      "steps": [
+                        {
+                          "value": null,
+                          "color": "green"
+                        },
+                        {
+                          "value": 0.02,
+                          "color": "orange"
+                        },
+                        {
+                          "value": 0.1,
+                          "color": "red"
+                        }
+                      ]
+                    }
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-8": {
+          "kind": "Panel",
+          "spec": {
+            "id": 8,
+            "title": "Total model call volume",
+            "description": "",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum(rate(zuno_model_calls_total{provider=~\"$provider\", model=~\"$model\", outcome=~\"$outcome\"}[5m]))"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "stat",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {
+                    "unit": "reqps"
+                  },
+                  "overrides": []
+                }
+              }
+            }
+          }
+        },
+        "panel-9": {
+          "kind": "Panel",
+          "spec": {
+            "id": 9,
+            "title": "vLLM: requests running / waiting",
+            "description": "gitops/charts/models/templates/servicemonitor-vllm.yaml - the three classic InferenceServices' own /metrics.",
+            "links": [],
+            "data": {
+              "kind": "QueryGroup",
+              "spec": {
+                "queries": [
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum by (model_name) (vllm:num_requests_running{model_name=~\"$served_model\"})",
+                          "legendFormat": "{{`{{model_name}}`}} (running)"
+                        }
+                      },
+                      "refId": "A",
+                      "hidden": false
+                    }
+                  },
+                  {
+                    "kind": "PanelQuery",
+                    "spec": {
+                      "query": {
+                        "kind": "DataQuery",
+                        "group": "prometheus",
+                        "version": "v0",
+                        "datasource": {
+                          "name": "prometheus"
+                        },
+                        "spec": {
+                          "expr": "sum by (model_name) (vllm:num_requests_waiting{model_name=~\"$served_model\"})",
+                          "legendFormat": "{{`{{model_name}}`}} (waiting)"
+                        }
+                      },
+                      "refId": "B",
+                      "hidden": false
+                    }
+                  }
+                ],
+                "transformations": [],
+                "queryOptions": {}
+              }
+            },
+            "vizConfig": {
+              "kind": "VizConfig",
+              "group": "timeseries",
+              "version": "",
+              "spec": {
+                "options": {},
+                "fieldConfig": {
+                  "defaults": {},
+                  "overrides": []
+                }
+              }
+            }
+          }
+        }
+      },
+      "layout": {
+        "kind": "RowsLayout",
+        "spec": {
+          "rows": [
+            {
+              "kind": "RowsLayoutRow",
+              "spec": {
+                "collapse": false,
+                "layout": {
+                  "kind": "AutoGridLayout",
+                  "spec": {
+                    "columnWidthMode": "standard",
+                    "items": [
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-1"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-2"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-3"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-4"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-7"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-8"
+                          }
+                        }
+                      }
+                    ],
+                    "maxColumnCount": 3,
+                    "rowHeightMode": "standard"
+                  }
+                },
+                "title": "Overview"
+              }
+            },
+            {
+              "kind": "RowsLayoutRow",
+              "spec": {
+                "collapse": true,
+                "layout": {
+                  "kind": "AutoGridLayout",
+                  "spec": {
+                    "columnWidthMode": "standard",
+                    "items": [
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-5"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-22"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-6"
+                          }
+                        }
+                      }
+                    ],
+                    "maxColumnCount": 3,
+                    "rowHeightMode": "standard"
+                  }
+                },
+                "title": "Semantic cache"
+              }
+            },
+            {
+              "kind": "RowsLayoutRow",
+              "spec": {
+                "collapse": true,
+                "layout": {
+                  "kind": "AutoGridLayout",
+                  "spec": {
+                    "columnWidthMode": "standard",
+                    "items": [
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-9"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-10"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-11"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-12"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-13"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-14"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-15"
+                          }
+                        }
+                      }
+                    ],
+                    "maxColumnCount": 3,
+                    "rowHeightMode": "standard"
+                  }
+                },
+                "title": "vLLM serving"
+              }
+            },
+            {
+              "kind": "RowsLayoutRow",
+              "spec": {
+                "collapse": true,
+                "layout": {
+                  "kind": "AutoGridLayout",
+                  "spec": {
+                    "columnWidthMode": "standard",
+                    "items": [
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-16"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-17"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-18"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-19"
+                          }
+                        }
+                      }
+                    ],
+                    "maxColumnCount": 3,
+                    "rowHeightMode": "standard"
+                  }
+                },
+                "title": "GPU (DCGM)"
+              }
+            },
+            {
+              "kind": "RowsLayoutRow",
+              "spec": {
+                "collapse": true,
+                "layout": {
+                  "kind": "AutoGridLayout",
+                  "spec": {
+                    "columnWidthMode": "standard",
+                    "items": [
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-20"
+                          }
+                        }
+                      },
+                      {
+                        "kind": "AutoGridLayoutItem",
+                        "spec": {
+                          "element": {
+                            "kind": "ElementReference",
+                            "name": "panel-21"
+                          }
+                        }
+                      }
+                    ],
+                    "maxColumnCount": 2,
+                    "rowHeightMode": "standard"
+                  }
+                },
+                "title": "Traces"
+              }
+            }
           ]
+        }
+      },
+      "links": [
+        {
+          "title": "Zuno dashboards",
+          "type": "dashboards",
+          "icon": "",
+          "tooltip": "",
+          "tags": [
+            "zuno"
+          ],
+          "asDropdown": true,
+          "targetBlank": false,
+          "includeVars": false,
+          "keepTime": true
+        }
+      ],
+      "liveNow": false,
+      "preload": false,
+      "tags": [
+        "zuno",
+        "models",
+        "vllm",
+        "gpu"
+      ],
+      "timeSettings": {
+        "timezone": "browser",
+        "from": "now-6h",
+        "to": "now",
+        "autoRefresh": "30s",
+        "autoRefreshIntervals": [
+          "5s",
+          "10s",
+          "30s",
+          "1m",
+          "5m",
+          "15m",
+          "30m",
+          "1h",
+          "2h",
+          "1d"
+        ],
+        "hideTimepicker": false,
+        "fiscalYearStartMonth": 0
+      },
+      "title": "AI models & serving",
+      "variables": [
+        {
+          "kind": "QueryVariable",
+          "spec": {
+            "name": "provider",
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "hide": "dontHide",
+            "refresh": "onTimeRangeChanged",
+            "skipUrlSync": false,
+            "query": {
+              "kind": "DataQuery",
+              "group": "prometheus",
+              "version": "v0",
+              "datasource": {
+                "name": "prometheus"
+              },
+              "spec": {
+                "__legacyStringValue": "label_values(zuno_model_calls_total, provider)"
+              }
+            },
+            "regex": "",
+            "sort": "alphabeticalAsc",
+            "definition": "label_values(zuno_model_calls_total, provider)",
+            "options": [],
+            "multi": true,
+            "includeAll": true,
+            "allValue": ".*",
+            "allowCustomValue": true
+          }
         },
         {
-          "id": 2,
-          "title": "Tokens consumed (rate, by kind)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (provider, model, kind) (rate(zuno_model_tokens_total{provider=~\"$provider\", model=~\"$model\"}[5m]))", "legendFormat": "{{`{{provider}}`}}/{{`{{model}}`}} ({{`{{kind}}`}})"}
-          ]
+          "kind": "QueryVariable",
+          "spec": {
+            "name": "model",
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "hide": "dontHide",
+            "refresh": "onTimeRangeChanged",
+            "skipUrlSync": false,
+            "query": {
+              "kind": "DataQuery",
+              "group": "prometheus",
+              "version": "v0",
+              "datasource": {
+                "name": "prometheus"
+              },
+              "spec": {
+                "__legacyStringValue": "label_values(zuno_model_calls_total{provider=~\"$provider\"}, model)"
+              }
+            },
+            "regex": "",
+            "sort": "alphabeticalAsc",
+            "definition": "label_values(zuno_model_calls_total{provider=~\"$provider\"}, model)",
+            "options": [],
+            "multi": true,
+            "includeAll": true,
+            "allValue": ".*",
+            "allowCustomValue": true
+          }
         },
         {
-          "id": 3,
-          "title": "Estimated cost (USD/s, by provider and model)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
-          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (provider, model) (rate(zuno_model_cost_usd_total{provider=~\"$provider\", model=~\"$model\"}[5m]))", "legendFormat": "{{`{{provider}}`}}/{{`{{model}}`}}"}
-          ]
+          "kind": "QueryVariable",
+          "spec": {
+            "name": "outcome",
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "hide": "dontHide",
+            "refresh": "onTimeRangeChanged",
+            "skipUrlSync": false,
+            "query": {
+              "kind": "DataQuery",
+              "group": "prometheus",
+              "version": "v0",
+              "datasource": {
+                "name": "prometheus"
+              },
+              "spec": {
+                "__legacyStringValue": "label_values(zuno_model_calls_total, outcome)"
+              }
+            },
+            "regex": "",
+            "sort": "alphabeticalAsc",
+            "definition": "label_values(zuno_model_calls_total, outcome)",
+            "options": [],
+            "multi": true,
+            "includeAll": true,
+            "allValue": ".*",
+            "allowCustomValue": true
+          }
         },
         {
-          "id": 4,
-          "title": "Latency p50/p95 (by provider/model)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "The histogram is live (ai-gateway/app/telemetry.py's create_histogram(\"zuno.model_call_duration_ms\", unit=\"ms\", ...)), but the OTel-to-Prometheus translator appends a unit suffix on top of the already-unit-suffixed name, so the real series is zuno_model_call_duration_ms_milliseconds_bucket, not the _ms_bucket name you'd expect - verified live against Thanos 2026-08-22.",
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
-          "fieldConfig": {"defaults": {"unit": "ms", "links": [
-            {"title": "View slow model_call traces in Tempo", "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22model_call%5C%22%20%26%26%20duration%20%3E%202s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D", "targetBlank": true}
-          ]}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.50, sum by (le, provider, model) (rate(zuno_model_call_duration_ms_milliseconds_bucket{provider=~\"$provider\", model=~\"$model\"}[5m])))", "legendFormat": "p50 {{`{{provider}}`}}/{{`{{model}}`}}"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.95, sum by (le, provider, model) (rate(zuno_model_call_duration_ms_milliseconds_bucket{provider=~\"$provider\", model=~\"$model\"}[5m])))", "legendFormat": "p95 {{`{{provider}}`}}/{{`{{model}}`}}"}
-          ]
-        },
-        {
-          "id": 5,
-          "title": "Semantic cache lookups (rate, by outcome)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (outcome) (rate(zuno_semantic_cache_lookups_total{model=~\"$model\"}[5m]))", "legendFormat": "{{`{{outcome}}`}}"}
-          ]
-        },
-        {
-          "id": 22,
-          "title": "Estimated $ saved by semantic cache",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "Cache hit rate x average cost per call - known-empty by design until SEMANTIC_CACHE_ENABLED=true is set on the ai-gateway Deployment (confirmed live 2026-08-22: currently false, zero zuno_semantic_cache_lookups_total series). Flipping that flag is a real behavior change (response freshness/cost trade-off) outside this dashboard's scope.",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 80},
-          "fieldConfig": {"defaults": {"unit": "currencyUSD"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_semantic_cache_lookups_total{outcome=\"hit\"}[5m])) * (sum(rate(zuno_model_cost_usd_total[5m])) / sum(rate(zuno_model_calls_total[5m])))"}
-          ]
-        },
-        {
-          "id": 6,
-          "title": "Semantic cache hit ratio",
-          "type": "stat",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 16},
-          "fieldConfig": {"defaults": {"unit": "percentunit"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_semantic_cache_lookups_total{outcome=\"hit\", model=~\"$model\"}[5m])) / sum(rate(zuno_semantic_cache_lookups_total{model=~\"$model\"}[5m]))"}
-          ]
-        },
-        {
-          "id": 7,
-          "title": "Error ratio",
-          "type": "stat",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 16},
-          "fieldConfig": {"defaults": {"unit": "percentunit", "thresholds": {"steps": [
-            {"color": "green", "value": null}, {"color": "orange", "value": 0.02}, {"color": "red", "value": 0.1}
-          ]}}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_model_calls_total{outcome=\"error\", provider=~\"$provider\", model=~\"$model\"}[5m])) / sum(rate(zuno_model_calls_total{provider=~\"$provider\", model=~\"$model\"}[5m]))"}
-          ]
-        },
-        {
-          "id": 8,
-          "title": "Total model call volume",
-          "type": "stat",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 4, "w": 12, "x": 12, "y": 20},
-          "fieldConfig": {"defaults": {"unit": "reqps"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum(rate(zuno_model_calls_total{provider=~\"$provider\", model=~\"$model\", outcome=~\"$outcome\"}[5m]))"}
-          ]
-        },
-        {
-          "id": 9,
-          "title": "vLLM: requests running / waiting",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "gitops/charts/models/templates/servicemonitor-vllm.yaml - the three classic InferenceServices' own /metrics.",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (model_name) (vllm:num_requests_running{model_name=~\"$served_model\"})", "legendFormat": "{{`{{model_name}}`}} (running)"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (model_name) (vllm:num_requests_waiting{model_name=~\"$served_model\"})", "legendFormat": "{{`{{model_name}}`}} (waiting)"}
-          ]
-        },
-        {
-          "id": 10,
-          "title": "vLLM: time to first token (p50/p95)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
-          "fieldConfig": {"defaults": {"unit": "s"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.50, sum by (le, model_name) (rate(vllm:time_to_first_token_seconds_bucket{model_name=~\"$served_model\"}[5m])))", "legendFormat": "p50 {{`{{model_name}}`}}"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:time_to_first_token_seconds_bucket{model_name=~\"$served_model\"}[5m])))", "legendFormat": "p95 {{`{{model_name}}`}}"}
-          ]
-        },
-        {
-          "id": 11,
-          "title": "vLLM: time per output token (p95)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 32},
-          "fieldConfig": {"defaults": {"unit": "s"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:time_per_output_token_seconds_bucket{model_name=~\"$served_model\"}[5m])))", "legendFormat": "{{`{{model_name}}`}}"}
-          ]
-        },
-        {
-          "id": 12,
-          "title": "vLLM: end-to-end request latency (p95)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 32},
-          "fieldConfig": {"defaults": {"unit": "s"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "histogram_quantile(0.95, sum by (le, model_name) (rate(vllm:e2e_request_latency_seconds_bucket{model_name=~\"$served_model\"}[5m])))", "legendFormat": "{{`{{model_name}}`}}"}
-          ]
-        },
-        {
-          "id": 13,
-          "title": "vLLM: token throughput (prompt + generation)",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 40},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (model_name) (rate(vllm:prompt_tokens_total{model_name=~\"$served_model\"}[5m]))", "legendFormat": "{{`{{model_name}}`}} (prompt)"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (model_name) (rate(vllm:generation_tokens_total{model_name=~\"$served_model\"}[5m]))", "legendFormat": "{{`{{model_name}}`}} (generation)"}
-          ]
-        },
-        {
-          "id": 14,
-          "title": "vLLM: KV-cache usage",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 40},
-          "fieldConfig": {"defaults": {"unit": "percentunit"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "vllm:gpu_cache_usage_perc{model_name=~\"$served_model\"}", "legendFormat": "{{`{{model_name}}`}}"}
-          ]
-        },
-        {
-          "id": 15,
-          "title": "vLLM: completed requests by finish reason",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 48},
-          "fieldConfig": {"defaults": {"unit": "reqps"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "sum by (model_name, finished_reason) (rate(vllm:request_success_total{model_name=~\"$served_model\"}[5m]))", "legendFormat": "{{`{{model_name}}`}} ({{`{{finished_reason}}`}})"}
-          ]
-        },
-        {
-          "id": 16,
-          "title": "GPU utilization",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "description": "gpu-operator's own nvidia-dcgm-exporter ServiceMonitor - single full GPU (no MIG slicing active on this cluster today).",
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 56},
-          "fieldConfig": {"defaults": {"unit": "percent"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_UTIL)", "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"}
-          ]
-        },
-        {
-          "id": 17,
-          "title": "GPU framebuffer used / free",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 56},
-          "fieldConfig": {"defaults": {"unit": "decmbytes"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_USED)", "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (used)"},
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE)", "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (free)"}
-          ]
-        },
-        {
-          "id": 18,
-          "title": "GPU temperature",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 64},
-          "fieldConfig": {"defaults": {"unit": "celsius"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP)", "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"}
-          ]
-        },
-        {
-          "id": 19,
-          "title": "GPU power draw",
-          "type": "timeseries",
-          "datasource": {"type": "prometheus", "uid": "prometheus"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 64},
-          "fieldConfig": {"defaults": {"unit": "watt"}},
-          "targets": [
-            {"datasource": {"type": "prometheus", "uid": "prometheus"}, "expr": "avg by (Hostname, gpu) (DCGM_FI_DEV_POWER_USAGE)", "legendFormat": "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"}
-          ]
-        },
-        {
-          "id": 20,
-          "title": "Traces: slow model_call (>2s)",
-          "type": "table",
-          "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 72},
-          "targets": [
-            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && duration > 2s}", "limit": 20, "tableType": "traces", "refId": "A"}
-          ]
-        },
-        {
-          "id": 21,
-          "title": "Traces: model_call errors",
-          "type": "table",
-          "datasource": {"type": "tempo", "uid": "tempo"},
-          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 72},
-          "targets": [
-            {"datasource": {"type": "tempo", "uid": "tempo"}, "queryType": "traceql", "query": "{name=\"model_call\" && status=error}", "limit": 20, "tableType": "traces", "refId": "A"}
-          ]
+          "kind": "QueryVariable",
+          "spec": {
+            "name": "served_model",
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "hide": "dontHide",
+            "refresh": "onTimeRangeChanged",
+            "skipUrlSync": false,
+            "query": {
+              "kind": "DataQuery",
+              "group": "prometheus",
+              "version": "v0",
+              "datasource": {
+                "name": "prometheus"
+              },
+              "spec": {
+                "__legacyStringValue": "label_values(vllm:num_requests_running, model_name)"
+              }
+            },
+            "regex": "",
+            "sort": "alphabeticalAsc",
+            "definition": "label_values(vllm:num_requests_running, model_name)",
+            "options": [],
+            "multi": true,
+            "includeAll": true,
+            "allValue": ".*",
+            "allowCustomValue": true
+          }
         }
       ]
     }
