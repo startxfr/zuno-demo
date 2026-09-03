@@ -111,6 +111,14 @@ merged | Operator pending | Done | Abandoned | Cancelled | Closed — deferred`.
 `platform/docs/check_docs.py` enforces this vocabulary AND that each row's
 State matches its brief's own `- **State:**` line.
 
+**Zero padding is significant.** `WP-57` and `WP-057` are two different work
+packages, as are `WP-58` and `WP-058` - the two-digit sequence was continued
+after the three-digit one had started. `check_docs.py` keys tracker rows on
+the brief filename from the row's own link, never on the WP id, so the pairs
+cannot be merged by accident. They are deliberately not renumbered: a
+published identifier is not renumbered to close a cosmetic collision, the same
+reasoning that left ADR-0541 free rather than reassigning a published ADR.
+
 ### Phase 0 — baseline
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |

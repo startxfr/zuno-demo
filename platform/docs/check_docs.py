@@ -7,12 +7,13 @@ component contract, `platform_profile.yaml`'s declared version intent).
 No live cluster or registry needed - pure static text/YAML inspection,
 same style as `platform/supply-chain/check_build_matrix.py`.
 
-Ten checks, each independent (a failure in one doesn't block the others
+Twelve checks, each independent (a failure in one doesn't block the others
 from reporting):
   - make_commands: every literal `make day0|d0|day1|d1 ...` example in
     README.md uses a verb/component this repository's actual Makefile
     accepts;
-  - adr_index: every docs/adr/NNNN-*.md file has a docs/adr/README.md
+  - adr_index / adr_target / adr_section / adr_status_vocab: every
+    docs/adr/NNNN-*.md file has exactly one docs/adr/README.md
     index row, and that row's status matches the ADR's own `**Status:**`
     field (catches stale statuses, e.g. an ADR quietly downgraded to
     "Partially implemented" without its index row following);
@@ -102,11 +103,12 @@ OPENSHIFT_VERSION_RE = re.compile(r"OpenShift(?: Container Platform)? (\d+\.\d+)
 OPENSHIFT_AI_VERSION_RE = re.compile(r"OpenShift AI (\d+\.\d+(?: EA\d)?)\b")
 
 WP_DIR = REPO_ROOT / "docs" / "roadmap" / "work-packages"
-# Both roadmap files carry WP tracker tables with the identical 6-column
-# header; there is no third one (verified across docs/roadmap/*.md).
+# One tracker since 2026-09-03: okf-roadmap.md's three phases folded into
+# the platform roadmap as phases 33-35 and its tracker became a pointer, so
+# it no longer carries WP rows. The file was also renamed from
+# v0.1-v0.3-implementation-roadmap.md, having long since outgrown that title.
 WP_TRACKER_PATHS = [
-    REPO_ROOT / "docs" / "roadmap" / "v0.1-v0.3-implementation-roadmap.md",
-    REPO_ROOT / "docs" / "roadmap" / "okf-roadmap.md",
+    REPO_ROOT / "docs" / "roadmap" / "implementation-roadmap.md",
 ]
 
 # The declared state machine plus the three terminal states real work
@@ -349,13 +351,51 @@ def check_debug_make_commands() -> List[Finding]:
     return findings
 
 
+# The closed status vocabulary docs/adr/README.md's Conventions section
+# declares. Anything else is drift: before 2026-09-03 the index carried
+# free-text variants ("Implemented (CA source corrected by ADR-0347)") that
+# hid whether a record was live, and one status - "Superseded by X" - was
+# being used for both full and partial supersessions, which is what let
+# ADR-0002 sit at `Implemented` while ADR-0319 superseded half of it.
+ADR_STATUS_VOCAB = {
+    "Proposed",
+    "Accepted",
+    "Partially implemented",
+    "Implemented",
+    "Deferred",
+    "Deprecated",
+}
+
+# "Superseded by ADR-0219", "Superseded in part by ADR-0526",
+# "Superseded by ADR-0332 and ADR-0349".
+_ADR_SUPERSEDED_PREFIX = re.compile(
+    r"Superseded (?:in part )?by ADR-\d{4}(?: and ADR-\d{4})*")
+_ADR_SUPERSEDED_STATUS = re.compile(_ADR_SUPERSEDED_PREFIX.pattern + r"$")
+
+# Sections of the index that are version bands, plus the one that is not.
+ADR_RETIRED_SECTION = "Retired"
+
+
+def _adr_status_valid(status: str) -> bool:
+    return status in ADR_STATUS_VOCAB or bool(_ADR_SUPERSEDED_STATUS.match(status))
+
+
+def _adr_status_retired(status: str) -> bool:
+    """Fully superseded or deprecated - belongs in the Retired section.
+
+    `Superseded in part` deliberately does NOT count: part of that decision
+    is still in force, so the record stays in its version band.
+    """
+    return status == "Deprecated" or status.startswith("Superseded by ADR-")
+
+
 def _normalize_adr_status(text: str) -> str:
     # Markdown links compare as their label ("Superseded by
     # [ADR-0332](0332-...md)" == "Superseded by ADR-0332").
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     # A superseded status may scope what remains in effect (ADR-0320,
     # ADR-0328); only the "Superseded by ADR-NNNN" phrase must match.
-    superseded = re.match(r"Superseded by ADR-\d{4}", text)
+    superseded = _ADR_SUPERSEDED_PREFIX.match(text)
     if superseded:
         return superseded.group(0)
     # Strip " - see `...`" elaborations and trailing parenthetical
@@ -365,34 +405,179 @@ def _normalize_adr_status(text: str) -> str:
     return text.split("(", 1)[0].strip()
 
 
+def _adr_body_fields(adr_path) -> dict:
+    """Status, Target and the Supersedes field of one ADR file."""
+    body = adr_path.read_text()
+    out = {}
+    for key in ("Status", "Target", "Supersedes"):
+        m = re.search(rf"^- \*\*{key}:\*\*\s*(.+?)(?=\n- \*\*|\n\n|\Z)",
+                      body, re.S | re.M)
+        out[key] = " ".join(m.group(1).split()) if m else None
+    return out
+
+
+def _adr_index_rows() -> dict:
+    """ADR number -> list of parsed index rows (a list, so duplicates show).
+
+    Active sections carry `| ADR | Status | Decision |`; the Retired section
+    carries a `Target` column too, because it has no version heading to
+    derive one from. Rows are keyed by number and collected per section, so
+    a row can be checked against the section it actually sits in - the drift
+    class that put ADR-0352 (Target v0.9) inside the v0.7 table.
+    """
+    rows = {}
+    section = None
+    for line in ADR_README_PATH.read_text().splitlines():
+        heading = re.match(r"^## (.+?)\s*$", line)
+        if heading:
+            section = heading.group(1)
+            continue
+        m = re.match(r"^\| \[ADR-(\d{4})\]\(([^)]+)\)(\s*\*\(stub\)\*)? \| (.*) \|\s*$", line)
+        if not m:
+            continue
+        cells = [c.strip() for c in m.group(4).split("|")]
+        if section == ADR_RETIRED_SECTION:
+            target, status = (cells + ["", ""])[0], (cells + ["", ""])[1]
+        else:
+            target, status = section, (cells + [""])[0]
+        rows.setdefault(m.group(1), []).append({
+            "section": section, "link": m.group(2).strip(),
+            "stub": bool(m.group(3)), "target": target, "status": status,
+        })
+    return rows
+
+
 def check_adr_index() -> List[Finding]:
+    """The index agrees with the records it indexes.
+
+    Until 2026-09-03 this compared exactly one pair - the index Status cell
+    against the ADR body's Status - and reported PASS while 33 rows sat in a
+    section contradicting their own Target, ten rows pointed at no file, and
+    nine declared supersessions had never been written back. Target, section
+    placement, the status vocabulary and row-level integrity are all checked
+    here now.
+    """
     findings: List[Finding] = []
-    index_text = ADR_README_PATH.read_text()
+    rows = _adr_index_rows()
+    files = {p.name[:4]: p for p in sorted(ADR_DIR.glob("[0-9][0-9][0-9][0-9]-*.md"))}
 
-    for adr_path in sorted(ADR_DIR.glob("[0-9][0-9][0-9][0-9]-*.md")):
-        adr_number = adr_path.name[:4]
-        row_match = re.search(rf"\[ADR-{adr_number}\]\({re.escape(adr_path.name)}\)[^\n]*", index_text)
-        if not row_match:
-            findings.append(Finding("adr_index", f"ADR-{adr_number} ({adr_path.name}) has no docs/adr/README.md index row linking directly to it"))
-            continue
+    for number, entries in sorted(rows.items()):
+        if len(entries) > 1:
+            findings.append(Finding(
+                "adr_index",
+                f"ADR-{number} has {len(entries)} index rows "
+                f"(sections: {', '.join(e['section'] or '?' for e in entries)}); "
+                "each record is indexed exactly once"))
+        row = entries[0]
+        if number not in files and not row["stub"]:
+            findings.append(Finding(
+                "adr_index",
+                f"ADR-{number} has an index row but no docs/adr/{number}-*.md file; "
+                "a row whose record lives in the roadmap must be marked *(stub)*"))
 
-        body = adr_path.read_text()
-        status_match = re.search(r"\*\*Status:\*\*\s*(.+)", body)
-        if not status_match:
+    for number, adr_path in files.items():
+        entries = rows.get(number)
+        if not entries:
+            findings.append(Finding(
+                "adr_index",
+                f"ADR-{number} ({adr_path.name}) has no docs/adr/README.md index row"))
             continue
-        body_status = _normalize_adr_status(status_match.group(1))
+        row = entries[0]
+        if row["link"] != adr_path.name:
+            findings.append(Finding(
+                "adr_index",
+                f"ADR-{number} index row links to '{row['link']}', "
+                f"the file is '{adr_path.name}'"))
 
-        row_cells = [c.strip() for c in row_match.group(0).split("|")]
-        # row_match captures from the link onward: "[ADR-NNNN](file.md) | Target | Status | Decision"
-        if len(row_cells) < 3:
+        fields = _adr_body_fields(adr_path)
+        if fields["Status"] is None:
             continue
-        row_status = _normalize_adr_status(row_cells[2])
+        body_status = _normalize_adr_status(fields["Status"])
+        row_status = _normalize_adr_status(row["status"])
+
         if row_status != body_status:
             findings.append(Finding(
                 "adr_index",
-                f"ADR-{adr_number} status drift: docs/adr/README.md index says "
-                f"'{row_status}', the ADR's own body says '{body_status}'",
-            ))
+                f"ADR-{number} status drift: docs/adr/README.md index says "
+                f"'{row_status}', the ADR's own body says '{body_status}'"))
+
+        if not _adr_status_valid(row_status):
+            findings.append(Finding(
+                "adr_status_vocab",
+                f"ADR-{number} index status '{row_status}' is outside the declared "
+                f"vocabulary ({', '.join(sorted(ADR_STATUS_VOCAB))}, "
+                "'Superseded by ADR-NNNN', 'Superseded in part by ADR-NNNN')"))
+
+        # Section placement. A fully superseded or deprecated record belongs
+        # in Retired; everything else belongs under its own Target.
+        body_target = (fields["Target"] or "").split(" (")[0].strip()
+        if _adr_status_retired(body_status):
+            if row["section"] != ADR_RETIRED_SECTION:
+                findings.append(Finding(
+                    "adr_section",
+                    f"ADR-{number} is '{body_status}' but sits in section "
+                    f"'{row['section']}'; fully superseded and deprecated records "
+                    f"belong in '{ADR_RETIRED_SECTION}'"))
+            elif row["target"] != body_target:
+                findings.append(Finding(
+                    "adr_target",
+                    f"ADR-{number} Retired-row Target says '{row['target']}', "
+                    f"the ADR's own body says '{body_target}'"))
+        else:
+            if row["section"] == ADR_RETIRED_SECTION:
+                findings.append(Finding(
+                    "adr_section",
+                    f"ADR-{number} is '{body_status}' but sits in "
+                    f"'{ADR_RETIRED_SECTION}'; a record still partly in force stays "
+                    "in its version band"))
+            elif row["section"] != body_target:
+                findings.append(Finding(
+                    "adr_target",
+                    f"ADR-{number} sits in section '{row['section']}' but targets "
+                    f"'{body_target}'; the section heading is the target"))
+    return findings
+
+
+# ADR-0527 supersedes ADR-0213 and then *extends* ADR-0209/ADR-0212 in the
+# same field; only the clause before the extends/refines/amends verb is a
+# supersession claim.
+_SUPERSEDES_CUT = re.compile(r"\b(?:Extends|extends|Refines|refines|Amends|amends)\b")
+
+
+def check_adr_supersede() -> List[Finding]:
+    """A declared supersession is written back to the record it supersedes.
+
+    Keyed strictly on the `- **Supersedes:**` field, never inferred from two
+    ADRs disagreeing: ADR-0518/ADR-0526/ADR-0531 contradict each other on the
+    fleet default model and are deliberately reconciled by dated correction
+    notes rather than a supersession, and must not be flagged.
+
+    Only the forward direction is checked. A record whose Status names a
+    superseder that has no `Supersedes:` field of its own is legitimate - the
+    claim is often made in the superseding ADR's Decision prose instead
+    (ADR-0317, ADR-0349) - and ADR-0526's body cannot be amended to name
+    ADR-0303 because an ADR body is immutable outside its Status line.
+    """
+    findings: List[Finding] = []
+    fields = {p.name[:4]: _adr_body_fields(p)
+              for p in sorted(ADR_DIR.glob("[0-9][0-9][0-9][0-9]-*.md"))}
+
+    for number, f in sorted(fields.items()):
+        if not f["Supersedes"]:
+            continue
+        claim = _SUPERSEDES_CUT.split(re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", f["Supersedes"]))[0]
+        for target in sorted(set(re.findall(r"ADR-(\d{4})", claim))):
+            if target not in fields:
+                findings.append(Finding(
+                    "adr_supersede",
+                    f"ADR-{number} declares it supersedes ADR-{target}, which has no file"))
+                continue
+            target_status = _normalize_adr_status(fields[target]["Status"] or "")
+            if f"ADR-{number}" not in target_status:
+                findings.append(Finding(
+                    "adr_supersede",
+                    f"ADR-{number} declares it supersedes ADR-{target}, but ADR-{target}'s "
+                    f"status is '{target_status}' and never names ADR-{number}"))
     return findings
 
 
@@ -521,6 +706,94 @@ def _wp_governing_adrs(wp_path: pathlib.Path) -> List[str]:
     adrs_bullet = re.search(r"^- \*\*ADRs:\*\*\s*(.+?)(?=\n- \*\*|\n\n|\Z)", text, re.MULTILINE | re.DOTALL)
     scoped_text = title_line + "\n" + (adrs_bullet.group(1) if adrs_bullet else "")
     return sorted(set(re.findall(r"ADR-(\d{4})", scoped_text)))
+
+
+ADR_VERSIONS = ["v0", "v0.1", "v0.2", "v0.3", "v0.4", "v0.5", "v0.6",
+                "v0.7", "v0.8", "v0.9", "OKF v0.1"]
+WP_OPEN_EXCLUDED = {"done", "abandoned", "cancelled", "closed — deferred"}
+
+
+def check_wp_version_view() -> List[Finding]:
+    """The roadmap's "Work packages by version" table is derived, not typed.
+
+    It exists because phase headings used to assert a version and 36 rows
+    disagreed with their ADRs' Target. That only helps while the table stays
+    true, so it is recomputed here from the ADR bodies and the tracker rows
+    rather than trusted.
+    """
+    findings: List[Finding] = []
+    roadmap = WP_TRACKER_PATHS[0]
+    text = roadmap.read_text()
+    rel = roadmap.relative_to(REPO_ROOT)
+
+    rows = {}
+    for line in text.splitlines():
+        m = re.match(r"^\| (v[\d.]+|OKF v[\d.]+) \| (\d+) \| ([^|]*) \| (\d+) \| ([^|]*) \|\s*$", line)
+        if m:
+            rows[m.group(1)] = (int(m.group(2)), m.group(3).strip(),
+                                int(m.group(4)), m.group(5).strip())
+    if not rows:
+        return [Finding("wp_version_view",
+                        f"{rel} has no 'Work packages by version' table rows")]
+
+    targets, statuses = {}, {}
+    for path in sorted(ADR_DIR.glob("[0-9][0-9][0-9][0-9]-*.md")):
+        f = _adr_body_fields(path)
+        targets[path.name[:4]] = (f["Target"] or "").split(" (")[0].strip()
+        statuses[path.name[:4]] = _normalize_adr_status(f["Status"] or "")
+    for number, entries in _adr_index_rows().items():   # stubs have no file
+        if number not in targets and entries[0]["stub"]:
+            targets[number] = entries[0]["target"]
+            statuses[number] = _normalize_adr_status(entries[0]["status"])
+
+    tracker = []
+    for line in text.splitlines():
+        if not line.startswith("| WP-"):
+            continue
+        cells = [c.strip() for c in line.split("|")]
+        if len(cells) >= 7:
+            tracker.append((cells[1], re.findall(r"(\d{4})", cells[3]), cells[5]))
+
+    for version in ADR_VERSIONS:
+        version_adrs = [n for n, v in targets.items() if v == version]
+        open_adrs = [n for n in version_adrs
+                     if statuses[n] in ("Proposed", "Accepted", "Deferred",
+                                        "Partially implemented")]
+        wps = [(w, _normalize_wp_state(s)) for w, a, s in tracker
+               if any(n in version_adrs for n in a)]
+        open_wps = sorted({w for w, s in wps if s not in WP_OPEN_EXCLUDED})
+
+        if version not in rows:
+            findings.append(Finding(
+                "wp_version_view",
+                f"{rel}'s by-version table has no row for {version} "
+                f"({len(version_adrs)} ADRs, {len(wps)} WPs)"))
+            continue
+        n_adr, open_adr_cell, n_wp, open_wp_cell = rows[version]
+        if n_adr != len(version_adrs):
+            findings.append(Finding(
+                "wp_version_view",
+                f"{rel}: {version} row says {n_adr} ADRs, the ADR bodies say "
+                f"{len(version_adrs)}"))
+        if n_wp != len(wps):
+            findings.append(Finding(
+                "wp_version_view",
+                f"{rel}: {version} row says {n_wp} WPs, the tracker rows say "
+                f"{len(wps)}"))
+        listed = sorted(re.findall(r"WP-[\w-]+", open_wp_cell))
+        if listed != open_wps:
+            findings.append(Finding(
+                "wp_version_view",
+                f"{rel}: {version} open WPs listed as {listed or ['—']}, "
+                f"the tracker states say {open_wps or ['—']}"))
+        stated_open = open_adr_cell.strip()
+        actual_open = str(len(open_adrs)) if open_adrs else "—"
+        if stated_open != actual_open:
+            findings.append(Finding(
+                "wp_version_view",
+                f"{rel}: {version} open-ADR count says '{stated_open}', "
+                f"the ADR statuses say '{actual_open}'"))
+    return findings
 
 
 def check_agent_status_vs_adr() -> List[Finding]:
@@ -817,7 +1090,9 @@ def main() -> int:
         check_make_commands()
         + check_auto_fix_commands()
         + check_adr_index()
+        + check_adr_supersede()
         + check_wp_state()
+        + check_wp_version_view()
         + check_agent_status_vs_adr()
         + check_day0_day1_roles()
         + check_debug_make_commands()
@@ -827,7 +1102,9 @@ def main() -> int:
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
-          "docs/adr/README.md index, work-package state vs the roadmap trackers, "
+          "docs/adr/README.md index (status, target, section placement, row integrity), "
+          "declared ADR supersessions, work-package state vs the roadmap tracker, "
+          "the roadmap's by-version table against the ADR bodies, "
           "agent zuno.status vs its governing ADR(s), Makefile/ansible role "
           "consistency, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
           f"platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}, "

@@ -1,78 +1,129 @@
 # Version Roadmap
 
+What each version band is *for*. Per-ADR status is in the
+[ADR index](../adr/README.md), which is the sole authority for it; work-package
+state is in the [implementation roadmap](implementation-roadmap.md). Neither is
+restated here — this file carries goals, and the open items each goal is still
+waiting on.
+
+The history of how ADRs moved between these bands (retargetings, renumberings,
+band creation) is in the [ADR change log](../adr/CHANGELOG.md), not here.
+
 ## MVP / v0
 
-Seven-day internal vertical slice and five-agent demo, prioritizing Tekos as the first end-to-end implementation.
+Seven-day internal vertical slice and five-agent demo, prioritizing Tekos as
+the first end-to-end implementation.
+
+**72 ADRs, all closed. No open work packages.**
 
 ## v0.1
 
-Industrialization: HA shared services, resumable workflows, automated ingestion/evaluation, stronger signing, source freshness, ACL synchronization and SecNumCloud-oriented hardening. Open ADRs: 0101–0117 plus 0322/0330 — [implementation roadmap](v0.1-v0.3-implementation-roadmap.md) Phase 1. (ADR-0111, SecNumCloud-oriented hardening, retargeted to v0.7 on 2026-08-26 — see that band below.) (ADR-0105, source-specific ingestion cadences, retargeted to v0.7 on 2026-08-26 — see that band below.)
+Industrialization: HA shared services, resumable workflows, automated
+ingestion and evaluation, stronger signing, source freshness, ACL
+synchronization and SecNumCloud-oriented hardening.
+
+**29 ADRs, all closed. No open work packages.**
 
 ## v0.2
 
-Knowledge governance: logical knowledge domains, knowledge authorization as policy intersection, multi-domain RAG generalization, indexed-vs-live routing, Salesforce/SXA-legacy separation, standardized tool authentication, project-scoped agent memory. Open ADRs: 0202–0209 — [implementation roadmap](v0.1-v0.3-implementation-roadmap.md) Phase 2. (ADR-0201, MaaS governance-plane completion, retargeted to v0.5 on 2026-08-24 — see that band below.) (ADR-0206, Salesforce/SXA-legacy separation, retargeted to v0.7 on 2026-08-26 — see that band below.) (ADR-0213, role-based conversation sharing, retargeted to v0.7 on 2026-08-26 — see that band below.) (ADR-0218, which drops the Aramis ingestion adapter and defers the Salesforce ingestion cadence, retargeted from `Unscheduled (backlog)` to v0.7 on 2026-08-26 — see that band below.) Also carries ADR-0354 (retargeted from v0.3 on 2026-08-24), installing Ansible Automation Platform as a new Day 1 component (`aap`) plus a companion `aap-config` component that registers this repository as an AAP Project with a `day0_check` Job Template. (ADR-0216 and ADR-0217, the two SXA import/ingestion decisions, superseded by ADR-0219 on 2026-08-26 — SXA is now served as a RAG-only pre-2021 historical corpus; ADR-0219 is v0.2 and Implemented.) Open WPs: WP-072, WP-073, WP-084 (operator steps).
+Knowledge governance: logical knowledge domains, knowledge authorization as
+policy intersection, multi-domain RAG generalization, indexed-vs-live routing,
+standardized enterprise tool authentication, project-scoped agent memory. Also
+carries ADR-0354, which installs Ansible Automation Platform as a Day 1
+component (`aap`) plus an `aap-config` companion.
+
+**14 ADRs, all closed.** Open: WP-098.
 
 ## v0.3
 
-Multi-agent rollout and optimization: the four remaining agent slices (Arkos, Comage, Advantage, Finage), multiple agent graph shapes, CDP/scoped capabilities, the AIAgent CRD/operator, LoRA/PEFT with dataset-to-model pipelines, dynamic adapters, benchmark-driven routing, self-service agent onboarding. Open ADRs: 0301–0309, 0326, 0327, 0340, 0342 — [implementation roadmap](v0.1-v0.3-implementation-roadmap.md) Phase 3. Also carries ADR-0355, a new `mcp-aap` server exposing AAP cluster/platform audits to Tekos and Arkos once v0.2's `aap`/`aap-config` are live. **v0.3 closed 2026-08-30**: ADR-0309/WP-42 (policy-driven autonomous optimization), the roadmap's final open item, flipped `Implemented` after a live cluster verification — autonomy enabled, one full tune-evaluate cycle observed and one rollback forced (both live-verified, `report_outcome()` reverts every open action on a trigger breach), user sign-off given. This closes the entire v0.1–v0.3 roadmap.
+Multi-agent rollout and optimization: the four remaining agent slices (Arkos,
+Comage, Advantage, Finage), multiple agent graph shapes, CDP and scoped
+capabilities, the AIAgent CRD and operator, LoRA/PEFT with dataset-to-model
+pipelines, benchmark-driven routing. Also carries ADR-0355 (the `mcp-aap`
+server exposing AAP audits to agents) and ADR-0532, which accepts
+`knowledge.adv` as sourceless pending a replacement adapter.
+
+**Closed 2026-08-30** — ADR-0309/WP-42, the last open item, went `Implemented`
+after a live verification (autonomy enabled, one full tune-evaluate cycle
+observed, one rollback forced), which closed the whole v0.1–v0.3 roadmap.
+
+**16 ADRs.** Open: ADR-0353 (stub); WP-34, WP-119.
 
 ## v0.4
 
-Agent-to-agent evolution (ADR-0401 – ADR-0409): A2A protocol adoption, identity propagation across agent calls, controlled shared memory, delegation traceability and limits, specialized task-oriented frontend views, automated removal of inaccessible private RAG content and advanced human approval workflows. Also carries ADR-0516 (diagram generation from LLM-authored Mermaid, rendered in-cluster by the `diagram-render` component alongside ADR-0415's SDXL `generate_image`), which is Implemented — landed 2026-08-23, status closed out 2026-08-26 with no work package, see [evidence](evidence/adr-0516-diagram-render.md). Six further v0.4 decisions were closed out to Implemented on 2026-08-27, having been delivered and in service while still reading `Proposed`: ADR-0415 (SDXL image generation via OVHcloud), ADR-0416 (gpt-oss-120b via OVHcloud) and ADR-0417 (Codestral via the Mistral API) — the latter two smoke-tested live that day, each returning a real completion; ADR-0518 (the Qwen3.6-27B / Qwen3-Embedding-0.6B / Qwen3.5-9B local model fleet, live-verified down to the re-ingested `vector(1024)` corpus); and ADR-0519 / ADR-0520 (RAG ingestion throughput, live-verified via WP-57 and WP-58 — `detect-changes` alone went from 3h48m to 13m25s). ADR-0415/0416/0417/0518 have no work package; ADR-0519/0520 are tracked as Phase 15. **Corrected 2026-09-03:** ADR-0518's description above as "the local model fleet" is no longer the whole picture — its decision 1 made `qwen3.6-27b-instruct` the chat/agents default, and ADR-0531 took that role for `qwen3.5-9b` on 2026-08-30 without either record saying so. Both now carry correction notes; neither is superseded, since ADR-0518's embedding, training-base and no-infrastructure-change decisions all still hold. The 27B is now formally the `quality` model, a role `platform/ai-gateway/provider-routing.yaml`'s `role` key declares and `check_docs.py`'s `model_roles` check enforces. Added 2026-08-27, `Implemented` as of 2026-08-29 (three-half gate PASS and `comage-lora` version `wesh-20260829-145123` registered; the fine-tune initially broke Comage's tool calling, corrected by a two-sided tool-call corpus and now gated by a third half — see the ADR's amendment): ADR-0526, which fine-tunes a French urban-register variant of ADR-0518's Qwen3.5-9B training base, serves it as `qwen3.5-9b-wesh` beside its unmodified base on a different MIG node, and routes Comage to it by default and Tekos to it second. **Corrected 2026-09-03:** ADR-0531 (below) later narrowed that — the variant leads three of Comage's four tasks, not all four, since `compare-historical-deals` is reflexional and leads `ovhcloud-gpt-oss-120b`. It supersedes ADR-0301 (decisions 1, 5) and ADR-0302 (decisions 2, 4) in part, replacing WP-34's never-run `comage-lora` objective; tracked as Phase 20 via WP-087. Added 2026-08-27: ADR-0527 and ADR-0528 (both `Proposed`), which make the project a first-class object — a `projects` table owning every `project_id`, four roles (`read < clone < write < admin`) granted to subjects or business-role groups, no owner column but a last-admin guard, a 54 000-character engagement context injected as budgeted background rather than instructions, cascade-archive deletion, and ADR-0209's `project_memberships` demoted to a projection — and then separate the Salesforce opportunity from the project's identity (an optional attribute making a project *customer* or *free*, verified at project save rather than at conversation start), re-keying quota and telemetry onto the Zuno `project_id` and adding the `zuno.project_id` span attribute. ADR-0527 supersedes ADR-0213 in full and ADR-0528 supersedes ADR-0512's clause 3 and its quota/observability keying; both land as Phase 21 via WP-088/WP-089/WP-090. They occupy the ground ADR-0404 (controlled shared memory) and ADR-0407 (task-oriented frontend views) had reserved without specifying.
+Agent-to-agent evolution: A2A protocol adoption, identity propagation across
+agent calls, controlled shared memory, delegation traceability and limits,
+task-oriented frontend views, automated removal of inaccessible private RAG
+content, advanced human approval workflows (ADR-0401 – ADR-0409, all still
+stubs). The band also carries the model-fleet, ingestion-throughput,
+observability and project work actually delivered during it — ADR-0516,
+ADR-0518 – ADR-0520, ADR-0524 – ADR-0531, ADR-0536.
+
+**33 ADRs.** Open: ADR-0401 – ADR-0409 (stubs); WP-55, WP-093, WP-101, WP-112.
 
 ## v0.5
 
-Make the OpenShift AI MaaS governance plane live and route agent model calls through it end-to-end. Carries ADR-0201 (MaaS governance plane), ADR-0511 (OKF quota policy via Kuadrant), ADR-0512 (project-bound tasks with Salesforce-verified context) and ADR-0521 (route ai-gateway's local model traffic through MaaS, added 2026-08-25 as the direction-change ADR-0114's evidence doc anticipated once WP-27 proved the governance plane live) — all grouped here since their live-MaaS objective is one and the same milestone. Open WPs: WP-55 (ADR-0512's clause 3 and its quota/telemetry keying were superseded by ADR-0528 on 2026-08-27 — see the v0.4 band; WP-55's merged work stands, its remaining live-Salesforce pass moves to WP-090). (WP-27 and WP-54 closed Done 2026-08-25 — ADR-0201/ADR-0511 both Implemented; WP-076 closed Done 2026-08-26 — ADR-0521 Implemented, both local models routed through MaaS with drill-proven direct fallback). This band also carries ADR-0522 (enable OpenShift AI's built-in monitoring stack side-by-side with the existing observability stack), Implemented 2026-08-26 via WP-078 (metrics), WP-079 (traces) and WP-080 (Perses/Route/Dashboard), all three Done and live-verified — tracked as Phase 17. Phase 1 deliberately ends with zero cross-stack data flow; unifying the two stacks is a separate, not-yet-started follow-up.
+Make the OpenShift AI MaaS governance plane live and route agent model calls
+through it end-to-end. Also carries the RHOAI monitoring stack enabled
+side-by-side with the existing observability stack (ADR-0522, ADR-0523) and
+per-run trace correlation (ADR-0543).
+
+**8 ADRs.** Open: ADR-0537; WP-55, WP-101, WP-106, WP-122.
 
 ## v0.6
 
-Close out the roadmap-reprioritization cluster carried in v0.7 through 2026-08-30. Retargeted here on 2026-08-30, splitting v0.7 by done-ness into this short-term closeout band and a long-term/harder v0.7: ADR-0105 (automate source-specific knowledge ingestion), ADR-0206 (separate current Salesforce knowledge from legacy SXA), ADR-0213 (role-based conversation sharing) and ADR-0218 (drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence). All four are already delivered — WP-22 and WP-23 are `Done`, ADR-0213 is `Superseded by ADR-0527` (WP-066 `Abandoned` with it — sharing moved from the conversation to the project; see the v0.4 band), and ADR-0218 is `Implemented` (the Aramis adapter physically removed from the repository: code, ansible, gitops, knowledge contracts, platform bindings and the Advantage OKF prose). Only `Target` moves for ADR-0105/0206/0213; their status fields and WP states are unchanged. What ADR-0218 leaves deferred (not tracked by any WP in this band) is the Salesforce half only — `fetch-salesforce` and its hours-scale cadence, with `domains.sales` still shipped `enabled: false` in the tree; `knowledge.adv` keeps its domain descriptor and `rag-adv` binding with no ingestion adapter, and Comage's live Salesforce MCP-tool access is untouched. This band reuses the slot vacated when ADR-0517 retargeted out to v0.8 (see that band below).
+Close out the roadmap-reprioritization cluster left over from v0.7:
+source-specific ingestion cadences, Salesforce/SXA-legacy separation, and the
+superseded role-based conversation sharing. All four items were already
+delivered; the band exists to formalize their retargeted status.
+
+**4 ADRs, all closed.** Open: WP-101.
 
 ## v0.7
 
-Automate the release/supply-chain pipeline using GitHub Actions (build, sign, publish, promote). Carries ADR-0115 (immutable/verifiable software supply-chain artifacts), retargeted from v0.1 on 2026-08-24 — WP-04's three-stage GitHub Actions + Quay release work. Also carries ADR-0111 (strengthen SecNumCloud-oriented security controls), retargeted from v0.1 on 2026-08-26 — its one remaining gap (immutable chart image tags) is blocked on the same WP-04 GitHub billing lock as ADR-0115. Both are hard-blocked on an external GitHub-billing/Quay-cutover decision with no repo-side fix, which is why they anchor the long-term/harder half of the 2026-08-30 v0.6/v0.7 split.
+Automate the release/supply-chain pipeline using GitHub Actions (build, sign,
+publish, promote). ADR-0111 and ADR-0115 are both hard-blocked on an external
+GitHub-billing/Quay-cutover decision with no repo-side fix. The band also
+carries the OKF extraction-and-reconciliation chain (ADR-0506 – ADR-0510),
+gated on an owner-created `zuno-okf` repository that does not yet exist, and
+the RHOAI 3.5 workload surfaces (ADR-0538 – ADR-0540) plus TrustyAI
+(ADR-0534) and model autoscaling (ADR-0542).
 
-Also retargeted here 2026-08-30: the entire OKF v0.2/v0.3 extraction-and-reconciliation chain — ADR-0506, ADR-0507, ADR-0508 (from OKF v0.2) and ADR-0509, ADR-0510 (from OKF v0.3), all `Proposed`. WP-48 through WP-53 are all `Not started`, gated on one owner-created `zuno-okf` GitHub repository (branch protection + CODEOWNERS) that has not yet been provisioned — no repo-side blocker exists otherwise, WP-48's own dependencies (WP-44/45/46) are all `Done`. Rather than leave a standalone OKF-stream band with no active work, this chain is scheduled alongside v0.7's other not-yet-started items (ADR-0534). WP-48 through WP-53 stay tracked in the [OKF roadmap](okf-roadmap.md)'s own tracker; only the ADRs' `Target` moved, per the precedent set when ADR-0511/ADR-0512 left OKF v0.1 for the platform bands.
-
-**Update (2026-09-02):** ADR-0534 is no longer "not yet started" — it moved to `Accepted` and is now executed by WP-107, WP-108 and WP-109 (implementation roadmap [Phase 28](v0.1-v0.3-implementation-roadmap.md#phase-28-trustyai-evaluation-and-guardrails-added-2026-09-02-v07)), all three `Not started`. TrustyAI itself needs no operator install — it already lives in the Day 1 `openshift-ai` component — so these three WPs cover baseline verification, generic RAGAS/Garak + `mcpGuardrailsMode` enablement, and Zuno-specific guardrail wiring plus PEFT/LoRA model comparison, in that order.
+**12 ADRs.** Open: ADR-0111, ADR-0115 (both `Deferred`), ADR-0506 – ADR-0510,
+ADR-0538 – ADR-0540; WP-48 – WP-53, WP-115, WP-119.
 
 ## v0.8
 
-Prove the platform's Day 0–3 automation is complete and portable by redeploying the full stack from scratch on a new cluster (`demo333`). Carries [ADR-0517](../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md), retargeted from v0.6 on 2026-08-30 — deprioritized behind v0.7's release-automation work. Also carries [ADR-0533](../adr/0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) (consolidate Advantage's and Finage's non-promotion into a dedicated decision), a new small ADR authored 2026-08-30 to hold the open question of whether either agent is ever promoted to `active`.
+Prove the platform's Day 0–3 automation is complete and portable by
+redeploying the full stack from scratch on a new cluster (`demo333`). Also
+holds the open question of whether Advantage or Finage is ever promoted to
+`active` (ADR-0533).
+
+**2 ADRs.** Open: ADR-0517. No open work packages.
 
 ## v0.9
 
-Adopt RHTAS as the platform's artifact trust and supply-chain service.
-Carries [ADR-0535](../adr/0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md),
-a new ADR authored 2026-08-30 that supersedes ADR-0420 (v0.4, in-cluster
-Vault Transit signing) — a product-demonstration decision (showing Red
-Hat's own trusted-software-supply-chain product on this platform), not a
-reversal of ADR-0420's technical reasoning, which remains valid: Vault
-Transit is smaller, cheaper and fully sufficient for the signing problem on
-its own. Originally scoped as one WP (WP-104), this is now split
-2026-09-02 into WP-110 (Day 1 `rhtas`: operator, fundamentals, Keycloak/
-OIDC signing identity) and WP-111 (Day 2 `rhtas-config`: RHOAI-integration
-assessment, then cutting the existing 14 signed first-party images over
-to RHTAS/Cosign keyless signing and deploying the Sigstore Policy
-Controller in audit-only mode).
-OKF bundle trust (blocked on ADR-0506/ADR-0507's still-`Proposed` `zuno-okf`
-extraction), AI/model artifact trust, and admission enforcement (reject
-mode) are deliberately left for later ADRs/WPs, authored once each is
-actually ready to start rather than pre-declared now. This band reuses no
-prior vacated slot — v0.6 was reused earlier the same day for an unrelated
-closeout cluster, and v0.7/v0.8 already carry differently-blocked work — so
-v0.9 is a genuinely new band.
+Adopt RHTAS as the platform's artifact trust and supply-chain service
+(ADR-0535) — a product-demonstration decision superseding ADR-0420's Vault
+Transit signing, not a reversal of its technical reasoning. OKF bundle trust,
+AI/model artifact trust and admission enforcement are deliberately left to
+later ADRs. The band also carries the two agent-onboarding decisions parked
+behind it (ADR-0307, ADR-0410 — WP-41 was cancelled 2026-08-23) and the day-0
+internal/external tiering effort (ADR-0352), which has no work package yet.
 
-Also retargeted here 2026-08-30 (same day, a second move — first v0.4 → v0.7, now v0.7 → v0.9): ADR-0307 (self-service agent onboarding) and ADR-0410 (expand the agent catalog beyond the initial five agents), both `Proposed`. WP-41, which would have discharged them, was Cancelled 2026-08-23 - the merged template generator (`platform/templates/agent/`) and Naveo agent bundle (`agents/naveo/`) stay in the repo, but the sixth-agent deployment gate is not being pursued. User decision: Naveo is not to be used as the new-agent-onboarding proof before at least v0.9, possibly later - so rather than sit in v0.7's already-populated long-term/harder band, they get their own explicit v0.9+ horizon.
-
-Also retargeted here 2026-09-02: ADR-0352 (run day-0 platform services in internal or external mode), `Proposed` and not yet started: reclassifying the platform's 28 day-0 components into three tiers (internal-only, externally-substitutable, and externally-required) with a `confidential.yml` schema per Tier-A component, planned to land one component-per-work-package starting with MariaDB as the pilot, then Keycloak ("the first hard one"), then Vault, then the rest. No work package exists for it yet. It leaves v0.7's long-term/harder band — whose remaining occupants (ADR-0111, ADR-0115, the OKF v0.2/v0.3 chain) are blocked on the external GitHub-billing/Quay-cutover decision and the `zuno-okf` repository provisioning respectively, neither of which gates ADR-0352 — and joins ADR-0307/ADR-0410/ADR-0535 here instead.
-
-Also added here 2026-09-02: WP-112, a new work package under ADR-0516 (v0.4, `Implemented`, no prior work package — see [evidence](evidence/adr-0516-diagram-render.md)). ADR-0516 itself does not move version; only this follow-up WP is scheduled here. A day2-stresstest deep dive found that Comage's `generate_image` tool-schema description contradicted its own system prompt (fixed same day, commit `ef7b5c43`) and, underneath that, that its reference model (`qwen3.5-9b-wesh`, already documented in ADR-0526 as prone to narrating tool use) now reasons correctly about which tool to call but narrates calling it instead of invoking it. `reason_node`, the single decision point on the shared `retrieve_reason_respond` graph shape, has no retry for a skipped tool call the way the diagram-render path retries a failed render — WP-112 scopes the design of that retry (detection, blast radius across every agent on that shape, retry shape, cost/latency), deliberately not a merged fix yet, per [implementation roadmap Phase 29](v0.1-v0.3-implementation-roadmap.md#phase-29-retry-design-for-skipped-tool-calls-on-the-single-shot-graph-shape-added-2026-09-02-v09).
+**4 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410. No open work packages.
 
 ## OKF stream
 
-A standalone version line for the Open Knowledge Format initiative (ADR-0501 – ADR-0512), decoupled from the platform bands above — [OKF roadmap](okf-roadmap.md).
+A standalone version line for the Open Knowledge Format initiative, decoupled
+from the platform bands — [OKF roadmap](okf-roadmap.md).
 
-- **OKF v0.1** — content excellence in-repo: two-stage agent maturity model, generated per-agent authorization matrices, real `deployment/` content, `tests/` target structure, per-agent task tabs. (Quota policy via Kuadrant and project-bound tasks — ADR-0511/ADR-0512 — retargeted to platform v0.5 on 2026-08-24, see that band above.)
-- **OKF v0.2** — extraction: OKF content moves to the standalone `zuno-okf` repository, consumed through a single pinned reference, with per-component adaptation hooks and a shared conformance suite. (ADR-0506/ADR-0507/ADR-0508 retargeted to platform v0.7 on 2026-08-30 — see that band above; WP-48–WP-51 stay tracked in the [OKF roadmap](okf-roadmap.md).)
-- **OKF v0.3** — live reconciliation: the AIAgent operator watches the `zuno-okf` repository and reconciles running agent configuration within CR-declared boundaries. (ADR-0509/ADR-0510 retargeted to platform v0.7 on 2026-08-30 — see that band above; WP-52/WP-53 stay tracked in the [OKF roadmap](okf-roadmap.md).)
+- **OKF v0.1** — content excellence in-repo: the two-stage agent maturity
+  model, generated per-agent authorization matrices, real `deployment/`
+  content, the `tests/` target structure, per-conversation task tabs.
+  **8 ADRs.** Open: ADR-0501. No open work packages.
+- **OKF v0.2 / OKF v0.3** — extraction into `zuno-okf` and live operator
+  reconciliation. Both milestones are **vacant**: every ADR that defined them
+  (ADR-0506 – ADR-0510) was retargeted to platform v0.7 on 2026-08-30. Their
+  work packages (WP-48 – WP-53) are tracked as phases 34–35 of the
+  [implementation roadmap](implementation-roadmap.md).
