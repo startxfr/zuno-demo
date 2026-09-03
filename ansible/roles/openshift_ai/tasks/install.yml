@@ -249,3 +249,12 @@
 # decision 5 as amended, WP-123). All the rationale lives in the shared file.
 - name: "openshift_ai | apply the RHOAI dashboard feature flags"
   ansible.builtin.include_tasks: dashboard_feature_flags.yml
+
+# Alongside the flags, and for the same "no applier at all" reason: RHOAI
+# 3.5.0's dashboard Deployment ships its new core-bff container with no
+# ServiceAccount token mounted, so that container CrashLoopBackOffs and the
+# rollout to the GA's three-container pod never completes. Shared with
+# reconcile.yml. All the rationale, including the measured proof that the
+# patch survives the operator's Server-Side Apply, lives in the shared file.
+- name: "openshift_ai | mount the dashboard SA token into core-bff (RHOAI 3.5.0 defect)"
+  ansible.builtin.include_tasks: dashboard_core_bff_token.yml

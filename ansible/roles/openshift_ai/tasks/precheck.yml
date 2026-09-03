@@ -400,6 +400,66 @@
     - (_oai_dashboard_config.resources | default([]) | length) == 0 or (_oai_dashboard_drifted | bool)
     - blocked_findings is defined
 
+# --- core-bff ServiceAccount token tripwire (RHOAI 3.5.0 packaging defect) --
+# RHOAI 3.5.0 GA replaced the dashboard pod's seven module-UI containers with
+# one `core-bff`, and mounts no ServiceAccount token into it - while the pod
+# still sets automountServiceAccountToken: false. core-bff dies on
+# "open /var/run/secrets/kubernetes.io/serviceaccount/token: no such file or
+# directory" and the rollout to the GA pod shape never finishes.
+#
+# This needs a tripwire precisely BECAUSE nothing else notices: the previous
+# ReplicaSet keeps serving, so the Deployment stays Available, the DSC reports
+# DashboardReady=True, and `make d0 check` is green while the platform quietly
+# runs the old dashboard forever. dashboard_core_bff_token.yml repairs it on
+# install and reconcile; this only reports, per precheck's read-only contract,
+# and deliberately does not gate _state_is_installed below.
+- name: "openshift_ai | precheck: read the rhods-dashboard Deployment for the core-bff token mount"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: rhods-dashboard
+    namespace: redhat-ods-applications
+  register: _oai_dashboard_deploy
+  failed_when: false
+
+- name: "openshift_ai | precheck: is core-bff present and missing its token mount?"
+  ansible.builtin.set_fact:
+    # Two separate facts, not one boolean: a 3.4/ea.2 dashboard has no
+    # core-bff at all and must stay silent, which is not the same as a 3.5.0
+    # core-bff that is present and broken.
+    _oai_core_bff: >-
+      {{ (_oai_dashboard_deploy.resources | default([]) | first | default({}))
+         .get('spec', {}).get('template', {}).get('spec', {}).get('containers', [])
+         | selectattr('name', 'equalto', 'core-bff') | list }}
+  failed_when: false
+
+- name: "openshift_ai | precheck: core-bff token-mount summary"
+  ansible.builtin.debug:
+    msg: >-
+      rhods-dashboard core-bff:
+      {{ 'container not present (pre-3.5.0 dashboard) - nothing to check'
+         if (_oai_core_bff | default([]) | length) == 0
+         else ('token mounted - OK'
+               if ((_oai_core_bff | first).get('volumeMounts', [])
+                   | selectattr('name', 'equalto', 'dashboard-sa-token') | list | length) > 0
+               else 'NO ServiceAccount token mounted - core-bff cannot start') }}
+
+- name: "openshift_ai | precheck: record the missing core-bff token mount"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "Deployment/rhods-dashboard container core-bff (redhat-ods-applications)"
+      state: "no ServiceAccount token mounted - core-bff CrashLoopBackOff, GA rollout stalled"
+      cause: "RHOAI 3.5.0 GA packaging defect (verified live 2026-09-03): the dashboard pod sets automountServiceAccountToken: false and compensates with a projected `dashboard-sa-token` volume, mounted into rhods-dashboard and kube-rbac-proxy but NOT into the core-bff container the GA introduces. core-bff exits on 'no kubeconfig found ... open /var/run/secrets/kubernetes.io/serviceaccount/token: no such file or directory'. NOTHING ELSE REPORTS THIS: the previous ReplicaSet keeps serving, so the Deployment stays Available and the DSC still reports DashboardReady=True while the cluster runs the old dashboard indefinitely."
+      solution: "Re-apply with the auto-fix below (ansible/roles/openshift_ai/tasks/dashboard_core_bff_token.yml). The patch is additive and survives the operator's Server-Side Apply because volumeMounts is a map-type list keyed on mountPath - measured across a forced operator restart. When a RHOAI 3.5.z ships the mount upstream the operator claims that key and this becomes a no-op: that is the signal to delete this tripwire, dashboard_core_bff_token.yml and the additive Role in gitops/charts/openshift-ai/templates/rbac-kserve-module-networkpolicy.yaml together."
+      auto_fix: "make d1 reconcile openshift-ai"
+  when:
+    - (_oai_core_bff | default([]) | length) > 0
+    - ((_oai_core_bff | first).get('volumeMounts', [])
+       | selectattr('name', 'equalto', 'dashboard-sa-token') | list | length) == 0
+    - blocked_findings is defined
+
 - name: "openshift_ai | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-

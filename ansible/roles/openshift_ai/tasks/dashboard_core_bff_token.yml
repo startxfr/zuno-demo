@@ -1,0 +1,130 @@
+---
+# Mounts the dashboard ServiceAccount token into the `core-bff` container of
+# Deployment/rhods-dashboard (redhat-ods-applications), working around a
+# packaging defect in RHOAI 3.5.0 GA.
+#
+# Included by BOTH install.yml and reconcile.yml, the same shape as
+# right_size_monitoring_stack.yml and dashboard_feature_flags.yml, and for the
+# same reason: without an applier this is a hand-run `oc patch` that no fresh
+# cluster would ever receive.
+#
+# THE DEFECT (RHOAI 3.5.0, verified live 2026-09-03). The dashboard pod sets
+# `automountServiceAccountToken: false` and compensates with an explicit
+# projected volume, `dashboard-sa-token`, mounted at the standard in-cluster
+# path. The GA replaced the ea.2 pod's seven module-UI containers (which used
+# a second volume, `modules-sa-token`) with one new `core-bff` container - and
+# that container mounts NEITHER volume. It dies immediately on:
+#
+#   failed to create Kubernetes client: failed to get kubeconfig for SA
+#   client: no kubeconfig found ... and not running in-cluster
+#   (open /var/run/secrets/kubernetes.io/serviceaccount/token:
+#    no such file or directory)
+#
+# so the pod stays 3/4 in CrashLoopBackOff and the rollout to the GA's
+# three-container shape never completes. Impact is bounded but permanent: the
+# previous ReplicaSet keeps serving, so the Deployment stays available and
+# nothing pages, which is exactly why this can sit unnoticed.
+#
+# WHICH TOKEN, and why it is not a guess. `dashboard-sa-token` (ServiceAccount
+# rhods-dashboard) is the one the two sibling containers already mount, it is a
+# projected auto-rotating token, and its ServiceAccount holds three
+# ClusterRoles and three Roles. The alternative, `modules-sa-token`, is backed
+# by ServiceAccount odh-dashboard-modules - an ea.2 leftover with a single
+# ClusterRole, superseded by the eight per-module ServiceAccounts the GA
+# creates (odh-dashboard-automl, -maas, -mlflow, ...). Confirmed live by
+# applying it: core-bff read ca.crt and service-ca.crt from the volume, reached
+# the API ("Auto-detected platform platform=OpenShift"), built its real client
+# ("Using real BFF client factory") and served TLS on :8943. Both pods then
+# reached 4/4 with zero restarts and the blocked GA rollout completed.
+#
+# WHY A PATCH SURVIVES THE OPERATOR - measured, not assumed. dashboard-operator
+# owns this Deployment and re-applies it with Server-Side Apply, so the obvious
+# expectation is that our mount gets pruned. It does not, because volumeMounts
+# is a MAP-type list in SSA, keyed on mountPath, not an atomic one. Read off
+# managedFields after forcing a full reconcile (operator pod deleted 13:06:11,
+# "Standalone mode reconciled successfully" at 13:06:58):
+#
+#   dashboard-operator  owns k:{"mountPath":"/tmp"}, k:{"mountPath":"/etc/tls/private"}, ...
+#   kubectl-patch       owns k:{"mountPath":"/var/run/secrets/kubernetes.io/serviceaccount"}
+#
+# Two managers co-own disjoint entries of the same list. The operator declares
+# only its own six and prunes nothing else, so the mount survived the restart,
+# the reconcile left generation unchanged, and the pods never restarted.
+#
+# It is also self-retiring: when a RHOAI 3.5.z ships the missing mount, the
+# operator will claim that same mountPath key, ownership transfers to it, and
+# this task becomes a no-op. THE EXIT: at that point delete this file, its two
+# include sites, precheck.yml's tripwire, AND the additive Role in
+# gitops/charts/openshift-ai/templates/rbac-kserve-module-networkpolicy.yaml -
+# two workarounds for the same GA, one cleanup.
+#
+# Contract, mirroring dashboard_feature_flags.yml: patch-only, never fails on
+# its own, records nothing and decides nothing. Task names use a neutral
+# "dashboard:" prefix because the two callers use different phase words.
+#
+# TRAPS:
+#   1. Use a STRATEGIC merge patch (the module's default for a built-in
+#      Deployment), never a JSON patch with a container index. `containers`
+#      merges on `name` and `volumeMounts` on `mountPath`, so the definition
+#      below adds one entry and touches nothing else. A `/containers/2/...`
+#      JSON pointer would silently target the wrong container the day the
+#      operator reorders them.
+#   2. Do NOT set merge_type: merge here. Unlike the OdhDashboardConfig CR
+#      next door, Deployment is a built-in with strategic-merge metadata, and
+#      RFC 7386 would REPLACE the volumeMounts array wholesale - dropping the
+#      operator's own six mounts.
+#   3. `state: patched` cannot CREATE the Deployment: if the dashboard
+#      component has not reconciled yet the lookup returns nothing and this
+#      no-ops silently. That is why the guarded wait below exists, and why
+#      precheck.yml carries the tripwire rather than relying on this file.
+
+- name: "openshift_ai | dashboard: look up the operator-created rhods-dashboard Deployment"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    name: rhods-dashboard
+    namespace: redhat-ods-applications
+  register: _openshift_ai_dashboard_deploy
+  # Created asynchronously after the DSC is accepted, same as the
+  # OdhDashboardConfig next door. Bounded and never fatal: on timeout the patch
+  # skips and `make d1 reconcile openshift-ai` re-applies it later.
+  until: (_openshift_ai_dashboard_deploy.resources | default([]) | length) > 0
+  retries: "{{ openshift_ai_dashboard_config_wait_retries | default(30) }}"
+  delay: "{{ openshift_ai_dashboard_config_wait_delay | default(10) }}"
+  failed_when: false
+
+- name: "openshift_ai | dashboard: does core-bff exist, and does it already have the token mount?"
+  ansible.builtin.set_fact:
+    # Guarded with default([]) at every hop: on a 3.4 or ea.2 dashboard there
+    # is no core-bff container at all, and this must stay a silent no-op there
+    # rather than erroring on a missing key.
+    _openshift_ai_core_bff: >-
+      {{ (_openshift_ai_dashboard_deploy.resources | default([]) | first | default({}))
+         .get('spec', {}).get('template', {}).get('spec', {}).get('containers', [])
+         | selectattr('name', 'equalto', 'core-bff') | list }}
+  when: (_openshift_ai_dashboard_deploy.resources | default([]) | length) > 0
+
+- name: "openshift_ai | dashboard: mount the dashboard SA token into core-bff (RHOAI 3.5.0 packaging defect)"
+  kubernetes.core.k8s:
+    state: patched
+    # merge_type deliberately unset - see TRAP 2 above. Deployment is a
+    # built-in, so the module's strategic-merge default is what makes this an
+    # additive patch keyed on container name and mountPath.
+    api_version: apps/v1
+    kind: Deployment
+    name: rhods-dashboard
+    namespace: redhat-ods-applications
+    definition:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: core-bff
+                volumeMounts:
+                  - name: dashboard-sa-token
+                    mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+                    readOnly: true
+  when:
+    - (_openshift_ai_core_bff | default([]) | length) > 0
+    - (_openshift_ai_core_bff | default([]) | first).get('volumeMounts', [])
+      | selectattr('name', 'equalto', 'dashboard-sa-token') | list | length == 0
