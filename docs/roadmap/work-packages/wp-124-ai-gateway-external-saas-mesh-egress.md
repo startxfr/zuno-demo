@@ -1,6 +1,6 @@
 # WP-124: Restore ai-gateway's egress to external SaaS providers
 
-- **State:** Not started
+- **State:** Repo work merged (2026-09-03) - live-verified, see "Live verification" below
 - **ADRs:** ADR-0415 (SDXL via OVHcloud AI Endpoints), ADR-0416 (gpt-oss-120b
   via OVHcloud), ADR-0417 (Codestral via Mistral API) - the three provider
   decisions this defect silently voids; ADR-0537 (Decision 3/4, the
@@ -132,13 +132,51 @@ traffic on the pod's loopback.
 - `python3 platform/docs/check_docs.py` exits 0.
 - From inside `ai-gateway`, an HTTPS request to each host returns the same
   status a non-mesh pod gets (`200` for OVHcloud, `401` for Mistral).
-- Envoy's `rq_success` for both clusters advances above 0 and
-  `cx_connect_fail` stops climbing.
+- Envoy's `cx_connect_fail` for both clusters stays at 0 while `cx_total`
+  and `rq_total` advance. Note `rq_success` does NOT advance and must not
+  be used as the criterion: with `tls: DISABLE` Envoy passes the
+  application's own TLS through opaquely, so it never sees an upstream
+  HTTP status to count.
 - `make d3 stresstest agents BULK=0`: Comage's `img-mockup_request` and
   `comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests`
   reach a real SDXL image, with `sxa_visualization_boundary` still 1/1.
 - `ai-gateway` logs show `image_call: provider=ovhcloud-sdxl` no longer
   followed by `Connection error`.
+
+## Live verification (2026-09-03)
+
+Pushed (`ebdf0d55`) and synced `zuno-models-d1`. Both DestinationRules
+created; the same probe that failed before now succeeds from inside
+`ai-gateway`, matching the non-mesh baseline exactly:
+
+```
+https://oai.endpoints.kepler.ai.cloud.ovh.net/v1/models -> HTTP 200
+https://api.mistral.ai/v1/models                        -> HTTP 401 (TLS OK)
+```
+
+Envoy's counters, same command that produced the 49/49 and 30/30 figures
+above (the clusters were rebuilt on the config change, so totals restart):
+
+```
+outbound|443||oai.endpoints.kepler.ai.cloud.ovh.net::51.68.117.147:443::cx_connect_fail::0
+outbound|443||oai.endpoints.kepler.ai.cloud.ovh.net::51.68.117.147:443::cx_total::1
+outbound|443||oai.endpoints.kepler.ai.cloud.ovh.net::51.68.117.147:443::rq_total::1
+outbound|443||api.mistral.ai::162.159.142.207:443::cx_connect_fail::0
+outbound|443||api.mistral.ai::162.159.142.207:443::cx_total::1
+outbound|443||api.mistral.ai::162.159.142.207:443::rq_total::1
+```
+
+**Sync gotcha worth recording.** The first sync appeared to run but stayed
+pinned to an old revision (`syncResult.revision 9439e3b8`) with phase
+`Running` and "successfully synced (all tasks run)", and created nothing -
+the same shape as the already-documented "a stuck operation pins the sync
+revision" trap. `oc annotate ... argocd.argoproj.io/refresh=hard` moved the
+app to `ebdf0d55` and the DestinationRules appeared within seconds. Check
+`.status.sync.revision` actually matches your commit before concluding a
+sync did anything.
+
+Still outstanding: the end-to-end `make d3 stresstest agents BULK=0` run,
+and WP-112's closure that depends on it.
 
 ## Out of scope
 
