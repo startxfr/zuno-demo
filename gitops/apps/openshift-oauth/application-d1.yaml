@@ -39,8 +39,19 @@ spec:
         # trusts the same Vault PKI root via proxy/cluster.spec.trustedCA.
         # ConfigMap created by the same Ansible task as oauth.openidCaConfigMap.
         clusterTrustedCA:
+          # Keep this true: it means "the chart owns
+          # Proxy/cluster.spec.trustedCA.name", NOT "a private CA is in use".
+          # Flipping it to false stops the template rendering and, with
+          # Prune=false, strands whatever value is live on the cluster -
+          # precisely the 2026-09-03 dangling-reference outage.
           enabled: true
-          configMapName: user-ca-bundle
+          # Placeholder, like clusterBaseDomain below: overwritten at apply
+          # time by ansible/roles/openshift_oauth/tasks/install.yml -
+          # user-ca-bundle when this cluster has a private PKI root (Vault
+          # pki/, ADR-0316), "" when it does not. "" is the safe value to
+          # hold in git: a hand-applied manifest then clears the field rather
+          # than pointing it at a ConfigMap that may not exist.
+          configMapName: ""
         # Literal placeholder - ansible/tasks/apply_gitops_app.yml replaces
         # this exact string with the real discovered domain before
         # applying (same mechanism gitops/apps/keycloak/application-d1.yaml

@@ -4,8 +4,10 @@
 # fields (httpProxy, httpsProxy, noProxy, status, ...) this chart must
 # never touch. kubernetes.core.k8s (Ansible) and ArgoCD's default apply
 # both merge only the fields a manifest declares, leaving fields owned by
-# other managers alone - safe here since proxy/cluster.spec.trustedCA.name
-# was confirmed empty/unclaimed on the demo cluster before this landed.
+# other managers alone. This chart IS the declared owner of
+# spec.trustedCA.name (and of nothing else on this object): it writes the
+# ConfigMap name when a private PKI root exists, and an explicit empty
+# string when none does.
 # Complements (does not replace) the scoped oauth.openidCaConfigMap fix
 # in templates/oauth.yaml: same Vault PKI root, trusted two ways.
 apiVersion: config.openshift.io/v1
@@ -22,5 +24,15 @@ metadata:
     argocd.argoproj.io/sync-options: Prune=false
 spec:
   trustedCA:
-    name: {{ .Values.clusterTrustedCA.configMapName }}
+    # An EMPTY string here is meaningful, not a no-op - it is how this chart
+    # actively releases the field. Gating the whole template off instead
+    # renders nothing, and with Prune=false above ArgoCD then leaves whatever
+    # is live in place forever: that is how a reference to a ConfigMap
+    # install.yml had already deleted survived from 2026-08-16 to 2026-09-03
+    # and put `oc get co network` Degraded=True cluster-wide
+    # ("failed to get trustedCA configmap ... user-ca-bundle not found").
+    #
+    # | quote is load-bearing: unquoted, an empty value renders `name:`,
+    # i.e. YAML null, which is not the same request as an empty string.
+    name: {{ .Values.clusterTrustedCA.configMapName | quote }}
 {{- end }}

@@ -58,8 +58,25 @@ oauth:
 # oauth.openidCaConfigMap; only the reference (this chart's
 # templates/cluster-trusted-ca.yaml) is Helm-rendered. Off by default.
 clusterTrustedCA:
+  # "does this chart OWN proxy/cluster.spec.trustedCA.name?" - NOT "is a
+  # private CA in use". That distinction is the 2026-09-03 fix: the template
+  # is `{{- if }}`-gated and the Application carries Prune=false, so turning
+  # this off renders nothing and strands whatever value is already live on
+  # the object. Off must therefore be expressed as configMapName: "", not as
+  # enabled: false. Left false here so `helm template` with no overrides
+  # still renders zero Proxy objects (ADR-0347 acceptance criterion 5), and
+  # so a cluster whose admin legitimately owns spec.trustedCA - a corporate
+  # egress-proxy bundle - is never clobbered by this chart.
   enabled: false
-  configMapName: user-ca-bundle
+  # Which ConfigMap in openshift-config the Proxy trusts, or "" to actively
+  # release the field. Written at apply time by
+  # ansible/roles/openshift_oauth/tasks/install.yml from the one fact that
+  # decides it - whether this cluster has a private PKI root worth trusting
+  # cluster-wide - so the ConfigMap's existence and this reference can no
+  # longer disagree. "" is the safe default: naming a ConfigMap that does not
+  # exist degrades the `network` clusteroperator cluster-wide, which is
+  # exactly what happened between 2026-08-16 and 2026-09-03.
+  configMapName: ""
 
 # Literal placeholder - gitops/apps/openshift-oauth/application-d1.yaml's
 # inline values carry the literal string "apps.mycluster.example.com",

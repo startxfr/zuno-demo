@@ -43,6 +43,25 @@
     namespace: openshift-config
   register: _openshift_oauth_trust_bundle_lookup
 
+# ADR-0347, amended 2026-09-03: user-ca-bundle only has to exist when
+# Proxy/cluster actually references it. On an ACME cluster (ADR-0211)
+# there may be no private PKI root to distribute, install.yml then removes
+# the ConfigMap and the chart renders spec.trustedCA.name: "" - so
+# requiring the ConfigMap unconditionally reported "openshift-oauth is NOT
+# installed" permanently on a perfectly healthy cluster (verified live
+# 2026-09-03, while ClusterOperator/authentication was Available=True).
+#
+# Reading the live Proxy rather than re-deriving the certificate fact keeps
+# this state-detection file lookup-light and never-failing, and encodes the
+# invariant whose violation actually broke the cluster: a reference points
+# at something that exists.
+- name: "openshift_oauth | look up Proxy/cluster's trustedCA reference"
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Proxy
+    name: cluster
+  register: _openshift_oauth_proxy_lookup
+
 - name: "openshift_oauth | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-
@@ -53,7 +72,11 @@
         and (_openshift_oauth_lookup.resources[0].spec.identityProviders
              | default([]) | selectattr('name', 'equalto', 'openshift') | list | length) > 0
         and (_openshift_oauth_ca_lookup.resources | default([]) | length) > 0
-        and (_openshift_oauth_trust_bundle_lookup.resources | default([]) | length) > 0
+        and (
+          (_openshift_oauth_proxy_lookup.resources | default([]) | length) == 0
+          or ((_openshift_oauth_proxy_lookup.resources[0].spec.trustedCA.name | default('')) | length) == 0
+          or (_openshift_oauth_trust_bundle_lookup.resources | default([]) | length) > 0
+        )
       }}
 
 - name: "openshift_oauth | record install state"
