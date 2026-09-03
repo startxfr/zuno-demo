@@ -90,6 +90,20 @@ kueueOperand:
   # queue yet). Extend this list only once a real consumer needs it.
   integrationFrameworks:
     - BatchJob
+  # ADR-0538/WP-117. `QueueName` = a Job without kueue.x-k8s.io/queue-name is
+  # ignored by Kueue. `None` = Jobs are suspended on creation and the label is
+  # ADDED for them by the mjob.kb.io mutating webhook - i.e. every Job in a
+  # `kueue.openshift.io/managed` namespace gets enrolled whether or not anyone
+  # asked. That is exactly what WP-117's first attempt hit, on another
+  # session's Jobs, so this is set EXPLICITLY rather than inherited:
+  # `oc explain` says an unset value lets the operator choose "a reasonable
+  # default, which is subject to change over time".
+  #
+  # Do not infer the behaviour from the rendered kueue-manager-config: it
+  # reported `manageJobsWithoutQueueName: false` (the QueueName semantic)
+  # while the webhook was stamping anyway. Controller config and webhook
+  # behaviour are separate; only this field governs the webhook.
+  labelPolicy: QueueName
 
 # Default ResourceFlavor/ClusterQueue/LocalQueue - matches
 # gitops/charts/openshift-ai/values.yaml's DataScienceCluster

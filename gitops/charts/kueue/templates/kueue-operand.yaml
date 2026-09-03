@@ -21,4 +21,12 @@ spec:
         {{- range .Values.kueueOperand.integrationFrameworks }}
         - {{ . }}
         {{- end }}
+    {{- with .Values.kueueOperand.labelPolicy }}
+    # ADR-0538/WP-117: whether the mjob.kb.io mutating webhook enrolls every
+    # Job in a managed namespace, or only those that ask. See values.yaml -
+    # this is set explicitly because the unset default is documented as
+    # subject to change.
+    workloadManagement:
+      labelPolicy: {{ . }}
+    {{- end }}
 {{- end }}
