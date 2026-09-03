@@ -66,3 +66,55 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 This ADR names `make d0 reconcile openshift-oauth` as the remedy for a router-cert rotation. That command has never worked: `openshift-oauth` is a Day 1 component (`DAY1_RUN_COMPONENTS`), and `reconcile` was a Day 0 verb, so the Day 0 dispatcher rejected the pair. The same string was recorded as an `auto_fix` hint in `ansible/roles/openshift_oauth/tasks/install.yml`, where nothing validated or executed it.
 
 `reconcile` now exists on Day 1 as well, so **read every occurrence here as `make d1 reconcile openshift-oauth`**. See ADR-0344's 2026-08-25 note for the verb change and for the `check_docs.py` lint that now fails CI on any `auto_fix` naming a command the Makefile would reject.
+
+## Implementation note (2026-09-03) — the cluster-wide anchor is sourced from the Vault root, and "off" is an empty string
+
+This ADR's decision is unchanged. Its implementation was half-conditional, and that
+cost a cluster-wide outage.
+
+**What happened.** `3fd54da7` (2026-08-16) made ConfigMap `user-ca-bundle` conditional
+on the Secret the Keycloak Ingress serves carrying a `ca.crt`, but left
+`clusterTrustedCA.enabled: true` hardcoded in
+`gitops/apps/openshift-oauth/application-d1.yaml`. Two layers then decided the same
+question differently. When ADR-0211's ACME wildcard was re-issued on 2026-09-02
+(`keycloak-wildcard-tls`, `letsencrypt-route53`, no `ca.crt`), the next run of this role
+deleted the ConfigMap and `Proxy/cluster` kept referencing it:
+`ClusterOperator/network` `Degraded=True` from `2026-09-03T08:31:26Z`, cluster-wide.
+
+**The design error, corrected.** Reading the Ingress's current Secret conflates two
+questions: *"what CA signs the cert Keycloak serves?"* (correct for
+`keycloak-serving-ca`/`openID.ca`, and still read that way) and *"does this cluster have
+a private PKI root worth trusting cluster-wide?"* (what `user-ca-bundle` is for). ACME
+changes the first answer and nothing about the second — `CN=zuno-demo.internal` still
+signs `zuno-data/mariadb-server-cert` and `zuno-mesh/istiod`, and was still present in
+all 41 CNO-injected bundles while the reference dangled. The cluster-wide anchor is now
+read from the Vault-issued Secret **by name**, so the ACME flip cannot strand it.
+
+**Corrections to this ADR's own text:**
+
+- **Acceptance criterion 3** — `oc get proxy cluster -o jsonpath='{.spec.trustedCA}'`
+  shows `{"name":"user-ca-bundle"}` **only when this cluster has a private PKI root**.
+  Where it has none, the correct value is `{"name":""}`, not an absent field.
+- **Operational considerations** — the partial patch does now clear
+  `spec.trustedCA.name`, by writing an explicit empty string. It has to: a
+  `{{- if }}`-gated template plus `Prune=false` can never clear anything, which is
+  precisely how the stale reference survived for 18 days. `clusterTrustedCA.enabled`
+  therefore now means *"this chart owns the field"*, not *"a private CA is in use"*;
+  `configMapName: ""` is the off state.
+- **Acceptance criterion 5 still holds** — chart defaults render no `Proxy` at all.
+
+**Latent risk closed at the same time.** `openshift-config/user-ca-bundle` is
+OpenShift's own reserved name for the installer's `additionalTrustBundle`. The 2026-08-16
+removal task deleted it unconditionally, which on a cluster installed behind an egress
+proxy would be a cluster-wide egress outage caused by this role. Creation now labels it
+`zuno.io/managed-by: zuno-ansible` and removal refuses anything without that label.
+demo222 was unaffected (`httpProxy`/`httpsProxy`/`noProxy` all empty), which is why this
+went unnoticed.
+
+**Live evidence (2026-09-03).** ConfigMap restored with `CN=zuno-demo.internal`
+(valid to 2036); `network` `Degraded=False`; all 34 ClusterOperators
+`Available=True Progressing=False Degraded=False`; the injected bundle holds 147
+certificates before and after, still including the Vault root — **a zero trust delta**,
+because `keycloak-tls` and `mariadb-server-cert` carry a byte-identical `ca.crt`;
+`OAuth/cluster` intact (both IDPs, all three templates, `tokenMaxAge`); Keycloak's OIDC
+discovery returns 200 **without** `-k`.

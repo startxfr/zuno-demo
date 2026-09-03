@@ -49,11 +49,35 @@ from cluster-specific data (Helm can't render them):
   `spec.trustedCA` - `Proxy`/`cluster` carries other operator-managed
   fields this chart must never touch).
 
-Both copies run unconditionally on every install, so a rotated Keycloak
-cert or regenerated Vault root is healed by re-running `make day1 install
-openshift-oauth` (no `day1_reconcile.yml` exists in this repo -
-`install.yml` is idempotent); `uninstall.yml` deletes both and
-`precheck.yml` requires both for the component to count as installed.
+The two copies answer **different questions**, and that distinction is
+load-bearing (ADR-0347's 2026-09-03 note):
+
+- `keycloak-serving-ca` asks *"what CA signs the cert Keycloak serves?"* and
+  is read from the Secret the Keycloak Ingress currently references. It is
+  written on every install, in both modes.
+- `user-ca-bundle` asks *"does this cluster have a private PKI root worth
+  trusting cluster-wide?"* and is read from the Vault-issued Secret **by
+  name** (`keycloak-tls`), so ADR-0211's ACME flip cannot strand it. It
+  exists only when that root exists; otherwise it is removed and
+  `Proxy/cluster.spec.trustedCA.name` is set to `""`. Both are steady states.
+
+Conflating the two is what put `ClusterOperator/network` `Degraded=True` for
+part of 2026-09-03: the ConfigMap was deleted while the Proxy still named it.
+
+A rotated Keycloak cert or regenerated Vault root is healed by re-running
+`make day1 install openshift-oauth`, or `make d1 reconcile openshift-oauth`
+(this role has no `reconcile.yml`; `run_component.yml` falls back to the
+idempotent `install.yml`). `uninstall.yml` resets the Proxy reference and
+deletes both ConfigMaps. `precheck.yml` requires `keycloak-serving-ca`
+unconditionally, but `user-ca-bundle` **only when the live Proxy references
+it** - requiring it unconditionally reported "NOT installed" forever on a
+healthy ACME cluster.
+
+`user-ca-bundle` is OpenShift's own reserved name for the installer's
+`additionalTrustBundle`, so this role labels what it creates
+(`zuno.io/managed-by: zuno-ansible`) and **refuses to delete a ConfigMap
+carrying no such label** - on a proxy-installed cluster, deleting it would
+take out cluster-wide egress trust.
 
 ## Referenced startx Secrets (never created here)
 

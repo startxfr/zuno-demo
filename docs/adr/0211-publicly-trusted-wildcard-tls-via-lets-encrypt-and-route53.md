@@ -106,3 +106,40 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered a
 - [ADR-0316](0316-keycloak-route-tls-via-cert-manager.md)
 - [ADR-0346](0346-trust-the-ingress-router-ca-and-absorb-the-startx-cluster-auth-oauth-settings.md)
 - [ADR-0347](0347-trust-the-vault-pki-root-for-the-oauth-openid-idp.md)
+
+## Implementation note (2026-09-03) — the Consequences follow-up, partially answered
+
+The Consequences section proposes a follow-up ADR to "evaluate retiring
+`keycloak-serving-ca`, `user-ca-bundle`, `Proxy/cluster.spec.trustedCA`, and
+`oauth.openidCaConfigMap`". That follow-up was never written, and the gap bit:
+
+On 2026-09-02 the ACME wildcard was re-issued as Keycloak's serving cert
+(`keycloak-wildcard-tls`, `letsencrypt-route53` — `tls.crt`/`tls.key` only, no `ca.crt`).
+`ansible/roles/openshift_oauth/tasks/install.yml` correctly deleted `user-ca-bundle` in
+response, but `gitops/apps/openshift-oauth/application-d1.yaml` still pointed
+`Proxy/cluster.spec.trustedCA` at it. `ClusterOperator/network` went `Degraded=True` at
+`2026-09-03T08:31:26Z`.
+
+**The answer is: do not retire them yet — make them self-consistent instead.** The
+premise "these become redundant" is true for the *browser-facing* paths and false for
+the cluster as a whole. Measured live on 2026-09-03:
+
+- The Vault root `CN=zuno-demo.internal` (valid to 2036) still signs
+  `zuno-data/mariadb-server-cert` and `zuno-mesh/istiod`, and was still present in all
+  41 CNO-injected trust bundles. Clearing `Proxy/cluster.spec.trustedCA` would have
+  **removed** it, which is a real change, not a cleanup.
+- So `user-ca-bundle` is now sourced from the Vault root **by name**, independently of
+  which certificate Keycloak happens to serve. Both modes — private root present, or
+  absent — are steady states. See ADR-0347's 2026-09-03 note.
+
+**Still open, and deliberately not bundled into that fix:** retiring
+`oauth.openidCaConfigMap`. `openID.ca` is a *replacing* trust-anchor set for the
+oauth-server, not an additive one; getting it wrong degrades `authentication` and locks
+out every non-`kubeadmin` login. It keeps working under ACME only because
+`openshift-config-managed/default-ingress-cert` now carries the full Let's Encrypt
+chain, of which `keycloak-serving-ca` is a **snapshot taken at install time**. That
+survives ordinary 60-day leaf renewals, but a Let's Encrypt *intermediate* rotation
+would stale it and re-degrade `authentication` with ADR-0347's original x509 message
+until `make d1 reconcile openshift-oauth` runs. Nothing watches for that today. The
+clean retirement is `oauth.openidCaConfigMap: ""` in ACME mode, since system roots track
+Let's Encrypt natively — a separate, deliberate change.
