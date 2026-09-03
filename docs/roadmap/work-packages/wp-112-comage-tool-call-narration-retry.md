@@ -1,22 +1,23 @@
 # WP-112: Design a retry for skipped tool calls on the single-shot graph shape
 
-- **State:** Repo work merged (2026-09-03) - NOT Done, pending a live
-  re-run of the second fix. History: the 2026-09-03 re-test (after WP-122
-  closed the MaaS 401s) showed both named checks still FAIL with the retry
-  never firing at all - `_NARRATED_TOOL_NAME_PATTERN` matches only the
-  literal tool name, and the live French narration describes using "the
-  tool" without ever saying `generate_image`. Rather than widen that
-  shared-runtime trigger first, a second fix landed the same day: the
-  explicit "actually invoke it" system-prompt instruction that closed the
-  identical defect for Arkos (`b0cb07f4`, 1/3 -> 3/3), which
-  `agents/comage/prompts/check-deal-status.md` had never had. Comage-only,
-  no shared-runtime change. Needs rebuild + `make d3 sign agents` +
-  `make d3 stresstest agents BULK=0` to confirm; widening the trigger
-  remains the designed next step if it does not close. The retry
-  mechanism's own correctness is still proven (2026-09-02 evidence: a real
-  `generate_image` call reaching `mcp-gateway`/`ai-gateway` for the first
-  time). See "Second fix (2026-09-03)" and both "Live verification"
-  sections below.
+- **State:** Repo work merged (2026-09-03) - blocked on an unrelated
+  platform defect, not on this WP. **The narrate-instead-of-call defect
+  this WP targets is fixed and live-proven**: after the second fix (the
+  Arkos-precedent "actually invoke it" system-prompt instruction, which
+  `agents/comage/prompts/check-deal-status.md` had never carried), the
+  2026-09-03 re-run shows Comage's marketing prompt making a real
+  `generate_image` call through `mcp-gateway` to `ai-gateway`, with no
+  prose narration anywhere in the run, and `sxa_visualization_boundary`
+  still passing. Both named checks nonetheless still report FAIL, for two
+  reasons now understood and neither of them narration: (1) every external
+  SaaS provider is unreachable from `ai-gateway` because
+  `automountServiceAccountToken: false` denies its sidecar the root CA
+  that the MaaS `tls: SIMPLE` DestinationRules need - our own config
+  defect, wider than this WP, needs its own WP; (2) `img-mockup_request`
+  now gets a defensible grounding-based decline rather than a narration,
+  recorded as a finding. Widening `_NARRATED_TOOL_NAME_PATTERN` is no
+  longer the indicated next step - there is no narration left to detect.
+  See "Live verification (2026-09-03, second run)" for the full evidence.
 - **ADRs:** ADR-0516 (Decision - the tool-schema/prompt contradiction ADR-0516
   accepted as an unmitigated risk; that risk has now manifested with live
   evidence). ADR-0516 itself stays `Implemented`/v0.4 - this WP does not
@@ -388,6 +389,109 @@ the security check's *marketing* half separately: its prompt is
 unambiguous, carries no "mockup" wording, and no narration snippet was
 ever captured for it, so it may be a plain miss with no narration - a case
 no reply-text trigger could ever catch.
+
+## Live verification (2026-09-03, second run) - narration gap CLOSED, two residuals
+
+Rebuilt (`agent-runtime-24`), re-signed (`make d3 sign agents` - the
+rebuild first crashlooped on `agents/comage: signature verification
+failed`, exactly what that step exists to clear), then re-ran
+`make d3 stresstest agents BULK=0`.
+
+**The defect this WP exists to fix no longer reproduces.** For the first
+time, Comage's marketing prompt produced a real tool invocation:
+
+```
+10:24:31 mcp_gateway tool=generate_image capability=image.generation.create
+         agent=comage task=check-deal-status classification=C2 allowed=True
+10:24:31 ai_gateway image_call: provider=ovhcloud-sdxl model=stable-diffusion-xl-base-v10
+```
+
+Exactly one `generate_image` call, inside the security check's own window
+(10:24:24 -> 10:24:35), so it is unambiguously the *marketing* half; the
+*chart* half correctly produced nothing. No prose narration anywhere in
+the run. The prompt instruction did what the trigger widening was meant
+to do, without touching shared runtime code.
+
+| Check | Result | Detail |
+| --- | --- | --- |
+| `img-mockup_request` | FAIL | `images=0`, but no longer narration - see below |
+| `comage_chat_uses_photorealistic_images_only_...` | FAIL | real tool call made; blocked downstream, see below |
+| `diagram-sales_process_flow` | PASS | `images=1 mime_types=['image/svg+xml']` |
+| `sxa_visualization_boundary` | PASS | the deliberate decline still works - the decline clause held |
+| acceptance 10 / 12 | FAIL | pre-existing, absent `salesforce-mcp` (WP-101) |
+
+### Residual 1 - `img-mockup_request` changed nature, and is arguably correct now
+
+The reply is no longer narration. It is a grounding-based request for
+input:
+
+> "J'ai pas de document de reference pour construire un mockup realiste.
+> Fournis le contenu exact a illustrer et j'genere le visuel proprement."
+
+No tool call was made for this probe (the only other call in the window,
+`generate_diagram` at 10:24:44, is `diagram-sales_process_flow`). This is
+not the narrate-instead-of-call defect: the model is declining for lack of
+material and saying what it needs, which is defensible behavior for a
+prompt ("Can you generate a mockup image to go with this deal's
+proposal?") that supplies no content to illustrate.
+
+**Recorded as a finding, deliberately not fixed here.** Widening
+`_NARRATED_TOOL_NAME_PATTERN` would do nothing for it - there is no tool
+name and no narration in that text to detect. Closing it would mean either
+rewording the probe or pushing the prompt to generate without grounding,
+and the second directly contradicts `check-deal-status`'s whole
+factual-grounding posture, which `sxa_visualization_boundary` exists to
+protect. Whether this probe should still assert `bool(images)` on a
+content-free prompt is a question for the probe's owner, not a runtime
+defect.
+
+### Residual 2 - the SDXL failure is NOT an external outage; it is our own config
+
+The 2026-09-02 conclusion ("An external-service outage, not a code
+defect") is **wrong** and is corrected here. Traced this run:
+
+```
+10:24:31 openai._base_client Retrying request to /images/generations in 0.45s
+10:24:32 openai._base_client Retrying request to /images/generations in 0.88s
+10:24:33 WARNING ai_gateway image provider 'ovhcloud-sdxl' failed: Connection error.
+         "POST /v1/images/generations HTTP/1.1" 502 Bad Gateway
+```
+
+Evidence chain:
+
+1. Envoy's own counters in `ai-gateway`'s sidecar:
+   `outbound|443||oai.endpoints.kepler.ai.cloud.ovh.net` shows
+   `cx_total::49`, `cx_connect_fail::49`, `rq_total::0` - every
+   connection since pod start has failed, none ever succeeded. Istio
+   telemetry tags them `response_flags.UF,URX` with 0 bytes sent.
+2. Non-mesh pods (`cert-manager`, `trusted-artifact-signer`) **on the same
+   node** reach `51.68.117.147:443` fine, and so does the `istio-proxy`
+   container itself (its own UID is excluded from redirection). Only
+   Envoy's outbound path fails. A plain TCP probe from the app container
+   "succeeds" and proves nothing - it terminates on the sidecar.
+3. The MaaS reconciler's `DestinationRule gpt-oss-120b-ovhcloud` sets
+   `trafficPolicy.tls.mode: SIMPLE`, i.e. Envoy must originate TLS and
+   validate the upstream certificate.
+4. Its validation context is the SDS resource
+   `file-root:/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`,
+   which the sidecar cannot load - the directory does not exist in that
+   container, because `ai-gateway`'s Deployment sets
+   `automountServiceAccountToken: false`. `mcp-gateway`, which sets it
+   `true`, has the file and does not have this problem.
+
+So the mesh-wide SDS `service-ca.crt` error loop, documented elsewhere as
+benign for ordinary mTLS, is **not** benign on this path: it removes the
+validation context a TLS-origination DestinationRule needs.
+
+**Blast radius is wider than SDXL.** `api.mistral.ai` carries the same
+`tls: SIMPLE` DestinationRule and shows `cx_connect_fail::30` /
+`rq_total::0` across both its IPs. Every external SaaS provider is
+unreachable from `ai-gateway`, and has been since that pod started - the
+platform has been silently falling back to local models.
+
+Out of scope for WP-112 (this WP's code and prompt are correct and
+proven); needs its own WP. WP-112 cannot show `images=1` on either named
+check until it is fixed.
 
 ## Acceptance checks (for this WP's own scope)
 
