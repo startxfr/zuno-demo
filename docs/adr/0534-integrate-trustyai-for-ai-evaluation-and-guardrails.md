@@ -4,6 +4,8 @@
 - **Target:** v0.7
 - **Date:** 2026-08-30
 - **Decision owners:** Zuno Demo architecture team
+- **Amended:** 2026-09-03 (OpenShift AI 3.5 GA deprecation notice) - clarifies which Phase 2
+  surfaces are vendor-deprecated vs. already superseded in this platform
 
 ## Context
 
@@ -240,3 +242,52 @@ Security considerations, Acceptance criteria and Review evidence.
 - [ADR-0010](0010-introduce-a-central-mcp-gateway.md),
   [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md) - the MCP Gateway boundary
   Phase 2's guardrails sit alongside, not inside.
+
+## Amendment (2026-09-03): OpenShift AI 3.5 GA deprecation notice
+
+OpenShift AI 3.5 GA marks FMS Guardrails Orchestrator and LM-Eval standalone/`LMEvalJob` as
+deprecated, recommending NeMo Guardrails as the framework for new deployments (per vendor 3.5 GA
+release notes; no specific citation available). This platform already relies on both deprecated
+surfaces, so this amendment records their status here explicitly rather than leaving a reader to
+assume Phase 2's five-name list (`GuardrailsOrchestrator`, NeMo-guardrails, EvalHub, LM-Eval, RAGAS,
+Garak) is uniformly still this ADR's target architecture:
+
+- **Guardrails backend.** NeMo Guardrails is already this platform's default
+  (`guardrails.backend: nemo`, flipped 2026-09-03,
+  [ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md)/WP-120).
+  `GuardrailsOrchestrator` (`zuno-guardrails-smoke`) is **not** retired by this amendment -
+  ADR-0540 decision 4 retains it, and `DETECTOR_PARAMS`, indefinitely as the declared fallback.
+  The vendor notice is a reason a future decision may retire it; it is not that decision.
+- **Evaluation gate.** `LMEvalJob` remains this platform's only model-quality promotion gate
+  (ADR-0108), explicitly not replaced or superseded per this ADR's own Non-goals. `EvalHub` is
+  live (WP-115) but only as a parallel per-project Evaluations UI - it is not wired into the
+  ADR-0107 promotion gate. No successor decision for `LMEvalJob` exists yet in this repo.
+- **Already-live, not aspirational.** RAGAS, Garak and Zuno's own acceptance/quality gates
+  (ADR-0107) are live parts of the current Phase 2 architecture since WP-108/WP-109, not a future
+  target still to be reached.
+
+```text
+Vendor-flagged for deprecation (OpenShift AI 3.5 GA)
+-----------------------------------------------------
+LMEvalJob                - still this platform's only model-quality gate (ADR-0108);
+                            no successor decided
+GuardrailsOrchestrator    - still deliberately retained as the guardrails fallback
+                            (ADR-0540 decision 4); retirement not yet decided
+
+       |  where a decision has been made, it is already live below
+       v
+
+Already live in this platform
+------------------------------
+NeMo Guardrails           - default guardrails backend since 2026-09-03 (ADR-0540/WP-120)
+RAGAS, Garak               - live evaluation frameworks since Phase 2 (WP-108/109)
+Zuno acceptance gates      - ADR-0107 promotion gate, extended by these results
+EvalHub                    - live per-project Evaluations UI (WP-115); not wired to
+                              the promotion gate
+```
+
+This amendment documents the vendor deprecation and where this platform already tracks it. It does
+**not** itself decide to retire `GuardrailsOrchestrator` or replace `LMEvalJob` - those remain open,
+future decisions. See also
+[ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md) for the guardrails-policy
+decision that made NeMo Guardrails the default backend.

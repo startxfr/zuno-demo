@@ -4,6 +4,8 @@
 - **Target:** v0.7
 - **Date:** 2026-09-02 (amended 2026-09-03)
 - **Decision owners:** Zuno Demo architecture team
+- **Amends:** [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) Phase 2 -
+  clarifies the guardrails backend without retiring GuardrailsOrchestrator
 
 ## Context
 
