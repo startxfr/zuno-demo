@@ -655,6 +655,114 @@ spec:
                   "expr": "sum(rate(zuno_rag_searches_total{outcome=\"error\"}[5m])) / sum(rate(zuno_rag_searches_total[5m]))"
                 }
               ]
+            },
+            {
+              "id": 16,
+              "title": "Searches returning NOTHING (share)",
+              "type": "stat",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "description": "Share of RAG searches that came back with zero rows. A search that finds nothing is outcome=ok, not an error - so the error-ratio stat beside this one stays green while retrieval is silently dead, and the p50/p95 panel above shows a low number rather than an alarming one. This is the shape of the failure the repo has already hit twice: an ingestion run that reports success while indexing nothing, and an embedding batch dropped behind a 503 that a green validate never noticed. Live on 2026-09-03 this read 0.8 - 32 of 40 searches, including the comage chat turn that answered anyway with source_mode=none. NOTE: zuno_rag_result_count carries no agent or domain label, so this is fleet-wide only; to attribute an empty retrieval to one run, use the rag_search span (it carries zuno.run_id, top_k and result_count).",
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 16
+              },
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "percentunit",
+                  "min": 0,
+                  "max": 1,
+                  "thresholds": {
+                    "steps": [
+                      {
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "orange",
+                        "value": 0.25
+                      },
+                      {
+                        "color": "red",
+                        "value": 0.5
+                      }
+                    ]
+                  }
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "(sum(rate(zuno_rag_result_count_bucket{le=\"0.0\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(zuno_rag_result_count_count[$__rate_interval])), 0.0001)",
+                  "legendFormat": "empty retrievals"
+                }
+              ]
+            },
+            {
+              "id": 17,
+              "title": "Answer grounding (zuno.source_mode)",
+              "type": "piechart",
+              "datasource": {
+                "type": "tempo",
+                "uid": "tempo"
+              },
+              "description": "How every agent answer was grounded: indexed (RAG corpus), live (fresh verification), both, or none. This is ADR-0205's acceptance signal - 'traces show whether a response used indexed knowledge, live verification, or both' - and until now no dashboard read it, even though agent-runtime has been setting it on every agent_graph_run span since WP-24. Read it against the empty-retrieval stat beside it: they are independent measurements of the same thing from opposite ends of the pipeline, rag-service counting rows returned and agent-runtime recording what the graph actually used. Agreement is reassuring; a large 'none' slice while retrieval looks healthy, or the reverse, means one of the two is lying.",
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 16
+              },
+              "transformations": [
+                {
+                  "id": "groupBy",
+                  "options": {
+                    "fields": {
+                      "zuno.source_mode": {
+                        "aggregations": [],
+                        "operation": "groupby"
+                      },
+                      "zuno.latency_ms": {
+                        "aggregations": [
+                          "count"
+                        ],
+                        "operation": "aggregate"
+                      }
+                    }
+                  }
+                }
+              ],
+              "options": {
+                "legend": {
+                  "displayMode": "table",
+                  "placement": "right",
+                  "values": [
+                    "value",
+                    "percent"
+                  ]
+                },
+                "pieType": "donut"
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "tempo",
+                    "uid": "tempo"
+                  },
+                  "queryType": "traceql",
+                  "query": "{name=\"agent_graph_run\" && span.zuno.agent=~\"$agent\"} | select(span.zuno.source_mode, span.zuno.latency_ms)",
+                  "limit": 200,
+                  "tableType": "traces",
+                  "refId": "A"
+                }
+              ]
             }
           ]
         },
