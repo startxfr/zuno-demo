@@ -263,6 +263,36 @@ platformNamespaces:
       opendatahub.io/dashboard: "true"
       istio-injection: enabled
       zuno.io/managed: "true"
+      # ADR-0538/WP-117. Read this before adding a Job to this namespace.
+      #
+      # This label enrolls EVERY Job created here into Kueue - all six that
+      # carry Replace=true, and any future one. That is not a setting anyone
+      # chose: enrolment on this operator build is per-namespace and has no
+      # per-workload opt-out. Setting
+      # Kueue.spec.config.workloadManagement.labelPolicy: QueueName
+      # explicitly does NOT stop the mjob.kb.io webhook from stamping
+      # kueue.x-k8s.io/queue-name onto every Job (probed twice in a
+      # throwaway namespace, 2026-09-03 - do not retry it), and the
+      # rendered kueue-manager-config claims otherwise, so do not trust it.
+      #
+      # Accepted deliberately rather than worked around, because the
+      # alternative is worse: the quota is undersized on purpose so Kueue
+      # serialises admissions, which caps how many multi-GiB image pulls can
+      # land at once on a control-plane node with ~11 GiB of headroom. The
+      # Jobs enrolled here are exactly the ones that pull those images.
+      #
+      # The prerequisite is that both Applications owning Jobs here
+      # (zuno-models-d1, zuno-trustyai-config-d1) carry ignoreDifferences on
+      # the fields Kueue writes AND RespectIgnoreDifferences=true. Without
+      # that, Replace + Kueue's writes form a recreation loop. Adding a
+      # seventh Replace=true Job here without the same protection would
+      # re-open it.
+      #
+      # zuno-ai-build is deliberately NOT labelled: it has no Replace=true
+      # Jobs and nothing to serialise, so enrolling it would add blast
+      # radius for no benefit. Its LocalQueue stays dormant, which is a
+      # cosmetic inconsistency and not a bug.
+      kueue.openshift.io/managed: "true"
       # ADR-0535/WP-111: see zuno-ai-build's identical comment above -
       # policy.rhtas.com/include deliberately not set (live finding: the
       # webhook's digest-format gate isn't governed by spec.mode: warn).

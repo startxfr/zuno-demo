@@ -42,14 +42,18 @@ namespace: zuno-ai-run
 # diskpressure-master-cascades-into-mesh memory, and commit 6c55a5b7).
 # Turn it on when someone is watching node disk, not incidentally.
 kueue:
-  # Flipped on 2026-09-03 as a deliberate, measured action (WP-117 live
-  # verification), not as part of the feature commit: nodefs was 60-68% on
-  # the masters with ~31 GiB free, DiskPressure False on all six nodes, and
-  # both garak Jobs share ONE image digest, so the worst case was a single
-  # 4.22 GiB pull per node rather than three. Reverting is setting this
-  # back to "" - and doing that costs another Replace cycle, so revert for
-  # a real reason, not for tidiness.
-  queueName: ""
+  # Set on the second attempt (2026-09-03), after the recreation loop that
+  # forced the first revert was actually closed - see the ignoreDifferences
+  # block in gitops/apps/trustyai-config/application-d1.yaml.
+  #
+  # Note what this value now does and does NOT control. It no longer decides
+  # whether these Jobs are queued: the namespace label enrolls every Job in
+  # zuno-ai-run unconditionally, and no per-workload opt-out exists on this
+  # operator build. What it does is make the rendered manifest DECLARE the
+  # label the webhook adds anyway, so git states the truth about these Jobs
+  # rather than leaving it to be discovered live. Setting it back to ""
+  # un-queues nothing; only removing the namespace label does that.
+  queueName: default
 
 # WP-108: standalone built-in guardrails detectors (no orchestrator, no
 # InferenceService wiring - see templates/guardrailsorchestrator.yaml).
