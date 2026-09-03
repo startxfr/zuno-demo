@@ -76,7 +76,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- [ADR-0002](0002-use-openshift-4-20-and-openshift-ai-3-5-ea2-for-the-mvp.md)
+- [ADR-0002](0002-use-openshift-4-20-and-openshift-ai-3-5-for-the-mvp.md)
 - [ADR-0030](0030-use-a-command-dispatch-makefile-interface.md)
 - [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md)
 - [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md)

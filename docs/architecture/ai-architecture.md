@@ -1,6 +1,6 @@
 # AI Architecture
 
-The AI architecture uses Red Hat OpenShift AI 3.5 EA2 as the primary AI platform. The design intentionally separates agent orchestration from inference governance.
+The AI architecture uses Red Hat OpenShift AI 3.5 as the primary AI platform. The design intentionally separates agent orchestration from inference governance.
 
 - **Agent Runtime**: state, LangChain/LangGraph workflows, RAG, MCP and task orchestration.
 - **AI/Inference Gateway**: model selection, local/SaaS routing, classification enforcement, quotas, costs, fallback and streaming.

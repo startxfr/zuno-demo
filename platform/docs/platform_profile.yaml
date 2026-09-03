@@ -16,7 +16,13 @@ openshift:
   target: "4.22"
 
 openshift_ai:
-  release_train: "3.5 EA2"
+  # 2026-09-03: the Early Access pin (3.5 EA2, ADR-0002 as amended) reached
+  # GA and the cluster was upgraded rhods-operator.3.5.0-ea.2 -> 3.5.0, with
+  # the Subscription moved from the `beta` channel to `stable-3.5`. Kept as
+  # a bare train rather than the full CSV: check_version_consistency below
+  # compares this against prose, and the exact build is pinned in
+  # gitops/charts/openshift-ai/values.yaml, not here.
+  release_train: "3.5"
 
 # Zuno-specific platform capabilities whose documented status has
 # historically drifted from the rendered DataScienceCluster

@@ -661,9 +661,14 @@ def check_version_consistency(profile: dict) -> List[Finding]:
                         f"{found}, platform_profile.yaml declares {target}",
                     ))
             for found in OPENSHIFT_AI_VERSION_RE.findall(line):
-                # A bare "3.5" is a legitimate shorthand for "3.5 EA2" in
-                # headings/prose, not a contradiction - only flag a
-                # genuinely different release (e.g. "3.4", "2.19").
+                # The startswith() arm let a bare "3.5" pass while the
+                # profile declared "3.5 EA2" - a legitimate shorthand in
+                # headings/prose. Since 2026-09-03 the profile declares a
+                # bare "3.5" (ADR-0002 as amended: the EA pin reached GA),
+                # so that arm is now inert and the check is exact: a
+                # leftover "OpenShift AI 3.5 EA2" is flagged, which is the
+                # point. Only a genuinely different release (e.g. "3.4",
+                # "2.19") would otherwise be caught.
                 if found != release_train and not release_train.startswith(found):
                     findings.append(Finding(
                         "version_consistency",

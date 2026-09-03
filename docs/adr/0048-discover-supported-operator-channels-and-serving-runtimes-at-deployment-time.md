@@ -39,7 +39,7 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives considered, 
 
 ## Related ADRs
 
-- [ADR-0002](0002-use-openshift-4-20-and-openshift-ai-3-5-ea2-for-the-mvp.md)
+- [ADR-0002](0002-use-openshift-4-20-and-openshift-ai-3-5-for-the-mvp.md)
 - [ADR-0019](0019-use-openshift-ai-model-serving-for-local-inference.md)
 - [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md)
 - [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md)

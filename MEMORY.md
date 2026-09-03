@@ -15,7 +15,7 @@ The MVP target is seven days with two contributors. Documentation and architectu
 ## 2. Platform target
 
 - OpenShift Container Platform 4.22, AWS IPI.
-- Red Hat OpenShift AI 3.5 EA2.
+- Red Hat OpenShift AI 3.5 (`rhods-operator.3.5.0` GA, `stable-3.5` channel).
 - Internet-connected cluster.
 - Two CPU worker nodes; GPU capacity per ADR-0351 as amended by WP-083:
   TWO permanent g7e.4xlarge nodes (NVIDIA RTX PRO 6000 Blackwell 96GB
@@ -108,7 +108,7 @@ NVIDIA L4 cards; since ADR-0351 the equivalent 1g.24gb MIG slices of the
 RTX PRO 6000, with the chat model on the roomier 2g.48gb slice).
 OpenShift AI model serving is used for local inference. KServe,
 Models-as-a-Service and llm-d are included in the architecture where
-relevant to OpenShift AI 3.5 EA2 capabilities.
+relevant to OpenShift AI 3.5 capabilities.
 
 Approved external provider preference and default fallback order:
 

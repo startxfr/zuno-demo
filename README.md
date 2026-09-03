@@ -11,7 +11,7 @@ Zuno Demo is an internal MVP demonstrating a reusable agentic AI platform on Red
 ## MVP target
 
 - Red Hat OpenShift Container Platform 4.22 on AWS, installed with IPI.
-- Red Hat OpenShift AI 3.5 EA2.
+- Red Hat OpenShift AI 3.5 (`rhods-operator.3.5.0` GA, `stable-3.5` channel).
 - Two worker nodes with one NVIDIA L4 24 GB GPU each.
 - About 50 named users, 10 expected concurrent users, and 5 concurrent active conversations as the initial sizing reference.
 - First-token objective below 6 seconds for interactive chat paths.
