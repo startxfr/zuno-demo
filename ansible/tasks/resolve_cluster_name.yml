@@ -1,0 +1,65 @@
+---
+# WP-132 step 1 (ADR-0547 clause 2): resolves this cluster's short name - the
+# one a human uses ("demo222", "demo333"), which is what ADR-0546's per-cluster
+# bucket convention `zuno-<cluster_name>-<purpose>` is keyed on. Idempotent via
+# the `is not defined` guard, mirroring resolve_cluster_base_domain.yml.
+#
+# Derived from the apps domain rather than from Infrastructure/cluster on
+# purpose. `status.infrastructureName` is "demo222-kpkqk" - the installer's
+# name plus its random suffix - which is correct for AWS tag filters (that is
+# what resolve_cluster_aws_identity.yml reads it for) and wrong here: it is not
+# the name anyone types, and a bucket named after it would change if the
+# cluster were ever reinstalled under the same DNS. The apps domain is the
+# stable human-facing identity, and every consumer of this fact is human-facing.
+- name: "cluster-name | resolve the apps domain first"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+  when:
+    - cluster_name is not defined
+    - zuno_cluster_name is not defined
+
+# Strip a leading "apps." and keep the first label: apps.demo222.startx.fr ->
+# demo222. The prefix is stripped conditionally, NOT with an unguarded
+# trimPrefix-style replace: a cluster whose Ingress domain does not start with
+# "apps." (a custom appsDomain is legal) would otherwise still yield its first
+# label, which happens to be right here and would not be for a domain shaped
+# like "demo333.apps.example.com". Slicing the labels explicitly makes the
+# assumption visible instead of accidental. WP-130's readiness probe P3 reports
+# a non-"apps." domain so an operator sees it rather than discovering it
+# through a wrongly-named bucket.
+#
+# One task with a ternary rather than a derive-then-override pair, exactly like
+# resolve_cluster_default_storage_class.yml's final task: two set_fact tasks
+# racing for the same variable is how an override silently loses.
+- name: "cluster-name | set the cluster_name fact"
+  ansible.builtin.set_fact:
+    cluster_name: >-
+      {{ zuno_cluster_name
+         if zuno_cluster_name is defined
+         else (_labels[1] if (_labels | length) > 1 and _labels[0] == 'apps'
+               else _labels[0]) }}
+  vars:
+    _labels: "{{ (cluster_base_domain | default('')).split('.') }}"
+  when: cluster_name is not defined
+
+# Hard failure rather than a fallback, for the same reason
+# resolve_cluster_default_storage_class.yml refuses to guess: this value ends up
+# in bucket names and Vault paths, where a wrong-but-plausible answer is worse
+# than no answer. An empty or single-label domain gets a human, not a default.
+- name: "cluster-name | fail if no usable name could be derived"
+  ansible.builtin.fail:
+    msg: >-
+      Could not derive a cluster name from the apps domain
+      '{{ cluster_base_domain | default('<unset>') }}'. Set zuno_cluster_name
+      explicitly in the inventory or ansible/confidential.yml. This value keys
+      ADR-0546's per-cluster S3 bucket names and their Vault paths, so it must
+      not be guessed.
+  when:
+    - cluster_name is not defined or (cluster_name | trim | length) == 0
+
+- name: "cluster-name | report the resolved cluster name"
+  ansible.builtin.debug:
+    msg: >-
+      Cluster name resolved to '{{ cluster_name }}'
+      {{ '(zuno_cluster_name override)'
+         if zuno_cluster_name is defined
+         else "(derived from the apps domain '" ~ cluster_base_domain ~ "')" }}
