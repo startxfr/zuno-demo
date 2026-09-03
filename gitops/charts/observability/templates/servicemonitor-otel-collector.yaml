@@ -30,6 +30,21 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: zuno-otel-collector-collector
+      # The service-type label is NOT redundant. The OpenTelemetry operator
+      # gives the base Service and the HEADLESS Service the SAME
+      # `app.kubernetes.io/name`, and both expose port `prometheus` (8889)
+      # on the same pod - so the name alone matches two Services backed by
+      # one endpoint, and every sample is scraped twice under two different
+      # `job` values (`...-collector` and `...-collector-headless`).
+      #
+      # That silently DOUBLED every zuno_* counter: BFF requests, model
+      # calls, tokens and the dollar totals on the usage-cost dashboard.
+      # It went unnoticed for 9 days because ratio panels are immune - the
+      # factor cancels between numerator and denominator - so the rate
+      # panels were right while the volume panels were exactly 2x wrong.
+      # Found 2026-09-03 while adding guardrails panels; `count by (job)
+      # (zuno_bff_requests_total)` returning one row is the check.
+      operator.opentelemetry.io/collector-service-type: base
   namespaceSelector:
     matchNames:
       - zuno-monitoring
