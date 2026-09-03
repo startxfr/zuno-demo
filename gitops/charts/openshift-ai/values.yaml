@@ -497,6 +497,19 @@ prometheusK8s:
 # Context section calls for, deliberately a fresh database rather than the
 # document_embeddings table rag-service's own provider reads (see that
 # values file's ogxDatabase comment for why).
+# Additive RBAC for RHOAI 3.5.0's kserve-module-controller-manager, whose own
+# bundle grants patch but not update on networkpolicies - see
+# templates/rbac-kserve-module-networkpolicy.yaml for the full diagnosis.
+# Disabled by default and enabled only in gitops/apps/openshift-ai/
+# application-d1.yaml: the openshift-ai chart is rendered by BOTH the d0 and
+# d1 Applications, and enabling it here would make ArgoCD report the Role and
+# RoleBinding as shared between them (the same collision the cluster-ods
+# project block above documents).
+kserveModuleNetworkPolicyRbac:
+  enabled: false
+  namespace: redhat-ods-applications
+  serviceAccount: kserve-module-controller-manager
+
 ogxServer:
   # Enabled (WP-06 operator follow-up): stands up the OGX data-plane API
   # for the corpus proof + provider-parity run.

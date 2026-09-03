@@ -1,0 +1,65 @@
+{{- /*
+Additive RBAC closing a one-verb gap in RHOAI 3.5.0's own operator bundle.
+
+kserve-module-controller-manager (new in 3.5.0) takes ownership of the
+NetworkPolicies the ea.2 ModelController used to own, which means calling
+Update() to strip the old ownerReference. Its bundled ClusterRole
+kserve-module-manager-role grants get/list/watch/create/patch/delete on
+networkpolicies but NOT update - and controller-runtime's Update() needs
+`update`; `patch` does not satisfy it. So the module reports:
+
+  KserveReady=False DeployFailed ... failed to remove owner references from
+  object redhat-ods-applications/workload-variant-autoscaler-allow-metrics-
+  traffic ... is forbidden: User "system:serviceaccount:redhat-ods-
+  applications:kserve-module-controller-manager" cannot update resource
+  "networkpolicies"
+
+and DataScienceCluster never leaves Not Ready, because the operator retries
+the same rejected call forever.
+
+Granted here rather than by editing kserve-module-manager-role, which the
+operator owns and would revert. RBAC is additive, so a separate Role unions
+with the bundled one.
+
+Scope is deliberately one verb, one resource, one namespace, one subject.
+The marginal privilege is nil: the same ServiceAccount already holds create,
+patch and delete on this exact resource, and `patch` already permits every
+mutation `update` does.
+
+REMOVE THIS once a RHOAI 3.5.z ships the missing verb - it is a workaround
+for a vendor defect, not a design decision. Harmless if left in place (a
+duplicate grant), but it should not outlive the bug.
+*/ -}}
+{{- if .Values.kserveModuleNetworkPolicyRbac.enabled }}
+{{- $r := .Values.kserveModuleNetworkPolicyRbac }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: zuno-kserve-module-networkpolicy-update
+  namespace: {{ $r.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+rules:
+  - apiGroups:
+      - networking.k8s.io
+    resources:
+      - networkpolicies
+    verbs:
+      - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-kserve-module-networkpolicy-update
+  namespace: {{ $r.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: zuno-kserve-module-networkpolicy-update
+subjects:
+  - kind: ServiceAccount
+    name: {{ $r.serviceAccount }}
+    namespace: {{ $r.namespace }}
+{{- end }}

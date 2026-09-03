@@ -39,6 +39,12 @@ spec:
           # Placeholder auto-substituted with the real cluster domain by
           # ansible/tasks/apply_gitops_app.yml.
           clusterBaseDomain: apps.mycluster.example.com
+        # Workaround for a one-verb RBAC gap in the RHOAI 3.5.0 bundle that
+        # otherwise pins DataScienceCluster at Not Ready - see the chart's
+        # templates/rbac-kserve-module-networkpolicy.yaml. Enabled here and
+        # not in values.yaml because both Applications render this chart.
+        kserveModuleNetworkPolicyRbac:
+          enabled: true
         prometheusK8s: null
         userWorkloadMonitoring:
             enabled: false
