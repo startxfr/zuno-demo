@@ -22,6 +22,14 @@ policy:
 #
 # allowedFromNamespaces are granted at the namespace level rather than
 # per-workload (proportionate for demo scale; tightening is a v1 follow-up).
+# Mesh control plane coordinates, used by
+# templates/networkpolicy-mesh-egress.yaml. istiod serves xDS on 15012
+# (the port a sidecar MUST reach to bootstrap), the legacy plaintext xDS
+# port on 15010 and its own monitoring port on 15014.
+mesh:
+  namespace: zuno-mesh
+  controlPlanePorts: [15012, 15010, 15014]
+
 platformNamespaces:
   - name: zuno-auth
     displayName: Zuno Authentication
@@ -561,6 +569,32 @@ platformNamespaces:
     # the Job's events. Limits are overcommit (only requests reserve node
     # capacity, and requests stay at 12), so this is headroom, not a
     # reservation - but it does mean every new RHOAI operand lands here.
+    # RHOAI 3.5.0 GA's dashboard creates a per-UI NetworkPolicy of its own
+    # (ownerRef Dashboard/default-dashboard) with policyTypes [Ingress,
+    # Egress) and a PORT-SCOPED egress allowlist - 5353/DNS, 6443, 8443,
+    # 9000, 443, 80. Never 15012, so an injected sidecar in this namespace
+    # cannot reach istiod and the pod never leaves Init. The cluster ran the
+    # A/B itself on 2026-09-03: of nine dashboard-owned policies, the three
+    # carrying an unrestricted egress rule (eval-hub, gen-ai,
+    # rhods-dashboard) were Ready and the six without it (automl, autorag,
+    # maas, mlflow, model-registry, agent-ops) were all stuck. No
+    # exceptions.
+    #
+    # The give-away is that istio-csr on :443 SUCCEEDS while xDS on :15012
+    # times out - the sidecar log shows a workload certificate issued
+    # normally, then `DeltaAggregatedResources ... dial tcp <istiod>:15012:
+    # i/o timeout`. Unlike MLflow (whose CR takes additionalEgressPorts, see
+    # gitops/charts/mlflow/values.yaml), the Dashboard CRD exposes no knob
+    # to widen this - `oc explain dashboard.spec` has components,
+    # deploymentMode, gateway, managementState, modules, observability and
+    # nothing else - so the union policy is the only lever.
+    meshEgress:
+      podSelector:
+        matchLabels:
+          # Exactly the dashboard's UI operands, and any the operator adds
+          # later; rhods-dashboard itself carries part-of: rhods-dashboard
+          # and already has an unrestricted egress rule.
+          app.kubernetes.io/part-of: odh-dashboard
     # 2026-09-03, rhods-operator 3.5.0-ea.2 -> 3.5.0 GA: the paragraph above
     # predicted this a third time and was right. The GA dashboard ships six
     # UI operands the EA build did not (automl-ui, autorag-ui, maas-ui,

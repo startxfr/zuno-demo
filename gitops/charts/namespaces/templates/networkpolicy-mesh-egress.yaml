@@ -1,0 +1,45 @@
+{{/*
+Additive egress allowance to the mesh control plane, for namespaces where an
+OPERATOR creates its own port-scoped egress NetworkPolicies that know nothing
+about istiod.
+
+NetworkPolicy is a union - traffic is permitted if ANY policy selecting the
+pod allows it - so this grants the ports the operator's own policy omits
+without contending for ownership of that policy. Trying to edit the
+operator's policy instead would just be reverted on its next reconcile.
+
+Only rendered for platformNamespaces entries that set .meshEgress; a
+namespace whose operator leaves an unrestricted egress rule in place does not
+need one.
+*/}}
+{{- if .Values.policy.enabled }}
+{{- range .Values.platformNamespaces }}
+{{- if .meshEgress }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zuno-allow-mesh-control-plane-egress
+  namespace: {{ .name }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-50"
+spec:
+  podSelector:
+    {{- toYaml .meshEgress.podSelector | nindent 4 }}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $.Values.mesh.namespace }}
+      ports:
+        {{- range $.Values.mesh.controlPlanePorts }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+---
+{{- end }}
+{{- end }}
+{{- end }}
