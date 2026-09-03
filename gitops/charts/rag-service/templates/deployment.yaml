@@ -23,6 +23,17 @@ spec:
       serviceAccountName: rag-service
       priorityClassName: zuno-workload-default
       automountServiceAccountToken: false
+      {{- if .Values.nodeAffinity.excludeControlPlane }}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
+                  - key: node-role.kubernetes.io/master
+                    operator: DoesNotExist
+      {{- end }}
       {{- if .Values.topologySpreadConstraints.enabled }}
       topologySpreadConstraints:
         - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}

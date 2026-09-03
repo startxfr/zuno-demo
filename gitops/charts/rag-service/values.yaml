@@ -33,6 +33,31 @@ topologySpreadConstraints:
   topologyKey: topology.kubernetes.io/zone
   whenUnsatisfiable: ScheduleAnyway
 
+# Keep the pod off the control-plane nodes. Added 2026-09-03 after the pod
+# accumulated 6 container restarts in 6 days on ip-10-18-31-92, with a
+# 222MB image re-pull 133 minutes before it was looked at - the signature
+# of kubelet image garbage collection, which only runs under disk
+# pressure. No termination reason survives
+# (kube_pod_container_status_last_terminated_reason is empty), so this is
+# a strong correlation rather than a proven cause; memory is not the
+# culprit either, at 107Mi against a 1Gi limit.
+#
+# This is INSURANCE, NOT A CURE. The real fault is the recurring
+# DiskPressure across all three schedulable control-plane nodes, which is
+# open and needs a human: they carry the least image-filesystem headroom
+# on the cluster (21-33GB against 52-153GB on the plain and GPU workers)
+# while still accepting general workload. Excluding them stops this
+# service being collateral; it does not stop the eviction storms.
+#
+# Both role keys are listed and AND together, so a node carrying either is
+# excluded: this cluster's masters have both, and the API server warns
+# that `master` is deprecated in favour of `control-plane`. Naming only
+# one would silently stop excluding anything the day the other is dropped.
+# Same reasoning and same shape as gitops/charts/trustyai-config's
+# nemoGuardrails.pod (57f68b5b).
+nodeAffinity:
+  excludeControlPlane: true
+
 resources:
   requests:
     cpu: 100m
