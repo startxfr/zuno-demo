@@ -1,6 +1,6 @@
 # WP-126: finalize the LoRA TrainJob (lift WP-119's "shipped disabled")
 
-- **State:** Not started
+- **State:** Operator pending (2026-09-03)
 - **ADRs:** ADR-0545 (decision 1), ADR-0539, ADR-0538
 - **Depends on:** WP-119 (Repo work merged, 2026-09-02)
 - **Related:** [ADR-0351](../../adr/0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md)
@@ -29,13 +29,32 @@ LoRA training run, closing the gap the Kubeflow Trainer controller has had since
   separate, non-MIG `g7e.2xlarge` per ADR-0351, but verify this against the live `ResourceFlavor`/
   `ClusterQueue` before assuming it is unaffected.
 
-## Repo changes (step by step)
+## Repo changes (step by step) - Done, live-verified 2026-09-03
 
-1. Flip `training.trainJob.enabled: true` in `gitops/charts/mlops/values.yaml`. No other
-   mechanism change is anticipated - WP-119's "What landed" already covers submission, adoption,
-   polling and the terminal contract.
-2. Sync the `mlops` GitOps Application and confirm the `mlops-lora` `TrainingRuntime` and RBAC
-   render as expected (`helm template` first, then live sync).
+1. Flipped `training.trainJob.enabled: true` in `gitops/charts/mlops/values.yaml` (commit
+   `9a0b7303`).
+2. **Found and fixed a latent defect `helm template`/`helm lint` could not catch.**
+   `mlPolicy.torch.numProcPerNode` rendered as a quoted `"1"` string; the `TrainingRuntime` CRD's
+   CEL validation rejects that outright (`'no such overload'` - neither the string-enum branch
+   ("auto"/"cpu"/"gpu") nor the int branch matches a quoted numeral). Caught only by
+   `oc apply --dry-run=server` against the live cluster, never live-tested since WP-119 merged it
+   disabled. Fixed to a bare YAML integer (`numProcPerNode: 1`), same commit.
+3. **Preconditions verified live before flipping anything:**
+   `zuno-gpu-burst-a`'s `MachineAutoscaler` (min 0/max 1) healthy at 0 replicas, not already
+   scaled up. GPU isolation from the saturated MIG `ClusterQueue` quota (ADR-0542) confirmed on
+   three independent axes: `zuno-mlops` carries no `kueue.openshift.io/managed` label (not
+   Kueue-enrolled at all), the runtime requests `nvidia.com/gpu` (a whole GPU, never
+   `nvidia.com/mig-*`), and its `nodeSelector` targets `machine.startx.io/group: gpu-burst` - a
+   node group distinct from the two permanent MIG nodes' `group: gpu`.
+4. Pushed (`9a0b7303`) and let ArgoCD's `automated`/`selfHeal` sync pick it up - confirmed
+   `Synced`/`Healthy`, `op=Succeeded`.
+5. **Live-verified the actual cluster objects**, not just the sync status:
+   `trainingruntime.trainer.kubeflow.org/mlops-lora` exists in `zuno-mlops` with
+   `spec.mlPolicy: {numNodes: 1, torch: {numProcPerNode: 1}}` (the fixed integer, confirmed
+   server-accepted); the `zuno-mlops-d1-mlops` Role now carries the four widened rule blocks
+   (`trainjobs` create/get/list/watch/delete, `trainingruntimes`/`jobsets`/`pods`/`pods/log`/
+   `events` read-only) and its RoleBinding lists both `zuno-mlops-d1-mlops` and
+   `pipeline-runner-mlops-dspa` as subjects - exactly WP-119's documented requirement.
 
 ## Live actions (confirm before running)
 
@@ -50,9 +69,10 @@ LoRA training run, closing the gap the Kubeflow Trainer controller has had since
 
 ## What NOT to touch
 
-`components/mlops/src/trainjob.py`'s submit/adopt/poll logic, the `TrainingRuntime` definition, or
-the RBAC - all already correct per WP-119. This WP is the flag flip plus the live proof, not a
-mechanism change.
+`components/mlops/src/trainjob.py`'s submit/adopt/poll logic and the RBAC - correct as WP-119 left
+them. The `TrainingRuntime` definition needed one field-level fix (`numProcPerNode`, above) that
+WP-119 could not have caught without a live dry-run; nothing else about it changed. This WP is the
+flag flip plus that fix plus the live proof, not a mechanism redesign.
 
 ## Acceptance checks
 
