@@ -179,14 +179,23 @@ class MetricsRecording(unittest.TestCase):
 # --------------------------------------------------------------------------
 
 def _nemo_payload(*names):
-    """A NeMo /v1/chat/completions body carrying one zuno_scan result."""
+    """A NeMo /v1/chat/completions body carrying one zuno_scan result.
+
+    Transcribed from a real response, 2026-09-03 (WP-120 question 5). The
+    log hangs off `guardrails`, not off the top level - the shape this
+    originally assumed parsed to zero detections against every real reply.
+    """
     return {
-        "messages": [{"role": "assistant", "content": "ok"}],
-        "log": {"activated_rails": [
-            {"type": "input", "executed_actions": [
-                {"action_name": "zuno_scan", "return_value": list(names)},
+        "choices": [{"message": {"role": "assistant", "content": "ok"}}],
+        "guardrails": {
+            "config_id": "zuno-observe",
+            "log": {"activated_rails": [
+                {"type": "input", "name": "zuno scan input", "stop": False,
+                 "executed_actions": [
+                     {"action_name": "zuno_scan", "return_value": list(names)},
+                 ]},
             ]},
-        ]},
+        },
     }
 
 
@@ -206,21 +215,38 @@ class NemoDetectionNames(unittest.TestCase):
         self.assertEqual(names, ["email", "injection-ignore-instructions"])
 
     def test_ignores_other_actions(self):
-        payload = {"log": {"activated_rails": [
+        payload = {"guardrails": {"log": {"activated_rails": [
             {"executed_actions": [{"action_name": "something_else",
-                                   "return_value": ["nope"]}]}]}}
+                                   "return_value": ["nope"]}]}]}}}
         self.assertEqual(guardrails_client._detection_names(payload), [])
+
+    def test_top_level_log_is_not_read(self):
+        # The pre-2026-09-03 assumption, kept as a test so the shallower
+        # shape can never quietly come back: a top-level `log` is NOT the
+        # operand's, and reading it would resurrect the silent-zero bug.
+        payload = {"log": {"activated_rails": [
+            {"executed_actions": [{"action_name": "zuno_scan",
+                                   "return_value": ["email"]}]}]}}
+        self.assertEqual(guardrails_client._detection_names(payload), [])
+
+    def test_clean_pass_shape_yields_no_detections(self):
+        # A real clean pass still reports the rail as activated, with an
+        # empty return_value - verified live 2026-09-03.
+        self.assertEqual(guardrails_client._detection_names(_nemo_payload()), [])
 
     def test_unrecognised_payload_yields_no_detections(self):
         # The operand's log shape is not pinned by the CRD. Every one of
         # these must degrade to "clean", never raise - an observer that
         # crashes on an unexpected body is worse than one that sees
         # nothing, because it burns the exchange's task slot.
-        for payload in ({}, None, {"log": None}, {"log": {"activated_rails": None}},
-                        {"log": {"activated_rails": [{"executed_actions": None}]}},
-                        {"log": {"activated_rails": [
+        for payload in ({}, None, {"guardrails": None}, {"guardrails": {"log": None}},
+                        {"guardrails": {"log": {"activated_rails": None}}},
+                        {"guardrails": {"log": {"activated_rails": [
+                            {"executed_actions": None}]}}},
+                        {"guardrails": {"log": {"activated_rails": [
                             {"executed_actions": [
-                                {"action_name": "zuno_scan", "return_value": "notalist"}]}]}}):
+                                {"action_name": "zuno_scan",
+                                 "return_value": "notalist"}]}]}}}):
             self.assertEqual(guardrails_client._detection_names(payload), [])
 
 
@@ -250,13 +276,30 @@ class NemoBackendContract(unittest.TestCase):
             with mock.patch.object(guardrails_client.httpx, "AsyncClient", factory):
                 _run_nemo(contents=["secret-free question"])
         body = _FakeAsyncClient.last_call["json"]
-        self.assertEqual(body["config_id"], guardrails_client.GUARDRAILS_CONFIG_ID)
         self.assertEqual(body["messages"], [
             {"role": "user", "content": "secret-free question"}])
         # No LLM generation is requested and no credential travels.
-        self.assertEqual(body["options"]["rails"], ["input"])
+        self.assertEqual(body["guardrails"]["options"]["rails"], ["input"])
         self.assertNotIn("Authorization", _FakeAsyncClient.last_call["headers"] or {})
         self.assertNotIn("token", str(body).lower())
+
+    def test_request_nests_config_id_and_options_under_guardrails(self):
+        # The server DROPS unknown top-level keys instead of rejecting
+        # them, so a flat config_id/options is not an error - it silently
+        # runs the dialog rails, which need an LLM this config does not
+        # have. Live 2026-09-03 that returned HTTP 200 carrying
+        # "Internal server error". `model` is separately required (422
+        # without it) even though no rail ever resolves it.
+        factory = lambda **kw: _FakeAsyncClient(payload=_nemo_payload(), **kw)  # noqa: E731
+        with mock.patch.object(guardrails_client, "GUARDRAILS_NEMO_URL", "http://nemo"):
+            with mock.patch.object(guardrails_client.httpx, "AsyncClient", factory):
+                _run_nemo()
+        body = _FakeAsyncClient.last_call["json"]
+        self.assertIn("model", body)
+        self.assertEqual(body["guardrails"]["config_id"],
+                         guardrails_client.GUARDRAILS_CONFIG_ID)
+        self.assertNotIn("config_id", body)
+        self.assertNotIn("options", body)
 
 
 class BackendSelection(unittest.TestCase):

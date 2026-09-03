@@ -180,6 +180,23 @@ async def _evaluate_nemo(
     to the input rail and `log.activated_rails` is what carries the
     detection names back; the generated message is ignored entirely.
 
+    REQUEST SHAPE, established live 2026-09-03 against the RHOAI operand
+    (WP-120 discovery questions 3 and 5). Two things about it are not
+    guessable and both fail silently rather than loudly:
+
+    - `config_id` and `options` are nested under `guardrails`, NOT at the
+      top level. The server's request model simply DROPS unknown top-level
+      keys, so a flat `options` is not rejected - it is ignored, the dialog
+      rails run, and the request needs an LLM the config does not have.
+      Live, that produced a 401 against api.openai.com and the string
+      "Internal server error" as the assistant message, with HTTP 200.
+    - `model` is required by the schema even though no rail uses it. Its
+      absence is the one loud failure here: HTTP 422.
+
+    With the correct nesting the stats come back `llm_calls_count: 0` and
+    `dialog_rails_duration: null` - ADR-0540 Decision 2's cost gate holds,
+    but only on this exact shape.
+
     Never raises: every failure path funnels to outcome "unavailable",
     exactly as the builtin backend does.
     """
@@ -190,11 +207,16 @@ async def _evaluate_nemo(
                 resp = await client.post(
                     f"{GUARDRAILS_NEMO_URL}/v1/chat/completions",
                     json={
-                        "config_id": GUARDRAILS_CONFIG_ID,
+                        # Required by the schema, unused by the rails: no
+                        # rail generates, so nothing ever resolves it.
+                        "model": GUARDRAILS_CONFIG_ID,
                         "messages": [{"role": "user", "content": content}],
-                        "options": {
-                            "rails": ["input"],
-                            "log": {"activated_rails": True},
+                        "guardrails": {
+                            "config_id": GUARDRAILS_CONFIG_ID,
+                            "options": {
+                                "rails": ["input"],
+                                "log": {"activated_rails": True},
+                            },
                         },
                     },
                 )
@@ -222,6 +244,20 @@ async def _evaluate_nemo(
 def _detection_names(payload: Any) -> List[str]:
     """Pull zuno_scan's matched pattern names out of an activated-rails log.
 
+    The log lives at `guardrails.log.activated_rails`, one level deeper
+    than the top-level `log` this originally assumed - confirmed live
+    2026-09-03 (WP-120 question 5). Verified shape, per activated rail:
+
+        {"type": "input", "name": "zuno scan input",
+         "executed_actions": [{"action_name": "zuno_scan",
+                               "return_value": ["injection-ignore-instructions"]}],
+         "stop": false}
+
+    A clean pass returns the same single rail with `return_value: []`, so
+    "the rail ran and found nothing" and "the rail never ran" are
+    distinguishable in the raw payload - though not in this function's
+    return, which is [] either way.
+
     Tolerant by design: the operand's log shape is not pinned by the CRD,
     so an unrecognised payload yields no detections rather than an
     exception. A silent zero here is visible as a flat detections series
@@ -229,7 +265,7 @@ def _detection_names(payload: Any) -> List[str]:
     an observer.
     """
     names: List[str] = []
-    log_block = (payload or {}).get("log") or {}
+    log_block = ((payload or {}).get("guardrails") or {}).get("log") or {}
     for rail in log_block.get("activated_rails") or []:
         for executed in (rail or {}).get("executed_actions") or []:
             if (executed or {}).get("action_name") != "zuno_scan":
