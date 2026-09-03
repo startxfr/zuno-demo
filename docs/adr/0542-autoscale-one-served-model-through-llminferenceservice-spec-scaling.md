@@ -1,8 +1,8 @@
 # ADR-0542: Autoscale a served model through LLMInferenceService spec.scaling
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.7
-- **Date:** 2026-09-02
+- **Date:** 2026-09-02 (amended 2026-09-03 after the live apply)
 - **Decision owners:** Zuno Demo architecture team
 
 ## Context
@@ -55,14 +55,31 @@ nodes advertise `nvidia.com/gpu: 0` with MIG slices only; cluster-wide that is 4
    slice on the cluster and leaves **zero rolling-update surge headroom** — after which every
    24GB-model rollout hits `ProgressDeadlineExceeded` unless surge is handled explicitly. That is
    a separate, separately-approved change.
+5. **`wva` is mandatory, carries exactly one mechanism, and that mechanism is `keda`.** The CRD's
+   own CEL requires `has(self.wva)` and exactly one of `hpa`/`keda` inside it. `keda` because
+   ADR-0318's Custom Metrics Autoscaler install has had zero `ScaledObject`s since it landed and
+   this is its first consumer; `hpa` would have left that gap open. Amended 2026-09-03:
+   the first attempt shipped `wva: {}`, which is not the same thing (see Operational
+   considerations).
+6. **The `ClusterTriggerAuthentication` is a prerequisite RHOAI names but does not ship, and this
+   platform must author it.** KServe reads `triggerAuthName`/`triggerAuthKind` from RHOAI's
+   `inferenceservice-config` ConfigMap (`autoscaling-wva-controller-config`) and stamps an
+   `authenticationRef` to cluster-scoped `ai-inference-keda-thanos` onto every `ScaledObject` it
+   derives from `spec.scaling`. No such object exists on a stock install. Without it the
+   `ScaledObject` is created and is permanently `Ready=False`
+   (`bearer token=<empty> is required when bearer auth is enabled`) and KEDA never creates the
+   HPA — so `spec.scaling` alone does not deliver a working autoscaler. It is authored in
+   `gitops/charts/custom-metrics-autoscaler` (the d1 operand slice), not in the models chart:
+   cluster-scoped auth for any KEDA consumer is chart-level plumbing, not model-specific.
 
 ## Non-goals
 
 Raising the GPU quota; autoscaling any other model (`qwen36-27b-instruct` and `qwen35-9b-wesh`
 sit on the full 48GB tier; `qwen35-9b` is half ADR-0536's failover-drill pair and is pinned off
 the wesh node by a required anti-affinity; `embeddings` is rag-service's hard query-path
-dependency and is a plain `InferenceService` with no `spec.scaling` at all); tuning `wva.hpa` or
-`wva.keda` behaviour, which is meaningless while `min == max`.
+dependency and is a plain `InferenceService` with no `spec.scaling` at all); tuning `wva.keda`'s
+*behaviour*, which is meaningless while `min == max` — note that its **presence** is not a
+tuning knob but a CRD requirement and a real decision, see decision 5.
 
 ## Operational considerations
 
@@ -77,8 +94,26 @@ dependency and is a plain `InferenceService` with no `spec.scaling` at all); tun
 - Which of `spec.replicas` and `spec.scaling` wins when both are present is deliberately left
   undiscovered — see decision 3. If a future change needs the answer, read the rendered
   Deployment's `spec.replicas`, do not infer it.
-- `gitops/apps/custom-metrics-autoscaler/application-d1.yaml` stays empty and should: the first
-  `ScaledObject` on this cluster is created *by KServe*, not authored there.
+- `gitops/apps/custom-metrics-autoscaler/application-d1.yaml` authors no `ScaledObject` and should
+  not: the first one on this cluster is created *by KServe*. It does author the
+  `ClusterTriggerAuthentication` that `ScaledObject` references — see decision 6.
+- **`helm template` is not validation on a CEL-validated CRD.** The first attempt rendered
+  `wva: {}`, which disappears entirely through Helm's `with`; `helm template` accepted the result
+  and the API server rejected it (`spec.scaling: Invalid value: wva is required when scaling is
+  configured`), pinning the whole `models` Application until it was fixed. Any chart change
+  touching a CRD with CEL rules needs `oc apply --dry-run=server`, not a render.
+- **"The object exists" and "the object works" are different checks.** The live apply created both
+  autoscaling objects and looked successful for nine hours while the `ScaledObject` sat
+  `Ready=False` on the missing trigger auth and no HPA existed at all. Counting objects is what
+  made that look green, so the `custom-metrics-autoscaler` precheck now reports each
+  `ScaledObject`'s `Ready` condition and message, not just a count.
+- **Two gaps are known, recorded, and deliberately not closed** — both moot while `min == max`.
+  The `VariantAutoscaling` reports `MetricsAvailable=False`/`MetricsMissing` because the
+  operand-managed `workload-variant-autoscaler-saturation-scaling-config` carries only a `default`
+  key and the controller logs *"Saturation scaling config not loaded yet for namespace"*; and
+  `AcceleratorNotResolved`, because WVA cannot infer an accelerator from the pod's generic
+  `nvidia.com/gpu.present: "true"` nodeSelector. Replica metrics are emitted regardless, so KEDA
+  can scale; only accelerator-specific saturation metrics are withheld.
 
 ## Migration / evolution
 
