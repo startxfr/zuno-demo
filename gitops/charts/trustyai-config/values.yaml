@@ -150,8 +150,10 @@ garakSecurity:
 
 # WP-115: the per-project evaluation service the RHOAI dashboard's
 # "Evaluations" page requires (its nav entry is unlocked by the
-# disableLMEval:false / guardrails:true OdhDashboardConfig flags, applied
-# live - that CR is operator-created and not in this repo). sqlite =
+# disableLMEval:false / guardrails:true OdhDashboardConfig flags - that CR is
+# operator-created and cannot be GitOps-managed, so since 2026-09-03 (WP-123)
+# the flags are applied by ansible/roles/openshift_ai/tasks/
+# dashboard_feature_flags.yml instead of by hand). sqlite =
 # demo-light, history lost on pod restart; a postgresql upgrade needs a
 # dedicated Crunchy PGO database + pre-composed db-url Secret (mind
 # [[pgo-does-not-recreate-dropped-database]]).

@@ -176,8 +176,14 @@ point - the chain worked but was invisible in every UI, spawning WP-113):
 - *(Amended 2026-09-02, WP-115.)* The RHOAI dashboard DOES have TrustyAI surfaces - they are
   hidden by default. `OdhDashboardConfig/odh-dashboard-config` (operator-created, **not**
   GitOps-managed) gates them: `disableLMEval: false` unlocks the Evaluations page and
-  `guardrails: true` the guardrails surface. Both are applied live by `oc patch` and recorded
-  here as the authoritative list; ADR-0538 adds `trainingJobs: true` under the same posture.
+  `guardrails: true` the guardrails surface. ADR-0538 adds `trainingJobs: true` under the same
+  posture. *(Further amended 2026-09-03, WP-123: both flags are applied by Ansible now -
+  `ansible/roles/openshift_ai/tasks/dashboard_feature_flags.yml`, shared by `make d1 install`
+  and `make d1 reconcile openshift-ai` - not by a hand-run `oc patch`. This bullet is no
+  longer the authoritative list: ADR-0538 decision 5 as amended holds the posture and
+  `ansible/roles/openshift_ai/tasks/set_dashboard_flags.yml` holds the values. Two ADRs each
+  claiming to be the authoritative list is how the fourth flag, `disableKueue: false`, went
+  missing until it was found disabling the Kueue UI in `zuno-ai-run`.)*
   Evaluations additionally needs a per-project `EvalHub` instance - now rendered by
   `gitops/charts/trustyai-config` (WP-115). Note its runs are plain `batch/v1` Jobs launched by
   EvalHub itself: this ADR's ArgoCD-managed `LMEvalJob`/garak/ragas path is parallel and does

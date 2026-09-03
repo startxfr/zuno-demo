@@ -1,0 +1,99 @@
+---
+# Applies this platform's RHOAI dashboard feature flags to
+# `OdhDashboardConfig/odh-dashboard-config` (redhat-ods-applications). The
+# values live in set_dashboard_flags.yml; this file only writes them.
+#
+# Included by BOTH install.yml (last, once the DataScienceCluster is Ready -
+# the dashboard component only creates its CR after that) and reconcile.yml,
+# the same shape as right_size_monitoring_stack.yml and for the same reason:
+# until 2026-09-03 these flags had NO applier at all. They were posted by hand
+# with `oc patch` (WP-115 step 1, WP-117 step 4) and recorded only in prose, so
+# a fresh cluster came up with the operator's defaults and the Evaluations,
+# guardrails, training-jobs and Kueue surfaces silently gone. WP-118 closed
+# nine demo333 portability blockers and could not see this one: a mutation that
+# exists only on a live cluster is invisible to a repo grep.
+#
+# Contract, mirroring right_size_monitoring_stack.yml: patch-only, never fails
+# on its own, records nothing and decides nothing - install.yml keeps its
+# record-then-fail shape while reconcile.yml records and continues. Task names
+# use a neutral "dashboard:" prefix because the two callers use different phase
+# words. Idempotent and re-applied every run, so it is also self-healing if the
+# CR is ever recreated (uninstall/reinstall, fresh redeploy).
+#
+# WHY THIS IS NOT GITOPS (ADR-0538 decision 5 as amended, WP-123). The CR has
+# no ownerReferences and THREE concurrent writers, read off managedFields live
+# on 2026-09-03:
+#   - the RHOAI operator owns spec.dashboardConfig.disableTracking (and
+#     notebookController/templateOrder),
+#   - this automation owns the four flags in set_dashboard_flags.yml,
+#   - the dashboard UI itself writes spec.hardwareProfileOrder and
+#     spec.modelServing at runtime, whenever an admin reorders profiles or
+#     changes a serving default.
+# Every Application in this repo runs prune: true + selfHeal: true, so ArgoCD
+# ownership would revert the UI's own writes; and the usual escape hatch is an
+# anti-pattern this repo has been burned by three times - a blanket
+# `ignoreDifferences: /spec` produced false greens on the DSC, on MachineSet
+# replicas and on Kiali's subtrees (see gitops/apps/grafana/application-d1.yaml
+# and wp-086). `Replace=true` on a CR looped (WP-117), and ServerSideApply is
+# used exactly once, on the manual-bootstrap root app, never on an operand.
+# A partial Ansible patch is the repo's established answer for an
+# operator-owned object (see openshift_oauth's Proxy/cluster patch).
+#
+# THREE TRAPS, all of them silent:
+#   1. Never send the whole dashboardConfig subtree, and never use
+#      state: present / apply: true / force: true on this CR - that would
+#      clobber the operator's and the UI's keys. RFC 7386 merges objects
+#      recursively, so the partial patch below touches ONLY the keys it names;
+#      note it REPLACES arrays wholesale, an extra reason hardwareProfileOrder
+#      and templateOrder must never appear here.
+#   2. Absent is not "the default". The CRD declares no `default:` for any
+#      flag and the dashboard reads an undefined key as "off", so deleting a
+#      key to "let the operator decide" turns the surface OFF, not back to
+#      neutral.
+#   3. `state: patched` cannot CREATE the object: on a missing CR the module
+#      warns and no-ops, so install and reconcile would stay green and silent
+#      if RHOAI ever renamed or moved it. precheck.yml's "CR absent" finding is
+#      the only thing that would say so - deliberately.
+#
+# If a flag ever reverts within seconds of a green reconcile, the operator has
+# started owning that key: drop it from set_dashboard_flags.yml and record it
+# as an upstream constraint, exactly like reconcile.yml's documented
+# OpenTelemetryCollector non-action. Do not add retries to fight a controller.
+- name: "openshift_ai | dashboard: load the authoritative feature-flag map"
+  ansible.builtin.include_tasks: set_dashboard_flags.yml
+
+- name: "openshift_ai | dashboard: wait for the operator-created OdhDashboardConfig to exist"
+  kubernetes.core.k8s_info:
+    # opendatahub.io/v1alpha (not v1alpha1) - the CRD's only served version,
+    # which is also its storage version, read off the live CRD.
+    api_version: opendatahub.io/v1alpha
+    kind: OdhDashboardConfig
+    name: odh-dashboard-config
+    namespace: redhat-ods-applications
+  register: _openshift_ai_dashboard_config
+  # The dashboard component creates this asynchronously after the DSC is
+  # accepted, so at install time a bare lookup returns nothing and the patch
+  # below would silently no-op - the whole reason this file is shared with
+  # install.yml. Bounded and never fatal: on timeout the patch simply skips and
+  # `make d1 reconcile openshift-ai` re-applies it later.
+  until: (_openshift_ai_dashboard_config.resources | default([]) | length) > 0
+  retries: "{{ openshift_ai_dashboard_config_wait_retries | default(30) }}"
+  delay: "{{ openshift_ai_dashboard_config_wait_delay | default(10) }}"
+  failed_when: false
+
+- name: "openshift_ai | dashboard: patch ONLY this platform's feature flags (partial merge patch, never the whole dashboardConfig)"
+  kubernetes.core.k8s:
+    state: patched
+    # Explicit, like openshift_oauth/tasks/uninstall.yml: left unset the module
+    # tries strategic-merge first, which a CRD has no metadata for - the API
+    # server rejects it and the module silently falls back to merge. Naming it
+    # makes this one deterministic RFC 7386 request with no failed round-trip.
+    merge_type: merge
+    api_version: opendatahub.io/v1alpha
+    kind: OdhDashboardConfig
+    name: odh-dashboard-config
+    namespace: redhat-ods-applications
+    definition:
+      spec:
+        dashboardConfig: "{{ _openshift_ai_dashboard_flags }}"
+  when: (_openshift_ai_dashboard_config.resources | default([]) | length) > 0

@@ -3,6 +3,10 @@
 - **Status:** Accepted
 - **Target:** v0.7
 - **Date:** 2026-09-02
+- **Amended:** 2026-09-03 (WP-123): decision 5's MECHANISM only - the flags are
+  now reconciled by Ansible instead of being posted by hand, the
+  "not GitOps-managed" posture is unchanged and reinforced, and the list gains
+  `disableKueue: false`. See decision 5.
 - **Decision owners:** Zuno Demo architecture team
 
 ## Context
@@ -77,6 +81,47 @@ deliberately uses a whole-GPU scale-from-zero burst node (ADR-0526 Operational c
    Operational considerations already document for `disableLMEval`/`guardrails`); this ADR adds
    `trainingJobs: true` the same way and records all such flags here as the authoritative list:
    `disableLMEval: false`, `guardrails: true`, `trainingJobs: true`.
+
+   > **Amended 2026-09-03 (WP-123).** The decision now reads: dashboard feature flags are
+   > **applied by Ansible**, not GitOps-managed. Nothing about the GitOps posture changes -
+   > it is reinforced below - only the applier: "live-patched" meant *by a human, from a
+   > shell*, and nothing in this repo ever applied them, so a from-scratch install came up
+   > with the operator's defaults and these surfaces silently gone. That was a portability
+   > blocker of exactly the class WP-118 closed, and it was invisible to WP-118 precisely
+   > because a cluster-only mutation leaves no trace in the repo to grep for.
+   >
+   > - **Applier:** `ansible/roles/openshift_ai/tasks/dashboard_feature_flags.yml`, shared by
+   >   `install` and `reconcile` (`make d1 install|reconcile openshift-ai`), with a read-only
+   >   drift tripwire in the role's `precheck.yml` (`make d1 check openshift-ai`). It is a
+   >   partial merge patch: it writes only the keys it names and never the whole
+   >   `dashboardConfig`.
+   > - **Authoritative list moves to the code:** `ansible/roles/openshift_ai/tasks/
+   >   set_dashboard_flags.yml`. This ADR stays authoritative for the *posture*; that file is
+   >   authoritative for the *values*. Two documents each claiming to hold the list (this one
+   >   and ADR-0534) is how `disableKueue` went missing in the first place.
+   > - **The list gains `disableKueue: false`** (decision 3's surface). The dashboard's KUEUE
+   >   area is `{featureFlags:["disableKueue"], requiredComponents:["kueue"]}`, and its flag
+   >   evaluator returns `"off"` for an **undefined** key *before* applying the `disable*`
+   >   inversion - so an absent key is not a default, it is a disabled feature. The
+   >   `requiredComponents` half was never the problem: the code accepts both `Managed` and
+   >   `Unmanaged`, so `kueue: Unmanaged` on the DSC is fine. Live symptom on 2026-09-03:
+   >   "Kueue is disabled in this cluster" in `zuno-ai-run` - the only namespace labelled
+   >   `kueue.openshift.io/managed=true` per decision 3 - with the "Deploy model" button
+   >   disabled and the hardware-profile list filtered to empty, while the Kueue operand was
+   >   `Available` with two ready replicas.
+   > - **Why still not GitOps.** The CR has no `ownerReferences` and three concurrent
+   >   writers, read off `managedFields` live: the operator owns `disableTracking`, this
+   >   automation owns the four flags, and the dashboard UI itself writes
+   >   `hardwareProfileOrder`/`modelServing` at runtime. Every Application here runs
+   >   `prune: true, selfHeal: true`, so ArgoCD ownership would revert an admin's own UI
+   >   actions; and the usual escape hatch is the false-green trap this repo has hit three
+   >   times (`ignoreDifferences: /spec` on the DSC, on MachineSet replicas, on Kiali's
+   >   subtrees). `Replace=true` on a CR looped (WP-117) and `ServerSideApply` is used
+   >   exactly once, on the manual-bootstrap root app, never on an operand.
+   > - **`disableTracking` stays out of the list** deliberately: it is the one
+   >   `dashboardConfig` key the operator itself owns, it already sits at the operator's
+   >   default, and its value decides whether telemetry is on - not something to assert
+   >   silently behind the operator's back.
 
 ## Non-goals
 

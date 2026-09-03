@@ -15,6 +15,9 @@
 #     DataScienceCluster, recording findings instead of raw errors
 #   - right-size the RHOAI-generated TempoStack (ADR-0522/ADR-0523), via
 #     right_size_monitoring_stack.yml - shared with install.yml
+#   - re-apply the RHOAI dashboard feature flags (ADR-0538 decision 5 as
+#     amended, WP-123), via dashboard_feature_flags.yml - also shared with
+#     install.yml
 # Optional, default OFF (side-effect safety): delete CrashLoopBackOff pods
 # in redhat-ods-applications with -e openshift_ai_reconcile_restart_pods=true.
 - name: "openshift_ai | reconcile: discover the operator channel (ADR-0048)"
@@ -281,6 +284,15 @@
 # rationale lives in the shared file.
 - name: "openshift_ai | reconcile: right-size the RHOAI-generated TempoStack"
   ansible.builtin.include_tasks: right_size_monitoring_stack.yml
+
+# --- Dashboard feature flags: shared with install.yml for the same reason as
+# the TempoStack above. These four flags had no applier at all until
+# 2026-09-03 - they were posted by hand with `oc patch` and recorded only in
+# prose, so any cluster that had not been hand-patched was missing the
+# Evaluations, guardrails, training-jobs and Kueue surfaces. All the rationale,
+# including why this cannot be GitOps-managed, lives in the shared file.
+- name: "openshift_ai | reconcile: re-apply the RHOAI dashboard feature flags"
+  ansible.builtin.include_tasks: dashboard_feature_flags.yml
 
 # --- NO remediation for RHOAI's broken collector->Tempo hop (ADR-0523/
 # WP-081 live incident, 2026-08-26; deliberate non-action, recorded so

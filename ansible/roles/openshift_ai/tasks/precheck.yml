@@ -324,6 +324,82 @@
     - _oai_catalog_csv != _oai_pinned_csv
     - blocked_findings is defined
 
+# --- Dashboard feature flags (ADR-0538 decision 5 as amended, WP-123) -------
+# Read-only tripwire. These four flags are applied by dashboard_feature_flags.yml
+# (install + reconcile) and cannot be GitOps-managed - the CR is operator-created
+# and co-owned by the operator, this automation and the dashboard UI itself. The
+# check matters because their absence is INVISIBLE from the cluster's own health:
+# every component stays Ready while whole dashboard pages are missing. It reports
+# and never gates _state_is_installed - a hidden UI surface is not an uninstalled
+# component.
+- name: "openshift_ai | precheck: load the authoritative dashboard feature-flag map"
+  ansible.builtin.include_tasks: set_dashboard_flags.yml
+
+- name: "openshift_ai | precheck: look up the OdhDashboardConfig"
+  kubernetes.core.k8s_info:
+    api_version: opendatahub.io/v1alpha
+    kind: OdhDashboardConfig
+    name: odh-dashboard-config
+    namespace: redhat-ods-applications
+  register: _oai_dashboard_config
+  failed_when: false
+
+- name: "openshift_ai | precheck: default the live dashboard feature-flag map"
+  ansible.builtin.set_fact:
+    _oai_dashboard_live: {}
+
+- name: "openshift_ai | precheck: capture the live dashboard feature-flag map"
+  ansible.builtin.set_fact:
+    _oai_dashboard_live: "{{ _oai_dashboard_config.resources[0].spec.dashboardConfig | default({}, true) }}"
+  when: (_oai_dashboard_config.resources | default([]) | length) > 0
+
+# Two facts on purpose. The boolean is the gate: `combine` catches both an
+# absent key and a wrong value with no Jinja loop to get wrong. The string is
+# for the human reading the report, and distinguishes "ABSENT" from "=false" -
+# for a `disable*` key those look identical and mean the opposite things, since
+# the dashboard reads an undefined key as "off" before inverting it.
+- name: "openshift_ai | precheck: compare the live dashboard flags against the authoritative map"
+  ansible.builtin.set_fact:
+    _oai_dashboard_drifted: >-
+      {{ (_oai_dashboard_live | combine(_openshift_ai_dashboard_flags)) != _oai_dashboard_live }}
+    _oai_dashboard_drift: >-
+      {%- set drift = [] -%}
+      {%- for k, v in (_openshift_ai_dashboard_flags | dictsort) -%}
+      {%- if k not in _oai_dashboard_live -%}
+      {%- set _ = drift.append(k ~ ' ABSENT (want ' ~ (v | string | lower) ~ ')') -%}
+      {%- elif _oai_dashboard_live[k] != v -%}
+      {%- set _ = drift.append(k ~ '=' ~ (_oai_dashboard_live[k] | string | lower) ~ ' (want ' ~ (v | string | lower) ~ ')') -%}
+      {%- endif -%}
+      {%- endfor -%}
+      {{ drift | join(', ') }}
+
+- name: "openshift_ai | precheck: report the dashboard feature-flag state"
+  ansible.builtin.debug:
+    msg: >-
+      RHOAI dashboard feature flags:
+      {{ 'OdhDashboardConfig/odh-dashboard-config NOT FOUND in redhat-ods-applications'
+         if (_oai_dashboard_config.resources | default([]) | length) == 0
+         else ('DRIFTED - ' ~ _oai_dashboard_drift)
+              if (_oai_dashboard_drifted | bool)
+              else ('all ' ~ (_openshift_ai_dashboard_flags | length) ~ ' flags as declared') }}
+
+- name: "openshift_ai | precheck: record the dashboard feature-flag drift"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "OdhDashboardConfig/odh-dashboard-config (redhat-ods-applications)"
+      state: >-
+        {{ 'CR absent - the dashboard component has not reconciled it yet'
+           if (_oai_dashboard_config.resources | default([]) | length) == 0
+           else 'dashboard feature flags drifted: ' ~ _oai_dashboard_drift }}
+      cause: "ADR-0538 decision 5 as amended (2026-09-03, WP-123): this CR is operator-created, co-owned by three writers and NOT GitOps-managed, so its feature flags are applied as an Ansible partial patch. A missing key does NOT fall back to the operator default - the dashboard's flag evaluator returns \"off\" for an UNDEFINED key BEFORE applying the disable* inversion, so an absent disableKueue renders as \"Kueue is disabled in this cluster\" in zuno-ai-run (Deploy model disabled, empty hardware-profile list) even with the Kueue operand Available and reconciling. disableLMEval/guardrails/trainingJobs hide the Evaluations, guardrails and training-jobs surfaces the same way."
+      solution: "Re-apply with the auto-fix below (ansible/roles/openshift_ai/tasks/dashboard_feature_flags.yml, values in set_dashboard_flags.yml). If a flag reverts within seconds of a green reconcile, the RHOAI operator has started owning that key: remove it from set_dashboard_flags.yml and record it as an upstream constraint rather than looping - same class as reconcile.yml's documented OpenTelemetryCollector non-action."
+      auto_fix: "make d1 reconcile openshift-ai"
+  when:
+    - (_oai_dashboard_config.resources | default([]) | length) == 0 or (_oai_dashboard_drifted | bool)
+    - blocked_findings is defined
+
 - name: "openshift_ai | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-

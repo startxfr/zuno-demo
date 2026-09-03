@@ -1,8 +1,9 @@
 {{- /*
 WP-115: the EvalHub instance backing the RHOAI dashboard's "Evaluations"
 page (Develop & train -> Evaluations). The page was unlocked by flipping
-`disableLMEval: false` on OdhDashboardConfig (live patch, not
-GitOps-managed - see ADR-0534 Operational considerations) but stays
+`disableLMEval: false` on OdhDashboardConfig (operator-created CR, not
+GitOps-managed - applied since WP-123 by ansible/roles/openshift_ai/tasks/
+dashboard_feature_flags.yml; see ADR-0538 decision 5 as amended) but stays
 "Evaluations unavailable" until a project carries an EvalHub CR - the
 operator's EVALHUB controller was always running (WP-108 finding #2),
 just never instantiated.

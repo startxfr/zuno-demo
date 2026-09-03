@@ -1,0 +1,55 @@
+---
+# THE authoritative list of the RHOAI dashboard feature flags this platform
+# asserts on `OdhDashboardConfig/odh-dashboard-config` (redhat-ods-applications).
+# Included by dashboard_feature_flags.yml (which writes them) and by
+# precheck.yml (which reads them back), so the list exists exactly once.
+# ADR-0538 decision 5 as amended (2026-09-03, WP-123) holds the POSTURE and
+# points here for the VALUES - before that amendment the flags lived only in
+# prose and were applied by hand, which is how disableKueue went missing.
+#
+# Every key is written EXPLICITLY, including the ones whose value looks like
+# the default, because on this dashboard build an absent key is NOT a default:
+# the flag evaluator returns "off" for an undefined key BEFORE applying the
+# `disable*` inversion, and the backend's own fallback for disableKueue is
+# `true`. "Unset" and "disabled" are indistinguishable in the UI - only an
+# explicit value turns a surface on (read live 2026-09-03 out of the running
+# rhods-dashboard bundle and backend).
+#
+# Deliberately NOT listed:
+#   - disableTracking: the ONLY dashboardConfig key the RHOAI operator itself
+#     owns in managedFields (checked live 2026-09-03). It is already at the
+#     operator's default, and its value means telemetry ON/OFF - not something
+#     this repo should assert silently behind the operator's back.
+#   - disableDistributedWorkloads, mlflow, and the ~45 other keys the CRD
+#     schema declares: unset on purpose. Adding one turns on a dashboard
+#     surface nobody has verified, so it is an ADR-level decision, not a
+#     symmetry edit.
+- name: "openshift_ai | dashboard: declare the authoritative feature-flag map"
+  ansible.builtin.set_fact:
+    _openshift_ai_dashboard_flags: >-
+      {{ openshift_ai_dashboard_flags
+         | default(_openshift_ai_dashboard_flags_default, true) }}
+  vars:
+    # A literal YAML mapping, referenced by a bare `{{ }}` above so the values
+    # stay real booleans: precheck.yml compares them with `!=` against the
+    # live CR's booleans, and a folded string would report permanent drift.
+    _openshift_ai_dashboard_flags_default:
+      # ADR-0534 / WP-115: unlocks Develop & train -> Evaluations (needs the
+      # zuno-evalhub EvalHub CR too - that one IS GitOps-managed, in
+      # gitops/charts/trustyai-config).
+      disableLMEval: false
+      # ADR-0534 / WP-115: unlocks the guardrails surface.
+      guardrails: true
+      # ADR-0538 decision 4 / WP-117 step 4: unlocks the training-jobs UI.
+      # No workload moves off KFP - this only makes the page usable.
+      trainingJobs: true
+      # ADR-0538 decision 3 / WP-123: the dashboard's KUEUE area is
+      # {featureFlags:["disableKueue"], requiredComponents:["kueue"]}. The
+      # requiredComponents half already passes (the code accepts BOTH
+      # "Managed" and "Unmanaged", so DSC kueue: Unmanaged is not the
+      # problem); the flag half fails whenever the key is absent. Symptom,
+      # live 2026-09-03: "Kueue is disabled in this cluster" in zuno-ai-run -
+      # the only namespace labelled kueue.openshift.io/managed=true - plus a
+      # disabled "Deploy model" button and an EMPTY hardware-profile list,
+      # while the Kueue operand was Available with 2 ready replicas.
+      disableKueue: false

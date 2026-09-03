@@ -240,3 +240,12 @@
 # full incident.
 - name: "openshift_ai | right-size the RHOAI-generated TempoStack"
   ansible.builtin.include_tasks: right_size_monitoring_stack.yml
+
+# After the TempoStack, and last overall, because the dashboard component only
+# creates its OdhDashboardConfig once the DSC above is accepted. Shared with
+# reconcile.yml for the same reason the TempoStack remediation is: until
+# 2026-09-03 these flags were applied by hand and never by any automation, so a
+# fresh cluster came up with four dashboard surfaces silently missing (ADR-0538
+# decision 5 as amended, WP-123). All the rationale lives in the shared file.
+- name: "openshift_ai | apply the RHOAI dashboard feature flags"
+  ansible.builtin.include_tasks: dashboard_feature_flags.yml

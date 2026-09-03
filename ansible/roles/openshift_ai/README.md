@@ -4,7 +4,10 @@ Applies the `gitops/apps/openshift-ai` ArgoCD Application, whose chart
 (`gitops/charts/openshift-ai`) installs the Red Hat OpenShift AI operator
 (OLM `Subscription`, channel discovered from the cluster's own catalog -
 see below) and the `DataScienceCluster` with `kserve` (model serving)
-enabled. A Day 0 component with all three verbs: `check` verifies the
+enabled. A Day 1 component (`DAY1_RUN_COMPONENTS` in the Makefile - this
+paragraph said Day 0 until 2026-09-03, and `make d0 <verb> openshift-ai`
+simply fails, as `tasks/reconcile.yml`'s own header already noted) with all
+three verbs: `check` verifies the
 operator is published in the catalog; `install` discovers the channel,
 applies the Application (Namespace + OperatorGroup + Subscription at
 sync-wave 10, DataScienceCluster at sync-wave 20 - gated on the
@@ -71,3 +74,31 @@ ArgoCD's default health evaluation would report the `Subscription`
 `Healthy` immediately after apply, before OLM has actually installed the
 CSV that registers the `DataScienceCluster` CRD, and the wave 20 sync
 would fail with "no matches for kind DataScienceCluster".
+
+## Dashboard feature flags
+
+`tasks/dashboard_feature_flags.yml` (shared by `install` and `reconcile`)
+applies four flags to `OdhDashboardConfig/odh-dashboard-config` in
+`redhat-ods-applications`; `tasks/set_dashboard_flags.yml` holds the values and
+is the authoritative list. `disableLMEval: false` and `guardrails: true` unlock
+the Evaluations and guardrails surfaces (ADR-0534/WP-115), `trainingJobs: true`
+the training-jobs UI (ADR-0538/WP-117), and `disableKueue: false` the Kueue
+workload-allocation UI (WP-123).
+
+They are not in a chart because the CR is created by the RHOAI operator and has
+three concurrent writers: the operator owns `disableTracking`, this role owns
+the four flags, and the dashboard UI itself writes `hardwareProfileOrder` and
+`modelServing` at runtime. With `prune`/`selfHeal` on every Application, ArgoCD
+ownership would revert the UI's own writes, and the usual `ignoreDifferences`
+escape hatch is the false-green trap this repo has hit three times. So this is a
+partial merge patch that touches only the keys it names - never the whole
+`dashboardConfig`.
+
+The trap worth knowing: an **absent** flag is not "the operator's default". The
+dashboard's flag evaluator returns `"off"` for an undefined key *before* it
+applies the `disable*` inversion, and the CRD declares no defaults - so deleting
+a key turns its surface off rather than restoring neutral behaviour. That is
+exactly how `disableKueue` went missing and produced "Kueue is disabled in this
+cluster" on a cluster whose Kueue operand was running fine. `check` reports any
+drift as a blocked finding (auto-fix `make d1 reconcile openshift-ai`) without
+marking the component uninstalled.
