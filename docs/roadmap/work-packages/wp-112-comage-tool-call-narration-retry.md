@@ -1,19 +1,18 @@
 # WP-112: Design a retry for skipped tool calls on the single-shot graph shape
 
-- **State:** Repo work merged (2026-09-02) - design answered below,
-  implemented in the same pass (judged in-scope, see "Design vs.
-  execution" below), unit-tested
-  (`components/agent-runtime/tests/test_reason_node_narration_retry.py`, 5/5
-  PASS, full existing suite green). Live-verified against a real
-  `qwen3.5-9b-wesh` deployment: the retry mechanism itself is confirmed
-  working (server-side logs show Comage genuinely invoking
-  `generate_image` for the first time, where it previously only
-  narrated) - a clean `images=1` PASS on the two named regression checks
-  is currently blocked by two separate, live, unrelated infra conditions
-  (an external SDXL-provider outage and a concurrent MaaS auth 401
-  burst), not by anything in this WP's own code. See "Live verification"
-  below for the full evidence and what's needed to re-confirm once those
-  clear.
+- **State:** Repo work merged (2026-09-03) - NOT Done, and not just
+  pending infra: re-tested 2026-09-03 after WP-122 closed the MaaS 401s
+  that were blocking the 2026-09-02 attempt, and both named checks still
+  FAIL. This time the retry mechanism itself never fired - a real,
+  narrower-than-hoped detection gap in `_NARRATED_TOOL_NAME_PATTERN`
+  (name-substring match only), confirmed against a live French-language
+  narration that describes using "the tool" without ever saying
+  `generate_image`. The retry mechanism's own correctness is still
+  proven (2026-09-02 evidence: a real `generate_image` call reaching
+  `mcp-gateway`/`ai-gateway` for the first time) - what's missing is a
+  safe way to widen when it triggers. See both "Live verification"
+  sections below for the full evidence and the follow-up design question
+  this leaves open.
 - **ADRs:** ADR-0516 (Decision - the tool-schema/prompt contradiction ADR-0516
   accepted as an unmitigated risk; that risk has now manifested with live
   evidence). ADR-0516 itself stays `Implemented`/v0.4 - this WP does not
@@ -231,6 +230,60 @@ downstream of the retry succeeding, neither in this WP's scope:
 PASS on both checks - the retry mechanism itself needs no further code
 change; this is now an infrastructure-availability gate, not a design or
 implementation gap.
+
+## Live verification (2026-09-03) - re-run after WP-122 closed the MaaS 401s: still FAIL, real detection gap found
+
+Both external conditions from the 2026-09-02 run were expected to have
+cleared (WP-122 fixed the MaaS 401 burst; no reason to assume SDXL was
+still down). Re-ran `make d3 stresstest agents BULK=0` as WP-122's own
+named downstream confirmation. **Both checks still FAIL** - but this
+time for a different, more fundamental reason than infra:
+
+```
+comage stress_test FAIL image_generation img-mockup_request
+  -> images=0 reply_snippet="\n\nOuais, pour un visuel de proposition
+     commerciale, c'est le bon outil. C'est un mockup marketing, pas une
+     visualisation de données structurées."
+comage security FAIL comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests
+  -> chart_status=200 chart_images=[] marketing_status=200 marketing_images=[]
+```
+
+Checked `mcp-gateway`/`ai-gateway` logs for the test window: **zero**
+`generate_image`/`check-deal-status` tool-call log lines - unlike the
+2026-09-02 run (which showed the retry actually firing and a real tool
+call reaching both services, just failing downstream on SDXL/MaaS), this
+time `_retry_narrated_visual_tool_call` never triggered at all.
+
+**Root cause, found by re-reading the trigger condition
+(`components/agent-runtime/app/graph/nodes.py:805-807,1023-1024`):**
+`_NARRATED_TOOL_NAME_PATTERN` only matches replies that literally contain
+the substring `generate_image` or `generate_diagram`. The model's actual
+reply above never names the tool - it describes intent in French
+("c'est le bon outil" / "that's the right tool") without ever saying
+`generate_image`. This is the exact narrate-instead-of-call defect this
+WP targets, just phrased in a way the name-substring heuristic cannot
+catch. **The retry mechanism itself is proven working (2026-09-02
+evidence stands); the trigger that decides when to invoke it is too
+narrow** - it only catches narration that names the function, not
+narration that merely describes using "the tool" for the task.
+
+This is a real, distinct gap, not a re-run of the same finding. Widening
+the trigger safely is a genuine design question, not a quick tweak: an
+unconditional retry-whenever-no-tool-call-came-back would also fire on
+Comage's deliberate, CORRECT declines (the `sxa_visualization_boundary`
+check - `comage/sxa_visualization_boundary: 1/1 passed` this same run -
+depends on Comage being able to say no without being nudged into calling
+a tool it shouldn't for that case). Any broader heuristic needs to keep
+that distinction, across at least French and English phrasing, without
+a new eval corpus to validate against - left as explicit follow-up
+work, not attempted here without review.
+
+Two other FAILs in this same run are unrelated, pre-existing, and out of
+scope: acceptance scenarios 10 and 12 both fail on the known absent
+`salesforce-mcp` live deployment (WP-101, not started, new-owner
+credential gap) - `status=500 expected=403` on scenario 12 is that same
+root cause surfacing through the MCP Gateway's own error path, not a new
+defect.
 
 ## Acceptance checks (for this WP's own scope)
 
