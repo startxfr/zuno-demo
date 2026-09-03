@@ -26,6 +26,19 @@ spec:
           enabled: true
           authorinoTls:
             enabled: true
+        # ADR-0517 B4 (WP-118 step 1): token, substituted by
+        # ansible/tasks/apply_gitops_app.yml. quotaEnforcement.gateway.enabled
+        # defaults to true in the chart's own values.yaml, so this
+        # Application renders templates/quota-demo-gateway.yaml (the
+        # tekos-quota-demo Route/Gateway) without an explicit gate override
+        # here - but that means it also needs its own demoHostname override
+        # to get the substitution, mirroring
+        # gitops/apps/connectivity-link-quota/application-d1.yaml's own
+        # (Day2) copy. Missing this left the live Route on the chart's raw
+        # placeholder default, live-confirmed 2026-09-03 as a 503 on the
+        # ADR-0511/WP-54 quota-demo route.
+        quotaEnforcement:
+          demoHostname: tekos-quota-demo.apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: kuadrant-system

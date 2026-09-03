@@ -75,13 +75,20 @@
     gitops_component_name: "connectivity-link"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-connectivity-link-d1"
-    gitops_app_extra_helm_values:
-      project:
-        enabled: true
-      kuadrant:
-        enabled: true
-        authorinoTls:
-          enabled: true
+    # No gitops_app_extra_helm_values here (2026-09-03 fix): this used to
+    # duplicate project/kuadrant/authorinoTls verbatim from
+    # gitops/apps/connectivity-link/application-d1.yaml's own static
+    # values - since extra_helm_values REPLACES spec.source.helm.values
+    # wholesale (see ansible/tasks/apply_gitops_app.yml's own comment),
+    # that silently dropped the manifest's quotaEnforcement.demoHostname
+    # addition (ADR-0517 B4/WP-118), leaving the live tekos-quota-demo
+    # Route on the chart's raw placeholder default - a live 503,
+    # live-confirmed and root-caused 2026-09-03. None of these three keys
+    # are runtime-discovered (unlike d0's channel/catalog-source above),
+    # so removing the override entirely lets the static manifest (now
+    # complete) pass through as-is, same fix shape check_docs.py's
+    # gitops_values_clobber check recommends (see cert_manager's own
+    # read-and-combine pattern for a case that DOES need one).
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 15
 
