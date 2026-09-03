@@ -81,3 +81,106 @@
 
 - name: "openshift_oauth | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+# ADR-0347/ADR-0211, 2026-09-03. keycloak-serving-ca is a SNAPSHOT of the
+# live trust chain, taken at install time and never resynchronised. Above,
+# this file only checks that it EXISTS - which is the same "the object
+# exists therefore it works" mistake that let a ScaledObject sit Ready=False
+# for nine hours and a trustedCA reference dangle for eighteen days. Both
+# were caught the same day; this is the third instance of the pattern.
+#
+# What goes stale: a Let's Encrypt INTERMEDIATE rotation, or any change to
+# the IngressController's defaultCertificate, changes the chain that
+# default-ingress-cert publishes. The snapshot then no longer verifies what
+# Keycloak serves and `authentication` degrades with ADR-0347's original
+# x509 message - with no prior signal. Ordinary 60-day LEAF renewals do not
+# do this.
+#
+# Report-only, and deliberately NOT part of _state_is_installed above: a
+# stale snapshot is a warning, not "not installed" - the component keeps
+# working right up until the rotation. Same shape as the WP-121 block in
+# ansible/roles/custom_metrics_autoscaler/tasks/precheck.yml.
+#
+# The test is a data comparison, not a crypto verification: recompute what
+# install.yml WOULD write from the live sources and diff it against what is
+# stored. That answers exactly "would a reconcile change this?", with no
+# date arithmetic and no false positives.
+- name: "openshift_oauth | look up the router CA the serving-CA snapshot is built from"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: default-ingress-cert
+    namespace: openshift-config-managed
+  register: _openshift_oauth_router_ca_check
+  ignore_errors: true
+
+- name: "openshift_oauth | look up the Keycloak Ingress to find its live TLS secret name"
+  kubernetes.core.k8s_info:
+    api_version: networking.k8s.io/v1
+    kind: Ingress
+    name: "{{ zuno_keycloak_cr_name | default('zuno') }}"
+    namespace: zuno-auth
+  register: _openshift_oauth_keycloak_ingress_check
+  ignore_errors: true
+
+- name: "openshift_oauth | look up the Secret the Keycloak Ingress actually serves"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: "{{ _openshift_oauth_keycloak_ingress_check.resources[0].spec.tls[0].secretName }}"
+    namespace: zuno-auth
+  register: _openshift_oauth_keycloak_ca_check
+  ignore_errors: true
+  when: (_openshift_oauth_keycloak_ingress_check.resources | default([]) | length) > 0
+
+- name: "openshift_oauth | note whether the serving-CA snapshot can be evaluated at all"
+  ansible.builtin.set_fact:
+    _openshift_oauth_serving_ca_checkable: >-
+      {{ (_openshift_oauth_ca_lookup.resources | default([]) | length) > 0
+         and (_openshift_oauth_router_ca_check.resources | default([]) | length) > 0
+         and ((_openshift_oauth_keycloak_ca_check.resources | default([])) | length) > 0 }}
+
+# Byte-for-byte the expression install.yml uses to build the ConfigMap - same
+# concatenation order, same conditional "\n". Any cosmetic divergence here
+# would report drift that a reconcile could never resolve.
+#
+# The Secret's ca.crt is base64 (| b64decode); the ConfigMap's ca-bundle.crt
+# is NOT - k8s_info base64-encodes Secret data only.
+- name: "openshift_oauth | recompute what a reconcile would write into keycloak-serving-ca"
+  ansible.builtin.set_fact:
+    _openshift_oauth_serving_ca_expected: >-
+      {{ (
+           (_openshift_oauth_keycloak_ca_check.resources[0].data['ca.crt'] | b64decode) + "\n"
+           if 'ca.crt' in (_openshift_oauth_keycloak_ca_check.resources[0].data | default({}))
+           else ''
+         )
+         + (_openshift_oauth_router_ca_check.resources[0].data['ca-bundle.crt']) }}
+  when: _openshift_oauth_serving_ca_checkable | bool
+
+- name: "openshift_oauth | record the stale serving-CA snapshot finding"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-oauth
+      resource: "ConfigMap/keycloak-serving-ca (openshift-config)"
+      state: "Stale"
+      cause: >-
+        the snapshot no longer matches the chain Keycloak actually serves - it was
+        taken at install time and nothing resynchronises it. Left alone, the next
+        Let's Encrypt intermediate rotation degrades the authentication
+        clusteroperator (OAuthServerConfigObservationDegraded, x509 unknown authority)
+      solution: "Re-copy the live chain into the ConfigMap"
+      auto_fix: "make d1 reconcile openshift-oauth"
+  when:
+    - _openshift_oauth_serving_ca_checkable | bool
+    - (_openshift_oauth_ca_lookup.resources[0].data['ca.crt'] | default('')) != _openshift_oauth_serving_ca_expected
+
+- name: "openshift_oauth | report the serving-CA snapshot's freshness"
+  ansible.builtin.debug:
+    msg: >-
+      keycloak-serving-ca:
+      {{ 'NOT EVALUABLE - one of ConfigMap/keycloak-serving-ca, ConfigMap/default-ingress-cert or the Keycloak Ingress TLS Secret is missing'
+         if not (_openshift_oauth_serving_ca_checkable | bool)
+         else ('current - matches the chain Keycloak serves'
+               if (_openshift_oauth_ca_lookup.resources[0].data['ca.crt'] | default('')) == _openshift_oauth_serving_ca_expected
+               else 'STALE - re-run `make d1 reconcile openshift-oauth` before the next chain rotation') }}
