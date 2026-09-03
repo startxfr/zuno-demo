@@ -29,6 +29,14 @@ metadata:
   namespace: {{ .Values.platform.namespace }}
   labels:
     {{- include "mlops.labels" . | nindent 4 }}
+    # WP-126: without this, the Trainer controller builds the JobSet/Job
+    # from this runtime's own template verbatim and never applies
+    # TrainJob.spec.trainer's command/args/env overrides at all - the
+    # container starts with no entrypoint. RHOAI's own 15
+    # ClusterTrainingRuntimes all carry it (verified live,
+    # trainer.kubeflow.org/framework: torch on torch-distributed); WP-119
+    # never set it on this namespaced runtime.
+    trainer.kubeflow.org/framework: torch
 spec:
   mlPolicy:
     numNodes: 1
@@ -47,8 +55,10 @@ spec:
       replicatedJobs:
         # "node" for both the replicatedJob and the container: this is the
         # pair the operator's own 15 ClusterTrainingRuntimes use, and it is
-        # what spec.trainer's command/args/env overrides key on. Verify
-        # against a live probe before changing either name.
+        # what env overrides key on (envInjection.targets matches the
+        # replicatedJob name). command/args injection is gated separately,
+        # by the trainer.kubeflow.org/framework label above - not by this
+        # naming. Verify against a live probe before changing either name.
         - name: node
           replicas: 1
           template:
