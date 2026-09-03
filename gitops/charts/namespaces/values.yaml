@@ -483,24 +483,31 @@ platformNamespaces:
       # a single replica instead leaves the CSV Failed with 2 of 3 pods
       # FailedCreate.
       #
-      # limits.memory must cover the ROLLING-UPDATE PEAK, not that 12Gi
+      # EVERY dimension here must cover the ROLLING-UPDATE PEAK, not that
       # steady state. OLM owns the Deployment's strategy and ships
       # maxSurge/maxUnavailable 25%: on 3 replicas that rounds to +1 surge
       # pod and 0 unavailable, so the Deployment can never retire an old pod
-      # before a new one is Ready - it MUST surge to 4 pods = 16Gi. At 14Gi
-      # the 3.5.0-ea.2 -> 3.5.0 upgrade deadlocked permanently: new
-      # ReplicaSet stuck at 0 pods on `exceeded quota: zuno-platform-quota,
-      # requested: limits.memory=4Gi, used: 12Gi, limited: 14Gi`, CSV pinned
-      # in Installing/InstallWaiting, and the Subscription reporting a
-      # DERIVED ResolutionFailed ("constraints not satisfiable ... both CSVs
-      # provide HardwareProfile") that reads like the real fault but is only
-      # the two CSVs coexisting while the replacement cannot finish. This is
-      # structural, not specific to 3.5.0: the initial ea.2 install passed
-      # only because there were no old pods to surge past. Recompute this
-      # value if RHOAI ever changes replicas or the per-pod memory limit.
-      # limits.cpu already covers the same peak: 4 x 500m = 2cpu of 3.
-      requests: { cpu: "2", memory: "2Gi" }
-      limits: { cpu: "3", memory: "16Gi" }
+      # before a new one is Ready - it MUST surge past 3. At 14Gi the
+      # 3.5.0-ea.2 -> 3.5.0 upgrade deadlocked permanently: new ReplicaSet
+      # stuck at 0 pods on `exceeded quota: zuno-platform-quota, requested:
+      # limits.memory=4Gi, used: 12Gi, limited: 14Gi`, CSV pinned in
+      # Installing/InstallWaiting, and the Subscription reporting a DERIVED
+      # ResolutionFailed ("constraints not satisfiable ... both CSVs provide
+      # HardwareProfile") that reads like the real fault but is only the two
+      # CSVs coexisting while the replacement cannot finish.
+      #
+      # Sizing for the 4-pod peak exactly (16Gi / requests.cpu 2) is NOT
+      # enough, as that same upgrade then proved: OLM's reinstall loop
+      # recomputes the deployment-spec hash mid-roll and cuts a THIRD
+      # ReplicaSet, so more than one surge pod can be pending at once, and
+      # the RS controller batches its creates before quota accounting
+      # settles. Both limits.memory and requests.cpu pinned at exactly
+      # `used == limited` and refused the next pod. So size for 5 concurrent
+      # pods (2.5cpu / 20Gi limits, 2.5cpu / 1280Mi requests) with headroom
+      # on top for OLM's own job pods. Recompute if RHOAI ever changes
+      # replicas or the per-pod requests/limits.
+      requests: { cpu: "4", memory: "4Gi" }
+      limits: { cpu: "5", memory: "24Gi" }
     limitRange:
       defaultRequest: { cpu: "50m", memory: "128Mi" }
       default: { cpu: "500m", memory: "512Mi" }
