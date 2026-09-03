@@ -1,6 +1,6 @@
 # WP-124: Restore ai-gateway's egress to external SaaS providers
 
-- **State:** Repo work merged (2026-09-03) - live-verified, see "Live verification" below
+- **State:** Done (2026-09-03) - end-to-end verified, see "Live verification" below
 - **ADRs:** ADR-0415 (SDXL via OVHcloud AI Endpoints), ADR-0416 (gpt-oss-120b
   via OVHcloud), ADR-0417 (Codestral via Mistral API) - the three provider
   decisions this defect silently voids; ADR-0537 (Decision 3/4, the
@@ -165,6 +165,45 @@ outbound|443||api.mistral.ai::162.159.142.207:443::cx_connect_fail::0
 outbound|443||api.mistral.ai::162.159.142.207:443::cx_total::1
 outbound|443||api.mistral.ai::162.159.142.207:443::rq_total::1
 ```
+
+### End-to-end run (`make d3 stresstest agents BULK=0`)
+
+Overall 222/242, against 221/242 on the pre-fix run. What this WP moved:
+
+| Category | Before | After |
+| --- | --- | --- |
+| `comage/security` | 7/8 | **8/8** |
+| `tekos/layer1_model_routing` | 0/2 | **2/2** |
+| `arkos/diagram_generation` | 2/3 | **3/3** |
+| `tekos/code_generation` | 5/6 | **6/6** |
+
+`tekos/layer1_model_routing` going 0/2 -> 2/2 confirms the blast radius this
+WP claimed but had not proven: those two checks were failing *because* the
+external providers were unreachable, not for any reason of their own.
+
+A real SDXL image was generated end to end, and there is **not one**
+`Connection error` or `502` anywhere in the run's window (previously 100%
+of attempts):
+
+```
+11:27:54 mcp_gateway tool=generate_image agent=comage task=check-deal-status allowed=True
+11:27:54 ai_gateway  image_call: provider=ovhcloud-sdxl model=stable-diffusion-xl-base-v10
+```
+
+**Two regressions in the same run, cause not established - do not call this
+run clean without checking them.** `tekos/technical_qa` 7/7 -> 4/7 (`qa-argocd`,
+`qa-helm`, `qa-go`, all `citations=0` with a real reply) and
+`tekos/dat_boundary` 2/2 -> 1/2 (`dat-write_dat`, `timed out`). These are
+retrieval/latency symptoms, and this WP's change only affects egress to two
+external hosts from `ai-gateway`, so a causal link is not obvious. But they
+are new in this run, so they cannot simply be assumed unrelated. The
+hypothesis worth testing first: with egress restored, C2/C3 turns now really
+do reach an external provider instead of silently falling back to a local
+model, and ADR-0035 withholds source-restricted (Confluence) context from
+external models by design - which would produce exactly `citations=0`. If
+that is what happened, the tests were implicitly calibrated against a
+fallback that was masking a real behavior. Tracked as a follow-up, not
+silently absorbed here.
 
 **Sync gotcha worth recording.** The first sync appeared to run but stayed
 pinned to an old revision (`syncResult.revision 9439e3b8`) with phase

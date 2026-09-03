@@ -9,12 +9,13 @@
   `generate_image` call through `mcp-gateway` to `ai-gateway`, with no
   prose narration anywhere in the run, and `sxa_visualization_boundary`
   still passing. Both named checks nonetheless still report FAIL, for two
-  reasons now understood and neither of them narration: (1) every external
-  SaaS provider is unreachable from inside the mesh, because the
-  `maas-controller` reconciler's `tls: SIMPLE` DestinationRules make Envoy
-  originate a second TLS layer over traffic `ai-gateway` already encrypts
-  - tracked as WP-124; (2) `img-mockup_request` now gets a defensible
-  grounding-based decline rather than a narration, recorded as a finding. Widening `_NARRATED_TOOL_NAME_PATTERN` is no
+  reasons, both since resolved or re-scoped. The external-egress defect is
+  fixed (WP-124, Done), and the third run has `comage/security` **8/8** - the
+  marketing check green for the first time, with a real SDXL image. What
+  remains is `img-mockup_request`, which across three runs has failed three
+  different ways, two of them plain narration ("Ouais, j'peux faire ca."), so
+  widening the trigger IS indicated after all - a claim this brief briefly
+  retracted on a one-run sample. That widening is the remaining work. Widening `_NARRATED_TOOL_NAME_PATTERN` is no
   longer the indicated next step - there is no narration left to detect.
   See "Live verification (2026-09-03, second run)" for the full evidence.
 - **ADRs:** ADR-0516 (Decision - the tool-schema/prompt contradiction ADR-0516
@@ -506,6 +507,50 @@ Out of scope for WP-112 (this WP's code and prompt are correct and
 proven); tracked as
 [WP-124](wp-124-ai-gateway-external-saas-mesh-egress.md). WP-112 cannot
 show `images=1` on either named check until that is fixed.
+
+## Live verification (2026-09-03, third run) - one check green, `img-mockup_request` still not
+
+Run after WP-124 restored `ai-gateway`'s external egress, which was the
+blocker the second run ended on. That half worked:
+
+- `comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests`
+  -> **PASS**, first time ever. `comage/security` is now 8/8.
+- `diagram-sales_process_flow` -> PASS, `images=1 image/svg+xml`.
+- `sxa_visualization_boundary` -> PASS, still declining correctly
+  ("J'ai pas le tableau de donnees. J'ai pas le droit de creer des tranches
+  inventees.").
+- A real SDXL image was produced end to end, no `Connection error` anywhere.
+
+**`img-mockup_request` still FAILs** (`images=0`), with no tool call between
+11:28:14 and the `generate_diagram` at 11:28:22. Its reply this time:
+
+> "Ouais, j'peux faire ca."
+
+### Correction: "widening the trigger is no longer indicated" was wrong
+
+That conclusion was recorded after the second run, on a single sample - a
+reply that declined for lack of grounding, which is defensible behavior.
+Three runs now show this probe fails three different ways:
+
+| Run | Reply | Nature |
+| --- | --- | --- |
+| 1 | "c'est le bon outil... un mockup marketing" | narration, describes the tool |
+| 2 | "J'ai pas de document de reference..." | grounding-based decline |
+| 3 | "Ouais, j'peux faire ca." | narration of intent, no action |
+
+Runs 1 and 3 are squarely the narrate-instead-of-call defect this WP exists
+to fix, so **widening the trigger is indicated again** - the second run's
+sample was not representative. Note none of the three names a tool, so
+`_NARRATED_TOOL_NAME_PATTERN` cannot fire on any of them; a widened trigger
+needs an intent signal, not just a tolerant name match. The three verbatim
+replies above are the corpus to validate it against, with
+`sxa_visualization_boundary`'s decline as the negative case.
+
+The prompt fix is not thereby worthless: it closed the *unambiguous*
+marketing case (proven by the security check going green) and left the
+deliberate-decline path intact. What it does not close is the "mockup"
+wording, which sits directly on `check-deal-status`'s own
+marketing-vs-structured-data boundary.
 
 ## Acceptance checks (for this WP's own scope)
 
