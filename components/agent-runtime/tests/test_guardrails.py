@@ -15,6 +15,7 @@ Run from components/agent-runtime:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import pathlib
 import sys
@@ -327,6 +328,65 @@ class BackendSelection(unittest.TestCase):
                 coro = spawn.call_args.args[0]
                 self.assertEqual(coro.__qualname__, expected)
                 coro.close()  # never awaited: stop the "never awaited" warning
+
+
+class ObserveSpan(unittest.TestCase):
+    """WP-120: the span must never be able to change the exchange.
+
+    It exists so a run drill-down can answer "was this observed, and what
+    did it find?" - a diagnostic. The moment instrumentation can break a
+    response it stops being one.
+    """
+
+    def test_span_is_opened_with_run_agent_and_backend(self):
+        seen = {}
+
+        @contextlib.contextmanager
+        def fake_span(**kwargs):
+            seen.update(kwargs)
+            yield
+
+        factory = lambda **kw: _FakeAsyncClient(payload=_nemo_payload(), **kw)  # noqa: E731
+        with mock.patch.object(guardrails_client, "guardrails_observe_span", fake_span):
+            with mock.patch.object(guardrails_client, "GUARDRAILS_BACKEND", "nemo"):
+                with mock.patch.object(guardrails_client, "GUARDRAILS_NEMO_URL", "http://nemo"):
+                    with mock.patch.object(guardrails_client.httpx, "AsyncClient", factory):
+                        _run_nemo(run_id="r-42", agent="comage", project_id="p-1")
+        self.assertEqual(seen["run_id"], "r-42")
+        self.assertEqual(seen["agent"], "comage")
+        # Span-only: the metric has no backend label on purpose.
+        self.assertEqual(seen["backend"], "nemo")
+        self.assertEqual(seen["project_id"], "p-1")
+
+    def test_a_broken_span_never_breaks_the_evaluation(self):
+        # Instrumentation is not allowed to be a dependency. If the span
+        # helper itself raises, the observer must still report - otherwise
+        # a telemetry bug silently stops all guardrails observation, which
+        # is the exact class of failure WP-120's panels exist to catch.
+        @contextlib.contextmanager
+        def exploding_span(**_kwargs):
+            raise RuntimeError("tracer exploded")
+            yield  # pragma: no cover
+
+        factory = lambda **kw: _FakeAsyncClient(payload=_nemo_payload("email"), **kw)  # noqa: E731
+        with mock.patch.object(guardrails_client, "guardrails_observe_span", exploding_span):
+            with mock.patch.object(guardrails_client, "GUARDRAILS_NEMO_URL", "http://nemo"):
+                with mock.patch.object(guardrails_client.httpx, "AsyncClient", factory):
+                    with mock.patch.object(
+                            guardrails_client, "record_guardrails_evaluation") as rec:
+                        _run_nemo()  # must not raise
+        # The evaluation ran to completion and reported normally: the
+        # failed span cost the trace, nothing else.
+        rec.assert_called_once()
+        self.assertEqual(rec.call_args.args[1], "detected")
+
+    def test_decorator_keeps_the_backend_coroutines_identifiable(self):
+        # functools.wraps is load-bearing, not cosmetic: the
+        # backend-selection test above identifies the chosen coroutine by
+        # __qualname__, so an unwrapped decorator would hide precisely
+        # what that test checks while still passing everything else.
+        self.assertEqual(guardrails_client._evaluate.__qualname__, "_evaluate")
+        self.assertEqual(guardrails_client._evaluate_nemo.__qualname__, "_evaluate_nemo")
 
 
 class PolicyParityWithRails(unittest.TestCase):

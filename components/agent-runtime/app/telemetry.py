@@ -87,16 +87,33 @@ def record_guardrails_evaluation(
     the detection names of a "detected" outcome ("email_address",
     "custom-regex", ...) - a bounded set, the detector's own vocabulary.
     Never raises: the observe-only contract extends to its own metrics."""
+    names = list(detections)
     try:
         if _guardrails_eval_counter is not None:
             _guardrails_eval_counter.add(1, {"agent": agent, "outcome": outcome})
         if _guardrails_detection_counter is not None:
-            for name in detections:
+            for name in names:
                 _guardrails_detection_counter.add(
                     1, {"agent": agent, "detection": name or "unknown"}
                 )
     except Exception:  # noqa: BLE001 - metrics must never affect a response
         logger.debug("guardrails metric recording failed", exc_info=True)
+
+    # WP-120: the same outcome onto the enclosing guardrails_observe span,
+    # so a run drill-down can answer "was this exchange observed, and what
+    # did it find?" - which the metrics cannot, because they carry no
+    # run_id (unbounded cardinality, the reason project_id is span-only
+    # too). Names, never contents: a detection NAME is policy vocabulary,
+    # the matched TEXT is the user's prompt.
+    try:
+        span = trace.get_current_span()
+        if span is not None and span.is_recording():
+            span.set_attribute("zuno.outcome", outcome)
+            span.set_attribute("zuno.detection_count", len(names))
+            if names:
+                span.set_attribute("zuno.detections", sorted(set(names)))
+    except Exception:  # noqa: BLE001 - same contract as the metrics above
+        logger.debug("guardrails span annotation failed", exc_info=True)
 
 
 class GraphRunRecorder:
@@ -169,6 +186,49 @@ def graph_run_span(
             span.set_attribute("zuno.source_mode", recorder.source_mode)
             if recorder.live_read_trigger_reason:
                 span.set_attribute("zuno.live_read_trigger_reason", recorder.live_read_trigger_reason)
+
+
+@contextmanager
+def guardrails_observe_span(
+    run_id: str,
+    agent: str,
+    backend: str,
+    project_id: Optional[str] = None,
+) -> Iterator[None]:
+    """ADR-0540/WP-120: wraps one observe-only guardrails evaluation.
+
+    The guardrails hook emitted metrics and a log line but no span, so the
+    per-run drill-down (dashboard zuno-run-trace, entirely TraceQL over
+    zuno.run_id) could not show whether a flagged run had even been
+    observed - the one question that dashboard exists to answer.
+
+    zuno.outcome and zuno.detection_count are NOT set here: they are
+    stamped by record_guardrails_evaluation, which already owns that
+    decision for the metrics, so the span and the counter can never
+    disagree about the same exchange.
+
+    zuno.backend is span-only and free here. The metric deliberately has no
+    backend label - it would split every existing series at the flip - but
+    a span attribute costs no cardinality and finally makes "which observer
+    answered this exchange" readable.
+
+    Never raises and never blocks: observe_exchange spawns its work
+    fire-and-forget AFTER the response is already on its way, and adding
+    instrumentation must not change that. A failure here degrades to no
+    span, exactly as a failed metric degrades to no sample.
+    """
+    tracer = _tracer or trace.get_tracer("agent-runtime")
+    start = time.monotonic()
+    with tracer.start_as_current_span("guardrails_observe") as span:
+        span.set_attribute("zuno.run_id", run_id)
+        span.set_attribute("zuno.agent", agent)
+        span.set_attribute("zuno.backend", backend)
+        if project_id:
+            span.set_attribute("zuno.project_id", project_id)
+        try:
+            yield
+        finally:
+            span.set_attribute("zuno.latency_ms", (time.monotonic() - start) * 1000.0)
 
 
 class ApiRequestRecorder:

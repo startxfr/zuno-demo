@@ -24,13 +24,15 @@ sees credentials or bulk corpus content.
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import functools
 import logging
 import os
 from typing import Any, Dict, List, Optional, Set
 
 import httpx
 
-from ..telemetry import record_guardrails_evaluation
+from ..telemetry import guardrails_observe_span, record_guardrails_evaluation
 
 logger = logging.getLogger("agent_runtime.guardrails")
 
@@ -97,6 +99,43 @@ DETECTOR_PARAMS: Dict[str, List[str]] = {
 _pending: Set[asyncio.Task] = set()
 
 
+def _with_observe_span(fn):
+    """WP-120: open a `guardrails_observe` span around one evaluation.
+
+    A decorator rather than a wrapper inside observe_exchange, for two
+    reasons. It applies identically to both backends without duplicating
+    the span code, and functools.wraps keeps __qualname__ intact - which
+    matters because the backend-selection test identifies the chosen
+    coroutine by name, and a closure would have hidden exactly the thing
+    that test exists to check.
+
+    The span is opened INSIDE the coroutine, so its duration is the
+    observer's own cost and not however long the event loop took to
+    schedule the fire-and-forget task.
+    """
+    @functools.wraps(fn)
+    async def wrapper(**kwargs: Any) -> None:
+        # ExitStack, not a plain `with`: if opening the span raises, the
+        # stack stays empty and the evaluation still runs unspanned. A
+        # tracer fault must not be able to stop guardrails observation -
+        # that would be a telemetry bug silently disabling the observer,
+        # which is the exact failure the WP-120 dashboard panels exist to
+        # catch and a poor thing to introduce while adding them.
+        with contextlib.ExitStack() as stack:
+            try:
+                stack.enter_context(guardrails_observe_span(
+                    run_id=kwargs.get("run_id", ""),
+                    agent=kwargs.get("agent", ""),
+                    backend=GUARDRAILS_BACKEND,
+                    project_id=kwargs.get("project_id"),
+                ))
+            except Exception:  # noqa: BLE001 - observability is never a dependency
+                logger.debug("guardrails span unavailable", exc_info=True)
+            await fn(**kwargs)
+    return wrapper
+
+
+@_with_observe_span
 async def _evaluate(
     *,
     contents: List[str],
@@ -173,6 +212,7 @@ def _report(
         record_guardrails_evaluation(agent, "clean")
 
 
+@_with_observe_span
 async def _evaluate_nemo(
     *,
     contents: List[str],
