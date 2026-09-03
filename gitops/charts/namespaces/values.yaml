@@ -477,14 +477,30 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
     resourceQuota:
-      # Sized to the live rhods-operator deployment: 3.5.0-ea.2 runs
-      # replicas: 3, each pod requests 500m/256Mi with limits 500m/4Gi - so
-      # the deployment alone needs requests 1.5cpu/768Mi and limits
-      # 1.5cpu/12Gi. Sizing for a single replica instead leaves the CSV
-      # Failed with 2 of 3 pods FailedCreate. Headroom on top covers OLM
-      # job pods.
+      # Sized to the live rhods-operator deployment: 3.5.0 runs replicas: 3,
+      # each pod requests 500m/256Mi with limits 500m/4Gi - so the deployment
+      # alone needs requests 1.5cpu/768Mi and limits 1.5cpu/12Gi. Sizing for
+      # a single replica instead leaves the CSV Failed with 2 of 3 pods
+      # FailedCreate.
+      #
+      # limits.memory must cover the ROLLING-UPDATE PEAK, not that 12Gi
+      # steady state. OLM owns the Deployment's strategy and ships
+      # maxSurge/maxUnavailable 25%: on 3 replicas that rounds to +1 surge
+      # pod and 0 unavailable, so the Deployment can never retire an old pod
+      # before a new one is Ready - it MUST surge to 4 pods = 16Gi. At 14Gi
+      # the 3.5.0-ea.2 -> 3.5.0 upgrade deadlocked permanently: new
+      # ReplicaSet stuck at 0 pods on `exceeded quota: zuno-platform-quota,
+      # requested: limits.memory=4Gi, used: 12Gi, limited: 14Gi`, CSV pinned
+      # in Installing/InstallWaiting, and the Subscription reporting a
+      # DERIVED ResolutionFailed ("constraints not satisfiable ... both CSVs
+      # provide HardwareProfile") that reads like the real fault but is only
+      # the two CSVs coexisting while the replacement cannot finish. This is
+      # structural, not specific to 3.5.0: the initial ea.2 install passed
+      # only because there were no old pods to surge past. Recompute this
+      # value if RHOAI ever changes replicas or the per-pod memory limit.
+      # limits.cpu already covers the same peak: 4 x 500m = 2cpu of 3.
       requests: { cpu: "2", memory: "2Gi" }
-      limits: { cpu: "3", memory: "14Gi" }
+      limits: { cpu: "3", memory: "16Gi" }
     limitRange:
       defaultRequest: { cpu: "50m", memory: "128Mi" }
       default: { cpu: "500m", memory: "512Mi" }
