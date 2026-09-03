@@ -59,6 +59,14 @@ spec:
               value: {{ .Values.mcpGatewayUrl | quote }}
             - name: AI_GATEWAY_URL
               value: {{ .Values.aiGatewayUrl | quote }}
+            # ADR-0544: app/graph/prompt_budget.py reads ONLY this file's
+            # max_model_len field (never routing/eligibility) - see
+            # values.yaml's own comment on providerRoutingConfigMap for why
+            # this mount is optional, not a startup dependency.
+            - name: PROVIDER_ROUTING_PATH
+              value: /app/config/provider-routing.yaml
+            - name: ZUNO_MODEL_CONTEXT_FLOOR
+              value: {{ .Values.modelContextFloorOverride | quote }}
             # ADR-0534/WP-109: observe-only guardrails detector (empty
             # value disables the hook entirely - see values.yaml).
             - name: GUARDRAILS_DETECTOR_URL
@@ -135,6 +143,9 @@ spec:
             - name: okf-signatures
               mountPath: /app/okf-signatures
               readOnly: true
+            - name: provider-routing
+              mountPath: /app/config
+              readOnly: true
           livenessProbe:
             httpGet:
               path: /healthz
@@ -155,4 +166,14 @@ spec:
         - name: okf-signatures
           secret:
             secretName: agent-runtime-okf-signatures
+            optional: true
+        # ADR-0544: `optional: true` deliberately - unlike ai-gateway
+        # (which cannot route without this file), agent-runtime's own
+        # consumer (prompt_budget.py) degrades to a conservative built-in
+        # constant when it's missing. Mounting it non-optionally would
+        # make this service's readiness depend on the `llm` Application
+        # having synced first, which nothing about this feature requires.
+        - name: provider-routing
+          configMap:
+            name: {{ .Values.providerRoutingConfigMap }}
             optional: true

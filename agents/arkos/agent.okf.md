@@ -29,45 +29,47 @@ zuno:
     # ADR-0215: Arkos is C3/local-only (see model.preferred_classification
     # below), so its history-carrying model calls route to a local model
     # only. Its two reflexional tasks lead gpt-oss-20b and structure-demo
-    # leads qwen3.6-27b-instruct, all of which serve 32768, so a generous
-    # budget beats the conservative fleet default (app/registry.py's
-    # HISTORY_TOKEN_BUDGET, 1800).
+    # leads qwen3.6-27b-instruct, most of which serve 32768 - but
+    # qwen3.5-9b (the fleet default, ADR-0531, and the LAST entry in every
+    # one of this agent's C3 fallback chains below) serves only 8192, so a
+    # generous 6000-token budget here is not automatically safe on every
+    # reachable path.
     #
-    # KNOWN GAP (2026-09-03, measured, documented not fixed): "both serve
-    # 32768" was true when written, when there were two local models.
-    # There are four now, and qwen3.5-9b - the fleet default, and the LAST
-    # entry in every one of this agent's C3 fallback chains below - serves
-    # 8192. Confirmed live against the running predictor's /v1/models, not
-    # just the chart value.
+    # FIXED by ADR-0544 (2026-09-03): app/graph/prompt_budget.py clamps
+    # the WHOLE assembled prompt (system + history + project context + RAG
+    # context) against the fleet's real narrowest reachable window at
+    # assembly time - this declared 6000 is never rewritten, only bounded
+    # on the turns that actually need it. The measured numbers that
+    # exposed the bug are kept below as the record of what was wrong and
+    # as tests/test_prompt_clamp.py's regression fixture - not stale, the
+    # arithmetic behind the fix.
     #
-    # Measured the same day, so the arithmetic is real rather than
-    # estimated. Live rag-tech corpus: 68,962 chunks, median 1,247 chars
-    # (~312 tokens at the char/4 heuristic), p95 1,796 (~449). Arkos does
-    # not declare rag.top_k, so it retrieves the default 5.
+    # Live rag-tech corpus, measured 2026-09-03: 68,962 chunks, median
+    # 1,247 chars (~312 tokens at the char/4 heuristic), p95 1,796 (~449).
+    # Arkos does not declare rag.top_k, so it retrieves the default 5.
     #
     #   draft-architecture-testimonial / workshop-presentation
     #     (allowed_knowledge: knowledge.tech + knowledge.project)
     #     6000 history + ~420 system prompt + up to 1200 project context
     #     (PROJECT_CONTEXT_TOKEN_BUDGET) + 5 chunks
     #     = ~9,180 tokens at median chunk size, ~9,865 at p95.
-    #     Both OVERFLOW 8192 before a single output token.
+    #     Both OVERFLOWED 8192 before a single output token - now clamped:
+    #     project context sheds first (to 0), then history, RAG kept
+    #     whole (it was retrieved for THIS question, so it gives way last).
     #
     #   structure-demo / write-code (allowed_knowledge: [])
-    #     6000 + ~214 + 1200 = ~7,414. Fits, leaving ~780 for generation.
+    #     6000 + ~214 + 1200 = ~7,414 against the raw 8192 window - fits,
+    #     but NOT once an output reserve is held back for the reply itself
+    #     (ADR-0544's prompt_token_ceiling): 8192 minus structure-demo's
+    #     own declared max_tokens (1536, agents/arkos/tasks/structure-
+    #     demo.md) leaves a 6656 ceiling, so even this pair now sheds a
+    #     few hundred tokens of project context. Caught only by actually
+    #     running the clamp against these numbers while building it - an
+    #     easy thing to get wrong by eyeballing the raw window alone.
     #
-    # So the exposure is the two RAG-bearing tasks, not all four, and
-    # nothing clamps it: build_history_messages caps history against this
-    # budget alone, with no awareness of the selected model's window, so
-    # an oversized prompt reaches vLLM and 400s. It is the LAST candidate
-    # in the chain, so this only bites when gpt-oss-20b, the 27B and wesh
-    # have all already failed - the exact scenario the fallback exists
-    # for, which is what makes it worth recording rather than shrugging at.
-    #
-    # Left unfixed deliberately, and it is not a number problem: any value
-    # that survives the 8192 fallback (~2,800) would gut the 32768 nominal
-    # path this agent actually runs on. The real fix is clamping the
-    # assembled prompt against the selected model's own max_model_len,
-    # which is a code change and its own decision.
+    # It is the LAST candidate in the chain, so full clamping only binds
+    # when gpt-oss-20b, the 27B and wesh have all already failed - the
+    # exact scenario the fallback exists for.
     history:
       enabled: true
       max_turns: 6

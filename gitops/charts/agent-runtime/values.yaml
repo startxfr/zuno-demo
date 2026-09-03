@@ -69,8 +69,23 @@ ragServiceUrl: http://rag-service.zuno-data.svc:8080
 mcpGatewayUrl: http://mcp-gateway.zuno-ai-run.svc:8080
 
 # Routing config, provider secrets, and the local model endpoint live in the
-# ai-gateway chart; this service only needs its URL.
+# ai-gateway chart; this service only needs its URL. ADR-0544 is the one
+# narrow exception: app/graph/prompt_budget.py reads provider-routing.yaml's
+# max_model_len field (only that field, never routing/eligibility) via the
+# ConfigMap below, to clamp an assembled prompt against the fleet's real
+# narrowest reachable window before sending.
 aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
+
+# ADR-0544: the same ConfigMap ai-gateway's own chart mounts
+# (providerRoutingConfigMap there) - agent-runtime's copy is `optional: true`
+# (templates/deployment.yaml) so this service gains no startup-ordering
+# dependency on the `llm` Application; app/graph/prompt_budget.py degrades
+# to a conservative built-in constant if the file is absent.
+providerRoutingConfigMap: zuno-provider-routing
+# Ops escape hatch, mirrors ZUNO_MODEL_CONTEXT_FLOOR - override the
+# computed floor without a code change. Empty (default) means "use
+# provider-routing.yaml's own min(max_model_len)".
+modelContextFloorOverride: ""
 
 # ADR-0534/WP-109: observe-only guardrails. The URL is the TrustyAI
 # built-in detector Service the trustyai-config chart's

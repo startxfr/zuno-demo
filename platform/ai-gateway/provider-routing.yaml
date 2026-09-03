@@ -135,6 +135,35 @@
 # The embedding model (`qwen3-embedding-0.6b`, ADR-0518 decision 2) has no
 # role here on purpose: it is not a chat provider and never enters this
 # fallback chain - it is configured in components/rag-service.
+#
+# `max_model_len` (LOCAL providers only; ADR-0544): the served model's real
+# `--max-model-len`, mirrored from `gitops/charts/models/values.yaml`'s own
+# `maxModelLen` per model and cross-checked against it by
+# `platform/docs/check_docs.py`'s `model_context_windows` check - the two
+# files have independent lifecycles and nothing else keeps them honest.
+# Written here because a real bug needed it: `qwen3.5-9b` (role `default`,
+# structurally always reachable as the terminal fallback per ADR-0531
+# decision 1's "additive, never removed" guarantee) serves 8192, while the
+# other three local models serve 32768, and nothing in agent-runtime knew
+# that before ADR-0544 - a prompt sized against the 32768 nominal path
+# could silently overflow whenever a chain fell back to the narrower one.
+# Two consumers:
+#   - `components/agent-runtime/app/graph/prompt_budget.py` reads ONLY this
+#     key across `kind: local` providers (never `eligible_for`, `prefer`,
+#     file order, or anything else routing-shaped) to learn the fleet's
+#     narrowest reachable window, and clamps the assembled prompt against
+#     it BEFORE sending - deliberately not a second routing implementation,
+#     just one physical fact borrowed from this file's single source of
+#     truth.
+#   - this gateway's own pre-flight skip (`app/main.py`, ADR-0544) uses it
+#     to attribute a too-long-prompt failure instead of leaving it
+#     indistinguishable from a network blip.
+# SaaS providers deliberately carry no `max_model_len`: their windows are
+# far larger and never the binding constraint, and a number nothing in
+# this repo can cross-verify is exactly the class of drift that let the
+# qwen3.5-9b/8192 gap go unnoticed. `-maas` and direct siblings of the same
+# served model MUST agree - they front the same runtime - and the check
+# enforces that too.
 
 providers:
   # ADR-0521 (WP-076) closeout: qwen's MaaS-preferred sibling, tried first
@@ -151,6 +180,7 @@ providers:
     kind: local
     role: quality
     model: qwen3.6-27b-instruct
+    max_model_len: 32768
     via_maas: true
     maas_model_ref: zuno-ai-run/qwen36-27b-instruct-maas
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen36-27b-instruct/v1
@@ -167,6 +197,7 @@ providers:
     kind: local
     role: quality
     model: qwen3.6-27b-instruct
+    max_model_len: 32768
     endpoint: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
     timeout_seconds: 60
@@ -210,6 +241,7 @@ providers:
     kind: local
     role: reasoning
     model: gpt-oss-20b
+    max_model_len: 32768
     via_maas: true
     maas_model_ref: zuno-ai-run/gpt-oss-20b-maas
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1
@@ -221,6 +253,7 @@ providers:
     kind: local
     role: reasoning
     model: gpt-oss-20b
+    max_model_len: 32768
     endpoint: https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
     timeout_seconds: 60
@@ -257,6 +290,7 @@ providers:
     kind: local
     role: specialized
     model: qwen3.5-9b-wesh
+    max_model_len: 32768
     via_maas: true
     maas_model_ref: zuno-ai-run/qwen35-9b-wesh-maas
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b-wesh/v1
@@ -268,6 +302,7 @@ providers:
     kind: local
     role: specialized
     model: qwen3.5-9b-wesh
+    max_model_len: 32768
     endpoint: https://qwen35-9b-wesh-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
     timeout_seconds: 60
@@ -286,6 +321,7 @@ providers:
     kind: local
     role: default
     model: qwen3.5-9b
+    max_model_len: 8192
     via_maas: true
     maas_model_ref: zuno-ai-run/qwen35-9b-maas
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b/v1
@@ -297,6 +333,7 @@ providers:
     kind: local
     role: default
     model: qwen3.5-9b
+    max_model_len: 8192
     endpoint: https://qwen35-9b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
     timeout_seconds: 60

@@ -23,6 +23,15 @@ mechanism with no SaaS-provider equivalent, so this is the concrete
 security boundary the "a C2/C3 adapter never reaches an external-eligible
 serving path" acceptance test exercises directly against this function,
 not just against app/main.py's own call-site discipline.
+
+ADR-0544: `max_tokens` is the first per-REQUEST value this factory takes -
+every other keyword (`temperature`, `timeout_seconds`, ...) reads from
+`cfg`, provider-routing.yaml's per-candidate CONFIG, unchanged across every
+call to that candidate. `max_tokens` instead arrives fresh per call
+(app/main.py's `chat_completions` parses it from X-Zuno-Max-Tokens), so it
+is an explicit function argument rather than a `cfg.get(...)` lookup -
+mixing the two sources into one precedence rule was rejected in favor of
+one producer, one path.
 """
 
 from __future__ import annotations
@@ -49,6 +58,7 @@ def chat_model_for(
     request_id: Optional[str] = None,
     adapter: Optional[str] = None,
     caller_bearer_token: Optional[str] = None,
+    max_tokens: Optional[int] = None,
 ) -> BaseChatModel:
     via_maas = maas_adapter.should_use_maas(cfg, candidate.kind)
     if adapter and (candidate.kind != "local" or via_maas or not cfg.get("serves_adapters", False)):
@@ -75,8 +85,13 @@ def chat_model_for(
         # a header - direct providers already get it on their own
         # model_call_span (app/main.py), which is the only correlation
         # surface Zuno controls for those.
+        # ADR-0544: MUST forward max_tokens - structure-demo's own
+        # preferred candidate is local-maas (via_maas: true), so skipping
+        # this branch would make max_tokens a silent no-op on its first
+        # real usage.
         return maas_adapter.chat_model_via_maas(
             cfg, request_id=request_id, caller_bearer_token=caller_bearer_token,
+            max_tokens=max_tokens,
         )
 
     if candidate.kind == "local":
@@ -120,6 +135,7 @@ def chat_model_for(
             # always calls via LangGraph's astream_events). Harmless on the
             # non-streaming .ainvoke() path.
             stream_usage=True,
+            max_tokens=max_tokens,
         )
 
     if candidate.name == "openai":
@@ -130,6 +146,7 @@ def chat_model_for(
             api_key=os.getenv(cfg.get("api_key_env", "OPENAI_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
             stream_usage=True,
+            max_tokens=max_tokens,
         )
     if candidate.name == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
@@ -138,6 +155,10 @@ def chat_model_for(
             model=cfg.get("model", "gemini-1.5-pro"),
             google_api_key=os.getenv(cfg.get("api_key_env", "GEMINI_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
+            # ADR-0544: this class's parameter is max_output_tokens, not
+            # max_tokens - the one real per-vendor translation this
+            # factory needs.
+            max_output_tokens=max_tokens,
         )
     if candidate.name == "anthropic":
         from langchain_anthropic import ChatAnthropic
@@ -146,6 +167,11 @@ def chat_model_for(
             model=cfg.get("model", "claude-3-5-sonnet-latest"),
             api_key=os.getenv(cfg.get("api_key_env", "ANTHROPIC_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
+            # ADR-0544: ChatAnthropic supplies its own default when this is
+            # None, so behavior is unchanged-but-not-byte-identical for a
+            # candidate that never declares max_tokens - noted since every
+            # other branch here is a true no-op on None.
+            max_tokens=max_tokens,
         )
     if candidate.name == "mistral":
         from langchain_mistralai import ChatMistralAI
@@ -154,6 +180,7 @@ def chat_model_for(
             model=cfg.get("model", "mistral-large-latest"),
             api_key=os.getenv(cfg.get("api_key_env", "MISTRAL_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
+            max_tokens=max_tokens,
         )
     if candidate.name == "mistral-codestral":
         from langchain_mistralai import ChatMistralAI
@@ -164,6 +191,7 @@ def chat_model_for(
             model=cfg.get("model", "codestral-latest"),
             api_key=os.getenv(cfg.get("api_key_env", "MISTRAL_CODESTRAL_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
+            max_tokens=max_tokens,
         )
     if candidate.name == "ovhcloud-gpt-oss-120b":
         from langchain_openai import ChatOpenAI
@@ -178,6 +206,7 @@ def chat_model_for(
             model=cfg.get("model", "gpt-oss-120b"),
             temperature=cfg.get("temperature", 0.2),
             stream_usage=True,
+            max_tokens=max_tokens,
         )
 
     raise ProviderFactoryError(f"no chat model factory registered for provider '{candidate.name}'")

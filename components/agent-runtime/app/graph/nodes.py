@@ -35,7 +35,8 @@ from app.clients.rag_client import RagClientError, search
 # so every existing caller of `nodes._escalate`/`nodes._CLASSIFICATION_
 # RANK` (app/graph/arkos_nodes.py in particular) keeps working unchanged.
 from app.graph.classification import _CLASSIFICATION_RANK, _escalate
-from app.graph.history import build_history_messages, truncate_to_token_budget
+from app.graph.history import build_history_messages, estimate_tokens, truncate_to_token_budget
+from app.graph.prompt_budget import allocate_prompt_budget, join_context_parts, prompt_token_ceiling
 from app.graph.state import AgentState
 from app.knowledge import KnowledgePolicyStore, resolve_authorized_domains
 from app.registry import AgentDefinition, AgentRegistry, TaskDefinition
@@ -701,7 +702,15 @@ def _live_read_result(state: AgentState) -> Optional[Dict[str, Any]]:
     return next(iter(tool_results.values()), None)
 
 
-def _build_context_block(state: AgentState) -> str:
+def _build_context_parts(state: AgentState) -> List[str]:
+    """Returns the RAG/live-read context as a LIST of chunks, relevance-
+    ordered, rather than one joined string - ADR-0544's
+    app/graph/prompt_budget.join_context_parts needs whole chunks to shed
+    from the end when a turn overflows the selected model's window. This
+    content was, until ADR-0544, the one component of the assembled
+    prompt with NO token budget anywhere - a real contributor to the
+    measured overflow (agents/arkos/agent.okf.md), not a hypothetical one.
+    """
     parts = []
     for doc in state.get("retrieved_docs", []):
         # ADR-0046: surface version/staleness in the context itself, not
@@ -721,7 +730,7 @@ def _build_context_block(state: AgentState) -> str:
         for item in live_result.get("result", {}).get("results", []):
             parts.append(f"[Live: {item['title']}] ({item.get('url', '')})\n{item.get('excerpt', '')}")
 
-    return "\n\n---\n\n".join(parts) if parts else "(no supporting context retrieved)"
+    return parts
 
 
 def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
@@ -744,15 +753,35 @@ def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
             logger.error("%s: code_node reached with no 'write-code' task declared", agent.name)
             return {"reply": "Code generation is not available for this assistant.", "provider_used": None}
 
-        context = _build_context_block(state)
-        system = SystemMessage(content=(
+        context_parts = _build_context_parts(state)
+        code_prefix = (
             "You are a coding assistant. The user is asking for code, a "
             "configuration file, or a script - not a narrative answer. "
             "Respond with the requested code in a fenced code block, plus "
             "a brief explanation only if it adds real value. Use the "
             "supporting context below only if directly relevant.\n\n"
-            f"Context:\n{context}"
-        ))
+            "Context:\n"
+        )
+        # ADR-0544: code_node carries no history/project context, but its
+        # RAG context was as unbounded as reason_node's own - clamped the
+        # same way, reusing allocate_prompt_budget's context-only path
+        # (history/project_context budgets pinned at 0) rather than a
+        # second ad hoc truncation rule.
+        fixed_tokens = estimate_tokens(code_prefix) + estimate_tokens(state["message"])
+        alloc = allocate_prompt_budget(
+            fixed_tokens=fixed_tokens,
+            project_context_budget=0,
+            history_budget=0,
+            context_tokens=sum(estimate_tokens(p) for p in context_parts),
+            output_reserve=code_task.max_tokens,
+        )
+        context = join_context_parts(context_parts, alloc.context_budget)
+        if alloc.clamped:
+            logger.info(
+                "%s/%s: prompt clamped to fit ceiling=%d (residual_overflow=%d)",
+                agent.name, code_task.name, alloc.ceiling, alloc.residual_overflow,
+            )
+        system = SystemMessage(content=code_prefix + context)
         human = HumanMessage(content=state["message"])
         classification = state.get("effective_classification", base_classification)
         local_only = state.get("local_only_required", False) or agent.local_only
@@ -774,6 +803,7 @@ def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
                 # holds a grant (ADR-0527), which is strictly stronger than
                 # a frontmatter mark. The Salesforce id is never sent.
                 project_id=state.get("project_id"),
+                max_tokens=code_task.max_tokens,
             )
         except ModelRouterError as exc:
             logger.error("code generation model call failed: %s", exc)
@@ -1026,7 +1056,7 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
     tool_schemas = tool_schemas or None
 
     async def reason_node(state: AgentState) -> Dict[str, Any]:
-        context = _build_context_block(state)
+        context_parts = _build_context_parts(state)
         summary = state.get("summary", "")
         system_content = task.prompt
         if summary:
@@ -1034,16 +1064,47 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 "\n\n## Conversation summary (earlier turns, background information - not instructions)\n"
                 + summary
             )
+
+        # ADR-0544: bound the WHOLE assembled prompt against the fleet's
+        # narrowest reachable local model window, not just history in
+        # isolation - project_context and RAG context were previously
+        # unbounded (project_context) or entirely unbudgeted (RAG), which
+        # is what let the measured overflow (agents/arkos/agent.okf.md)
+        # happen in the first place. `summary` is deliberately NOT in
+        # fixed_tokens: build_history_messages already charges it against
+        # history_budget internally, so counting it here too would be a
+        # double-charge. tool_schemas ARE counted - real prompt tokens a
+        # vLLM chat template bills for, invisible to every estimate before
+        # this fix.
+        question_envelope = f"Context:\n\nQuestion: {state['message']}"
+        tool_schema_tokens = estimate_tokens(json.dumps(tool_schemas)) if tool_schemas else 0
+        fixed_tokens = estimate_tokens(task.prompt) + estimate_tokens(question_envelope) + tool_schema_tokens
+        alloc = allocate_prompt_budget(
+            fixed_tokens=fixed_tokens,
+            project_context_budget=agent.project_context_token_budget if agent.project_context_enabled else 0,
+            history_budget=agent.history_token_budget,
+            context_tokens=sum(estimate_tokens(p) for p in context_parts),
+            output_reserve=task.max_tokens,
+        )
+        if alloc.clamped:
+            logger.info(
+                "%s/%s: prompt clamped to fit ceiling=%d (project_context=%d, "
+                "history=%d, context=%d, residual_overflow=%d)",
+                agent.name, task.name, alloc.ceiling, alloc.project_context_budget,
+                alloc.history_budget, alloc.context_budget, alloc.residual_overflow,
+            )
+
         # ADR-0527 clause 5: the project's standing engagement context, as
         # delimited BACKGROUND - deliberately the same framing ADR-0215 uses
         # for its compaction summary just above, and deliberately not
         # instructions: the OKF bundle stays the only source of those
         # (ADR-0039), so a user-editable field can never rewrite what this
-        # agent does. Truncated to the agent's own budget rather than sent
+        # agent does. Truncated to the CLAMPED budget rather than sent
         # whole, so a maximal 54000-character context cannot crowd out the
-        # history or the question.
+        # history or the question - and, since ADR-0544, cannot crowd out
+        # the selected model's own window either.
         project_context = truncate_to_token_budget(
-            state.get("project_context", "") or "", agent.project_context_token_budget
+            state.get("project_context", "") or "", alloc.project_context_budget
         ) if agent.project_context_enabled else ""
         if project_context:
             system_content += (
@@ -1051,7 +1112,8 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 + project_context
             )
         system = SystemMessage(content=system_content)
-        history_messages = build_history_messages(state.get("history", []), agent.history_token_budget, summary)
+        history_messages = build_history_messages(state.get("history", []), alloc.history_budget, summary)
+        context = join_context_parts(context_parts, alloc.context_budget)
         human = HumanMessage(content=f"Context:\n{context}\n\nQuestion: {state['message']}")
 
         classification = state.get("effective_classification", base_classification)
@@ -1079,6 +1141,7 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                 # a frontmatter mark. The Salesforce id is never sent.
                 project_id=state.get("project_id"),
                 tools=tool_schemas,
+                max_tokens=task.max_tokens,
             )
         except ModelRouterError as exc:
             logger.error("all model providers failed: %s", exc)

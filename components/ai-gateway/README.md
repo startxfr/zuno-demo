@@ -22,8 +22,13 @@ redeploy of *this* service, not `agent-runtime`.
 
 ### `POST /v1/chat/completions`
 
-OpenAI-compatible on the wire, with two Zuno-specific headers and one
-Zuno-specific response field:
+OpenAI-compatible on the wire, with Zuno-specific headers (nine as of
+ADR-0544 - `X-Zuno-Data-Classification`/`X-Zuno-Local-Only` documented
+below in full, plus `X-Zuno-Task`/`X-Zuno-Agent`/`X-Zuno-Request-Id`/
+`X-Zuno-Run-Id`/`X-Zuno-Quota-Class`/`X-Zuno-Project-Id`/`X-Zuno-Max-Tokens`
+- see components/agent-runtime/app/clients/model_router.py's
+`chat_model_for` for what each one is and why) and one Zuno-specific
+response field:
 
 - **Auth:** `Authorization: Bearer <keycloak-jwt>` (required - validated
   against the realm's JWKS; this gateway does not do group-based
@@ -40,6 +45,13 @@ Zuno-specific response field:
   this turn (e.g. Confluence, via the MCP Gateway's
   `external_model_policy.allow_context: false`) must never leave the
   cluster.
+- **Header:** `X-Zuno-Max-Tokens: <positive integer>` (optional, ADR-0544) -
+  per-request generation ceiling, forwarded to whichever candidate
+  ends up serving the turn (`app/providers.py`'s per-vendor factories -
+  `max_output_tokens` on Gemini, `max_tokens` everywhere else). A
+  malformed or out-of-range value is logged and ignored, never a 4xx -
+  same posture every other header here takes; absent means no cap,
+  today's behavior for a task with no declared `zuno.max_tokens`.
 - **Body:**
   ```json
   {

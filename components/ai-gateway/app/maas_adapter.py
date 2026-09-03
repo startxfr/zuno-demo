@@ -130,6 +130,7 @@ def chat_model_via_maas(
     cfg: Dict[str, Any],
     request_id: Optional[str] = None,
     caller_bearer_token: Optional[str] = None,
+    max_tokens: Optional[int] = None,
 ) -> BaseChatModel:
     """The exact same `ChatOpenAI` class every direct candidate in
     app/providers.py already uses, pointed at the MaaS gateway's
@@ -203,4 +204,8 @@ def chat_model_via_maas(
         # Same reasoning as app/providers.py's local/openai branches - keeps
         # this dormant adapter from becoming a landmine once it's wired up.
         stream_usage=True,
+        # ADR-0544: forwarded, not optional - structure-demo's own
+        # preferred candidate (local-maas) is via_maas: true, so this is
+        # the branch its declared max_tokens actually reaches.
+        max_tokens=max_tokens,
     )

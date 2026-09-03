@@ -170,6 +170,11 @@
             "notes": {
               "description": "Optional free-text routing guidance (e.g. sovereignty constraints on a subset of tasks).",
               "type": "string"
+            },
+            "local_only": {
+              "description": "ADR-0416: unconditional, agent-declared restriction to local models only, regardless of what preferred_classification alone would otherwise permit - mirrored at the routing layer by the graph's own per-turn local_only_required flag (ADR-0035). Optional - absent means false. Documented here because it was already in real use (agents/finage/agent.okf.md), read by registry.py, with no schema entry for it - this schema is a documentation contract, not something anything runs jsonschema.validate() against today, so the gap was silent rather than a validation failure, but additionalProperties:false still meant the schema was actively describing a shape Finage does not have.",
+              "type": "boolean",
+              "default": false
             }
           }
         },

@@ -257,6 +257,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0530](0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) | Implemented | Reconcile Keycloak clients instead of relying on a create-only realm import |
 | [ADR-0531](0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md) | Implemented | Promote qwen3.5-9b to the fleet-wide default model, extend OVHcloud reasoning access from Arkos to Tekos/Comage |
 | [ADR-0536](0536-live-node-failover-drill-for-qwen-model-fallback.md) | Implemented | Live GPU-node failover drill for the qwen-normal/qwen-wesh fallback, and a reusable `make d3 scenario-failover-node` command |
+| [ADR-0544](0544-bound-every-model-call-at-both-ends.md) | Implemented | Bound every model call at both ends - a prompt-window clamp and a declarative max_tokens |
 
 ## v0.5
 

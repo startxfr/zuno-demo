@@ -15,8 +15,16 @@ streaming needs no code changes" for the full reasoning.
 Before this split, this module held five provider-specific factory
 functions and the classification-eligibility/fallback loop itself (moved
 verbatim to components/ai-gateway/app/{routing,providers}.py) - this file
-no longer reads platform/ai-gateway/provider-routing.yaml at all, and
-holds no provider API key.
+holds no provider API key and does not resolve routing/eligibility.
+
+ADR-0544's one exception: app/graph/prompt_budget.py (imported by
+app/graph/nodes.py and arkos_nodes.py, not by this module itself) reads
+ONE field out of the same provider-routing.yaml ConfigMap - `max_model_len`
+per local provider, never `eligible_for`/`prefer`/anything routing-shaped -
+to clamp an assembled prompt before it ever reaches this client. Noted
+here since the paragraph above otherwise reads as a blanket "never", which
+this narrow exception does not actually contradict: nothing in THIS module
+reads that file.
 """
 
 from __future__ import annotations
@@ -60,6 +68,7 @@ class ModelRouter:
         task_name: Optional[str] = None,
         project_id: Optional[str] = None,
         run_id: Optional[str] = None,
+        max_tokens: Optional[int] = None,
     ) -> BaseChatModel:
         headers = {
             "X-Zuno-Data-Classification": classification.upper(),
@@ -113,6 +122,15 @@ class ModelRouter:
             # (per-call correlation id) - run_id is the whole conversation
             # turn's identifier, needed for the per-run resource dashboard.
             headers["X-Zuno-Run-Id"] = run_id
+        if max_tokens:
+            # ADR-0544: per-REQUEST generation ceiling (app/registry.py's
+            # TaskDefinition.max_tokens, from the task's own OKF
+            # frontmatter) - distinct from every other header above,
+            # which are per-CALL identity/routing metadata, not a
+            # provider-config value. Positive decimal integer, no units,
+            # no sign, no whitespace; omitted (not "0"/"") when absent so
+            # ai-gateway's own parsing stays a simple presence check.
+            headers["X-Zuno-Max-Tokens"] = str(int(max_tokens))
         return ChatOpenAI(
             base_url=f"{AI_GATEWAY_URL}/v1",
             # ADR-0032: forward the same validated end-user token the
@@ -149,6 +167,7 @@ class ModelRouter:
         run_id: Optional[str] = None,
         tags: Optional[List[str]] = None,
         tools: Optional[List[Any]] = None,
+        max_tokens: Optional[int] = None,
     ):
         """Kept as async + same name/signature as before this split (plus
         `bearer_token`/`local_only`, added for ADR-0032/ADR-0035) so
@@ -177,7 +196,15 @@ class ModelRouter:
         as they already read `result.content`.
         """
         model = self.chat_model_for(
-            classification, bearer_token, local_only, request_id, agent_name, task_name, project_id, run_id
+            classification=classification,
+            bearer_token=bearer_token,
+            local_only=local_only,
+            request_id=request_id,
+            agent_name=agent_name,
+            task_name=task_name,
+            project_id=project_id,
+            run_id=run_id,
+            max_tokens=max_tokens,
         )
         if tools:
             model = model.bind_tools(tools)

@@ -43,16 +43,31 @@ real content - `deployment/` and `tests/` no longer are, see below).
   retroactive gate catch-up" section for the full result. Closed the gap
   WP-11's earlier status flip left open.
 
-**Known open item:** scenario 9 (`structure-demo` streaming) times out at
-30s on every run - a single-call path which, until 2026-09-03, had no
-`model-routing-policy.yaml` override at all. It was described here and in
-WP-31 as riding the WP-096 `qwen3.5-9b` fleet default; that was wrong. With
-no entry it fell through to `provider-routing.yaml` file order and was
-answered by `local-maas`/`local` = `qwen3.6-27b-instruct`, as this bundle's
-own generated matrix showed all along. It now carries an explicit entry
-pinning that same chain (ADR-0531's correction note), so the timeout is
-unchanged and still open - but it is a 27B timeout, not a 9B one. Non-blocking (Layer 1
-still clears the 75% threshold at 19/20) but unresolved; see WP-31.
+**Resolved.** Scenario 9 (`structure-demo` streaming) used to time out at
+30s on every run. Three separate things were wrong with it, fixed across
+two dates:
+- The routing side: it had no `model-routing-policy.yaml` entry at all,
+  described here and in WP-31 as riding the WP-096 `qwen3.5-9b` fleet
+  default - wrong. With no entry it fell through to `provider-routing.yaml`
+  file order and was answered by `local-maas`/`local` = `qwen3.6-27b-instruct`,
+  as this bundle's own generated matrix showed all along. Fixed by an
+  explicit entry pinning that same resolved chain (ADR-0531's correction
+  note, 2026-09-03) - zero behavior change, matrix byte-identical.
+- The eval side: the scenario's own `timeout_seconds` was left at the
+  handler's 30s default while scenarios 7/10 had already been raised to
+  180s - fixed 2026-09-02 (`e138280e`), a day BEFORE the routing fix and
+  this file's own prior note, which had wrongly presented the 180s raise
+  as still-pending. The real production ceiling (agent-bff's own 180s
+  streaming context deadline, `components/agent-bff/main.go`) predates
+  both fixes, back to 2026-08-21.
+- The root cause itself: `qwen3.6-27b-instruct` generates at ~18 tok/s
+  measured live - a genuine, load-independent speed limit, not routing or
+  eval-config noise. ADR-0544 (2026-09-03) gives `structure-demo` a
+  declared `max_tokens: 1536` (~85s at that rate, 2x margin under 180s),
+  bounding generation length structurally rather than relying on the
+  timeout alone to catch a runaway reply.
+
+See WP-31 for the full measurement.
 
 ## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)
 

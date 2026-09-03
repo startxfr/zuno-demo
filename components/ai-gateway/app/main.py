@@ -187,6 +187,42 @@ def _to_langchain_messages(messages: List[ChatMessage]) -> List[Any]:
     return result
 
 
+def _parse_max_tokens(raw: str) -> Optional[int]:
+    """ADR-0544: X-Zuno-Max-Tokens is an optional control header, not a
+    caller-authenticated value - a malformed one must never fail a user's
+    chat turn, same posture every other header in chat_completions takes.
+    Degrades to None (no cap) on anything that isn't a plain positive
+    decimal integer, including an out-of-range one - the OKF schema
+    (zuno-okf-task-v0.2.schema.json) already bounds a declared value to
+    [1, 8192], so anything past that reaching the wire is either a bug or
+    a caller this endpoint doesn't need to trust.
+    """
+    raw = raw.strip()
+    if not raw.isdigit():
+        if raw:
+            logger.warning("ignoring malformed X-Zuno-Max-Tokens header: %r", raw)
+        return None
+    value = int(raw)
+    if not (0 < value <= 8192):
+        logger.warning("ignoring out-of-range X-Zuno-Max-Tokens header: %r", raw)
+        return None
+    return value
+
+
+# Deliberately duplicated char/4 heuristic (matches components/agent-runtime/
+# app/graph/history.py's own estimate_tokens - same style precedent as this
+# repo's other cross-service duplicated small parsing logic) rather than a
+# shared dependency between the two components for one four-line function.
+_CHARS_PER_TOKEN = 4
+
+
+def _estimate_prompt_tokens(messages: List[Any], tools: Optional[List[Dict[str, Any]]]) -> int:
+    total_chars = sum(len(getattr(m, "content", "") or "") for m in messages)
+    if tools:
+        total_chars += len(json.dumps(tools))
+    return total_chars // _CHARS_PER_TOKEN + 1
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(
     payload: ChatCompletionRequest,
@@ -224,6 +260,12 @@ async def chat_completions(
     # key the Kuadrant request-rate dimension.
     x_zuno_quota_class: str = Header(default="standard", alias="X-Zuno-Quota-Class"),
     x_zuno_project_id: str = Header(default="", alias="X-Zuno-Project-Id"),
+    # ADR-0544: per-request generation ceiling - components/agent-runtime's
+    # ModelRouter forwards a task's own declared max_tokens (OKF frontmatter)
+    # this way rather than through payload.model or per-provider config,
+    # since it is a per-CALL value, not a routing decision or a provider
+    # default. Optional; absent means no cap, today's exact behavior.
+    x_zuno_max_tokens: str = Header(default="", alias="X-Zuno-Max-Tokens"),
 ):
     classification = x_zuno_data_classification.upper()
     local_only = x_zuno_local_only.strip().lower() == "true"
@@ -231,6 +273,7 @@ async def chat_completions(
     run_id = x_zuno_run_id.strip() or None
     quota_class = x_zuno_quota_class.strip() or "standard"
     project_id = x_zuno_project_id.strip() or None
+    max_tokens = _parse_max_tokens(x_zuno_max_tokens)
     # ADR-0511: token-budget check BEFORE dispatch, on top of (never
     # instead of) the classification/eligibility intersection below.
     # Exhaustion is an explicit 429, never silent degradation.
@@ -278,7 +321,7 @@ async def chat_completions(
             _stream_completion(
                 candidates, classification, messages, request_id, adapter_decl,
                 identity=identity, tools=payload.tools, agent=x_zuno_agent, run_id=run_id,
-                project_id=project_id, quota_class=quota_class,
+                project_id=project_id, quota_class=quota_class, max_tokens=max_tokens,
             ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
@@ -302,6 +345,7 @@ async def chat_completions(
         tools=payload.tools,
         agent=x_zuno_agent,
         run_id=run_id,
+        max_tokens=max_tokens,
     )
 
 
@@ -424,6 +468,7 @@ async def _invoke_with_fallback(
     # the MaaS Gateway instead of ai-gateway's fixed ServiceAccount - see
     # maas_adapter._maas_bearer_token's own docstring.
     caller_bearer_token: Optional[str] = None,
+    max_tokens: Optional[int] = None,
 ) -> ChatCompletionResponse:
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
@@ -465,8 +510,31 @@ async def _invoke_with_fallback(
             return ChatCompletionResponse(**cached)
 
     errors: List[str] = []
-    for candidate in candidates:
+    for idx, candidate in enumerate(candidates):
         cfg = routing_table.provider_config(candidate.name)
+        # ADR-0544 pre-flight: skip a candidate whose own max_model_len
+        # (provider-routing.yaml) the prompt clearly can't fit, rather
+        # than dispatch and let vLLM fail - today that failure is caught
+        # by the same generic `except Exception` as a network blip
+        # (below), indistinguishable in logs from one. Never skip the
+        # LAST candidate: trying it anyway and surfacing the real
+        # upstream error beats inventing a refusal this estimate (char/4,
+        # deliberately approximate) could be wrong about. Also the only
+        # protection non-agent-runtime callers (Lightspeed) get -
+        # app/graph/prompt_budget.py's clamp never runs for them.
+        max_model_len = cfg.get("max_model_len")
+        if max_model_len and idx < len(candidates) - 1:
+            estimated = _estimate_prompt_tokens(messages, tools)
+            if estimated > max_model_len:
+                logger.info(
+                    "skipping candidate %s: estimated prompt ~%d tokens exceeds "
+                    "its max_model_len=%d", candidate.name, estimated, max_model_len,
+                )
+                errors.append(
+                    f"{candidate.name}: estimated prompt (~{estimated} tokens) exceeds "
+                    f"max_model_len={max_model_len}"
+                )
+                continue
         if _adapter_skips_maas(cfg, adapter_decl):
             logger.debug(
                 "skipping via_maas candidate %s: adapter declaration resolved, "
@@ -491,7 +559,7 @@ async def _invoke_with_fallback(
             ) as call:
                 model = chat_model_for(
                     candidate, cfg, request_id=request_id, adapter=adapter_name,
-                    caller_bearer_token=caller_bearer_token,
+                    caller_bearer_token=caller_bearer_token, max_tokens=max_tokens,
                 )
                 if tools:
                     model = model.bind_tools(tools)
@@ -592,6 +660,7 @@ async def _stream_completion(
     # usage at all (confirmed live 2026-09-01: only test/stresstest traffic,
     # which calls this endpoint non-streaming, ever drew the budget down).
     quota_class: str = "",
+    max_tokens: Optional[int] = None,
 ) -> AsyncIterator[str]:
     """Streams the first candidate that produces at least one token. A
     candidate that fails *before* yielding any token falls back to the next
@@ -607,8 +676,31 @@ async def _stream_completion(
     created = int(time.time())
     errors: List[str] = []
 
-    for candidate in candidates:
+    for idx, candidate in enumerate(candidates):
         cfg = routing_table.provider_config(candidate.name)
+        # ADR-0544 pre-flight: skip a candidate whose own max_model_len
+        # (provider-routing.yaml) the prompt clearly can't fit, rather
+        # than dispatch and let vLLM fail - today that failure is caught
+        # by the same generic `except Exception` as a network blip
+        # (below), indistinguishable in logs from one. Never skip the
+        # LAST candidate: trying it anyway and surfacing the real
+        # upstream error beats inventing a refusal this estimate (char/4,
+        # deliberately approximate) could be wrong about. Also the only
+        # protection non-agent-runtime callers (Lightspeed) get -
+        # app/graph/prompt_budget.py's clamp never runs for them.
+        max_model_len = cfg.get("max_model_len")
+        if max_model_len and idx < len(candidates) - 1:
+            estimated = _estimate_prompt_tokens(messages, tools)
+            if estimated > max_model_len:
+                logger.info(
+                    "skipping candidate %s: estimated prompt ~%d tokens exceeds "
+                    "its max_model_len=%d", candidate.name, estimated, max_model_len,
+                )
+                errors.append(
+                    f"{candidate.name}: estimated prompt (~{estimated} tokens) exceeds "
+                    f"max_model_len={max_model_len}"
+                )
+                continue
         if _adapter_skips_maas(cfg, adapter_decl):
             logger.debug(
                 "skipping via_maas candidate %s: adapter declaration resolved, "
@@ -632,6 +724,7 @@ async def _stream_completion(
                 model = chat_model_for(
                     candidate, cfg, request_id=request_id, adapter=adapter_name,
                     caller_bearer_token=identity.token if identity else None,
+                    max_tokens=max_tokens,
                 )
                 if tools:
                     model = model.bind_tools(tools)

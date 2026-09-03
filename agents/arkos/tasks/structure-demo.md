@@ -5,6 +5,17 @@ title: Structure a demo
 zuno:
   allowed_tools: []
   allowed_knowledge: []
+  # ADR-0544: this task's preferred candidate (provider-routing.yaml's
+  # local-maas/local, qwen3.6-27b-instruct, role `quality`) measured at
+  # ~18 tok/s live on 2026-09-03 - 1536 tokens is ~85s, inside scenario
+  # 9's 180s ceiling with a 2x margin (evaluations/arkos/scenarios.yaml).
+  # ~45s on the fleet-default qwen3.5-9b fallback (~22.5 tok/s warm),
+  # ~12s on gpt-oss-20b. Enough for a real 5-7 section demo narrative
+  # with talking points, while bounding the runaway generation that made
+  # this the one scenario timing out 5/5 under the old 30s default
+  # (WP-31) - a symptom root-caused to raw generation speed, not
+  # transport, and now guarded structurally rather than by timeout alone.
+  max_tokens: 1536
   # ADR-0515: editable starters. Shown in the chat empty state, and in the
   # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
   # UX only - never parsed or enforced server-side, and picking one does NOT

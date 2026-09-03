@@ -50,9 +50,16 @@ OKF_SIGNATURES_DIR = os.getenv("ZUNO_OKF_SIGNATURES_DIR", "/app/okf-signatures")
 # roughly right against the narrowest, which is the one the default model
 # actually has. An agent wanting a larger window declares it explicitly in
 # its own bundle rather than this shared default silently inflating every
-# agent's per-turn token spend - but a bundle that raises it should check
-# it against 8192, not 32768, because qwen3.5-9b is reachable in almost
-# every chain.
+# agent's per-turn token spend.
+#
+# ADR-0544 is the real backstop this default alone was never enough to be:
+# app/graph/prompt_budget.py clamps the WHOLE assembled prompt (this
+# budget, project context, and RAG/live context, none of which shared a
+# common ceiling before) against the fleet's actual narrowest reachable
+# window at assembly time - a bundle raising this value no longer needs
+# to hand-check it against 8192 itself, though it still should for its
+# OWN sake (a larger declared budget is more likely to trigger the
+# clamp's sacrifice order on the narrow-window path).
 HISTORY_TOKEN_BUDGET_DEFAULT = int(os.getenv("HISTORY_TOKEN_BUDGET", "1800"))
 HISTORY_MAX_TURNS_DEFAULT = 6
 # ADR-0527 clause 5: the project context's own token budget, separate from
@@ -147,6 +154,14 @@ class TaskDefinition:
     # PromptSlot above). Empty for every task that doesn't declare any -
     # today, only arkos's draft-architecture-testimonial does.
     prompts: Dict[str, PromptSlot] = field(default_factory=dict)
+    # ADR-0544: per-request generation ceiling, forwarded to ai-gateway as
+    # X-Zuno-Max-Tokens (app/clients/model_router.py) and, on this side,
+    # fed to app/graph/prompt_budget.py as the assembled prompt's output
+    # reserve - a task that promises N tokens of reply must have N tokens
+    # of the model's window held back for them, or the clamp guarantees a
+    # truncated answer. None means no cap (today's exact behavior) and no
+    # reserve override (prompt_budget.OUTPUT_RESERVE_TOKENS applies).
+    max_tokens: Optional[int] = None
 
 
 @dataclass
@@ -379,6 +394,7 @@ class AgentRegistry:
             live_read_tool=zuno.get("live_read_tool"),
             project_required=bool(zuno.get("project_required", False)),
             prompts=prompts,
+            max_tokens=int(zuno["max_tokens"]) if zuno.get("max_tokens") else None,
         )
 
     def get(self, name: str) -> Optional[AgentDefinition]:

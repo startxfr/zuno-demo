@@ -7,7 +7,7 @@ component contract, `platform_profile.yaml`'s declared version intent).
 No live cluster or registry needed - pure static text/YAML inspection,
 same style as `platform/supply-chain/check_build_matrix.py`.
 
-Thirteen checks, each independent (a failure in one doesn't block the others
+Fourteen checks, each independent (a failure in one doesn't block the others
 from reporting):
   - make_commands: every literal `make day0|d0|day1|d1 ...` example in
     README.md uses a verb/component this repository's actual Makefile
@@ -54,6 +54,12 @@ from reporting):
     days later, neither recording a supersession; the coverage half found
     `arkos/structure-demo` still riding the file-order default that
     ADR-0531 decision 1 claims no task rides.
+  - model_context_windows: every local provider's max_model_len (ADR-0544)
+    matches gitops/charts/models/values.yaml's real maxModelLen for that
+    served model, every SaaS provider omits the field, and -maas/direct
+    siblings of one model agree - the cross-reference that never existed
+    while a fleet-default model served a narrower window than the budget
+    written against it assumed.
 
 Run from the repository root:
 
@@ -133,6 +139,7 @@ PROVIDER_ROUTING_PATH = REPO_ROOT / "platform" / "ai-gateway" / "provider-routin
 MODEL_ROUTING_POLICY_PATH = (
     REPO_ROOT / "policies" / "model-routing" / "model-routing-policy.yaml"
 )
+MODELS_VALUES_PATH = REPO_ROOT / "gitops" / "charts" / "models" / "values.yaml"
 
 # The architectural roles provider-routing.yaml's `role` key may hold, and
 # which that file's own header block documents at length. Kept in sync by
@@ -989,6 +996,102 @@ def check_model_roles() -> List[Finding]:
     return findings
 
 
+def _served_model_context_windows() -> Dict[str, int]:
+    """model id (`servedModelName`) -> its real `--max-model-len`.
+
+    Scans gitops/charts/models/values.yaml for every mapping - root
+    included - that carries BOTH `servedModelName` and `maxModelLen`,
+    rather than naming the four known keys (`gptOssModel`, `weshModel`,
+    `qwen35Model`, the root qwen entry): hardcoding key names is exactly
+    the drift this check exists to prevent, since a fifth model added
+    under a new key would silently be invisible to a name-keyed scan.
+    """
+    doc = yaml.safe_load(MODELS_VALUES_PATH.read_text(encoding="utf-8")) or {}
+    windows: Dict[str, int] = {}
+
+    def _walk(node: object) -> None:
+        if not isinstance(node, dict):
+            return
+        if "servedModelName" in node and "maxModelLen" in node:
+            windows[node["servedModelName"]] = node["maxModelLen"]
+        for value in node.values():
+            _walk(value)
+
+    _walk(doc)
+    return windows
+
+
+def check_model_context_windows() -> List[Finding]:
+    """Every local provider's `max_model_len` (ADR-0544) matches the
+    served model's real `--max-model-len`, every SaaS provider omits the
+    field, and `-maas`/direct siblings of one served model agree.
+
+    provider-routing.yaml and gitops/charts/models/values.yaml have
+    independent lifecycles and nothing else keeps them honest - exactly
+    the gap that let a 6000-token history budget go unnoticed against an
+    8192-token model for as long as it did (ADR-0531's `qwen3.5-9b`,
+    role `default`, is a structurally always-reachable fallback per that
+    ADR's decision 1, while the other three local models serve 32768).
+    components/agent-runtime/app/graph/prompt_budget.py reads this same
+    max_model_len field to clamp the assembled prompt before sending -
+    this check is what keeps that clamp honest.
+    """
+    findings: List[Finding] = []
+
+    providers_doc = yaml.safe_load(PROVIDER_ROUTING_PATH.read_text(encoding="utf-8")) or {}
+    providers = providers_doc.get("providers") or []
+    chart_windows = _served_model_context_windows()
+
+    by_model_declared: Dict[str, set] = {}
+    for provider in providers:
+        name = provider.get("name")
+        model = provider.get("model")
+        declared = provider.get("max_model_len")
+        kind = provider.get("kind")
+
+        if kind == "local":
+            if declared is None:
+                findings.append(Finding(
+                    "model_context_windows",
+                    f"provider-routing.yaml's '{name}' is kind 'local' but declares no "
+                    f"max_model_len - agent-runtime's prompt clamp cannot see its real window.",
+                ))
+            elif model not in chart_windows:
+                findings.append(Finding(
+                    "model_context_windows",
+                    f"provider-routing.yaml's '{name}' names model '{model}', which no "
+                    f"servedModelName/maxModelLen pair in gitops/charts/models/values.yaml "
+                    f"resolves - was the model renamed on one side only?",
+                ))
+            elif declared != chart_windows[model]:
+                findings.append(Finding(
+                    "model_context_windows",
+                    f"provider-routing.yaml's '{name}' declares max_model_len={declared} for "
+                    f"'{model}', but gitops/charts/models/values.yaml's own maxModelLen for "
+                    f"that servedModelName is {chart_windows[model]} - the two have drifted.",
+                ))
+            by_model_declared.setdefault(model, set()).add(declared)
+        elif kind == "saas" and declared is not None:
+            findings.append(Finding(
+                "model_context_windows",
+                f"provider-routing.yaml's '{name}' is kind 'saas' but declares "
+                f"max_model_len={declared} - SaaS windows are never the binding constraint "
+                f"and nothing in this repo can cross-verify a SaaS value, so the field is "
+                f"local-only by convention; remove it.",
+            ))
+
+    for model, values in by_model_declared.items():
+        if len(values) > 1:
+            findings.append(Finding(
+                "model_context_windows",
+                f"provider-routing.yaml's providers for model '{model}' disagree on "
+                f"max_model_len ({sorted(values)}) - the -maas and direct entries for one "
+                f"served model front the same runtime and must agree.",
+            ))
+
+    return findings
+
+
 def check_day0_day1_roles() -> List[Finding]:
     findings: List[Finding] = []
     lists = _parse_makefile_lists()
@@ -1137,6 +1240,7 @@ def main() -> int:
         + check_version_consistency(profile)
         + check_model_roles()
         + check_doc_links()
+        + check_model_context_windows()
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
@@ -1147,8 +1251,9 @@ def main() -> int:
           "consistency, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
           f"platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}, "
           "model architectural roles against provider-routing.yaml/"
-          "model-routing-policy.yaml, and relative ADR links in ADR/roadmap/"
-          "work-package markdown.")
+          "model-routing-policy.yaml, relative ADR links in ADR/roadmap/"
+          "work-package markdown, and model context windows against "
+          "gitops/charts/models/values.yaml.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")
         return 0

@@ -160,6 +160,15 @@ jobs:
           # after a real, permanently-failing test in this same family sat
           # unnoticed for a day precisely because it was not wired here.
           python3 tests/test_reason_node_narration_retry.py
+          # ADR-0544: the prompt-window clamp and the declarative
+          # max_tokens mechanism. test_history.py is added alongside them,
+          # not just the two new files - it predates ADR-0544 and was
+          # never wired here at all, the same "real failure sits unnoticed
+          # because nothing runs it" gap the narration-retry comment above
+          # already names once.
+          python3 tests/test_history.py
+          python3 tests/test_prompt_clamp.py
+          python3 tests/test_max_tokens.py
       - name: mcp-gateway tests
         working-directory: components/mcp-gateway
         run: |
@@ -180,6 +189,10 @@ jobs:
           python3 tests/test_optimizer.py
           python3 tests/test_stream_telemetry.py
           python3 tests/test_local_cost_estimation.py
+          # ADR-0544: X-Zuno-Max-Tokens parsing and per-vendor forwarding,
+          # including the via_maas branch structure-demo's own preferred
+          # candidate actually uses.
+          python3 tests/test_max_tokens_passthrough.py
       - name: supply-chain pin_release.py tests (ADR-0115)
         working-directory: platform/supply-chain
         run: |

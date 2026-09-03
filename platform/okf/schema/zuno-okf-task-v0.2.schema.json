@@ -70,6 +70,12 @@
           "type": "boolean",
           "default": false
         },
+        "max_tokens": {
+          "description": "ADR-0544: generation ceiling for this task's model call, forwarded per-REQUEST (never per-provider config) as the X-Zuno-Max-Tokens header from components/agent-runtime/app/clients/model_router.py through to whichever candidate ai-gateway ends up trying. Optional - absent means no cap, today's exact behavior. Distinct from Agent Runtime's own zuno.memory.history/project_context token budgets (agents/<name>/agent.okf.md): those bound what goes INTO the prompt: this bounds what comes OUT. A declared value also becomes the prompt clamp's output reserve (components/agent-runtime/app/graph/prompt_budget.py) so the model's context window is never sized as if the whole thing were free for input.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
         "allowed_knowledge": {
           "description": "Logical knowledge-domain IDs (knowledge/<domain>/domain.yaml, ADR-0202) this task may retrieve from. Declared independently of allowed_tools (ADR-0203). Effective authorization is the intersection of this list with the agent's declared-knowledge ceiling (the union of every task's allowed_knowledge - see components/agent-runtime/app/registry.py:AgentDefinition.declared_knowledge()), the caller's group rights and policies/knowledge/knowledge-policy.yaml - this field is a ceiling, not a grant on its own. Optional/omitted for tasks that never call RAG retrieval.",
           "type": "array",

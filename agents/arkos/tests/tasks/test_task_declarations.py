@@ -94,11 +94,33 @@ def test_project_required_tasks_declare_a_project_scopable_resource() -> None:
         )
 
 
+def test_declared_max_tokens_is_within_the_schema_bound() -> None:
+    """ADR-0544: platform/okf/schema/zuno-okf-task-v0.2.schema.json bounds
+    max_tokens to [1, 8192] - this file is documentation, not something
+    anything runs jsonschema.validate() against (see that schema's own
+    zuno.model.local_only comment for why), so the bound is only real if
+    a contract test like this one enforces it. structure-demo's 1536 is
+    the mechanism's first live usage."""
+    agent = _agent_zuno()
+    checked = 0
+    for task_name in agent["tasks"]:
+        zuno = _task_zuno(task_name)
+        max_tokens = zuno.get("max_tokens")
+        if max_tokens is None:
+            continue
+        checked += 1
+        assert isinstance(max_tokens, int) and 1 <= max_tokens <= 8192, (
+            f"{task_name}: max_tokens={max_tokens!r} is outside the schema's [1, 8192] bound"
+        )
+    assert checked >= 1, "expected at least structure-demo to declare max_tokens"
+
+
 TESTS = [
     test_primary_task_is_declared_in_zuno_tasks,
     test_every_declared_task_has_a_task_file,
     test_live_read_tool_is_within_its_own_allowed_tools,
     test_project_required_tasks_declare_a_project_scopable_resource,
+    test_declared_max_tokens_is_within_the_schema_bound,
 ]
 
 
