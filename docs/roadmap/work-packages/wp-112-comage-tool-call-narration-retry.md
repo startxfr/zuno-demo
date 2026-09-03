@@ -1,23 +1,16 @@
 # WP-112: Design a retry for skipped tool calls on the single-shot graph shape
 
-- **State:** Repo work merged (2026-09-03) - blocked on an unrelated
-  platform defect, not on this WP. **The narrate-instead-of-call defect
-  this WP targets is fixed and live-proven**: after the second fix (the
-  Arkos-precedent "actually invoke it" system-prompt instruction, which
-  `agents/comage/prompts/check-deal-status.md` had never carried), the
-  2026-09-03 re-run shows Comage's marketing prompt making a real
-  `generate_image` call through `mcp-gateway` to `ai-gateway`, with no
-  prose narration anywhere in the run, and `sxa_visualization_boundary`
-  still passing. Both named checks nonetheless still report FAIL, for two
-  reasons, both since resolved or re-scoped. The external-egress defect is
-  fixed (WP-124, Done), and the third run has `comage/security` **8/8** - the
-  marketing check green for the first time, with a real SDXL image. What
-  remains is `img-mockup_request`, which across three runs has failed three
-  different ways, two of them plain narration ("Ouais, j'peux faire ca."), so
-  widening the trigger IS indicated after all - a claim this brief briefly
-  retracted on a one-run sample. That widening is the remaining work. Widening `_NARRATED_TOOL_NAME_PATTERN` is no
-  longer the indicated next step - there is no narration left to detect.
-  See "Live verification (2026-09-03, second run)" for the full evidence.
+- **State:** Done (2026-09-03). Two fixes closed this WP: the
+  Arkos-precedent "actually invoke it" system-prompt instruction
+  (`agents/comage/prompts/check-deal-status.md`) closed the unambiguous
+  marketing case (`comage/security` 8/8); widening the narration trigger
+  to an intent signal (`_VISUAL_COMMITMENT_PATTERN`/
+  `_VISUAL_REFUSAL_PATTERN`, against the three verbatim failing replies as
+  the corpus, with `sxa_visualization_boundary`'s decline as the negative
+  case) closed `img-mockup_request`, which across three runs had failed
+  three different ways, none naming a tool. Both named checks are green
+  in the same clean run, no regression on the refusal veto. See "Live
+  verification (2026-09-03, fourth run)" for the final evidence.
 - **ADRs:** ADR-0516 (Decision - the tool-schema/prompt contradiction ADR-0516
   accepted as an unmitigated risk; that risk has now manifested with live
   evidence). ADR-0516 itself stays `Implemented`/v0.4 - this WP does not
@@ -552,6 +545,37 @@ deliberate-decline path intact. What it does not close is the "mockup"
 wording, which sits directly on `check-deal-status`'s own
 marketing-vs-structured-data boundary.
 
+## Live verification (2026-09-03, fourth run) - CLEAN, both named checks green, no regression
+
+The widened trigger (`_VISUAL_COMMITMENT_PATTERN`/`_VISUAL_REFUSAL_PATTERN`,
+`components/agent-runtime/app/graph/nodes.py`) built against the three
+verbatim replies above, plus the recalibrated 120s client timeouts
+(`evaluations/tekos/stress_test.py`), were rebuilt+signed and deployed, then
+re-verified in a `make d3 stresstest agents BULK=0` run (routed around a
+separately-discovered AAP Execution Environment gap - missing `kustomize`
+- by invoking `ansible/playbooks/day3_stresstest.yml` directly, out of this
+WP's scope):
+
+- **`img-mockup_request` -> PASS.** `comage/image_generation`: 1/1,
+  `comage/diagram_generation`: 1/1, `comage/security`: 8/8.
+- **`sxa_visualization_boundary` -> PASS**, still 1/1 - the refusal veto
+  correctly never fires on it.
+- **`tekos/dat_boundary`: 2/2**, including `dat-write_dat` (the 120s
+  timeout fix).
+- `qa-argocd`/`qa-helm`/`qa-go` also PASS in this same run, now backed by a
+  real corpus (WP-129 shipped 460 `argocd` + 110 `helm` document_embeddings
+  rows, DB-verified, not just a green exit code) rather than the earlier
+  false-pass mechanism.
+- 227/242 overall. The 15 remaining failures are all pre-existing, unrelated
+  to this WP: `bff_forwards_identity_to_runtime`/
+  `runtime_ignores_mismatched_user_sub` on advantage/finage/naveo, one
+  acceptance-scenario flake each on arkos/comage, and the `tekos/quota` 503
+  storm - same shapes as every prior run, no new regression introduced by
+  the widened trigger.
+
+Both named checks this WP exists to close are green in the same run, with
+no false positive on the boundary check. This WP is Done.
+
 ## Acceptance checks (for this WP's own scope)
 
 - A written, reviewed design (this WP's brief, updated in place, or a
@@ -571,7 +595,7 @@ marketing-vs-structured-data boundary.
   never infra.
 - Both named live checks green in one `make d3 stresstest agents BULK=0`
   run, with `sxa_visualization_boundary` still passing in the same run. -
-  **not yet**, see "Second fix (2026-09-03)".
+  **done**, see "Live verification (2026-09-03, fourth run)".
 
 ## Out of scope / deferred
 

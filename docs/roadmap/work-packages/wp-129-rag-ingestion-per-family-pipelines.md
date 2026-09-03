@@ -1,7 +1,13 @@
 # WP-129: generic fetch-oss-docs adapter + per-family knowledge.tech pipelines
 
-- **State:** Repo work merged (2026-09-03) - not yet deployed or
-  live-verified, see "Remaining" below.
+- **State:** Operator pending (2026-09-03) - repo work merged AND deployed
+  live: all 19 `PipelineVersion`s compiled, all 19 KFP recurring runs
+  `ENABLED` with the staggered schedule, the `argocd`/`helm` families each
+  triggered and confirmed with a real document-count delta (460/110
+  `document_embeddings` rows, DB-verified). Two items remain, see
+  "Live rollout (2026-09-03)" below: the other 17 families have not yet had
+  their first run (scheduled, not yet due), and the concurrent-run race
+  fix has not been deliberately exercised live.
 - **ADRs:** ADR-0105 (amended a second time, this WP). ADR-0202's
   single-`knowledge.tech`-database constraint is preserved unaffected by
   this split, not itself amended - see "Goal" below.
@@ -132,38 +138,75 @@ Every non-`redhat-openshift` slot clears by 05:15, ≥45 min before the next
   `ansible-playbook --syntax-check` against the playbook that includes
   this role: passed, no cluster connection required.
 
+## Live rollout (2026-09-03)
+
+ArgoCD's `selfHeal`/`prune` picked up the merged commits automatically
+(not a manual `make d1/d2 install`, which surfaced this the hard way mid-
+WP-112-verification): the old single `templates/configmap.yaml` was
+pruned while a manual `tech-redhat` ingestion run was still in flight,
+breaking it with `CreateContainerConfigError` at `detect-changes` (the
+`fetch-redhat` stage had already completed all 112 sources over ~3.5h).
+That run was terminated (`kfp.Client().runs.terminate_run()`); no data
+was lost, just wasted compute.
+
+Getting the new 19-pipeline structure fully live took three real,
+unrelated fixes, each confirmed against the actual error before applying:
+
+1. **RBAC gap** (pre-existing, not introduced by this WP - just never
+   exercised until 19 brand-new `PipelineVersion`s needed creating at
+   once): `zuno-aap-installer`'s `ClusterRole` was missing
+   `pipelines.kubeflow.org` (it had the adjacent
+   `datasciencepipelinesapplications.opendatahub.io` DSPA-operand group,
+   but not the DSP operator's own KFP-native `Pipeline`/`PipelineVersion`
+   CRDs). Fixed in `gitops/charts/aap-config/templates/
+   clusterrole-installer.yaml`.
+2. **Immutable PipelineVersion**: every `techSources` pipeline-def's
+   `configure(..., domain=...)` calls changed from the shared literal
+   `"tech"` to `"tech-<srcName>"` (needed so each family resolves its own
+   ConfigMap) - a real compiled-spec change even for the two *pre-existing*
+   targets (`tech-confluence`, and `tech-redhat` now `tech-redhat-openshift`),
+   not just the 17 new ones. `pipeline.version` bumped `v0-8-0` -> `v0-9-0`.
+3. **Stale image**: the chart already compiled the new `fetch-oss-docs`
+   stage name into the pipeline spec, but the `rag-ingestion` container
+   image had never been rebuilt from Phase 1's rename - every triggered
+   run failed instantly with `argument stage: invalid choice: 'fetch-oss-docs'`.
+   Fixed with `make d2 build rag-ingestion` (signed, live).
+
+After all three fixes: all 19 `PipelineVersion`s compiled, all 19 KFP
+recurring runs `ENABLED` with the staggered schedule (confirmed via the
+v2beta1 API, no stale `tech-redhat-schedule`/`tech-confluence-schedule`
+leftovers beyond the unchanged confluence one). `argocd` and `helm` were
+each triggered on-demand (their ConfigMaps already contain both the Red
+Hat chapter entries and the new upstream `crawlStrategy: generic` sources
+- one run exercises both) and `SUCCEEDED`; DB-verified via
+`document_embeddings`: 460 `argocd` rows, 110 `helm` rows. A subsequent
+`make d3 stresstest agents BULK=0` confirmed `qa-argocd`/`qa-helm`/`qa-go`
+all PASS against this real corpus, no regression.
+
+Aside, out of this WP's scope but discovered along the way: the same
+stresstest run's `make d3` invocation is now routed through AAP by
+default (`zuno_make_aap_mode: auto` in `ansible/confidential.yml`, AAP
+newly reachable partway through this session), and AAP's Execution
+Environment is missing the `kustomize` binary, failing
+`ansible/roles/agents/kustomize`. Worked around by invoking
+`ansible/playbooks/day3_stresstest.yml` directly, bypassing the AAP
+routing layer for that one run - the EE gap itself is unrelated to
+rag-ingestion and not fixed here.
+
 ## Remaining (operator actions, not yet done)
 
-Nothing has been applied to the live cluster. Before this WP can move to
-Done:
-
-1. Push (already done incidentally — confirm), rebuild the
-   `rag-ingestion` image if the CLI rename requires it (check whether the
-   image tag/build actually needs to change or whether `:latest` already
-   picks up the source rename on next build).
-2. `make d1 install rag-ingestion` (or the ansible-role equivalent) to
-   apply the 19 `PipelineVersion`s + `Pipeline` CRs + ConfigMaps, and let
-   the recurring-run reconciliation create/replace the 19 KFP schedules
-   (the existing `cleanup_orphaned_recurring_runs.yml` should retire the
-   old single `tech-redhat`/`tech-confluence` shared-prefix state
-   automatically — confirm live, not just by design read).
-3. **Cold re-fetch expected, not a regression**: every family's first run
-   under its new suffixed prefix finds an empty raw prefix and treats
-   every doc as new — a one-time full-cost run per family. Don't mistake
-   week-one runtimes for a defect.
-4. Trigger at least one family pipeline (recommend `argocd` or `helm` —
-   smallest, fastest, and exercises the new `crawlStrategy: generic` path
-   for real) and confirm a real document-count delta, not just a green
-   exit code — the exact trap `agents/tekos/rag/tech.md`'s prior false-pass
-   already taught this repo.
-5. Once `argocd`/`helm` have real runs from both the Red Hat chapter
-   entries and the new upstream sources, compare corpus quality via
-   `evaluations/tekos/stress_test.py`'s `qa-argocd`/`qa-helm` probes —
-   check the citations' actual `source`/`url`, not just
-   `len(citations) > 0` — then decide whether to drop the Red Hat chapter
-   stopgap entries.
-6. Deliberately exercise the race fix live: trigger two sibling family
+1. The other 17 families (everything except `argocd`/`helm`) have not yet
+   had their first run - they're scheduled, not yet due. Their first run
+   under the new suffixed S3 prefix will be a full cold re-fetch, not
+   incremental - expect week-one runtimes higher than steady-state,
+   especially `redhat-openshift`'s ~3-4h. Not a regression.
+2. Deliberately exercise the race fix live: trigger two sibling family
    pipelines concurrently (or one scheduled + one on-demand) and confirm
    both `manifest-tech-<family>.json` files converge correctly with no
    lost `deleted_ids`, and each `detect-changes` log shows only its own
    family's doc counts.
+3. Once there's more signal on the upstream sources' actual coverage
+   (right now `argocd`/`helm` chunks aren't broken down by which of the 3
+   sources per family they came from), check citations resolve to the new
+   upstream URLs specifically, not just `len(citations) > 0` - then decide
+   whether to drop the Red Hat chapter stopgap entries.

@@ -26,7 +26,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.1 | 29 | — | 18 | — |
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 18 | WP-34, WP-119 |
-| v0.4 | 34 | 9 | 27 | WP-55, WP-093, WP-101, WP-112 |
+| v0.4 | 34 | 9 | 27 | WP-55, WP-093, WP-101 |
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101, WP-129 |
 | v0.7 | 14 | 12 | 25 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119, WP-125, WP-126 |
@@ -513,7 +513,7 @@ pre-existing, not introduced by WP-129).
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-100 | [wp-100](work-packages/wp-100-split-tech-ingestion-cadence-by-source.md) | 0105 (amended) | WP-22 | Done (2026-08-30) | none |
-| WP-129 | [wp-129](work-packages/wp-129-rag-ingestion-per-family-pipelines.md) | 0105 (amended again) | WP-100 | Repo work merged (2026-09-03) | not yet deployed - apply the 19 PipelineVersions/ConfigMaps/schedules live, confirm a real per-family document-count delta, exercise the concurrent-run race fix, then compare argocd/helm corpus quality before dropping the Red Hat chapter stopgap entries; see WP-129 "Remaining" |
+| WP-129 | [wp-129](work-packages/wp-129-rag-ingestion-per-family-pipelines.md) | 0105 (amended again) | WP-100 | Operator pending (2026-09-03) | live: 19 PipelineVersions/schedules active, argocd/helm triggered with a DB-verified document-count delta (460/110 rows) and confirmed via a clean stresstest run. Remaining: let the other 17 families run their first (cold-refetch) cycle, exercise the concurrent-run race fix deliberately, and compare upstream-vs-Red-Hat-chapter corpus quality before dropping the stopgap entries; see WP-129 "Remaining" |
 
 ### Phase 25 — Salesforce sandbox credential provisioning (added 2026-08-30)
 Three separate "blocked on sandbox" notes — WP-22/ADR-0218's `fetch-salesforce`
@@ -632,7 +632,7 @@ verification against a real `qwen3.5-9b-wesh` deployment still open.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-112 | [wp-112](work-packages/wp-112-comage-tool-call-narration-retry.md) | 0516 | none | Repo work merged (2026-09-03) | half closed: the prompt fix made the security check green for the first time (`comage/security` 8/8, real SDXL image) once WP-124 restored external egress. `img-mockup_request` still fails - across three runs it failed three different ways, two of them plain narration naming no tool, so widening `_NARRATED_TOOL_NAME_PATTERN` with an intent signal (not just a tolerant name match) IS indicated after all, against those three verbatim replies as the corpus |
+| WP-112 | [wp-112](work-packages/wp-112-comage-tool-call-narration-retry.md) | 0516 | none | Done (2026-09-03) | none - the Arkos-precedent prompt fix plus a widened intent-based narration trigger both live-verified in one clean `make d3 stresstest agents BULK=0` run: `img-mockup_request` and `comage/security` (8/8) both PASS, `sxa_visualization_boundary` still 1/1, no regression |
 
 ### Phase 30 — RHOAI 3.5 dashboard workload surfaces (added 2026-09-02)
 Closing ADR-0534's visibility work exposed a broader gap: four RHOAI
