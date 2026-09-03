@@ -376,6 +376,21 @@ async def _check_project_membership(
         )
 
 
+DEFAULT_DOMAIN = "knowledge.tech"
+
+
+def effective_domain_set(domains: Optional[List[str]]) -> List[str]:
+    """The domains a search will actually query.
+
+    Extracted so the telemetry layer can label a search with the same set
+    the search really used, rather than re-deriving the default and
+    drifting from it - app/main.py sees the caller's raw (possibly empty)
+    `domains`, and an empty list is NOT "all domains", it is knowledge.tech
+    only.
+    """
+    return list(domains) if domains else [DEFAULT_DOMAIN]
+
+
 async def hybrid_search(
     query: str,
     top_k: int,
@@ -412,7 +427,7 @@ async def hybrid_search(
     domain's pool is queried for any content.
     """
     caller_groups = caller_groups or []
-    effective_domains = list(domains) if domains else ["knowledge.tech"]
+    effective_domains = effective_domain_set(domains)
     top_k = max(1, min(top_k, config.MAX_TOP_K))
     fetch_n = max(top_k * 4, 20)  # over-fetch each ranked list before fusion
 

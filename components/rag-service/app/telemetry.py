@@ -14,7 +14,7 @@ import logging
 import os
 import time
 from contextlib import contextmanager
-from typing import Iterator, Optional
+from typing import Iterator, List, Optional
 
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -62,10 +62,12 @@ def init_telemetry(service_name: str = "rag-service") -> None:
     _tracer = trace.get_tracer(service_name)
     meter = metrics.get_meter(service_name)
     _search_counter = meter.create_counter(
-        "zuno.rag_searches", description="RAG searches by outcome (ok/error)"
+        "zuno.rag_searches",
+        description="RAG searches by outcome (ok/error), provider and requested domain set",
     )
     _result_count_histogram = meter.create_histogram(
-        "zuno.rag_result_count", description="Number of hybrid-search results returned per query"
+        "zuno.rag_result_count",
+        description="Number of hybrid-search results returned per query, by requested domain set",
     )
     # ADR-0109/WP-24: "metrics expose now - indexed_at ... with alerting
     # against domain objectives" - one histogram, sliced by the `domain`
@@ -88,17 +90,41 @@ def record_freshness_lag(domain: str, lag_seconds: float) -> None:
 
 @contextmanager
 def search_span(
-    query: str, top_k: int, run_id: Optional[str] = None
+    query: str,
+    top_k: int,
+    run_id: Optional[str] = None,
+    domains: Optional[List[str]] = None,
 ) -> Iterator["SearchRecorder"]:
     """ADR-0543: run_id (the calling chat turn's id, forwarded by
     agent-runtime's rag_client as X-Zuno-Run-Id) is a span attribute only,
     never added to the zuno.rag_searches counter - unbounded cardinality.
+
+    `domains` is the set the search will actually query, and becomes ONE
+    label holding the sorted set joined by commas - never one point per
+    domain. A search fans out across its domains and RRF-fuses them into a
+    single result set, so there is no single domain to attribute a result
+    count to, and emitting one point per domain would inflate the counter
+    by the size of the request's domain list. That is precisely the defect
+    zuno_bff_requests_total carries by recording one point per Keycloak
+    group, and reproducing it here would be a poor way to fix it there.
+
+    Cardinality is bounded by the domain COMBINATIONS callers request, not
+    by their power set: each agent has a fixed authorized domain list, so
+    this is a handful of values. The common case reads as a single domain
+    name, because an empty request means knowledge.tech only.
+
+    Without this label a zero result count is unreadable: knowledge.sales
+    is deliberately empty until Salesforce ingestion lands in v0.7
+    (ADR-0218), so "returned nothing" is correct there and alarming
+    anywhere else, and the fleet-wide number cannot tell the two apart.
     """
     tracer = _tracer or trace.get_tracer("rag-service")
     start = time.monotonic()
+    domain_label = ",".join(sorted(domains)) if domains else "unknown"
     with tracer.start_as_current_span("rag_search") as span:
         span.set_attribute("zuno.query_length", len(query))
         span.set_attribute("zuno.top_k", top_k)
+        span.set_attribute("zuno.domains", domain_label)
         if run_id:
             span.set_attribute("zuno.run_id", run_id)
         recorder = SearchRecorder()
@@ -119,9 +145,15 @@ def search_span(
             # native pgvector retrieval or OGX-backed retrieval."
             span.set_attribute("zuno.provider", recorder.provider)
             if _search_counter is not None:
-                _search_counter.add(1, {"outcome": recorder.outcome, "provider": recorder.provider})
+                _search_counter.add(1, {
+                    "outcome": recorder.outcome,
+                    "provider": recorder.provider,
+                    "domains": domain_label,
+                })
             if _result_count_histogram is not None and recorder.outcome == "ok":
-                _result_count_histogram.record(recorder.result_count)
+                _result_count_histogram.record(
+                    recorder.result_count, {"domains": domain_label}
+                )
 
 
 class SearchRecorder:

@@ -21,7 +21,7 @@ from app.schemas import (
     SearchRequest,
     SearchResponse,
 )
-from app.search import ProjectMembershipDenied, hybrid_search
+from app.search import ProjectMembershipDenied, effective_domain_set, hybrid_search
 from app.telemetry import init_telemetry, search_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -96,7 +96,15 @@ async def search(
         await db.retry_failed_domains()
     if not use_ogx and not db.any_ready():
         raise HTTPException(status_code=503, detail="no domain database connected")
-    with search_span(payload.query, payload.top_k, run_id=x_zuno_run_id or None) as call:
+    # effective_domain_set, not payload.domains: an empty request means
+    # knowledge.tech only, and the metric must say what was searched
+    # rather than what was asked for.
+    with search_span(
+        payload.query,
+        payload.top_k,
+        run_id=x_zuno_run_id or None,
+        domains=effective_domain_set(payload.domains),
+    ) as call:
         call.provider = "ogx" if use_ogx else "pgvector"
         try:
             if use_ogx:
