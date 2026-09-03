@@ -91,12 +91,21 @@ nemoGuardrails:
   # confirms affinity, nodeSelector and tolerations are all exposed;
   # the whole block is passed through verbatim by the template, so
   # nodeSelector/tolerations can be added here without a code change.
+  #
+  # Both role keys are listed, ANDed inside the one term, so a node
+  # carrying EITHER is excluded. This cluster's masters carry both, and
+  # the API server warns that `master` is deprecated in favour of
+  # `control-plane` - naming only one would silently stop excluding
+  # anything the day the other is dropped, and a silent loss of this
+  # constraint is the incident it exists to prevent.
   pod:
     affinity:
       nodeAffinity:
         requiredDuringSchedulingIgnoredDuringExecution:
           nodeSelectorTerms:
             - matchExpressions:
+                - key: node-role.kubernetes.io/control-plane
+                  operator: DoesNotExist
                 - key: node-role.kubernetes.io/master
                   operator: DoesNotExist
 
