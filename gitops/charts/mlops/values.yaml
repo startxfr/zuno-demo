@@ -272,7 +272,7 @@ training:
   # templates/trainingruntime.yaml instead of by six KFP SDK calls inside
   # files/pipeline.py.tpl. Same values, same comments, visible in the chart.
   trainJob:
-    enabled: false
+    enabled: true
     runtimeName: mlops-lora
     # ~2h for the one green wesh run; a training pod that outlives this is
     # a step failure, not necessarily a job failure - see trainjob.py's

@@ -33,7 +33,15 @@ spec:
   mlPolicy:
     numNodes: 1
     torch:
-      numProcPerNode: "1"
+      # WP-126: NOT a quoted string. numProcPerNode is IntOrString
+      # (`oc explain trainingruntime.spec.mlPolicy.torch.numProcPerNode`:
+      # "auto, cpu, gpu, or int value"); the CRD's CEL validation rejects a
+      # quoted "1" with "no such overload" (neither the string branch nor
+      # the int branch matches), caught live only by
+      # `oc apply --dry-run=server` - `helm template`/`helm lint` render
+      # and pass either form. A bare YAML 1 parses as the int variant and
+      # is accepted.
+      numProcPerNode: 1
   template:
     spec:
       replicatedJobs:
