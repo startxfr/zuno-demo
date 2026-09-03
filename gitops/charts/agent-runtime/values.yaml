@@ -83,9 +83,13 @@ guardrails:
   # GuardrailsOrchestrator detector below, with its patterns compiled into
   # this image. "nemo" = the NemoGuardrails server, whose patterns are
   # data in a ConfigMap (gitops/charts/trustyai-config/files/nemo-rails/).
-  # Stays "builtin" until the nemo path is live-proven; flipping it is a
-  # one-value change, and flipping it back is the rollback.
-  backend: builtin
+  # FLIPPED to "nemo" 2026-09-03, once the path was live-proven end to
+  # end (WP-120): the server answers, options.rails restricts execution to
+  # the input rail, llm_calls_count comes back 0, and all eight detection
+  # classes fire by name. Flipping it back to "builtin" is the rollback,
+  # and DETECTOR_PARAMS is deliberately still in the image so that
+  # rollback is a working observer and not an empty one.
+  backend: nemo
   detectorUrl: http://zuno-guardrails-smoke-service.zuno-ai-run.svc:8080
   # CORRECTED 2026-09-03 from a live reading, and the correction is the
   # point: the operator does NOT follow the <cr-name>-service convention

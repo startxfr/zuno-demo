@@ -117,7 +117,7 @@ spec:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "custom-regex = the prompt-injection/jailbreak heuristics; the named PII detections (email_address, ...) come from the built-in detector's own vocabulary.",
+          "description": "One series per detection class per agent. Since the ADR-0540 backend flip (2026-09-03) the names come from the NeMo rails policy - email, us-social-security-number, credit-card, and injection-ignore-instructions / -disregard-rules / -persona-override / -pretend-unrestricted / -system-prompt-leak. Series before that date are NOT comparable: the builtin detector reported all five injection heuristics under one custom-regex label, so what reads as a drop in custom-regex is that one series splitting into five, not detections falling.",
           "gridPos": {
             "h": 8,
             "w": 9,
