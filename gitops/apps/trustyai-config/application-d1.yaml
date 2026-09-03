@@ -40,9 +40,44 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
+  # ADR-0538/WP-117: Kueue writes these fields on every Job it manages, and
+  # without this the result is a RECREATION LOOP, not cosmetic drift. The
+  # Jobs in this chart carry Replace=true,Force=true (a Job's spec.template
+  # is immutable, so they must), so ArgoCD reading Kueue's writes as drift
+  # means selfHeal deletes and recreates the Job, Kueue re-writes them, and
+  # round it goes - observed live on 2026-09-03 at 8+ Workload generations
+  # in five minutes, each one re-running the Job and re-pulling its image.
+  #
+  # /spec/suspend is NOT optional here: the ClusterQueue is deliberately
+  # undersized so only one evaluation Job is admitted at a time, which means
+  # Jobs are MEANT to sit suspended waiting for quota. Without this pointer
+  # every queued Job would read as drift the whole time it waits.
+  #
+  # The three label pointers are the keys Kueue's mjob.kb.io webhook injects
+  # into the pod template (~1 is the JSON Pointer escape for "/"). Named
+  # individually rather than ignoring /spec/template/metadata/labels wholesale
+  # so a real change to any other pod label is still caught.
+  ignoreDifferences:
+    - group: batch
+      kind: Job
+      jsonPointers:
+        # The webhook stamps this onto the Job's OWN metadata at creation.
+        # Harmless to ignore even where the chart declares it itself.
+        - /metadata/labels/kueue.x-k8s.io~1queue-name
+        - /spec/suspend
+        - /spec/template/metadata/labels/kueue.x-k8s.io~1cluster-queue-name
+        - /spec/template/metadata/labels/kueue.x-k8s.io~1local-queue-name
+        - /spec/template/metadata/labels/kueue.x-k8s.io~1podset
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
+      # Required for the ignoreDifferences above to apply during a SYNC and
+      # not merely in the diff view - see gitops/apps/machines/application-d0.yaml,
+      # the only other place in this repo that needs it. Without it the
+      # ignore suppresses the OutOfSync display while Replace still fires,
+      # which is the worst of both worlds: the loop keeps running and the
+      # Application looks healthy.
+      - RespectIgnoreDifferences=true

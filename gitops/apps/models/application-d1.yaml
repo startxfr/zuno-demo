@@ -19,9 +19,36 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
+  # ADR-0538/WP-117: this chart's three *-cache-prefetch Jobs are queued by
+  # Kueue whether or not they ask to be. Enrolment on this operator build is
+  # per-NAMESPACE and has no per-workload opt-out: labelling zuno-ai-run
+  # makes the mjob.kb.io webhook stamp kueue.x-k8s.io/queue-name onto every
+  # Job created in it, and setting workloadManagement.labelPolicy: QueueName
+  # explicitly does NOT stop that (proven by probe, 2026-09-03 - do not
+  # retry it). So these Jobs are in scope for Kueue's writes, and they carry
+  # Replace=true, which turns those writes into a recreation loop where
+  # every turn re-pulls a multi-GiB LM-Eval image onto whichever node the
+  # Job lands - the exact churn behind that day's DiskPressure incident.
+  #
+  # See gitops/apps/trustyai-config/application-d1.yaml for the full
+  # reasoning; these pointers must stay in step with that file's.
+  ignoreDifferences:
+    - group: batch
+      kind: Job
+      jsonPointers:
+        # The webhook stamps this onto the Job's OWN metadata at creation.
+        # Harmless to ignore even where the chart declares it itself.
+        - /metadata/labels/kueue.x-k8s.io~1queue-name
+        - /spec/suspend
+        - /spec/template/metadata/labels/kueue.x-k8s.io~1cluster-queue-name
+        - /spec/template/metadata/labels/kueue.x-k8s.io~1local-queue-name
+        - /spec/template/metadata/labels/kueue.x-k8s.io~1podset
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=false
+      # Required for ignoreDifferences to apply during a sync and not only in
+      # the diff view (see gitops/apps/machines/application-d0.yaml).
+      - RespectIgnoreDifferences=true
