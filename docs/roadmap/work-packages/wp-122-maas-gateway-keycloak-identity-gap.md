@@ -4,14 +4,14 @@
   real, freshly-minted persona token gets a genuine `200` with real model
   output through `local-wesh-maas`. See "Live verification (2026-09-03)"
   below.
-- **ADRs:** ADR-0537 (Decision 3/4 - the same `maas-controller` operator
+- **ADRs:** ADR-0541 (Decision 1/2 - the same `maas-controller` operator
   immaturity class this WP extends with a second, distinct symptom); ADR-0521
   (the local-model MaaS cutover whose per-group `MaaSSubscription`
   governance this defect silently defeats for every real caller).
 - **Depends on:** none.
 - **Related:** WP-112 (where this was found, as a live side-effect while
   verifying a Comage fix - out of that WP's own scope, split out here);
-  WP-106 (ADR-0537's own WP, same operator, a different confirmed
+  WP-125 (ADR-0541's own WP, same operator, a different confirmed
   `maas-controller` route-identity defect on `ExternalModel`).
 - **Target:** v0.7.
 
@@ -28,9 +28,9 @@ ADR-0521's whole point, per-group `MaaSSubscription` token-budget
 enforcement, is currently not exercised by any real traffic at all, only
 by whatever synthetic/admin-token testing happens to be used to
 "verify" it. This WP root-causes and, if repo-side fixable, closes that
-gap; if it is genuinely upstream-blocked like ADR-0537's own
+gap; if it is genuinely upstream-blocked like ADR-0541's own
 `ExternalModel` finding, this WP's job is to document that precisely
-(the same rigor ADR-0537 already applied) rather than leave a silently
+(the same rigor ADR-0541 already applied) rather than leave a silently
 broken governance control undocumented.
 
 ## Live evidence already gathered (2026-09-02/03, do not re-derive)
@@ -107,8 +107,8 @@ broken governance control undocumented.
   the Tenant patch below until this is true.
 - Read `gitops/charts/models/templates/maas.yaml` in full (both the
   `Tenant` and `ModelsAsService` blocks and their accumulated comments)
-  and `docs/adr/0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md`
-  Decision 3/4 in full - the exact same operator, a different confirmed
+  and `docs/adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md`
+  Decision 1/2 in full - the exact same operator, a different confirmed
   defect, already has the citation/verification rigor this WP should
   match.
 - **User approval required before the first live step**: patching
@@ -143,20 +143,20 @@ broken governance control undocumented.
    template instead of hand-patching a resource it doesn't own. If no
    GitOps-declarable path exists, document the manual step precisely
    (namespace, exact patch, what re-triggers it) as an accepted
-   operational gap, the same honesty ADR-0537 already models for its own
+   operational gap, the same honesty ADR-0541 already models for its own
    `ExternalModel` finding.
 3. **If it does NOT work**: this becomes a second, distinct, confirmed
    `maas-controller` capability gap (externalOIDC never becoming an
    Authorino identity source on any CR that carries it) alongside
-   ADR-0537's own `ExternalModel` route-identity one. Search
+   ADR-0541's own `ExternalModel` route-identity one. Search
    `opendatahub-io/models-as-a-service`'s GitHub issues the same way
-   ADR-0537 did (issues #1417/#1399/#1240 already found there) for a
+   ADR-0541 did (issues #1417/#1399/#1240 already found there) for a
    matching known issue; if none exists, document this as a new,
    currently-unfiled upstream gap rather than assume one exists.
-4. **Either outcome**: amend ADR-0537 (not a new ADR - same operator,
+4. **Either outcome**: amend ADR-0541 (not a new ADR - same operator,
    same "Proposed" status, same "known upstream `maas-controller`
    defect" framing already established there) with this second finding,
-   mirroring its own Decision 3 correction style. Update this WP's own
+   mirroring its own Decision 1 correction style. Update this WP's own
    Consequences-equivalent section with the real, live-tested outcome.
 5. Update `evaluations/comage/security_checks.py`'s
    `comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests`
@@ -174,8 +174,8 @@ broken governance control undocumented.
   `maas-gateway-auth`'s identity sources visibly include the Keycloak
   OIDC one via `oc get authpolicy maas-gateway-auth -n openshift-ingress
   -o jsonpath='{.spec.defaults.rules.authentication}'`.
-- If blocked upstream: ADR-0537 amended with the same citation rigor as
-  its existing Decision 3 (a real upstream issue link, or an explicit
+- If blocked upstream: ADR-0541 amended with the same citation rigor as
+  its existing Decision 1 (a real upstream issue link, or an explicit
   "searched, none found, filing recommended" note - never a bare "this
   doesn't work" claim).
 - `python3 platform/docs/check_docs.py` exits 0.
@@ -185,7 +185,7 @@ broken governance control undocumented.
 
 ## Out of scope
 
-- Re-litigating ADR-0537's own `ExternalModel`/route-identity finding -
+- Re-litigating ADR-0541's own `ExternalModel`/route-identity finding -
   cited as precedent, not reopened.
 - The `tekos/quota` 503 burst observed during WP-112's second stresstest
   re-run (2026-09-02, likely concurrent-session collateral, not

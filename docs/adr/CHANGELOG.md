@@ -9,6 +9,28 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Splitting note (2026-09-03)
+
+ADR-0537 bundled two nearly-independent decisions from one diagnostic
+session: `HardwareProfile` CRs for local models (Decisions 1-2), and
+publishing `mistral`/`gpt-oss-120b` as `ExternalModel`+`MaaSModelRef`
+(Decisions 3-4). The first was fully live-verified; the second stayed
+permanently blocked on an upstream defect. Carrying both under one
+`Status:` field meant ADR-0537 could not honestly move past `Proposed`
+even though its HardwareProfile half was done, and v0.5 (its Target)
+could not close while it sat in the band non-terminal.
+
+Split: ADR-0537 keeps Decisions 1-2 only and moves to `Implemented`.
+Decisions 3-4, unreworded, become new **ADR-0541** - the gap this file's
+Numbering note (below) had flagged as free - `Target: v0.7`,
+`Status: Proposed` (still blocked, now on a different upstream-adjacent
+defect - see the ADR body's 2026-09-03 note). WP-106 splits the same way:
+it keeps HardwareProfile only and moves to `Done`; new **WP-125** carries
+the `ExternalModel`/MaaS work. No Decision text was reworded, only
+relocated and (for ADR-0537's three stale `namespace: zuno-ai-run` YAML/
+annotation examples, left uncorrected by the 2026-09-02 amendment that
+moved the real namespace to `redhat-ods-applications`) fixed in place.
+
 ## Numbering note (2026-09-03)
 
 ADR-0541 is FREE and is the only gap in the 05xx band - the next author should take it rather than the next sequential number. It was drafted for an ADR putting the endpoint picker back in the data path and moving MaaS aliasing onto `InferenceModelRewrite`, then dropped by user decision: the EPP is deliberately out of the data path (ADR-0521 routes every real rule at the workload Service, leaving only a synthetic anchor rule on the InferencePool), so those CRDs are structurally inert here and making them useful would partially reopen the empty-body incident. ADR-0542 was already written when that landed, so the gap stayed. Separately the same day, ADR-0543 was authored for run_id trace propagation and deliberately did NOT reclaim 0541 - the gap's status was unconfirmed at the time, and renumbering a published ADR would have meant rewriting 25 citations across 15 files a second time to close a cosmetic hole.

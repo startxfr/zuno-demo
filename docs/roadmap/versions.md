@@ -66,9 +66,13 @@ ADR-0518 – ADR-0520, ADR-0524 – ADR-0531, ADR-0536.
 Make the OpenShift AI MaaS governance plane live and route agent model calls
 through it end-to-end. Also carries the RHOAI monitoring stack enabled
 side-by-side with the existing observability stack (ADR-0522, ADR-0523) and
-per-run trace correlation (ADR-0543).
+per-run trace correlation (ADR-0543). ADR-0537 (RHOAI `HardwareProfile` CRs
+for local models) closed `Implemented` 2026-09-03; its `ExternalModel`/MaaS
+half, permanently blocked upstream, split out the same day to
+[ADR-0541](../adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md)
+in the v0.7 band below.
 
-**8 ADRs.** Open: ADR-0537; WP-55, WP-101, WP-106, WP-122.
+**8 ADRs, all closed.** Open: WP-55, WP-101, WP-122.
 
 ## v0.6
 
@@ -86,11 +90,13 @@ publish, promote). ADR-0111 and ADR-0115 are both hard-blocked on an external
 GitHub-billing/Quay-cutover decision with no repo-side fix. The band also
 carries the OKF extraction-and-reconciliation chain (ADR-0506 – ADR-0510),
 gated on an owner-created `zuno-okf` repository that does not yet exist, and
-the RHOAI 3.5 workload surfaces (ADR-0538 – ADR-0540) plus TrustyAI
-(ADR-0534) and model autoscaling (ADR-0542).
+the RHOAI 3.5 workload surfaces (ADR-0538 – ADR-0540), TrustyAI (ADR-0534),
+model autoscaling (ADR-0542), and mistral/gpt-oss-120b as MaaS
+`ExternalModel`s (ADR-0541, split 2026-09-03 from ADR-0537's now-Implemented
+HardwareProfile half - blocked upstream, see that ADR's body).
 
-**12 ADRs.** Open: ADR-0111, ADR-0115 (both `Deferred`), ADR-0506 – ADR-0510,
-ADR-0538 – ADR-0540; WP-48 – WP-53, WP-115, WP-119.
+**13 ADRs.** Open: ADR-0111, ADR-0115 (both `Deferred`), ADR-0506 – ADR-0510,
+ADR-0538 – ADR-0540, ADR-0541; WP-48 – WP-53, WP-115, WP-119, WP-125.
 
 ## v0.8
 

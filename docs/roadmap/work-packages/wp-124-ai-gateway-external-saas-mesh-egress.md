@@ -3,7 +3,7 @@
 - **State:** Done (2026-09-03) - end-to-end verified, see "Live verification" below
 - **ADRs:** ADR-0415 (SDXL via OVHcloud AI Endpoints), ADR-0416 (gpt-oss-120b
   via OVHcloud), ADR-0417 (Codestral via Mistral API) - the three provider
-  decisions this defect silently voids; ADR-0537 (Decision 3/4, the
+  decisions this defect silently voids; ADR-0541 (Decision 1/2, the
   `maas-controller` operator-immaturity class - its `MaaSModelRef`s are
   already `ReconcileFailed`, yet it still emits the networking resources that
   break egress); ADR-0020/ADR-0021 (the local-vs-external provider routing
@@ -11,7 +11,7 @@
 - **Depends on:** none.
 - **Related:** WP-112 (found there while verifying a Comage fix, out of that
   WP's scope and split out here - it cannot reach `images=1` until this is
-  fixed); WP-106 (ADR-0537's own WP, same operator, a different confirmed
+  fixed); WP-125 (ADR-0541's own WP, same operator, a different confirmed
   `maas-controller` defect on `ExternalModel`).
 - **Target:** v0.7.
 
@@ -220,7 +220,7 @@ and WP-112's closure that depends on it.
 ## Out of scope
 
 - Fixing `maas-controller` itself, or the `ReconcileFailed` `MaaSModelRef`s
-  ADR-0537 already documents - this WP works around the resources it emits,
+  ADR-0541 already documents - this WP works around the resources it emits,
   it does not repair the operator.
 - The port-8000 `excludeOutboundPorts` workaround already in
   `gitops/charts/ai-gateway/templates/deployment.yaml`. Different

@@ -27,9 +27,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 18 | WP-34, WP-119 |
 | v0.4 | 33 | 9 | 27 | WP-55, WP-093, WP-101, WP-112 |
-| v0.5 | 8 | 1 | 14 | WP-55, WP-101, WP-106, WP-122 |
+| v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 5 | WP-101 |
-| v0.7 | 12 | 10 | 21 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119 |
+| v0.7 | 13 | 11 | 22 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119, WP-125 |
 | v0.8 | 2 | 1 | 2 | — |
 | v0.9 | 4 | 3 | 4 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -549,7 +549,7 @@ ADRs/WPs — see ADR-0535's Non-goals and Migration/evolution sections.
 | WP-110 | [wp-110](work-packages/wp-110-rhtas-operator-deployment-and-fundamentals.md) | 0535 | none | Done (2026-09-02) | none — operator v1.4.3 live, Securesign Ready (Trillian on the shared MariaDB), `zuno-signer` OIDC identity live-tested, keyless sign+verify smoke test passed with a real Rekor entry; 5 live findings fixed in-repo, see the brief's State |
 | WP-111 | [wp-111](work-packages/wp-111-rhtas-config-rhoai-assessment-and-signing-cutover.md) | 0535 | WP-110 | Done (2026-09-02) | none — signing cutover fully live-verified (`make d2 check supply-chain` PASS, 14 images, real Rekor entries); Policy Controller deployed but dormant (zero namespaces scoped - its digest-format gate isn't governed by mode:warn and this repo's `tag: latest` convention, ADR-0115 gap 2, made it reject real pods) until that gap closes; Part A found the ADR-0535 Non-goal premise already stale (WP-087) |
 
-### Phase 27 — RHOAI HardwareProfiles + MaaS ExternalModels for mistral/gpt-oss-120b (added 2026-09-01)
+### Phase 27 — RHOAI HardwareProfiles + MaaS ExternalModels for mistral/gpt-oss-120b (added 2026-09-01, split 2026-09-03)
 A live diagnostic of `granite-7b-redhat-lab`'s `CrashLoopBackOff` found its
 Dashboard-assigned `HardwareProfile` declares no GPU identifier at all - a
 hardware-profile authoring gap, not a cluster GPU shortage. The same session
@@ -557,18 +557,27 @@ found `mistral` and `gpt-oss-120b` are the only two chat providers still
 called directly from `ai-gateway`, bypassing the MaaS governance plane every
 local model has used since ADR-0521, even though the transport code for a
 SaaS candidate already exists (`maas_adapter.py`'s dormant
-`MAAS_EXTERNAL_EGRESS_ENABLED` gate). ADR-0537/WP-106 close both gaps: two
-new GitOps-managed `HardwareProfile` CRs for the two MIG tiers already in
-use, hardware-profile annotations on the five existing local model
-InferenceServices, and `ExternalModel`+`MaaSModelRef` publication for
+`MAAS_EXTERNAL_EGRESS_ENABLED` gate).
+
+These two gaps shared only a diagnostic session, not an implementation - one
+closed clean, the other stayed blocked on a separate upstream defect - so the
+original ADR-0537/WP-106 pair split 2026-09-03. **ADR-0537**/**WP-106** now
+cover HardwareProfile only (two new GitOps-managed `HardwareProfile` CRs for
+the two MIG tiers already in use, plus hardware-profile annotations on the
+five existing local-model InferenceServices) and are `Implemented`/`Done`.
+**ADR-0541**/**WP-125** carry `ExternalModel`+`MaaSModelRef` publication for
 `mistral-large-latest` (kept on its native `api.mistral.ai` API) and
 `gpt-oss-120b` (OVHcloud, unchanged endpoint) with per-group
 `MaaSSubscription` quotas, followed by a full cutover of `ai-gateway`'s
-routing to the MaaS path for these two providers.
+routing to the MaaS path for these two providers - blocked on a live Envoy-
+proxy timeout to the real upstream, confirmed 2026-09-03 on RHOAI 3.5.0 GA
+after the originally-diagnosed Gateway-attachment defect turned out to be
+already fixed on that build (cause unconfirmed).
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-106 | [wp-106](work-packages/wp-106-rhoai-hardware-profiles-and-maas-external-models.md) | 0537 | WP-27, WP-076 | Not started (2026-09-01) | apply the two `HardwareProfile` CRs and confirm Dashboard parity with Granite; live-verify the `ExternalModel`/`MaaSModelRef` route-identity behavior (unknown for this backend kind); live-verify the full `ai-gateway` cutover (per-group quotas, Finage still denied) before removing the old direct-call code paths |
+| WP-106 | [wp-106](work-packages/wp-106-rhoai-hardware-profiles-and-maas-external-models.md) | 0537 | none | Done (2026-09-03) | none — both phases live-verified 2026-09-02 (Dashboard hardware-profile badges shown for all five models; the annotation-triggered rollout incident recovered manually) |
+| WP-125 | [wp-125](work-packages/wp-125-external-models-through-maas.md) | 0541 | WP-27, WP-076, WP-106 | Repo work merged (blocked upstream, 2026-09-03) | none actionable today - root-cause the Envoy-proxy timeout to the real upstream through the MaaS gateway (see ADR-0541 Decision 1's 2026-09-03 note); do not attempt the `ai-gateway` cutover before then |
 
 ### Phase 28 — TrustyAI evaluation and guardrails (added 2026-09-02)
 ADR-0534 extends the platform's existing TrustyAI integration (already
@@ -654,7 +663,7 @@ token gets a `401` from the local-model MaaS providers
 (`local-wesh-maas`/`local-gpt-oss-maas`/`local-maas`), across multiple
 agents, with no visible user-facing error (the provider-fallback chain
 masks it). Root cause confirmed live via a discriminating generation-bump
-test: `maas-controller` (the same operator ADR-0537 already found one
+test: `maas-controller` (the same operator ADR-0541 already found one
 confirmed defect in) never adds a Keycloak/OIDC identity source to the
 `maas-gateway-auth` AuthPolicy no matter what `ModelsAsService.spec.
 externalOIDC` says, despite the AuthPolicy self-reporting `Accepted`/

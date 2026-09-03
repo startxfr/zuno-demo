@@ -69,9 +69,10 @@ any stream.** The 05xx band was declared reserved for the OKF stream on
 convention is retired rather than maintained artificially. Stream membership
 is expressed by `Target`, not by number.
 
-**ADR-0541 is free** and should be taken before the next sequential number -
-see the [change log](CHANGELOG.md). Renumbered records carry a `Renumbered:`
-line; a published ADR is never renumbered to close a cosmetic gap.
+ADR-0541 was the sole gap in the 05xx band and has since been taken (see the
+[change log](CHANGELOG.md)); there is no free gap currently reserved.
+Renumbered records carry a `Renumbered:` line; a published ADR is never
+renumbered to close a cosmetic gap.
 
 ### Stub records
 
@@ -267,7 +268,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0521](0521-route-local-model-traffic-through-maas.md) | Implemented | Route ai-gateway's local model traffic through MaaS |
 | [ADR-0522](0522-enable-openshift-ai-monitoring-stack-side-by-side.md) | Implemented | Enable OpenShift AI's built-in monitoring stack, side-by-side with the existing observability stack |
 | [ADR-0523](0523-dual-export-traces-into-the-rhoai-monitoring-stack.md) | Implemented | Dual-export traces into the RHOAI monitoring stack |
-| [ADR-0537](0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md) | Proposed | Integrate RHOAI HardwareProfiles and MaaS ExternalModels |
+| [ADR-0537](0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md) | Implemented | Integrate RHOAI HardwareProfiles for local models |
 | [ADR-0543](0543-propagate-a-per-run-id-across-every-service-span.md) | Implemented | Propagate a per-run id across every service span (documents work implemented 2026-08-23 whose ADR was never written) |
 
 ## v0.6
@@ -293,6 +294,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0538](0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md) | Accepted | Adopt RHOAI 3.5 workload surfaces - MLflow tracking, queued workloads, training-jobs UI |
 | [ADR-0539](0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md) | Accepted | Delegate LoRA training compute to a KFP-submitted Kubeflow TrainJob |
 | [ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md) | Accepted | Express guardrail policy as NeMo rails configuration, not in-image detector parameters |
+| [ADR-0541](0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md) | Proposed | Integrate mistral and gpt-oss-120b as MaaS ExternalModels |
 | [ADR-0542](0542-autoscale-one-served-model-through-llminferenceservice-spec-scaling.md) | Implemented | Autoscale a served model through LLMInferenceService spec.scaling |
 
 ## v0.8
