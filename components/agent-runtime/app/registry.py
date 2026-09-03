@@ -41,12 +41,18 @@ OKF_SIGNATURES_DIR = os.getenv("ZUNO_OKF_SIGNATURES_DIR", "/app/okf-signatures")
 # platform/okf/schema/zuno-okf-v0.2.schema.json). HISTORY_TOKEN_BUDGET's
 # default (1800) predates ADR-0518: it was sized against the old chat
 # model's --max-model-len=8192, with headroom for the system prompt
-# (~500) and RAG context (~2500). Both local models now serve 32768
-# (gitops/charts/models/templates/llminferenceservice-qwen.yaml,
-# templates/llminferenceservice-gptoss.yaml), so this default is
-# deliberately conservative rather than binding - an agent wanting a
-# larger window declares it explicitly in its own bundle instead of this
-# shared default silently inflating every agent's per-turn token spend.
+# (~500) and RAG context (~2500). There are FOUR local chat models now,
+# and they do NOT share one window: qwen3.6-27b-instruct, gpt-oss-20b and
+# qwen3.5-9b-wesh serve 32768, but qwen3.5-9b - the fleet-wide default
+# since ADR-0531 - serves 8192 (gitops/charts/models/values.yaml's
+# qwen35Model.maxModelLen, reduced to fit 19.3GB of bf16 weights on a
+# 24GB MIG slice). So 1800 is conservative against the widest window and
+# roughly right against the narrowest, which is the one the default model
+# actually has. An agent wanting a larger window declares it explicitly in
+# its own bundle rather than this shared default silently inflating every
+# agent's per-turn token spend - but a bundle that raises it should check
+# it against 8192, not 32768, because qwen3.5-9b is reachable in almost
+# every chain.
 HISTORY_TOKEN_BUDGET_DEFAULT = int(os.getenv("HISTORY_TOKEN_BUDGET", "1800"))
 HISTORY_MAX_TURNS_DEFAULT = 6
 # ADR-0527 clause 5: the project context's own token budget, separate from

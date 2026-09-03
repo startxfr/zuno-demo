@@ -7,7 +7,7 @@ component contract, `platform_profile.yaml`'s declared version intent).
 No live cluster or registry needed - pure static text/YAML inspection,
 same style as `platform/supply-chain/check_build_matrix.py`.
 
-Nine checks, each independent (a failure in one doesn't block the others
+Ten checks, each independent (a failure in one doesn't block the others
 from reporting):
   - make_commands: every literal `make day0|d0|day1|d1 ...` example in
     README.md uses a verb/component this repository's actual Makefile
@@ -45,6 +45,14 @@ from reporting):
     target/release train (ADR bodies are immutable and excluded; RAG
     fixture/test data is excluded - those are demo content, not platform
     documentation).
+  - model_roles: every provider-routing.yaml entry declares an
+    architectural `role`, exactly one local model id holds `default`, and
+    every task an agent bundle declares has an explicit
+    model-routing-policy.yaml entry. ADR-0518 named qwen3.6-27b-instruct
+    the chat model and ADR-0531 named qwen3.5-9b the fleet default five
+    days later, neither recording a supersession; the coverage half found
+    `arkos/structure-demo` still riding the file-order default that
+    ADR-0531 decision 1 claims no task rides.
 
 Run from the repository root:
 
@@ -113,6 +121,24 @@ WP_STATES = {
     "abandoned",
     "cancelled",
     "closed — deferred",
+}
+
+PROVIDER_ROUTING_PATH = REPO_ROOT / "platform" / "ai-gateway" / "provider-routing.yaml"
+MODEL_ROUTING_POLICY_PATH = (
+    REPO_ROOT / "policies" / "model-routing" / "model-routing-policy.yaml"
+)
+
+# The architectural roles provider-routing.yaml's `role` key may hold, and
+# which that file's own header block documents at length. Kept in sync by
+# check_model_roles rather than by hand: an unlisted role fails the check.
+MODEL_ROLES = {
+    "default",
+    "quality",
+    "reasoning",
+    "specialized",
+    "reasoning-external",
+    "code",
+    "general-external",
 }
 
 
@@ -546,6 +572,113 @@ def check_agent_status_vs_adr() -> List[Finding]:
     return findings
 
 
+def _okf_frontmatter(path: pathlib.Path) -> dict:
+    """Parse an OKF bundle's leading `---` YAML frontmatter block.
+
+    Same shape platform/okf/generate_authorization_matrix.py's
+    `_split_document` reads; duplicated here for the same reason that
+    file duplicates validate_okf_bundle.py's parsing - small,
+    well-specified logic with an independent lifecycle.
+    """
+    parts = path.read_text(encoding="utf-8").split("---", 2)
+    if len(parts) < 3 or parts[0].strip():
+        return {}
+    return yaml.safe_load(parts[1]) or {}
+
+
+def check_model_roles() -> List[Finding]:
+    """Every provider declares an architectural role, exactly one local
+    model holds `default`, and every declared (agent, task) pair has an
+    explicit routing entry.
+
+    ADR-0518 decision 1 made `qwen3.6-27b-instruct` the chat/agents model
+    and classed `Qwen3.5-9B` as a training base only; ADR-0531 made
+    `qwen3.5-9b` the fleet-wide default five days later. Neither ADR
+    recorded a supersession, and nothing here validated the pair - the
+    same blind spot check_adr_index and check_wp_state each close for
+    their own document pair.
+
+    The third invariant is the one with teeth. ADR-0531 decision 1 states
+    that "every declared (agent, task) pair across all eight agents now
+    carries an explicit `preferred:` entry - no more implicit
+    provider-routing.yaml file-order default for any task". That was
+    false when written: ADR-0531 decision 7 counted "all three of Arkos's
+    declared tasks" where the bundle declares four, so
+    `arkos/structure-demo` was left riding the file-order default while
+    two other documents claimed it rode the fleet default instead. Only
+    the generated authorization matrix was right. Asserting the invariant
+    the ADR already claims is what keeps the next task from slipping
+    through the same gap.
+    """
+    findings: List[Finding] = []
+
+    providers_doc = yaml.safe_load(PROVIDER_ROUTING_PATH.read_text(encoding="utf-8")) or {}
+    providers = providers_doc.get("providers") or []
+
+    by_name = {}
+    default_models = set()
+    for provider in providers:
+        name = provider.get("name")
+        role = provider.get("role")
+        by_name[name] = provider
+        if role not in MODEL_ROLES:
+            findings.append(Finding(
+                "model_roles",
+                f"provider-routing.yaml's '{name}' declares role "
+                f"{role!r}, which is not one of: {', '.join(sorted(MODEL_ROLES))}",
+            ))
+            continue
+        if role == "default":
+            if provider.get("kind") != "local":
+                findings.append(Finding(
+                    "model_roles",
+                    f"provider-routing.yaml's '{name}' holds role 'default' but is "
+                    f"kind {provider.get('kind')!r} - the fleet default must be a local "
+                    f"model (ADR-0021: a C3 turn must still reach it).",
+                ))
+            default_models.add(provider.get("model"))
+
+    if len(default_models) != 1:
+        findings.append(Finding(
+            "model_roles",
+            f"provider-routing.yaml declares {len(default_models)} distinct model id(s) "
+            f"with role 'default' ({', '.join(sorted(default_models)) or 'none'}) - "
+            f"ADR-0531 decision 1 defines exactly one fleet-wide default.",
+        ))
+
+    policy_doc = yaml.safe_load(MODEL_ROUTING_POLICY_PATH.read_text(encoding="utf-8")) or {}
+    preferences = policy_doc.get("preferences") or []
+
+    declared = set()
+    for entry in preferences:
+        declared.add((entry.get("agent"), entry.get("task")))
+        for key in ("preferred", "prefer"):
+            for provider_name in entry.get(key) or []:
+                if provider_name not in by_name:
+                    findings.append(Finding(
+                        "model_roles",
+                        f"model-routing-policy.yaml's {entry.get('agent')}/{entry.get('task')} "
+                        f"names provider '{provider_name}', which provider-routing.yaml does "
+                        f"not declare (routing.py warns and ignores it at runtime, so the "
+                        f"chain silently loses a candidate).",
+                    ))
+
+    for okf_path in sorted(AGENTS_DIR.glob("*/agent.okf.md")):
+        zuno = (_okf_frontmatter(okf_path).get("zuno") or {})
+        agent = zuno.get("name", okf_path.parent.name)
+        for task in zuno.get("tasks") or []:
+            if (agent, task) not in declared:
+                findings.append(Finding(
+                    "model_roles",
+                    f"agents/{okf_path.parent.name}/agent.okf.md declares task '{task}', but "
+                    f"model-routing-policy.yaml has no preferences entry for {agent}/{task} - "
+                    f"it falls through to provider-routing.yaml file order, which ADR-0531 "
+                    f"decision 1 states no task does.",
+                ))
+
+    return findings
+
+
 def check_day0_day1_roles() -> List[Finding]:
     findings: List[Finding] = []
     lists = _parse_makefile_lists()
@@ -690,13 +823,16 @@ def main() -> int:
         + check_debug_make_commands()
         + check_gitops_values_clobber()
         + check_version_consistency(profile)
+        + check_model_roles()
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
           "docs/adr/README.md index, work-package state vs the roadmap trackers, "
           "agent zuno.status vs its governing ADR(s), Makefile/ansible role "
           "consistency, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
-          f"and platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}.")
+          f"platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}, "
+          "and model architectural roles against provider-routing.yaml/"
+          "model-routing-policy.yaml.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")
         return 0

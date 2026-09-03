@@ -42,6 +42,35 @@ agent's own natural classification).
 
 ## Decision
 
+> **Correction note (2026-09-03) — decision 1's invariant was not met, because decision 7
+> miscounted Arkos's tasks.**
+> Decision 1 states that every declared `(agent, task)` pair carries an explicit `preferred:`
+> entry — "no more implicit `provider-routing.yaml` file-order default for any task". One task
+> was missed. Decision 7 says "all **three** of Arkos's declared tasks"; `agents/arkos/agent.okf.md`
+> declares **four** (`draft-architecture-testimonial`, `workshop-presentation`, **`structure-demo`**,
+> `write-code`). `structure-demo` falls in neither carve-out — it is not a `write-code` case
+> (ADR-0417) and not a reflect-slot case (ADR-0416) — so it alone kept riding file order, landing
+> on `local-maas`/`local` = `qwen3.6-27b-instruct`. WP-096 repeated the same count of three, and
+> two further documents (`agents/arkos/README.md`, `wp-31-arkos-slice.md`) asserted the opposite,
+> that it rode the `qwen3.5-9b` fleet default. Only the generated authorization matrix was right.
+>
+> Fixed the same day by writing `arkos/structure-demo` explicitly, pinned to the order file order
+> already produced — so decision 1's invariant now holds with **no change in live behaviour**;
+> the regenerated matrix is byte-identical. That task is deliberately **not** migrated to
+> `qwen3.5-9b`: it carries an unresolved 30s streaming timeout (WP-31) and changing its model is
+> an investigation, not a documentation fix.
+>
+> This decision also took the fleet-default role from
+> [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md)
+> decision 1 without recording it, and narrowed
+> [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) decision 7 from
+> four Comage tasks to three. Both now carry their own correction notes; neither is superseded.
+>
+> `platform/docs/check_docs.py`'s `model_roles` check now asserts decision 1's invariant
+> directly — it fails if any declared task lacks a routing entry. It was confirmed to fail on
+> `arkos/structure-demo` before the entry was added.
+
+
 1. **`qwen3.5-9b`(`-maas`) becomes the fleet-wide default candidate.** Every declared `(agent,
    task)` pair across all eight agents now carries an explicit `preferred:` entry in
    `policies/model-routing/model-routing-policy.yaml` - no more implicit
@@ -175,6 +204,10 @@ See [Standard clauses](README.md#standard-clauses) for Migration/evolution and R
 
 ## Related ADRs
 
+- [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) - made
+  `qwen3.6-27b-instruct` the chat/agents model and `Qwen3.5-9B` a training base only; this
+  decision took the former's default role and promoted the latter, which went unrecorded on both
+  sides until 2026-09-03 (see the correction notes on both records)
 - [ADR-0021](0021-route-models-according-to-c1-c2-c3-classification.md) - the C1/C2/C3
   eligibility rule this decision's reordering never bypasses
 - [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md) - C3 escalation

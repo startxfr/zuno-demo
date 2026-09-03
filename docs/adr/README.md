@@ -57,6 +57,27 @@ and the `zuno-okf` repository provisioning respectively - neither of which
 touches ADR-0352. It joins ADR-0307/ADR-0410/ADR-0535 in v0.9. Numbering is
 unchanged; only `Target` moves.
 
+**Correction note (2026-09-03):** three v0.4 model decisions contradicted each other and none
+recorded it. ADR-0518 decision 1 made `qwen3.6-27b-instruct` the chat/agents model and classed
+`Qwen3.5-9B` as a training base only; five days later ADR-0531 decision 1 made `qwen3.5-9b` the
+fleet-wide default, and ADR-0531 decision 3 narrowed ADR-0526 decision 7 from "all four" of
+Comage's tasks to three. All three records read `Implemented` and current. Resolved **without a
+supersession** — by dated correction notes in each body — because only the *default-model role*
+moved: ADR-0518's embedding, training-base and no-infrastructure decisions are all still in force,
+and ADR-0526's fine-tune is untouched. No `Status:` field changes, so no index row moves.
+
+Two defects surfaced doing this, both fixed the same day. ADR-0531 decision 1 claims every declared
+`(agent, task)` pair carries an explicit routing entry; `arkos/structure-demo` did not, because
+decision 7 counted "all three of Arkos's declared tasks" where the bundle declares four — so that
+task alone still rode `provider-routing.yaml` file order onto the 27B, while `agents/arkos/README.md`
+and WP-31 both claimed it rode the 9B default. It now has an explicit entry pinning the chain file
+order already produced (live behaviour unchanged, regenerated matrix byte-identical). And the
+architectural roles themselves are now declared rather than implied: `provider-routing.yaml` carries
+a `role` key (`default`, `quality`, `reasoning`, `specialized`, `reasoning-external`, `code`,
+`general-external`), the OKF authorization matrices render each provider's model id and role instead
+of an opaque provider name, and `platform/docs/check_docs.py`'s new `model_roles` check enforces all
+three invariants — including ADR-0531 decision 1's own, which nothing had verified.
+
 ## version 0
 
 | ADR | Target | Status | Decision |

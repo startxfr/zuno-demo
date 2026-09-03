@@ -27,11 +27,23 @@ zuno:
     - write-code
   memory:
     # ADR-0215: Arkos is C3/local-only (see model.preferred_classification
-    # below), so its history-carrying model calls route to gpt-oss-20b's
-    # 32768 context window (since ADR-0518 the chat model matches it -
-    # both serve 32768, see gitops/charts/models/values.yaml), so its
-    # history budget can be generous rather than riding the conservative
-    # fleet default (app/registry.py's HISTORY_TOKEN_BUDGET, 1800).
+    # below), so its history-carrying model calls route to a local model
+    # only. Its two reflexional tasks lead gpt-oss-20b and structure-demo
+    # leads qwen3.6-27b-instruct, all of which serve 32768, so a generous
+    # budget beats the conservative fleet default (app/registry.py's
+    # HISTORY_TOKEN_BUDGET, 1800).
+    #
+    # KNOWN GAP (2026-09-03, documented not fixed): "both serve 32768" was
+    # true when written, when there were two local models. There are four
+    # now, and qwen3.5-9b - reachable as a C3 fallback on EVERY task in the
+    # generated matrix below - serves 8192, not 32768
+    # (gitops/charts/models/values.yaml's qwen35Model.maxModelLen). On that
+    # fallback path this 6000-token budget plus the system prompt (~500)
+    # plus RAG context (~2500) does not fit. The nominal path is unaffected
+    # and no overflow has been observed, so the value is left alone
+    # deliberately: lowering it would degrade every nominal turn to protect
+    # a fallback, and picking the right number needs a real measurement
+    # against a live qwen3.5-9b turn, which has not been taken.
     history:
       enabled: true
       max_turns: 6
@@ -132,17 +144,17 @@ Generated per ADR-0503 from this bundle's frontmatter, `policies/tools/tool-poli
 
 ### Model routing
 
-Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `platform/ai-gateway/provider-routing.yaml`'s classification eligibility reordered by this `(agent, task)`'s `policies/model-routing/model-routing-policy.yaml` preference — the first entry is the reference model, the rest are fallback alternatives, in try order.
+Effective per-task model chain (ADR-0021/ADR-0303/ADR-0412), resolved from `platform/ai-gateway/provider-routing.yaml`'s classification eligibility reordered by this `(agent, task)`'s `policies/model-routing/model-routing-policy.yaml` preference — the first entry is the reference model, the rest are fallback alternatives, in try order. The reference model is annotated with the model id it actually serves and that model's architectural role (`default`, `quality`, `reasoning`, `specialized`, `reasoning-external`, `code`, `general-external`); `provider-routing.yaml`'s `role` key is the authority for both, and every model reachable through the fallback chain is named in the **Available models** rollup below the table.
 
 | Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |
 |---|---|---|---|---|---|
-| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) → `reflect` | `C2` | `ovhcloud-gpt-oss-120b` | `local-gpt-oss-maas`, `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `C3` | `local-gpt-oss-maas` | `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) → `reflect` | `C2` | `ovhcloud-gpt-oss-120b` | `local-gpt-oss-maas`, `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `C3` | `local-gpt-oss-maas` | `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
-| `structure-demo` (prompt: `prompts/structure-demo.md`) | `C3` | `local-maas` | `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) → `reflect` | `C2` | `ovhcloud-gpt-oss-120b` → `gpt-oss-120b` (reasoning-external) | `local-gpt-oss-maas`, `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `draft-architecture-testimonial` (primary; prompt: `prompts/draft-architecture-testimonial.md`) | `C3` | `local-gpt-oss-maas` → `gpt-oss-20b` (reasoning) | `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) → `reflect` | `C2` | `ovhcloud-gpt-oss-120b` → `gpt-oss-120b` (reasoning-external) | `local-gpt-oss-maas`, `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `workshop-presentation` (prompt: `prompts/workshop-presentation.md`) | `C3` | `local-gpt-oss-maas` → `gpt-oss-20b` (reasoning) | `local-gpt-oss`, `local-maas`, `local`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
+| `structure-demo` (prompt: `prompts/structure-demo.md`) | `C3` | `local-maas` → `qwen3.6-27b-instruct` (quality) | `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35` | — | `policies/model-routing/model-routing-policy.yaml` |
 | `write-code` | `C3` | (none eligible) | — | — | `policies/model-routing/model-routing-policy.yaml` |
 
-**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification - `local-maas`, `local`, `local-gpt-oss-maas`, `local-gpt-oss`, `local-wesh-maas`, `local-wesh`, `local-qwen35-maas`, `local-qwen35`, `openai`, `anthropic`, `mistral-codestral`, `ovhcloud-gpt-oss-120b`.
+**Available models** (ADR-0419, generated): the union of every model reachable by any task or prompt slot above, at any classification, each with the model id it serves and that model's role - `local-maas` → `qwen3.6-27b-instruct` (quality), `local` → `qwen3.6-27b-instruct` (quality), `local-gpt-oss-maas` → `gpt-oss-20b` (reasoning), `local-gpt-oss` → `gpt-oss-20b` (reasoning), `local-wesh-maas` → `qwen3.5-9b-wesh` (specialized), `local-wesh` → `qwen3.5-9b-wesh` (specialized), `local-qwen35-maas` → `qwen3.5-9b` (default), `local-qwen35` → `qwen3.5-9b` (default), `openai` → `gpt-4o-mini` (general-external), `anthropic` → `claude-3-5-sonnet-latest` (general-external), `mistral-codestral` → `codestral-latest` (code), `ovhcloud-gpt-oss-120b` → `gpt-oss-120b` (reasoning-external).
 
 <!-- END GENERATED AUTHORIZATION MATRIX -->

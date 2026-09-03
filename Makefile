@@ -534,8 +534,9 @@ if [[ -z "$$verb" ]]; then \
     '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
     '  sign         Re-sign every OKF bundle against the deployed agent-runtime image, then verify (ADR-0420)' \
     '               The signed digest covers every file under agents/<name>/, tasks/ included - not just agent.okf.md' \
-    '  scenario-failover-node   Live GPU-node failover drill (WP-105/ADR-0536): cordon+kill the qwen3.5-9b' \
-    '               pod, verify Tekos fails over to qwen3.5-9b-wesh (Comage unaffected), pause for human' \
+    '  scenario-failover-node   Live GPU-node failover drill (WP-105/ADR-0536): cordon+kill the qwen3.5-9b-wesh' \
+    '               pod, verify Comage fails over to qwen3.5-9b (Tekos pinned to ovhcloud-gpt-oss-120b as the' \
+    '               decoupling control), pause for human' \
     '               confirmation, then uncordon+reschedule and verify the return to normal. Requires a TTY' \
     '               (refuses to run non-interactively) and mutates live shared GPU infra - coordinate with' \
     '               any other session on this cluster first.' \

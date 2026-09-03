@@ -46,7 +46,7 @@ logger = logging.getLogger("agent_runtime.graph.history")
 
 # A char/4 approximation, not a real tokenizer - components/agent-runtime
 # has no tiktoken dependency, and it would be the wrong tokenizer for the
-# local qwen2.5/gpt-oss models regardless. A conservative budget
+# local qwen/gpt-oss models regardless. A conservative budget
 # compensates for the approximation; build_history_messages's own hard
 # cap is the real backstop, not this estimate's precision.
 _CHARS_PER_TOKEN = 4

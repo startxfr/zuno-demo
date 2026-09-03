@@ -44,8 +44,14 @@ real content - `deployment/` and `tests/` no longer are, see below).
   WP-11's earlier status flip left open.
 
 **Known open item:** scenario 9 (`structure-demo` streaming) times out at
-30s on every run - a single-call path with no `model-routing-policy.yaml`
-override, riding the WP-096 fleet-wide default model. Non-blocking (Layer 1
+30s on every run - a single-call path which, until 2026-09-03, had no
+`model-routing-policy.yaml` override at all. It was described here and in
+WP-31 as riding the WP-096 `qwen3.5-9b` fleet default; that was wrong. With
+no entry it fell through to `provider-routing.yaml` file order and was
+answered by `local-maas`/`local` = `qwen3.6-27b-instruct`, as this bundle's
+own generated matrix showed all along. It now carries an explicit entry
+pinning that same chain (ADR-0531's correction note), so the timeout is
+unchanged and still open - but it is a 27B timeout, not a 9B one. Non-blocking (Layer 1
 still clears the 75% threshold at 19/20) but unresolved; see WP-31.
 
 ## Declarative structure (ADR-0038: OKF v0.2 Markdown bundles)

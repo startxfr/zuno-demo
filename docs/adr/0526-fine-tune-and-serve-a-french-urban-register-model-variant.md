@@ -142,6 +142,22 @@ sans raisonner différemment"*.
 
 ## Decision
 
+> **Correction note (2026-09-03) — decision 7 counts four tasks; three is the live number.**
+> Decision 7 below states that Comage prefers `qwen3.5-9b-wesh` first on **all four** of its
+> declared tasks. That stopped being true on 2026-08-30:
+> [ADR-0531](0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md)
+> decision 3 put `ovhcloud-gpt-oss-120b` at the head of `comage/compare-historical-deals`
+> (reflexional, C1/C2 only) and inserted the wesh/qwen3.5 pair *behind* `local-gpt-oss`, so the
+> variant leads **three of four** — `check-deal-status`, `update-opportunity-status` and
+> `check-my-drive-and-mail`. ADR-0531 did not record the narrowing, and this text was left
+> reading as current.
+>
+> Nothing about the fine-tune, its serving, or Comage's status as its target agent changes.
+> `qwen3.5-9b-wesh` carries the **`specialized`** role in the taxonomy
+> `platform/ai-gateway/provider-routing.yaml`'s `role` key now declares. Tekos still places it
+> second, as decision 7 says.
+
+
 1. **Objective and base model** — LoRA/PEFT fine-tuning of `Qwen/Qwen3.5-9B`
    (staged at `s3://zuno-demo-rag-corpus/models/qwen3.5-9b`, already this
    platform's training base per ADR-0518 decision 3), followed by a **merge**

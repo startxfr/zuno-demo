@@ -88,6 +88,53 @@
 # turns caching on). A cache entry is only ever served back to a request
 # with an identical model/user/classification/local-only/task context -
 # see the ADR for the full key. No entry below sets it yet.
+#
+# `role` (required): the provider's ARCHITECTURAL role in the model fleet.
+# Documentation and policy-as-code metadata, never a routing input - the
+# gateway ignores this key entirely (app/routing.py reads providers by
+# named key; unknown keys are inert). Its purpose is to make the fleet's
+# intent auditable, because it was not: ADR-0518 decision 1 made
+# `qwen3.6-27b-instruct` the chat/agents model and classed `Qwen3.5-9B` as
+# a training base only, then ADR-0531 made `qwen3.5-9b` the fleet-wide
+# default five days later without either ADR recording a supersession.
+# Both models coexist fine; only the stated role was contradictory.
+#
+#   default            the fleet-wide default candidate every (agent, task)
+#                      leads with unless it has a documented reason not to
+#                      (ADR-0531 decision 1). Exactly ONE local model id
+#                      may hold this role.
+#   quality            the higher-quality local model. Not a routing
+#                      default since ADR-0531, but far from inert: it is
+#                      the only provider that serves LoRA adapters
+#                      (serves_adapters, ADR-0303), the only model
+#                      `policies/optimization/optimization-policy.yaml`
+#                      may toggle the semantic cache for, Lightspeed's
+#                      defaultModel (ADR-0524), the RAGAS judge and Garak
+#                      target (ADR-0534), and an LM-Eval MMLU subject.
+#   reasoning          the local model preferred for reflexional /
+#                      multi-source-synthesis tasks (ADR-0419's doctrine,
+#                      preserved unchanged by ADR-0531 decision 3).
+#   specialized        a fine-tuned variant serving a named audience
+#                      rather than the fleet (ADR-0526's French
+#                      urban-register `-wesh` model, Comage's lead on its
+#                      three non-reflexional tasks).
+#   reasoning-external the off-cluster reasoning model, C1/C2 only
+#                      (ADR-0416). Leads reflexional chains where granted,
+#                      and is eligibility-filtered out at C3 by ADR-0021.
+#   code               the code-specialized SaaS model (ADR-0417).
+#   general-external   approved general-purpose SaaS fallbacks (ADR-0020).
+#
+# `platform/docs/check_docs.py`'s `model_roles` check enforces three
+# invariants over this key: every provider carries a role from this list,
+# exactly one local model id holds `default` and it matches the lead of
+# `policies/model-routing/model-routing-policy.yaml`, and every task any
+# agent declares has an explicit entry in that policy - the invariant
+# ADR-0531 decision 1 states and which nothing verified until
+# `arkos/structure-demo` was found silently riding the file-order default.
+#
+# The embedding model (`qwen3-embedding-0.6b`, ADR-0518 decision 2) has no
+# role here on purpose: it is not a chat provider and never enters this
+# fallback chain - it is configured in components/rag-service.
 
 providers:
   # ADR-0521 (WP-076) closeout: qwen's MaaS-preferred sibling, tried first
@@ -102,6 +149,7 @@ providers:
   # them on the direct `local` entry below instead.
   - name: local-maas
     kind: local
+    role: quality
     model: qwen3.6-27b-instruct
     via_maas: true
     maas_model_ref: zuno-ai-run/qwen36-27b-instruct-maas
@@ -117,6 +165,7 @@ providers:
   # local candidate, not just gpt-oss, despite the env var's name).
   - name: local
     kind: local
+    role: quality
     model: qwen3.6-27b-instruct
     endpoint: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
@@ -159,6 +208,7 @@ providers:
   # MaaSSubscription/MaaSAuthPolicy grant this depends on.
   - name: local-gpt-oss-maas
     kind: local
+    role: reasoning
     model: gpt-oss-20b
     via_maas: true
     maas_model_ref: zuno-ai-run/gpt-oss-20b-maas
@@ -169,6 +219,7 @@ providers:
 
   - name: local-gpt-oss
     kind: local
+    role: reasoning
     model: gpt-oss-20b
     endpoint: https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
@@ -204,6 +255,7 @@ providers:
   # eligible but it is not exercised here.
   - name: local-wesh-maas
     kind: local
+    role: specialized
     model: qwen3.5-9b-wesh
     via_maas: true
     maas_model_ref: zuno-ai-run/qwen35-9b-wesh-maas
@@ -214,6 +266,7 @@ providers:
 
   - name: local-wesh
     kind: local
+    role: specialized
     model: qwen3.5-9b-wesh
     endpoint: https://qwen35-9b-wesh-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
@@ -231,6 +284,7 @@ providers:
   # reduced --max-model-len that makes 19.3GB of bf16 weights fit.
   - name: local-qwen35-maas
     kind: local
+    role: default
     model: qwen3.5-9b
     via_maas: true
     maas_model_ref: zuno-ai-run/qwen35-9b-maas
@@ -241,6 +295,7 @@ providers:
 
   - name: local-qwen35
     kind: local
+    role: default
     model: qwen3.5-9b
     endpoint: https://qwen35-9b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
@@ -249,6 +304,7 @@ providers:
 
   - name: openai
     kind: saas
+    role: general-external
     model: gpt-4o-mini
     api_key_env: OPENAI_API_KEY
     temperature: 0.2
@@ -256,6 +312,7 @@ providers:
 
   - name: gemini
     kind: saas
+    role: general-external
     model: gemini-1.5-pro
     api_key_env: GEMINI_API_KEY
     temperature: 0.2
@@ -263,6 +320,7 @@ providers:
 
   - name: anthropic
     kind: saas
+    role: general-external
     model: claude-3-5-sonnet-latest
     api_key_env: ANTHROPIC_API_KEY
     temperature: 0.2
@@ -270,6 +328,7 @@ providers:
 
   - name: mistral
     kind: saas
+    role: general-external
     model: mistral-large-latest
     api_key_env: MISTRAL_API_KEY
     temperature: 0.2
@@ -285,6 +344,7 @@ providers:
   # as every other entry in this file (ADR-0021/0035).
   - name: mistral-codestral
     kind: saas
+    role: code
     model: codestral-latest
     api_key_env: MISTRAL_CODESTRAL_API_KEY
     temperature: 0.2
@@ -300,6 +360,7 @@ providers:
   # entry above.
   - name: ovhcloud-gpt-oss-120b
     kind: saas
+    role: reasoning-external
     model: gpt-oss-120b
     endpoint: https://oai.endpoints.kepler.ai.cloud.ovh.net/v1
     api_key_env: OVHCLOUD_API_KEY

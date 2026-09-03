@@ -170,6 +170,27 @@ def _effective_model_chain(
     return preferred + rest
 
 
+def _provider_meta(providers: List[Dict]) -> Dict[str, Tuple[str, str]]:
+    """provider name -> (served model id, architectural role).
+
+    The chain columns below name PROVIDERS (`local`, `local-qwen35`),
+    which say nothing about which model actually answers - reading
+    "`local`" gave no way to tell it is the 27B. That opacity is where
+    the ADR-0518/ADR-0531 role contradiction became invisible in the
+    generated docs, so the model id and its `role` (provider-routing.yaml
+    is the authority for both) are surfaced here.
+    """
+    return {
+        p["name"]: (p.get("model", "?"), p.get("role", "?"))
+        for p in providers
+    }
+
+
+def _annotated(provider_name: str, meta: Dict[str, Tuple[str, str]]) -> str:
+    model, role = meta.get(provider_name, ("?", "?"))
+    return f"`{provider_name}` → `{model}` ({role})"
+
+
 def _quota_cell(task_zuno: Dict, quota_classes: Dict[str, Dict]) -> str:
     cls_name = task_zuno.get("quota_class") or "standard"
     cls = quota_classes.get(cls_name) or {}
@@ -293,7 +314,13 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
             "from `platform/ai-gateway/provider-routing.yaml`'s classification "
             "eligibility reordered by this `(agent, task)`'s `policies/model-routing/"
             "model-routing-policy.yaml` preference — the first entry is the "
-            "reference model, the rest are fallback alternatives, in try order."
+            "reference model, the rest are fallback alternatives, in try order. "
+            "The reference model is annotated with the model id it actually "
+            "serves and that model's architectural role (`default`, `quality`, "
+            "`reasoning`, `specialized`, `reasoning-external`, `code`, "
+            "`general-external`); `provider-routing.yaml`'s `role` key is the "
+            "authority for both, and every model reachable through the fallback "
+            "chain is named in the **Available models** rollup below the table."
         )
         lines.append("")
         lines.append("| Task | Classification ceiling | Reference model | Fallback chain | Adapter | Policy source |")
@@ -303,6 +330,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
         # exact same computed chains the table already renders, not a
         # separate computation, so it can never drift out of sync with it.
         available_models: set = set()
+        provider_meta = _provider_meta(providers)
         for task_name, task_label, task_prompts in task_labels:
             if classification not in ("C1", "C2", "C3"):
                 lines.append(f"| {task_label} | `{classification}` | — | (classification ceiling unknown — cannot resolve) | — | — |")
@@ -328,7 +356,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
                     slot_classification, providers, prefer, local_only=local_only, strict=strict
                 )
                 available_models.update(slot_chain)
-                slot_reference = f"`{slot_chain[0]}`" if slot_chain else "(none eligible)"
+                slot_reference = _annotated(slot_chain[0], provider_meta) if slot_chain else "(none eligible)"
                 slot_fallback = ", ".join(f"`{p}`" for p in slot_chain[1:]) or "—"
                 slot_label = f"{task_label} → `{slot_name}`"
                 lines.append(
@@ -340,7 +368,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
                 classification, providers, prefer, local_only=local_only, strict=strict
             )
             available_models.update(chain)
-            reference = f"`{chain[0]}`" if chain else "(none eligible)"
+            reference = _annotated(chain[0], provider_meta) if chain else "(none eligible)"
             fallback = ", ".join(f"`{p}`" for p in chain[1:]) or "—"
             lines.append(
                 f"| {task_label} | `{classification}` | {reference} | {fallback} | {adapter_cell} | "
@@ -353,7 +381,9 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
             lines.append(
                 "**Available models** (ADR-0419, generated): the union of every "
                 "model reachable by any task or prompt slot above, at any "
-                "classification - " + ", ".join(f"`{p}`" for p in ordered) + "."
+                "classification, each with the model id it serves and that "
+                "model's role - "
+                + ", ".join(_annotated(p, provider_meta) for p in ordered) + "."
             )
 
     lines.append("")

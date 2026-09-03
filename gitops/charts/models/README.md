@@ -1,9 +1,15 @@
 # models chart
 
-KServe `ServingRuntime` (vLLM) + `InferenceService` for the demo's one local
-model, Qwen2.5-7B-Instruct - sized to fit one 24GB NVIDIA L4 in fp16 with
-headroom for KV cache at the demo's low concurrency (~5 concurrent
-conversations, MEMORY.md). Serves an OpenAI-compatible `/v1` API, which is
+KServe serving for the demo's local model fleet, sized against the ADR-0351
+MIG layout on an RTX PRO 6000 96GB rather than a whole card each. Four chat
+models (ADR-0518, ADR-0526): `qwen3.6-27b-instruct` (the `quality` model,
+FP8 on the 2g.48gb slice), `qwen3.5-9b` (the fleet-wide default since
+ADR-0531), `qwen3.5-9b-wesh` (ADR-0526's French urban-register fine-tune)
+and `gpt-oss-20b` (the local reasoning model, ADR-0414), plus
+`qwen3-embedding-0.6b` for RAG. The four chat models are
+`LLMInferenceService`s; embeddings remain a classic
+`ServingRuntime`/`InferenceService` pair. `platform/ai-gateway/provider-routing.yaml`'s
+`role` key is the authority for which model plays which architectural role. Serves an OpenAI-compatible `/v1` API, which is
 what `components/agent-runtime`'s model router expects at
 `agent-runtime.localModelEndpoint` / `localModelName`
 (`gitops/charts/agent-runtime/values.yaml`).

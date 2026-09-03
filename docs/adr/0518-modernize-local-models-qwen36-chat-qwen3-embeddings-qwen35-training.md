@@ -29,6 +29,32 @@ MIG-disabled burst node's full 96GB absorbs a 9B training base.
 
 ## Decision
 
+> **Correction note (2026-09-03) — decision 1's *role*, not its mechanism.**
+> Decision 1 below makes `qwen3.6-27b-instruct` the **chat/agents** model, i.e. the
+> platform's default. [ADR-0531](0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md)
+> took that role five days later, promoting `qwen3.5-9b` — decision 3's *training base* — to
+> fleet-wide default. Neither ADR recorded the change, and ADR-0531 did not even list this
+> record in its `Related ADRs`, so both read as current and contradictory for a week.
+>
+> This is **not a supersession**. Only the *default-model role* moved. Everything decision 1
+> actually specifies — the checkpoint, the `qwen36-27b-instruct` InferenceService, the served
+> name, `--max-model-len=32768`, `--tool-call-parser=qwen3_xml`, `--reasoning-parser=qwen3`,
+> the clean rename across consumers — is unchanged and live. Decisions **2, 3 and 4** are
+> untouched and fully in force: the `vector(1024)` corpus, the S3-staged training base, and the
+> no-infrastructure-change constraint.
+>
+> `qwen3.6-27b-instruct`'s role today is **`quality`** in the taxonomy
+> `platform/ai-gateway/provider-routing.yaml`'s `role` key now carries. That role is not
+> ceremonial: it is the only provider serving LoRA adapters (`serves_adapters`, ADR-0303), the
+> only model `policies/optimization/optimization-policy.yaml` may toggle the semantic cache
+> for, Lightspeed's `defaultModel` (ADR-0524), the RAGAS judge and Garak target (ADR-0534), an
+> LM-Eval MMLU subject, and — since the same-day correction to ADR-0531 — the explicit lead of
+> `arkos/structure-demo`.
+>
+> Decision 2's `qwen3-embedding-0.6b` is likewise unchanged; it carries no `role` because it is
+> not a chat provider and never enters the fallback chain.
+
+
 1. **Chat/agents:** `Qwen/Qwen3.6-27B-FP8` (official FP8 checkpoint,
    ~28GB) on the existing 2g.48gb slice, served as
    **`qwen3.6-27b-instruct`** (InferenceService
@@ -180,3 +206,16 @@ and 007 then resized it properly within the Job's 300-second budget, using the
 `lists = 319` for 319,713, and no ingestion run was needed. `make d2 check rag`,
 which requires every per-domain Job to have succeeded, reports installed
 again.
+
+## Related ADRs
+
+- [ADR-0531](0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md) -
+  took decision 1's fleet-default role, and promoted decision 3's training base to fill it; see
+  the correction note above for what did and did not move
+- [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) - fine-tunes
+  decision 3's `Qwen/Qwen3.5-9B` training base into `qwen3.5-9b-wesh` and serves it, which is
+  what made a "training base only, not served" model routable in the first place
+- [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) - the predictor
+  layout this decision's model set replaced, amended again on 2026-08-29 to five predictors
+- [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) - the MIG layout
+  decision 4 commits not to change

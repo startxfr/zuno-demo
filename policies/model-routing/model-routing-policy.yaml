@@ -124,6 +124,36 @@ preferences:
   - agent: arkos
     task: workshop-presentation
     prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
+  # 2026-09-03 correction to ADR-0531. Decision 1 states that every
+  # declared (agent, task) pair carries an explicit entry - "no more
+  # implicit provider-routing.yaml file-order default for any task" - but
+  # decision 7 counted "all three of Arkos's declared tasks" where
+  # agents/arkos/agent.okf.md declares FOUR. structure-demo was neither in
+  # the ADR-0417 write-code carve-out nor the ADR-0416 reflexional one, so
+  # it was the single task still falling through to file order, and two
+  # other documents (agents/arkos/README.md, wp-31-arkos-slice.md) claimed
+  # it rode the qwen3.5-9b fleet default instead. Only the generated
+  # authorization matrix was right: it resolved to local-maas/local.
+  #
+  # This entry pins that resolved order EXACTLY as file order already
+  # produces it, so live behaviour does not change - structure-demo keeps
+  # answering on qwen3.6-27b-instruct. It is written rather than left
+  # implicit for two reasons: it makes decision 1's invariant true (and
+  # check_docs.py's model_roles check now enforces it), and it gives the
+  # `quality` role its first explicit reference in this file, so "higher-
+  # quality local model" names a routing fact rather than a label.
+  #
+  # Arkos is C3-seeded and ADR-0034's effective classification only ever
+  # escalates, so this chain is always evaluated local-only; the SaaS
+  # entries provider-routing.yaml declares after these are filtered out by
+  # ADR-0021 before any preference is applied. Deliberately NOT migrated
+  # to the qwen3.5-9b fleet default: that would be a behaviour change on a
+  # task carrying a known unresolved 30s streaming timeout (WP-31), which
+  # is its own investigation, not a side effect of a documentation fix.
+  - agent: arkos
+    task: structure-demo
+    preferred: [local-maas, local]
+    fallback: [local-gpt-oss-maas, local-gpt-oss, local-wesh-maas, local-wesh, local-qwen35-maas, local-qwen35]
   # ADR-0526 (WP-087) decision 7: Comage is the candidate agent, so the
   # qwen3.5-9b-wesh pair leads the chain on ALL FOUR of its declared
   # tasks. A preference is keyed by the (agent, task) tuple and an entry
