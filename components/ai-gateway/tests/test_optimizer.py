@@ -267,7 +267,19 @@ def test_policy_loader_reads_the_real_repo_policy_file() -> None:
         "policies", "optimization", "optimization-policy.yaml",
     )
     policy = OptimizationPolicy.load(repo_policy)
-    assert policy.enabled is False, "shipped default must be autonomy off"
+    # Until 2026-08-30 this asserted `enabled is False` ("shipped default
+    # must be autonomy off"). ADR-0309/WP-42 then closed Implemented -
+    # autonomy enabled after a full tune-evaluate cycle was observed live
+    # and one rollback was forced on a trigger breach, with operator
+    # sign-off - and the assertion was never updated, so this test had
+    # been failing at HEAD ever since. The value is deliberate; the
+    # assertion was stale. What is worth pinning now is not which way the
+    # switch points but that the safety rails around it are intact:
+    # kill_switch off (nothing is being emergency-suppressed) and, below,
+    # an empty pre_approved_equivalents list - the tuner may never swap
+    # one model for another without a human, whatever `enabled` says.
+    assert policy.enabled is True, "ADR-0309/WP-42 enabled autonomy 2026-08-30"
+    assert policy.kill_switch is False
     assert policy.cache_ttl_enabled is True
     assert policy.pre_approved_equivalents == []
 

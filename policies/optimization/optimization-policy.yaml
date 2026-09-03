@@ -10,9 +10,14 @@
 #
 # kill_switch: true disables ALL autonomy in one configuration change -
 # the tuner refuses every new action and reverts anything currently
-# applied. Autonomy also stays off while `enabled: false` (the shipped
-# default: the operator flips it deliberately, per scope, after the
-# WP-42 brief's own observed-cycle sign-off - never on by default).
+# applied. Autonomy also stays off while `enabled: false`, which was the
+# shipped default until 2026-08-30: the operator flips it deliberately,
+# per scope, after the WP-42 brief's own observed-cycle sign-off - never
+# on by default. That flip has now happened. ADR-0309/WP-42 closed
+# `Implemented` on 2026-08-30 after a live cycle was observed end to end
+# and one rollback was forced on a trigger breach, with operator
+# sign-off, so `enabled: true` below is the deliberate current state, not
+# a default. kill_switch remains the one-line way to turn it all off.
 enabled: true
 kill_switch: false
 
