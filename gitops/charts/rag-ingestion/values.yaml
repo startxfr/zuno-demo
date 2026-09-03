@@ -70,6 +70,7 @@ redhat:
   - enabled: true
     product: "Red Hat Satellite"
     productSlug: "red-hat-satellite"
+    family: "redhat-satellite"
     version: "6.17"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_satellite/6.17"
     languages: [en-US]
@@ -79,6 +80,7 @@ redhat:
   - enabled: true
     product: "Red Hat Satellite"
     productSlug: "red-hat-satellite"
+    family: "redhat-satellite"
     version: "6.16"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_satellite/6.16"
     languages: [en-US]
@@ -88,6 +90,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/release_notes/index"
     languages: [en-US]
@@ -97,6 +100,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/release_notes/index"
     languages: [en-US]
@@ -122,6 +126,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/architecture/index"
     languages: [en-US]
@@ -131,6 +136,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/index"
     languages: [en-US]
@@ -140,6 +146,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/authentication_and_authorization/index"
     languages: [en-US]
@@ -149,6 +156,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/storage/index"
     languages: [en-US]
@@ -158,6 +166,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/registry/index"
     languages: [en-US]
@@ -167,6 +176,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/web_console/index"
     languages: [en-US]
@@ -176,6 +186,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/cli_tools/index"
     languages: [en-US]
@@ -185,6 +196,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/building_applications/index"
     languages: [en-US]
@@ -194,6 +206,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/images/index"
     languages: [en-US]
@@ -203,6 +216,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/operators/index"
     languages: [en-US]
@@ -212,6 +226,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/index"
     languages: [en-US]
@@ -221,6 +236,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/machine_management/index"
     languages: [en-US]
@@ -230,6 +246,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/scalability_and_performance/index"
     languages: [en-US]
@@ -239,6 +256,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/backup_and_restore/index"
     languages: [en-US]
@@ -248,6 +266,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index"
     languages: [en-US]
@@ -257,6 +276,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/index"
     languages: [en-US]
@@ -266,6 +286,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/hosted_control_planes/index"
     languages: [en-US]
@@ -275,6 +296,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/specialized_hardware_and_driver_enablement/index"
     languages: [en-US]
@@ -284,6 +306,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/extensions/index"
     languages: [en-US]
@@ -293,6 +316,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installation_overview/index"
     languages: [en-US]
@@ -302,6 +326,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_bare_metal/index"
     languages: [en-US]
@@ -311,6 +336,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_aws/index"
     languages: [en-US]
@@ -320,6 +346,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_azure/index"
     languages: [en-US]
@@ -329,6 +356,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_google_cloud/index"
     languages: [en-US]
@@ -338,6 +366,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_ibm_cloud/index"
     languages: [en-US]
@@ -347,6 +376,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_a_single_node/index"
     languages: [en-US]
@@ -356,6 +386,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_ibm_power/index"
     languages: [en-US]
@@ -365,6 +396,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_openstack/index"
     languages: [en-US]
@@ -374,6 +406,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_nutanix/index"
     languages: [en-US]
@@ -383,6 +416,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_vmware_vsphere/index"
     languages: [en-US]
@@ -392,6 +426,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_on_ibm_z_and_ibm_linuxone/index"
     languages: [en-US]
@@ -401,6 +436,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/installing_an_on-premise_cluster_with_the_agent-based_installer/index"
     languages: [en-US]
@@ -410,6 +446,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/networking_operators/index"
     languages: [en-US]
@@ -419,6 +456,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/network_security/index"
     languages: [en-US]
@@ -428,6 +466,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/distributed_tracing/index"
     languages: [en-US]
@@ -437,6 +476,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/logging/index"
     languages: [en-US]
@@ -446,6 +486,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/monitoring/index"
     languages: [en-US]
@@ -455,6 +496,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/architecture/index"
     languages: [en-US]
@@ -464,6 +506,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/security_and_compliance/index"
     languages: [en-US]
@@ -473,6 +516,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/authentication_and_authorization/index"
     languages: [en-US]
@@ -482,6 +526,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/storage/index"
     languages: [en-US]
@@ -491,6 +536,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/registry/index"
     languages: [en-US]
@@ -500,6 +546,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/web_console/index"
     languages: [en-US]
@@ -509,6 +556,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/cli_tools/index"
     languages: [en-US]
@@ -518,6 +566,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/building_applications/index"
     languages: [en-US]
@@ -527,6 +576,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/images/index"
     languages: [en-US]
@@ -536,6 +586,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/operators/index"
     languages: [en-US]
@@ -545,6 +596,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/nodes/index"
     languages: [en-US]
@@ -554,6 +606,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/machine_management/index"
     languages: [en-US]
@@ -563,6 +616,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/scalability_and_performance/index"
     languages: [en-US]
@@ -572,6 +626,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/backup_and_restore/index"
     languages: [en-US]
@@ -581,6 +636,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/updating_clusters/index"
     languages: [en-US]
@@ -590,6 +646,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/disconnected_environments/index"
     languages: [en-US]
@@ -599,6 +656,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/hosted_control_planes/index"
     languages: [en-US]
@@ -608,6 +666,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/specialized_hardware_and_driver_enablement/index"
     languages: [en-US]
@@ -617,6 +676,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/extensions/index"
     languages: [en-US]
@@ -626,6 +686,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installation_overview/index"
     languages: [en-US]
@@ -635,6 +696,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_bare_metal/index"
     languages: [en-US]
@@ -644,6 +706,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_aws/index"
     languages: [en-US]
@@ -653,6 +716,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_azure/index"
     languages: [en-US]
@@ -662,6 +726,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_google_cloud/index"
     languages: [en-US]
@@ -671,6 +736,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_ibm_cloud/index"
     languages: [en-US]
@@ -680,6 +746,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_a_single_node/index"
     languages: [en-US]
@@ -689,6 +756,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_ibm_power/index"
     languages: [en-US]
@@ -698,6 +766,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_openstack/index"
     languages: [en-US]
@@ -707,6 +776,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_nutanix/index"
     languages: [en-US]
@@ -716,6 +786,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_vmware_vsphere/index"
     languages: [en-US]
@@ -725,6 +796,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_on_ibm_z_and_ibm_linuxone/index"
     languages: [en-US]
@@ -734,6 +806,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/installing_an_on-premise_cluster_with_the_agent-based_installer/index"
     languages: [en-US]
@@ -743,6 +816,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/networking_operators/index"
     languages: [en-US]
@@ -752,6 +826,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/network_security/index"
     languages: [en-US]
@@ -761,6 +836,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/distributed_tracing/index"
     languages: [en-US]
@@ -770,6 +846,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/logging/index"
     languages: [en-US]
@@ -779,6 +856,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Container Platform"
     productSlug: "openshift-container-platform"
+    family: "redhat-openshift"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/monitoring/index"
     languages: [en-US]
@@ -788,6 +866,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift AI"
     productSlug: "red-hat-openshift-ai-self-managed"
+    family: "redhat-openshift-ai"
     version: "3.5"                # matches platform.openshiftAIVersion above
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5"
     languages: [en-US]
@@ -797,6 +876,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift AI"
     productSlug: "red-hat-openshift-ai-self-managed"
+    family: "redhat-openshift-ai"
     version: "3.4"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.4"
     languages: [en-US]
@@ -806,6 +886,7 @@ redhat:
   - enabled: true
     product: "Red Hat build of Keycloak"
     productSlug: "red-hat-build-of-keycloak"
+    family: "redhat-keycloak"
     version: "26.6"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/release_notes/index"
     languages: [en-US]
@@ -815,6 +896,7 @@ redhat:
   - enabled: true
     product: "Red Hat build of Keycloak"
     productSlug: "red-hat-build-of-keycloak"
+    family: "redhat-keycloak"
     version: "26.4"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.4/html-single/release_notes/index"
     languages: [en-US]
@@ -824,6 +906,7 @@ redhat:
   - enabled: true
     product: "Red Hat Enterprise Linux"
     productSlug: "red-hat-enterprise-linux"
+    family: "redhat-rhel"
     version: "10"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10"
     languages: [en-US]
@@ -833,6 +916,7 @@ redhat:
   - enabled: true
     product: "Red Hat Enterprise Linux"
     productSlug: "red-hat-enterprise-linux"
+    family: "redhat-rhel"
     version: "9"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9"
     languages: [en-US]
@@ -842,6 +926,7 @@ redhat:
   - enabled: true
     product: "Red Hat Ansible Automation Platform"
     productSlug: "red-hat-ansible-automation-platform"
+    family: "redhat-aap"
     version: "2.7"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7"
     languages: [en-US]
@@ -851,6 +936,7 @@ redhat:
   - enabled: true
     product: "Red Hat Ansible Automation Platform"
     productSlug: "red-hat-ansible-automation-platform"
+    family: "redhat-aap"
     version: "2.6"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.6"
     languages: [en-US]
@@ -860,6 +946,7 @@ redhat:
   - enabled: true
     product: "Red Hat Advanced Cluster Management for Kubernetes"
     productSlug: "red-hat-advanced-cluster-management"
+    family: "redhat-acm"
     version: "2.17"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.17"
     languages: [en-US]
@@ -869,6 +956,7 @@ redhat:
   - enabled: true
     product: "Red Hat Advanced Cluster Management for Kubernetes"
     productSlug: "red-hat-advanced-cluster-management"
+    family: "redhat-acm"
     version: "2.16"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_management_for_kubernetes/2.16"
     languages: [en-US]
@@ -878,6 +966,7 @@ redhat:
   - enabled: true
     product: "Red Hat Advanced Cluster Security for Kubernetes"
     productSlug: "red-hat-advanced-cluster-security"
+    family: "redhat-acs"
     version: "4.11"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.11"
     languages: [en-US]
@@ -887,6 +976,7 @@ redhat:
   - enabled: true
     product: "Red Hat Advanced Cluster Security for Kubernetes"
     productSlug: "red-hat-advanced-cluster-security"
+    family: "redhat-acs"
     version: "4.10"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_advanced_cluster_security_for_kubernetes/4.10/html-single/release_notes/index"
     languages: [en-US]
@@ -896,6 +986,7 @@ redhat:
   - enabled: true
     product: "Red Hat Quay"
     productSlug: "red-hat-quay"
+    family: "redhat-quay"
     version: "3.17"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_quay/3.17"
     languages: [en-US]
@@ -905,6 +996,7 @@ redhat:
   - enabled: true
     product: "Red Hat Quay"
     productSlug: "red-hat-quay"
+    family: "redhat-quay"
     version: "3.16"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_quay/3.16"
     languages: [en-US]
@@ -914,6 +1006,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Data Foundation"
     productSlug: "red-hat-openshift-data-foundation"
+    family: "redhat-odf"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.22"
     languages: [en-US]
@@ -923,6 +1016,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift Data Foundation"
     productSlug: "red-hat-openshift-data-foundation"
+    family: "redhat-odf"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_data_foundation/4.21"
     languages: [en-US]
@@ -932,6 +1026,7 @@ redhat:
   - enabled: true
     product: "Red Hat Connectivity Link"
     productSlug: "red-hat-connectivity-link"
+    family: "redhat-connectivity-link"
     version: "1.4"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4"
     languages: [en-US]
@@ -941,6 +1036,7 @@ redhat:
   - enabled: true
     product: "Red Hat Connectivity Link"
     productSlug: "red-hat-connectivity-link"
+    family: "redhat-connectivity-link"
     version: "1.3"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.3"
     languages: [en-US]
@@ -950,6 +1046,7 @@ redhat:
   - enabled: true
     product: "Migration Toolkit for Applications"
     productSlug: "migration-toolkit-for-applications"
+    family: "redhat-mta"
     version: "8.2"
     documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.2"
     languages: [en-US]
@@ -959,6 +1056,7 @@ redhat:
   - enabled: true
     product: "Migration Toolkit for Applications"
     productSlug: "migration-toolkit-for-applications"
+    family: "redhat-mta"
     version: "8.1"
     documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_applications/8.1"
     languages: [en-US]
@@ -968,6 +1066,7 @@ redhat:
   - enabled: true
     product: "Migration Toolkit for Virtualization"
     productSlug: "migration-toolkit-for-virtualization"
+    family: "redhat-mtv"
     version: "2.11"
     documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.11"
     languages: [en-US]
@@ -977,6 +1076,7 @@ redhat:
   - enabled: true
     product: "Migration Toolkit for Virtualization"
     productSlug: "migration-toolkit-for-virtualization"
+    family: "redhat-mtv"
     version: "2.10"
     documentationUrl: "https://docs.redhat.com/en/documentation/migration_toolkit_for_virtualization/2.10"
     languages: [en-US]
@@ -986,6 +1086,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenStack Services on OpenShift"      # relaunch of Red Hat OpenStack Platform (RHOSP -> RHOSO); this is the "latest" half of the OpenStack pair
     productSlug: "red-hat-openstack-services-on-openshift"
+    family: "redhat-openstack"
     version: "18.0"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openstack_services_on_openshift/18.0"
     languages: [en-US]
@@ -995,6 +1096,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenStack Platform"                    # last classic-RHOSP release before the RHOSO rename; the "previous" half of the OpenStack pair
     productSlug: "red-hat-openstack-platform"
+    family: "redhat-openstack"
     version: "17.1"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openstack_platform/17.1"
     languages: [en-US]
@@ -1004,6 +1106,7 @@ redhat:
   - enabled: true
     product: "OpenShift Virtualization"                      # replaces Red Hat Virtualization (RHV), which is EOL with no second version to pair - ships as an OpenShift Container Platform doc chapter, versioned alongside it
     productSlug: "openshift-virtualization"
+    family: "redhat-virtualization"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/index"
     languages: [en-US]
@@ -1013,6 +1116,7 @@ redhat:
   - enabled: true
     product: "OpenShift Virtualization"
     productSlug: "openshift-virtualization"
+    family: "redhat-virtualization"
     version: "4.21"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html/virtualization/index"
     languages: [en-US]
@@ -1022,6 +1126,7 @@ redhat:
   - enabled: true
     product: "Red Hat Identity Management"                   # no independent version - a RHEL doc chapter; versioned alongside RHEL 10 above
     productSlug: "red-hat-identity-management"
+    family: "redhat-rhel"
     version: "10"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/10/html-single/planning_identity_management/index"
     languages: [en-US]
@@ -1031,6 +1136,7 @@ redhat:
   - enabled: true
     product: "Red Hat Identity Management"
     productSlug: "red-hat-identity-management"
+    family: "redhat-rhel"
     version: "9"                                             # versioned alongside RHEL 9 above
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html-single/planning_identity_management/index"
     languages: [en-US]
@@ -1040,6 +1146,7 @@ redhat:
   - enabled: true
     product: "Migration Toolkit for Containers"              # no independent version - an OpenShift Container Platform doc chapter; versioned alongside OCP 4.22 above.
     productSlug: "migration-toolkit-for-containers"
+    family: "redhat-mtc"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/migrating_from_version_3_to_4/index"
     languages: [en-US]
@@ -1049,6 +1156,7 @@ redhat:
   - enabled: true
     product: "Migration Toolkit for Containers"
     productSlug: "migration-toolkit-for-containers"
+    family: "redhat-mtc"
     version: "4.21"                                          # versioned alongside OCP 4.21 above - same inference caveat as 4.22 above
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/migrating_from_version_3_to_4/index"
     languages: [en-US]
@@ -1071,6 +1179,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift GitOps"                      # Argo CD, as Red Hat ships it - the only Argo CD documentation on docs.redhat.com.
     productSlug: "red-hat-openshift-gitops"
+    family: "argocd"
     version: "1.17"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.17/html-single/understanding_openshift_gitops/index"
     languages: [en-US]
@@ -1080,6 +1189,7 @@ redhat:
   - enabled: true
     product: "Red Hat OpenShift GitOps"
     productSlug: "red-hat-openshift-gitops"
+    family: "argocd"
     version: "1.16"
     documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.16/html-single/argo_cd_instance/index"
     languages: [en-US]
@@ -1089,6 +1199,7 @@ redhat:
   - enabled: true
     product: "Helm"                                          # no independent version - an OpenShift Container Platform doc chapter (Building applications), same shape as Migration Toolkit above.
     productSlug: "helm"
+    family: "helm"
     version: "4.22"
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/building_applications/index"
     languages: [en-US]
@@ -1098,6 +1209,7 @@ redhat:
   - enabled: true
     product: "Helm"
     productSlug: "helm"
+    family: "helm"
     version: "4.21"                                          # versioned alongside OCP 4.21 above - same inference caveat as Migration Toolkit
     documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/building_applications/index"
     languages: [en-US]
@@ -1484,12 +1596,128 @@ corpus:
 # enabled domains.<name>.schedule below), which
 # ansible/roles/rag_ingestion/tasks/install.yml consumes to create the
 # actual recurring runs - see README's "Scheduling" section.
+# 2026-09-03 (18-family split): the single flat `redhat[]` list is 68%
+# OpenShift (76/112 entries) with every other product family sitting
+# queued behind its multi-hour runtime for no reason - see this file's own
+# `redhat:` header comment. Each family below is now its own
+# techSources entry (own KFP pipeline, own schedule), scoped to its
+# `redhat[]` entries via `family` (added to every entry above) rather than
+# a per-family source list duplicated here. `redhat` (the original single
+# entry) is renamed `redhat-openshift` and keeps its exact existing Sunday
+# 02:00 slot/cron unchanged. The other 17 families are staggered
+# Monday-Saturday, <=3 per day, each clearing by 05:15 - at least 45 min
+# before the next `tech-confluence` firing (00:00/06:00/12:00/18:00) - and
+# never sharing a day with `redhat-openshift`'s Sunday run.
 techSources:
-  redhat:
-    fetchStages: [fetch-redhat]
+  redhat-openshift:
+    fetchStages: [fetch-oss-docs]
     schedule:
       enabled: true
       cron: "0 0 2 * * 0"
+      timezone: Europe/Paris
+  argocd:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 0 3 * * 1"
+      timezone: Europe/Paris
+  helm:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 45 3 * * 1"
+      timezone: Europe/Paris
+  redhat-mtc:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 30 4 * * 1"
+      timezone: Europe/Paris
+  redhat-virtualization:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 0 3 * * 2"
+      timezone: Europe/Paris
+  redhat-mtv:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 45 3 * * 2"
+      timezone: Europe/Paris
+  redhat-mta:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 30 4 * * 2"
+      timezone: Europe/Paris
+  redhat-quay:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 0 3 * * 3"
+      timezone: Europe/Paris
+  redhat-odf:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 45 3 * * 3"
+      timezone: Europe/Paris
+  redhat-openshift-ai:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 30 4 * * 3"
+      timezone: Europe/Paris
+  redhat-rhel:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      # Extra buffer vs. the other slots (02:30 not 03:00): 4 redhat[]
+      # entries (RHEL + IdM) instead of 2.
+      cron: "0 30 2 * * 4"
+      timezone: Europe/Paris
+  redhat-keycloak:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 45 3 * * 4"
+      timezone: Europe/Paris
+  redhat-connectivity-link:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 30 4 * * 4"
+      timezone: Europe/Paris
+  redhat-aap:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 0 3 * * 5"
+      timezone: Europe/Paris
+  redhat-acs:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 45 3 * * 5"
+      timezone: Europe/Paris
+  redhat-acm:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 30 4 * * 5"
+      timezone: Europe/Paris
+  redhat-satellite:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 0 3 * * 6"
+      timezone: Europe/Paris
+  redhat-openstack:
+    fetchStages: [fetch-oss-docs]
+    schedule:
+      enabled: true
+      cron: "0 45 3 * * 6"
       timezone: Europe/Paris
   confluence:
     fetchStages: [fetch-confluence]
@@ -1694,10 +1922,12 @@ resources:
     # WP-57: both bound network/S3-latency-bound worker pools (thread
     # count higher than CPU count is fine and expected), not CPU-bound
     # work - separate from the cpu/memory requests above.
-    # redhatConcurrency: fetch-redhat's per-source page-fetch pool
-    # (FETCH_REDHAT_CONCURRENCY). sxaWriteConcurrency: load-sxa-dump's
-    # per-row S3-write pool (FETCH_SXA_WRITE_CONCURRENCY).
-    redhatConcurrency: 8
+    # ossDocsConcurrency: fetch-oss-docs's per-source page-fetch pool
+    # (FETCH_OSS_DOCS_CONCURRENCY, renamed from redhatConcurrency/
+    # FETCH_REDHAT_CONCURRENCY alongside the fetch-redhat -> fetch-oss-docs
+    # rename). sxaWriteConcurrency: load-sxa-dump's per-row S3-write pool
+    # (FETCH_SXA_WRITE_CONCURRENCY).
+    ossDocsConcurrency: 8
     sxaWriteConcurrency: 8
   normalize:
     requests: {cpu: "2", memory: "6Gi"}

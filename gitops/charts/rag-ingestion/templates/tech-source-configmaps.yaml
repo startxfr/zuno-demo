@@ -1,0 +1,101 @@
+{{- /* 2026-09-03 (18-family split): retires templates/configmap.yaml's
+single shared "tech" ConfigMap. Every knowledge.tech source (18 product
+families derived from redhat[]'s `family` field, plus confluence) now
+gets its own config ConfigMap, same key set as templates/domain-
+configmaps.yaml's one-per-domain pattern (this is that exact pattern
+replicated one level deeper, over .Values.techSources instead of
+.Values.domains) - only OSS_DOCS_SOURCES_JSON/CONFLUENCE_SOURCES_JSON and
+the S3 prefixes differ per entry.
+
+S3 prefixes are suffixed per tech-source deliberately, same rationale as
+domain-configmaps.yaml: detect-changes builds its manifest from
+EVERYTHING under the raw prefix, so two sources sharing one prefix would
+each see the other's documents as deleted-orphans on every run. This was
+a real, pre-existing race between today's tech-redhat/tech-confluence
+pipelines (their unsuffixed prefixes were shared) - fixed here for
+confluence too, not just the 17 new families. */}}
+{{- $root := . }}
+{{- range $srcName, $src := .Values.techSources }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "rag-ingestion.fullname" $root }}-config-tech-{{ $srcName }}
+  namespace: {{ $root.Values.platform.namespace }}
+  labels:
+    {{- include "rag-ingestion.labels" $root | nindent 4 }}
+    zuno.io/rag-ingestion-domain: "tech"
+    zuno.io/rag-ingestion-source: {{ $srcName | quote }}
+data:
+  # Fixed for every tech-source entry: all of them still write into the
+  # one knowledge.tech database (ADR-0202) - this is the wire-level domain
+  # the CLI's fail-closed fetch-stage guard checks, not a per-family value.
+  INGESTION_DOMAIN: "knowledge.tech"
+  {{- if eq $srcName "confluence" }}
+  OSS_DOCS_SOURCES_JSON: "[]"
+  CONFLUENCE_SOURCES_JSON: {{ $root.Values.confluence | toJson | quote }}
+  {{- else }}
+  {{- $familySources := list }}
+  {{- range $root.Values.redhat }}
+  {{- if eq .family $srcName }}
+  {{- $familySources = append $familySources . }}
+  {{- end }}
+  {{- end }}
+  OSS_DOCS_SOURCES_JSON: {{ $familySources | toJson | quote }}
+  CONFLUENCE_SOURCES_JSON: "[]"
+  {{- end }}
+  SALESFORCE_SOURCES_JSON: "[]"
+  SXA_DUMP_SCHEMA_S3_KEY: ""
+  SXA_DUMP_DATA_S3_KEY: ""
+  SXA_SNAPSHOT_ID: ""
+  # No tech-source ever fetches from SXA or Salesforce - these exist only
+  # because pipeline.py.tpl's CONFIG_KEYS requires the full key contract
+  # in every ConfigMap regardless of source type (see
+  # templates/domain-configmaps.yaml's own comment on the same
+  # CreateContainerConfigError this avoids).
+  SXA_S3_ENDPOINT: ""
+  SXA_S3_BUCKET: ""
+  SXA_S3_REGION: ""
+  SXA_S3_PATH_STYLE: ""
+  S3_ENDPOINT: {{ include "rag-ingestion.s3Endpoint" $root | quote }}
+  S3_BUCKET: {{ $root.Values.s3.bucket | quote }}
+  S3_REGION: {{ $root.Values.s3.region | quote }}
+  S3_PATH_STYLE: {{ $root.Values.s3.pathStyle | quote }}
+  S3_RAW_PREFIX: "{{ $root.Values.corpus.rawPrefix }}-tech-{{ $srcName }}"
+  S3_NORMALIZED_PREFIX: "{{ $root.Values.corpus.normalizedPrefix }}-tech-{{ $srcName }}"
+  S3_MANIFEST_PREFIX: "{{ $root.Values.corpus.manifestPrefix }}-tech-{{ $srcName }}"
+  S3_FAILED_PREFIX: "{{ $root.Values.corpus.failedPrefix }}-tech-{{ $srcName }}"
+  PGHOST: {{ $root.Values.postgres.host | quote }}
+  PGPORT: {{ $root.Values.postgres.port | quote }}
+  PGDATABASE: {{ $root.Values.postgres.database | quote }}
+  PGSCHEMA: {{ $root.Values.postgres.schema | quote }}
+  PGSSLMODE: {{ $root.Values.postgres.sslmode | quote }}
+  EMBEDDING_ENDPOINT: {{ $root.Values.embedding.endpoint | quote }}
+  EMBEDDING_MODEL: {{ $root.Values.embedding.model | quote }}
+  EMBEDDING_DIMENSIONS: {{ $root.Values.embedding.dimensions | quote }}
+  EMBEDDING_BATCH_SIZE: {{ $root.Values.embedding.batchSize | quote }}
+  CHUNKING_STRATEGY: {{ $root.Values.chunking.strategy | quote }}
+  CHUNK_MAX_TOKENS: {{ $root.Values.chunking.maxTokens | quote }}
+  CHUNK_OVERLAP_TOKENS: {{ $root.Values.chunking.overlapTokens | quote }}
+  CHUNK_PRESERVE_CODE_BLOCKS: {{ $root.Values.chunking.preserveCodeBlocks | quote }}
+  CHUNK_PRESERVE_TABLES: {{ $root.Values.chunking.preserveTables | quote }}
+  CORPUS_INCREMENTAL: {{ $root.Values.corpus.incremental | quote }}
+  CORPUS_HASH_ALGORITHM: {{ $root.Values.corpus.hashAlgorithm | quote }}
+  CORPUS_DELETE_ORPHANS: {{ $root.Values.corpus.deleteOrphans | quote }}
+  # WP-24 / ADR-0109 / ADR-0205: mirrors knowledge/tech/domain.yaml's
+  # freshness.operation_classes.semantic-read.max_staleness - same for
+  # every tech-source entry, same as today's shared tech ConfigMap.
+  STALE_AFTER: {{ $root.Values.staleAfter | quote }}
+  # WP-57: network/S3-latency-bound worker pool sizes, not CPU-bound - same
+  # fleet-wide values as every domain's ConfigMap.
+  FETCH_OSS_DOCS_CONCURRENCY: {{ $root.Values.resources.fetch.ossDocsConcurrency | quote }}
+  FETCH_SXA_WRITE_CONCURRENCY: {{ $root.Values.resources.fetch.sxaWriteConcurrency | quote }}
+  # WP-58: same rationale, detect-changes' per-document S3 read pool.
+  DETECT_CHANGES_READ_CONCURRENCY: {{ $root.Values.resources.detectChanges.readConcurrency | quote }}
+  VALIDATE_READ_CONCURRENCY: {{ $root.Values.resources.validate.readConcurrency | quote }}
+  # ADR-0219: normalize/chunk/embed/index-pgvector worker pools.
+  NORMALIZE_CONCURRENCY: {{ $root.Values.resources.normalize.concurrency | quote }}
+  CHUNK_CONCURRENCY: {{ $root.Values.resources.chunk.concurrency | quote }}
+  EMBED_CONCURRENCY: {{ $root.Values.resources.embed.concurrency | quote }}
+  INDEX_READ_CONCURRENCY: {{ $root.Values.resources.index.readConcurrency | quote }}
+---
+{{- end }}

@@ -10,6 +10,9 @@ import re
 import sys
 import unittest.mock as mock
 from datetime import datetime, timedelta
+from urllib.parse import urlparse
+
+from bs4 import BeautifulSoup
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
@@ -86,7 +89,7 @@ class _FakeResponse:
 
 def test_every_fetch_stage_has_an_adapter_bound_to_one_domain():
     expected = {
-        "fetch-redhat": "knowledge.tech",
+        "fetch-oss-docs": "knowledge.tech",
         "fetch-confluence": "knowledge.tech",
         "fetch-salesforce": "knowledge.sales",
         "load-sxa-dump": "knowledge.sxa-legacy",
@@ -108,23 +111,70 @@ def test_fetch_stage_for_the_wrong_domain_fails_closed_before_any_write():
     assert store.json == {}
 
 
-# --- fetch-redhat / fetch-confluence (refactored, knowledge.tech) -----------
+# --- fetch-redhat -> fetch-oss-docs rename: deprecated env var fallback -----
 
 
-_REDHAT_HTML = "<html><body><h1>Satellite Guide</h1><main><p>Install steps.</p></main></body></html>"
+def test_load_config_falls_back_to_the_deprecated_env_var_names():
+    """One release's backward compat: an operator's existing
+    REDHAT_SOURCES_JSON/FETCH_REDHAT_CONCURRENCY (not yet migrated to
+    OSS_DOCS_SOURCES_JSON/FETCH_OSS_DOCS_CONCURRENCY) must still work, and
+    the deprecation must be logged so the gap gets noticed."""
+    with mock.patch.dict(
+        os.environ,
+        {
+            **_REQUIRED_ENV,
+            "REDHAT_SOURCES_JSON": '[{"product": "Satellite"}]',
+            "FETCH_REDHAT_CONCURRENCY": "3",
+        },
+        clear=True,
+    ):
+        with mock.patch.object(rag_ingestion.logger, "warning") as warned:
+            config = rag_ingestion.load_config()
+    assert config.oss_docs_sources == [{"product": "Satellite"}]
+    assert config.fetch_oss_docs_concurrency == 3
+    messages = " ".join(str(c.args) for c in warned.call_args_list)
+    assert "REDHAT_SOURCES_JSON" in messages, messages
+    assert "FETCH_REDHAT_CONCURRENCY" in messages, messages
 
 
-def test_fetch_redhat_stamps_domain_and_canonical_technology():
+def test_load_config_prefers_the_new_env_var_names_and_does_not_warn():
+    """No deprecation noise once an operator has migrated - the new names
+    must win outright, even when the old ones are also (still) set."""
+    with mock.patch.dict(
+        os.environ,
+        {
+            **_REQUIRED_ENV,
+            "OSS_DOCS_SOURCES_JSON": '[{"product": "New"}]',
+            "REDHAT_SOURCES_JSON": '[{"product": "Old"}]',
+            "FETCH_OSS_DOCS_CONCURRENCY": "5",
+            "FETCH_REDHAT_CONCURRENCY": "3",
+        },
+        clear=True,
+    ):
+        with mock.patch.object(rag_ingestion.logger, "warning") as warned:
+            config = rag_ingestion.load_config()
+    assert config.oss_docs_sources == [{"product": "New"}]
+    assert config.fetch_oss_docs_concurrency == 5
+    warned.assert_not_called()
+
+
+# --- fetch-oss-docs / fetch-confluence (refactored, knowledge.tech) -----------
+
+
+_OSS_DOCS_HTML = "<html><body><h1>Satellite Guide</h1><main><p>Install steps.</p></main></body></html>"
+
+
+def test_fetch_oss_docs_stamps_domain_and_canonical_technology():
     sources = (
         '[{"product": "Satellite", "productSlug": "red-hat-satellite", '
         '"version": "6.15", "documentationUrl": "https://docs.test/sat"},'
         '{"product": "Quay", "productSlug": "red-hat-quay", '
         '"version": "3.10", "documentationUrl": "https://docs.test/quay"}]'
     )
-    config = _config(REDHAT_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech")
+    config = _config(OSS_DOCS_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech")
     store = FakeStore()
-    with mock.patch.object(rag_ingestion, "_http_get", return_value=_FakeResponse(text=_REDHAT_HTML)):
-        _run_source_adapter(SOURCE_ADAPTERS["fetch-redhat"], config, store)
+    with mock.patch.object(rag_ingestion, "_http_get", return_value=_FakeResponse(text=_OSS_DOCS_HTML)):
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-oss-docs"], config, store)
     records = list(store.json.values())
     assert len(records) == 2
     by_slug = {r["product"]: r for r in records}
@@ -135,7 +185,7 @@ def test_fetch_redhat_stamps_domain_and_canonical_technology():
     assert "technology" not in by_slug["red-hat-quay"]
 
 
-def test_fetch_redhat_sends_conditional_headers_and_skips_a_304():
+def test_fetch_oss_docs_sends_conditional_headers_and_skips_a_304():
     """WP-57: a second run must send If-None-Match/If-Modified-Since built
     from the previous run's stored etag/last_modified, and a 304 response
     must leave that record untouched rather than overwrite it."""
@@ -143,12 +193,12 @@ def test_fetch_redhat_sends_conditional_headers_and_skips_a_304():
         '[{"product": "Satellite", "productSlug": "red-hat-satellite", '
         '"version": "6.15", "documentationUrl": "https://docs.test/sat"}]'
     )
-    config = _config(REDHAT_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech")
+    config = _config(OSS_DOCS_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech")
     store = FakeStore()
 
-    first_resp = _FakeResponse(text=_REDHAT_HTML, headers={"ETag": '"v1"'})
+    first_resp = _FakeResponse(text=_OSS_DOCS_HTML, headers={"ETag": '"v1"'})
     with mock.patch.object(rag_ingestion, "_http_get", return_value=first_resp):
-        _run_source_adapter(SOURCE_ADAPTERS["fetch-redhat"], config, store)
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-oss-docs"], config, store)
     (raw_key,) = [k for k in store.json if k.startswith(f"{config.raw_prefix}/")]
     first_record = dict(store.json[raw_key])
     assert first_record["etag"] == '"v1"'
@@ -162,21 +212,21 @@ def test_fetch_redhat_sends_conditional_headers_and_skips_a_304():
 
     with mock.patch.object(rag_ingestion, "_http_get", side_effect=assert_conditional_and_return_304):
         # base_url itself is always fetched unconditionally (to discover
-        # links) by _fetch_redhat's own top-level call - only
-        # _fetch_redhat_one's per-URL fetches are conditional. With a
-        # single-URL source, exercise _fetch_redhat_one directly instead
+        # links) by _fetch_oss_docs's own top-level call - only
+        # _fetch_oss_docs_one's per-URL fetches are conditional. With a
+        # single-URL source, exercise _fetch_oss_docs_one directly instead
         # to isolate that conditional-GET path from the unconditional
         # base_url fetch.
-        written = rag_ingestion._fetch_redhat_one(
+        written = rag_ingestion._fetch_oss_docs_one(
             config, store, {"productSlug": "red-hat-satellite", "version": "6.15"}, "https://docs.test/sat"
         )
     assert written is False
     assert store.json[raw_key] == first_record
 
 
-def test_fetch_redhat_fetches_discovered_links_concurrently():
+def test_fetch_oss_docs_fetches_discovered_links_concurrently():
     """WP-57: exercises the ThreadPoolExecutor branch specifically (the
-    other fetch-redhat tests' fixture HTML has no discoverable links, so
+    other fetch-oss-docs tests' fixture HTML has no discoverable links, so
     `remaining` is always empty there and that branch runs zero times)."""
     landing_html = (
         "<html><body><h1>Satellite Guide</h1>"
@@ -188,16 +238,16 @@ def test_fetch_redhat_fetches_discovered_links_concurrently():
         '[{"product": "Satellite", "productSlug": "red-hat-satellite", '
         '"version": "6.15", "documentationUrl": "https://docs.test/sat"}]'
     )
-    config = _config(REDHAT_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech", FETCH_REDHAT_CONCURRENCY="4")
+    config = _config(OSS_DOCS_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech", FETCH_OSS_DOCS_CONCURRENCY="4")
     store = FakeStore()
 
     def fake_get(url, **kwargs):
         if url == "https://docs.test/sat":
             return _FakeResponse(text=landing_html)
-        return _FakeResponse(text=_REDHAT_HTML)
+        return _FakeResponse(text=_OSS_DOCS_HTML)
 
     with mock.patch.object(rag_ingestion, "_http_get", side_effect=fake_get):
-        _run_source_adapter(SOURCE_ADAPTERS["fetch-redhat"], config, store)
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-oss-docs"], config, store)
 
     records = [v for k, v in store.json.items() if k.startswith(f"{config.raw_prefix}/")]
     assert {r["url"] for r in records} == {
@@ -205,6 +255,103 @@ def test_fetch_redhat_fetches_discovered_links_concurrently():
         "https://docs.test/html/chapter1/index",
         "https://docs.test/html/chapter2/index",
     }
+
+
+# --- crawlStrategy: generic (Phase 1 of the fetch-oss-docs generalization) --
+
+
+def test_generic_link_filter_stays_within_the_base_path_prefix_unlike_redhat_docs_filter():
+    """crawlStrategy: generic narrows discovery to the source's own path
+    prefix (the "book"/section its documentationUrl points at) instead of
+    the redhat-docs strategy's /html|html-single/ pattern - the two filters
+    must behave differently on the identical landing page."""
+    base_url = "https://example.org/docs/v1/"
+    landing_html = (
+        "<html><body>"
+        '<a href="https://example.org/docs/v1/page1">Same book, page 1</a>'
+        '<a href="https://example.org/docs/v1/sub/page2">Same book, nested</a>'
+        '<a href="https://example.org/other/page3">Different path, same netloc</a>'
+        '<a href="https://other.org/docs/v1/page4">Same path, different netloc</a>'
+        '<a href="https://example.org/support/html/page5">Matches redhat-docs pattern, wrong prefix</a>'
+        "</body></html>"
+    )
+    soup = BeautifulSoup(landing_html, "lxml")
+
+    generic_links = rag_ingestion._discover_links(
+        base_url, soup, link_filter=rag_ingestion._generic_link_filter(urlparse(base_url)),
+    )
+    assert generic_links == [
+        "https://example.org/docs/v1/page1",
+        "https://example.org/docs/v1/sub/page2",
+    ], generic_links
+
+    # Same input, redhat-docs filter: ignores the path prefix entirely and
+    # keys only on same-netloc + the /html|html-single/ pattern - so it
+    # picks up the one link the generic filter above correctly excluded
+    # (wrong prefix) and misses the two the generic filter correctly kept
+    # (right prefix, but no /html/ in their path).
+    redhat_docs_links = rag_ingestion._discover_links(
+        base_url, soup, link_filter=rag_ingestion._redhat_docs_link_filter(urlparse(base_url)),
+    )
+    assert redhat_docs_links == ["https://example.org/support/html/page5"], redhat_docs_links
+
+
+def test_fetch_oss_docs_generic_strategy_stays_within_the_source_path_prefix():
+    """End-to-end: crawlStrategy: generic dispatches through the exact same
+    fetch/cache/pool code as redhat-docs (WP-57's ThreadPoolExecutor,
+    conditional-GET/ETag caching, _matches_filters) - only the
+    link-discovery filter differs. Also confirms the explicit per-source
+    `technology` field (values.yaml) is preferred over
+    TECHNOLOGY_BY_PRODUCT_SLUG, which has no "argocd" entry."""
+    landing_html = (
+        "<html><body><h1>Argo CD Guide</h1>"
+        '<a href="https://argo-cd.test/en/stable/getting-started/">In scope</a>'
+        '<a href="https://argo-cd.test/en/stable/operator-manual/">In scope</a>'
+        '<a href="https://argo-cd.test/en/latest/other/">Out of scope (different version path)</a>'
+        '<a href="https://unrelated.test/en/stable/x">Out of scope (different netloc)</a>'
+        "</body></html>"
+    )
+    sources = (
+        '[{"product": "Argo CD", "productSlug": "argocd", "technology": "argocd", '
+        '"version": "stable", "documentationUrl": "https://argo-cd.test/en/stable/", '
+        '"crawlStrategy": "generic"}]'
+    )
+    config = _config(OSS_DOCS_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech")
+    store = FakeStore()
+
+    def fake_get(url, **kwargs):
+        if url == "https://argo-cd.test/en/stable/":
+            return _FakeResponse(text=landing_html)
+        return _FakeResponse(text=_OSS_DOCS_HTML)
+
+    with mock.patch.object(rag_ingestion, "_http_get", side_effect=fake_get):
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-oss-docs"], config, store)
+
+    records = [v for k, v in store.json.items() if k.startswith(f"{config.raw_prefix}/")]
+    assert {r["url"] for r in records} == {
+        "https://argo-cd.test/en/stable/",
+        "https://argo-cd.test/en/stable/getting-started/",
+        "https://argo-cd.test/en/stable/operator-manual/",
+    }
+    (base_record,) = [r for r in records if r["url"] == "https://argo-cd.test/en/stable/"]
+    assert base_record["technology"] == "argocd"
+
+
+def test_fetch_oss_docs_rejects_an_unrecognized_crawl_strategy():
+    """An unrecognized crawlStrategy must fail closed and name both the bad
+    value and the offending source, not silently fall back to a default."""
+    sources = (
+        '[{"product": "Mystery", "productSlug": "mystery-docs", "version": "1.0", '
+        '"documentationUrl": "https://docs.test/mystery", "crawlStrategy": "bogus"}]'
+    )
+    config = _config(OSS_DOCS_SOURCES_JSON=sources, INGESTION_DOMAIN="knowledge.tech")
+    store = FakeStore()
+    try:
+        _run_source_adapter(SOURCE_ADAPTERS["fetch-oss-docs"], config, store)
+        raise AssertionError("expected SystemExit")
+    except SystemExit as exc:
+        assert "bogus" in str(exc), exc
+        assert "mystery-docs" in str(exc), exc
 
 
 def test_fetch_confluence_uses_explicit_per_source_technology():
@@ -725,7 +872,7 @@ def test_stage_detect_changes_reads_raw_records_concurrently():
 
 
 def test_stage_detect_changes_writes_a_per_scope_changeset_key():
-    # knowledge.tech's fetch-redhat and fetch-confluence pipelines run
+    # knowledge.tech's fetch-oss-docs and fetch-confluence pipelines run
     # independently now - each must write its own changeset key so one
     # pipeline's detect-changes can never clobber the other's in-flight
     # changeset between detect-changes and normalize/validate reading it.
@@ -741,7 +888,7 @@ def test_stage_detect_changes_writes_a_per_scope_changeset_key():
 
 
 def test_load_changeset_reads_the_same_scoped_key_it_was_written_to():
-    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-redhat")
+    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-oss-docs")
     store = FakeStore()
     store.json[f"{config.raw_prefix}/doc1.json"] = _raw_record("doc1", "sha-1", source_type="product-doc")
 
@@ -771,23 +918,23 @@ def test_stage_detect_changes_is_unscoped_when_fetch_stages_not_set():
 
 
 def test_stage_detect_changes_scopes_orphan_detection_to_fetch_stages_in_this_run():
-    # The scenario this whole mechanism exists to prevent: a redhat-only
+    # The scenario this whole mechanism exists to prevent: an oss-docs-only
     # scheduled run must never mark confluence-sourced manifest entries as
     # deleted just because this run's raw scan didn't happen to include them.
-    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-redhat")
+    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-oss-docs")
     store = FakeStore()
     store.json[f"{config.manifest_prefix}/manifest.json"] = {
-        "redhat-gone": {"sha256": "old-sha", "url": "https://docs.test/gone", "source_type": "product-doc"},
+        "oss-docs-gone": {"sha256": "old-sha", "url": "https://docs.test/gone", "source_type": "product-doc"},
         "confluence-doc": {"sha256": "cf-sha", "url": "https://confluence.test/x", "source_type": "confluence"},
     }
-    # Neither doc appears in this run's raw scan (redhat-gone really was
+    # Neither doc appears in this run's raw scan (oss-docs-gone really was
     # removed upstream; confluence-doc was simply never fetched by this
-    # redhat-only pipeline).
+    # oss-docs-only pipeline).
 
     stage_detect_changes(config, store)
 
     changeset = store.json[_changeset_key(config)]
-    assert changeset["deleted"] == ["redhat-gone"]
+    assert changeset["deleted"] == ["oss-docs-gone"]
     assert "confluence-doc" not in changeset["deleted"]
 
 
@@ -795,7 +942,7 @@ def test_stage_detect_changes_treats_missing_source_type_as_not_owned_by_any_sco
     # A manifest entry written before WP-100 (or by any pre-migration run)
     # has no source_type at all - a scoped run must never guess it belongs
     # to itself and delete it.
-    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-redhat")
+    config = _config(INGESTION_DOMAIN="knowledge.tech", INGESTION_FETCH_STAGES="fetch-oss-docs")
     store = FakeStore()
     store.json[f"{config.manifest_prefix}/manifest.json"] = {
         "legacy-doc": {"sha256": "old-sha", "url": "https://docs.test/legacy"},
@@ -1445,7 +1592,7 @@ def test_s3_pool_covers_the_widest_stage_worker_pool():
         validate_read_concurrency=16,
         normalize_concurrency=16,
         chunk_concurrency=16,
-        fetch_redhat_concurrency=8,
+        fetch_oss_docs_concurrency=8,
         fetch_sxa_write_concurrency=8,
     )
     size = rag_ingestion._s3_pool_size(cfg)
@@ -1458,7 +1605,7 @@ def test_s3_pool_covers_the_widest_stage_worker_pool():
         validate_read_concurrency=4,
         normalize_concurrency=4,
         chunk_concurrency=4,
-        fetch_redhat_concurrency=4,
+        fetch_oss_docs_concurrency=4,
         fetch_sxa_write_concurrency=4,
     )
     assert rag_ingestion._s3_pool_size(small) >= 32
@@ -1470,7 +1617,7 @@ def test_s3_pool_covers_the_widest_stage_worker_pool():
         "validate_read_concurrency",
         "normalize_concurrency",
         "chunk_concurrency",
-        "fetch_redhat_concurrency",
+        "fetch_oss_docs_concurrency",
         "fetch_sxa_write_concurrency",
     ):
         one = types.SimpleNamespace(**{**vars(small), knob: 128})
@@ -1583,7 +1730,9 @@ def test_ivfflat_lists_sizing_matches_pgvector_guidance():
 TESTS = [
     test_every_fetch_stage_has_an_adapter_bound_to_one_domain,
     test_fetch_stage_for_the_wrong_domain_fails_closed_before_any_write,
-    test_fetch_redhat_stamps_domain_and_canonical_technology,
+    test_load_config_falls_back_to_the_deprecated_env_var_names,
+    test_load_config_prefers_the_new_env_var_names_and_does_not_warn,
+    test_fetch_oss_docs_stamps_domain_and_canonical_technology,
     test_fetch_confluence_uses_explicit_per_source_technology,
     test_fetch_confluence_scopes_via_ancestor_cql_when_directories_set,
     test_fetch_confluence_resolves_a_shared_directory_scope_only_once,
@@ -1619,8 +1768,11 @@ TESTS = [
     test_stage_validate_does_not_advance_manifest_on_failure,
     test_fetch_stage_source_never_issues_a_write_http_verb_against_a_source_system,
     test_embed_batch_asks_the_server_to_truncate_oversized_chunks,
-    test_fetch_redhat_sends_conditional_headers_and_skips_a_304,
-    test_fetch_redhat_fetches_discovered_links_concurrently,
+    test_fetch_oss_docs_sends_conditional_headers_and_skips_a_304,
+    test_fetch_oss_docs_fetches_discovered_links_concurrently,
+    test_generic_link_filter_stays_within_the_base_path_prefix_unlike_redhat_docs_filter,
+    test_fetch_oss_docs_generic_strategy_stays_within_the_source_path_prefix,
+    test_fetch_oss_docs_rejects_an_unrecognized_crawl_strategy,
     test_embed_pools_single_chunk_documents_into_full_batches,
     test_embed_writes_back_every_document_and_survives_a_failed_batch,
     test_embed_still_batches_within_a_long_multi_chunk_document,

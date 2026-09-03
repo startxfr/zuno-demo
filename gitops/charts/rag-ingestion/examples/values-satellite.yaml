@@ -10,6 +10,7 @@ redhat:
   - enabled: true
     product: Red Hat Satellite
     productSlug: red-hat-satellite
+    family: redhat-satellite
     version: "6.17"
     documentationUrl: https://docs.redhat.com/en/documentation/red_hat_satellite/6.17
     languages: [en-US]
@@ -17,6 +18,7 @@ redhat:
   - enabled: true
     product: Red Hat Satellite
     productSlug: red-hat-satellite
+    family: redhat-satellite
     version: "6.16"
     documentationUrl: https://docs.redhat.com/en/documentation/red_hat_satellite/6.16
     languages: [en-US]

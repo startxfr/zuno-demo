@@ -108,7 +108,7 @@ No sensitive value is stored in Helm. The existing `SecretStore` or `ClusterSecr
 
 ## Pipeline lifecycle
 
-OpenShift AI / Kubeflow Pipelines orchestrates the chain. The chart creates the `Pipeline` CR and a ConfigMap containing the rendered KFP source, plus a `REDHAT_SOURCES_JSON`/`CONFLUENCE_SOURCES_JSON`-carrying ConfigMap (`templates/configmap.yaml`).
+OpenShift AI / Kubeflow Pipelines orchestrates the chain. The chart creates one `Pipeline` CR and one config ConfigMap per `techSources` entry (18 product families + confluence, `templates/tech-source-configmaps.yaml`) and per additional domain (`templates/domain-configmaps.yaml`), each carrying an `OSS_DOCS_SOURCES_JSON`/`CONFLUENCE_SOURCES_JSON` pair (family-filtered for tech sources), plus one shared ConfigMap containing the rendered KFP source (`templates/pipeline-source-configmap.yaml`).
 
 ## Scheduling
 
@@ -138,7 +138,7 @@ The build context and CLI are at `components/rag-ingestion/`
 round-tripping its state through S3 rather than local disk:
 
 ```text
-fetch-redhat      crawls each enabled redhat[] documentationUrl, discovers same-book
+fetch-oss-docs    crawls each enabled redhat[] documentationUrl, discovers same-book
                   chapter links, writes raw HTML + metadata to <rawPrefix>/<doc_id>.json
                   (fetchMode: pdf not implemented - logged and skipped)
 fetch-confluence  Confluence Cloud REST API v1 (wiki/rest/api/content/search, CQL by

@@ -20,7 +20,7 @@ no shared local disk between them:
 
 ADR-0204 (WP-22): the fetch stages are implementations of one source-adapter
 interface (SOURCE_ADAPTERS below), each bound to exactly one logical knowledge
-domain: fetch-redhat + fetch-confluence -> knowledge.tech, fetch-salesforce ->
+domain: fetch-oss-docs + fetch-confluence -> knowledge.tech, fetch-salesforce ->
 knowledge.sales, load-sxa-dump -> knowledge.sxa-legacy (ADR-0219: the
 company's pre-2021 commercial record, parsed straight from S3 - no database
 engine, no MCP tools). A pipeline run targets one domain (--domain /
@@ -55,7 +55,7 @@ from pgvector.psycopg import register_vector
 logger = logging.getLogger("rag_ingestion")
 
 STAGES = (
-    "fetch-redhat",
+    "fetch-oss-docs",
     "fetch-confluence",
     "fetch-salesforce",
     "load-sxa-dump",
@@ -142,7 +142,7 @@ class IngestionConfig:
     # platform/bindings/knowledge/bindings.yaml).
     domain: str
 
-    redhat_sources: list
+    oss_docs_sources: list
     confluence_sources: list
     salesforce_sources: list
 
@@ -219,10 +219,10 @@ class IngestionConfig:
     # (network/S3-latency-bound work, not CPU-bound - higher than the CPU
     # count is fine and expected). Configurable rather than hardcoded so an
     # operator can tune per-cluster network conditions without a code
-    # change. fetch_redhat_concurrency bounds the per-source page-fetch
-    # pool in _fetch_redhat; fetch_sxa_write_concurrency bounds the
+    # change. fetch_oss_docs_concurrency bounds the per-source page-fetch
+    # pool in _fetch_oss_docs; fetch_sxa_write_concurrency bounds the
     # per-row S3-write pool in _load_sxa_dump.
-    fetch_redhat_concurrency: int
+    fetch_oss_docs_concurrency: int
     fetch_sxa_write_concurrency: int
     # ADR-0219 (2026-08-26): the same treatment for the four stages that
     # were still strictly serial. The SXA dump renders one document per
@@ -253,7 +253,7 @@ class IngestionConfig:
 
     # WP-100 (ADR-0105 amendment): when set, this run belongs to one of
     # knowledge.tech's independently-scheduled per-source pipelines
-    # (fetch-redhat / fetch-confluence) rather than the whole domain.
+    # (fetch-oss-docs / fetch-confluence) rather than the whole domain.
     # Empty tuple (every domain but tech, and any legacy/manual tech run)
     # preserves the exact pre-WP-100 unscoped behavior everywhere below -
     # see _changeset_key/_run_scope_source_types.
@@ -292,9 +292,36 @@ def _env_json(name: str, default: Any) -> Any:
 
 
 def load_config() -> IngestionConfig:
+    # fetch-redhat -> fetch-oss-docs rename: one release's backward-compat
+    # fallback to the old env var names, so an operator's existing
+    # ExternalSecret/ConfigMap keeps working until it's updated to the new
+    # keys. Warn only when the fallback actually fires (the new key is
+    # genuinely absent/empty and the old key carries something) - not on
+    # every run, which would just be noise once operators have migrated.
+    oss_docs_sources_env = os.environ.get("OSS_DOCS_SOURCES_JSON")
+    if not oss_docs_sources_env and os.environ.get("REDHAT_SOURCES_JSON"):
+        logger.warning(
+            "OSS_DOCS_SOURCES_JSON is unset but the deprecated REDHAT_SOURCES_JSON "
+            "is set - falling back to it for this run. Rename REDHAT_SOURCES_JSON "
+            "to OSS_DOCS_SOURCES_JSON; this fallback will be removed in a future release."
+        )
+    oss_docs_sources = _env_json("OSS_DOCS_SOURCES_JSON", None) or _env_json("REDHAT_SOURCES_JSON", [])
+
+    fetch_oss_docs_concurrency_env = os.environ.get("FETCH_OSS_DOCS_CONCURRENCY")
+    if not fetch_oss_docs_concurrency_env and os.environ.get("FETCH_REDHAT_CONCURRENCY"):
+        logger.warning(
+            "FETCH_OSS_DOCS_CONCURRENCY is unset but the deprecated "
+            "FETCH_REDHAT_CONCURRENCY is set - falling back to it for this run. "
+            "Rename FETCH_REDHAT_CONCURRENCY to FETCH_OSS_DOCS_CONCURRENCY; this "
+            "fallback will be removed in a future release."
+        )
+    fetch_oss_docs_concurrency = _env_int(
+        "FETCH_OSS_DOCS_CONCURRENCY", _env_int("FETCH_REDHAT_CONCURRENCY", 8)
+    )
+
     return IngestionConfig(
         domain=os.environ.get("INGESTION_DOMAIN") or DEFAULT_DOMAIN,
-        redhat_sources=_env_json("REDHAT_SOURCES_JSON", []),
+        oss_docs_sources=oss_docs_sources,
         confluence_sources=_env_json("CONFLUENCE_SOURCES_JSON", []),
         salesforce_sources=_env_json("SALESFORCE_SOURCES_JSON", []),
         salesforce_instance_url=os.environ.get("SALESFORCE_INSTANCE_URL"),
@@ -341,7 +368,7 @@ def load_config() -> IngestionConfig:
         corpus_incremental=_env_bool("CORPUS_INCREMENTAL", True),
         corpus_hash_algorithm=os.environ.get("CORPUS_HASH_ALGORITHM", "sha256"),
         corpus_delete_orphans=_env_bool("CORPUS_DELETE_ORPHANS", True),
-        fetch_redhat_concurrency=_env_int("FETCH_REDHAT_CONCURRENCY", 8),
+        fetch_oss_docs_concurrency=fetch_oss_docs_concurrency,
         fetch_sxa_write_concurrency=_env_int("FETCH_SXA_WRITE_CONCURRENCY", 8),
         detect_changes_read_concurrency=_env_int("DETECT_CHANGES_READ_CONCURRENCY", 16),
         validate_read_concurrency=_env_int("VALIDATE_READ_CONCURRENCY", 16),
@@ -373,7 +400,7 @@ def _s3_pool_size(config: "IngestionConfig") -> int:
         config.validate_read_concurrency,
         config.normalize_concurrency,
         config.chunk_concurrency,
-        config.fetch_redhat_concurrency,
+        config.fetch_oss_docs_concurrency,
         config.fetch_sxa_write_concurrency,
     )
 
@@ -508,20 +535,60 @@ def _matches_filters(url: str, include: list, exclude: list) -> bool:
     return True
 
 
-def _discover_doc_links(base_url: str, soup: BeautifulSoup, limit: int = MAX_DISCOVERED_LINKS) -> list:
-    """Finds same-book links from a docs.redhat.com landing/TOC page.
+def _redhat_docs_link_filter(base_parsed) -> Callable[[str], bool]:
+    """crawlStrategy: redhat-docs (the default - today's exact behavior,
+    unchanged for all 112 existing entries): same netloc as the base URL
+    AND a same-book path (`/html/` or `/html-single/`, DOC_LINK_PATTERN).
+    """
+
+    def _matches(href: str) -> bool:
+        parsed = urlparse(href)
+        return parsed.netloc == base_parsed.netloc and bool(DOC_LINK_PATTERN.search(parsed.path))
+
+    return _matches
+
+
+def _generic_link_filter(base_parsed) -> Callable[[str], bool]:
+    """crawlStrategy: generic - for real upstream OSS doc sites (e.g.
+    argo-cd.readthedocs.io) that don't follow docs.redhat.com's `/html/`
+    convention. Same netloc as the base URL AND the candidate path stays
+    within the base URL's own path prefix, i.e. the same "book"/section its
+    `documentationUrl` points at - a directory-style narrowing rather than a
+    fixed path pattern. The include/exclude fnmatch filtering (
+    _matches_filters) is a separate, later filtering stage and is not
+    duplicated here.
+    """
+    base_path = base_parsed.path
+    if not base_path.endswith("/"):
+        base_path = base_path.rsplit("/", 1)[0] + "/"
+
+    def _matches(href: str) -> bool:
+        parsed = urlparse(href)
+        return parsed.netloc == base_parsed.netloc and parsed.path.startswith(base_path)
+
+    return _matches
+
+
+def _discover_links(
+    base_url: str,
+    soup: BeautifulSoup,
+    *,
+    link_filter: Callable[[str], bool],
+    limit: int = MAX_DISCOVERED_LINKS,
+) -> list:
+    """Finds in-scope links from a landing/TOC page, `link_filter` deciding
+    which discovered hrefs to keep (see _redhat_docs_link_filter /
+    _generic_link_filter for the two crawlStrategy values).
 
     html-single pages already contain the whole book, so this typically finds
     little/nothing extra for them; multi-page/landing pages yield their real
     chapter links here instead.
     """
-    parsed_base = urlparse(base_url)
     found: list = []
     seen = {base_url}
     for a in soup.find_all("a", href=True):
         href = urljoin(base_url, a["href"]).split("#", 1)[0]
-        parsed = urlparse(href)
-        if parsed.netloc != parsed_base.netloc or not DOC_LINK_PATTERN.search(parsed.path):
+        if not link_filter(href):
             continue
         if href in seen:
             continue
@@ -578,12 +645,12 @@ def _run_source_adapter(adapter: SourceAdapter, config: IngestionConfig, store: 
 
 
 # --------------------------------------------------------------------------
-# fetch-redhat (knowledge.tech)
+# fetch-oss-docs (knowledge.tech)
 # --------------------------------------------------------------------------
 
 
-def _build_redhat_record(source: dict, url: str, page) -> Optional[dict]:
-    """Builds one fetch-redhat record from an already-fetched response, or
+def _build_oss_doc_record(source: dict, url: str, page) -> Optional[dict]:
+    """Builds one fetch-oss-docs record from an already-fetched response, or
     None if the page has no extractable text (skip - unchanged from the
     pre-WP-57 behavior)."""
     title, text = _extract_title_and_text(page.text)
@@ -610,16 +677,20 @@ def _build_redhat_record(source: dict, url: str, page) -> Optional[dict]:
         # same URL on the next run.
         "etag": page.headers.get("ETag"),
     }
-    technology = TECHNOLOGY_BY_PRODUCT_SLUG.get(source["productSlug"])
+    # An explicit per-source `technology` (values.yaml) takes precedence
+    # over the canonical productSlug map - the extension point a new
+    # family (argocd/helm/a future go family) uses to stamp its own
+    # `technology` without another TECHNOLOGY_BY_PRODUCT_SLUG edit.
+    technology = source.get("technology") or TECHNOLOGY_BY_PRODUCT_SLUG.get(source["productSlug"])
     if technology:
         record["technology"] = technology
     return record
 
 
-def _fetch_redhat_one(config: IngestionConfig, store: CorpusStore, source: dict, url: str) -> bool:
+def _fetch_oss_docs_one(config: IngestionConfig, store: CorpusStore, source: dict, url: str) -> bool:
     """Fetches and stores one page, run concurrently across a source's
     discovered URLs (WP-57 - sequential per-page fetching was the
-    dominant cost of fetch-redhat). Uses a conditional GET against any
+    dominant cost of fetch-oss-docs). Uses a conditional GET against any
     ETag/Last-Modified this URL's raw record carries from a previous run:
     a 304 leaves that record untouched rather than re-fetching/re-parsing
     it - safe because nothing ever purges raw/<domain>/ between runs, so
@@ -637,20 +708,20 @@ def _fetch_redhat_one(config: IngestionConfig, store: CorpusStore, source: dict,
     try:
         page = _http_get(url, headers=headers)
     except requests.RequestException as exc:
-        logger.error("fetch-redhat: failed to fetch %s: %s", url, exc)
+        logger.error("fetch-oss-docs: failed to fetch %s: %s", url, exc)
         return False
     if page.status_code == 304:
         return False
-    record = _build_redhat_record(source, url, page)
+    record = _build_oss_doc_record(source, url, page)
     if record is None:
         return False
     store.put_json(raw_key, record)
     return True
 
 
-def _fetch_redhat(config: IngestionConfig, store: CorpusStore) -> int:
+def _fetch_oss_docs(config: IngestionConfig, store: CorpusStore) -> int:
     fetched = 0
-    for source in config.redhat_sources:
+    for source in config.oss_docs_sources:
         if not source.get("enabled", True):
             continue
         if source.get("fetchMode") == "pdf":
@@ -660,13 +731,24 @@ def _fetch_redhat(config: IngestionConfig, store: CorpusStore) -> int:
             )
             continue
         base_url = source["documentationUrl"]
+        crawl_strategy = source.get("crawlStrategy", "redhat-docs")
+        if crawl_strategy == "redhat-docs":
+            link_filter = _redhat_docs_link_filter(urlparse(base_url))
+        elif crawl_strategy == "generic":
+            link_filter = _generic_link_filter(urlparse(base_url))
+        else:
+            raise SystemExit(
+                f"fetch-oss-docs: unrecognized crawlStrategy {crawl_strategy!r} for source "
+                f"productSlug={source.get('productSlug')!r} product={source.get('product')!r} "
+                "- expected 'redhat-docs' or 'generic'"
+            )
         try:
             base_resp = _http_get(base_url)
         except requests.RequestException as exc:
-            logger.error("fetch-redhat: failed to fetch %s: %s", base_url, exc)
+            logger.error("fetch-oss-docs: failed to fetch %s: %s", base_url, exc)
             continue
         soup = BeautifulSoup(base_resp.text, "lxml")
-        urls = [base_url] + _discover_doc_links(base_url, soup)
+        urls = [base_url] + _discover_links(base_url, soup, link_filter=link_filter)
         include = source.get("include") or []
         exclude = source.get("exclude") or []
         urls = [u for u in dict.fromkeys(urls) if _matches_filters(u, include, exclude)]
@@ -675,15 +757,15 @@ def _fetch_redhat(config: IngestionConfig, store: CorpusStore) -> int:
         # above to discover links) - store it directly rather than
         # re-fetching it conditionally. WP-57: every OTHER discovered URL
         # runs through the concurrent conditional-GET path below.
-        base_record = _build_redhat_record(source, base_url, base_resp)
+        base_record = _build_oss_doc_record(source, base_url, base_resp)
         if base_record is not None:
             store.put_json(f"{config.raw_prefix}/{base_record['doc_id']}.json", base_record)
             fetched += 1
 
         remaining = [u for u in urls if u != base_url]
         if remaining:
-            with ThreadPoolExecutor(max_workers=max(1, config.fetch_redhat_concurrency)) as pool:
-                results = pool.map(lambda u: _fetch_redhat_one(config, store, source, u), remaining)
+            with ThreadPoolExecutor(max_workers=max(1, config.fetch_oss_docs_concurrency)) as pool:
+                results = pool.map(lambda u: _fetch_oss_docs_one(config, store, source, u), remaining)
                 fetched += sum(1 for written in results if written)
     return fetched
 
@@ -1383,7 +1465,7 @@ def _parse_insert_rows(data_text: str, columns_by_table: Dict[str, list]):
 SOURCE_ADAPTERS = {
     adapter.stage: adapter
     for adapter in (
-        SourceAdapter("fetch-redhat", "knowledge.tech", _fetch_redhat),
+        SourceAdapter("fetch-oss-docs", "knowledge.tech", _fetch_oss_docs),
         SourceAdapter("fetch-confluence", "knowledge.tech", _fetch_confluence),
         SourceAdapter("fetch-salesforce", "knowledge.sales", _fetch_salesforce),
         SourceAdapter("load-sxa-dump", "knowledge.sxa-legacy", _load_sxa_dump),
@@ -1391,11 +1473,11 @@ SOURCE_ADAPTERS = {
 }
 
 # WP-100: ties each fetch stage to the `source_type` value its own records
-# are stamped with (see _build_redhat_record/_fetch_confluence/
+# are stamped with (see _build_oss_doc_record/_fetch_confluence/
 # _fetch_salesforce/_load_sxa_dump) - the identifier stage_detect_changes
 # uses to scope orphan detection to only the source(s) a given run fetched.
 STAGE_SOURCE_TYPES = {
-    "fetch-redhat": "product-doc",
+    "fetch-oss-docs": "product-doc",
     "fetch-confluence": "confluence",
     "fetch-salesforce": "salesforce-object",
     "load-sxa-dump": "sxa-dump",
@@ -1408,7 +1490,7 @@ STAGE_SOURCE_TYPES = {
 
 
 def _changeset_key(config: IngestionConfig) -> str:
-    # WP-100: knowledge.tech's fetch-redhat and fetch-confluence now run as
+    # WP-100: knowledge.tech's fetch-oss-docs and fetch-confluence now run as
     # two independently-scheduled KFP pipelines sharing one domain/database
     # (ADR-0202). Without a per-scope key here, one pipeline's detect-changes
     # could overwrite the shared changeset.json between the other pipeline's
@@ -1583,7 +1665,7 @@ def _normalize_one(doc_id: str, config: IngestionConfig, store: CorpusStore) -> 
     # modification signal when the adapter captured one (Confluence's
     # history.lastUpdated.when, Salesforce's LastModifiedDate, or a
     # best-effort HTTP Last-Modified header for product docs - see
-    # _fetch_redhat); when a source genuinely exposes none,
+    # _fetch_oss_docs); when a source genuinely exposes none,
     # `fetched_at` is the best available lower bound,
     # not an invented value. indexed_at is always this pipeline's own
     # clock at normalize time, independent of whatever the source
@@ -2665,7 +2747,7 @@ def main() -> int:
             "INGESTION_FETCH_STAGES env, empty = unscoped). WP-100: scopes "
             "detect-changes' changeset key and orphan detection to only "
             "these stages' source_type(s) - used by knowledge.tech's "
-            "independently-scheduled fetch-redhat/fetch-confluence pipelines."
+            "independently-scheduled fetch-oss-docs/fetch-confluence pipelines."
         ),
     )
     args = parser.parse_args()

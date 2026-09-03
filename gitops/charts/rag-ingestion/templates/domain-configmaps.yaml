@@ -1,7 +1,8 @@
 {{- /* ADR-0204 part 2 (WP-22): one config ConfigMap per enabled
-additional domain, same key set as templates/configmap.yaml (tech's) so
-every pipeline pod reads one contract - only the domain, its database,
-its source config and its S3 prefixes differ.
+additional domain, same key set as templates/tech-source-configmaps.yaml
+(tech's, one per techSources family) so every pipeline pod reads one
+contract - only the domain, its database, its source config and its S3
+prefixes differ.
 
 S3 prefixes are suffixed per domain deliberately: detect-changes builds
 its manifest from EVERYTHING under the raw prefix, so two domains
@@ -21,7 +22,7 @@ metadata:
     zuno.io/rag-ingestion-domain: {{ $name | quote }}
 data:
   INGESTION_DOMAIN: "knowledge.{{ $name }}"
-  REDHAT_SOURCES_JSON: "[]"
+  OSS_DOCS_SOURCES_JSON: "[]"
   CONFLUENCE_SOURCES_JSON: "[]"
   SALESFORCE_SOURCES_JSON: {{ ($domain.salesforce).sources | default list | toJson | quote }}
   SXA_DUMP_SCHEMA_S3_KEY: {{ ($domain.sxaDump).schemaS3Key | default "" | quote }}
@@ -71,7 +72,7 @@ data:
   # WP-57: same fleet-wide values as templates/configmap.yaml (tech's) -
   # always rendered, pipeline.py.tpl's CONFIG_KEYS requires every domain's
   # ConfigMap to carry these regardless of that domain's source type.
-  FETCH_REDHAT_CONCURRENCY: {{ $root.Values.resources.fetch.redhatConcurrency | quote }}
+  FETCH_OSS_DOCS_CONCURRENCY: {{ $root.Values.resources.fetch.ossDocsConcurrency | quote }}
   FETCH_SXA_WRITE_CONCURRENCY: {{ $root.Values.resources.fetch.sxaWriteConcurrency | quote }}
   # WP-58: same rationale, detect-changes' per-document S3 read pool.
   DETECT_CHANGES_READ_CONCURRENCY: {{ $root.Values.resources.detectChanges.readConcurrency | quote }}

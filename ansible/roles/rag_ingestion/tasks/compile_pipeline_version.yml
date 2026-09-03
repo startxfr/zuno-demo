@@ -11,28 +11,30 @@
 # `pipelineversions.pipelines.kubeflow.org`) rather than a raw KFP-server
 # REST upload - `oc apply`-ing that manifest is the actual missing step,
 # not a kfp.Client() call. compile_one_pipeline_version.yml does this per
-# domain (operator-machine imperative op, same pattern as the KFP
+# target (operator-machine imperative op, same pattern as the KFP
 # recurring-run activation below and the day1-build BuildConfig trigger),
-# so a future reinstall regenerates every enabled domain's version instead
-# of leaving any of them permanently empty.
+# so a future reinstall regenerates every target's version instead of
+# leaving any of them permanently empty.
 #
-# COMPILE_TARGETS below is knowledge.tech's two independently-scheduled
-# source pipelines (WP-100/ADR-0105 amendment: fetch-redhat and
-# fetch-confluence no longer share one "tech" pipeline) plus every
-# WP-22/ADR-0217 domain that is actually `enabled: true` today (sales/adv
-# remain `enabled: false` - nothing to compile for them yet) - extend this
-# list as more domains flip on. Confirmed live 2026-08-21: compiling a
-# second domain (sxa) exposed a real PipelineVersion-naming collision with
-# tech's ("Pipeline spec is immutable" - two domains' compiles both
-# produced an object literally named the chart's single pipeline.version
-# value, and PipelineVersion names are unique per-namespace, not
-# per-pipeline) - fixed in files/pipeline.py.tpl by suffixing every
-# pipeline's compiled version name with its own target name (no more
-# unsuffixed "tech" exemption since WP-100). sxa-legacy added 2026-08-23
-# once WP-065's amended Part B flipped it to enabled: true.
-- name: "rag_ingestion | set the list of pipeline compile targets"
+# The target list used to be hand-maintained here
+# (["tech-redhat", "tech-confluence", "sxa-legacy"]) - confirmed live
+# 2026-08-21 that a hand-maintained list drifts (a second target's compile
+# collided with tech's PipelineVersion name, fixed in files/pipeline.py.tpl
+# by suffixing every compiled version name with its own target - see that
+# file's header comment). The 2026-09-03 18-family rag-ingestion split
+# turned "extend this list by hand" into "extend this 19-item list by hand
+# every time a family is added/renamed", the next guaranteed drift point.
+# Fixed at the source instead: files/pipeline.py.tpl's __main__ block now
+# has a `--list-targets` branch that prints PIPELINES.keys() (built from
+# BOTH .Values.techSources AND every enabled .Values.domains entry - so
+# the derived list below already includes sxa-legacy, and any other
+# enabled domain, without appending it separately here). This task runs
+# that once, against the already-rendered pipeline.py source, and derives
+# the compile-target list from it - closing all three lockstep points
+# (files/pipeline.py.tpl, templates/pipeline.yaml, this list) at once.
+- name: "rag_ingestion | default the list of pipeline compile targets to empty"
   ansible.builtin.set_fact:
-    _rag_ingestion_compile_targets: ["tech-redhat", "tech-confluence", "sxa-legacy"]
+    _rag_ingestion_compile_targets: []
 
 - name: "rag_ingestion | ensure the compiler venv (kfp SDK) exists"
   ansible.builtin.pip:
@@ -56,7 +58,39 @@
       zuno-ai-build (the d1 Application may not have synced yet).
   when: (_rag_ingestion_pipeline_source_cm.resources | default([]) | length) == 0
 
-- name: "rag_ingestion | compile and apply each enabled domain's pipeline version"
+- name: "rag_ingestion | derive the compile-target list from the rendered pipeline.py"
+  when: (_rag_ingestion_pipeline_source_cm.resources | default([]) | length) > 0
+  block:
+    - name: "rag_ingestion | create a working directory to list pipeline targets"
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: "rag-ingestion-pipeline-list-targets"
+      register: _rag_ingestion_list_targets_dir
+
+    - name: "rag_ingestion | write the rendered pipeline.py to the working directory"
+      ansible.builtin.copy:
+        dest: "{{ _rag_ingestion_list_targets_dir.path }}/pipeline.py"
+        content: "{{ _rag_ingestion_pipeline_source_cm.resources[0].data['pipeline.py'] }}"
+        mode: "0644"
+
+    - name: "rag_ingestion | list every target the compiled pipeline.py knows about"
+      ansible.builtin.command:
+        cmd: "{{ zuno_repo_root }}/components/rag-ingestion/tooling/.venv/bin/python pipeline.py --list-targets"
+        chdir: "{{ _rag_ingestion_list_targets_dir.path }}"
+      changed_when: false
+      register: _rag_ingestion_list_targets_result
+
+    - name: "rag_ingestion | set the list of pipeline compile targets"
+      ansible.builtin.set_fact:
+        _rag_ingestion_compile_targets: "{{ _rag_ingestion_list_targets_result.stdout_lines }}"
+  always:
+    - name: "rag_ingestion | clean up the list-targets working directory"
+      ansible.builtin.file:
+        path: "{{ _rag_ingestion_list_targets_dir.path }}"
+        state: absent
+      when: _rag_ingestion_list_targets_dir.path is defined
+
+- name: "rag_ingestion | compile and apply each target's pipeline version"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/rag_ingestion/tasks/compile_one_pipeline_version.yml"
   loop: "{{ _rag_ingestion_compile_targets }}"
   loop_control:

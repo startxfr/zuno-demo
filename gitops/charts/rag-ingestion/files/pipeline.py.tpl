@@ -4,7 +4,6 @@ from kfp import compiler, dsl, kubernetes
 from kfp.compiler.compiler_utils import KubernetesManifestOptions
 
 IMAGE = "{{ include "rag-ingestion.image" . }}"
-CONFIGMAP = "{{ include "rag-ingestion.fullname" . }}-config"
 S3_SECRET = "{{ .Values.s3.secretName }}"
 PG_SECRET = "{{ .Values.postgres.secretName }}"
 {{- $confluenceEnabled := gt (len .Values.confluence) 0 }}
@@ -14,14 +13,16 @@ CONFLUENCE_SECRET = "{{ (first .Values.confluence).authentication.secretName }}"
 EMBEDDING_SECRET = "{{ .Values.embedding.auth.secretName }}"
 
 # ADR-0204 part 2 (WP-22): every pipeline pod reads one env contract; the
-# per-domain ConfigMaps (templates/domain-configmaps.yaml) carry the same
-# key set as tech's (templates/configmap.yaml) with domain-specific
-# values - INGESTION_DOMAIN is what the CLI's fetch-stage guard checks.
-# REDHAT_SOURCES_JSON/CONFLUENCE_SOURCES_JSON etc. carry full arrays as
-# JSON blobs - flat keys can't represent multiple sources.
+# per-domain ConfigMaps (templates/domain-configmaps.yaml) and per-tech-
+# source ConfigMaps (templates/tech-source-configmaps.yaml) carry the same
+# key set with domain/source-specific values - INGESTION_DOMAIN is what
+# the CLI's fetch-stage guard checks. OSS_DOCS_SOURCES_JSON (renamed from
+# REDHAT_SOURCES_JSON alongside the fetch-redhat -> fetch-oss-docs rename)
+# /CONFLUENCE_SOURCES_JSON etc. carry full arrays as JSON blobs - flat
+# keys can't represent multiple sources.
 CONFIG_KEYS = {
     "INGESTION_DOMAIN": "INGESTION_DOMAIN",
-    "REDHAT_SOURCES_JSON": "REDHAT_SOURCES_JSON",
+    "OSS_DOCS_SOURCES_JSON": "OSS_DOCS_SOURCES_JSON",
     "CONFLUENCE_SOURCES_JSON": "CONFLUENCE_SOURCES_JSON",
     "SALESFORCE_SOURCES_JSON": "SALESFORCE_SOURCES_JSON",
     "SXA_DUMP_SCHEMA_S3_KEY": "SXA_DUMP_SCHEMA_S3_KEY",
@@ -65,7 +66,7 @@ CONFIG_KEYS = {
     # domain's ConfigMap the same way every key above is (missing one
     # here is a CreateContainerConfigError at pod start, the exact
     # incident SXA_S3_ENDPOINT's own comment above documents).
-    "FETCH_REDHAT_CONCURRENCY": "FETCH_REDHAT_CONCURRENCY",
+    "FETCH_OSS_DOCS_CONCURRENCY": "FETCH_OSS_DOCS_CONCURRENCY",
     "FETCH_SXA_WRITE_CONCURRENCY": "FETCH_SXA_WRITE_CONCURRENCY",
     # WP-58: detect-changes' per-document S3 read pool - same
     # every-domain-ConfigMap requirement as the two keys above.
@@ -79,12 +80,21 @@ CONFIG_KEYS = {
     "INDEX_READ_CONCURRENCY": "INDEX_READ_CONCURRENCY",
 }
 
-# Per-domain wiring (rendered from values.yaml's domains map): which
-# ConfigMap, which database credential Secret and which source-system
-# credential Secret each domain's tasks mount. "tech" is the chart's
-# top-level config.
+# Per-domain / per-tech-source wiring: which ConfigMap, which database
+# credential Secret and which source-system credential Secret each
+# pipeline's tasks mount. "tech-<srcName>" (2026-09-03, 18-family split):
+# each techSources entry now resolves its own ConfigMap
+# (templates/tech-source-configmaps.yaml) scoped to just its own family's
+# redhat[] entries - the single hardcoded "tech" key used to make every
+# knowledge.tech pipeline mount the SAME shared ConfigMap, relying only on
+# fetch_stages to pick which source ran. PG_SECRETS still points every
+# tech-<srcName> entry at the SAME shared Postgres secret (PG_SECRET) -
+# ADR-0202's one-database-per-knowledge-domain constraint means every
+# tech-* pipeline still writes to the one knowledge.tech database.
 CONFIGMAPS = {
-    "tech": CONFIGMAP,
+{{- range $srcName, $src := .Values.techSources }}
+    "tech-{{ $srcName }}": "{{ include "rag-ingestion.fullname" $ }}-config-tech-{{ $srcName }}",
+{{- end }}
 {{- range $name, $domain := .Values.domains }}
 {{- if $domain.enabled }}
     "{{ $name }}": "{{ include "rag-ingestion.fullname" $ }}-config-{{ $name }}",
@@ -92,7 +102,9 @@ CONFIGMAPS = {
 {{- end }}
 }
 PG_SECRETS = {
-    "tech": PG_SECRET,
+{{- range $srcName, $src := .Values.techSources }}
+    "tech-{{ $srcName }}": PG_SECRET,
+{{- end }}
 {{- range $name, $domain := .Values.domains }}
 {{- if $domain.enabled }}
     "{{ $name }}": "{{ $domain.postgres.secretName }}",
@@ -136,7 +148,7 @@ SXA_SOURCE_SECRETS = {
 # applies each of the four set_*_request/set_*_limit calls per task,
 # keyed by stage name.
 RESOURCES = {
-    "fetch-redhat": {"requests": {{ .Values.resources.fetch.requests | toJson }}, "limits": {{ .Values.resources.fetch.limits | toJson }}},
+    "fetch-oss-docs": {"requests": {{ .Values.resources.fetch.requests | toJson }}, "limits": {{ .Values.resources.fetch.limits | toJson }}},
     "fetch-confluence": {"requests": {{ .Values.resources.fetch.requests | toJson }}, "limits": {{ .Values.resources.fetch.limits | toJson }}},
     "fetch-salesforce": {"requests": {{ .Values.resources.fetch.requests | toJson }}, "limits": {{ .Values.resources.fetch.limits | toJson }}},
     "load-sxa-dump": {"requests": {{ .Values.resources.fetch.requests | toJson }}, "limits": {{ .Values.resources.fetch.limits | toJson }}},
@@ -212,7 +224,7 @@ def configure(task, *, stage, domain="tech", confluence=False, postgres=False, e
     return task
 
 
-fetch_redhat = component("fetch-redhat")
+fetch_oss_docs = component("fetch-oss-docs")
 fetch_confluence = component("fetch-confluence")
 fetch_salesforce = component("fetch-salesforce")
 load_sxa_dump = component("load-sxa-dump")
@@ -225,22 +237,28 @@ validate = component("validate")
 reconcile_acls = component("reconcile-acls")
 
 FETCH_COMPONENTS = {
-    "fetch-redhat": fetch_redhat,
+    "fetch-oss-docs": fetch_oss_docs,
     "fetch-confluence": fetch_confluence,
     "fetch-salesforce": fetch_salesforce,
     "load-sxa-dump": load_sxa_dump,
 }
 
 
-{{- /* WP-100 (ADR-0105 amendment): knowledge.tech's two sources
-(fetch-redhat, fetch-confluence) each get their own independently
-schedulable pipeline instead of one shared "rag_ingestion_pipeline" -
-same generic per-source-with-fetchStages shape as the domains loop below,
-but domain="tech" is fixed so both reuse CONFIGMAPS["tech"]/
-PG_SECRETS["tech"] (the same ConfigMap/Postgres secret, keeping both
-sources in the one knowledge.tech database per ADR-0202). fetch_stages is
-threaded into every stage so detect-changes/normalize/.../validate scope
-their shared-S3-state access to just this pipeline's source(s) (see
+{{- /* WP-100 (ADR-0105 amendment) + 2026-09-03 18-family split: each
+techSources entry (one knowledge.tech source, now one per product family
+plus confluence) gets its own independently schedulable pipeline instead
+of one shared "rag_ingestion_pipeline" - same generic
+per-source-with-fetchStages shape as the domains loop below. domain is now
+"tech-<srcName>" (no longer the fixed literal "tech") so each family/
+source resolves its OWN ConfigMap
+(CONFIGMAPS["tech-<srcName>"], templates/tech-source-configmaps.yaml) -
+before this split, every knowledge.tech pipeline mounted the SAME shared
+ConfigMap and relied only on fetch_stages to pick which source ran.
+PG_SECRETS["tech-<srcName>"] still resolves to the same shared Postgres
+secret for every entry (ADR-0202: one knowledge.tech database, no matter
+how many independently-scheduled source pipelines feed it). fetch_stages
+is threaded into every stage so detect-changes/normalize/.../validate
+scope their shared-S3-state access to just this pipeline's source(s) (see
 _changeset_key/_run_scope_source_types in rag_ingestion.py). */}}
 {{- range $srcName, $src := .Values.techSources }}
 @dsl.pipeline(
@@ -252,22 +270,22 @@ def rag_ingestion_pipeline_tech_{{ $srcName | replace "-" "_" }}():
     fetches = []
 {{- range $stage := $src.fetchStages }}
     fetches.append(configure(
-        FETCH_COMPONENTS["{{ $stage }}"](), stage="{{ $stage }}", domain="tech",
+        FETCH_COMPONENTS["{{ $stage }}"](), stage="{{ $stage }}", domain="tech-{{ $srcName }}",
 {{- if eq $stage "fetch-confluence" }} confluence=True,{{- end }}
         fetch_stages=fetch_stages,
     ))
 {{- end }}
-    changes = configure(detect_changes().after(*fetches), stage="detect-changes", domain="tech", fetch_stages=fetch_stages)
-    normalized = configure(normalize().after(changes), stage="normalize", domain="tech", fetch_stages=fetch_stages)
-    chunks = configure(chunk().after(normalized), stage="chunk", domain="tech", fetch_stages=fetch_stages)
-    embeddings = configure(embed().after(chunks), stage="embed", domain="tech", embedding=True, fetch_stages=fetch_stages)
-    indexed = configure(index_pgvector().after(embeddings), stage="index-pgvector", domain="tech", postgres=True, fetch_stages=fetch_stages)
-    validated = configure(validate().after(indexed), stage="validate", domain="tech", postgres=True, fetch_stages=fetch_stages)
+    changes = configure(detect_changes().after(*fetches), stage="detect-changes", domain="tech-{{ $srcName }}", fetch_stages=fetch_stages)
+    normalized = configure(normalize().after(changes), stage="normalize", domain="tech-{{ $srcName }}", fetch_stages=fetch_stages)
+    chunks = configure(chunk().after(normalized), stage="chunk", domain="tech-{{ $srcName }}", fetch_stages=fetch_stages)
+    embeddings = configure(embed().after(chunks), stage="embed", domain="tech-{{ $srcName }}", embedding=True, fetch_stages=fetch_stages)
+    indexed = configure(index_pgvector().after(embeddings), stage="index-pgvector", domain="tech-{{ $srcName }}", postgres=True, fetch_stages=fetch_stages)
+    validated = configure(validate().after(indexed), stage="validate", domain="tech-{{ $srcName }}", postgres=True, fetch_stages=fetch_stages)
 {{- if $src.reconcileAcls }}
     # ADR-0110 (WP-25): only the source with live Confluence access runs
-    # this - a no-op on the redhat-only pipeline would just mount
+    # this - a no-op on the other families' pipelines would just mount
     # Confluence credentials for nothing (see stage_reconcile_acls).
-    configure(reconcile_acls().after(validated), stage="reconcile-acls", domain="tech", confluence=True, postgres=True)
+    configure(reconcile_acls().after(validated), stage="reconcile-acls", domain="tech-{{ $srcName }}", confluence=True, postgres=True)
 {{- end }}
 
 
@@ -313,9 +331,20 @@ PIPELINES = {
 
 
 if __name__ == "__main__":
-    # One compile per pipeline: `python pipeline.py [tech-redhat|tech-confluence|sales|sxa-legacy]`
-    # (default tech-redhat).
-    target = sys.argv[1] if len(sys.argv) > 1 else "tech-redhat"
+    # `python pipeline.py --list-targets` prints every valid target (one
+    # per line, PIPELINES' own keys - every techSources entry plus every
+    # enabled domain), so callers never hand-maintain that list separately
+    # (see ansible/roles/rag_ingestion/tasks/compile_pipeline_version.yml,
+    # which used to hardcode ["tech-redhat", "tech-confluence",
+    # "sxa-legacy"] and drifted the moment a target was added/renamed).
+    if len(sys.argv) > 1 and sys.argv[1] == "--list-targets":
+        print("\n".join(PIPELINES.keys()))
+        sys.exit(0)
+    # One compile per pipeline: `python pipeline.py [tech-redhat-openshift|tech-confluence|...|sxa-legacy]`
+    # (default tech-redhat-openshift). In practice the ansible caller
+    # (compile_one_pipeline_version.yml) always passes the target
+    # explicitly - this default only matters for a manual/ad-hoc compile.
+    target = sys.argv[1] if len(sys.argv) > 1 else "tech-redhat-openshift"
     pipeline_func, pipeline_name = PIPELINES[target]
     # PipelineVersion is a plain namespaced Kubernetes resource - its
     # metadata.name is unique per (namespace, kind), NOT scoped per
