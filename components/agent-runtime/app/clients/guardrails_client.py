@@ -50,13 +50,23 @@ GUARDRAILS_NEMO_URL = os.getenv("GUARDRAILS_NEMO_URL", "")
 GUARDRAILS_CONFIG_ID = os.getenv("GUARDRAILS_CONFIG_ID", "zuno-observe")
 
 # BUILTIN BACKEND ONLY. ADR-0540 moves this policy into NeMo rails
-# config (custom_data.zuno_patterns); this dict is kept ONLY because
-# "builtin" remains the fallback backend and deleting it now would drop
-# the injection heuristics from that path - a real loss of coverage while
-# nemo is still unproven. It is deleted in the same commit that flips
-# guardrails.backend to "nemo" by default, once the live proof passes.
-# Until then the two must be kept in step: an edit here needs the same
-# edit in files/nemo-rails/observe/config.yaml.
+# config (custom_data.zuno_patterns); this dict is kept because "builtin"
+# remains the declared fallback backend and this dict is that fallback's
+# ENTIRE policy - the GuardrailsOrchestrator carries no patterns of its
+# own, they travel on every request in detector_params. Deleting it would
+# leave backend="builtin" wired, healthy and detecting nothing, which
+# turns the rollback for the nemo flip into a silent loss of observation.
+#
+# ADR-0540 Decision 4 originally said this dies in the same commit that
+# flips the default; that was amended 2026-09-03 (WP-120) once the flip
+# made the contradiction concrete. It now lives as long as the
+# GuardrailsOrchestrator is the declared fallback - whichever decision
+# retires zuno-guardrails-smoke deletes this and PolicyParityWithRails
+# together.
+#
+# Meanwhile the two copies must stay in step: an edit here needs the same
+# edit in files/nemo-rails/observe/config.yaml. PolicyParityWithRails
+# fails if they drift.
 #
 # Built-in detector params, live-verified 2026-09-02 against this
 # cluster's detector (quay.io/trustyai/guardrails-detector-built-in via

@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Target:** v0.7
-- **Date:** 2026-09-02
+- **Date:** 2026-09-02 (amended 2026-09-03)
 - **Decision owners:** Zuno Demo architecture team
 
 ## Context
@@ -67,10 +67,24 @@ on.
    live-proven.** `gitops/charts/agent-runtime/values.yaml` `guardrails.backend` chooses between
    `nemo` and the existing `builtin` detector. The `GuardrailsOrchestrator/zuno-guardrails-smoke`
    instance is **not** deleted: it stays as ADR-0534's proof and as the fallback. `DETECTOR_PARAMS`
-   is likewise retained until the flip, because deleting it now would drop the injection
-   heuristics from the fallback path — a real loss of coverage while the replacement is unproven.
-   A unit test (`PolicyParityWithRails`) fails if the two copies drift, and both are deleted in
-   the same commit that flips the default.
+   is likewise retained, because deleting it would drop the injection heuristics from the fallback
+   path — a real loss of coverage. A unit test (`PolicyParityWithRails`) fails if the two copies
+   drift. The flip happened on 2026-09-03 (WP-120).
+
+   *Amended 2026-09-03 (WP-120)* — the original text ended "and both are deleted in the same
+   commit that flips the default." That instruction contradicted this same decision's own
+   retention of the `GuardrailsOrchestrator` as the fallback, which its Non-goals restate.
+   `DETECTOR_PARAMS` **is** that fallback's entire policy: the orchestrator applies no patterns of
+   its own, they travel on every request in `detector_params`. Deleting the dict would therefore
+   leave `backend: builtin` wired, healthy and detecting nothing — turning the documented rollback
+   for this flip into a silent loss of observation, which is precisely the failure mode the rest of
+   this ADR is written to avoid.
+
+   The retention is therefore **not** time-limited to the flip. `DETECTOR_PARAMS` and
+   `PolicyParityWithRails` live as long as the `GuardrailsOrchestrator` is the declared fallback;
+   whichever decision retires that instance is the one that deletes them. The cost of keeping them
+   is a duplicated policy, and `PolicyParityWithRails` already fails on drift — a guarded
+   duplicate, against an unguarded empty rollback.
 
 ## Non-goals
 
@@ -115,13 +129,9 @@ Executed by [WP-120](../roadmap/work-packages/wp-120-guardrail-policy-as-nemo-ra
 `guardrails.backend` was flipped to `nemo` on 2026-09-03 once the live proof passed.
 
 Decision 4's second half — deleting `DETECTOR_PARAMS` and `PolicyParityWithRails` in that same
-commit — was deliberately **not** executed, and the deviation is open. The reasoning the decision
-gives for retaining the dict ("deleting it now would drop the injection heuristics from the
-fallback path") does not stop applying at the flip: this ADR keeps the `GuardrailsOrchestrator`
-as the fallback in its Non-goals, and `DETECTOR_PARAMS` is that fallback's entire policy. Deleting
-it makes `backend: builtin` an observer with nothing to apply, so the rollback for the flip would
-be a switch to a detector that finds nothing. Closing WP-120 means resolving this either way —
-deleting both, or superseding Decision 4's "same commit" wording.
+commit — was not executed, and Decision 4 is amended above rather than followed: the retention now
+tracks the `GuardrailsOrchestrator`'s lifetime instead of the flip. Whichever decision retires that
+instance deletes them.
 
 Separately and later: ADR-0534's observe-to-block decision, which this work makes cheaper by
 putting the policy where a reviewer can read it.

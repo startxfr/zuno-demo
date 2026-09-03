@@ -1,11 +1,10 @@
 # WP-120: Guardrail policy as NeMo rails configuration
 
 - **State:** Repo work merged (2026-09-03) — deployed and live: the rails server runs, the
-  five-point discovery gate is fully answered, `guardrails.backend` is `nemo` and the dashboard
-  follows. Not Done, for two reasons that both need a decision rather than more work: ADR-0540
-  Decision 4's deletion of `DETECTOR_PARAMS` is deliberately not executed (see "Open: the
-  DETECTOR_PARAMS deletion"), and one acceptance step cannot be run as written (see "Not
-  proven").
+  five-point discovery gate is fully answered, `guardrails.backend` is `nemo`, the dashboard
+  follows, and ADR-0540 Decision 4 is amended so `DETECTOR_PARAMS` stays as long as the
+  `GuardrailsOrchestrator` is the declared fallback. One acceptance step cannot be run as written
+  and its end-to-end half is outstanding — see "Not proven".
 - **ADRs:** [ADR-0540](../../adr/0540-express-guardrail-policy-as-nemo-rails-configuration.md)
 - **Depends on:** WP-108 (the `GuardrailsOrchestrator` this sits beside and falls back to),
   WP-113 (the `zuno-trustyai` dashboard whose detections panel this changes)
@@ -142,19 +141,20 @@ but no live authenticated turn has been driven since the flip. `zuno_guardrails_
 in Prometheus from WP-113-era traffic and currently carry no recent samples, so the first real
 turn is also what confirms the export path end to end.
 
-## Open: the DETECTOR_PARAMS deletion
+## Resolved: DETECTOR_PARAMS stays, and ADR-0540 Decision 4 is amended
 
-ADR-0540 Decision 4 says `DETECTOR_PARAMS` and `PolicyParityWithRails` die in the same commit as
-the backend flip. They did not, deliberately.
+Decision 4 originally said `DETECTOR_PARAMS` and `PolicyParityWithRails` die in the same commit as
+the backend flip. They did not, and the decision is amended (2026-09-03) rather than followed.
 
-The ADR keeps the `GuardrailsOrchestrator` smoke instance as a non-goal of deletion — it is
-ADR-0534's proof and the documented fallback. But `DETECTOR_PARAMS` *is* that fallback's policy:
-delete it and `backend: builtin` becomes an observer with nothing to apply, so the rollback for
-this flip would be a switch to a detector that finds nothing. Keeping the dict costs a duplicated
-policy that `PolicyParityWithRails` already guards against drift; deleting it costs the rollback.
+The instruction contradicted the same decision's own retention of the `GuardrailsOrchestrator` as
+the fallback, which the ADR's Non-goals restate. `DETECTOR_PARAMS` *is* that fallback's entire
+policy — the orchestrator carries no patterns of its own, they travel on every request in
+`detector_params`. Deleting the dict would leave `backend: builtin` wired, healthy and detecting
+nothing, turning this flip's documented rollback into a silent loss of observation.
 
-That trade is better decided on real nemo traffic than at the moment of the flip. Resolving it
-either way — deleting both, or amending ADR-0540 Decision 4 to keep them — closes this WP.
+The retention now tracks the orchestrator's lifetime, not the flip: whichever decision retires
+`zuno-guardrails-smoke` is the one that deletes both. The standing cost is a duplicated policy
+that `PolicyParityWithRails` fails on if it drifts.
 
 ## Verification
 
