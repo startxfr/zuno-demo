@@ -33,3 +33,57 @@
 
 - name: "custom_metrics_autoscaler | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+# ADR-0542/WP-121: reported, never asserted - this is a precheck, and the
+# ClusterTriggerAuthentication is only meaningful once some consumer has
+# created a ScaledObject that references it.
+#
+# The Ready condition is here, and not just an object count, because
+# WP-121's first apply looked successful for nine hours on counts alone:
+# both autoscaling objects existed while the ScaledObject was Ready=False
+# on an empty bearer token, and KEDA had created no HPA at all. "The
+# object exists" and "the object works" must never be read apart again.
+- name: "custom_metrics_autoscaler | look up the Thanos ClusterTriggerAuthentication (WP-121)"
+  kubernetes.core.k8s_info:
+    api_version: keda.sh/v1alpha1
+    kind: ClusterTriggerAuthentication
+    name: "{{ cma_trigger_auth_name | default('ai-inference-keda-thanos') }}"
+  register: _cma_trigger_auth
+  ignore_errors: true
+
+- name: "custom_metrics_autoscaler | look up the ScaledObjects KServe derives from spec.scaling (WP-121)"
+  kubernetes.core.k8s_info:
+    api_version: keda.sh/v1alpha1
+    kind: ScaledObject
+    namespace: "{{ cma_consumer_namespace | default('zuno-ai-run') }}"
+  register: _cma_scaledobjects
+  ignore_errors: true
+
+- name: "custom_metrics_autoscaler | report the trigger auth"
+  ansible.builtin.debug:
+    msg: >-
+      ClusterTriggerAuthentication
+      '{{ cma_trigger_auth_name | default('ai-inference-keda-thanos') }}':
+      {{ 'present'
+         if (_cma_trigger_auth.resources | default([]) | length) > 0
+         else 'MISSING - every KServe-generated ScaledObject stays Ready=False' }}
+      | ScaledObjects in {{ cma_consumer_namespace | default('zuno-ai-run') }}:
+      {{ _cma_scaledobjects.resources | default([]) | length }}
+
+# One line per ScaledObject rather than one composed expression: a nested
+# map/selectattr chain over .status.conditions returns [] silently when the
+# shape is not what it assumed, which is the failure mode this whole block
+# exists to catch.
+- name: "custom_metrics_autoscaler | report each ScaledObject's Ready condition"
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.metadata.name }}:
+      Ready={{ (item.status.conditions | default([])
+                | selectattr('type', 'equalto', 'Ready')
+                | map(attribute='status') | first) | default('unknown', true) }}
+      {{ (item.status.conditions | default([])
+          | selectattr('type', 'equalto', 'Ready')
+          | map(attribute='message') | first) | default('', true) }}
+  loop: "{{ _cma_scaledobjects.resources | default([]) }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"

@@ -1,13 +1,18 @@
 ---
-# Minimal KedaController operand CR (not the operator, see
-# application-d0.yaml). Empty spec - no ScaledObject/TriggerAuthentication
-# exists yet for it to act on (ADR-0318 installs the operator ahead of
-# any consumer).
+# The KEDA operand slice (not the operator, see application-d0.yaml): the
+# minimal KedaController CR, plus ADR-0318's operator now finally having
+# something to act on.
 #
 # ADR-0542/WP-121: this Application still renders no ScaledObject, and
-# should not. The first one on this cluster is created BY KServe from
+# should not - the first one on this cluster is created BY KServe from
 # LLMInferenceService.spec.scaling (gitops/charts/models), not authored
-# here - so this stays empty while KEDA finally has an object to act on.
+# here. It DOES render the ClusterTriggerAuthentication that ScaledObject
+# references, because RHOAI's inferenceservice-config names
+# `ai-inference-keda-thanos` and then ships no such object; without it the
+# KServe-generated ScaledObject sits Ready=False on an empty bearer token
+# and KEDA never creates its HPA (live-caught 2026-09-03). Cluster-scoped
+# auth for any KEDA consumer is chart-level plumbing, not model-specific,
+# which is why it lives here and not in gitops/charts/models.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -25,6 +30,8 @@ spec:
       releaseName: zuno-custom-metrics-autoscaler-d1
       values: |
         kedaController:
+          enabled: true
+        triggerAuthentication:
           enabled: true
   destination:
     server: https://kubernetes.default.svc

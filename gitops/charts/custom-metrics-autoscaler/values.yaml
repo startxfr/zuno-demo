@@ -73,7 +73,33 @@ operator:
 kedaController:
   enabled: false
 
-# Referenced by templates/kedacontroller.yaml - kept in sync with
+# ADR-0542/WP-121: the bearer-token identity KEDA uses against the
+# cluster's Thanos querier, plus the ClusterTriggerAuthentication that
+# hands it to every ScaledObject KServe derives from
+# LLMInferenceService.spec.scaling.
+#
+# The name is FIXED by RHOAI, not chosen here: KServe reads
+# triggerAuthName/triggerAuthKind out of the inferenceservice-config
+# ConfigMap in redhat-ods-applications and stamps an authenticationRef to
+# that exact cluster-scoped name onto the ScaledObject. RHOAI names it and
+# does not ship it, so until this renders, every such ScaledObject sits
+# Ready=False on "bearer token=<empty> is required when bearer auth is
+# enabled" and KEDA never creates the HPA. It is exposed as a value only
+# so the two ends stay greppable together - changing it requires editing
+# that RHOAI-managed ConfigMap first.
+#
+# Enabled by the d1 (operand) Application: it needs the KEDA CRDs that d0
+# installs.
+triggerAuthentication:
+  enabled: false
+  name: ai-inference-keda-thanos
+  # The SA + its long-lived token Secret both land in `namespace` below -
+  # a cluster-scoped TriggerAuthentication resolves secretTargetRef from
+  # KEDA's own namespace, never from the workload's.
+  serviceAccountName: keda-thanos-reader
+
+# Referenced by templates/kedacontroller.yaml and
+# templates/clustertriggerauthentication.yaml - kept in sync with
 # project.project.name above (must match, since that's what actually
 # creates the namespace).
 namespace: openshift-keda

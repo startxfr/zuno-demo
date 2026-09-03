@@ -1,0 +1,107 @@
+{{- if .Values.triggerAuthentication.enabled }}
+# ADR-0542/WP-121. The bearer-token identity KEDA uses to query the
+# cluster's Thanos querier, and the ClusterTriggerAuthentication that
+# hands it to every KServe-generated ScaledObject.
+#
+# NOT optional, and NOT ours to name. KServe reads the name and kind out
+# of RHOAI's own inferenceservice-config ConfigMap
+# (redhat-ods-applications), key autoscaling-wva-controller-config:
+#
+#   {"prometheus": {"url": "https://thanos-querier...:9091",
+#                   "authModes": "bearer",
+#                   "triggerAuthName": "ai-inference-keda-thanos",
+#                   "triggerAuthKind": "ClusterTriggerAuthentication"}}
+#
+# and stamps an authenticationRef to it on the ScaledObject it derives
+# from LLMInferenceService.spec.scaling. RHOAI names the object but does
+# NOT ship it - so without this file the ScaledObject exists and is
+# permanently Ready=False:
+#
+#   ScaledObjectCheckFailed: failed to ensure HPA is correctly created for
+#   ScaledObject: error parsing prometheus metadata: bearer token=<empty>
+#   is required when bearer auth is enabled
+#
+# and KEDA never creates the HPA at all. Live-caught 2026-09-03, nine
+# hours after WP-121's first apply looked successful because both
+# autoscaling objects had been created. "The object exists" and "the
+# object works" are not the same check - which is why precheck.yml now
+# reports the Ready condition, not just the count.
+#
+# Renaming it means editing that RHOAI-managed ConfigMap first; it is not
+# a values edit here.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.triggerAuthentication.serviceAccountName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "21"
+---
+# Same shape, and the same reason, as
+# gitops/charts/grafana/templates/serviceaccount-prometheus-reader.yaml:
+# OpenShift stopped auto-generating a token Secret per ServiceAccount in
+# 4.11/Kubernetes 1.24, and a projected/expiring token does not fit a
+# static secretTargetRef. One wave after the ServiceAccount so the
+# controller has something to mint the token against.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.triggerAuthentication.serviceAccountName }}-token
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "22"
+    kubernetes.io/service-account.name: {{ .Values.triggerAuthentication.serviceAccountName }}
+type: kubernetes.io/service-account-token
+---
+# cluster-monitoring-view is what makes thanos-querier:9091 answer at all;
+# the query KServe generates
+# (wva_desired_replicas{variant_name=...,exported_namespace=...}) is a
+# user-workload metric federated through the platform querier.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ .Values.triggerAuthentication.serviceAccountName }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "21"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-monitoring-view
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.triggerAuthentication.serviceAccountName }}
+    namespace: {{ .Values.namespace }}
+---
+# Wave 23: after the KedaController's 20 (the CRD has to exist) and after
+# the token Secret's 22.
+#
+# The Secret lives in {{ .Values.namespace }}, NOT in the workload's
+# namespace, and that is not a choice either: a CLUSTER-scoped
+# TriggerAuthentication resolves secretTargetRef from KEDA's
+# cluster-object namespace (KEDA_CLUSTER_OBJECT_NAMESPACE, which is unset
+# on the keda-operator Deployment and therefore falls back to the
+# operator's own namespace), never from the ScaledObject's namespace.
+#
+# Unlike grafana's Prometheus datasource, this needs no two-phase ansible
+# token read-back: KEDA dereferences the Secret live at scale time, so
+# nothing has to be injected as a Helm value.
+apiVersion: keda.sh/v1alpha1
+kind: ClusterTriggerAuthentication
+metadata:
+  name: {{ .Values.triggerAuthentication.name }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "23"
+spec:
+  secretTargetRef:
+    - parameter: bearerToken
+      name: {{ .Values.triggerAuthentication.serviceAccountName }}-token
+      key: token
+{{- end }}

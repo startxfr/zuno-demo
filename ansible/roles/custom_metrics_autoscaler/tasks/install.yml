@@ -77,8 +77,16 @@
     gitops_component_name: "custom-metrics-autoscaler"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-custom-metrics-autoscaler-d1"
+    # NOTE: gitops_app_extra_helm_values REPLACES the Application
+    # manifest's spec.source.helm.values wholesale (see the combine() in
+    # ansible/tasks/apply_gitops_app.yml) - it does not merge with it. Any
+    # key added to application-d1.yaml MUST be repeated here or every run
+    # of this role silently deletes it. ADR-0542/WP-121's
+    # ClusterTriggerAuthentication is exactly such a key.
     gitops_app_extra_helm_values:
       kedaController:
+        enabled: true
+      triggerAuthentication:
         enabled: true
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 15

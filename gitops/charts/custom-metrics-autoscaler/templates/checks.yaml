@@ -7,3 +7,18 @@
 {{- fail "operator.subscription.operator.source.name must be set via gitops_app_extra_helm_values (ADR-0048)" -}}
 {{- end -}}
 {{- end -}}
+
+{{- /*
+  ADR-0542/WP-121: the ClusterTriggerAuthentication's name is dictated by
+  RHOAI's inferenceservice-config, not chosen here. An empty name renders a
+  nameless cluster-scoped object that the API server rejects only at apply
+  time, so fail at render instead.
+*/ -}}
+{{- if .Values.triggerAuthentication.enabled -}}
+{{- if not .Values.triggerAuthentication.name -}}
+{{- fail "triggerAuthentication.name must match inferenceservice-config's autoscaling-wva-controller-config.prometheus.triggerAuthName (ADR-0542)" -}}
+{{- end -}}
+{{- if not .Values.triggerAuthentication.serviceAccountName -}}
+{{- fail "triggerAuthentication.serviceAccountName must be set (ADR-0542)" -}}
+{{- end -}}
+{{- end -}}
