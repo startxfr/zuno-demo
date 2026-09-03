@@ -137,8 +137,41 @@ queueResources:
   resourceFlavorName: default
   clusterQueueName: default
   localQueueName: default
-  cpuQuota: "8"
-  memoryQuota: 32Gi
+  # ADR-0538/WP-117: DELIBERATELY UNDERSIZED. This is not a capacity plan and
+  # must not be "corrected" upward because it looks small - it is an image-pull
+  # rate limiter, and the small number is the whole mechanism.
+  #
+  # Why: zuno-ai-run's Jobs pull multi-GiB images (garak is 4.22 GiB, the
+  # LM-Eval prefetch images similar) and land on control-plane nodes that have
+  # ~11 GiB of headroom above their eviction threshold, on a cluster whose etcd
+  # nodes carry the smallest disks and are schedulable. A single cold pull eats
+  # a third of that; concurrent pulls are what tipped a node into DiskPressure
+  # and evicted 55 pods on 2026-09-03. Kueue cannot make that node safe, but it
+  # can bound how many of those pulls happen at once, which turns an unbounded
+  # worst case into a bounded one.
+  #
+  # Sized from admitted usage read live off the Workload objects, NOT from the
+  # templates - and note the istio sidecar does NOT count: Kueue builds the
+  # Workload from the Job's pod template, while injection happens later at pod
+  # creation, so admitted usage is the app container alone (verified: garak
+  # admits as exactly 500m/1Gi in a mesh-injected namespace).
+  #
+  #   garak-smoke / garak-security   500m / 1Gi     <- the 4.22 GiB image
+  #   ragas-eval                     250m / 512Mi   <- internal registry
+  #   *-mmlu-cache-prefetch (x3)     100m / 256Mi   <- multi-GiB LM-Eval image
+  #   day2-stresstest-* (x4)         200m / 256Mi   <- python:3.12-slim
+  #
+  # 750m/1536Mi therefore blocks the two combinations that matter: two garak
+  # Jobs together (1000m) and garak alongside the three prefetch Jobs (800m),
+  # i.e. no two big-image pulls are ever admitted concurrently. Small
+  # workloads still flow - garak+ragas fits exactly, three prefetch Jobs fit,
+  # three of the four stresstest Jobs fit.
+  #
+  # Raising this re-permits concurrent multi-GiB pulls. If you need to, raise
+  # it and say so in the commit message rather than treating it as a tuning
+  # detail.
+  cpuQuota: 750m
+  memoryQuota: 1536Mi
   # GPU quota, against the real MIG topology (ADR-0351). Read live from
   # both `machine.startx.io/group=gpu` nodes 2026-09-03: each allocates
   # mig-1g.24gb: 2 and mig-2g.48gb: 1, so the cluster-wide totals are 4
