@@ -39,4 +39,13 @@ spec:
       default: true
       configMaps:
         - {{ .Values.nemoGuardrails.configMapName }}
+{{- with .Values.nemoGuardrails.pod }}
+  # Pod-level scheduling constraints, passed through verbatim from
+  # values.yaml. Present so the server image pull cannot land on a
+  # control-plane node again - see the values.yaml comment for what
+  # happened when scheduling was left free.
+  template:
+    pod:
+      {{- toYaml . | nindent 6 }}
+{{- end }}
 {{- end }}

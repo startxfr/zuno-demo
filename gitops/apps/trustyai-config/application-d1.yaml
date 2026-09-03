@@ -35,8 +35,14 @@ spec:
         # evicted cluster-wide). Backed out to stop the pull-retry loop
         # while the node is under pressure. Re-enable once the node has
         # headroom - the chart and the CR shape are unchanged and proven.
+        #
+        # RE-ENABLED 2026-09-03, with the cause addressed rather than
+        # waited out: all six nodes read DiskPressure=False, and the
+        # chart now pins the pod off the control-plane nodes
+        # (nemoGuardrails.pod in values.yaml), which is where the
+        # headroom actually is. The rollback is this one value.
         nemoGuardrails:
-          enabled: false
+          enabled: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

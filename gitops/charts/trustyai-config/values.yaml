@@ -76,6 +76,29 @@ nemoGuardrails:
   configId: zuno-observe
   configMapName: zuno-nemo-rails-observe
   replicas: 1
+  # WP-120 2026-09-03: keep this pod OFF the control-plane nodes. The
+  # first deployment left scheduling free, its ~multi-GB server image
+  # pull landed on master ip-10-18-31-92, and that node crossed its
+  # DiskPressure threshold four minutes later - 43 pods evicted
+  # cluster-wide (see gitops/apps/trustyai-config/application-d1.yaml).
+  # The three masters here are schedulable workers too AND are exactly
+  # the nodes with the least image-filesystem headroom (21-27GB free
+  # vs 62-153GB on the plain/GPU workers, read live 2026-09-03), so an
+  # unconstrained pull lands in the worst available place roughly half
+  # the time. Excluding them is the mitigation, not a preference.
+  #
+  # `oc explain nemoguardrails.spec.template.pod` (live 2026-09-03)
+  # confirms affinity, nodeSelector and tolerations are all exposed;
+  # the whole block is passed through verbatim by the template, so
+  # nodeSelector/tolerations can be added here without a code change.
+  pod:
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node-role.kubernetes.io/master
+                  operator: DoesNotExist
 
 # WP-108: one bounded Garak scan against the local qwen predictor,
 # proving the shipped scanner runs end-to-end and emits a report.
