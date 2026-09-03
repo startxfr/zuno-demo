@@ -98,14 +98,39 @@ monitors predictive-model bias and this platform serves generative models.
   `conditions`.
 - The `{0,2}` filler window in the injection patterns is load-bearing: the 2026-09-02 live test
   (run `d9445c2a`) proved `ignore all PREVIOUS instructions` slips a single-filler pattern.
+- **The ConfigMap key must be `config.yaml`.** The NeMo library accepts either spelling; the
+  RHOAI image's startup wrapper checks the `.yaml` name by hand and exits before the library
+  runs. Live, that one character CrashLoopBackOff'd the server after a ~14GB image pull.
+- **The server's image is ~14GB and its pod must not schedule on a control-plane node.** The
+  first deployment left scheduling free, landed on a master with 21GB of image-filesystem
+  headroom, and evicted 43 pods cluster-wide. `nemoGuardrails.pod` excludes both
+  `node-role.kubernetes.io/control-plane` and the deprecated `-master`.
+- **The CRD forbids `spec.replicas: 0`** (minimum 1), and the operator reconciles a directly
+  scaled Deployment straight back — so "scale the observer to zero" is not an available way to
+  test the unavailable path. Black-holing `GUARDRAILS_NEMO_URL` is.
 
 ## Migration / evolution
 
-Executed by [WP-120](../roadmap/work-packages/wp-120-guardrail-policy-as-nemo-rails.md). Future:
-flipping `guardrails.backend` to `nemo` by default once the live proof passes, which is also the
-commit that deletes `DETECTOR_PARAMS` and its parity test; and, separately and later, ADR-0534's
-observe-to-block decision, which this work makes cheaper by putting the policy where a reviewer
-can read it.
+Executed by [WP-120](../roadmap/work-packages/wp-120-guardrail-policy-as-nemo-rails.md).
+`guardrails.backend` was flipped to `nemo` on 2026-09-03 once the live proof passed.
+
+Decision 4's second half — deleting `DETECTOR_PARAMS` and `PolicyParityWithRails` in that same
+commit — was deliberately **not** executed, and the deviation is open. The reasoning the decision
+gives for retaining the dict ("deleting it now would drop the injection heuristics from the
+fallback path") does not stop applying at the flip: this ADR keeps the `GuardrailsOrchestrator`
+as the fallback in its Non-goals, and `DETECTOR_PARAMS` is that fallback's entire policy. Deleting
+it makes `backend: builtin` an observer with nothing to apply, so the rollback for the flip would
+be a switch to a detector that finds nothing. Closing WP-120 means resolving this either way —
+deleting both, or superseding Decision 4's "same commit" wording.
+
+Separately and later: ADR-0534's observe-to-block decision, which this work makes cheaper by
+putting the policy where a reviewer can read it.
+
+Live evidence, 2026-09-03 (see WP-120 for the full gate). Decision 2's cost claim holds in
+practice — `llm_calls_count: 0`, `dialog_rails_duration: null` — but only on the exact request
+shape: `config_id` and `options` nest under `guardrails`, and a `model` field is required though
+no rail resolves it. At the top level `options` is silently DROPPED rather than rejected, the
+dialog rails then run, and the request needs an LLM the config does not have.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Consequences,
 Security considerations, Acceptance criteria and Review evidence.
