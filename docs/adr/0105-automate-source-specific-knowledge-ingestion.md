@@ -115,6 +115,34 @@ the AAP job-template path hit an unrelated `aap-installer` RBAC gap on
   confluence.json`) persisted independently - the exact race WP-100's
   `_changeset_key`/`_owned_by_this_run` scoping was built to survive.
 
+## Amended (2026-09-03)
+
+WP-100's amendment above closed the domain-vs-adapter granularity gap for
+`knowledge.tech` (one schedule per source-adapter: `fetch-redhat` weekly,
+`fetch-confluence` every 6h) but left `fetch-redhat` itself as a single,
+strictly-serial 112-source pipeline — a live run triggered during WP-112's
+closure verification confirmed this takes multiple hours end to end, with
+no way to scope a subset. Measuring the source list live showed why: Red
+Hat OpenShift Container Platform alone is 76 of the 112 entries (68%);
+every other product family has only 1-2 entries and sat queued behind
+OpenShift's runtime for no reason.
+
+WP-129 takes the same per-source cadence principle one level deeper: the
+renamed `fetch-oss-docs` adapter (generalized to also crawl real upstream
+OSS doc sites, not just docs.redhat.com — closing the `qa-go`-class gap
+this ADR's sources never covered) now backs **18 independently-scheduled
+per-family KFP pipelines** (`redhat-openshift`, `redhat-aap`, `argocd`,
+`helm`, …) instead of one, fully staggered across the week so no two
+`knowledge.tech` pipelines ever run concurrently, still sharing
+`knowledge.tech`'s single database (ADR-0202 unaffected). This also closes
+a concurrency gap WP-100's own split left open: `detect-changes` scanning
+a shared, unscoped S3 raw prefix meant sibling pipelines could pick up
+each other's newly-fetched docs, and `manifest.json`'s unlocked
+read-modify-write could silently lose a sibling's orphan-deletions — see
+WP-129 for the per-source S3-prefix-suffixing fix, the same pattern
+`domain-configmaps.yaml` already used per domain, applied one level
+deeper and backported to `fetch-confluence` too.
+
 ## Related ADRs
 
 - [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md)

@@ -28,7 +28,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.3 | 16 | 1 | 18 | WP-34, WP-119 |
 | v0.4 | 34 | 9 | 27 | WP-55, WP-093, WP-101, WP-112 |
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
-| v0.6 | 4 | — | 5 | WP-101 |
+| v0.6 | 4 | — | 6 | WP-101, WP-129 |
 | v0.7 | 14 | 12 | 25 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119, WP-125, WP-126 |
 | v0.8 | 3 | 2 | 2 | — |
 | v0.9 | 4 | 3 | 4 | — |
@@ -495,18 +495,25 @@ Config-content only - no code change, no new provider, no infrastructure impact.
 |---|---|---|---|---|---|
 | WP-096 | [wp-096](work-packages/wp-096-qwen35-9b-fleet-default-and-ovh-reasoning-rollout.md) | 0531 | WP-087, WP-092 | Done (live-verified 2026-08-30 — ai-gateway rebuilt/rolled out, routing checks confirmed live, zero model-pod churn) | none |
 
-### Phase 24 — knowledge.tech per-source ingestion cadence split (added 2026-08-30)
+### Phase 24 — knowledge.tech per-source ingestion cadence split (added 2026-08-30; extended to per-family 2026-09-03)
 WP-22 implemented ADR-0105's per-source cadence decision at domain
 granularity only; `knowledge.tech`'s two independent sources
 (fetch-redhat, fetch-confluence) still shared one schedule and one KFP
 pipeline. WP-100 gives them independent schedules (redhat weekly,
 confluence every 6h) and closes the detect-changes/changeset
 concurrency-isolation gap that independent scheduling exposed, without
-splitting `knowledge.tech`'s single database (ADR-0202).
+splitting `knowledge.tech`'s single database (ADR-0202). WP-129 takes the
+same principle one level deeper: `fetch-redhat`'s single 112-source,
+multi-hour-serial pipeline (76 of those 112 entries are just OpenShift)
+becomes a generalized `fetch-oss-docs` adapter backing 18 independently
+and fully staggered per-family pipelines, and fixes the shared-raw-prefix/
+unlocked-manifest races WP-100's split left open (one of them
+pre-existing, not introduced by WP-129).
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-100 | [wp-100](work-packages/wp-100-split-tech-ingestion-cadence-by-source.md) | 0105 (amended) | WP-22 | Done (2026-08-30) | none |
+| WP-129 | [wp-129](work-packages/wp-129-rag-ingestion-per-family-pipelines.md) | 0105 (amended again) | WP-100 | Repo work merged (2026-09-03) | not yet deployed - apply the 19 PipelineVersions/ConfigMaps/schedules live, confirm a real per-family document-count delta, exercise the concurrent-run race fix, then compare argocd/helm corpus quality before dropping the Red Hat chapter stopgap entries; see WP-129 "Remaining" |
 
 ### Phase 25 — Salesforce sandbox credential provisioning (added 2026-08-30)
 Three separate "blocked on sandbox" notes — WP-22/ADR-0218's `fetch-salesforce`
