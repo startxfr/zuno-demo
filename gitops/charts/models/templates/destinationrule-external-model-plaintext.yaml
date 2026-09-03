@@ -1,0 +1,69 @@
+{{- /*
+WP-124: the necessary counterpart to the ExternalModel CRs in this same
+chart. From each of them, `maas-controller` generates a ServiceEntry (443,
+protocol HTTPS) AND a DestinationRule with trafficPolicy.tls.mode: SIMPLE -
+i.e. it tells every mesh client's Envoy to ORIGINATE TLS to that host. But
+ai-gateway already speaks TLS end to end: platform/ai-gateway/
+provider-routing.yaml and image-provider-routing.yaml both declare
+`https://` endpoints, and its OpenAI/Mistral clients verify with the
+image's own certifi bundle. So Envoy was handed bytes that are already a
+TLS ClientHello and asked to wrap them in a second TLS layer.
+
+Live symptom (2026-09-03, found while verifying WP-112): ai-gateway had
+NEVER opened a single connection to either provider. Envoy's own counters -
+`pilot-agent request GET clusters` in its istio-proxy - showed
+cx_connect_fail == cx_total with rq_total 0 for both hosts (79 attempts,
+zero successes, all response_flags UF,URX). Every C2/C3 request silently
+fell back to a local model, with no alert and no failing health check.
+Surfaced to users only as `image provider 'ovhcloud-sdxl' failed:
+Connection error` -> 502 on /v1/images/generations.
+
+It was NOT an outage and NOT a NetworkPolicy: a non-mesh pod on the same
+node gets OVHcloud 200 / Mistral 401 with a sub-80ms handshake, and this
+chart's clients have no egress policy. It was also NOT the mesh-wide SDS
+`service-ca.crt` loop that ADR-0411 calls so-far-benign, nor ai-gateway's
+automountServiceAccountToken: false - those clusters validate against the
+`file-root:system` SDS resource, which is active and healthy, and
+mcp-gateway (which DOES have the service-ca.crt file) fails identically.
+The differentiator is only the ServiceEntry+DestinationRule pair: from the
+same mesh pod, github.com - which has no ServiceEntry, so it takes
+PassthroughCluster - returns 200.
+
+mode: DISABLE pins client-side TLS origination off for these hosts, so
+Envoy passes the application's own TLS through untouched. Same shape as
+this repo's mariadb-plaintext and postgres *-plain-5432 DestinationRules.
+
+workloadSelector, not a bare host rule: the controller-owned DestinationRule
+targets the same host in the same namespace, and two such rules otherwise
+resolve by an unpredictable oldest-wins tiebreak. A workloadSelector rule
+takes precedence over a selector-less one for the workloads it matches, so
+this wins deterministically and touches nothing but ai-gateway. Istio here
+is v1.30.3.
+
+Deliberately NOT excludeOutboundPorts: "443" (the escape hatch used for
+port 8000 in gitops/charts/ai-gateway/templates/deployment.yaml): 443
+carries every outbound HTTPS call ai-gateway makes, so excluding it would
+pull far more than these two hosts out of the mesh.
+*/}}
+{{- range $key, $model := .Values.externalModels }}
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: {{ $model.name }}-plaintext
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/name: models
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  # workloadSelector wins over the controller-owned rule for this client.
+  workloadSelector:
+    matchLabels:
+      app.kubernetes.io/name: ai-gateway
+  host: {{ $model.endpoint }}
+  trafficPolicy:
+    tls:
+      mode: DISABLE
+---
+{{- end }}

@@ -10,12 +10,11 @@
   prose narration anywhere in the run, and `sxa_visualization_boundary`
   still passing. Both named checks nonetheless still report FAIL, for two
   reasons now understood and neither of them narration: (1) every external
-  SaaS provider is unreachable from `ai-gateway` because
-  `automountServiceAccountToken: false` denies its sidecar the root CA
-  that the MaaS `tls: SIMPLE` DestinationRules need - our own config
-  defect, wider than this WP, needs its own WP; (2) `img-mockup_request`
-  now gets a defensible grounding-based decline rather than a narration,
-  recorded as a finding. Widening `_NARRATED_TOOL_NAME_PATTERN` is no
+  SaaS provider is unreachable from inside the mesh, because the
+  `maas-controller` reconciler's `tls: SIMPLE` DestinationRules make Envoy
+  originate a second TLS layer over traffic `ai-gateway` already encrypts
+  - tracked as WP-124; (2) `img-mockup_request` now gets a defensible
+  grounding-based decline rather than a narration, recorded as a finding. Widening `_NARRATED_TOOL_NAME_PATTERN` is no
   longer the indicated next step - there is no narration left to detect.
   See "Live verification (2026-09-03, second run)" for the full evidence.
 - **ADRs:** ADR-0516 (Decision - the tool-schema/prompt contradiction ADR-0516
@@ -464,34 +463,49 @@ Evidence chain:
    `cx_total::49`, `cx_connect_fail::49`, `rq_total::0` - every
    connection since pod start has failed, none ever succeeded. Istio
    telemetry tags them `response_flags.UF,URX` with 0 bytes sent.
-2. Non-mesh pods (`cert-manager`, `trusted-artifact-signer`) **on the same
-   node** reach `51.68.117.147:443` fine, and so does the `istio-proxy`
-   container itself (its own UID is excluded from redirection). Only
-   Envoy's outbound path fails. A plain TCP probe from the app container
-   "succeeds" and proves nothing - it terminates on the sidecar.
-3. The MaaS reconciler's `DestinationRule gpt-oss-120b-ovhcloud` sets
-   `trafficPolicy.tls.mode: SIMPLE`, i.e. Envoy must originate TLS and
-   validate the upstream certificate.
-4. Its validation context is the SDS resource
-   `file-root:/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`,
-   which the sidecar cannot load - the directory does not exist in that
-   container, because `ai-gateway`'s Deployment sets
-   `automountServiceAccountToken: false`. `mcp-gateway`, which sets it
-   `true`, has the file and does not have this problem.
+   `api.mistral.ai` shows the same, `cx_connect_fail::30` / `rq_total::0`
+   across both its IPs.
+2. The endpoints themselves are healthy. From a non-mesh pod on the same
+   node, `curl` gets OVHcloud `http=200` and Mistral `http=401` (no API
+   key), TLS handshake under 80ms. This is not an outage.
+3. It is not pod-specific: `mcp-gateway` fails identically
+   (`Connection reset by peer`).
+4. It is not mesh egress in general: from that same mesh pod,
+   `https://github.com` returns `200`. github.com has no ServiceEntry, so
+   it goes through `PassthroughCluster` - raw TCP, no TLS origination.
 
-So the mesh-wide SDS `service-ca.crt` error loop, documented elsewhere as
-benign for ordinary mTLS, is **not** benign on this path: it removes the
-validation context a TLS-origination DestinationRule needs.
+The differentiator is precisely the pair the `maas-controller` reconciler
+generates from our `ExternalModel` CRs: a `ServiceEntry` (port 443,
+`protocol: HTTPS`, `resolution: DNS`) plus a `DestinationRule` with
+`trafficPolicy.tls.mode: SIMPLE`. `ai-gateway` already composes `https://`
+endpoints and terminates its own TLS, so that DestinationRule asks Envoy
+to originate a second, redundant TLS layer over bytes that are already a
+TLS ClientHello.
 
-**Blast radius is wider than SDXL.** `api.mistral.ai` carries the same
-`tls: SIMPLE` DestinationRule and shows `cx_connect_fail::30` /
-`rq_total::0` across both its IPs. Every external SaaS provider is
-unreachable from `ai-gateway`, and has been since that pod started - the
-platform has been silently falling back to local models.
+**Correction to an earlier version of this section.** It claimed the cause
+was `automountServiceAccountToken: false` starving the sidecar of
+`/var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt`, and that
+the mesh-wide SDS error loop about that file is therefore not benign.
+**That was wrong on two independent counts**, both checked live: Envoy's
+`config_dump` shows these clusters validate against SDS resource
+`file-root:system`, which is in `dynamic_active_secrets` (provisioned and
+healthy) - the failing `service-ca.crt` resource sits in
+`dynamic_warming_secrets` and is not referenced by them; and
+`mcp-gateway`, which runs `automountServiceAccountToken: true` and does
+have the file, fails exactly the same way. The SDS loop is benign here as
+documented; it is not this defect. (`ai-gateway`'s existing
+`excludeOutboundPorts: "8000"` workaround and its
+`caCertificates`-based rationale concern a *different* DestinationRule and
+remain correct for their own case.)
+
+**Blast radius.** Every external SaaS provider is unreachable from
+`ai-gateway`, and has been since that pod started - the platform has been
+silently falling back to local models.
 
 Out of scope for WP-112 (this WP's code and prompt are correct and
-proven); needs its own WP. WP-112 cannot show `images=1` on either named
-check until it is fixed.
+proven); tracked as
+[WP-124](wp-124-ai-gateway-external-saas-mesh-egress.md). WP-112 cannot
+show `images=1` on either named check until that is fixed.
 
 ## Acceptance checks (for this WP's own scope)
 
