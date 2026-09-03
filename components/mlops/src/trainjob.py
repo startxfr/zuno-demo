@@ -28,12 +28,8 @@ the convention.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
-import socket
-import ssl
-import subprocess
 import sys
 import time
 from typing import Any, Dict, List, Optional
@@ -74,6 +70,17 @@ def _session() -> "requests.Session":
     session = requests.Session()
     session.headers["Authorization"] = f"Bearer {_read('token')}"
     session.verify = os.path.join(_SA_DIR, "ca.crt")
+    # The KFP v2 launcher_v2 binary (this module's actual parent process,
+    # via emissary) sets REQUESTS_CA_BUNDLE/SSL_CERT_FILE for the user
+    # command it execs, pointing at its own merged CA temp file - which on
+    # this UBI image is missing the system CAs (it assumes the Debian path
+    # /etc/ssl/certs/ca-certificates.crt) AND never includes the
+    # kube-apiserver's own signer. `requests` only honors an explicit
+    # `session.verify` when neither the call site nor Session.request()'s
+    # own verify=None default triggers env lookup first - trust_env=False
+    # is required so a launcher-set REQUESTS_CA_BUNDLE cannot silently
+    # replace this session's correct SA ca.crt.
+    session.trust_env = False
     return session
 
 
@@ -144,53 +151,7 @@ def build_trainjob(*, run_id: str, agent: str, environ: Optional[Dict[str, str]]
     return body
 
 
-def _debug_tls() -> None:  # pragma: no cover - WP-126 temporary diagnostic, remove after root-cause
-    tag = "[trainjob][debug]"
-    try:
-        proxy_keys = ("HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy",
-                      "no_proxy", "ALL_PROXY", "all_proxy", "REQUESTS_CA_BUNDLE",
-                      "CURL_CA_BUNDLE", "SSL_CERT_FILE", "SSL_CERT_DIR")
-        for key in proxy_keys:
-            if key in os.environ:
-                print(f"{tag} env {key}={os.environ[key]!r}", flush=True)
-        print(f"{tag} all env keys: {sorted(os.environ.keys())}", flush=True)
-        print(f"{tag} ssl.get_default_verify_paths()={ssl.get_default_verify_paths()}", flush=True)
-
-        ca_path = os.path.join(_SA_DIR, "ca.crt")
-        st = os.stat(ca_path)
-        print(f"{tag} {ca_path} size={st.st_size} mtime={st.st_mtime}", flush=True)
-
-        host = "kubernetes.default.svc"
-        unverified = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
-        unverified.check_hostname = False
-        unverified.verify_mode = ssl.CERT_NONE
-        with socket.create_connection((host, 443), timeout=10) as sock:
-            with unverified.wrap_socket(sock, server_hostname=host) as ssock:
-                der = ssock.getpeercert(binary_form=True)
-                print(f"{tag} peer cert sha256={hashlib.sha256(der).hexdigest()} len={len(der)}", flush=True)
-                pem = ssl.DER_cert_to_PEM_cert(der)
-                try:
-                    out = subprocess.run(
-                        ["openssl", "x509", "-noout", "-issuer", "-subject", "-dates"],
-                        input=pem, capture_output=True, text=True, timeout=10,
-                    )
-                    print(f"{tag} peer cert details:\n{out.stdout}{out.stderr}", flush=True)
-                except Exception as exc:  # openssl CLI unavailable or failed
-                    print(f"{tag} openssl decode failed: {exc!r}", flush=True)
-
-        verified = ssl.create_default_context(cafile=ca_path)
-        try:
-            with socket.create_connection((host, 443), timeout=10) as sock:
-                with verified.wrap_socket(sock, server_hostname=host):
-                    print(f"{tag} verified handshake against {ca_path} OK", flush=True)
-        except Exception as exc:
-            print(f"{tag} verified handshake against {ca_path} FAILED: {exc!r}", flush=True)
-    except Exception as exc:
-        print(f"{tag} diagnostic itself failed: {exc!r}", flush=True)
-
-
 def _find_existing(session, namespace: str, run_id: str) -> Optional[Dict[str, Any]]:
-    _debug_tls()
     resp = session.get(_url(namespace), params={"labelSelector": f"zuno.io/run-id={run_id}"}, timeout=30)
     resp.raise_for_status()
     items = resp.json().get("items") or []
