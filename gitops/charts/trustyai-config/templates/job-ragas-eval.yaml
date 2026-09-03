@@ -34,6 +34,11 @@ spec:
         app.kubernetes.io/name: lm-eval
         app.kubernetes.io/component: ragas-eval
     spec:
+      {{- with .Values.kueue.priorityClassName }}
+      # ADR-0545/WP-127 - see values.yaml's kueue.priorityClassName comment
+      # for why this ships empty by default (Replace=true recreation risk).
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       restartPolicy: Never
       containers:
         - name: ragas

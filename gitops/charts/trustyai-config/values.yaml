@@ -55,6 +55,20 @@ kueue:
   # un-queues nothing; only removing the namespace label does that.
   queueName: default
 
+  # ADR-0545/WP-127: same ship-empty convention as queueName above, and for
+  # the same Replace=true,Force=true recreation reason - gates
+  # priorityClassName on job-garak-security.yaml and job-ragas-eval.yaml
+  # (job-garak-smoke.yaml deliberately excluded: a lightweight smoke check,
+  # not a quality/security gate). Reuses the existing scheduling.k8s.io
+  # PriorityClass hierarchy (gitops/charts/admin-context) rather than a new
+  # Kueue-native WorkloadPriorityClass CRD - Kueue already derives a
+  # Workload's spec.priority from the pod template's priorityClassName.
+  # Recommended value once flipped: zuno-workload-default (100) - above
+  # day2-stresstest's zuno-platform-weak (1), below platform-important/
+  # -critical. Flipping it recreates both Jobs (garak-security alone pulls
+  # a 4.22 GiB image) - stage them, do not sync together, watch node disk.
+  priorityClassName: ""
+
 # WP-108: standalone built-in guardrails detectors (no orchestrator, no
 # InferenceService wiring - see templates/guardrailsorchestrator.yaml).
 guardrailsSmoke:

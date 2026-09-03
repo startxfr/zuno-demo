@@ -29,7 +29,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.4 | 34 | 9 | 27 | WP-55, WP-093, WP-101, WP-112 |
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 5 | WP-101 |
-| v0.7 | 14 | 12 | 25 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119, WP-125, WP-126, WP-127, WP-128 |
+| v0.7 | 14 | 12 | 25 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119, WP-125, WP-126 |
 | v0.8 | 2 | 1 | 2 | — |
 | v0.9 | 4 | 3 | 4 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -730,8 +730,8 @@ dependency on the already-merged WP-119.
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-126 | [wp-126](work-packages/wp-126-finalize-lora-trainjob.md) | 0545, 0539, 0538 | WP-119 | Not started | confirm before the live steps (real GPU burst-node scale-up), then run one real LoRA training end to end |
-| WP-127 | [wp-127](work-packages/wp-127-kueue-workload-priority-classes.md) | 0545 | WP-117 | Not started | review and approve the proposed WorkloadPriorityClass tiers before any future WP applies them live |
-| WP-128 | [wp-128](work-packages/wp-128-inferencegraph-rag-research.md) | 0545 | none | Not started | review the reranker/InferenceGraph recommendation; a new WP/ADR is needed if a reranker is adopted |
+| WP-127 | [wp-127](work-packages/wp-127-kueue-workload-priority-classes.md) | 0545 | WP-117 | Done (2026-09-03) | recentered mid-flight: LLMInferenceService predictors are not Kueue-managed, so agent-serving protection was out of reach; Kueue also already derives Workload priority from the pod's standard PriorityClass, so no new WorkloadPriorityClass CRD was introduced. Design lands as a values-gated, ship-empty-by-default `kueue.priorityClassName` on `job-lmeval-cache-prefetch`/`job-garak-security`/`job-ragas-eval` (`zuno-workload-default`, 100), correcting the accidental gap where quality/security-gate Jobs sat one priority notch below day2-stresstest. `oc explain lmevaljob.spec.pod` found the LMEvalJob CRD itself exposes no `priorityClassName` field - the MMLU run's own pod priority stays unchanged, a real CRD limitation, not routed around. `helm template` verified inert at defaults and correct when flipped; no live apply in this WP (Replace=true,Force=true on all three Jobs would recreate them - see the diskpressure-master-cascades-into-mesh precedent) - operator action remaining is a staged live rollout, one Job at a time, watching node disk |
+| WP-128 | [wp-128](work-packages/wp-128-inferencegraph-rag-research.md) | 0545 | none | Done (2026-09-03) | recommendation: no reranker for now. Confirmed via full code read that neither rag-service provider (pgvector RRF+metadata, OGX client-side filtering) calls a second model anywhere; no documented quality gap (the one live RAGAS sample is excellent but too small to trust); the GPU quota that would host a reranker is already saturated (ADR-0542). InferenceGraph-vs-direct-call is therefore moot until a reranker is actually wanted - revisit on degraded RAGAS at scale or a documented relevance complaint |
 
 
 ### OKF stream phases

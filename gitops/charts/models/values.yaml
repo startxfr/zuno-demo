@@ -19,6 +19,28 @@ clusterBaseDomain: apps.mycluster.example.com
 # clusters, or a deliberate consolidation) without editing templates.
 spreadAcrossGpuNodes: true
 
+# ADR-0545/WP-127: Kueue queueing priority for this chart's two lm-eval
+# Jobs (lmevaljob.yaml, job-lmeval-cache-prefetch.yaml), reusing the
+# existing scheduling.k8s.io PriorityClass hierarchy
+# (gitops/charts/admin-context) rather than a new Kueue-native
+# WorkloadPriorityClass CRD - Kueue already derives a Workload's
+# spec.priority from the pod template's priorityClassName. Ships EMPTY on
+# purpose, same convention and for the same reason as
+# gitops/charts/trustyai-config's kueue.queueName: both target Jobs carry
+# argocd.argoproj.io/sync-options: Replace=true,Force=true (a Job's
+# spec.template is immutable), so ANY rendered-metadata change deletes and
+# recreates them - job-lmeval-cache-prefetch.yaml's own comment documents
+# measuring that pattern take a control-plane node from 85% image-filesystem
+# usage to DiskPressure in 22 seconds (see memory
+# diskpressure-master-cascades-into-mesh). An empty value renders no field
+# at all, so this commit changes nothing live; flipping it is a deliberate,
+# watched operator action (stage the two Jobs' recreation, do not sync both
+# at once, watch node disk). Recommended value once flipped:
+# zuno-workload-default (100) - above day2-stresstest's zuno-platform-weak
+# (1), below platform-important/-critical.
+kueue:
+  priorityClassName: ""
+
 # ADR-0537 (WP-106, Phase 1/2): RHOAI HardwareProfile CRs (
 # infrastructure.opendatahub.io/v1), one per MIG tier already in use below,
 # so the Dashboard shows a hardware profile for these models the same way

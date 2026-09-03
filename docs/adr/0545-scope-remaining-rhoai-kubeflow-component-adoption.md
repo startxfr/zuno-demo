@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Target:** v0.7
-- **Date:** 2026-09-03
+- **Date:** 2026-09-03 (amended 2026-09-03)
 - **Decision owners:** Zuno Demo architecture team
 
 ## Context
@@ -47,12 +47,32 @@ embed→rerank" but "do we want a reranker at all."
    Kubeflow Trainer controller has had 15 usable `ClusterTrainingRuntime`s and zero consumers
    since install, and a designed-but-never-run mechanism is exactly the kind of drift this repo's
    own conventions (ADR-0323, `check_docs.py`) exist to catch elsewhere.
-2. **Explore Kueue `WorkloadPriorityClass` for `zuno-ai-run` (WP-127).** Design (not yet apply) a
-   small set of priority tiers - agent-serving inference above evaluation batches
-   (MMLU/garak/ragas) above day2-stresstest - so client-facing inference is never queued behind
-   internal batch under a saturated GPU quota. Scoped as research/design first, not a live change:
-   the quota-saturation problem is real and measured (ADR-0542), but the right tier boundaries are
-   not yet known and a wrong first cut would be disruptive to reverse under production load.
+2. **Explore Kueue-aware priority ordering for `zuno-ai-run`'s batch Jobs (WP-127).** Design (not
+   yet apply) a small set of priority tiers so quality/security-gate batch Jobs are never queued
+   behind lower-stakes batch under a saturated GPU quota. Scoped as research/design first, not a
+   live change: the quota-saturation problem is real and measured (ADR-0542), but the right tier
+   boundaries are not yet known and a wrong first cut would be disruptive to reverse under
+   production load.
+
+   *Amended 2026-09-03 (WP-127)* - the original text above named `WorkloadPriorityClass` and
+   framed the goal as protecting agent-serving inference from batch delay. Both are corrected by
+   what WP-127's own research found: `LLMInferenceService` predictors are not Kueue-managed at
+   all (`kueueOperand.integrationFrameworks: [BatchJob]` is the only integration enabled, per
+   `gitops/charts/kueue/values.yaml`) - Kueue cannot delay a workload it never admits, so
+   protecting serving from batch is not achievable through Kueue and is not this WP's goal.
+   Separately, Kueue was found to already derive a `Workload`'s `spec.priority` from the pod's
+   standard Kubernetes `priorityClassName` (live-proven: `day2-stresstest-*` Jobs, which set
+   `priorityClassName: zuno-platform-weak`, get `spec.priority: 1`; every other batch Job in
+   `zuno-ai-run` - LMEval MMLU, its cache-prefetch, `job-garak-security`, `job-garak-smoke`,
+   `job-ragas-eval` - sets no `priorityClassName` and gets `spec.priority: 0`), so introducing a
+   new Kueue-native `WorkloadPriorityClass` CRD would duplicate a mechanism that already works.
+   The corrected goal: reuse the existing `PriorityClass` hierarchy
+   (`gitops/charts/admin-context/templates/priorityclass-*.yaml`) to order batch Jobs against each
+   other - concretely, today's quality/security-gate Jobs (MMLU, garak-security, ragas) sit at
+   `spec.priority: 0`, *below* the day2-stresstest drills at `1`, which is not intentional and is
+   the real problem this WP now targets. Protecting agent-serving from GPU contention is a
+   separate, native-Kubernetes concern (`ResourceQuota`/pod-preemption, not Kueue) and is logged
+   here as a candidate for a future ADR, not part of WP-127.
 3. **Evaluate InferenceGraph for the RAG pipeline only (WP-128).** First resolve whether a
    reranker is wanted at all (none is served today); only if so, compare a declarative
    `InferenceGraph` composing `embeddings`→reranker against the status quo of composing them in

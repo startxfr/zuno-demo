@@ -70,6 +70,11 @@ spec:
         app.kubernetes.io/name: lm-eval
         app.kubernetes.io/component: model-quality-gate
     spec:
+      {{- with $.Values.kueue.priorityClassName }}
+      # ADR-0545/WP-127 - see values.yaml's kueue.priorityClassName comment
+      # for why this ships empty by default (Replace=true recreation risk).
+      priorityClassName: {{ . | quote }}
+      {{- end }}
       # Keep these prefetches off the control-plane nodes (2026-09-03).
       # This is the lever the Replace=true comment above names: on demo222
       # the masters are schedulable (control-plane,master,worker) on 99.4
