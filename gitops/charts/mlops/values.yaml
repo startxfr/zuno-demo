@@ -154,6 +154,11 @@ pipelineServer:
   name: mlops-dspa
   pipelineStore: kubernetes
   cacheEnabled: true
+  # ADR-0545/WP-126: name only - ansible/roles/mlops/tasks/install.yml
+  # owns this ConfigMap's data (merged Vault root + openshift-service-ca).
+  trustedCABundle:
+    configMapName: dsp-mlflow-trust-mlops-dspa
+    configMapKey: ca-bundle.crt
   # Switched to externalMySQL: embeddedMariaDB mode (DSPO's own
   # self-managed pod) has no way to exclude port 3306 from istio's
   # protocol-sniffing interception (no such field on the DSPA CRD's

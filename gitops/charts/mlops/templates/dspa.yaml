@@ -19,6 +19,17 @@ spec:
     pipelineStore: {{ .Values.pipelineServer.pipelineStore }}
     cacheEnabled: {{ .Values.pipelineServer.cacheEnabled }}
     enableSamplePipeline: false
+    # ADR-0545/WP-126: trust both the cluster-wide Vault root AND the
+    # openshift-service-serving-signer CA (MLflow's, WP-116) - the
+    # operator's own odh-trusted-ca-bundle auto-detection only ever
+    # provides the former. The ConfigMap's DATA is ansible-managed
+    # (ansible/roles/mlops/tasks/install.yml) - it concatenates two live
+    # cluster sources Helm cannot see at chart-render time; only this name
+    # reference is templated here, same split as
+    # gitops/charts/openshift-oauth's keycloak-serving-ca.
+    cABundle:
+      configMapName: {{ .Values.pipelineServer.trustedCABundle.configMapName }}
+      configMapKey: {{ .Values.pipelineServer.trustedCABundle.configMapKey }}
   workflowController:
     deploy: true
   mlmd:

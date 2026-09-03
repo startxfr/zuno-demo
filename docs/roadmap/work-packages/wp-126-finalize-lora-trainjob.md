@@ -56,7 +56,47 @@ LoRA training run, closing the gap the Kubeflow Trainer controller has had since
    `events` read-only) and its RoleBinding lists both `zuno-mlops-d1-mlops` and
    `pipeline-runner-mlops-dspa` as subjects - exactly WP-119's documented requirement.
 
-## Live actions (confirm before running)
+## Live actions (confirm before running) - two real defects found and fixed en route, 2026-09-03
+
+Triggering the first real run (`kfp` SDK against the `mlops-dspa` route, `oc apply
+--dry-run=server`-verified beforehand) surfaced two independent, previously-invisible defects,
+neither in this WP's original scope:
+
+1. **DSP api-server could not create ANY run, for any pipeline - not specific to training.**
+   `CreateRun` calls MLflow (WP-116's tracking integration) at `https://mlflow.
+   redhat-ods-applications.svc:8443`; the DSP api-server pod rejected its certificate
+   (`x509: certificate signed by unknown authority`), retried for ~30s, then failed the whole
+   run-creation server-side (`ds-pipeline-api-server` logs: `client rate limiter Wait returned an
+   error: context canceled`). Root cause: MLflow's cert is signed by
+   `openshift-service-serving-signer` (confirmed via its Service's
+   `service.beta.openshift.io/serving-cert-*` annotations and the `mlflow-tls` Secret), but the
+   DSP api-server's trust bundle (`dsp-trusted-ca-mlops-dspa` ConfigMap, key `dsp-ca.crt`) only
+   ever carried the project's own Vault-issued root (CN `zuno-demo.internal`, sourced from the
+   cluster-wide `user-ca-bundle`/`Proxy.spec.trustedCA` via the RHOAI operator's own
+   `odh-trusted-ca-bundle` auto-detection) - a completely different CA, never previously exercised
+   against an in-cluster service-ca-signed endpoint. **Fixed live**: a new ConfigMap
+   (`dsp-mlflow-trust-mlops-dspa`, `zuno-mlops`) concatenates the Vault root
+   (`user-ca-bundle`/`ca-bundle.crt` in `openshift-config`) with the namespace's own
+   `openshift-service-ca.crt`/`service-ca.crt`, referenced via
+   `mlops-dspa.spec.apiServer.cABundle`. The operator merges this into the SAME
+   `dsp-trusted-ca-mlops-dspa`/`dsp-ca.crt` file rather than switching ConfigMaps (confirmed by
+   its size growing by exactly the new content's byte count) - the deployment needs an explicit
+   `oc rollout restart` afterward, since the pod does not reload its trust store from the changed
+   file on its own. **Not yet backported to GitOps** - live-only fix, see Follow-up below.
+2. **The running `mlops:latest` image predates WP-119 by two commits and has no dispatcher at
+   all.** The first real run's `train-lora` step executed `stage_train_lora`'s OLD body (`import
+   tempfile` inline, no `import trainjob`) straight into the S3 base-model download - on a
+   100m-CPU/512Mi-memory submitter pod sized for a lightweight TrainJob-submit call, not an
+   in-process 9B-parameter load. Confirmed via `oc exec`: `/opt/app-root/src/trainjob.py` does not
+   exist in the image at all, and `MLOPS_TRAINJOB_ENABLED=true` was correctly present in the pod's
+   own env (so the *chart* wiring was right - the *image* was simply stale). The last build
+   (`mlops-30`, `oc get builds -n zuno-ai-build`) was from commit `7141a6f` ("WP-116 phase 4"),
+   which predates `07c5fb02` ("WP-119 submit LoRA training...") - nobody rebuilt the image after
+   WP-119 merged. The run was terminated (`kfp.Client.terminate_run`) before it could OOM or spend
+   real wall-clock time on doomed work, and `make d2 build mlops` was triggered to rebuild from
+   current `main`.
+
+### Original live-action plan (now resuming against a rebuilt image)
 
 1. Trigger the `mlops` KFP pipeline's LoRA training stage for a real run (the same wesh-style
    dataset WP-119/ADR-0526 already used, unless a different real case is preferred).

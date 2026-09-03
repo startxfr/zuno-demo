@@ -11,6 +11,70 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-mlops-d0"
 
+# ADR-0545/WP-126. dsp-mlops-dspa's OWN trust bundle
+# (dsp-trusted-ca-mlops-dspa/dsp-ca.crt) only ever carries the cluster-wide
+# Vault root (CN zuno-demo.internal, via odh-trusted-ca-bundle's
+# CNO-injected ca-bundle.crt) - never the openshift-service-serving-signer
+# CA that signs in-cluster Service certs like mlflow.redhat-ods-applications.svc.
+# WP-116's MLflow integration calls that endpoint from CreateRun, and with
+# only the Vault root trusted the DSP api-server rejected its certificate
+# (x509: certificate signed by unknown authority) and failed EVERY run
+# creation server-side, not just training's - live-caught 2026-09-03
+# triggering the first real TrainJob run. Same split as
+# ansible/roles/openshift_oauth/tasks/install.yml's keycloak-serving-ca: the
+# ConfigMap *name* is Helm-templated (dspa.yaml's spec.apiServer.cABundle),
+# only this data-write belongs in Ansible, since it concatenates two live
+# cluster sources Helm cannot see at chart-render time. The DSP operator
+# merges this into its own dsp-ca.crt file (not a Route swap), so a plain
+# `oc rollout restart deployment/ds-pipeline-mlops-dspa -n zuno-mlops` is
+# still needed after a first-time change - the pod does not reload its
+# trust store from a changed mounted file on its own. Idempotent: re-running
+# with unchanged source CAs produces byte-identical data, no restart forced.
+- name: "mlops | read the cluster-wide Vault CA (user-ca-bundle)"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    namespace: openshift-config
+    name: user-ca-bundle
+  register: _mlops_vault_ca
+
+- name: "mlops | read this namespace's OpenShift service-ca bundle"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    namespace: zuno-mlops
+    name: openshift-service-ca.crt
+  register: _mlops_service_ca
+
+- name: "mlops | merge both CAs into the DSP api-server's trust ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: dsp-mlflow-trust-mlops-dspa
+        namespace: zuno-mlops
+      data:
+        ca-bundle.crt: >-
+          {{ (_mlops_vault_ca.resources[0].data['ca-bundle.crt'] | default('')) + "\n"
+             + (_mlops_service_ca.resources[0].data['service-ca.crt'] | default('')) }}
+  register: _mlops_ca_bundle_apply
+  when: >-
+    (_mlops_vault_ca.resources | default([]) | length) > 0 and
+    (_mlops_service_ca.resources | default([]) | length) > 0
+
+- name: "mlops | fail loudly if either source CA ConfigMap is missing"
+  ansible.builtin.fail:
+    msg: >-
+      user-ca-bundle (openshift-config) or openshift-service-ca.crt
+      (zuno-mlops) not found - the DSP api-server's MLflow-trust ConfigMap
+      cannot be built. Both are cluster-standard ConfigMaps that should
+      always exist; investigate before re-running.
+  when: >-
+    (_mlops_vault_ca.resources | default([]) | length) == 0 or
+    (_mlops_service_ca.resources | default([]) | length) == 0
+
 - name: "mlops | apply the mlops GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -19,6 +83,25 @@
     gitops_app_name: "zuno-mlops-d1"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
+
+# Only needed the very first time this ConfigMap gains data the DSP
+# operator merges into dsp-trusted-ca-mlops-dspa/dsp-ca.crt (see the task
+# above) - restarting on every idempotent no-op re-run would be needless
+# churn, so this is gated on the merge task actually reporting `changed`.
+- name: "mlops | restart the DSP api-server so it reloads its merged trust bundle"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: apps/v1
+    kind: Deployment
+    namespace: zuno-mlops
+    name: ds-pipeline-mlops-dspa
+    definition:
+      spec:
+        template:
+          metadata:
+            annotations:
+              zuno.io/ca-bundle-restarted-at: "{{ ansible_date_time.iso8601 }}"
+  when: _mlops_ca_bundle_apply is defined and _mlops_ca_bundle_apply.changed | default(false)
 
 # UNVERIFIED against a live cluster - same caveat
 # ansible/roles/rag_ingestion/tasks/install.yml documents for its own
