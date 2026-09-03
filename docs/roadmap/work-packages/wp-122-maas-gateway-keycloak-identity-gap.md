@@ -1,8 +1,8 @@
 # WP-122: Close the MaaS gateway's missing Keycloak identity source
 
-- **State:** Repo work in review (2026-09-03) - two real, distinct root
-  causes found and fixed live, a third suspected and under investigation;
-  not yet a clean end-to-end pass. See "Live verification (2026-09-03)"
+- **State:** Repo work merged (2026-09-03) - clean end-to-end live pass: a
+  real, freshly-minted persona token gets a genuine `200` with real model
+  output through `local-wesh-maas`. See "Live verification (2026-09-03)"
   below.
 - **ADRs:** ADR-0537 (Decision 3/4 - the same `maas-controller` operator
   immaturity class this WP extends with a second, distinct symptom); ADR-0521
@@ -235,31 +235,52 @@ report that first flagged the window (zuno-demo-64).
    Live-confirmed the fix propagated correctly: `MaaSSubscription`'s
    `spec.owner.groups[].name` and the regenerated `MaaSAuthPolicy`'s own
    `require-group-membership` OPA rego both show `/agent_tekos`.
-4. **Still 403, same message, after fix #3 confirmed propagated** - not
-   yet a clean pass. `oc exec` into `maas-api`'s own pod to query
-   `/internal/v1/subscriptions/select` directly (bypassing the gateway,
-   to isolate the failure to maas-api's own matching logic vs. an
-   upstream layer) was blocked by the permission classifier before a
-   result was obtained. Suspected next cause, untested: `maas-api`
-   (`redhat-ods-applications`, 6d9h uptime) may cache its subscription
-   index from a periodic poll rather than a live CR watch, so it has not
-   yet observed the `MaaSSubscription` update the CRD-level API server
-   already reflects. A scoped `oc rollout restart deployment/maas-api -n
-   redhat-ods-applications` would test this cheaply but touches a
-   shared, operator-owned platform component outside this repo's GitOps
-   ownership - holding for explicit go-ahead before doing it, per this
-   WP's own coordination precondition.
+4. **Still 403, same message, after fix #3 confirmed propagated** - user
+   approved (with a scoped `Bash(oc rollout restart deployment/maas-api
+   -n redhat-ods-applications)` permission rule) an `oc rollout restart`
+   of `maas-api` to test a suspected stale-subscription-cache hypothesis.
+   The restart completed cleanly (new pod Ready in ~20s) but the same
+   403/message persisted after it - **falsifying that hypothesis**, not
+   confirming it.
+5. **Real root cause of step 4's 403, found by re-reading
+   `components/ai-gateway/app/maas_adapter.py`**: it was a flaw in this
+   WP's own manual test, not a system defect. `maas_adapter.py`'s
+   `model=` field sends the **MaaS-published identifier**
+   (`cfg.get("maas_model_ref", ...)`, e.g.
+   `zuno-ai-run/qwen35-9b-wesh-maas`) in the request body - a
+   cluster-side `ipp-pre` ext_proc filter copies that body field into the
+   `X-Gateway-Model-Name` header every OPA policy above keys its
+   model-identity lookup on. Every manual test in this WP up to this
+   point sent the raw KServe/vLLM model name instead
+   (`qwen3.5-9b-wesh`, matching the URL path segment, not the MaaS
+   published name) - a value with no entry in `model_access`/no matching
+   `MaaSSubscription`, which is exactly a "no matching subscription"
+   response, indistinguishable from a real defect without reading the
+   adapter's own header-construction comment (it names this exact
+   header-vs-path identity split as a known trap, live-verified
+   2026-08-26, predating this WP).
+6. **Corrected re-test, same debug pod method, `model` field set to the
+   real MaaS-published identifier**: **`HTTP_STATUS:200`**, with a real
+   completion body from `vllm-0.21.0+rhaiv.10` - genuine model output,
+   not just "not-401". This is WP-122's own Acceptance check, met.
 
 ## Status updates
 
-- 2026-09-03: two of (at least) three root causes in the 401/403 chain
-  found and fixed live and via a merged repo change; a third is suspected
-  (`maas-api` subscription-cache staleness) but untested pending user
-  approval for a `maas-api` restart. State stays "Repo work in review"
-  until a real, fresh persona token gets a genuine `200` with model
-  output through `local-wesh-maas` - not just "no longer 401".
-- On the eventual full pass (or a confirmed, undocumented-upstream dead
-  end for cause #3): State -> "Repo work merged" if any further repo-side
-  change lands, otherwise "Done" if the remainder is a live operational
-  action + ADR amendment with nothing further to merge, or "Closed -
-  deferred" if blocked upstream with no interim mitigation available.
+- 2026-09-03: **closed with a clean, live, end-to-end pass.** Three
+  things had to be true at once and were fixed/found in this order: (1)
+  `Tenant.spec.externalOIDC`, not `ModelsAsService`'s copy, is what
+  `maas-controller` actually reconciles into `maas-gateway-auth` -
+  patched live on the operator-managed `Tenant`; (2) Keycloak's
+  full-path `groups` claim (`/agent_tekos`) needed a matching
+  `values.yaml` declaration, not a shared-mapper change - fixed in
+  `gitops/charts/models/values.yaml` (commit `9439e3b8`); (3) this WP's
+  own manual reproduction was sending the wrong `model` identifier
+  (KServe name instead of the MaaS-published name `maas_adapter.py`
+  actually sends) - once corrected, no further code or config change was
+  needed. The `maas-api` rollout restart (step 4) turned out unnecessary
+  in hindsight, but was a reasonable, cheap, reversible diagnostic at
+  the time and caused no harm.
+- WP-112's own "Live verification" section names
+  `img-mockup_request`/`comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests`
+  as the downstream checks to re-run now that this closes - do that next
+  and update WP-112's State to Done if they pass end to end.
