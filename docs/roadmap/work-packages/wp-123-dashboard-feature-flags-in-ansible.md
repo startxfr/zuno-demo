@@ -1,9 +1,8 @@
 # WP-123: Reconcile the RHOAI dashboard feature flags from Ansible
 
-- **State:** Operator pending (2026-09-03) — applied and live-verified end to end
-  (`check` found the drift, `reconcile` fixed it, a re-run was a no-op, and a delete-a-flag
-  drill proved self-healing); the one remaining step is the operator confirming the banner is
-  gone in the `zuno-ai-run` UI
+- **State:** Done (2026-09-03) — applied and live-verified end to end (`check` found the
+  drift, `reconcile` fixed it, a re-run was a no-op, a delete-a-flag drill proved
+  self-healing), with operator sign-off on the `zuno-ai-run` UI
 - **ADRs:** [ADR-0538](../../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md)
   (decision 5 amended here; decision 3 is the surface `disableKueue` unlocks),
   [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md)
@@ -185,11 +184,15 @@ evidence that anything is still hand-managed. The two facts that do matter held 
 the operator still owns only `disableTracking`, and the dashboard UI still owns
 `hardwareProfileOrder`/`modelServing`.
 
-### Not verified here
+### The UI half, confirmed by the operator
 
-The dashboard's own `/api/config` cannot be read from a shell: the route sits behind an
-oauth-proxy that wants the browser login flow, and the backend rejects a bearer token
-in-pod (`401 - Failed to determine user identity`). So the UI-side confirmation - banner
-gone, "Deploy model" enabled, hardware-profile list populated in `zuno-ai-run` - is an
-operator action, not something this WP can self-certify. The CR is the only input the
-frontend evaluator reads, and it now carries `disableKueue: false`.
+**Human live test: OK - operator sign-off 2026-09-03.** The `zuno-ai-run` project page is
+clean after a plain refresh: no "Kueue is disabled in this cluster" banner, no `rhods-dashboard`
+restart needed (the flags are read per request, as WP-115 already saw for `disableLMEval`).
+
+This half could not be self-certified, and that is worth recording for the next person: the
+dashboard's own `/api/config` is unreadable from a shell - the route sits behind an
+oauth-proxy that wants the browser login flow, and the backend rejects a bearer token even
+in-pod (`401 - Failed to determine user identity`). The CR is the only input the frontend
+evaluator reads, so the API-side evidence above is what the automation can prove; the pixels
+are always a human step.
