@@ -664,7 +664,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "description": "Share of RAG searches that came back with zero rows. A search that finds nothing is outcome=ok, not an error - so the error-ratio stat beside this one stays green while retrieval is silently dead, and the p50/p95 panel above shows a low number rather than an alarming one. This is the shape of the failure the repo has already hit twice: an ingestion run that reports success while indexing nothing, and an embedding batch dropped behind a 503 that a green validate never noticed. Live on 2026-09-03 this read 0.8 - 32 of 40 searches, including the comage chat turn that answered anyway with source_mode=none. NOTE: zuno_rag_result_count carries no agent or domain label, so this is fleet-wide only; to attribute an empty retrieval to one run, use the rag_search span (it carries zuno.run_id, top_k and result_count).",
+              "description": "Share of RAG searches that came back with zero rows. A search that finds nothing is outcome=ok, not an error - so the error-ratio stat beside this one stays green while retrieval is silently dead, and the p50/p95 panel above shows a low number rather than an alarming one. This is the shape of failure the repo has hit twice: an ingestion run reporting success while indexing nothing, and an embedding batch dropped behind a 503 that a green validate never noticed. READ THIS AS A TREND, NOT A THRESHOLD. A high baseline is currently CORRECT: knowledge.sales and knowledge.project are deliberately empty until Salesforce ingestion lands in v0.7 (ADR-0218), so every check-deal-status turn retrieves nothing by design - verified 2026-09-03, sales 0 rows against sxa-legacy 319841 and tech 68962, all three searching correctly. What matters is this line MOVING: a jump means a domain that was serving content stopped. zuno_rag_result_count carries no domain label, which is why this cannot separate the two cases on its own; the rag_search span (zuno.run_id, top_k, result_count) attributes one run, and a per-domain label on the metric is the real fix.",
               "gridPos": {
                 "h": 8,
                 "w": 12,
@@ -683,12 +683,8 @@ spec:
                         "value": null
                       },
                       {
-                        "color": "orange",
-                        "value": 0.25
-                      },
-                      {
-                        "color": "red",
-                        "value": 0.5
+                        "color": "text",
+                        "value": 0.0
                       }
                     ]
                   }
