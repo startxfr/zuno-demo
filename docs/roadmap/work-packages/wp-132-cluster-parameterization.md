@@ -57,10 +57,26 @@ is exactly where the fallback hides the gap) without loading the file. Verified
 both ways: the check fires on the pre-fix file and passes on the fixed one, and a
 sweep of all 59 roles found cert_manager was the only offender.
 
-Verified read-only, with no apply: with the loader in place the identity resolves
-to `dev+zuno-acme@startx.fr` / `eu-west-3` / `Z3HY376RT1N9S1`, byte-identical to
-what `zuno-cert-manager-d1` carries live today. That is the inertia proof B6
-should have had.
+Verified read-only first: with the loader in place the identity resolves to
+`dev+zuno-acme@startx.fr` / `eu-west-3` / `Z3HY376RT1N9S1`, byte-identical to what
+`zuno-cert-manager-d1` carries live.
+
+**Live-verified 2026-09-04** with `make d0 install cert-manager` (operator
+approved): `changed=0`, both `zuno-cert-manager-d0` and `-d1` Synced/Healthy, and
+their `spec.source.helm.values` byte-identical to the captured baseline with no
+`mycluster` string anywhere. The ACME track is untouched — all five ClusterIssuers
+Ready, `router-wildcard-tls` and `api-server-tls` Ready with renewal at
+2026-11-01, the IngressController still on `router-wildcard-tls`, the APIServer
+still serving `api.demo222.startx.fr` from `api-server-tls`, and
+`letsencrypt-route53` still pointed at the production Let's Encrypt directory with
+zone `Z3HY376RT1N9S1` / region `eu-west-3`.
+
+**And this `changed=0` means something, unlike B6's.** The chart defaults are
+placeholders *now*, so an absent loader would have rewritten the Application and
+reported a change. It reported none and the values are real — that is positive
+evidence the parameter surface is live, not merely evidence that nothing moved.
+The general rule: an inertia proof is only worth as much as the answer to "what
+would this have looked like if the mechanism were dead?"
 
 
 Each step follows ADR-0547 clause 4's two-step order without exception: inject the real
