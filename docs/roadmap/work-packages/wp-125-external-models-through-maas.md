@@ -110,6 +110,29 @@ in `ai-gateway`, not duplicated into MaaS).
   a Gateway shared with every local model's production traffic - out of
   scope for this investigation pass. **Phase 2 still does not proceed.**
 
+  **`inference.opendatahub.io` native API explored and closed off, same
+  day.** Tested whether Red Hat's documented `ExternalProvider` +
+  `ExternalModel.inference.opendatahub.io` + `MaaSModelRef` chain offers
+  a way around the mismatch above by giving direct control over the
+  client-facing model name (`spec.modelName`, unlike the read-only
+  legacy-bridge shadow). Live results: the CRD/reconciliation half works
+  (`spec.modelName` accepted and preserved, standalone canary reaches
+  `Ready`), but it is a dead end for real traffic - a different
+  controller (`ipp-external-model-reconciler`) reproduces the original
+  Gateway-attachment defect for this API family specifically, and
+  `MaaSModelRef` cannot resolve an `inference.opendatahub.io/ExternalModel`
+  at all (no status, no `MaaSSubscription`, confirmed live), so a real
+  request gets rejected by Kuadrant itself before ever reaching
+  `payload-processing`. A same-name-collision workaround (legacy CR +
+  standalone canary sharing a name, hoping the legacy reconciler adopts
+  it) was also tried live: silent no-op, no adoption, no overwrite - the
+  legacy reconciler produces no status/events/children at all when its
+  target names collide. All test objects deleted, cluster confirmed
+  clean. Full evidence: ADR-0541 Decision 1's 2026-09-03 note. **No
+  further investigation planned** - this is a compiled-in RHOAI/Kuadrant
+  integration gap (`MaaSModelRef` cannot target `inference.opendatahub.io`),
+  not something a repo-side change can close.
+
 ### Phase 2 - ai-gateway cutover (ADR-0541 Decision 2) - BLOCKED, not started
 
 **Do not execute this phase.** Its precondition (Phase 1's live check) is
