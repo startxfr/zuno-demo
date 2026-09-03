@@ -1,8 +1,9 @@
 # WP-123: Reconcile the RHOAI dashboard feature flags from Ansible
 
-- **State:** Repo work merged (2026-09-03), not yet applied live — the four-flag patch, its
-  reconcile path and its `check` tripwire are in the role; the live `make d1 reconcile
-  openshift-ai` pass and the dashboard re-check are operator actions
+- **State:** Operator pending (2026-09-03) — applied and live-verified end to end
+  (`check` found the drift, `reconcile` fixed it, a re-run was a no-op, and a delete-a-flag
+  drill proved self-healing); the one remaining step is the operator confirming the banner is
+  gone in the `zuno-ai-run` UI
 - **ADRs:** [ADR-0538](../../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md)
   (decision 5 amended here; decision 3 is the surface `disableKueue` unlocks),
   [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md)
@@ -140,3 +141,55 @@ partial Ansible patch, and that is what this WP ships.
 7. The banner: hard-refresh `/projects/zuno-ai-run?section=settings` — no "Kueue is disabled in
    this cluster", "Deploy model" enabled, hardware-profile list populated. No `rhods-dashboard`
    restart is needed; the flags are read per request (WP-115 finding 1).
+
+## Live run, 2026-09-03
+
+Executed in the order above, on `demo222`:
+
+1. **`make d1 check openshift-ai` before the fix** — reported
+   `dashboard feature flags drifted: disableKueue ABSENT (want false)` with auto-fix
+   `make d1 reconcile openshift-ai`, exited 0, and still reported `openshift-ai is installed`:
+   the tripwire does not gate the component's state, as designed. (A second, pre-existing
+   `maas-api` finding was already there and is unrelated.)
+2. **`make d1 reconcile openshift-ai`** — the patch task reported `changed`.
+3. **Re-run** — the same task reported `ok`; the play's `changed` count dropped from 3 to 2
+   (the two remaining are the ArgoCD Application re-applies, not this patch). Idempotent.
+4. **`make d1 check openshift-ai`** — "all 4 flags as declared", blocked findings down from 2
+   to 1.
+5. **Nothing clobbered.** A full object diff before/after, minus `managedFields`/
+   `resourceVersion`/`generation`, is exactly one added line: `"disableKueue": false`.
+   `hardwareProfileOrder`, `modelServing`, `notebookController`, `templateOrder`,
+   `templateDisablement` and `disableTracking` are byte-identical.
+6. **Self-healing drill.** `trainingJobs` was deleted with a `null` merge patch, as a stand-in
+   for the operator recreating the CR on a fresh cluster. `check` reported
+   `trainingJobs ABSENT (want true)`, `reconcile` restored it (`changed`), `check` went clean.
+
+### Finding: ownership transfers on value change, not on write
+
+The expectation that the `kubectl-patch` manager entry would disappear after the first
+reconcile was wrong, and the mechanics are worth recording. A JSON merge patch only
+re-attributes a field in `managedFields` when it actually **changes** the value, so after
+step 2 ownership read:
+
+| manager | dashboardConfig keys |
+|---|---|
+| `manager` (RHOAI operator) | `disableTracking` |
+| `kubectl-patch` (the 2026-09-02 hand patch) | `disableLMEval`, `guardrails`, `trainingJobs` |
+| `OpenAPI-Generator` (this automation) | `disableKueue` |
+
+Step 6 then proved the transfer: once `trainingJobs` actually changed, it moved to
+`OpenAPI-Generator` and left `kubectl-patch` holding only the two flags whose values have
+never moved. This is cosmetic - the automation asserts all four on every run regardless of
+who is recorded as their last writer - but it means the stale `kubectl-patch` entry is not
+evidence that anything is still hand-managed. The two facts that do matter held throughout:
+the operator still owns only `disableTracking`, and the dashboard UI still owns
+`hardwareProfileOrder`/`modelServing`.
+
+### Not verified here
+
+The dashboard's own `/api/config` cannot be read from a shell: the route sits behind an
+oauth-proxy that wants the browser login flow, and the backend rejects a bearer token
+in-pod (`401 - Failed to determine user identity`). So the UI-side confirmation - banner
+gone, "Deploy model" enabled, hardware-profile list populated in `zuno-ai-run` - is an
+operator action, not something this WP can self-certify. The CR is the only input the
+frontend evaluator reads, and it now carries `disableKueue: false`.
