@@ -1,10 +1,12 @@
 # WP-120: Guardrail policy as NeMo rails configuration
 
-- **State:** Repo work merged (2026-09-03) — deployed and live: the rails server runs, the
+- **State:** Done (2026-09-03) — deployed, live and proven on real traffic: the rails server runs, the
   five-point discovery gate is fully answered, `guardrails.backend` is `nemo`, the dashboard
   follows, and ADR-0540 Decision 4 is amended so `DETECTOR_PARAMS` stays as long as the
-  `GuardrailsOrchestrator` is the declared fallback. One acceptance step cannot be run as written
-  and its end-to-end half is outstanding — see "Not proven".
+  `GuardrailsOrchestrator` is the declared fallback. A real authenticated comage turn on
+  2026-09-03 proved the whole path including the Prometheus export. The one acceptance step that
+  cannot be run as written is the "scale to 0" failure drill — the CRD forbids it; see "The acceptance
+  step that cannot be run as written" for what replaced it.
 - **ADRs:** [ADR-0540](../../adr/0540-express-guardrail-policy-as-nemo-rails-configuration.md)
 - **Depends on:** WP-108 (the `GuardrailsOrchestrator` this sits beside and falls back to),
   WP-113 (the `zuno-trustyai` dashboard whose detections panel this changes)
@@ -118,7 +120,7 @@ would silently stop excluding anything the day it is dropped).
 On the second attempt the pod scheduled on `ip-10-18-55-73` and its pull took that node from
 61.7GB to 47.6GB free. No node reported DiskPressure at any point.
 
-## Not proven: the acceptance step as written
+## The acceptance step that cannot be run as written
 
 ADR-0540/this WP called for proving the failure path "with the Nemo Service scaled to 0". That
 is **not possible**: the CRD rejects `spec.replicas: 0` (`should be greater than or equal to 1`),
@@ -133,13 +135,26 @@ agent-runtime pod against the live Service, with only the URL black-holed for ca
 | B — observer unreachable | `unavailable` (no raise) | — |
 | C — observer up, benign content | `clean` | — |
 
-**Still outstanding:** an authenticated end-to-end agent turn showing the HTTP response reaching
-the user complete and unmodified while B is in effect, and `zuno.guardrails_evaluations` visibly
-incrementing in Prometheus. The structural guarantee is there — `observe_exchange` is
-fire-and-forget, spawned after the response is already on its way — and the unit tests cover it,
-but no live authenticated turn has been driven since the flip. `zuno_guardrails_*` series exist
-in Prometheus from WP-113-era traffic and currently carry no recent samples, so the first real
-turn is also what confirms the export path end to end.
+**Closed 2026-09-03 by a real authenticated turn.** A human drove a comage chat through the UI
+(`run_id=dd297f91-b65a-4ec6-87f6-a3fd67bcf450`). The response was delivered normally — `bff_request`
+`code=200`, 2915 ms, `api_request` `outcome=ok` — and the observer ran behind it:
+
+```
+agent_runtime.guardrails  guardrails clean: run_id=dd297f91-… agent=comage contents=2 tools=[] retrieved_docs=0
+promql                    zuno_guardrails_evaluations_total{agent="comage", outcome="clean"} = 1
+```
+
+That is the whole path end to end: agent turn → nemo rails → shared `_report()` → OTel counter →
+collector → Prometheus. The export leg had never been exercised since the flip, so this also
+retired the possibility that the metric worked only in the local test harness.
+
+**One narrower claim remains unexercised on real traffic:** a live turn *while the observer is
+unreachable*. Case B above proves it against the deployed client, and the structural guarantee is
+that `observe_exchange` is fire-and-forget and spawned after the response is already on its way,
+but no human turn has been driven with the observer black-holed. It is now watchable rather than
+merely assumed — the `zuno-trustyai` dashboard gained an *Observer unavailable (share)* stat and a
+*Coverage: exchanges observed vs agent traffic* panel on 2026-09-03 precisely so this failure
+announces itself instead of waiting for someone to test it.
 
 ## Resolved: DETECTOR_PARAMS stays, and ADR-0540 Decision 4 is amended
 
