@@ -29,13 +29,10 @@ metadata:
   namespace: {{ .Values.platform.namespace }}
   labels:
     {{- include "mlops.labels" . | nindent 4 }}
-    # WP-126: without this, the Trainer controller builds the JobSet/Job
-    # from this runtime's own template verbatim and never applies
-    # TrainJob.spec.trainer's command/args/env overrides at all - the
-    # container starts with no entrypoint. RHOAI's own 15
-    # ClusterTrainingRuntimes all carry it (verified live,
-    # trainer.kubeflow.org/framework: torch on torch-distributed); WP-119
-    # never set it on this namespaced runtime.
+    # Matches RHOAI's own 15 ClusterTrainingRuntimes (verified live against
+    # torch-distributed). Not load-bearing for the override-injection bug
+    # below - see the replicatedJobs comment for the actual mechanism -
+    # but kept for consistency with the operator's own runtimes.
     trainer.kubeflow.org/framework: torch
 spec:
   mlPolicy:
@@ -56,18 +53,28 @@ spec:
         # "node" for both the replicatedJob and the container: this is the
         # pair the operator's own 15 ClusterTrainingRuntimes use, and it is
         # what env overrides key on (envInjection.targets matches the
-        # replicatedJob name). command/args injection is gated separately,
-        # by the trainer.kubeflow.org/framework label above - not by this
-        # naming. Verify against a live probe before changing either name.
+        # replicatedJob name).
         - name: node
           replicas: 1
           template:
+            # WP-126: trainer.kubeflow.org/trainjob-ancestor-step: trainer
+            # belongs HERE - on the Job's own metadata (this level) - not on
+            # the pod template's metadata one level down. Confirmed live: a
+            # version of this file with the label on the pod template built
+            # a JobSet/Job whose pod carried the runtime's bare container
+            # verbatim, with NEITHER TrainJob.spec.trainer.env NOR
+            # command/args ever injected (silently, no controller error) -
+            # the controller uses this label, at the Job level, to find
+            # which Job in the JobSet is "the trainer step" it should patch.
+            # RHOAI's own torch-distributed ClusterTrainingRuntime carries
+            # it at this exact level (verified live,
+            # `oc get clustertrainingruntime torch-distributed -o json`).
+            metadata:
+              labels:
+                trainer.kubeflow.org/trainjob-ancestor-step: trainer
             spec:
               backoffLimit: 0
               template:
-                metadata:
-                  labels:
-                    trainer.kubeflow.org/trainjob-ancestor-step: trainer
                 spec:
                   serviceAccountName: {{ include "mlops.serviceAccountName" . }}
                   restartPolicy: Never
