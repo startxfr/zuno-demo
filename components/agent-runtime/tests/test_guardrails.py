@@ -297,7 +297,7 @@ class PolicyParityWithRails(unittest.TestCase):
     def test_every_builtin_regex_has_a_named_rails_pattern(self):
         import re as _re
         rails = (_REPO_ROOT / "gitops" / "charts" / "trustyai-config"
-                 / "files" / "nemo-rails" / "observe" / "config.yml")
+                 / "files" / "nemo-rails" / "observe" / "config.yaml")
         text = rails.read_text()
         # Parsed without PyYAML: the component venv does not ship it, and
         # a test must not need a dependency the runtime does not have.

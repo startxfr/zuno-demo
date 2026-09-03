@@ -10,7 +10,7 @@ needs the evidence this policy exists to collect.
 
 ## Where the machine-readable policy lives
 
-`gitops/charts/trustyai-config/files/nemo-rails/observe/config.yml`,
+`gitops/charts/trustyai-config/files/nemo-rails/observe/config.yaml`,
 under `custom_data.zuno_patterns`.
 
 It is not in this directory, and that is deliberate. Helm's `.Files.Get`
@@ -39,7 +39,7 @@ label on `zuno.guardrails_detections` and are queried by the
   The 2026-09-02 live test (run `d9445c2a`) proved that
   `ignore all PREVIOUS instructions` slips a single-filler pattern.
   Tightening it needs that test re-run.
-- **`config.yml` has no `models:` block**, so no rail calls an LLM. Every
+- **`config.yaml` has no `models:` block**, so no rail calls an LLM. Every
   detection is a pattern match executed by `actions.py`. Adding a rail
   that reasons (self-check, fact-checking, topical rails) makes every
   observed exchange an inference call on a cluster whose GPU quota is

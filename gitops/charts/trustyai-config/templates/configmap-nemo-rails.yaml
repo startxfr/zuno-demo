@@ -27,8 +27,15 @@ metadata:
     # Ahead of the CR, so the server never starts against a missing mount.
     argocd.argoproj.io/sync-wave: "-1"
 data:
-  config.yml: |
-{{ .Files.Get "files/nemo-rails/observe/config.yml" | indent 4 }}
+  # `config.yaml`, NOT `config.yml`. The NeMo Guardrails library accepts
+  # either, but the RHOAI image's startup wrapper checks for the .yaml
+  # spelling by name and exits before the library ever runs:
+  #   "ERROR: config.yaml not found in /app/config/zuno-observe"
+  # Live, 2026-09-03: that single character CrashLoopBackOff'd the server
+  # after a ~14GB image pull. The source file is named to match so the
+  # repo and the mount can never disagree again.
+  config.yaml: |
+{{ .Files.Get "files/nemo-rails/observe/config.yaml" | indent 4 }}
   rails.co: |
 {{ .Files.Get "files/nemo-rails/observe/rails.co" | indent 4 }}
   actions.py: |

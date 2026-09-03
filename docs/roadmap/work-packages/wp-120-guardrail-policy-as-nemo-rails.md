@@ -22,7 +22,7 @@ observe-only, still non-blocking, still emitting `zuno.guardrails_evaluations` a
 
 ## What landed
 
-- `gitops/charts/trustyai-config/files/nemo-rails/observe/{config.yml,rails.co,actions.py}` —
+- `gitops/charts/trustyai-config/files/nemo-rails/observe/{config.yaml,rails.co,actions.py}` —
   the policy as data, the two recording flows, and a generic pattern-matching action that
   contains no policy of its own.
 - `gitops/charts/trustyai-config/templates/{configmap-nemo-rails.yaml,nemoguardrails.yaml}`,

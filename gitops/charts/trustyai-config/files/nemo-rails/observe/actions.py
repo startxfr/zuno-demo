@@ -1,7 +1,7 @@
 """Generic pattern-matching action for the zuno observe-only rails.
 
 ADR-0540/WP-120. This file deliberately contains NO policy: every pattern
-comes from config.yml's custom_data.zuno_patterns. Adding, removing or
+comes from config.yaml's custom_data.zuno_patterns. Adding, removing or
 tuning a detection class is a YAML edit that ArgoCD syncs - it never
 touches this code, and never rebuilds an image.
 

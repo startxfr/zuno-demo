@@ -45,14 +45,14 @@ on.
 ## Decision
 
 1. **Guardrail policy becomes data, rendered from Git.** The patterns live in
-   `gitops/charts/trustyai-config/files/nemo-rails/observe/config.yml` under
+   `gitops/charts/trustyai-config/files/nemo-rails/observe/config.yaml` under
    `custom_data.zuno_patterns`, rendered into ConfigMap `zuno-nemo-rails-observe` and mounted by
    a `NemoGuardrails/zuno-guardrails` CR in `zuno-ai-run`. Canonical location is the chart, not
    `policies/guardrails/`: Helm's `.Files.Get` is chart-root-relative and cannot traverse out of
    the chart, and rendering from the chart keeps the policy under ArgoCD rather than applied
    out-of-band (ADR-0311/ADR-0312). `policies/guardrails/README.md` becomes the human-readable
    specification and points at it.
-2. **The rails carry no model.** `config.yml` has an empty `models:` block; every rail is a
+2. **The rails carry no model.** `config.yaml` has an empty `models:` block; every rail is a
    pattern match executed by a generic action in `actions.py` that reads
    `custom_data.zuno_patterns`. No rail reasons, so no observation costs inference. `actions.py`
    contains no policy — adding or tuning a detection class is a YAML edit ArgoCD syncs, and the

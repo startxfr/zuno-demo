@@ -56,7 +56,7 @@ GUARDRAILS_CONFIG_ID = os.getenv("GUARDRAILS_CONFIG_ID", "zuno-observe")
 # nemo is still unproven. It is deleted in the same commit that flips
 # guardrails.backend to "nemo" by default, once the live proof passes.
 # Until then the two must be kept in step: an edit here needs the same
-# edit in files/nemo-rails/observe/config.yml.
+# edit in files/nemo-rails/observe/config.yaml.
 #
 # Built-in detector params, live-verified 2026-09-02 against this
 # cluster's detector (quay.io/trustyai/guardrails-detector-built-in via
@@ -174,7 +174,7 @@ async def _evaluate_nemo(
 ) -> None:
     """Same contract as _evaluate, against the NemoGuardrails server.
 
-    The rails are pattern-only (config.yml carries no `models:` block), so
+    The rails are pattern-only (config.yaml carries no `models:` block), so
     this costs no LLM inference - which matters, because the GPU quota on
     this cluster is fully saturated. `options.rails` restricts execution
     to the input rail and `log.activated_rails` is what carries the
