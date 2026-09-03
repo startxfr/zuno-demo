@@ -1,8 +1,9 @@
 # ADR-0541: Integrate mistral and gpt-oss-120b as MaaS ExternalModels
 
-- **Status:** Proposed - blocked on a live Envoy-proxy timeout reaching
-  the real upstream for ExternalModel-backed routes (root cause open);
-  the originally-diagnosed Gateway-attachment defect is confirmed fixed
+- **Status:** Proposed - blocked on a RHOAI `payload-processing` ext_proc
+  plugin defect that rejects every `ExternalModel` request as a "model
+  mismatch" (root-caused 2026-09-03, see Decision 1); the
+  originally-diagnosed Gateway-attachment defect is confirmed fixed
   on RHOAI 3.5.0 GA (re-verified 2026-09-03, see Decision 1)
 - **Target:** v0.7
 - **Date:** 2026-09-03 (extracted from ADR-0537, originally proposed
@@ -245,6 +246,60 @@ Live verification during this ADR's preparation confirmed:
    depends on a RHOAI version bump, since the version this was pinned to
    (3.6-EA2) is not what actually changed.
 
+   **Root-caused, 2026-09-03 (continued investigation, same day).** The
+   "timeout" is not a network/TLS/DNS problem at all - the request never
+   leaves the cluster. `maas-default-gateway-istio`'s own Envoy (not
+   `ai-gateway`'s sidecar, which is irrelevant to this hop) correctly
+   originates real TLS to both upstreams (`config_dump` shows a genuine
+   `UpstreamTlsContext` on `outbound|443||api.mistral.ai` and the OVHcloud
+   equivalent, TLS 1.2-1.3, system CA validation) - ruling out double-TLS
+   on this pod too, not just `ai-gateway`'s. Debug-level Envoy logging on
+   that pod during a live test shows the request is rejected by an
+   ext_proc filter, `envoy.filters.http.ext_proc.ipp` (cluster
+   `outbound|9004||payload-processing.openshift-ingress.svc.cluster.local`),
+   *before* any upstream router logic for `mistral-large`/`gpt-oss-120b-
+   ovhcloud` runs at all - `failure_mode_allow: false` on this filter
+   (RHOAI's own setting, kept by design in
+   `gitops/charts/openshift-ai/templates/maas-gateway-ipp-anchor.yaml`,
+   see that file's own comments) turns the rejection into a local 404 (or,
+   non-deterministically observed elsewhere, an indefinite hang - same
+   underlying rejection, different Envoy-side handling of the streamed
+   ext_proc protocol).
+
+   `payload-processing`'s own logs name the exact defect: its
+   `model-provider-resolver` plugin (`github.com/opendatahub-io/
+   ai-gateway-payload-processing`, running on `llm-d/
+   llm-d-inference-payload-processor@v0.1.0-rc.2`) extracts the
+   `ExternalModel`'s bare name from the request path (`mistral-large`) and
+   rejects with `"model mismatch between request body and ExternalModel"`
+   / `"inference error: NotFound - model in request body
+   'zuno-ai-run/mistral-large-maas' doesn't match ExternalModel"` -
+   because the request body's `model` field carries the full
+   `<namespace>/<name>-maas` identity, which Kuadrant's own
+   `maas-gateway-auth` `AuthPolicy` *requires* earlier in the same filter
+   chain (see the 2026-09-03 note above on Decision 1's route-identity
+   fix). **No value can satisfy both checks at once**: this is a
+   structural incompatibility between two RHOAI/Kuadrant components for
+   an `ExternalModel` backend specifically, not a config error on our
+   side, and not something this investigation searched for an existing
+   upstream issue number for.
+
+   This is architecturally distinct from the two previously-tracked gaps
+   (#1417, #1399, #1240): those were about `HTTPRoute`/Gateway attachment
+   and route-identity resolution; this is a request-body/path identity
+   mismatch inside RHOAI's own metering ext_proc plugin, one that only
+   triggers for `ExternalModel` backends (local `InferencePool`-backed
+   models never hit this comparison at all). Unlike those, this one is
+   *potentially workaroundable in this repo*: `maas-gateway-ipp-anchor.yaml`
+   applies the `ipp`/`ipp-pre` filters at `context: GATEWAY` (every route,
+   no scoping) - the same file's own comments describe the
+   `typed_per_filter_config` mechanism RHOAI's own (broken) EnvoyFilter
+   already uses to disable `ipp-pre` on specific routes
+   (`maas-api-route.0`/`.1`); the same mechanism could, in principle,
+   disable `ipp` for the two `ExternalModel`-backed routes here. **Not
+   attempted** - it is a live change to a Gateway shared with every local
+   model's production traffic, out of scope for this investigation pass.
+
 2. **Activate the existing `via_maas` SaaS path in `ai-gateway`, then retire
    the direct-call branches (full cutover) - BLOCKED, do not execute yet.**
    The plan: set `MAAS_EXTERNAL_EGRESS_ENABLED=true`; add `via_maas: true`
@@ -327,14 +382,18 @@ can move to `Implemented`:
   confirmed to be
   [#1399](https://github.com/opendatahub-io/models-as-a-service/issues/1399),
   which remains open upstream).
-- **Blocked upstream - not satisfiable today, blocker changed 2026-09-03**:
-  a live smoke test confirming real completions through
-  `mistral-large-maas`/`gpt-oss-120b-ovhcloud-maas`, the Finage
+- **Blocked upstream - not satisfiable today, blocker changed 2026-09-03,
+  root-caused same day**: a live smoke test confirming real completions
+  through `mistral-large-maas`/`gpt-oss-120b-ovhcloud-maas`, the Finage
   negative test, and the per-persona-group quota test below now block on
-  an unexplained Envoy-proxy timeout reaching the real upstream through
-  the MaaS gateway (see Decision 1's 2026-09-03 note), not the
-  route-identity defect that originally blocked them. None of the three
-  can be attempted until that timeout is root-caused.
+  RHOAI's own `payload-processing` ext_proc filter rejecting every
+  `ExternalModel` request with `"model mismatch between request body and
+  ExternalModel"` (see Decision 1's 2026-09-03 "Root-caused" note) -
+  a structural identity-format conflict with Kuadrant's own `AuthPolicy`,
+  not the route-identity defect that originally blocked them and not a
+  config error on our side. None of the three can be attempted until
+  either RHOAI fixes this plugin or this repo scopes the `ipp` filter
+  away from these two routes (not attempted).
 - A live negative test confirms Finage is still denied `gpt-oss-120b` after
   cutover (blocked - see above).
 - A live test per persona group (`agent_tekos`, `sales`, catch-all) confirms

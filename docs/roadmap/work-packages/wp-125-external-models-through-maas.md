@@ -1,6 +1,8 @@
 # WP-125: mistral and gpt-oss-120b as ExternalModel/MaaSModelRef
 
-- **State:** Repo work merged (blocked upstream - see Phase 1 result below)
+- **State:** Repo work merged (blocked upstream - `payload-processing`
+  ext_proc plugin defect, root-caused 2026-09-03 - see Phase 1 result
+  below)
 - **ADRs:** ADR-0541 (Proposed - blocked upstream)
 - **Depends on:** WP-27/ADR-0201 (MaaS governance plane live), WP-076/ADR-0521
   (per-group `MaaSSubscription` pattern this WP reuses); split from WP-106
@@ -89,6 +91,25 @@ in `ai-gateway`, not duplicated into MaaS).
   0.1s). Root cause not identified. See ADR-0541 Decision 1's `2026-09-03`
   note for the full evidence. **Phase 2 still does not proceed.**
 
+  **Root-caused, same day.** Not a network/TLS issue - the request never
+  reaches `api.mistral.ai`/OVHcloud at all. RHOAI's own `payload-processing`
+  ext_proc filter (`envoy.filters.http.ext_proc.ipp`, wired Gateway-wide by
+  `gitops/charts/openshift-ai/templates/maas-gateway-ipp-anchor.yaml`,
+  `failure_mode_allow: false`) rejects the request before the upstream
+  router runs: its `model-provider-resolver` plugin compares the request
+  body's `model` field against the bare `ExternalModel` CR name and errors
+  `"model mismatch between request body and ExternalModel"`, because the
+  body must carry the full `<namespace>/<name>-maas` identity to satisfy
+  Kuadrant's `AuthPolicy` earlier in the same chain - no value satisfies
+  both checks. This never triggers for local `InferencePool`-backed
+  routes (the comparison is `ExternalModel`-specific), which is why only
+  these two routes are affected. Full evidence: ADR-0541 Decision 1's
+  2026-09-03 "Root-caused" note. **Not attempted**: scoping the `ipp`
+  filter away from these two routes via `typed_per_filter_config` (the
+  same mechanism the anchor file already documents) is a live change to
+  a Gateway shared with every local model's production traffic - out of
+  scope for this investigation pass. **Phase 2 still does not proceed.**
+
 ### Phase 2 - ai-gateway cutover (ADR-0541 Decision 2) - BLOCKED, not started
 
 **Do not execute this phase.** Its precondition (Phase 1's live check) is
@@ -109,10 +130,12 @@ this unblocks, unchanged:
   these two providers from `components/ai-gateway/app/providers.py`. This
   is the point at which ADR-0541 can move to `Implemented`.
 
-**Re-entry condition, updated 2026-09-03**: the Envoy-proxy timeout found
-in the 2026-09-03 re-test (see Phase 1's result above and ADR-0541
-Decision 1) is root-caused and fixed, and Phase 1's live check is re-run
-and passes. This is no longer pinned to a RHOAI version bump - the
+**Re-entry condition, updated 2026-09-03 (root cause identified same
+day)**: RHOAI's `payload-processing` ext_proc plugin (see Phase 1's
+"Root-caused" note above and ADR-0541 Decision 1) either stops rejecting
+`ExternalModel` requests as a model mismatch, or this repo scopes the
+`ipp` filter away from these two routes - and Phase 1's live check is
+re-run and passes. This is no longer pinned to a RHOAI version bump - the
 originally-diagnosed Gateway-attachment defect that motivated the
 `3.6-EA2` target is already fixed on the 3.5.0 GA build now running, but a
 different, still-open defect took its place. Until the timeout is fixed,
