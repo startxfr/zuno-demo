@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,15 +19,60 @@ func newTestCounter(t *testing.T) (*sdkmetric.ManualReader, func()) {
 	t.Helper()
 	reader := sdkmetric.NewManualReader()
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-	counter, err := provider.Meter("agent-bff-test").Int64Counter("zuno.bff.requests")
+	meter := provider.Meter("agent-bff-test")
+	counter, err := meter.Int64Counter("zuno.bff.requests")
 	if err != nil {
 		t.Fatalf("creating test counter: %v", err)
 	}
+	identity, err := meter.Int64Counter("zuno.bff.requests_by_identity")
+	if err != nil {
+		t.Fatalf("creating test identity counter: %v", err)
+	}
 	SetCounterForTest(counter)
-	return reader, func() { SetCounterForTest(nil) }
+	SetIdentityCounterForTest(identity)
+	return reader, func() { SetCounterForTest(nil); SetIdentityCounterForTest(nil) }
 }
 
-func TestRecordRequestIncrementsByAgentAndCode(t *testing.T) {
+// collect returns, per metric name, the summed points keyed by the
+// attributes that metric actually carries.
+func collect(t *testing.T, reader *sdkmetric.ManualReader) map[string]map[string]int64 {
+	t.Helper()
+	var got metricdata.ResourceMetrics
+	if err := reader.Collect(context.Background(), &got); err != nil {
+		t.Fatalf("collecting metrics: %v", err)
+	}
+	out := map[string]map[string]int64{}
+	for _, sm := range got.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			sum, ok := m.Data.(metricdata.Sum[int64])
+			if !ok {
+				continue
+			}
+			byKey := map[string]int64{}
+			for _, dp := range sum.DataPoints {
+				agent, _ := dp.Attributes.Value("agent")
+				code, _ := dp.Attributes.Value("code")
+				user, _ := dp.Attributes.Value("user")
+				group, _ := dp.Attributes.Value("group")
+				key := agent.AsString() + "/" + code.AsString()
+				if user.AsString() != "" || group.AsString() != "" {
+					key += "/" + user.AsString() + "/" + group.AsString()
+				}
+				byKey[key] += dp.Value
+			}
+			out[m.Name] = byKey
+		}
+	}
+	return out
+}
+
+func TestRecordRequestCountsOnePointPerResponse(t *testing.T) {
+	// The 2026-09-03 split. This counter used to fan out to one point per
+	// Keycloak group, which made zuno_bff_requests_total not a request
+	// count: alice, in two groups, counted twice per response. Live that
+	// read 6541 against 6180 real responses, and it biased the SLO ratios
+	// too - a 5xx from a one-group caller weighed less than one from a
+	// twelve-group caller in the same 5xx/total.
 	reader, cleanup := newTestCounter(t)
 	defer cleanup()
 	ctx := context.Background()
@@ -36,40 +82,52 @@ func TestRecordRequestIncrementsByAgentAndCode(t *testing.T) {
 	RecordRequest(ctx, "tekos", "403", "bob", nil)
 	RecordRequest(ctx, "arkos", "200", "alice", []string{"agent_arkos"})
 
-	var got metricdata.ResourceMetrics
-	if err := reader.Collect(ctx, &got); err != nil {
-		t.Fatalf("collecting metrics: %v", err)
-	}
+	got := collect(t, reader)
+	requests := got["zuno.bff.requests"]
 
-	counts := map[string]int64{}
-	for _, sm := range got.ScopeMetrics {
-		for _, m := range sm.Metrics {
-			sum, ok := m.Data.(metricdata.Sum[int64])
-			if !ok {
-				continue
-			}
-			for _, dp := range sum.DataPoints {
-				agent, _ := dp.Attributes.Value("agent")
-				code, _ := dp.Attributes.Value("code")
-				user, _ := dp.Attributes.Value("user")
-				group, _ := dp.Attributes.Value("group")
-				key := agent.AsString() + "/" + code.AsString() + "/" + user.AsString() + "/" + group.AsString()
-				counts[key] = dp.Value
-			}
+	// Four calls, four responses - alice's two groups buy her nothing here.
+	want := map[string]int64{"tekos/200": 2, "tekos/403": 1, "arkos/200": 1}
+	for k, v := range want {
+		if requests[k] != v {
+			t.Errorf("zuno.bff.requests[%q] = %d, want %d (all: %v)", k, requests[k], v, requests)
 		}
 	}
+	var total int64
+	for _, v := range requests {
+		total += v
+	}
+	if total != 4 {
+		t.Errorf("zuno.bff.requests total = %d, want 4 (one per RecordRequest call): %v", total, requests)
+	}
+	// No identity dimension may leak back onto this metric - that leak is
+	// the whole defect, and it is invisible until someone sums the series.
+	for k := range requests {
+		if strings.Count(k, "/") != 1 {
+			t.Errorf("zuno.bff.requests carries identity attributes in key %q; it must be agent/code only", k)
+		}
+	}
+}
 
-	// One point per (agent, code, user, group) - a multi-group user
-	// (alice) is intentionally double-counted across her two groups.
+func TestIdentityCounterKeepsTheGroupBreakdown(t *testing.T) {
+	// ADR-0029's "by user" bullet is preserved, just moved somewhere its
+	// fan-out cannot reach a volume or SLO query.
+	reader, cleanup := newTestCounter(t)
+	defer cleanup()
+	ctx := context.Background()
+
+	RecordRequest(ctx, "tekos", "200", "alice", []string{"agent_tekos", "sales"})
+	RecordRequest(ctx, "tekos", "200", "alice", []string{"agent_tekos", "sales"})
+	RecordRequest(ctx, "tekos", "403", "bob", nil)
+
+	identity := collect(t, reader)["zuno.bff.requests_by_identity"]
 	want := map[string]int64{
 		"tekos/200/alice/agent_tekos": 2,
 		"tekos/200/alice/sales":       2,
-		"tekos/403/bob/":              1,
-		"arkos/200/alice/agent_arkos": 1,
+		"tekos/403/bob/":              1, // bob had no groups: one point, empty group
 	}
 	for k, v := range want {
-		if counts[k] != v {
-			t.Errorf("counts[%q] = %d, want %d (all: %v)", k, counts[k], v, counts)
+		if identity[k] != v {
+			t.Errorf("identity[%q] = %d, want %d (all: %v)", k, identity[k], v, identity)
 		}
 	}
 }

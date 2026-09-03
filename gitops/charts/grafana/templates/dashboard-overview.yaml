@@ -599,6 +599,7 @@ spec:
             "type": "prometheus",
             "uid": "prometheus"
           },
+          "description": "EXPECT A STEP DOWN ON 2026-09-03, with no drop in real traffic behind it. Until then zuno_bff_requests_total recorded one point per Keycloak GROUP, so a caller in twelve groups counted as twelve requests - the fleet read 6541 against 6180 real responses. It now counts exactly one point per response, so every series here falls to its true value at deploy. Rates before and after that date are not comparable. The group breakdown moved to zuno_bff_requests_by_identity_total, which is a count of group-request pairs and must never be used for volume or SLO.",
           "gridPos": {
             "h": 8,
             "w": 16,

@@ -30,6 +30,7 @@ const defaultOTELEndpoint = "http://zuno-otel-collector-collector.zuno-monitorin
 
 var (
 	requestCounter    metric.Int64Counter
+	identityCounter   metric.Int64Counter
 	durationHistogram metric.Float64Histogram
 	tracer            trace.Tracer
 )
@@ -70,10 +71,22 @@ func Init(ctx context.Context, serviceName string) (func(context.Context) error,
 	meter := meterProvider.Meter(serviceName)
 	requestCounter, err = meter.Int64Counter(
 		"zuno.bff.requests",
-		metric.WithDescription("agent-bff HTTP responses by agent and status code"),
+		metric.WithDescription("agent-bff HTTP responses by agent and status code - exactly one point per response"),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("telemetry: creating request counter: %w", err)
+	}
+	// Identity breakdown, split off from zuno.bff.requests on 2026-09-03.
+	// Fans out to one point PER KEYCLOAK GROUP, so it counts group-request
+	// pairs, not requests - the name says so, and its description says so,
+	// because that is the whole reason it is a separate series. Never a
+	// source of volume, rate or SLO.
+	identityCounter, err = meter.Int64Counter(
+		"zuno.bff.requests_by_identity",
+		metric.WithDescription("agent-bff responses fanned out per Keycloak group - group-request pairs, NOT a request count; use zuno.bff.requests for volume and SLO"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("telemetry: creating identity counter: %w", err)
 	}
 	durationHistogram, err = meter.Float64Histogram(
 		"zuno.bff.request_duration_ms",
@@ -108,25 +121,49 @@ func Init(ctx context.Context, serviceName string) (func(context.Context) error,
 // response. A nil counter (Init not called, e.g. in tests that exercise
 // handlers directly) is a silent no-op rather than a panic.
 //
-// user/groups (ADR-0029's "by user" bullet, never wired until now) are
-// empty for requests that never reached a successfully-verified token
-// (e.g. /healthz, a missing/invalid bearer token) - see main.go's
-// metricsMiddleware/chatHandler for how they're threaded through. A
-// Keycloak group membership is a list, but metric labels are scalar - one
-// point is recorded per group (accepted double-counting across a
-// `sum by (group)` rollup for a multi-group user, same demo-scope
-// trade-off components/ai-gateway/app/telemetry.py's model_call_span
-// documents for the identical shape).
+// zuno.bff.requests gets EXACTLY ONE POINT per response, labeled by agent
+// and code. The identity breakdown (ADR-0029's "by user" bullet) goes to
+// zuno.bff.requests_by_identity instead.
+//
+// Until 2026-09-03 both lived on one counter, which fanned out to one
+// point per Keycloak group. That made zuno_bff_requests_total not a
+// request count: a caller in twelve groups counted twelve times, while a
+// request that never reached a verified token (/healthz, a bad bearer)
+// counted once. Live, the fleet read 6541 against 6180 real responses.
+//
+// The damage was not confined to volume panels. docs/platform/slo.md's
+// availability rules are 5xx/total ratios, and a ratio only survives a
+// UNIFORM fan-out. This one scaled with the caller's group count, so an
+// error from a one-group caller and an error from a twelve-group caller
+// carried different weight in the same ratio - the SLO measured an error
+// rate weighted by group membership rather than by request. Nothing else
+// changes: the two metrics keep the same agent/code labels, so every
+// existing dashboard and rule reads the corrected series with no edit.
+//
+// user/groups are empty for requests that never reached a
+// successfully-verified token - see main.go's metricsMiddleware/
+// chatHandler for how they're threaded through.
 func RecordRequest(ctx context.Context, agent, code, user string, groups []string) {
 	if requestCounter == nil {
 		return
 	}
+	requestCounter.Add(ctx, 1, metric.WithAttributes(
+		attribute.String("agent", agent),
+		attribute.String("code", code),
+	))
+
+	if identityCounter == nil {
+		return
+	}
+	// A Keycloak group membership is a list and metric labels are scalar,
+	// so this one deliberately fans out. It is a separate metric precisely
+	// so that fan-out can never reach a volume or SLO query again.
 	groupList := groups
 	if len(groupList) == 0 {
 		groupList = []string{""}
 	}
 	for _, group := range groupList {
-		requestCounter.Add(ctx, 1, metric.WithAttributes(
+		identityCounter.Add(ctx, 1, metric.WithAttributes(
 			attribute.String("agent", agent),
 			attribute.String("code", code),
 			attribute.String("user", user),
@@ -197,6 +234,11 @@ func EndBFFRequestSpan(span trace.Span, code, runID, projectID string, start tim
 // manual reader, so telemetry_test.go can assert on recorded values
 // without going through Init's real OTLP exporter/network setup.
 func SetCounterForTest(c metric.Int64Counter) { requestCounter = c }
+
+// SetIdentityCounterForTest is the same hook for the identity breakdown,
+// so a test can assert that the fan-out lands there and NOT on the request
+// counter - which is the entire point of the 2026-09-03 split.
+func SetIdentityCounterForTest(c metric.Int64Counter) { identityCounter = c }
 
 // SetTracerForTest points tracer at one backed by a test span recorder, so
 // telemetry_test.go can assert on `bff_request`'s exported attributes

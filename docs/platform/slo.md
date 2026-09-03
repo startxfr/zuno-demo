@@ -65,7 +65,21 @@ not live-cluster-only verification:
    `agent`/`code`, incremented once per HTTP response by `main.go`'s new
    `metricsMiddleware`. Same OTLP-push-to-the-shared-Collector pattern as
    every Python service (ADR-0029), not a bespoke per-service `/metrics`
-   endpoint. Unit-tested (`internal/telemetry/telemetry_test.go`,
+   endpoint.
+
+   *"Once per HTTP response" was true as written and false in practice
+   between then and 2026-09-03:* `RecordRequest` also carried `user`/`group`
+   labels and emitted one point PER KEYCLOAK GROUP, so a caller in twelve
+   groups counted twelve times while a request that never reached a verified
+   token counted once. Live, the fleet read 6541 against 6180 real responses.
+   The ratios above are NOT immune to that - a ratio only survives a uniform
+   fan-out, and this one scaled with the caller's group count, so an error
+   from a one-group caller and one from a twelve-group caller carried
+   different weight in the same `5xx/total`. The counter now matches this
+   description again; the identity breakdown lives on
+   `zuno_bff_requests_by_identity_total`, which counts group-request pairs
+   and must never appear in a volume or SLO query. Expect a step down in
+   every absolute count on 2026-09-03 with no change in real traffic. Unit-tested (`internal/telemetry/telemetry_test.go`,
    `main_test.go`) against a `ManualReader`; live emission depends on this
    change actually being built and deployed (tracked below).
 2. **A `ServiceMonitor` for the Collector's `:8889` exporter now exists
