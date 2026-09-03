@@ -12,6 +12,23 @@
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 15
 
+# BEFORE the first d1 apply, not after it. The bearer token below genuinely
+# cannot be resolved until d1 has created the ServiceAccount, but the
+# StorageClass can - and must be. This apply is what writes the Grafana CR,
+# and values.yaml ships storageClassName as the deliberately-invalid
+# placeholder `mycluster-default-storageclass` (WP-118 B5). Applying d1
+# without substituting it writes that placeholder into the CR; since a bound
+# PVC's storageClassName is immutable, the operator then wedges at stage
+# `pvc` and NO Grafana change reconciles until the CR is corrected by hand.
+#
+# That used to be invisible: the Application ignored the CR's whole /spec, so
+# the placeholder never actually reached it and this apply's Synced/Healthy
+# wait passed. Once that ignore was narrowed to spec.version - so real drift
+# is no longer hidden - the omission became a hard deadlock here, before the
+# second apply that would have fixed it could ever run.
+- name: "grafana | resolve the cluster's default StorageClass (WP-118 B5)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_default_storage_class.yml"
+
 - name: "grafana | apply the grafana GitOps Application (d1: Grafana instance, datasources, dashboard)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -20,9 +37,17 @@
     gitops_app_name: "zuno-grafana-d1"
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
-
-- name: "grafana | resolve the cluster's default StorageClass (WP-118 B5)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_default_storage_class.yml"
+    # Starts from application-d1.yaml's own values, exactly like the re-apply
+    # below - gitops_app_extra_helm_values REPLACES spec.source.helm.values
+    # wholesale, so a bare dict here would silently drop appsDomain.
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/grafana/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+        | combine({'storage': {'storageClassName': cluster_default_storage_class}},
+                  recursive=True)
+      }}
 
 - name: "grafana | wait for the Prometheus-reader ServiceAccount token to be minted"
   kubernetes.core.k8s_info:
