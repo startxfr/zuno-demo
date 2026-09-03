@@ -9,52 +9,52 @@ Consolidated from 12 individual ADR files. Each entry below is its own immutable
 
 ### ADR-0101: Provide HA for shared agent platform services
 
-Promoted to a full decision record: see [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) (WP-12 implementation).
+Promoted to a full decision record: see [ADR-0101](../adr/0101-provide-ha-for-shared-agent-platform-services.md) (WP-12 implementation).
 
 ### ADR-0102: Target 99.9 percent platform availability
 
-Promoted to a full decision record: see [ADR-0102](0102-target-99-9-percent-platform-availability.md) (WP-12 implementation).
+Promoted to a full decision record: see [ADR-0102](../adr/0102-target-99-9-percent-platform-availability.md) (WP-12 implementation).
 
 ### ADR-0103: Persist resumable long-running agent workflows
 
-Promoted to a full decision record: see [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) (WP-08 implementation).
+Promoted to a full decision record: see [ADR-0103](../adr/0103-persist-resumable-long-running-agent-workflows.md) (WP-08 implementation).
 
 ### ADR-0104: Introduce controlled semantic caching
 
-Promoted to a full decision record: see [ADR-0104](0104-introduce-controlled-semantic-caching.md) (WP-09 implementation).
+Promoted to a full decision record: see [ADR-0104](../adr/0104-introduce-controlled-semantic-caching.md) (WP-09 implementation).
 
 <a id="adr-0105-automate-monthly-knowledge-ingestion"></a>
 ### ADR-0105: Automate source-specific knowledge ingestion
 
-Promoted to a full decision record: see [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) (WP-22 implementation).
+Promoted to a full decision record: see [ADR-0105](../adr/0105-automate-source-specific-knowledge-ingestion.md) (WP-22 implementation).
 
 ### ADR-0106: Enforce OKF bundle signing and validation
 
-Promoted to a full decision record: see [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) (WP-05 implementation).
+Promoted to a full decision record: see [ADR-0106](../adr/0106-enforce-okf-bundle-signing-and-validation.md) (WP-05 implementation).
 
 ### ADR-0107: Introduce automated model quality gates
 
-Promoted to a full decision record: see [ADR-0107](0107-introduce-automated-model-quality-gates.md) (WP-10 implementation).
+Promoted to a full decision record: see [ADR-0107](../adr/0107-introduce-automated-model-quality-gates.md) (WP-10 implementation).
 
 ### ADR-0108: Automate model evaluation with LM-Eval
 
-Promoted to a full decision record: see [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) (WP-10 implementation).
+Promoted to a full decision record: see [ADR-0108](../adr/0108-automate-model-evaluation-with-lm-eval.md) (WP-10 implementation).
 
 ### ADR-0109: Implement source freshness and trust scoring
 
-Promoted to a full decision record: see [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) (WP-24 implementation).
+Promoted to a full decision record: see [ADR-0109](../adr/0109-implement-source-freshness-and-trust-scoring.md) (WP-24 implementation).
 
 ### ADR-0110: Automate document ACL synchronization
 
-Promoted to a full decision record: see [ADR-0110](0110-automate-document-acl-synchronization.md) (WP-25 implementation).
+Promoted to a full decision record: see [ADR-0110](../adr/0110-automate-document-acl-synchronization.md) (WP-25 implementation).
 
 ### ADR-0111: Strengthen SecNumCloud-oriented security controls
 
-Promoted to a full decision record: see [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) (WP-11 implementation).
+Promoted to a full decision record: see [ADR-0111](../adr/0111-strengthen-secnumcloud-oriented-security-controls.md) (WP-11 implementation).
 
 ### ADR-0112: Implement production-grade backup and recovery
 
-Promoted to a full decision record: see [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) (WP-13 implementation).
+Promoted to a full decision record: see [ADR-0112](../adr/0112-implement-production-grade-backup-and-recovery.md) (WP-13 implementation).
 
 ## Renumbered into the v0.1 stream (2026-08-13 roadmap reorganization)
 
@@ -62,20 +62,20 @@ ADR-0114 – ADR-0117 are full decision records in their own files, moved into t
 
 ### ADR-0350: Provide an AIAgent Kubernetes CRD and operator
 
-Formerly ADR-0026, then ADR-0113; re-streamed to v0.3 on 2026-08-15: see [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md).
+Formerly ADR-0026, then ADR-0113; re-streamed to v0.3 on 2026-08-15: see [ADR-0350](../adr/0350-provide-an-aiagent-kubernetes-crd-and-operator.md).
 
 ### ADR-0114: Use Zuno as a policy router in front of OpenShift AI MaaS
 
-Formerly ADR-0049: see [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md).
+Formerly ADR-0049: see [ADR-0114](../adr/0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md).
 
 ### ADR-0115: Use immutable and verifiable software supply chain artifacts
 
-Formerly ADR-0051, retargeted v0 -> v0.1: see [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md).
+Formerly ADR-0051, retargeted v0 -> v0.1: see [ADR-0115](../adr/0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md).
 
 ### ADR-0116: Decouple logical tool capabilities from physical backend bindings
 
-Formerly ADR-0207, promoted from v0.2: see [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md).
+Formerly ADR-0207, promoted from v0.2: see [ADR-0116](../adr/0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md).
 
 ### ADR-0117: Implement Confluence as the first real external MCP integration
 
-Formerly ADR-0210, promoted from v0.2: see [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md).
+Formerly ADR-0210, promoted from v0.2: see [ADR-0117](../adr/0117-implement-confluence-as-the-first-real-external-mcp-integration.md).

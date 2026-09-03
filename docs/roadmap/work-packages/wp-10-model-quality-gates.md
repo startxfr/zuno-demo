@@ -83,7 +83,7 @@ serving). Acceptance criteria: Standard clauses.
    (0107: 0027, 0028, 0053, 0108; 0108: 0019, 0021, 0107).
 3. In `docs/roadmap/adr-decisions-v0.1.md`: KEEP both `### ADR-0107:`/`### ADR-0108:`
    headings; replace each body with the promotion pointer line to its new file
-   (`Promoted to a full decision record: see [ADR-0107](0107-introduce-automated-model-quality-gates.md) (WP-10 implementation).` etc.).
+   (`Promoted to a full decision record: see [ADR-0107](../../adr/0107-introduce-automated-model-quality-gates.md) (WP-10 implementation).` etc.).
 4. In `docs/adr/README.md`: flip both rows to direct links; statuses
    `Proposed` → `To be implemented`.
 5. `python3 platform/docs/check_docs.py` must exit 0 before continuing.

@@ -107,7 +107,7 @@ adapter per agent/task honored per request), not optimization.
    usage metering." Standard-clauses pointer + Related ADRs (0021, 0034,
    0301, 0302, 0304).
 2. `docs/roadmap/adr-decisions-v0.3.md`: KEEP heading; body →
-   `Promoted to a full decision record: see [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) (WP-39 implementation).`
+   `Promoted to a full decision record: see [ADR-0303](../../adr/0303-support-dynamic-lora-adapter-loading.md) (WP-39 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.
 

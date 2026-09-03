@@ -7,7 +7,7 @@ component contract, `platform_profile.yaml`'s declared version intent).
 No live cluster or registry needed - pure static text/YAML inspection,
 same style as `platform/supply-chain/check_build_matrix.py`.
 
-Twelve checks, each independent (a failure in one doesn't block the others
+Thirteen checks, each independent (a failure in one doesn't block the others
 from reporting):
   - make_commands: every literal `make day0|d0|day1|d1 ...` example in
     README.md uses a verb/component this repository's actual Makefile
@@ -99,6 +99,10 @@ MAKE_COMMAND_RE = re.compile(r"\bmake[ \t]+(?:day)?(d?[0-3])[ \t]+(\S+)(?:[ \t]+
 # what happened to `make d0 reconcile openshift-ai` (a Day 0 verb applied
 # to a Day 1 component), printed by nine findings and runnable by none.
 AUTO_FIX_RE = re.compile(r"^\s*auto_fix:\s*[\"']?(.+?)[\"']?\s*$", re.MULTILINE)
+# Relative markdown links naming a 4-digit-prefixed ADR/WP file. Absolute
+# URLs and bare anchors are deliberately out of scope - this catches the
+# one mistake that actually recurs: a path correct for the wrong depth.
+DOC_LINK_RE = re.compile(r"\]\((?!https?:)([^)\s]*?\d{4}-[^)\s]*?\.md(?:#[^)\s]*)?)\)")
 OPENSHIFT_VERSION_RE = re.compile(r"OpenShift(?: Container Platform)? (\d+\.\d+)\b")
 OPENSHIFT_AI_VERSION_RE = re.compile(r"OpenShift AI (\d+\.\d+(?: EA\d)?)\b")
 
@@ -845,6 +849,39 @@ def check_agent_status_vs_adr() -> List[Finding]:
     return findings
 
 
+def check_doc_links() -> List[Finding]:
+    """Every relative markdown link to an ADR resolves from the file that
+    writes it.
+
+    Work-package briefs live two directories below `docs/adr/`, so a link
+    written as `](0309-....md)` - the shape that is correct inside an ADR
+    body - silently points at a sibling that does not exist. Nothing
+    rendered these as errors, so 15 of them across 11 briefs survived at
+    HEAD until a 2026-09-03 audit. Cheap to assert, and the failure mode
+    is invisible in review: the link text reads correctly either way.
+    """
+    findings: List[Finding] = []
+    roots = [WP_DIR, ADR_DIR, REPO_ROOT / "docs" / "roadmap"]
+    seen = set()
+
+    for root in roots:
+        for path in sorted(root.glob("*.md")):
+            if path in seen:
+                continue
+            seen.add(path)
+            for link in DOC_LINK_RE.findall(path.read_text(encoding="utf-8")):
+                target = link.split("#", 1)[0]
+                if not target:
+                    continue
+                if not (path.parent / target).resolve().is_file():
+                    findings.append(Finding(
+                        "doc_links",
+                        f"{path.relative_to(REPO_ROOT)} links to '{target}', which does not "
+                        f"resolve from that file's own directory.",
+                    ))
+    return findings
+
+
 def _okf_frontmatter(path: pathlib.Path) -> dict:
     """Parse an OKF bundle's leading `---` YAML frontmatter block.
 
@@ -1099,6 +1136,7 @@ def main() -> int:
         + check_gitops_values_clobber()
         + check_version_consistency(profile)
         + check_model_roles()
+        + check_doc_links()
     )
 
     print("Checked README.md Make commands, Ansible auto_fix commands, "
@@ -1108,8 +1146,9 @@ def main() -> int:
           "agent zuno.status vs its governing ADR(s), Makefile/ansible role "
           "consistency, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
           f"platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}, "
-          "and model architectural roles against provider-routing.yaml/"
-          "model-routing-policy.yaml.")
+          "model architectural roles against provider-routing.yaml/"
+          "model-routing-policy.yaml, and relative ADR links in ADR/roadmap/"
+          "work-package markdown.")
     if not findings:
         print("\nRESULT: PASS - no documentation drift detected.")
         return 0

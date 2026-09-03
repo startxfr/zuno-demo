@@ -66,7 +66,7 @@ Acceptance criteria: Standard clauses (docs/adr/README.md#standard-clauses).
    Related ADRs list: 0015, 0039, 0045, 0209, 0315.
 2. In `docs/roadmap/adr-decisions-v0.1.md`: KEEP the `### ADR-0103: …` heading;
    replace the body with
-   `Promoted to a full decision record: see [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) (WP-08 implementation).`
+   `Promoted to a full decision record: see [ADR-0103](../../adr/0103-persist-resumable-long-running-agent-workflows.md) (WP-08 implementation).`
 3. In `docs/adr/README.md`: flip the ADR-0103 row link from the roadmap
    anchor to the new file; status `Proposed` → `To be implemented`.
 4. `python3 platform/docs/check_docs.py` must exit 0 before continuing.

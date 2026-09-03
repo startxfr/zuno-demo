@@ -157,7 +157,7 @@ status conditions), within the contract's hard boundaries.
    adopted." Standard-clauses pointer + Related ADRs (0113, 0327, 0022,
    0008).
 2. `docs/roadmap/adr-decisions-v0.3.md`: KEEP the `### ADR-0308:` heading; body →
-   `Promoted to a full decision record: see [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) (WP-38 implementation).`
+   `Promoted to a full decision record: see [ADR-0308](../../adr/0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) (WP-38 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.
 

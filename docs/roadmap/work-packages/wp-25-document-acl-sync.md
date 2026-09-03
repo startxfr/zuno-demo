@@ -51,7 +51,7 @@ mandatory (authorization boundary).
 
    Standard-clauses pointer + Related ADRs (0046, 0105, 0330, 0408).
 2. `docs/roadmap/adr-decisions-v0.1.md`: KEEP heading; body →
-   `Promoted to a full decision record: see [ADR-0110](0110-automate-document-acl-synchronization.md) (WP-25 implementation).`
+   `Promoted to a full decision record: see [ADR-0110](../../adr/0110-automate-document-acl-synchronization.md) (WP-25 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.
 

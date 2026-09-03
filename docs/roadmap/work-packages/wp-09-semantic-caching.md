@@ -62,7 +62,7 @@ mandatory (this touches a classification boundary).
    Related ADRs list: 0021, 0029, 0034, 0035.
 2. In `docs/roadmap/adr-decisions-v0.1.md`: KEEP the `### ADR-0104: …` heading;
    replace the body with
-   `Promoted to a full decision record: see [ADR-0104](0104-introduce-controlled-semantic-caching.md) (WP-09 implementation).`
+   `Promoted to a full decision record: see [ADR-0104](../../adr/0104-introduce-controlled-semantic-caching.md) (WP-09 implementation).`
 3. In `docs/adr/README.md`: flip the ADR-0104 row link to the new file;
    status `Proposed` → `To be implemented`.
 4. `python3 platform/docs/check_docs.py` must exit 0 before continuing.

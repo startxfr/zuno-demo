@@ -72,16 +72,16 @@ this adds a trust boundary.
 
    ## Related ADRs
 
-   - [ADR-0022](0022-use-gitops-managed-declarative-agent-tasks-and-policies.md)
-   - [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md)
-   - [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md)
-   - [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md)
+   - [ADR-0022](../../adr/0022-use-gitops-managed-declarative-agent-tasks-and-policies.md)
+   - [ADR-0038](../../adr/0038-use-standards-compliant-okf-v0-2-markdown-bundles.md)
+   - [ADR-0039](../../adr/0039-make-agent-runtime-execute-the-okf-agent-contract.md)
+   - [ADR-0115](../../adr/0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md)
    ```
 
 2. In `docs/roadmap/adr-decisions-v0.1.md`: KEEP the heading
    `### ADR-0106: Enforce OKF bundle signing and validation`; replace its
    one-line body with:
-   `Promoted to a full decision record: see [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) (WP-05 implementation).`
+   `Promoted to a full decision record: see [ADR-0106](../../adr/0106-enforce-okf-bundle-signing-and-validation.md) (WP-05 implementation).`
 3. In `docs/adr/README.md`: change the ADR-0106 row link from the
    `../adr-decisions-v0.1.md#adr-0106-...` anchor to
    `0106-enforce-okf-bundle-signing-and-validation.md`; status cell

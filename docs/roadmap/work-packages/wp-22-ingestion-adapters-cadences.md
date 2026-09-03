@@ -101,7 +101,7 @@ deferred to v0.7.
 2. `docs/roadmap/adr-decisions-v0.1.md`: KEEP the `### ADR-0105:` heading **and
    its explicit `<a id="adr-0105-automate-monthly-knowledge-ingestion"></a>`
    anchor line** (external links target it); replace only the body paragraph
-   with `Promoted to a full decision record: see [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) (WP-22 implementation).`
+   with `Promoted to a full decision record: see [ADR-0105](../../adr/0105-automate-source-specific-knowledge-ingestion.md) (WP-22 implementation).`
 3. `docs/adr/README.md`: ADR-0105 row → direct link, `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.
 

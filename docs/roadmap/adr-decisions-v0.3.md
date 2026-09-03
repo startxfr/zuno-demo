@@ -11,55 +11,55 @@ Consolidated from 9 individual ADR files, plus four further decisions promoted t
 
 ### ADR-0301: Introduce LoRA and PEFT model customization
 
-Promoted to a full decision record: see [ADR-0301](0301-introduce-lora-and-peft-model-customization.md) (`ansible/roles/mlops` needed a real design to scaffold against).
+Promoted to a full decision record: see [ADR-0301](../adr/0301-introduce-lora-and-peft-model-customization.md) (`ansible/roles/mlops` needed a real design to scaffold against).
 
 ### ADR-0302: Build dataset-to-model MLOps pipelines
 
-Promoted to a full decision record: see [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md).
+Promoted to a full decision record: see [ADR-0302](../adr/0302-build-dataset-to-model-mlops-pipelines.md).
 
 ### ADR-0303: Support dynamic LoRA adapter loading
 
-Promoted to a full decision record: see [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) (WP-39 implementation).
+Promoted to a full decision record: see [ADR-0303](../adr/0303-support-dynamic-lora-adapter-loading.md) (WP-39 implementation).
 
 ### ADR-0304: Optimize model selection using quality cost and latency
 
-Promoted to a full decision record: see [ADR-0304](0304-optimize-model-selection-using-quality-cost-and-latency.md) (WP-40 implementation).
+Promoted to a full decision record: see [ADR-0304](../adr/0304-optimize-model-selection-using-quality-cost-and-latency.md) (WP-40 implementation).
 
 ### ADR-0305: Introduce automated model benchmarking
 
-Promoted to a full decision record: see [ADR-0305](0305-introduce-automated-model-benchmarking.md) (WP-40 implementation).
+Promoted to a full decision record: see [ADR-0305](../adr/0305-introduce-automated-model-benchmarking.md) (WP-40 implementation).
 
 ### ADR-0410: Expand the agent catalog beyond the initial five agents
 
-Promoted to a full decision record and re-streamed to v0.4 as ADR-0410, formerly ADR-0306 (2026-08-15): see [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) (WP-41 implementation).
+Promoted to a full decision record and re-streamed to v0.4 as ADR-0410, formerly ADR-0306 (2026-08-15): see [ADR-0410](../adr/0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) (WP-41 implementation).
 
 ### ADR-0307: Support self-service agent onboarding
 
-Promoted to a full decision record: see [ADR-0307](0307-support-self-service-agent-onboarding.md) (WP-41 implementation).
+Promoted to a full decision record: see [ADR-0307](../adr/0307-support-self-service-agent-onboarding.md) (WP-41 implementation).
 
 ### ADR-0308: Expand agent lifecycle management through the AIAgent Operator
 
-Promoted to a full decision record: see [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) (WP-38 implementation).
+Promoted to a full decision record: see [ADR-0308](../adr/0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) (WP-38 implementation).
 
 ### ADR-0309: Introduce policy-driven autonomous optimization
 
-Promoted to a full decision record: see [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) (WP-42 implementation).
+Promoted to a full decision record: see [ADR-0309](../adr/0309-introduce-policy-driven-autonomous-optimization.md) (WP-42 implementation).
 
 ### ADR-0326: Generalize the Tekos vertical slice to the four remaining agents
 
-Promoted to a full decision record: see [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md).
+Promoted to a full decision record: see [ADR-0326](../adr/0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md).
 
 ### ADR-0327: Define the AIAgent CRD reconciliation contract before implementing the operator
 
-Promoted to a full decision record: see [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md).
+Promoted to a full decision record: see [ADR-0327](../adr/0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md).
 
 ### ADR-0340: Extend business-role authorization with CDP and scoped capabilities
 
-Promoted to a full decision record: see [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md).
+Promoted to a full decision record: see [ADR-0340](../adr/0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md).
 
 ### ADR-0342: Support multiple agent graph shapes in Agent Runtime
 
-Promoted to a full decision record: see [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md).
+Promoted to a full decision record: see [ADR-0342](../adr/0342-support-multiple-agent-graph-shapes-in-agent-runtime.md).
 
 ### ADR-0353: Support an optional external registry as the first-party runtime image source
 

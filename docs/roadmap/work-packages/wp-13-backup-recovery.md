@@ -56,7 +56,7 @@ explicitly), ADR-0101/WP-12. Acceptance criteria: Standard clauses.
 
    Standard-clauses pointer + Related ADRs (0015, 0022, 0024, 0101, 0315).
 2. `docs/roadmap/adr-decisions-v0.1.md`: KEEP heading; body →
-   `Promoted to a full decision record: see [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) (WP-13 implementation).`
+   `Promoted to a full decision record: see [ADR-0112](../../adr/0112-implement-production-grade-backup-and-recovery.md) (WP-13 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.
 

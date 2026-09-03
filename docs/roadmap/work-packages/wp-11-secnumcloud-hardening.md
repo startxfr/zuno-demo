@@ -57,7 +57,7 @@ Acceptance criteria: Standard clauses.
 
    Standard-clauses pointer + Related ADRs (0037, 0041, 0052, 0115).
 2. `docs/roadmap/adr-decisions-v0.1.md`: KEEP the heading, body →
-   `Promoted to a full decision record: see [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) (WP-11 implementation).`
+   `Promoted to a full decision record: see [ADR-0111](../../adr/0111-strengthen-secnumcloud-oriented-security-controls.md) (WP-11 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.
 

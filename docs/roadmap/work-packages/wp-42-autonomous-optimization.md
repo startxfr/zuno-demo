@@ -112,7 +112,7 @@ governance."
    enumerated scope remains a human-reviewed PR (ADR-0304)." Related:
    0104, 0304, 0305.
 2. `docs/roadmap/adr-decisions-v0.3.md`: KEEP heading; body →
-   `Promoted to a full decision record: see [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) (WP-42 implementation).`
+   `Promoted to a full decision record: see [ADR-0309](../../adr/0309-introduce-policy-driven-autonomous-optimization.md) (WP-42 implementation).`
 3. `docs/adr/README.md`: direct link + `To be implemented`.
 4. `python3 platform/docs/check_docs.py` exits 0.
 
