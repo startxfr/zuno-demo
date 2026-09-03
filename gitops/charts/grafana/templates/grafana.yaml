@@ -51,8 +51,15 @@ spec:
         service.beta.openshift.io/serving-cert-secret-name: grafana-oauth-tls
     spec:
       ports:
+        # protocol/weight/etc are spelled out here even though they are the
+        # API defaults: whatever this CR omits, the API server fills in, and
+        # ArgoCD then reads that back as permanent drift. Rendering the
+        # defaulted value is what keeps this Application Synced without
+        # needing an ignoreDifferences rule to hide it - see
+        # gitops/apps/grafana/application-d1.yaml for what hiding it cost.
         - name: oauth-proxy
           port: 8443
+          protocol: TCP
           targetPort: oauth-proxy
   # Without this, SQLite state (datasources, dashboards, admin user) lives
   # in the operator's default emptyDir and is wiped on every pod restart -
@@ -73,6 +80,7 @@ spec:
       to:
         kind: Service
         name: grafana-service
+        weight: 100
       port:
         targetPort: oauth-proxy
       tls:
@@ -107,6 +115,7 @@ spec:
               ports:
                 - containerPort: 8443
                   name: oauth-proxy
+                  protocol: TCP
               volumeMounts:
                 - name: grafana-oauth-tls
                   mountPath: /etc/tls/private

@@ -30,13 +30,18 @@ spec:
     server: https://kubernetes.default.svc
     namespace: zuno-monitoring
   ignoreDifferences:
-    # Ignore the four paths that are actually defaulted, NOT all of /spec.
+    # Ignore ONE path, not all of /spec.
     #
     # This used to be `jsonPointers: [/spec]` on the belief that "the operator
     # defaults nearly every leaf under spec". A live diff of the rendered CR
     # against the cluster one (2026-09-03) shows it defaults exactly four
-    # things - three of them plain Kubernetes API defaulting, one the operator
-    # resolving the image tag to a digest. Everything else matched.
+    # things - three of them plain Kubernetes API defaulting (route to.weight,
+    # protocol: TCP on the service port and the container port), one the
+    # operator resolving the image tag to a digest. Everything else matched.
+    #
+    # The three API defaults are now spelled out in the chart template itself
+    # (templates/grafana.yaml), so they produce no diff at all and need no rule
+    # here. Only spec.version genuinely cannot be rendered ahead of time.
     #
     # Ignoring the whole subtree cost a real outage of reconciliation: WP-118
     # step 3b replaced the hardcoded storageClassName with the placeholder
@@ -47,22 +52,13 @@ spec:
     # wedged at stage `pvc` reporting Degraded while ArgoCD reported Synced.
     # No Grafana change applied at all for as long as that lasted.
     #
-    # jqPathExpressions, not jsonPointers: three of the four sit inside arrays,
-    # and a jsonPointer would have to hardcode an index that shifts whenever a
-    # port or container is added.
-    #
-    # If a future operator version defaults something new, ArgoCD will report
-    # OutOfSync and self-heal in a loop - add that path here rather than
-    # widening back to /spec, which only hides the next real drift too.
+    # If a future operator version defaults something new, prefer rendering the
+    # defaulted value in the template over widening this rule - an ignore only
+    # hides the next real drift too.
     - group: grafana.integreatly.org
       kind: Grafana
       jqPathExpressions:
-        # operator-resolved image digest
         - .spec.version
-        # Kubernetes API defaults
-        - .spec.route.spec.to.weight
-        - .spec.service.spec.ports[].protocol
-        - .spec.deployment.spec.template.spec.containers[].ports[].protocol
   syncPolicy:
     automated:
       prune: true
