@@ -60,6 +60,7 @@ class _FakePingPool:
 def _reset_db_state() -> None:
     db._pools.clear()
     db._pool_errors.clear()
+    db._unconfigured.clear()
     db._bindings.clear()
     db._last_retry_at = 0.0
     os.environ["TEST_RECONNECT_PGUSER"] = "u"
@@ -126,6 +127,69 @@ def test_ready_domains_are_untouched_by_retry() -> None:
     assert db._pools["knowledge.sales"] is healthy
 
 
+def test_missing_credentials_are_not_an_error_and_are_never_retried() -> None:
+    """A domain the chart did not enable must not look broken forever.
+
+    knowledge.adv is this case live: the rag-service chart has
+    `domain: adv, enabled: false` so no RAGADV_* env exists, while the
+    bindings file baked into the image still declares the domain. It used
+    to land in _pool_errors, which made _retry_failed re-attempt it every
+    15s and re-log the same WARNING for the life of the pod - roughly
+    5,700 identical lines a day for a decision someone made in a values
+    file.
+    """
+    _reset_db_state()
+    os.environ.pop("TEST_RECONNECT_PGUSER", None)
+    os.environ.pop("TEST_RECONNECT_PGPASSWORD", None)
+    b = _binding("knowledge.adv")
+    db._bindings[b.domain] = b
+
+    async def scenario():
+        await db._connect_one(b)
+        # Not an error: absent from _pool_errors, so _retry_failed cannot
+        # reach it at all.
+        assert b.domain not in db._pool_errors
+        assert b.domain in db._unconfigured
+        assert b.domain not in db._pools
+
+        with mock.patch.object(db, "_connect_one") as spy:
+            db._last_retry_at = 0.0
+            await db._retry_failed()
+            spy.assert_not_called()
+
+    asyncio.run(scenario())
+
+    # And the probe says which of the two it is.
+    status = db.ready_domains()
+    assert status[b.domain].startswith("not-configured:"), status
+    os.environ["TEST_RECONNECT_PGUSER"] = "u"
+    os.environ["TEST_RECONNECT_PGPASSWORD"] = "p"
+
+
+def test_a_real_failure_is_still_retried() -> None:
+    """The split must not make genuine failures unretryable - that would
+    trade a noisy log for a silent outage, which is a worse bargain."""
+    _reset_db_state()
+    b = _binding()
+    db._bindings[b.domain] = b
+
+    async def scenario():
+        boom = mock.AsyncMock(side_effect=Exception("the database system is starting up"))
+        with mock.patch.object(db.asyncpg, "create_pool", boom):
+            await db._connect_one(b)
+        assert b.domain in db._pool_errors
+        assert b.domain not in db._unconfigured
+
+        ok = mock.AsyncMock(return_value=_FakePingPool())
+        with mock.patch.object(db.asyncpg, "create_pool", ok):
+            db._last_retry_at = 0.0
+            await db._retry_failed()
+        assert b.domain in db._pools and b.domain not in db._pool_errors
+
+    asyncio.run(scenario())
+    assert db.ready_domains()[b.domain] == "ready"
+
+
 def test_no_bindings_no_crash() -> None:
     """A failed domain with no remembered binding (registry load error) is
     skipped, never raises."""
@@ -143,6 +207,8 @@ TESTS = [
     test_failed_domain_recovers_on_ping_any_retry,
     test_retry_is_interval_bounded,
     test_ready_domains_are_untouched_by_retry,
+    test_missing_credentials_are_not_an_error_and_are_never_retried,
+    test_a_real_failure_is_still_retried,
     test_no_bindings_no_crash,
 ]
 

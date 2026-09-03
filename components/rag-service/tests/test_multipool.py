@@ -176,8 +176,12 @@ def test_connect_one_skips_domain_when_credentials_missing() -> None:
 
     asyncio.run(run())
     assert db.get_pool("knowledge.tech") is None
-    assert "knowledge.tech" in db._pool_errors
-    db._pool_errors.pop("knowledge.tech", None)
+    # Absent credentials mean the chart did not enable this domain here -
+    # tracked apart from real failures so _retry_failed never re-attempts
+    # it, because container env is fixed at start and no retry can help.
+    assert "knowledge.tech" in db._unconfigured
+    assert "knowledge.tech" not in db._pool_errors
+    db._unconfigured.pop("knowledge.tech", None)
 
 
 def test_connect_one_creates_a_pool_with_per_domain_credentials_and_search_path() -> None:

@@ -27,6 +27,22 @@ logger = logging.getLogger("rag_service.db")
 
 _pools: Dict[str, asyncpg.Pool] = {}
 _pool_errors: Dict[str, str] = {}
+# Domains this DEPLOYMENT does not configure, as opposed to domains that
+# are configured and broken. The distinction is not cosmetic: a domain
+# whose credential env vars are absent can never recover in-process
+# (container env is fixed at container start, so a late-arriving
+# ExternalSecret cannot appear here), so retrying it forever logs a
+# warning every _RETRY_MIN_INTERVAL_SECONDS for the life of the pod and
+# reports a permanent not-ready that no operator action will clear.
+#
+# knowledge.adv is exactly this today: gitops/charts/rag-service's
+# values.yaml has `domain: adv, enabled: false` - no ExternalSecret, no
+# RAGADV_* env - while platform/bindings/knowledge/bindings.yaml, baked
+# into the image, still declares the domain (ADR-0218 removed its only
+# ingestion adapter but kept the binding so the domain keeps its
+# database). Two sources of truth disagreeing, and this is where they
+# meet.
+_unconfigured: Dict[str, str] = {}
 # Every binding connect_all ever resolved, kept so _retry_failed() can
 # re-attempt a domain that failed its startup connect: a cluster
 # stop/start can bring this pod up while PostgreSQL is still in crash
@@ -84,14 +100,23 @@ async def _connect_one(binding: KnowledgeBinding) -> None:
     user = os.getenv(binding.pguser_env, "")
     password = os.getenv(binding.pgpassword_env, "")
     if not user or not password:
+        # NOT an error, and deliberately NOT added to _pool_errors: absent
+        # credentials mean the chart did not enable this domain on this
+        # deployment. Retrying cannot help - see _unconfigured above - so
+        # this is recorded once and never retried, where it used to warn
+        # every 15 seconds forever.
         msg = (
-            f"{binding.pguser_env}/{binding.pgpassword_env} not set - "
-            f"domain '{binding.domain}' will report not-ready until its "
-            "ExternalSecret-populated credentials are present"
+            f"{binding.pguser_env}/{binding.pgpassword_env} not set - domain "
+            f"'{binding.domain}' is not configured on this deployment and will "
+            "not be retried; enable it in the rag-service chart if it should serve"
         )
-        logger.warning(msg)
-        _pool_errors[binding.domain] = msg
+        if binding.domain not in _unconfigured:
+            logger.info(msg)
+        _unconfigured[binding.domain] = msg
+        _pool_errors.pop(binding.domain, None)
         return
+
+    _unconfigured.pop(binding.domain, None)
 
     try:
         pool = await asyncpg.create_pool(
@@ -150,10 +175,13 @@ async def _retry_failed() -> None:
     ping_any() (the readiness probe is the heartbeat - no background task
     to manage) and on the search path's own not-ready check, so a
     PostgreSQL that comes up AFTER this pod (the 2026-08-18 restart
-    ordering) heals without a pod delete. Missing-credential domains are
-    retried too but only recover on a pod restart: container env is fixed
-    at start, so a late-arriving ExternalSecret can't appear here -
-    _connect_one just re-logs the same warning once per window."""
+    ordering) heals without a pod delete.
+
+    Domains with no credentials are NOT in _pool_errors and so are never
+    reached from here: they are not broken, they are not configured on
+    this deployment, and container env is fixed at container start so no
+    amount of retrying can change that. They used to sit in _pool_errors
+    and re-log the same warning once per window for the life of the pod."""
     global _last_retry_at
     if not _pool_errors:
         return
@@ -185,6 +213,11 @@ def ready_domains() -> Dict[str, str]:
     """Domain -> live/error status, for /readyz reporting."""
     status: Dict[str, str] = {domain: "ready" for domain in _pools}
     status.update({domain: f"not-ready: {err}" for domain, err in _pool_errors.items()})
+    # Reported separately so an operator reading the probe can tell
+    # "deliberately absent here" from "configured and broken". Both used
+    # to render as not-ready, which made a chart decision look like an
+    # outage every time anyone looked at /readyz.
+    status.update({domain: f"not-configured: {err}" for domain, err in _unconfigured.items()})
     return status
 
 
