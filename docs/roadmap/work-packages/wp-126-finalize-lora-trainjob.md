@@ -96,6 +96,24 @@ neither in this WP's original scope:
    real wall-clock time on doomed work, and `make d2 build mlops` was triggered to rebuild from
    current `main`.
 
+3. **A third, still-unresolved defect: `trainjob.py`'s own K8s API call to `kubernetes.default.svc`
+   fails TLS verification, deterministically, only inside the real KFP-launcher-wrapped execution.**
+   After the image rebuild (finding 2, fixed), a fresh run's `train-lora` step correctly reached
+   `_find_existing`'s `session.get(...)` call and failed with the same
+   `SSLCertVerificationError: ... self-signed certificate in certificate chain` on **two separate
+   run attempts** (ruling out a transient/race explanation). Manual reproduction in a throwaway
+   pod - same image, same `pipeline-runner-mlops-dspa` ServiceAccount, same explicit
+   `session.verify = /var/run/secrets/kubernetes.io/serviceaccount/ca.crt` call - **succeeds
+   cleanly** (`Verify return code: 0`), twice, including with `SSL_CERT_FILE` explicitly set to
+   the same 227958-byte merged `/kfp/certs/ca.crt` bundle the real pod also mounts (ruling out
+   that env var as the cause too - `requests`'s explicit `session.verify=` path does not consult
+   `SSL_CERT_FILE`). Confirmed `kube-root-ca.crt` (the modern projected-volume source for the
+   standard SA `ca.crt` mount) correctly contains all 7 expected signers, including
+   `kube-apiserver-service-network-signer` (the one that actually signs `kubernetes.default.svc`'s
+   served cert, confirmed via direct `openssl s_client`). Two concrete hypotheses tested and
+   disproved; root cause not yet identified. Something specific to the Argo `emissary` executor's
+   process-wrapping of the launched Python process is the remaining suspect, untested.
+
 ### Original live-action plan (now resuming against a rebuilt image)
 
 1. Trigger the `mlops` KFP pipeline's LoRA training stage for a real run (the same wesh-style
