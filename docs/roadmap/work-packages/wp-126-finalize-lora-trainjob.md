@@ -1,6 +1,8 @@
 # WP-126: finalize the LoRA TrainJob (lift WP-119's "shipped disabled")
 
-- **State:** Operator pending (2026-09-03)
+- **State:** Operator pending (2026-09-04) - 4/4 known defects fixed and live-verified individually;
+  no run has yet completed end to end (last attempt interrupted by a planned cluster stop, not by
+  a defect)
 - **ADRs:** ADR-0545 (decision 1), ADR-0539, ADR-0538
 - **Depends on:** WP-119 (Repo work merged, 2026-09-02)
 - **Related:** [ADR-0351](../../adr/0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md)
@@ -96,34 +98,80 @@ neither in this WP's original scope:
    real wall-clock time on doomed work, and `make d2 build mlops` was triggered to rebuild from
    current `main`.
 
-3. **A third, still-unresolved defect: `trainjob.py`'s own K8s API call to `kubernetes.default.svc`
-   fails TLS verification, deterministically, only inside the real KFP-launcher-wrapped execution.**
-   After the image rebuild (finding 2, fixed), a fresh run's `train-lora` step correctly reached
-   `_find_existing`'s `session.get(...)` call and failed with the same
-   `SSLCertVerificationError: ... self-signed certificate in certificate chain` on **two separate
-   run attempts** (ruling out a transient/race explanation). Manual reproduction in a throwaway
-   pod - same image, same `pipeline-runner-mlops-dspa` ServiceAccount, same explicit
-   `session.verify = /var/run/secrets/kubernetes.io/serviceaccount/ca.crt` call - **succeeds
-   cleanly** (`Verify return code: 0`), twice, including with `SSL_CERT_FILE` explicitly set to
-   the same 227958-byte merged `/kfp/certs/ca.crt` bundle the real pod also mounts (ruling out
-   that env var as the cause too - `requests`'s explicit `session.verify=` path does not consult
-   `SSL_CERT_FILE`). Confirmed `kube-root-ca.crt` (the modern projected-volume source for the
-   standard SA `ca.crt` mount) correctly contains all 7 expected signers, including
-   `kube-apiserver-service-network-signer` (the one that actually signs `kubernetes.default.svc`'s
-   served cert, confirmed via direct `openssl s_client`). Two concrete hypotheses tested and
-   disproved; root cause not yet identified. Something specific to the Argo `emissary` executor's
-   process-wrapping of the launched Python process is the remaining suspect, untested.
+3. **RESOLVED 2026-09-04. `trainjob.py`'s own K8s API call to `kubernetes.default.svc` failed TLS
+   verification, deterministically, only inside the real KFP-launcher-wrapped execution.** Root
+   cause found by instrumenting a throwaway diagnostic build (commit `19e95796`, reverted once the
+   cause was captured) and triggering one real run: `launcher_v2` (the container's actual PID 1,
+   this module's parent process) tries to build its own merged CA bundle before exec'ing the user
+   command, fails to read the system CA store at the Debian path
+   `/etc/ssl/certs/ca-certificates.crt` (this image is UBI/RHEL, so that read silently fails
+   - `launcher_v2.go:746 Error reading CA bundle file`), and sets `REQUESTS_CA_BUNDLE`/
+   `SSL_CERT_FILE` to its own incomplete temp file regardless - which never contains the
+   kube-apiserver's own signer. `_session()`'s explicit `session.verify = .../ca.crt` looked like
+   it should win, but `_find_existing`/`submit_and_wait` call `session.get()`/`.post()` without an
+   explicit per-call `verify=`, so `requests.Session.request()`'s own `verify=None` default
+   triggers `requests`' environment lookup first, and `REQUESTS_CA_BUNDLE` ends up overriding
+   `session.verify` in the final merge (confirmed by reading `requests` 2.32.5's own
+   `merge_environment_settings` source). **Fixed** (commit `dda503fa`): `session.trust_env = False`
+   in `_session()`, so the session never consults the environment at all. The two hypotheses
+   disproved in the previous investigation (incomplete `kube-root-ca.crt`; `SSL_CERT_FILE`
+   interference) were both real disproofs of what they tested, just not of the actual mechanism
+   (`REQUESTS_CA_BUNDLE`, not `SSL_CERT_FILE`, is what `requests` actually consults on this code
+   path).
 
-### Original live-action plan (now resuming against a rebuilt image)
+4. **RESOLVED 2026-09-04. A fourth defect, found only once finding 3's fix let a `TrainJob` submit
+   for the first time: the Kubeflow Trainer controller built the JobSet/Job from the
+   `TrainingRuntime`'s own container template verbatim and never applied
+   `TrainJob.spec.trainer`'s `env`/`command`/`args` overrides at all** - the pod's `node` container
+   started with `command: null, args: null, env: [JOB_COMPLETION_INDEX only]` and crashed
+   immediately (`mlops: error: the following arguments are required: stage`), with no error
+   anywhere in the controller's own logs. A first attempted fix (adding the
+   `trainer.kubeflow.org/framework: torch` label, matching RHOAI's shipped runtimes) did **not**
+   work - a second live run still showed zero overrides applied. Comparing byte-for-byte against
+   RHOAI's own `torch-distributed` `ClusterTrainingRuntime` (`oc get clustertrainingruntime
+   torch-distributed -o json`) found the real structural bug:
+   `trainer.kubeflow.org/trainjob-ancestor-step: trainer` belongs on the **Job's own metadata**
+   (`replicatedJobs[].template.metadata`), which is what the controller uses to find which Job in
+   the JobSet is "the trainer step" to patch. `gitops/charts/mlops/templates/trainingruntime.yaml`
+   had it one level too deep, on the **pod template's** metadata
+   (`replicatedJobs[].template.spec.template.metadata`) - a silent, structural YAML-nesting bug
+   that `helm template`/`helm lint`/`oc apply --dry-run=server` all pass, since the label is valid
+   at either level; only a live run against the actual controller logic exposes it. **Fixed**
+   (commit `14d86bda`): moved the label to the correct level. Confirmed live 2026-09-04: a fresh
+   `TrainJob`'s pod showed `command=['/opt/app-root/src/mlops-run']`,
+   `args=['train-lora-local', '--run-id', ...]`, `env_count=48` - all four defects now cleared.
 
-1. Trigger the `mlops` KFP pipeline's LoRA training stage for a real run (the same wesh-style
-   dataset WP-119/ADR-0526 already used, unless a different real case is preferred).
-2. Watch the JobSet-owned pod actually materialize on `zuno-gpu-burst-a` from a scaled-from-zero
-   node - this is the one step WP-119 explicitly left unverified ("the scale-from-zero probe for a
-   JobSet-owned pod").
-3. Confirm the `TrainJob` reaches a terminal `Complete` condition and `mlops.py`'s
-   `train_manifest.json` verification against S3 passes (per WP-119, it does not trust the
-   `Complete` condition alone).
+### Live-action plan - status 2026-09-04
+
+1. Done. Multiple real runs triggered via `kfp.Client.run_pipeline` against the `mlops-dspa` route
+   (pipeline id `d3976051-...` / version `fb1617ae-...`, agent `comage`).
+2. **Done, proven live for the first time.** `zuno-gpu-burst-a` scaled 0->1, the JobSet-owned pod
+   (`lora-comage-6qcnx-node-0-0-rbwxb`) was placed on the scaled-up node, the GPU device plugin
+   registered (~2 min cold start, normal), and the pod ran the real training loop (`2/2 Running`,
+   loss decreasing normally, reached 111/224 steps / ~50% before the session ended).
+3. **Not yet done.** The 2026-09-04 run was interrupted by a planned cluster stop (operator
+   decision, not a defect - see "Resuming this WP" below) before `train-lora` finished, so
+   `merge-export`/`evaluate`/`push-registry` never ran. `TrainJob` never reached a terminal
+   `Complete` condition; `train_manifest.json` / MLflow visibility / burst-node scale-down are
+   still unconfirmed.
+
+### Resuming this WP (next session)
+
+All four defects are fixed and pushed to `main` (commits `dda503fa`, `6d384044`, `14d86bda`; the
+diagnostic-only `19e95796` was reverted by `dda503fa`). Nothing code-side is left to investigate -
+this is now purely "run it again and watch it finish":
+
+1. After cluster restart, work through the post-restart recovery checklist first (ArgoCD/PgBouncer/
+   etc. - see that memory) before touching mlops.
+2. Confirm `zuno-gpu-burst-a` is back at 0 replicas (it should have scaled down on its own once the
+   interrupted pod's node was torn down by the cluster stop - verify rather than assume).
+3. Trigger one more real run the same way (`kfp.Client.run_pipeline`, see git history around
+   2026-09-04 for the exact invocation) and let it run to completion uninterrupted - training alone
+   took ~13 minutes for 224 steps on the previous attempt, so budget for the full pipeline
+   (dataset-prep + train + merge-export + evaluate + push-registry) rather than just the training
+   loop.
+4. Verify the acceptance checks below, then close out this WP's `State` line and ADR-0539's
+   `Status` line together.
 
 ## What NOT to touch
 
