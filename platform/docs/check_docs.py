@@ -1224,6 +1224,66 @@ def check_version_consistency(profile: dict) -> List[Finding]:
     return findings
 
 
+def check_confidential_var_loaders() -> List[Finding]:
+    """Catch roles that read an ansible/confidential.yml variable without loading it.
+
+    This repo has no vars_files and no global include_vars: every role that reads
+    an operator-supplied variable loads ansible/confidential.yml itself (stat,
+    then include_vars when present). A role that reads one of those variables and
+    skips the loader does not error - the variable is simply undefined, so the
+    role's `| default(<chart value>)` fallback wins silently.
+
+    That is exactly how cert_manager broke. WP-118 B6 moved the ACME DNS-01
+    identity out of gitops/charts/cert-manager/values.yaml into
+    ansible/confidential.yml and flipped the chart defaults to `mycluster-*`
+    placeholders, but never added the loader - so the three variables were always
+    undefined and the identity resolved to the placeholders. The apply that
+    proved B6 inert was measured while the chart still carried the real values,
+    so `changed=0` was true for the wrong reason, and the next
+    `make d0 install cert-manager` would have written MYCLUSTERHOSTEDZONEID into
+    the live Application and stopped DNS-01 from solving on demo222. Found
+    2026-09-04 by WP-132, recorded as ADR-0517 B13.
+
+    Commented-out keys in confidential.example.yml count as documented: an
+    optional variable is exactly the case where the fallback hides the gap.
+    """
+    findings: List[Finding] = []
+    example = REPO_ROOT / "ansible" / "confidential.example.yml"
+    if not example.exists():
+        return findings
+    raw = example.read_text()
+    try:
+        documented = set(yaml.safe_load(raw) or {})
+    except Exception:
+        documented = set()
+    documented |= set(re.findall(r"^#\s*(zuno_[a-z0-9_]+)\s*:", raw, re.M))
+    if not documented:
+        return findings
+
+    for role_dir in sorted((REPO_ROOT / "ansible" / "roles").iterdir()):
+        tasks_dir = role_dir / "tasks"
+        if not tasks_dir.is_dir():
+            continue
+        text = "".join(f.read_text() for f in sorted(tasks_dir.rglob("*.yml")))
+        loads = "confidential.yml" in text and "include_vars" in text
+        if loads:
+            continue
+        used = sorted(
+            key for key in documented
+            if re.search(r"\b" + re.escape(key) + r"\b", text)
+        )
+        if used:
+            findings.append(Finding(
+                "confidential_loader",
+                f"ansible/roles/{role_dir.name} reads {', '.join(used)} from "
+                "ansible/confidential.yml but never loads the file - the "
+                "variable stays undefined and any `| default(...)` fallback "
+                "wins silently. Add the stat + include_vars pair the other "
+                "roles use (see ansible/roles/mariadb/tasks/install.yml).",
+            ))
+    return findings
+
+
 def main() -> int:
     profile = _load_profile()
     findings = (
@@ -1237,6 +1297,7 @@ def main() -> int:
         + check_day0_day1_roles()
         + check_debug_make_commands()
         + check_gitops_values_clobber()
+        + check_confidential_var_loaders()
         + check_version_consistency(profile)
         + check_model_roles()
         + check_doc_links()
@@ -1249,6 +1310,7 @@ def main() -> int:
           "the roadmap's by-version table against the ADR bodies, "
           "agent zuno.status vs its governing ADR(s), Makefile/ansible role "
           "consistency, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
+          "roles reading ansible/confidential.yml variables without loading the file, "
           f"platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}, "
           "model architectural roles against provider-routing.yaml/"
           "model-routing-policy.yaml, relative ADR links in ADR/roadmap/"

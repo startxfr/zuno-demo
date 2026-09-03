@@ -1,6 +1,6 @@
 # WP-132: Convert every remaining cluster-specific value into an Ansible parameter
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0547](../../adr/0547-parameterize-every-cluster-specific-value-in-ansible.md)
   (the execution of that decision),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md)
@@ -22,6 +22,47 @@ breaks or corrupts a fresh cluster.
 
 ## Steps
 
+### Step 0 — the unwired parameter surface (B13) — **DONE 2026-09-04**
+
+Found while reading `cert_manager` for step 2, and it had to jump the queue: it
+was a live `demo222` defect, not a `demo333` one.
+
+WP-118 B6 moved the ACME DNS-01 identity (`zuno_certmanager_email`,
+`zuno_certmanager_route53_region`, `zuno_certmanager_route53_hosted_zone_id`) into
+`ansible/confidential.yml` and flipped the chart defaults to `mycluster-*`
+placeholders — but `ansible/roles/cert_manager/tasks/install.yml` never loaded the
+file. This repo has no `vars_files` and no global `include_vars`; each role that
+reads an operator variable loads it itself (mariadb, models, smtp, keycloak,
+postgresql, vault, aap all do). So the three variables were permanently undefined
+and `| default(_cm_chart_acme[...])` resolved to the placeholders.
+
+The next `make d0 install cert-manager` would have written
+`MYCLUSTERHOSTEDZONEID` / `mycluster-route53-region` /
+`acme-contact@mycluster.example.com` into the live `zuno-cert-manager-d1`
+Application. DNS-01 would stop solving, and with B11's consumer flips on, a
+failed renewal eventually takes the router certificate with it.
+
+**Why B6's own inertia proof missed it.** The `changed=0` was measured while the
+chart still carried the real values, so the apply was inert *for the wrong
+reason* — `changed=0` is equally consistent with "the parameter works" and with
+"the parameter is dead and the old value is still there". Step two then removed
+the real values and left the fallback pointing at placeholders. An inertia proof
+has to state why nothing changed, not only that nothing changed.
+
+Fixed by adding the `stat` + `include_vars` pair, and by making the class
+mechanically impossible to reintroduce: `check_confidential_var_loaders` in
+`platform/docs/check_docs.py` fails any role that reads a variable documented in
+`confidential.example.yml` (commented-out entries included — an optional variable
+is exactly where the fallback hides the gap) without loading the file. Verified
+both ways: the check fires on the pre-fix file and passes on the fixed one, and a
+sweep of all 59 roles found cert_manager was the only offender.
+
+Verified read-only, with no apply: with the loader in place the identity resolves
+to `dev+zuno-acme@startx.fr` / `eu-west-3` / `Z3HY376RT1N9S1`, byte-identical to
+what `zuno-cert-manager-d1` carries live today. That is the inertia proof B6
+should have had.
+
+
 Each step follows ADR-0547 clause 4's two-step order without exception: inject the real
 value at the Application level, prove the render is byte-identical **with the
 Application's own toggle on**, apply live on `demo222`, confirm ArgoCD has synced a
@@ -42,9 +83,22 @@ override is the cheapest possible thing to get wrong in isolation.
 
 ### Step 2 — the RHOAI version pin (B9's residual manual step)
 
-`gitops/charts/openshift-ai/values.yaml`'s
-`cluster-ods.operator.subscription.version`/`.channel` become parameters. The human
-decision stays — ADR-0517 is explicit that auto-approving whatever a catalog publishes is
+**Corrected 2026-09-04 after reading the code.** The channel is already a
+parameter: `ansible/roles/openshift_ai/tasks/discover_channel.yml` reads it from
+the live PackageManifest per ADR-0048 and injects it through
+`gitops_app_extra_helm_values`, and the chart default `stable-3.5` is
+deliberately a real channel because `helm template` and a plain ArgoCD sync must
+still render. Only `subscription.version` (the `3.5.0` pin, now the GA rather
+than the `3.5.0-ea.2` the ADR text still describes in places) is a chart literal.
+
+So the scope is one value: `subscription.version` becomes a parameter defaulting
+to the chart file itself, the shape WP-118 B6 used for the ACME identity — one
+source of truth, and the apply stays inert until an operator sets it. **With step
+0's lesson applied**: the role must actually load `confidential.yml`, and the
+inertia proof must show the resolved value equals the live one, not merely that
+the apply reported `changed=0`.
+
+The human decision stays — ADR-0517 is explicit that auto-approving whatever a catalog publishes is
 how a platform stops being reproducible, and the hard refusal in
 `openshift_ai/tasks/install.yml:90` is kept exactly as it is. What changes is that
 recording the decision stops requiring a chart edit, which today is a live change to
@@ -52,7 +106,9 @@ every cluster rendering from `main`.
 
 Note that `openshift_ai/tasks/precheck.yml` reads the pin **from the chart** precisely
 because a fresh cluster has no Subscription. That read must follow the value to its new
-home rather than being left pointing at a stale default.
+home rather than being left pointing at a stale default — otherwise a `demo333` operator
+who sets the parameter correctly still gets a DRIFTED report, which is B9's own failure
+mode reintroduced one level up.
 
 ### Step 3 — the ACME issuer and consumer flips (B11)
 

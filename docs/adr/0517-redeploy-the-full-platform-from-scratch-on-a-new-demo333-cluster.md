@@ -36,10 +36,10 @@ genuine from-scratch run.
    implies is bounded to the blockers enumerated under *Known blockers*
    below. Anything found beyond them during the run falls under clause 3 —
    logged, then fixed or deferred to a follow-up ADR/WP. The list started at
-   nine and is now twelve; each is carried by exactly one work package:
+   nine and is now thirteen; each is carried by exactly one work package:
    B1–B9 by WP-118 (added 2026-09-02), B10 by WP-123, B11 by WP-132 with
-   detection in WP-130, and B12 by ADR-0546 executed by WP-131. The run
-   itself stays blocked until `demo333` exists.
+   detection in WP-130, B12 by ADR-0546 executed by WP-131, and B13 by WP-132.
+   The run itself stays blocked until `demo333` exists.
 
 ## Acceptance criteria
 
@@ -84,6 +84,7 @@ The blockers are exactly the places that bypass that mechanism:
 | B10 | The four RHOAI dashboard feature flags (`disableKueue`, `disableTrustyAIEval` and siblings) were set by hand on the live cluster and had no applier at all | live `DataScienceCluster`/`OdhDashboardConfig` only — nothing in the repo | A fresh cluster comes up with the RHOAI dashboard missing the surfaces WP-115/WP-117 rely on, and no `make` verb restores them. **Closed 2026-09-03** by WP-123: the flags are reconciled from Ansible, drill-proven (check found the drift, reconcile fixed it, a re-run was a no-op, deleting a flag self-healed). Invisible to WP-118's audit by construction: a cluster-only mutation leaves nothing in the repo to grep for |
 | B11 | `acme.enabled: true`, `certificatesIssuer: letsencrypt-route53` (production) and both `consumers.routerDefaultCert`/`apiServerNamedCert` shipped `true` — demo222's *end state*, committed to git | `gitops/apps/cert-manager/application-d1.yaml:36-49` | On the first sync of a fresh cluster ArgoCD patches `IngressController/default.spec.defaultCertificate` to `router-wildcard-tls`, a Secret that cannot exist yet, and adds an APIServer named certificate for the same absent Secret — breaking Console and route serving before any Certificate could be issued. The chart's own comment says these flip ONLY after `oc get certificate -A` shows Ready. Also skips the staging rehearsal ADR-0211 prescribes. **Open**: parameterized by WP-132 (safe first-install defaults, demo222's live value injected), detected meanwhile by WP-130 |
 | B12 | Seven S3 buckets mix cross-cluster inputs and per-cluster outputs, and none is namespaced by cluster | `ansible/confidential.yml` plus `gitops/charts/*/values.yaml`, enumerated in ADR-0546 | A `demo333` installed today writes its RAG ingestion outputs, pgBackRest and MariaDB backups, RHOAI traces and MLflow artifacts into **`demo222`'s** buckets — the only blocker here that damages the *existing* cluster rather than the new one, and a direct violation of this ADR's own "`demo222` is left untouched" criterion. **Open**: decided by ADR-0546 (`Proposed`), executed by WP-131 |
+| B13 | The ACME DNS-01 identity was moved to `ansible/confidential.yml` and the chart flipped to placeholders, but `cert_manager` never loaded the file — so all three variables were always undefined and the `default()` chain resolved to the placeholders | `ansible/roles/cert_manager/tasks/install.yml` | Not a `demo333` blocker at all: a live `demo222` defect, armed and waiting. The next `make d0 install cert-manager` would have written `MYCLUSTERHOSTEDZONEID` / `mycluster-route53-region` / `acme-contact@mycluster.example.com` into `zuno-cert-manager-d1` and stopped DNS-01 from solving — and with B11's consumer flips on, a failed renewal eventually takes the router certificate with it. **Closed 2026-09-04** (WP-132): the loader added, and `check_confidential_var_loaders` in `check_docs.py` now fails any role that reads a documented variable without loading the file |
 
 B7 and B8 were closed by WP-118 step 4 on 2026-09-02, and both rows above were
 rewritten that day. The audit had described B7 as a variable-name mismatch that
@@ -151,6 +152,24 @@ how to see. This is why ADR-0547 replaces "remove the literals we can find"
 with a rule that holds by construction: no chart default may carry a
 cluster-specific value at all, and conformance is checked by the readiness
 probe rather than by re-reading the tree.
+
+B13 was found on 2026-09-04 while WP-132 was reading the same code for an
+unrelated conversion, and it is the sharpest lesson on this page. WP-118 B6
+followed the two-step order exactly — Application first, chart default second —
+and still shipped a broken result, because the order was applied to the *value*
+and not to the *surface*. Nothing loaded `confidential.yml` in that role, so the
+new variables could never be defined; the `| default(chart)` fallback then
+silently supplied whatever the chart held. While the chart still held the real
+values that was invisible, and it is precisely what made the `changed=0`
+inertia proof pass: the apply was inert for the wrong reason. Step two removed
+the real values and left the fallback pointing at placeholders.
+
+Two things follow. An inertia proof must state *why* nothing changed, not only
+that nothing changed — `changed=0` is consistent with "the parameter works" and
+with "the parameter is dead and the old value is still there". And the check
+that prevents recurrence has to be mechanical: `check_confidential_var_loaders`
+now fails any role reading a documented `confidential.yml` variable without
+loading the file, which is ADR-0547 clause 6 applied to this defect class.
 
 Delivery constraint for B1–B6, which must be respected whenever they are
 fixed: every `gitops/apps/*/application-*.yaml` points at

@@ -79,6 +79,32 @@
 # Defaults come from the chart file itself rather than being restated here:
 # one source of truth, and this apply stays byte-identical on demo222 until
 # an operator actually sets the variables. Subscript ['acme'], never .acme.
+# The role must LOAD confidential.yml before reading those variables. Nothing
+# else does it for it: this repo has no vars_files and no global include_vars,
+# so each role that reads an operator variable loads the file itself (see
+# mariadb, models, smtp, keycloak, postgresql, vault, aap).
+#
+# Missing until 2026-09-04 (WP-132), and latent rather than harmless: with the
+# three variables undefined, the default() chain below silently resolved to the
+# chart, which WP-118 had just flipped to placeholders - so the next
+# `make d0 install cert-manager` would have written MYCLUSTERHOSTEDZONEID /
+# mycluster-route53-region / acme-contact@mycluster.example.com into the live
+# zuno-cert-manager-d1 Application and stopped DNS-01 from solving on demo222.
+# B6's "changed=0" inertia proof did not catch it because it was measured while
+# the chart still carried the real values: the apply was inert for the wrong
+# reason. This is ADR-0547 clause 4 read backwards - the values were moved and
+# the default flipped, but the parameter surface was never actually wired, so
+# step 2 removed the only working source.
+- name: "cert_manager | check for ansible/confidential.yml (optional, only for the ACME DNS identity)"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _cert_manager_confidential_file
+
+- name: "cert_manager | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _cert_manager_confidential_file.stat.exists
+
 - name: "cert_manager | resolve the ACME DNS identity (WP-118 B6)"
   ansible.builtin.set_fact:
     _cert_manager_acme_identity:
