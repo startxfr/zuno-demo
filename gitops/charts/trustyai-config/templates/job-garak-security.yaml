@@ -72,10 +72,16 @@ spec:
             - name: push-asr
               mountPath: /tmp/push_asr.py
               subPath: push_asr.py
-      volumes:
-        - name: push-asr
-          configMap:
-            name: garak-push-asr
+          # Belongs to the container. WP-113 (commit 117c48e3) inserted the
+          # `volumes:` block ABOVE this and orphaned it as a key of the
+          # push-asr volume, where `resources` is not a valid field: the API
+          # server dropped it, so the rendered manifest never matched the live
+          # object and this Job sat permanently OutOfSync. Combined with
+          # Replace=true,Force=true that is a silent recreation loop - the Job
+          # deleted, recreated and RE-RUN every reconcile, re-pulling a 4.22 GiB
+          # image each time, for as long as the bug stood. It also meant this
+          # container ran with no requests or limits at all, taking whatever
+          # the namespace LimitRange defaulted.
           resources:
             requests:
               cpu: 500m
@@ -83,4 +89,8 @@ spec:
             limits:
               cpu: "2"
               memory: 4Gi
+      volumes:
+        - name: push-asr
+          configMap:
+            name: garak-push-asr
 {{- end }}
