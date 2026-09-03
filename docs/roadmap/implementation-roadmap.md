@@ -29,7 +29,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.4 | 34 | 9 | 27 | WP-55, WP-093, WP-101, WP-112 |
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 5 | WP-101 |
-| v0.7 | 13 | 11 | 22 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119, WP-125 |
+| v0.7 | 14 | 12 | 25 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119, WP-125, WP-126, WP-127, WP-128 |
 | v0.8 | 2 | 1 | 2 | — |
 | v0.9 | 4 | 3 | 4 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -716,6 +716,22 @@ validate against the healthy `file-root:system` resource, and
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-124 | [wp-124](work-packages/wp-124-ai-gateway-external-saas-mesh-egress.md) | 0415, 0416, 0417, 0537, 0020, 0021 | none | Done (2026-09-03) | none - end-to-end verified: real SDXL image, zero `Connection error` in the run, `comage/security` 7/8 -> 8/8 and `tekos/layer1_model_routing` 0/2 -> 2/2 (confirming the claimed blast radius). Two same-run regressions logged in the brief as an unproven follow-up, not absorbed here |
+
+### Phase 36 — RHOAI/Kubeflow component adoption scope (added 2026-09-03)
+
+A live inventory of every RHOAI-managed CRD actually instantiated in the cluster found ~20 Kind
+with zero instances. Most were already deliberate prior rejections (LocalModelCache, TrustyAIService,
+etc. - see ADR-0545 decision 5) or structurally inapplicable (Kueue Cohort/MultiKueue/
+ProvisioningRequestConfig, distributed-training job kinds). Four items carried a genuine signal and
+were arbitrated with the demo's owner into ADR-0545 decisions 1-4; each gets its own WP here.
+Order rationale: independent tracks, no cross-dependency among WP-126/127/128 beyond WP-126's own
+dependency on the already-merged WP-119.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-126 | [wp-126](work-packages/wp-126-finalize-lora-trainjob.md) | 0545, 0539, 0538 | WP-119 | Not started | confirm before the live steps (real GPU burst-node scale-up), then run one real LoRA training end to end |
+| WP-127 | [wp-127](work-packages/wp-127-kueue-workload-priority-classes.md) | 0545 | WP-117 | Not started | review and approve the proposed WorkloadPriorityClass tiers before any future WP applies them live |
+| WP-128 | [wp-128](work-packages/wp-128-inferencegraph-rag-research.md) | 0545 | none | Not started | review the reranker/InferenceGraph recommendation; a new WP/ADR is needed if a reranker is adopted |
 
 
 ### OKF stream phases
