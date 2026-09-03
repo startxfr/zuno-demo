@@ -1216,6 +1216,42 @@ redhat:
     fetchMode: html
     include: []
     exclude: []
+  # Phase 4 (rag-ingestion redesign): real upstream sources for the argocd/
+  # helm families, added ALONGSIDE the two Red-Hat-chapter entries above
+  # rather than replacing them yet - run both for one ingestion cycle,
+  # compare corpus quality via evaluations/tekos/stress_test.py's
+  # qa-argocd/qa-helm probes (check the citations' actual source/url, not
+  # just len(citations) > 0), then drop the Red Hat chapter entries above
+  # once confirmed. crawlStrategy: generic restricts link discovery to the
+  # same netloc AND the same path prefix as documentationUrl, so these
+  # stay inside /en/stable/ and /docs/ respectively rather than wandering
+  # into unrelated site content. Both URLs confirmed to return 200 before
+  # being added (2026-09-03) - a wrong URL yields a green run that indexes
+  # nothing.
+  - enabled: true
+    product: "Argo CD"
+    productSlug: "argocd-upstream"
+    family: "argocd"
+    technology: "argocd"
+    crawlStrategy: "generic"
+    version: "stable"
+    documentationUrl: "https://argo-cd.readthedocs.io/en/stable/"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Helm"
+    productSlug: "helm-upstream"
+    family: "helm"
+    technology: "helm"
+    crawlStrategy: "generic"
+    version: "latest"
+    documentationUrl: "https://helm.sh/docs/"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
   # Go is deliberately NOT here. There is no Go documentation on
   # docs.redhat.com that the fetch-redhat adapter could take (every
   # candidate URL 404s), and the Go Toolset docs that do exist elsewhere
