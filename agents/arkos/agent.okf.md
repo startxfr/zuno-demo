@@ -33,17 +33,41 @@ zuno:
     # budget beats the conservative fleet default (app/registry.py's
     # HISTORY_TOKEN_BUDGET, 1800).
     #
-    # KNOWN GAP (2026-09-03, documented not fixed): "both serve 32768" was
-    # true when written, when there were two local models. There are four
-    # now, and qwen3.5-9b - reachable as a C3 fallback on EVERY task in the
-    # generated matrix below - serves 8192, not 32768
-    # (gitops/charts/models/values.yaml's qwen35Model.maxModelLen). On that
-    # fallback path this 6000-token budget plus the system prompt (~500)
-    # plus RAG context (~2500) does not fit. The nominal path is unaffected
-    # and no overflow has been observed, so the value is left alone
-    # deliberately: lowering it would degrade every nominal turn to protect
-    # a fallback, and picking the right number needs a real measurement
-    # against a live qwen3.5-9b turn, which has not been taken.
+    # KNOWN GAP (2026-09-03, measured, documented not fixed): "both serve
+    # 32768" was true when written, when there were two local models.
+    # There are four now, and qwen3.5-9b - the fleet default, and the LAST
+    # entry in every one of this agent's C3 fallback chains below - serves
+    # 8192. Confirmed live against the running predictor's /v1/models, not
+    # just the chart value.
+    #
+    # Measured the same day, so the arithmetic is real rather than
+    # estimated. Live rag-tech corpus: 68,962 chunks, median 1,247 chars
+    # (~312 tokens at the char/4 heuristic), p95 1,796 (~449). Arkos does
+    # not declare rag.top_k, so it retrieves the default 5.
+    #
+    #   draft-architecture-testimonial / workshop-presentation
+    #     (allowed_knowledge: knowledge.tech + knowledge.project)
+    #     6000 history + ~420 system prompt + up to 1200 project context
+    #     (PROJECT_CONTEXT_TOKEN_BUDGET) + 5 chunks
+    #     = ~9,180 tokens at median chunk size, ~9,865 at p95.
+    #     Both OVERFLOW 8192 before a single output token.
+    #
+    #   structure-demo / write-code (allowed_knowledge: [])
+    #     6000 + ~214 + 1200 = ~7,414. Fits, leaving ~780 for generation.
+    #
+    # So the exposure is the two RAG-bearing tasks, not all four, and
+    # nothing clamps it: build_history_messages caps history against this
+    # budget alone, with no awareness of the selected model's window, so
+    # an oversized prompt reaches vLLM and 400s. It is the LAST candidate
+    # in the chain, so this only bites when gpt-oss-20b, the 27B and wesh
+    # have all already failed - the exact scenario the fallback exists
+    # for, which is what makes it worth recording rather than shrugging at.
+    #
+    # Left unfixed deliberately, and it is not a number problem: any value
+    # that survives the 8192 fallback (~2,800) would gut the 32768 nominal
+    # path this agent actually runs on. The real fix is clamping the
+    # assembled prompt against the selected model's own max_model_len,
+    # which is a code change and its own decision.
     history:
       enabled: true
       max_turns: 6
