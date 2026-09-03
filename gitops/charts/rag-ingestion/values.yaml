@@ -1796,7 +1796,14 @@ pipeline:
   #  b7a86aaf that rejection fails the play loudly instead of silently.
   # v0-8-0 (2026-08-27): adds VALIDATE_READ_CONCURRENCY, which changes
   #  CONFIG_KEYS and therefore the compiled spec - a new name is mandatory.
-  version: v0-8-0
+  # v0-9-0 (WP-129, 2026-09-03): every techSources pipeline-def loop's
+  #  configure(..., domain=...) calls changed from the shared literal
+  #  "tech" to "tech-<srcName>" so each family resolves its own ConfigMap
+  #  - a real compiled-spec change even for the two pre-existing targets
+  #  (tech-redhat/now tech-redhat-openshift, tech-confluence), not just
+  #  the 17 new ones. Confirmed live: re-applying v0-8-0's tech-confluence
+  #  name against the new spec was rejected as immutable.
+  version: v0-9-0
   displayName: RAG corpus ingestion
   description: Incremental ingestion of Red Hat documentation and Confluence into PostgreSQL/pgvector
   createPipelineResource: true

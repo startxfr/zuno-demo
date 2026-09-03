@@ -9,6 +9,37 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Authoring note (2026-09-03) - ADR-0547, and why ADR-0517 grew three blockers
+
+ADR-0517 bounded its own remediation to nine blockers in an explicit clause,
+and WP-118 closed all nine by removing `demo222` literals from chart defaults.
+A second audit pass on 2026-09-03 re-ran the same search, found no further
+literals, and found three further blockers of the same consequence anyway:
+
+- B10, four RHOAI dashboard feature flags set by hand on the live cluster with
+  no applier anywhere. Already closed by WP-123, which named itself "a tenth
+  blocker of exactly that class" - and was never written back into ADR-0517.
+  A cluster-only mutation leaves nothing in the repository to grep for.
+- B11, `gitops/apps/cert-manager/application-d1.yaml` shipping `demo222`'s ACME
+  end state - production issuer, both consumer flips true. Correct for
+  `demo222`, destructive on a fresh cluster where it points the router at a
+  Secret that cannot exist yet. No literal; a per-cluster *state* as a default.
+- B12, seven S3 buckets none of which is namespaced by cluster, so a second
+  cluster writes into the first one's data. Architectural, and recorded in
+  ADR-0546 the day before.
+
+Three shapes, one cause: nothing said where a cluster-specific value is allowed
+to live. ADR-0547 says it - no chart default carries one; discoverable values
+come from a `resolve_cluster_*.yml` task, undiscoverable non-secrets from
+`confidential.yml`, secrets from Vault with one path per consumer - and makes
+conformance a probe rather than a review, because two of these three entered
+the tree *after* the audit meant to bound them.
+
+ADR-0517's clause 5 was extended in place rather than superseded: it is a
+bound-and-carrier clause, and the record of which work package carries which
+blocker is exactly the kind of dated progress list the index conventions keep
+editable. Its Status stays `Proposed`; only the run can close it.
+
 ## Splitting note (2026-09-03)
 
 ADR-0537 bundled two nearly-independent decisions from one diagnostic

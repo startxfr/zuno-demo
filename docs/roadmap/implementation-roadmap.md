@@ -30,7 +30,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101, WP-129 |
 | v0.7 | 14 | 12 | 25 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119, WP-125, WP-126 |
-| v0.8 | 3 | 2 | 2 | — |
+| v0.8 | 4 | 3 | 5 | WP-130, WP-131, WP-132 |
 | v0.9 | 4 | 3 | 4 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -740,6 +740,26 @@ dependency on the already-merged WP-119.
 | WP-127 | [wp-127](work-packages/wp-127-kueue-workload-priority-classes.md) | 0545 | WP-117 | Done (2026-09-03) | recentered mid-flight: LLMInferenceService predictors are not Kueue-managed, so agent-serving protection was out of reach; Kueue also already derives Workload priority from the pod's standard PriorityClass, so no new WorkloadPriorityClass CRD was introduced. Design lands as a values-gated, ship-empty-by-default `kueue.priorityClassName` on `job-lmeval-cache-prefetch`/`job-garak-security`/`job-ragas-eval` (`zuno-workload-default`, 100), correcting the accidental gap where quality/security-gate Jobs sat one priority notch below day2-stresstest. `oc explain lmevaljob.spec.pod` found the LMEvalJob CRD itself exposes no `priorityClassName` field - the MMLU run's own pod priority stays unchanged, a real CRD limitation, not routed around. `helm template` verified inert at defaults and correct when flipped; no live apply in this WP (Replace=true,Force=true on all three Jobs would recreate them - see the diskpressure-master-cascades-into-mesh precedent) - operator action remaining is a staged live rollout, one Job at a time, watching node disk |
 | WP-128 | [wp-128](work-packages/wp-128-inferencegraph-rag-research.md) | 0545 | none | Done (2026-09-03) | recommendation: no reranker for now. Confirmed via full code read that neither rag-service provider (pgvector RRF+metadata, OGX client-side filtering) calls a second model anywhere; no documented quality gap (the one live RAGAS sample is excellent but too small to trust); the GPU quota that would host a reranker is already saturated (ADR-0542). InferenceGraph-vs-direct-call is therefore moot until a reranker is actually wanted - revisit on degraded RAGAS at scale or a documented relevance complaint |
 
+
+### Phase 37 — demo333 portability: parameterize, gate, and split the buckets (added 2026-09-03)
+
+ADR-0517's own run stays blocked on an operator provisioning `demo333`, but the
+audit that was meant to bound it has been overtaken. WP-118 closed nine blockers
+by removing `demo222` literals; audit pass 2 found no further literals and three
+further blockers anyway — a cluster-only mutation with nothing in the repo to
+grep for (B10, already closed by WP-123), `demo222`'s ACME end state committed to
+git (B11), and seven S3 buckets that a second cluster would write straight into
+(B12, the only one that damages the *existing* cluster). ADR-0547 replaces
+"remove the literals we can find" with a rule that holds by construction, and
+these three WPs carry it: WP-132 converts the values, WP-130 verifies the rule at
+`make d0 check` time and turns every from-scratch failure mode into a pre-install
+finding, WP-131 executes ADR-0546's bucket split.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-130 | [wp-130](work-packages/wp-130-fresh-cluster-readiness-gate.md) | 0517, 0547 | WP-118 | Not started | seven read-only probes behind `make d0 check` (default StorageClass, AWS installer identity and per-AZ subnets, base domain and Route53 identity, the ACME consumer flips, confidential.yml completeness, bucket ownership, leftover `mycluster-*` placeholders) plus a blocking gate on `make d0 install`; acceptance is zero findings on `demo222` |
+| WP-131 | [wp-131](work-packages/wp-131-per-cluster-s3-bucket-convention.md) | 0546, 0517, 0547 | ADR-0546 to `Accepted`; manual AWS provisioning | Not started | provision `zuno-demo-sources` and the `zuno-demo222-*` set, migrate per ADR-0546's mapping, one IAM identity and Vault path per bucket, rewire eight charts, decommission the old buckets. Gates the ADR-0517 run: until it lands a `demo333` writes into `demo222`'s buckets |
+| WP-132 | [wp-132](work-packages/wp-132-cluster-parameterization.md) | 0547, 0517 | WP-118 | Not started | five conversions in ascending risk — `zuno_cluster_name`, the RHOAI version pin, the ACME issuer and consumer flips (B11), the `machines` chart's AZ and instance shape, then Vault paths for whatever is secret; each landed in the two-step order with its inertia proof |
 
 ### OKF stream phases
 

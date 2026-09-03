@@ -32,11 +32,14 @@ genuine from-scratch run.
 4. Success is demonstrated by `demo333` passing the same Day 0/Day 1/
    Day 2 acceptance gates (ADR-0053, ADR-0057/ADR-0058) as `demo222`,
    proving the automation — not just the design — is complete.
-5. (Added 2026-09-02.) The remediation work this ADR implies is bounded to
-   the nine blockers enumerated under *Known blockers* below. Anything
-   found beyond them during the run falls under clause 3 — logged, then
-   fixed or deferred to a follow-up ADR/WP. B1–B9 are carried by WP-118
-   (added 2026-09-02); the run itself stays blocked until `demo333` exists.
+5. (Added 2026-09-02; extended 2026-09-03.) The remediation work this ADR
+   implies is bounded to the blockers enumerated under *Known blockers*
+   below. Anything found beyond them during the run falls under clause 3 —
+   logged, then fixed or deferred to a follow-up ADR/WP. The list started at
+   nine and is now twelve; each is carried by exactly one work package:
+   B1–B9 by WP-118 (added 2026-09-02), B10 by WP-123, B11 by WP-132 with
+   detection in WP-130, and B12 by ADR-0546 executed by WP-131. The run
+   itself stays blocked until `demo333` exists.
 
 ## Acceptance criteria
 
@@ -70,14 +73,17 @@ The blockers are exactly the places that bypass that mechanism:
 | # | Blocker | Location | Effect on `demo333` |
 |---|---|---|---|
 | B1 | `cluster.id: demo222-kpkqk`, security group, subnet names, pinned AMI, region | `gitops/charts/machines/values.yaml` | "no security group found" — zero GPU nodes; Day 0 step 9 (`machines`) hangs waiting for machines to become available. **Closed 2026-09-03** (WP-118 steps 2a/2b): discovered from `Infrastructure/cluster` plus any MachineSet lacking `machine.startx.io/group`, injected as Application values, chart flipped to `mycluster-*` placeholders |
-| B2 | Key is `appsDomain`, not `clusterBaseDomain`, so the token substitution never reaches it | `gitops/charts/grafana/values.yaml:74`, `kiali/values.yaml:60`, `tempo/values.yaml:62` | Tempo's Jaeger UI Route rejected (host outside the cluster wildcard); Kiali serves a dead `web_fqdn`; Grafana trace links point at the old cluster |
-| B3 | Full URLs frozen into the acceptance-gate values | `gitops/charts/mlops/values.yaml:135-136` | The ADR-0053 acceptance gate authenticates against the **old** cluster's Keycloak and frontend |
-| B4 | `demoHostname` frozen | `gitops/charts/connectivity-link/values.yaml:61` | Kuadrant quota-demo Route on a hostname that does not exist |
+| B2 | Key is `appsDomain`, not `clusterBaseDomain`, so the token substitution never reaches it | `gitops/charts/grafana/values.yaml:74`, `kiali/values.yaml:60`, `tempo/values.yaml:62` | Tempo's Jaeger UI Route rejected (host outside the cluster wildcard); Kiali serves a dead `web_fqdn`; Grafana trace links point at the old cluster. **Closed 2026-09-02** (WP-118 step 1): all three routed back onto the `apps.mycluster.example.com` token |
+| B3 | Full URLs frozen into the acceptance-gate values | `gitops/charts/mlops/values.yaml:135-136` | The ADR-0053 acceptance gate authenticates against the **old** cluster's Keycloak and frontend. **Closed 2026-09-02** (WP-118 step 1) |
+| B4 | `demoHostname` frozen | `gitops/charts/connectivity-link/values.yaml:61` | Kuadrant quota-demo Route on a hostname that does not exist. **Closed 2026-09-02** (WP-118 step 1) |
 | B5 | Four `gp3-csi` StorageClass defaults | `models`, `postgresql`, `mariadb`, `grafana` `values.yaml` | Breaks if `demo333` is not AWS or names its default class differently; PVC `storageClassName` is immutable once bound. **Closed 2026-09-03** (WP-118 steps 3a/3b): discovered from the `is-default-class` annotation, injected into all five PVC-rendering applies, charts flipped to a deliberately invalid placeholder so a lost value fails loudly instead of binding to the wrong storage |
 | B6 | Route53 `hostedZoneID: Z3HY376RT1N9S1`, `region: eu-west-3`, ACME contact email | `gitops/charts/cert-manager/values.yaml` | ACME DNS-01 cannot solve if `demo333` sits under a different parent DNS zone. **Closed 2026-09-03** (WP-118 step 3b): the three values moved to `ansible/confidential.yml` as `zuno_certmanager_route53_hosted_zone_id`/`_region`/`zuno_certmanager_email`, the re-apply was `changed=0`, and the chart defaults are now placeholders |
-| B7 | Two identically-named tasks wrote `zuno/salesforce/technical` with competing key schemas: `url`/`access_token` (l.940, live) and `instance_url`/`token` (l.1001, inert because its variables were never documented) | `ansible/roles/vault/tasks/install.yml:1001-1014` | `vault kv put` replaces rather than merges, so only one schema can exist. Documenting the missing variables — the obvious fix — would have started the dead task and wiped the keys `mcp-salesforce` serves Comage from |
-| B8 | All five `zuno_mariadb_backup_s3_{bucket,endpoint,region,access_key_id,secret_access_key}` are read but appear nowhere in `confidential.example.yml` | `ansible/roles/mariadb/tasks/install.yml:98-104`, `ansible/roles/vault/tasks/install.yml:1064-1076` | Undocumented prerequisite, and not merely cosmetic: with them unset `backups.s3.enabled` stays false, the ExternalSecret is never rendered, and **no MariaDB backup schedule exists at all** |
+| B7 | Two identically-named tasks wrote `zuno/salesforce/technical` with competing key schemas: `url`/`access_token` (l.940, live) and `instance_url`/`token` (l.1001, inert because its variables were never documented) | `ansible/roles/vault/tasks/install.yml:1001-1014` | `vault kv put` replaces rather than merges, so only one schema can exist. Documenting the missing variables — the obvious fix — would have started the dead task and wiped the keys `mcp-salesforce` serves Comage from. **Closed 2026-09-02** (WP-118 step 4): `url`/`access_token` made the single canonical schema and the duplicate seed task deleted |
+| B8 | All five `zuno_mariadb_backup_s3_{bucket,endpoint,region,access_key_id,secret_access_key}` are read but appear nowhere in `confidential.example.yml` | `ansible/roles/mariadb/tasks/install.yml:98-104`, `ansible/roles/vault/tasks/install.yml:1064-1076` | Undocumented prerequisite, and not merely cosmetic: with them unset `backups.s3.enabled` stays false, the ExternalSecret is never rendered, and **no MariaDB backup schedule exists at all**. **Closed 2026-09-02** (WP-118 step 4): all five documented in `confidential.example.yml` |
 | B9 | Drifted RHOAI InstallPlan — the only `auto_fix: "manual only"` on the install path | `ansible/roles/openshift_ai/tasks/install.yml:90` | A cluster provisioned later than the pin gets a catalog publishing a newer CSV than `startingCSV`, and the install refuses to approve it. **Not a defect — the refusal is the reproducibility guarantee.** Closed as a decision, not a fix (2026-09-03): the gate stays, and the drift is now detected in `precheck.yml` from the PackageManifest, before the install runs |
+| B10 | The four RHOAI dashboard feature flags (`disableKueue`, `disableTrustyAIEval` and siblings) were set by hand on the live cluster and had no applier at all | live `DataScienceCluster`/`OdhDashboardConfig` only — nothing in the repo | A fresh cluster comes up with the RHOAI dashboard missing the surfaces WP-115/WP-117 rely on, and no `make` verb restores them. **Closed 2026-09-03** by WP-123: the flags are reconciled from Ansible, drill-proven (check found the drift, reconcile fixed it, a re-run was a no-op, deleting a flag self-healed). Invisible to WP-118's audit by construction: a cluster-only mutation leaves nothing in the repo to grep for |
+| B11 | `acme.enabled: true`, `certificatesIssuer: letsencrypt-route53` (production) and both `consumers.routerDefaultCert`/`apiServerNamedCert` shipped `true` — demo222's *end state*, committed to git | `gitops/apps/cert-manager/application-d1.yaml:36-49` | On the first sync of a fresh cluster ArgoCD patches `IngressController/default.spec.defaultCertificate` to `router-wildcard-tls`, a Secret that cannot exist yet, and adds an APIServer named certificate for the same absent Secret — breaking Console and route serving before any Certificate could be issued. The chart's own comment says these flip ONLY after `oc get certificate -A` shows Ready. Also skips the staging rehearsal ADR-0211 prescribes. **Open**: parameterized by WP-132 (safe first-install defaults, demo222's live value injected), detected meanwhile by WP-130 |
+| B12 | Seven S3 buckets mix cross-cluster inputs and per-cluster outputs, and none is namespaced by cluster | `ansible/confidential.yml` plus `gitops/charts/*/values.yaml`, enumerated in ADR-0546 | A `demo333` installed today writes its RAG ingestion outputs, pgBackRest and MariaDB backups, RHOAI traces and MLflow artifacts into **`demo222`'s** buckets — the only blocker here that damages the *existing* cluster rather than the new one, and a direct violation of this ADR's own "`demo222` is left untouched" criterion. **Open**: decided by ADR-0546 (`Proposed`), executed by WP-131 |
 
 B7 and B8 were closed by WP-118 step 4 on 2026-09-02, and both rows above were
 rewritten that day. The audit had described B7 as a variable-name mismatch that
@@ -129,6 +135,23 @@ render no PVC until their Application's toggle is set. And an obvious-looking
 `selectattr` on the dotted `is-default-class` annotation silently returns `[]`, which
 would have failed all five installs on a cluster that has exactly one default class.
 
+Audit pass 2 (2026-09-03) re-ran the same static search for cluster-identity
+literals beyond B1–B9 and found none: the surviving `eu-west-2` occurrences are
+the S3 *data-plane* region of `zuno-demo-rag-corpus`, which `mlops/values.yaml`
+already comments as deliberately not the cluster's own region; the `ip-10-…`
+node names appear only in comments; and every scheduling rule is expressed
+against topology labels rather than node names.
+
+That clean result is the finding, not a clearance. B10, B11 and B12 were all
+found in the same pass, and none of them is a literal — B10 is a cluster-only
+mutation that leaves nothing in the repo to grep for, B11 is a perfectly valid
+end state committed to git, B12 is an architectural question about who owns a
+bucket. Clause 5's bound held only for the class of defect a static read knows
+how to see. This is why ADR-0547 replaces "remove the literals we can find"
+with a rule that holds by construction: no chart default may carry a
+cluster-specific value at all, and conformance is checked by the readiness
+probe rather than by re-reading the tree.
+
 Delivery constraint for B1–B6, which must be respected whenever they are
 fixed: every `gitops/apps/*/application-*.yaml` points at
 `targetRevision: main` with `selfHeal: true`, so ArgoCD renders each chart
@@ -166,3 +189,5 @@ Review evidence.
 - [ADR-0058](0058-aggregate-existing-test-content-into-a-bulk-interaction-stresstest.md)
 - [ADR-0060](0060-restructure-day-0-day-1-day-2-day-3-deployment-sequencing.md)
 - [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md)
+- [ADR-0546](0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
+- [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md)

@@ -72,7 +72,7 @@ it applies d1 twice and the second apply replaces the values block, so it droppe
 `appsDomain` the moment the manifest declared it — caught by this morning's
 `gitops_values_clobber` check, its first real save.
 
-### Step 2 — AWS infra identity (B1) — **2a DONE 2026-09-03, 2b pending a live apply**
+### Step 2 — AWS infra identity (B1) — **DONE 2026-09-03, live-verified**
 
 `gitops/charts/machines/values.yaml` hardcodes `cluster.id: demo222-kpkqk`, the security
 group, three subnet names, a pinned AMI and the region. This one cannot use token
@@ -130,7 +130,7 @@ nothing until the new chart has actually rendered — and the three MachineSets 
 the pre-apply baseline exactly. One `demo222` string survives in the file, in a comment
 recording which installer MachineSet `zuno-gpu-c` replaced.
 
-### Step 3 — StorageClass and DNS (B5, B6) — **3a DONE 2026-09-03, 3b pending a live apply**
+### Step 3 — StorageClass and DNS (B5, B6) — **DONE 2026-09-03, live-verified**
 
 Four `gp3-csi` defaults (`models:296`, `postgresql:71`, `mariadb:105`, `grafana:92` — the
 audit said 85) and cert-manager's Route53 `hostedZoneID`/`region`/ACME email.
@@ -166,7 +166,7 @@ PVC at all, so a naive diff would have "passed" while testing nothing). The cert
 identity resolves to the chart's own `dev+zuno-acme@startx.fr` / `eu-west-3` /
 `Z3HY376RT1N9S1`.
 
-**3b — B5 DONE 2026-09-03, live-verified; B6 blocked on one operator decision.**
+**3b — B5 and B6 both DONE 2026-09-03, live-verified.**
 
 B5: the five applies ran (`d0 cert-manager`, `d0 postgresql`, `d1 mariadb`, `d1 grafana`,
 `d2 models`), each Application now carries `gp3-csi` discovered from the annotation, and

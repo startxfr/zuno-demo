@@ -105,7 +105,21 @@ redeploying the full stack from scratch on a new cluster (`demo333`). Also
 holds the open question of whether Advantage or Finage is ever promoted to
 `active` (ADR-0533).
 
-**2 ADRs.** Open: ADR-0517. No open work packages.
+**Widened 2026-09-03**, by the same finding twice over. WP-118 closed
+ADR-0517's nine portability blockers by removing `demo222` literals; a second
+audit pass found no further literals and three further blockers anyway — a
+cluster-only mutation invisible to any `grep` (B10, closed by WP-123),
+`demo222`'s ACME end state committed to git (B11), and seven S3 buckets a
+second cluster would write straight into (B12, the only blocker that damages
+the *existing* cluster). Removing literals one at a time was never going to
+converge, so the band now also carries ADR-0546 (a cross-cluster source bucket
+plus a per-cluster bucket convention, executed by WP-131) and ADR-0547 (every
+cluster-specific value becomes an Ansible parameter, seeded through Vault when
+secret — executed by WP-132, verified by WP-130's Day 0 readiness probe).
+ADR-0517's own run stays blocked on an operator provisioning `demo333`.
+
+**4 ADRs.** Open: ADR-0517, ADR-0546, ADR-0547. Open work packages: WP-130,
+WP-131, WP-132.
 
 ## v0.9
 

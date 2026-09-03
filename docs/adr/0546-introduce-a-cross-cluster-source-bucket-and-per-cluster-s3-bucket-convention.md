@@ -110,6 +110,11 @@ Anomalies found along the way, independent of the cross-cluster question:
 - This ADR is reviewed and its Status moves to `Accepted`.
 - A follow-up work package exists, scoping the actual bucket provisioning, data
   migration and `ansible`/`gitops` rewiring described in Decision clause 5.
+  (Satisfied 2026-09-03: WP-131. It is tied to the `demo333` effort exactly as
+  clause 5 anticipated — ADR-0517 now records the sharing question as blocker
+  B12, the one blocker on that list which damages `demo222` rather than the new
+  cluster, so WP-131 gates the ADR-0517 run. It stays `Not started` until this
+  ADR is `Accepted`.)
 - No `demo222` bucket, credential or chart is touched by this ADR itself.
 
 ## Mapping (old → new)
@@ -144,3 +149,4 @@ Security/Operational considerations, Migration/evolution and Review evidence.
 - [ADR-0538](0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md)
 - [ADR-0539](0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md)
 - [ADR-0517](0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md)
+- [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md)
