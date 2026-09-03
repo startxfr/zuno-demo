@@ -30,13 +30,39 @@ spec:
     server: https://kubernetes.default.svc
     namespace: zuno-monitoring
   ignoreDifferences:
-    # The Grafana operator defaults nearly every leaf under spec at runtime;
-    # without this, ArgoCD sees permanent drift and fights it (same reasoning
-    # as gitops/apps/kiali/application-d1.yaml for the Kiali CR).
+    # Ignore the four paths that are actually defaulted, NOT all of /spec.
+    #
+    # This used to be `jsonPointers: [/spec]` on the belief that "the operator
+    # defaults nearly every leaf under spec". A live diff of the rendered CR
+    # against the cluster one (2026-09-03) shows it defaults exactly four
+    # things - three of them plain Kubernetes API defaulting, one the operator
+    # resolving the image tag to a digest. Everything else matched.
+    #
+    # Ignoring the whole subtree cost a real outage of reconciliation: WP-118
+    # step 3b replaced the hardcoded storageClassName with the placeholder
+    # `mycluster-default-storageclass`, ansible correctly substituted the real
+    # class into this Application's values - and ArgoCD then never pushed it,
+    # because /spec was ignored. The CR kept the placeholder, the PVC was
+    # already bound to gp3-csi, storageClassName is immutable, and the operator
+    # wedged at stage `pvc` reporting Degraded while ArgoCD reported Synced.
+    # No Grafana change applied at all for as long as that lasted.
+    #
+    # jqPathExpressions, not jsonPointers: three of the four sit inside arrays,
+    # and a jsonPointer would have to hardcode an index that shifts whenever a
+    # port or container is added.
+    #
+    # If a future operator version defaults something new, ArgoCD will report
+    # OutOfSync and self-heal in a loop - add that path here rather than
+    # widening back to /spec, which only hides the next real drift too.
     - group: grafana.integreatly.org
       kind: Grafana
-      jsonPointers:
-        - /spec
+      jqPathExpressions:
+        # operator-resolved image digest
+        - .spec.version
+        # Kubernetes API defaults
+        - .spec.route.spec.to.weight
+        - .spec.service.spec.ports[].protocol
+        - .spec.deployment.spec.template.spec.containers[].ports[].protocol
   syncPolicy:
     automated:
       prune: true
