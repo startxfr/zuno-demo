@@ -190,6 +190,17 @@ Live verification during this ADR's preparation confirmed:
    hand, selecting `mig-1g-24gb` at redeploy time, not folded into this
    chart.
 
+   > **2026-09-03: the object no longer exists.** The diagnostic that
+   > motivates this ADR stands, but `granite-7b-redhat-lab` was deleted to
+   > release the `mig-1g.24gb` slice its stalled rollout was holding. The
+   > hand-applied hardware profile had not been enough: with the GPU quota
+   > saturated, its `minReplicas: 2` demanded a replica that could never be
+   > admitted, so the ISVC stayed `READY=False` while its running pod starved
+   > `embeddings` for nine days. This does not change the decision - a
+   > redeployed Granite still stays out of GitOps - it only records that the
+   > example is gone, and that `minReplicas: 1` is a precondition for
+   > redeploying it at all.
+
 2. **Annotate the five existing `LLMInferenceService`/`InferenceService`
    templates** so the Dashboard displays a hardware profile the same way it
    does for Granite:

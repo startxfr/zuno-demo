@@ -60,8 +60,21 @@ Finage's exclusion stays in `ai-gateway`, not duplicated into MaaS).
   two `opendatahub.io/hardware-profile-*` annotations.
 - Live check: after ArgoCD sync, the Dashboard's Model Serving page shows a
   hardware profile for all five, matching Granite's presentation.
-- Granite itself: fix by hand in the Dashboard (select `mig-1g-24gb` at
-  redeploy) - not part of this chart, no repo change.
+- ~~Granite itself: fix by hand in the Dashboard (select `mig-1g-24gb` at
+  redeploy) - not part of this chart, no repo change.~~ **Moot since
+  2026-09-03: `granite-7b-redhat-lab` was deleted.** The hardware-profile fix
+  had in fact already been applied by hand (the live ISVC carried
+  `opendatahub.io/hardware-profile-name: mig-1g-24gb`) and it did *not* make
+  the model Ready - the real blocker was `minReplicas: 2` against a saturated
+  GPU quota, so its HPA demanded a second replica that could never be
+  admitted, the Deployment stalled at `1/2`, and its one running pod held the
+  last free `mig-1g.24gb` slice for 47h. That starved `embeddings` (down 9
+  days), which starved `rag-service` of an embedding endpoint, which failed
+  `ragas-eval` and the six `zuno-day2-stresstest-*` Jobs. Deleting the ISVC
+  and its ServingRuntime released the slice; `embeddings` went Ready and
+  retrieval recovered on the same query `ragas-eval` had reported empty.
+  If Granite is ever redeployed, set `minReplicas: 1` - the quota cannot
+  admit two of anything.
 
 ### Phase 3 - ExternalModel + MaaSModelRef + per-group quotas (ADR-0537 Decision 3)
 
