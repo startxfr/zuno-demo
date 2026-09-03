@@ -224,12 +224,109 @@ async def test_reason_node_does_not_retry_when_a_real_tool_call_already_fired() 
     assert result["generated_images"] == [{"data_base64": "xyz", "mime_type": "image/png", "alt": "a mascot"}]
 
 
+# --- WP-112, 2026-09-03: the widened trigger --------------------------
+# Three live runs produced three different failing replies for
+# evaluations/comage/stress_test.py::img-mockup_request, and NOT ONE of
+# them names a tool - so _NARRATED_TOOL_NAME_PATTERN alone could never
+# fire on any of them. These are the verbatim replies, kept as the
+# regression corpus, with sxa_visualization_boundary's deliberate decline
+# as the negative case it must never swallow.
+
+_LIVE_NARRATIONS = [
+    (
+        "boundary_adjudication_2026_09_03_run1",
+        "\n\nOuais, pour un visuel de proposition commerciale, c'est le bon "
+        "outil. C'est un mockup marketing, pas une visualisation de "
+        "donn\u00e9es structur\u00e9es.",
+    ),
+    (
+        "conditional_promise_2026_09_03_run2",
+        "\n\nJ'ai pas de document de r\u00e9f\u00e9rence pour construire un mockup "
+        "r\u00e9aliste. Fournis le contenu exact \u00e0 illustrer et j'gen\u00e8re le visuel "
+        "proprement.",
+    ),
+    ("bare_intent_2026_09_03_run3", "\n\nOuais, j'peux faire ca."),
+]
+
+
+async def test_reason_node_retries_every_live_narration_that_names_no_tool() -> None:
+    """The three real failing replies, verbatim. Each must trigger the
+    retry even though none contains "generate_image"/"generate_diagram"."""
+    for case, narration in _LIVE_NARRATIONS:
+        call_count = 0
+
+        async def fake_invoke(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return _FakeModelResult(narration), ProviderCandidate(name="ai-gateway")
+            return (
+                _FakeModelResult(
+                    "", tool_calls=[{"name": "generate_image", "args": {"prompt": "a deal mockup"}, "id": "call_1"}]
+                ),
+                ProviderCandidate(name="ai-gateway"),
+            )
+
+        async def fake_invoke_tool(**kwargs):
+            return {
+                "tool": "generate_image",
+                "result": {"data_base64": "img", "mime_type": "image/png", "alt": "a deal mockup"},
+            }
+
+        saved_invoke = nodes._model_router.invoke_with_fallback
+        saved_invoke_tool = nodes.invoke_tool
+        try:
+            nodes._model_router.invoke_with_fallback = fake_invoke
+            nodes.invoke_tool = fake_invoke_tool
+            result = await comage_reason_node(dict(_BASE_STATE))
+        finally:
+            nodes._model_router.invoke_with_fallback = saved_invoke
+            nodes.invoke_tool = saved_invoke_tool
+
+        assert call_count >= 2, f"{case}: the widened trigger did not fire on a real live narration"
+        assert result["generated_images"] == [
+            {"data_base64": "img", "mime_type": "image/png", "alt": "a deal mockup"}
+        ], f"{case}: the retry fired but its tool call was not resolved"
+
+
+async def test_reason_node_does_not_retry_a_deliberate_decline() -> None:
+    """The load-bearing negative case. sxa_visualization_boundary (1/1
+    passing live) depends on Comage being able to refuse without being
+    nudged into fabricating a visual. Note this reply opens on "J'ai pas"
+    exactly like the conditional-promise narration above, so the opener
+    is not the discriminator - the explicit refusal is."""
+    for case, decline in (
+        ("sxa_boundary_verbatim", "\n\nJ'ai pas le tableau de donn\u00e9es. J'ai pas le droit de cr\u00e9er des tranches invent\u00e9es."),
+        ("sxa_boundary_live_variant", "\n\nJ'ai pas les donn\u00e9es de g\u00e9n\u00e9ration de devis entre 2003 et 2013. J'ai pas de quoi construire ce pie chart."),
+    ):
+        call_count = 0
+
+        async def fake_invoke(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            return _FakeModelResult(decline), ProviderCandidate(name="ai-gateway")
+
+        saved_invoke = nodes._model_router.invoke_with_fallback
+        try:
+            nodes._model_router.invoke_with_fallback = fake_invoke
+            result = await comage_reason_node(
+                {**_BASE_STATE, "message": "Genere un pie chart des devis SXA entre 2003 et 2013."}
+            )
+        finally:
+            nodes._model_router.invoke_with_fallback = saved_invoke
+
+        assert call_count == 1, f"{case}: a correct decline must never be retried"
+        assert result["reply"] == decline, f"{case}: the decline must survive verbatim"
+
+
 TESTS = [
     test_reason_node_retries_and_succeeds_when_the_reply_narrates_generate_image,
     test_reason_node_falls_back_to_the_retrys_own_words_when_it_narrates_again,
     test_reason_node_falls_back_to_the_original_reply_when_the_retry_call_fails,
     test_reason_node_does_not_retry_a_reply_that_never_mentions_a_visual_tool_by_name,
     test_reason_node_does_not_retry_when_a_real_tool_call_already_fired,
+    test_reason_node_retries_every_live_narration_that_names_no_tool,
+    test_reason_node_does_not_retry_a_deliberate_decline,
 ]
 
 

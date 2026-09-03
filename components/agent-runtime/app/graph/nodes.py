@@ -21,6 +21,7 @@ import base64
 import json
 import logging
 import re
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -815,6 +816,88 @@ _NARRATED_TOOL_NAME_PATTERN = re.compile(
     "|".join(re.escape(name) for name in _VISUAL_TOOL_NAMES), re.IGNORECASE,
 )
 
+# Second, wider signal (2026-09-03). Three live runs produced three
+# different failing replies and NOT ONE of them named a tool, so the
+# name pattern above could never fire on any of them:
+#   "Ouais, pour un visuel de proposition commerciale, c'est le bon
+#    outil. C'est un mockup marketing, pas une visualisation de donnees
+#    structurees."
+#   "J'ai pas de document de reference pour construire un mockup
+#    realiste. Fournis le contenu exact a illustrer et j'genere le
+#    visuel proprement."
+#   "Ouais, j'peux faire ca."
+# What they share is a forward-looking COMMITMENT to produce the visual.
+# What must NOT fire is the deliberate decline sxa_visualization_boundary
+# depends on - "J'ai pas le tableau de donnees. J'ai pas le droit de
+# creer des tranches inventees." Note the second and fourth both open on
+# "J'ai pas", so the opener is not the discriminator: commitment vs
+# explicit refusal is. Hence a veto pattern rather than a longer
+# commitment list.
+#
+# Same provisional-heuristic posture as _CODE_TRIGGER_PATTERN: expect
+# false positives and negatives, tune from real usage rather than trying
+# to enumerate every phrasing. The cost of a false positive is bounded
+# and small - one extra model call, and _retry_narrated_visual_tool_call
+# already falls back to the original reply on anything unusable.
+#
+# Blast radius is every task declaring a visual tool, not just Comage:
+# tekos/answer-technical-question and arkos (diagram), and
+# advantage/answer-project-question (image) - Advantage is still
+# `status: placeholder` with no live route, so no live traffic today.
+_VISUAL_COMMITMENT_PHRASES = (
+    # FR - including the elided/unaccented register these agents answer in
+    "c'est le bon outil", "le bon outil",
+    "j'peux faire", "je peux faire", "j'peux te faire", "je peux te faire",
+    "j'genere", "je genere", "je vais generer", "j'vais generer",
+    "je vais creer", "j'vais creer", "je vais te faire", "je vais faire",
+    "je te genere", "j'te genere", "je m'en occupe",
+    # EN
+    "i can do that", "i can generate", "i can create", "i'll generate",
+    "i will generate", "i'll create", "i will create", "let me generate",
+    "let me create",
+)
+_VISUAL_REFUSAL_PHRASES = (
+    # FR
+    "j'ai pas le droit", "je n'ai pas le droit", "j'peux pas", "je peux pas",
+    "je ne peux pas", "j'ai pas les donnees", "invente", "inventee",
+    "inventees", "inventes",
+    # EN
+    "i can't", "i cannot", "i'm not allowed", "i am not allowed",
+    "not permitted", "made up", "fabricate",
+)
+_VISUAL_COMMITMENT_PATTERN = re.compile(
+    "|".join(re.escape(p) for p in _VISUAL_COMMITMENT_PHRASES)
+)
+_VISUAL_REFUSAL_PATTERN = re.compile(
+    "|".join(re.escape(p) for p in _VISUAL_REFUSAL_PHRASES)
+)
+
+
+def _normalize_reply(text: str) -> str:
+    """Lowercase and strip combining accents, same approach as
+    evaluations/register_conformance.py's own _normalize. Needed because
+    the live replies are unaccented elided slang - "ca" for "ca",
+    "j'genere" for "je genere" - so an accented vocabulary would miss
+    them."""
+    lowered = (text or "").lower()
+    return "".join(
+        c for c in unicodedata.normalize("NFD", lowered)
+        if unicodedata.category(c) != "Mn"
+    )
+
+
+def _should_retry_narrated_visual(reply_text: str) -> bool:
+    """True when a reply that made no tool call still reads as one that
+    was going to. Either it names the tool outright (the original, very
+    low-false-positive signal), or it commits to producing the visual
+    without explicitly refusing."""
+    if _NARRATED_TOOL_NAME_PATTERN.search(reply_text or ""):
+        return True
+    normalized = _normalize_reply(reply_text)
+    if not _VISUAL_COMMITMENT_PATTERN.search(normalized):
+        return False
+    return not _VISUAL_REFUSAL_PATTERN.search(normalized)
+
 
 async def _retry_narrated_visual_tool_call(
     state: AgentState,
@@ -1029,7 +1112,7 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
         # for the narrate-instead-of-call pattern before accepting the
         # reply as final.
         visual_schemas = [s for s in (tool_schemas or []) if s["function"]["name"] in _VISUAL_TOOL_NAMES]
-        if visual_schemas and _NARRATED_TOOL_NAME_PATTERN.search(reply_text):
+        if visual_schemas and _should_retry_narrated_visual(reply_text):
             retried = await _retry_narrated_visual_tool_call(
                 state, agent, task, turn_messages, result, provider, visual_schemas,
             )

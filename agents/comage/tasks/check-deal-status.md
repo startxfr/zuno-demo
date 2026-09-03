@@ -7,8 +7,11 @@ zuno:
     - salesforce.opportunity.read
     - web_search
     # ADR-0415: stable-diffusion-xl via OVHcloud AI Endpoints. Comage is
-    # the only agent with this capability (policy update: photorealistic
-    # generation elsewhere was removed), and even here it's scoped to
+    # the only LIVE-ROUTED agent with this capability (an earlier version
+    # of this comment said "the only agent" - wrong, advantage/
+    # answer-project-question declares it too; Advantage is still
+    # `status: placeholder` with no live route, which is the whole of the
+    # difference). Even here it's scoped to
     # genuine marketing-visual requests only, never deal-status charts/
     # mockups - see prompts/check-deal-status.md's system prompt, which is
     # where that scope is actually enforced (this task has only the one

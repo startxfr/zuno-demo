@@ -120,7 +120,18 @@ def check_technical_qa_domain(domain: str, message: str) -> StressResult:
         f"{BFF_URL}/api/chat",
         headers=auth_headers(PERSONA),
         json={"session_id": f"stress-qa-{domain}", "message": message},
-        timeout=30,
+        # 120s, not 30s (WP-124, 2026-09-03): Tekos's reference model for
+        # answer-technical-question is ovhcloud-gpt-oss-120b - FIRST in its
+        # preferred chain (policies/model-routing/model-routing-policy.yaml)
+        # and C1-eligible, so every turn genuinely goes there. Until WP-124
+        # the mesh made that provider unreachable and Envoy failed the
+        # connection instantly, so the turn silently fell through to a local
+        # model in milliseconds; these 30s timeouts were calibrated against
+        # that accident. A real transatlantic 120B generation runs against
+        # the gateway's own 60s default, so a 30s client could never observe
+        # a legitimate success - it reported its own impatience as a failure.
+        # Same fix, same reasoning as evaluations/comage/security_checks.py.
+        timeout=120,
     )
     if resp.status_code != 200:
         return StressResult(f"qa-{domain}", "technical_qa", message, False, f"status={resp.status_code}")
@@ -260,7 +271,18 @@ def check_dat_boundary(case: str, message: str) -> StressResult:
         f"{RUNTIME_URL}/v1/agents/tekos/chat",
         headers=auth_headers(PERSONA),
         json={"session_id": f"stress-dat-{case}", "user_sub": PERSONA, "message": message},
-        timeout=30,
+        # 120s, not 30s (WP-124, 2026-09-03): Tekos's reference model for
+        # answer-technical-question is ovhcloud-gpt-oss-120b - FIRST in its
+        # preferred chain (policies/model-routing/model-routing-policy.yaml)
+        # and C1-eligible, so every turn genuinely goes there. Until WP-124
+        # the mesh made that provider unreachable and Envoy failed the
+        # connection instantly, so the turn silently fell through to a local
+        # model in milliseconds; these 30s timeouts were calibrated against
+        # that accident. A real transatlantic 120B generation runs against
+        # the gateway's own 60s default, so a 30s client could never observe
+        # a legitimate success - it reported its own impatience as a failure.
+        # Same fix, same reasoning as evaluations/comage/security_checks.py.
+        timeout=120,
     )
     if resp.status_code != 200:
         return StressResult(f"dat-{case}", "dat_boundary", message, False, f"status={resp.status_code}")

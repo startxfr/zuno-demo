@@ -156,6 +156,10 @@ jobs:
           python3 tests/test_bundle_signing.py
           python3 tests/test_checkpointing.py
           python3 tests/test_guardrails.py
+          # WP-112: the narration-retry trigger. Added to CI 2026-09-03
+          # after a real, permanently-failing test in this same family sat
+          # unnoticed for a day precisely because it was not wired here.
+          python3 tests/test_reason_node_narration_retry.py
       - name: mcp-gateway tests
         working-directory: components/mcp-gateway
         run: |
@@ -243,6 +247,16 @@ jobs:
       - name: evaluations PEFT regression gate tests (ADR-0534/WP-109)
         working-directory: evaluations
         run: python3 tests/test_peft_regression.py
+      # WP-112: carries test_probe_schemas_have_not_drifted_from_the_runtime,
+      # which had been FAILING since ef7b5c43 (2026-09-02) with nobody
+      # noticing - the probe fixture still held the pre-ef7b5c43
+      # generate_image description, so the narration gate was scoring a
+      # schema the runtime no longer sends. Not wired here is why.
+      - name: evaluations tool-calling conformance tests (ADR-0526/WP-087)
+        working-directory: evaluations
+        run: |
+          pip install pyyaml
+          python3 tests/test_tool_calling_conformance.py
 
   quality-gate:
     # ADR-0107 (roadmap WP-10): a real PASS/FAIL quality verdict needs a

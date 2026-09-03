@@ -1056,6 +1056,66 @@ redhat:
     include: []
     exclude: []
 
+  # WP-112/WP-124 (2026-09-03): evaluations/tekos/stress_test.py's
+  # technical_qa battery asks about Argo CD, Helm and Go, and Tekos's own
+  # bundle advertises "Argo CD/Helm/Go documentation" - but the corpus held
+  # NONE of it. Those three probes were nonetheless scoring 7/7, because
+  # components/rag-service/app/search.py's _vector_query has no relevance
+  # threshold: a working vector arm returns its 20 nearest neighbours for
+  # ANY query, and the check only asserts len(citations) > 0, so they were
+  # passing on unrelated OpenShift chunks. The failure only surfaced when
+  # the vector arm degraded to full-text-only and full-text - correctly -
+  # found nothing. These two entries close the Argo CD and Helm halves.
+  # Every documentationUrl below was confirmed to return 200 before being
+  # added: a wrong URL yields a green ingestion run that indexes nothing.
+  - enabled: true
+    product: "Red Hat OpenShift GitOps"                      # Argo CD, as Red Hat ships it - the only Argo CD documentation on docs.redhat.com.
+    productSlug: "red-hat-openshift-gitops"
+    version: "1.17"
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.17/html-single/understanding_openshift_gitops/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Red Hat OpenShift GitOps"
+    productSlug: "red-hat-openshift-gitops"
+    version: "1.16"
+    documentationUrl: "https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.16/html-single/argo_cd_instance/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Helm"                                          # no independent version - an OpenShift Container Platform doc chapter (Building applications), same shape as Migration Toolkit above.
+    productSlug: "helm"
+    version: "4.22"
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/building_applications/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  - enabled: true
+    product: "Helm"
+    productSlug: "helm"
+    version: "4.21"                                          # versioned alongside OCP 4.21 above - same inference caveat as Migration Toolkit
+    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/building_applications/index"
+    languages: [en-US]
+    fetchMode: html
+    include: []
+    exclude: []
+  # Go is deliberately NOT here. There is no Go documentation on
+  # docs.redhat.com that the fetch-redhat adapter could take (every
+  # candidate URL 404s), and the Go Toolset docs that do exist elsewhere
+  # document Red Hat's packaging of the compiler, not the language
+  # semantics qa-go actually asks about ("how do goroutines and channels
+  # work together"). Covering it needs a generic-web source adapter for
+  # go.dev - SOURCE_ADAPTERS in components/rag-ingestion/src/
+  # rag_ingestion.py has only fetch-redhat/fetch-confluence/
+  # fetch-salesforce/load-sxa-dump - which is its own work package, not a
+  # values edit. qa-go stays red until then, honestly rather than on
+  # nearest-neighbour noise.
+
 # Shared Confluence Cloud authentication, reused by every confluence[]
 # entry below via YAML anchor (one Atlassian site, one token secret for
 # this demo) - Helm parses values.yaml as plain YAML before templating,
