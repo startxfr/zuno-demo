@@ -191,7 +191,7 @@ are observed in production traffic.
   happened.
 - `docs/adr/README.md`: ADR-0215 row -> `Partially implemented` done; ->
   `Implemented` done.
-- `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`: WP-060 tracker row ->
+- `docs/roadmap/implementation-roadmap.md`: WP-060 tracker row ->
   `Operator pending (repo work merged)` done; -> `Done` done.
 - `MEMORY.md`: one dated bullet describing multi-turn history + compaction
   as implemented state, across which agents, and the residual operator

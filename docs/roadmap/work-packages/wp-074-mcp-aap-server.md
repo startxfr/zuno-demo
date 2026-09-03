@@ -193,7 +193,7 @@ After all live acceptance checks pass:
 
 - WP-074 -> `Done` (2026-08-27).
 - ADR-0355 -> `Implemented` (2026-08-27).
-- `docs/roadmap/v0.1-v0.3-implementation-roadmap.md` tracker row -> `Done`.
+- `docs/roadmap/implementation-roadmap.md` tracker row -> `Done`.
 
 ## Live findings (2026-08-27)
 

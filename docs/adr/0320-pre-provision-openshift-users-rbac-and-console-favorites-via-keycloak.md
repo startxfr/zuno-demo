@@ -1,6 +1,6 @@
 # ADR-0320: Pre-provision OpenShift users, RBAC and Console favorites via Keycloak
 
-- **Status:** Superseded by [ADR-0332](0332-remove-console-favorites-provisioning.md) (Deprecated) for the Console favorites provisioning component, and by [ADR-0349](0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) for the platform-group/persona model (`admin`, `zuno-admin`, `aidev`, `aiops` and the four demo personas are replaced by `ocp-*` groups); the OpenShift OAuth configuration, the confidential `openshift` client and the static-RBAC mechanism remain in effect - see `gitops/charts/openshift-oauth/`, `gitops/charts/openshift-rbac-groups/`, `gitops/charts/keycloak/files/realm-zuno.json`.
+- **Status:** Superseded in part by ADR-0332 and ADR-0349 - by [ADR-0332](0332-remove-console-favorites-provisioning.md) (itself Deprecated) for the Console favorites provisioning component, and by [ADR-0349](0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) for the platform-group/persona model (`admin`, `zuno-admin`, `aidev`, `aiops` and the four demo personas are replaced by `ocp-*` groups); the OpenShift OAuth configuration, the confidential `openshift` client and the static-RBAC mechanism remain in effect - see `gitops/charts/openshift-oauth/`, `gitops/charts/openshift-rbac-groups/`, `gitops/charts/keycloak/files/realm-zuno.json`.
 - **Target:** v0
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

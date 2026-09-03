@@ -17,7 +17,7 @@
 - **Estimated files touched:** ~14
 
 > Execute this brief as a standalone task from the repository root.
-> Tracked in [docs/roadmap/v0.1-v0.3-implementation-roadmap.md](../v0.1-v0.3-implementation-roadmap.md).
+> Tracked in [docs/roadmap/implementation-roadmap.md](../implementation-roadmap.md).
 
 ## Goal
 
@@ -232,7 +232,7 @@ unprovisioned until the operator step below runs):**
   only after the live demo (step 3) actually runs with the real
   Keycloak client wired in.
 - `docs/adr/README.md`: ADR-0213 row → match.
-- `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`: add a new
+- `docs/roadmap/implementation-roadmap.md`: add a new
   "Phase 10: role-based conversation sharing" section (same
   outside-the-original-40-ADR-scope convention as Phase 6/8/9), WP-066
   row → state to match.

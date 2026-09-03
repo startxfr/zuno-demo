@@ -191,7 +191,7 @@ This is why nothing has ever run.
     objective — **never a rewrite of its body**; a new
     `## Phase 20: French urban-register model variant (added 2026-08-27, outside
     the original 40-ADR scope)` section plus tracker row in
-    `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`; the v0.4 paragraph in
+    `docs/roadmap/implementation-roadmap.md`; the v0.4 paragraph in
     `docs/roadmap/versions.md`; a dated `MEMORY.md` bullet.
 
 ## What NOT to touch

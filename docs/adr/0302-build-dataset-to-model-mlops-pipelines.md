@@ -1,6 +1,6 @@
 # ADR-0302: Build dataset-to-model MLOps pipelines
 
-- **Status:** Superseded by ADR-0526 for the dataset sourcing and training objective (decisions 2 and 4); the pipeline, storage, evaluation-gate, registry and human-reviewed-promotion rules (decisions 1, 3, 5-7) remain in effect. Prior status for the record: Partially implemented - pipeline, roles and tests merged.
+- **Status:** Superseded in part by ADR-0526 for the dataset sourcing and training objective (decisions 2 and 4); the pipeline, storage, evaluation-gate, registry and human-reviewed-promotion rules (decisions 1, 3, 5-7) remain in effect. Prior status for the record: Partially implemented - pipeline, roles and tests merged.
 - **Target:** v0.3
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team

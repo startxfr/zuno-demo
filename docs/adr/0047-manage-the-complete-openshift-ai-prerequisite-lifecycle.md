@@ -1,6 +1,6 @@
 # ADR-0047: Manage the complete OpenShift AI prerequisite lifecycle
 
-- **Status:** Implemented
+- **Status:** Superseded in part by [ADR-0317](0317-install-connectivity-link-and-leaderworkerset-operators.md) - the Connectivity Link and LeaderWorkerSet prerequisite clauses only; the rest of the prerequisite lifecycle (channel/runtime discovery, operator sequencing) remains in effect. Prior status for the record: Implemented.
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team

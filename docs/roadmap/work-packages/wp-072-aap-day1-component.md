@@ -363,7 +363,7 @@ After all live acceptance checks pass and the CRD inventory is recorded:
 - WP-072 -> `Done`.
 - ADR-0354 -> `Partially implemented` (component `aap` live; `aap-config`
   still pending WP-073).
-- Update `docs/roadmap/v0.1-v0.3-implementation-roadmap.md` and
+- Update `docs/roadmap/implementation-roadmap.md` and
   `MEMORY.md` to describe the implemented state.
 - Run `python3 platform/docs/check_docs.py` again.
 

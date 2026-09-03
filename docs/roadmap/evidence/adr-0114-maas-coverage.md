@@ -6,7 +6,7 @@ capabilities" operational requirement in
 [ADR-0114](../../adr/0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md).
 Owned by WP-03 (repo prototype) and closed out by WP-27 (live governance
 verification) — see the
-[implementation roadmap](../v0.1-v0.3-implementation-roadmap.md).
+[implementation roadmap](../implementation-roadmap.md).
 
 Each row is marked `keep-in-zuno` (Zuno retains this responsibility
 regardless of MaaS), `delegate-to-maas` (MaaS is expected to take this over

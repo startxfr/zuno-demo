@@ -10,7 +10,7 @@
 > touches the BFF OpenAPI contract - sequence the contract step as one atomic
 > change (spec + Go code + contract tests together), per ADR-0054.
 >
-> Tracked in [docs/roadmap/v0.1-v0.3-implementation-roadmap.md](../v0.1-v0.3-implementation-roadmap.md) Phase 21.
+> Tracked in [docs/roadmap/implementation-roadmap.md](../implementation-roadmap.md) Phase 21.
 
 ## Goal
 

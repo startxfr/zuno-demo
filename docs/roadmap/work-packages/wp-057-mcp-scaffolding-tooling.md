@@ -107,7 +107,7 @@ it is validated by YAML/schema inspection and `check_build_matrix.py`.
   already recorded `Implemented` in this change (repo-provable, no operator
   step needed).
 - `docs/adr/README.md`: ADR-0119 row → `Implemented` (already done).
-- `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`: WP-057 tracker row →
+- `docs/roadmap/implementation-roadmap.md`: WP-057 tracker row →
   `Done`.
 - This file: `- **State:**` → `Done` (already reflects this).
 - `MEMORY.md`: one dated bullet describing the scaffolding/conformance

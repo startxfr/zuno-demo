@@ -1,6 +1,6 @@
 # ADR-0301: Introduce LoRA and PEFT model customization
 
-- **Status:** Superseded by ADR-0526 for the adapter objective and serving mechanism (decisions 1 and 5); the static-selection, artifact-registration and classification-inheritance rules (decisions 2-4) remain in effect. Prior status for the record: Partially implemented - serving configuration and classification gating merged.
+- **Status:** Superseded in part by ADR-0526 for the adapter objective and serving mechanism (decisions 1 and 5); the static-selection, artifact-registration and classification-inheritance rules (decisions 2-4) remain in effect. Prior status for the record: Partially implemented - serving configuration and classification gating merged.
 - **Target:** v0.3
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team

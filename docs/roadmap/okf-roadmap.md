@@ -50,7 +50,7 @@ copy would drift unvalidated).
 ## Execution model
 
 Inherited unchanged from the
-[v0.1 – v0.3 implementation roadmap](v0.1-v0.3-implementation-roadmap.md):
+[implementation roadmap](implementation-roadmap.md):
 
 - **1 WP = 1 brief = 1 reviewable change-set** (large WPs split into
   lettered parts, each independently committable).
@@ -82,59 +82,20 @@ flip prescribed by each brief's Status-updates section.
 
 ## Tracker
 
-Update the **State** column as WPs progress; everything else is fixed at
-authoring time. States: `Not started | Repo work in review | Repo work
-merged | Operator pending | Done | Abandoned | Cancelled | Closed — deferred`.
-`platform/docs/check_docs.py` enforces this vocabulary AND that each row's
-State matches its brief's own `- **State:**` line.
+**Moved (2026-09-03).** The OKF work packages are tracked in the single
+[implementation roadmap](implementation-roadmap.md), phases 33–35:
 
-### Phase 1 — OKF v0.1: content excellence
+| Was | Now |
+|---|---|
+| Phase 1 — OKF v0.1: content excellence | [Phase 33 — OKF: content excellence](implementation-roadmap.md#phase-33--okf-content-excellence) |
+| Phase 2 — OKF v0.2: extraction | [Phase 34 — OKF: extraction](implementation-roadmap.md#phase-34--okf-extraction) |
+| Phase 3 — OKF v0.3: live reconciliation | [Phase 35 — OKF: live reconciliation](implementation-roadmap.md#phase-35--okf-live-reconciliation) |
 
-Order rationale: WP-43 (stages + READMEs) first — every later package
-writes into the structure it fixes. WP-44/45/46 are independent once it
-merges; WP-44 Part A unblocks the quota column (WP-54) and the
-prompt-example schema (WP-061 soft). WP-54 → WP-55 is strict (the
-binding's validity window and precedence live in quota policy). WP-47 is
-Abandoned; WP-061 (its replacement, ADR-0515) is the phase's only
-component-code package.
-
-| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
-|---|---|---|---|---|---|
-| WP-43 | [wp-43](work-packages/wp-43-agent-maturity-alignment.md) | 0502 | — | Done | none |
-| WP-44 | [wp-44](work-packages/wp-44-okf-authorization-matrix.md) | 0503 (matrix) | WP-43 | Done | none |
-| WP-45 | [wp-45](work-packages/wp-45-deployment-dir-content.md) | 0503 (deployment) | WP-43 | Done | none |
-| WP-46 | [wp-46](work-packages/wp-46-tests-target-structure.md) | 0504 | WP-43 | Done | none |
-| WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Abandoned | superseded by WP-061 (ADR-0515); no code was written |
-| WP-061 | [wp-061](work-packages/wp-061-per-conversation-tabs-frontend.md) | 0515 | WP-44A | Done | none |
-| WP-54 | [wp-54](work-packages/wp-54-quota-policy-and-kuadrant-translation.md) | 0511 | WP-44A | Done (2026-08-25 — 429-exceedance run passed live with a real token: `intensive` 429 at request 11 against 10/5m, `standard` at 61 against 60/5m, zero 5xx. The run itself found three stacked defects that had left enforcement counting nothing while still reporting Accepted+Enforced — missing identity dynamic metadata, CEL error-absorption the shim does not implement, and predicate concatenation shredding an unparenthesized ternary. See ADR-0511's 2026-08-25 note) | none |
-| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 (clause 3 superseded by 0528) | WP-54 (+WP-061A rec.) | Repo work merged; superseded in part 2026-08-27 | none here — ADR-0528 moves Salesforce verification from conversation start to project save, so the live bind/deny pass (still needing sandbox creds — WP-22/33 gap) and the `finance`/`salesforce.opportunity.read` policy decision both carry over to WP-090, Phase 21 of the [platform roadmap](v0.1-v0.3-implementation-roadmap.md) |
-| WP-56 | [wp-56](work-packages/wp-56-rag-tools-policies-schema.md) | 0513 | WP-43 | Done | none |
-
-### Phase 2 — OKF v0.2: extraction
-
-Order rationale: strictly mirror (WP-48) → pin (WP-49) → cutover
-(WP-50), so image builds are never without a working content source;
-WP-51 (hooks) needs only the pin and runs in parallel with the cutover.
-The cross-repo single-writer clause is in force from WP-48's merge to
-WP-50's.
-
-| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
-|---|---|---|---|---|---|
-| WP-48 | [wp-48](work-packages/wp-48-okf-repo-bootstrap.md) | 0506 (start) | WP-44, WP-45, WP-46 | Not started | create zuno-okf repo + protection + CODEOWNERS (blocking precondition) |
-| WP-49 | [wp-49](work-packages/wp-49-pinned-ref-builds.md) | 0507 | WP-48 | Not started | read-only CI credential for zuno-okf; one signed-bundle verification |
-| WP-50 | [wp-50](work-packages/wp-50-okf-extraction-cutover.md) | 0506+0507 (close) | WP-49 | Not started | one ArgoCD sync cycle + one evaluation run post-cutover |
-| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-49 (∥ WP-50) | Not started | none (deploys ride the next rollout) |
-
-### Phase 3 — OKF v0.3: live reconciliation
-
-Order rationale: mounts before watching — WP-52 must be **Done** (live
-Naveo proof), not merely merged, before WP-53 starts; WP-53's Part B
-demo pair is the stream's closing proof.
-
-| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
-|---|---|---|---|---|---|
-| WP-52 | [wp-52](work-packages/wp-52-mounted-okf-artifacts.md) | 0509 | WP-50, WP-51 | Not started | deploy operator + Naveo chart bump; mounted-content confirmation |
-| WP-53 | [wp-53](work-packages/wp-53-okf-live-reconciliation.md) | 0510 | WP-52 Done | Not started | two live demos (prompt propagation; ceiling violation); stream sign-off |
+Two trackers had become one tracker's worth of truth: ADR-0506–ADR-0510 were
+retargeted to platform v0.7 on 2026-08-30, so WP-48–WP-53 sat under phase
+headings ("OKF v0.2", "OKF v0.3") naming milestones their own ADRs no longer
+targeted. The milestone narrative below is still current and still owns the
+OKF *version line*; only the WP tables moved.
 
 ## Dependency graph
 
@@ -185,7 +146,7 @@ WP-43 ─┬─ WP-44 ─┬──────────────┬─ WP-
   `odh-model-controller` already uses for `maas-default-gateway`). Both
   fixed and live-verified 2026-08-24: `401`, not `500`, on
   `zuno-agent-gateway`. See ADR-0511's 2026-08-24 note and
-  `v0.1-v0.3-implementation-roadmap.md`'s matching entry (WP-071 is
+  `implementation-roadmap.md`'s matching entry (WP-071 is
   tracked there, alongside WP-27, since it lives in that file's
   `work-packages/`).
 - 2026-08-24 (afternoon) — ADR-0511/ADR-0512 moved a second time today,
@@ -195,7 +156,7 @@ WP-43 ─┬─ WP-44 ─┬──────────────┬─ WP-
   Retargeting note and `versions.md`.
 - 2026-08-24 (morning) — ADR-0511/ADR-0512 retargeted from OKF v0.1 to
   platform v0.3
-  (see [v0.1-v0.3-implementation-roadmap.md](v0.1-v0.3-implementation-roadmap.md)'s
+  (see [implementation-roadmap.md](implementation-roadmap.md)'s
   own change log and `docs/adr/README.md`'s Retargeting note): WP-54 is
   stalled on the same upstream Kuadrant wasm-shim defect blocking WP-27/
   ADR-0201, and WP-55/ADR-0512 has a hard `Depends on: WP-54`, so it moves

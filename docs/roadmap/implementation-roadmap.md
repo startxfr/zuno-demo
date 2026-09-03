@@ -1,6 +1,6 @@
-# v0.1 – v0.3 implementation roadmap
+# Implementation roadmap
 
-**Purpose:** drive every open ADR in the v0.1, v0.2 and v0.3 streams to
+**Purpose:** drive every open ADR, in every version stream, to
 `Implemented`. The work is decomposed into work packages (WPs), each with a
 self-contained brief under [work-packages/](work-packages/) written so a
 lower-capability model can execute it as a standalone task.
@@ -10,7 +10,34 @@ status**. This roadmap tracks WP state only — never copy ADR status strings
 here (`platform/docs/check_docs.py` validates the index/body pair; a third
 copy would drift unvalidated).
 
-## Scope: the 40 open ADRs
+## Work packages by version
+
+Derived, not maintained by hand: a version's ADRs are the ADRs whose
+`**Target:**` names it, and its work packages are those whose tracker row
+cites one of them. A WP that advances ADRs in two versions is counted under
+both, so the WP column sums to more than the 120 tracked rows. "Open ADRs"
+counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
+`Superseded*` or `Deprecated` is closed. Regenerate after any status change;
+`platform/docs/check_docs.py` verifies the table against the ADR bodies.
+
+| Version | ADRs | Open ADRs | WPs | Open WPs |
+|---|---|---|---|---|
+| v0 | 72 | — | 7 | — |
+| v0.1 | 29 | — | 18 | — |
+| v0.2 | 14 | — | 17 | WP-098 |
+| v0.3 | 16 | 1 | 18 | WP-34, WP-119 |
+| v0.4 | 33 | 9 | 27 | WP-55, WP-093, WP-101, WP-112 |
+| v0.5 | 8 | 1 | 14 | WP-55, WP-101, WP-106, WP-122 |
+| v0.6 | 4 | — | 5 | WP-101 |
+| v0.7 | 12 | 10 | 21 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119 |
+| v0.8 | 2 | 1 | 2 | — |
+| v0.9 | 4 | 3 | 4 | — |
+| OKF v0.1 | 8 | 1 | 7 | — |
+
+Version *goals* live in [versions.md](versions.md); per-ADR status lives in
+the [ADR index](../adr/README.md). Neither is restated here.
+
+## Original scope: the 40 open ADRs (2026-08-13)
 
 - **v0.1 (17):** 0101–0110, 0112 (stubs in `adr-decisions-v0.1.md`), 0350
   (ex-0113, re-streamed to v0.3 on 2026-08-15), 0114,
@@ -90,7 +117,7 @@ State matches its brief's own `- **State:**` line.
 |---|---|---|---|---|---|
 | WP-00 | (executed inline, 2026-08-13) | — | — | Done | none — `check_docs.py` green |
 
-### Phase 1 — v0.1: platform trust and tool foundation
+### Phase 1 — platform trust and tool foundation
 
 Order rationale: the binding registry (WP-01) is the prerequisite for
 Confluence (WP-02), auth modes (WP-26), scoped capabilities (WP-32) and all
@@ -120,7 +147,7 @@ phase.
 
 (P) = brief starts with a stub-ADR promotion.
 
-### Phase 2 — v0.2: knowledge governance (+ v0.1 carve-outs)
+### Phase 2 — knowledge governance (+ v0.1 carve-outs)
 
 Order rationale: the strict spine is WP-20 (domains + policy) → WP-21
 (multi-domain core) → WP-22 (adapters + cadences). WP-23/24/25 build on the
@@ -140,7 +167,7 @@ touches the BFF contract and its final acceptance is a Phase 3 carve-out).
 | WP-071 | [wp-071](work-packages/wp-071-authorino-service-ca-trust-alignment.md) | 0201, 0511 | WP-27, WP-54 | Done (2026-08-24 — Authorino/Envoy TLS trust mismatch root-caused and fixed live; `maas-default-gateway` returns 401, not 500) | none |
 | WP-28 | [wp-28](work-packages/wp-28-project-memory.md) | 0209 | WP-20, WP-21 | Done (2026-08-23 — tracker correction: WP-31's own 2026-08-15 merge already flipped ADR-0209 to `Implemented` and passed its cross-agent acceptance test (Tekos writes a `demo-001` fact, Arkos retrieves it); this row had not been updated to reflect that closure) | none |
 
-### Phase 3 — v0.3: multi-agent rollout, MLOps, operator
+### Phase 3 — multi-agent rollout, MLOps, operator
 
 Order rationale: WP-30 (multi-shape runtime) precedes any second agent.
 Agents follow ADR-0326's sequence Arkos → Comage → Advantage → Finage, with
@@ -164,8 +191,7 @@ agents; WP-38 (operator) closes ADR-0350. WP-39–WP-42 close the roadmap.
 | WP-41 | [wp-41](work-packages/wp-41-onboarding-catalog.md) | 0307, 0410 (ex-0306) - retargeted to v0.9 (2026-08-30, via v0.7 same day), Proposed | WP-38, WP-36 | Cancelled (2026-08-23) | none (cancelled) |
 | WP-42 | [wp-42](work-packages/wp-42-autonomous-optimization.md) | 0309 | WP-40, WP-09 | Done | none |
 
-## Phase 5: git-forge integration (added 2026-08-19/20, outside the original 40-ADR scope)
-
+### Phase 5 — git-forge integration (added 2026-08-19/20)
 WP-057 builds the scaffolding/conformance tooling ADR-0119 decides; WP-058
 is its first real consumer, the GitHub/GitLab MCP server ADR-0120 decides;
 WP-059 wires Tekos and Arkos to it with the public/private access split
@@ -177,8 +203,7 @@ ADR-0121 decides.
 | WP-059 | [wp-059](work-packages/wp-059-git-forge-tekos-arkos-wiring.md) | 0121 | WP-058 | Done | none |
 | WP-058 | [wp-058](work-packages/wp-058-git-forge-mcp-server.md) | 0120 | WP-057 | Done | none (read + delete-refusal live-verified both providers 2026-08-23; write/create/fork remain test-only by choice) |
 
-## Phase 6: conversation history and compaction (added 2026-08-20, outside the original 40-ADR scope)
-
+### Phase 6 — conversation history and compaction (added 2026-08-20)
 WP-060 makes every agent multi-turn: history reconstructed server-side from
 ADR-0103's own checkpoints, injected into each model call under a token
 budget, with older turns auto-summarized when that budget is exceeded -
@@ -188,8 +213,7 @@ ADR-0215 decides it.
 |---|---|---|---|---|---|
 | WP-060 | [wp-060](work-packages/wp-060-conversation-history-compaction.md) | 0215 | WP-08, WP-30, WP-31, WP-33 | Done | none - live two-turn verification per agent confirmed on the real cluster (2026-08-21) |
 
-## Phase 7: Day 2 operations (added 2026-08-21, outside the original 40-ADR scope)
-
+### Phase 7 — Day 2 operations (added 2026-08-21)
 WP-062 builds the Day 2 chassis ADR-0057 decides: the `make d2
 test|stresstest` Makefile/Ansible dispatch, dynamic OKF-bundle-driven
 agent/service discovery, the shared text/JSON/CSV report engine, and the
@@ -205,8 +229,7 @@ bulk-interaction load mode.
 | WP-062 | [wp-062](work-packages/wp-062-day2-test-chassis.md) | 0057 | WP-31, WP-43 | Done | none - live run 2026-08-21: 14/14 passed |
 | WP-063 | [wp-063](work-packages/wp-063-day2-stresstest-content-aggregation.md) | 0058 | WP-062 | Done | none - live run 2026-08-21 (BULK=25): mechanism proven, 166/178 content passed (12 real app-layer failures logged, see WP-063) |
 
-## Phase 8: build/deploy trigger formalization (added 2026-08-21, outside the original 40-ADR scope)
-
+### Phase 8 — build/deploy trigger formalization (added 2026-08-21)
 WP-064 formalizes ADR-0059: the already-shipped `image.openshift.io/
 triggers` mechanism (commit `649243c`) that auto-redeploys a component's
 running pods the moment its in-cluster `Build` completes, with matching
@@ -220,8 +243,7 @@ release pin had briefly broken it for 16 components).
 |---|---|---|---|---|---|
 | WP-064 | [wp-064](work-packages/wp-064-auto-redeploy-trigger-formalization.md) | 0059 | — | Done | none |
 
-## Phase 9: real SXA content (added 2026-08-21, outside the original 40-ADR scope)
-
+### Phase 9 — real SXA content (added 2026-08-21)
 **Abandoned 2026-08-26 — superseded by Phase 14 (ADR-0219/WP-084).** WP-065
 delivered ADR-0216's Part A: a real SXA mysqldump imported natively into a
 new MariaDB database on the shared instance, served through the `sales-db`
@@ -234,8 +256,7 @@ MariaDB store and the MCP tool surface are deleted rather than completed.
 |---|---|---|---|---|---|
 | WP-065 | [wp-065](work-packages/wp-065-sxa-mariadb-import-rag.md) | 0216 (Superseded by 0219) | WP-23 | Abandoned | none — superseded by WP-084 |
 
-## Phase 10: role-based conversation sharing (added 2026-08-21, outside the original 40-ADR scope)
-
+### Phase 10 — role-based conversation sharing (added 2026-08-21)
 WP-066 delivers ADR-0213: an owner can grant a colleague reader/actor/
 cloner rights on a conversation, a single-active-writer lease prevents two
 collaborators racing the same LangGraph checkpoint thread, and the
@@ -258,8 +279,7 @@ trust boundary both survive into WP-088.
 |---|---|---|---|---|---|
 | WP-066 | [wp-066](work-packages/wp-066-role-based-conversation-sharing.md) | 0213 (Superseded by 0527) | ADR-0212, WP-061 | Abandoned 2026-08-27 — superseded by Phase 21 (WP-088/WP-089) | none — the `zuno-admin-api` provisioning it needed carries over to WP-088, which reuses `GET /api/colleagues` |
 
-## Phase 11: weekly SXA RAG corpus (added 2026-08-21, outside the original 40-ADR scope)
-
+### Phase 11 — weekly SXA RAG corpus (added 2026-08-21)
 **Abandoned 2026-08-26 — superseded by Phase 14 (ADR-0219/WP-084).** WP-067
 delivered ADR-0217: a second SXA source parsed directly in Python (no
 MariaDB, no MCP tools) into a new `knowledge.sxa` RAG domain, opened to
@@ -272,8 +292,7 @@ was preserved by widening `knowledge.sxa-legacy`'s `allowed_groups`.
 |---|---|---|---|---|---|
 | WP-067 | [wp-067](work-packages/wp-067-sxa-weekly-rag-corpus.md) | 0217 (Superseded by 0219) | — | Abandoned | none — superseded by WP-084 |
 
-## Phase 12: in-cluster supply-chain signing (added 2026-08-22, outside the original 40-ADR scope)
-
+### Phase 12 — in-cluster supply-chain signing (added 2026-08-22)
 ADR-0420 replaces ADR-0106/ADR-0115's GitHub-OIDC/Fulcio/Rekor keyless
 signing (external SaaS: GitHub Actions, Sigstore's public Fulcio/Rekor,
 `quay.io`) with a fully in-cluster mechanism built on Vault Transit — a
@@ -289,8 +308,7 @@ go-ahead.
 | WP-069 | [wp-069](work-packages/wp-069-in-cluster-okf-bundle-signing.md) | 0106 (mechanism superseded by 0420) | WP-068 | Done | none - `requireSignedBundles: true` flipped and live on the running Deployment 2026-08-22, all 8 agents verified with zero errors |
 | WP-070 | [wp-070](work-packages/wp-070-in-cluster-image-signing.md) | 0115 (mechanism superseded by 0420) | WP-068 | Done | none - fix aiagent-operator's missing Makefile/build-component wiring only if a future WP needs it (pre-existing gap, deliberately out of scope here) |
 
-## Phase 13: Ansible Automation Platform (added 2026-08-24, outside the original 40-ADR scope)
-
+### Phase 13 — Ansible Automation Platform (added 2026-08-24)
 ADR-0354 (amended 2026-08-24: Day 0 → Day 1 placement post-ADR-0060,
 retargeted v0.3 → v0.2) installs AAP as a new Day 1 component (`aap`) plus
 a companion `aap-config` component registering this repository as an AAP
@@ -311,8 +329,7 @@ automation rather than only reading state.
 | WP-075 | [wp-075](work-packages/wp-075-aap-hub-s3-storage.md) | 0354 | WP-072 | Done (live-verified 2026-08-25 — Hub content on S3; podAffinity is the real fix, S3 does not remove the local PVC) | none |
 | WP-077 | [wp-077](work-packages/wp-077-aap-postgres-uninstall-cleanup.md) | 0354 | WP-072, WP-075 | Done (live-verified 2026-08-25 — a full uninstall/install cycle ran clean with zero manual intervention) | none |
 
-## Phase 14: SXA as a RAG-only historical corpus (added 2026-08-26, outside the original 40-ADR scope)
-
+### Phase 14 — SXA as a RAG-only historical corpus (added 2026-08-26)
 WP-084 delivers ADR-0219, which supersedes ADR-0216 and ADR-0217 in full and
 closes out Phases 9 and 11. SXA is the company's commercial record from
 before 2021: there is no live system behind it, so the deterministic MCP path
@@ -327,8 +344,7 @@ the MariaDB `sxa` database are deleted. ADR-0016 becomes superseded in full.
 |---|---|---|---|---|---|
 | WP-084 | [wp-084](work-packages/wp-084-retire-the-sxa-mcp-path-and-second-rag-domain.md) | 0219 (Implemented); supersedes 0216, 0217, 0016 | WP-065, WP-067 | Done (2026-08-27 — teardown, re-ingestion and verification all complete; `rag-sxa-legacy` independently confirmed at 319,713 chunks) | none |
 
-## Phase 15: RAG ingestion throughput (added 2026-08-27, outside the original 40-ADR scope)
-
+### Phase 15 — RAG ingestion throughput (added 2026-08-27)
 Two mechanical performance decisions against `components/rag-ingestion/`, taken once ADR-0518's
 full re-ingestion made the existing stage timings untenable. WP-57 parallelizes and
 short-circuits the fetch stages (thread pools, conditional GET with stored ETag, a sha256
@@ -341,8 +357,7 @@ different work packages (`wp-057-mcp-scaffolding-tooling`, `wp-058-git-forge-mcp
 | WP-57 | [wp-57](work-packages/wp-57-accelerate-rag-ingestion-fetch-stages.md) | 0519 | ADR-0518's re-ingestion | Done (2026-08-25 — live-verified: the SXA fetch stage went from 127min+ and incomplete to 35m27s, CPU 4.3% → 89%+) | none |
 | WP-58 | [wp-58](work-packages/wp-58-parallelize-detect-changes-read.md) | 0520 | WP-57 | Done (2026-08-25 — live-verified: `detect-changes` 3h48m17s → 13m25s, ~17x; full pipeline SUCCEEDED in 16m51s) | none — `readConcurrency` retuned 16 → 64 by WP-084 since |
 
-## Phase 16: route local model traffic through MaaS (added 2026-08-27, outside the original 40-ADR scope)
-
+### Phase 16 — route local model traffic through MaaS (added 2026-08-27)
 WP-076 generalizes WP-27's live MaaS proof: ai-gateway's own local-model calls now go through the
 MaaS governance plane rather than around it, with a drill-proven direct fallback.
 
@@ -350,8 +365,7 @@ MaaS governance plane rather than around it, with a drill-proven direct fallback
 |---|---|---|---|---|---|
 | WP-076 | [wp-076](work-packages/wp-076-maas-local-traffic.md) | 0521 | WP-27 | Done (2026-08-26 — all five steps live-verified, both local models routed through MaaS, fallback drill-proven) | none |
 
-## Phase 17: RHOAI side-by-side monitoring (added 2026-08-27, outside the original 40-ADR scope)
-
+### Phase 17 — RHOAI side-by-side monitoring (added 2026-08-27)
 Three increments delivering ADR-0522: populate `DSCInitialization.spec.monitoring` so RHOAI
 provisions its own metrics, traces and Perses stack in the until-then-empty
 `redhat-ods-monitoring`, running fully side-by-side with the hand-deployed `zuno-monitoring` and
@@ -366,8 +380,7 @@ unifying the two stacks is a separate, not-yet-started follow-up (WP-080's "Phas
 | WP-081 | [wp-081](work-packages/wp-081-mesh-trace-fanout-to-rhoai-collector.md) | 0523 | WP-079, WP-080 | Done (live-verified 2026-08-26 — mesh traces fanned out to RHOAI's collector) | none |
 | WP-082 | [wp-082](work-packages/wp-082-model-workload-otel-auto-instrumentation.md) | 0523 | WP-079, WP-080 | Done (live-verified 2026-08-26 on embeddings + qwen; gpt-oss-20b blocked on a separate defect recorded in the brief) | gpt-oss-20b instrumentation only |
 
-## Phase 18: GPU capacity and MIG layout (added 2026-08-27, outside the original 40-ADR scope)
-
+### Phase 18 — GPU capacity and MIG layout (added 2026-08-27)
 Operator-tier capacity work amending ADR-0351 in place rather than opening a new decision: a
 second permanent MIG node, right-sized GPU requests, and the retirement of the IPI GPU node.
 WP-086 then spreads the predictors across both MIG nodes and clears two platform-hygiene items.
@@ -382,8 +395,7 @@ rather than the two already-`Done` WPs above.
 | WP-086 | [wp-086](work-packages/wp-086-spread-models-and-platform-hygiene.md) | none new; relates to 0351 | WP-083 | Done (live-verified 2026-08-26 — machine replaced, predictors spread, all 11 checks passed) | none |
 | WP-092 | [wp-092](work-packages/wp-092-qwen35-wesh-targeted-anti-affinity.md) | 0414 (amended 2026-08-29) | WP-086, WP-087 | Done (live-verified 2026-08-29 — placement separated, decisive check run, see the brief's live findings) | none |
 
-## Phase 19: OpenShift Lightspeed as a Zuno consumer (added 2026-08-27, outside the original 40-ADR scope)
-
+### Phase 19 — OpenShift Lightspeed as a Zuno consumer (added 2026-08-27)
 WP-085 wires OpenShift Lightspeed to Zuno's own inference, knowledge and identity planes,
 reusing ADR-0521's MaaS transport and mirroring the `aap`/`aap-config` two-component split.
 **Repo-only so far** — no cluster change has been made, so ADR-0524 correctly remains `Proposed`.
@@ -392,8 +404,7 @@ reusing ADR-0521's MaaS transport and mirroring the `aap`/`aap-config` two-compo
 |---|---|---|---|---|---|
 | WP-085 | [wp-085](work-packages/wp-085-openshift-lightspeed-integration.md) | 0524 | WP-076, WP-072/WP-073 | Done (live-verified 2026-08-27 — Lightspeed answers as `consultant-01`/`sale-01`, loads exactly the 2 capped `zuno-mcp` tools, and a real `confluence.page.search` call succeeded under the end user's own identity) | none for this WP — returning inference to MaaS is 2 edits, blocked on a MaaS subject-matching defect (the `qwen36-27b-instruct-lightspeed` subscription is Active, yet the control plane still answers `403 no matching subscription`) |
 
-## Phase 20: French urban-register model variant (added 2026-08-27, outside the original 40-ADR scope)
-
+### Phase 20 — French urban-register model variant (added 2026-08-27)
 WP-087 replaces WP-34's `comage-lora` objective, which never ran and had no data behind it
 (Comage's two knowledge domains hold zero rows), with a style adaptation whose corpus exists:
 a LoRA fine-tune of `Qwen/Qwen3.5-9B` on a staged French urban-register corpus, merged into a
@@ -409,8 +420,7 @@ Repo work merged 2026-08-27. Along the way it closed the two independent reasons
 |---|---|---|---|---|---|
 | WP-087 | [wp-087](work-packages/wp-087-french-urban-register-model.md) | 0526 | WP-34, WP-076, WP-083/WP-086 | Done (2026-08-29) | Three-half PASS + push-registry (model_version_id 6). Tool calling was broken by the fine-tune and is now gated by a third half; hallucinated-tool ceiling met by neither the variant nor its base; fallback paths untested |
 
-## Phase 21: the project as sharing and context boundary (added 2026-08-27, outside the original 40-ADR scope)
-
+### Phase 21 — the project as sharing and context boundary (added 2026-08-27)
 Three unrelated notions of "project" existed and none was an object a user could
 create: ADR-0209's mandatory `project_id` metadata key guarded by a binary
 `project_memberships` table nobody could populate through an API, ADR-0213's
@@ -437,8 +447,7 @@ effect.
 | WP-090 | [wp-090](work-packages/wp-090-project-salesforce-quota-telemetry.md) | 0528 | WP-088 | Done (2026-08-30) | none on the repo-verifiable criteria — telemetry confirmed live 2026-08-29 and now regression-tested (2026-08-30), tool-policy decision recorded (no change); the live Salesforce three-cause pass is carved out to WP-101 (v0.7), no longer a precondition for this WP's or ADR-0528's closure |
 | WP-091 | [wp-091](work-packages/wp-091-keycloak-client-reconciliation-and-zuno-admin-api.md) | 0530 | — | Done (2026-08-28) | none — reconcile ran live, `GET /api/colleagues` returns 200 |
 
-## Phase 22: Day 0/Day 1 always-on infra reorg + AAP execution extension (added 2026-08-30, outside the original 40-ADR scope)
-
+### Phase 22 — Day 0/Day 1 always-on infra reorg + AAP execution extension (added 2026-08-30)
 ADR-0418's own Context section (v0.4, still `Proposed`) had already named
 a broader reshaping - collapsing Day 0 into a smaller "always-on infra"
 tier (ArgoCD, Keycloak, Vault, External Secrets, AAP) - but deliberately
@@ -467,8 +476,7 @@ separately and added to this phase's table as they land.
 | WP-103 | [wp-103](work-packages/wp-103-aap-launch-rbac.md) | 0418 | WP-094, WP-097 | Done | model Controller RBAC for who may launch which Job/Workflow Template, ahead of Phase 3/4 (renumbered from a WP-101 draft that collided with the pre-existing Salesforce WP-101) |
 | WP-105 | [wp-105](work-packages/wp-105-node-failover-drill-scenario-command.md) | 0536 | WP-094, WP-095, WP-097, WP-103, WP-087 | Done | Both Part A (local path) and Part B (AAP Workflow Template with a real human approval click in the Controller UI) live-verified end to end 2026-08-30/31 - Comage fails over `local-wesh`→`local-qwen35`→`local-wesh` both ways, Tekos unaffected throughout; 6 real bugs found and fixed live across both parts (see WP-105/evidence doc) |
 
-## Phase 23: qwen3.5-9b fleet default + extended OVHcloud reasoning access (added 2026-08-30, outside the original 40-ADR scope)
-
+### Phase 23 — qwen3.5-9b fleet default + extended OVHcloud reasoning access (added 2026-08-30)
 ADR-0531 promotes `qwen3.5-9b` (ADR-0526/WP-087's training base, live per WP-092) from an
 unreferenced provider to the fleet-wide default, pairs it with Comage's `qwen3.5-9b-wesh`
 fine-tune for both Tekos and Comage, and extends `ovhcloud-gpt-oss-120b` reasoning-task access
@@ -479,8 +487,7 @@ Config-content only - no code change, no new provider, no infrastructure impact.
 |---|---|---|---|---|---|
 | WP-096 | [wp-096](work-packages/wp-096-qwen35-9b-fleet-default-and-ovh-reasoning-rollout.md) | 0531 | WP-087, WP-092 | Done (live-verified 2026-08-30 — ai-gateway rebuilt/rolled out, routing checks confirmed live, zero model-pod churn) | none |
 
-## Phase 24: knowledge.tech per-source ingestion cadence split (added 2026-08-30, outside the original 40-ADR scope)
-
+### Phase 24 — knowledge.tech per-source ingestion cadence split (added 2026-08-30)
 WP-22 implemented ADR-0105's per-source cadence decision at domain
 granularity only; `knowledge.tech`'s two independent sources
 (fetch-redhat, fetch-confluence) still shared one schedule and one KFP
@@ -493,8 +500,7 @@ splitting `knowledge.tech`'s single database (ADR-0202).
 |---|---|---|---|---|---|
 | WP-100 | [wp-100](work-packages/wp-100-split-tech-ingestion-cadence-by-source.md) | 0105 (amended) | WP-22 | Done (2026-08-30) | none |
 
-## Phase 25: Salesforce sandbox credential provisioning (added 2026-08-30, v0.7)
-
+### Phase 25 — Salesforce sandbox credential provisioning (added 2026-08-30)
 Three separate "blocked on sandbox" notes — WP-22/ADR-0218's `fetch-salesforce`
 batch-ingestion cadence, WP-33's deferred live Comage gate, and ADR-0528/WP-090's
 deferred live three-cause pass — shared one root cause with no owning WP: no
@@ -508,8 +514,7 @@ changes, closing all three notes' live-pass follow-ups once a credential exists.
 |---|---|---|---|---|---|
 | WP-101 | [wp-101](work-packages/wp-101-salesforce-sandbox-credentials.md) | 0512, 0528, 0218 | none | Not started (2026-08-30) | obtain a sandbox org + technical-user token, seed Vault, restore the salesforce-mcp install path, then run the three confirming live passes (Comage freshness read/write, ADR-0528's 404/403/503 causes, `fetch-salesforce` one-shot KFP run) |
 
-## Phase 26: adopt RHTAS as the artifact trust service (added 2026-08-30, v0.9; split into WP-110/WP-111 2026-09-02)
-
+### Phase 26 — adopt RHTAS as the artifact trust service (added 2026-08-30; split into WP-110/WP-111 2026-09-02)
 ADR-0535 supersedes ADR-0420, replacing Phase 12's in-cluster Vault Transit
 signing with RHTAS (self-hosted Fulcio/Rekor/Policy Controller) as a
 product-demonstration decision, not a security-driven one — Vault Transit
@@ -536,8 +541,7 @@ ADRs/WPs — see ADR-0535's Non-goals and Migration/evolution sections.
 | WP-110 | [wp-110](work-packages/wp-110-rhtas-operator-deployment-and-fundamentals.md) | 0535 | none | Done (2026-09-02) | none — operator v1.4.3 live, Securesign Ready (Trillian on the shared MariaDB), `zuno-signer` OIDC identity live-tested, keyless sign+verify smoke test passed with a real Rekor entry; 5 live findings fixed in-repo, see the brief's State |
 | WP-111 | [wp-111](work-packages/wp-111-rhtas-config-rhoai-assessment-and-signing-cutover.md) | 0535 | WP-110 | Done (2026-09-02) | none — signing cutover fully live-verified (`make d2 check supply-chain` PASS, 14 images, real Rekor entries); Policy Controller deployed but dormant (zero namespaces scoped - its digest-format gate isn't governed by mode:warn and this repo's `tag: latest` convention, ADR-0115 gap 2, made it reject real pods) until that gap closes; Part A found the ADR-0535 Non-goal premise already stale (WP-087) |
 
-## Phase 27: RHOAI HardwareProfiles + MaaS ExternalModels for mistral/gpt-oss-120b (added 2026-09-01, v0.5)
-
+### Phase 27 — RHOAI HardwareProfiles + MaaS ExternalModels for mistral/gpt-oss-120b (added 2026-09-01)
 A live diagnostic of `granite-7b-redhat-lab`'s `CrashLoopBackOff` found its
 Dashboard-assigned `HardwareProfile` declares no GPU identifier at all - a
 hardware-profile authoring gap, not a cluster GPU shortage. The same session
@@ -558,8 +562,7 @@ routing to the MaaS path for these two providers.
 |---|---|---|---|---|---|
 | WP-106 | [wp-106](work-packages/wp-106-rhoai-hardware-profiles-and-maas-external-models.md) | 0537 | WP-27, WP-076 | Not started (2026-09-01) | apply the two `HardwareProfile` CRs and confirm Dashboard parity with Granite; live-verify the `ExternalModel`/`MaaSModelRef` route-identity behavior (unknown for this backend kind); live-verify the full `ai-gateway` cutover (per-group quotas, Finage still denied) before removing the old direct-call code paths |
 
-## Phase 28: TrustyAI evaluation and guardrails (added 2026-09-02, v0.7)
-
+### Phase 28 — TrustyAI evaluation and guardrails (added 2026-09-02)
 ADR-0534 extends the platform's existing TrustyAI integration (already
 `Managed` on the `DataScienceCluster`, already serving ADR-0108/WP-10's
 LM-Eval model-benchmarking gate) from benchmarking-only to evaluation and
@@ -583,8 +586,7 @@ third rather than split into its own WP.
 | WP-113 | [wp-113](work-packages/wp-113-trustyai-observability-dashboard.md) | 0534 | WP-109 | Done (2026-09-02) | none — born from the FAILED human live test of ADR-0534 and closed the same day WITH the human sign-off: guardrails/RAGAS/Garak metrics live in Thanos via the standard OTLP pipeline, `zuno-trustyai` Grafana dashboard applied and human-validated (after one adjustment round: kube-state lag + missing table-merge transform); the RHOAI "Model monitoring bias" card stays unconfigured by decision |
 | WP-114 | [wp-114](work-packages/wp-114-peft-regression-gate-input-and-trustyai-alerting.md) | 0107, 0534 | WP-109, WP-113 | Done (2026-09-02) | none — the gate's fourth input is live (real FAIL on wesh's -0.12, then operator-granted waiver: PASS with the regression visibly WAIVED, future candidates still gated at 0.05), and `GarakAttackSuccessHigh` is FIRING on the real MitigationBypass finding; the one remaining proof deferred by decision is a full-gate run with a real mlops candidate |
 
-## Phase 29: retry design for skipped tool calls on the single-shot graph shape (added 2026-09-02, v0.9)
-
+### Phase 29 — retry design for skipped tool calls on the single-shot graph shape (added 2026-09-02)
 ADR-0516 shipped with no work package (`docs/roadmap/evidence/
 adr-0516-diagram-render.md`'s own header) and its "Accepted risks" section
 already named the `generate_image` tool-schema wording ambiguity as
@@ -608,8 +610,7 @@ verification against a real `qwen3.5-9b-wesh` deployment still open.
 |---|---|---|---|---|---|
 | WP-112 | [wp-112](work-packages/wp-112-comage-tool-call-narration-retry.md) | 0516 | none | Repo work merged (2026-09-03) | half closed: the prompt fix made the security check green for the first time (`comage/security` 8/8, real SDXL image) once WP-124 restored external egress. `img-mockup_request` still fails - across three runs it failed three different ways, two of them plain narration naming no tool, so widening `_NARRATED_TOOL_NAME_PATTERN` with an intent signal (not just a tolerant name match) IS indicated after all, against those three verbatim replies as the corpus |
 
-## Phase 30: RHOAI 3.5 dashboard workload surfaces (added 2026-09-02, v0.7)
-
+### Phase 30 — RHOAI 3.5 dashboard workload surfaces (added 2026-09-02)
 Closing ADR-0534's visibility work exposed a broader gap: four RHOAI
 dashboard pages sit empty or unconfigured on this platform. Evaluations
 (ADR-0534's own surface) needed the dashboard's hidden feature flags plus
@@ -639,8 +640,7 @@ move off KFP to a later ADR.
 | WP-121 | [wp-121](work-packages/wp-121-llminferenceservice-spec-scaling.md) | 0542, 0318 | none | Done (2026-09-03) | first autoscaling object on the platform, via `LLMInferenceService.spec.scaling` on `gpt-oss-20b` at min=max=1 - not a raw `VariantAutoscaling`, which the operand deprecates. `maxReplicas` stays 1 because the GPU ResourceQuota is saturated (3/3, 2/2) and no model can reach two replicas; raising it is a separate approval. Live-verified: ScaledObject Ready=True/Active=True and `keda-hpa-gpt-oss-20b-kserve-keda` created with ValidMetricFound; the controller honoured `spec.scaling` (Deployment spec.replicas=1). The real gap was the `ClusterTriggerAuthentication` RHOAI names in `inferenceservice-config` and does not ship - without it the ScaledObject sat Ready=False for 9h with no HPA at all |
 | WP-123 | [wp-123](work-packages/wp-123-dashboard-feature-flags-in-ansible.md) | 0538, 0534, 0517 | none | Done (2026-09-03) | the four RHOAI dashboard feature flags had no applier at all: `disableLMEval`/`guardrails`/`trainingJobs` were posted by a human with `oc patch` and recorded only in prose, so a from-scratch install came up with those surfaces silently gone - a tenth blocker of WP-118's class, invisible to it because a cluster-only mutation leaves nothing in the repo to grep for. They now live in `ansible/roles/openshift_ai/tasks/set_dashboard_flags.yml` and are applied as a partial merge patch shared by install and reconcile, with a `check` tripwire that prints `ABSENT` distinctly from `=false`. Not GitOps, deliberately and for a reason read off `managedFields`: the CR has three concurrent writers, the dashboard UI itself being one of them. A fourth flag was missing entirely - `disableKueue: false` - which is what surfaced this: the dashboard's flag evaluator returns "off" for an UNDEFINED key BEFORE applying the `disable*` inversion, so an absent key is a disabled feature, not a default. That showed as "Kueue is disabled in this cluster" in `zuno-ai-run`, with Deploy model disabled and an empty hardware-profile list, while the Kueue operand was Available with two ready replicas. ADR-0538 decision 5 amended: mechanism only, the not-GitOps posture is unchanged and reinforced. Live-verified the same day: check found the drift, reconcile fixed it, a re-run was a no-op, a delete-a-flag drill proved self-healing, and a full object diff before/after is exactly one added line - the operator's and the UI's keys are byte-identical. One correction on the way: a merge patch re-attributes a field in `managedFields` only when the VALUE changes, so the stale `kubectl-patch` manager entry survives on the flags whose values never moved and is not evidence of anything still being hand-managed. Closed with operator sign-off the same day: the banner is gone from `zuno-ai-run` on a plain refresh, no dashboard restart needed. That half is not self-certifiable - `/api/config` is unreadable from a shell (oauth-proxy wants the browser flow, the backend 401s a bearer token even in-pod), so the CR state is what the automation can prove and the pixels stay a human step |
 
-## Phase 31: MaaS gateway's missing Keycloak identity source (added 2026-09-03, v0.7)
-
+### Phase 31 — MaaS gateway's missing Keycloak identity source (added 2026-09-03)
 Live-verified while confirming WP-112's Comage fix: every real persona
 token gets a `401` from the local-model MaaS providers
 (`local-wesh-maas`/`local-gpt-oss-maas`/`local-maas`), across multiple
@@ -672,8 +672,7 @@ genuine `200` with real model output through `local-wesh-maas`.
 |---|---|---|---|---|---|
 | WP-122 | [wp-122](work-packages/wp-122-maas-gateway-keycloak-identity-gap.md) | 0537, 0521 | none | Repo work merged (2026-09-03) | none - closed with a clean live pass; the downstream re-run it unblocked (WP-112's `img-mockup_request`/security-check) surfaced a separate, real WP-112 gap, tracked there, not here |
 
-## Phase 32: ai-gateway's external SaaS egress broken by the mesh (added 2026-09-03, v0.7)
-
+### Phase 32 — ai-gateway's external SaaS egress broken by the mesh (added 2026-09-03)
 Found while verifying WP-112's Comage fix, and far wider than that WP:
 `ai-gateway` has never once opened a connection to an external SaaS
 provider. Envoy's own counters in its sidecar show `cx_connect_fail` equal
@@ -701,6 +700,64 @@ validate against the healthy `file-root:system` resource, and
 |---|---|---|---|---|---|
 | WP-124 | [wp-124](work-packages/wp-124-ai-gateway-external-saas-mesh-egress.md) | 0415, 0416, 0417, 0537, 0020, 0021 | none | Done (2026-09-03) | none - end-to-end verified: real SDXL image, zero `Connection error` in the run, `comage/security` 7/8 -> 8/8 and `tekos/layer1_model_routing` 0/2 -> 2/2 (confirming the claimed blast radius). Two same-run regressions logged in the brief as an unproven follow-up, not absorbed here |
 
+
+### OKF stream phases
+
+The three phases below were tracked in a separate `okf-roadmap.md` until
+2026-09-03. They are folded in here because their headings had become
+permanently untrue: ADR-0506–ADR-0510 were retargeted to platform v0.7 on
+2026-08-30 while their work packages stayed under headings reading
+"OKF v0.2"/"OKF v0.3". Phase numbering continues the platform sequence; the
+OKF *version line* (OKF v0.1) still exists as an ADR target and is listed in
+[versions.md](versions.md).
+
+### Phase 33 — OKF: content excellence
+
+Order rationale: WP-43 (stages + READMEs) first — every later package
+writes into the structure it fixes. WP-44/45/46 are independent once it
+merges; WP-44 Part A unblocks the quota column (WP-54) and the
+prompt-example schema (WP-061 soft). WP-54 → WP-55 is strict (the
+binding's validity window and precedence live in quota policy). WP-47 is
+Abandoned; WP-061 (its replacement, ADR-0515) is the phase's only
+component-code package.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-43 | [wp-43](work-packages/wp-43-agent-maturity-alignment.md) | 0502 | — | Done | none |
+| WP-44 | [wp-44](work-packages/wp-44-okf-authorization-matrix.md) | 0503 (matrix) | WP-43 | Done | none |
+| WP-45 | [wp-45](work-packages/wp-45-deployment-dir-content.md) | 0503 (deployment) | WP-43 | Done | none |
+| WP-46 | [wp-46](work-packages/wp-46-tests-target-structure.md) | 0504 | WP-43 | Done | none |
+| WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Abandoned | superseded by WP-061 (ADR-0515); no code was written |
+| WP-061 | [wp-061](work-packages/wp-061-per-conversation-tabs-frontend.md) | 0515 | WP-44A | Done | none |
+| WP-54 | [wp-54](work-packages/wp-54-quota-policy-and-kuadrant-translation.md) | 0511 | WP-44A | Done (2026-08-25 — 429-exceedance run passed live with a real token: `intensive` 429 at request 11 against 10/5m, `standard` at 61 against 60/5m, zero 5xx. The run itself found three stacked defects that had left enforcement counting nothing while still reporting Accepted+Enforced — missing identity dynamic metadata, CEL error-absorption the shim does not implement, and predicate concatenation shredding an unparenthesized ternary. See ADR-0511's 2026-08-25 note) | none |
+| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 (clause 3 superseded by 0528) | WP-54 (+WP-061A rec.) | Repo work merged; superseded in part 2026-08-27 | none here — ADR-0528 moves Salesforce verification from conversation start to project save, so the live bind/deny pass (still needing sandbox creds — WP-22/33 gap) and the `finance`/`salesforce.opportunity.read` policy decision both carry over to WP-090, Phase 21 above |
+| WP-56 | [wp-56](work-packages/wp-56-rag-tools-policies-schema.md) | 0513 | WP-43 | Done | none |
+
+### Phase 34 — OKF: extraction
+
+Order rationale: strictly mirror (WP-48) → pin (WP-49) → cutover
+(WP-50), so image builds are never without a working content source;
+WP-51 (hooks) needs only the pin and runs in parallel with the cutover.
+The cross-repo single-writer clause is in force from WP-48's merge to
+WP-50's.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-48 | [wp-48](work-packages/wp-48-okf-repo-bootstrap.md) | 0506 (start) | WP-44, WP-45, WP-46 | Not started | create zuno-okf repo + protection + CODEOWNERS (blocking precondition) |
+| WP-49 | [wp-49](work-packages/wp-49-pinned-ref-builds.md) | 0507 | WP-48 | Not started | read-only CI credential for zuno-okf; one signed-bundle verification |
+| WP-50 | [wp-50](work-packages/wp-50-okf-extraction-cutover.md) | 0506+0507 (close) | WP-49 | Not started | one ArgoCD sync cycle + one evaluation run post-cutover |
+| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-49 (∥ WP-50) | Not started | none (deploys ride the next rollout) |
+
+### Phase 35 — OKF: live reconciliation
+
+Order rationale: mounts before watching — WP-52 must be **Done** (live
+Naveo proof), not merely merged, before WP-53 starts; WP-53's Part B
+demo pair is the stream's closing proof.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-52 | [wp-52](work-packages/wp-52-mounted-okf-artifacts.md) | 0509 | WP-50, WP-51 | Not started | deploy operator + Naveo chart bump; mounted-content confirmation |
+| WP-53 | [wp-53](work-packages/wp-53-okf-live-reconciliation.md) | 0510 | WP-52 Done | Not started | two live demos (prompt propagation; ceiling violation); stream sign-off |
 
 ## Cross-version carve-outs
 
@@ -787,6 +844,16 @@ moving.
 10. **Autonomy sign-off** after one observed cycle (WP-42).
 
 ## Change log
+
+- 2026-09-03 — index revamp. This file renamed from
+  `v0.1-v0.3-implementation-roadmap.md`: it had carried phases through 32,
+  covering v0.4–v0.9, for weeks. The OKF stream's three phases were folded in
+  as phases 33–35 and `okf-roadmap.md`'s tracker reduced to a pointer — their
+  headings named OKF milestones ("OKF v0.2", "OKF v0.3") that ADR-0506–ADR-0510
+  stopped targeting on 2026-08-30. Phase headings no longer assert a version
+  (36 rows disagreed with their ADRs' `Target`); a derived
+  [Work packages by version](#work-packages-by-version) table carries that
+  axis instead. No WP state, dependency or scope changed.
 
 - 2026-08-27 — ADR-0527 and ADR-0528 authored, superseding ADR-0213 in full
   and ADR-0512's clause 3 respectively: the project becomes a first-class

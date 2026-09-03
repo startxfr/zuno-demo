@@ -1,6 +1,6 @@
 # ADR-0002: Use OpenShift 4.20 and OpenShift AI 3.5 for the MVP
 
-- **Status:** Implemented
+- **Status:** Superseded in part by [ADR-0319](0319-target-openshift-4-22.md) - the OpenShift Container Platform version target (4.20) only. The OpenShift AI half of this decision is untouched by ADR-0319 ("OpenShift AI stays at 3.5 - unchanged, not a party to this decision") and remains in effect as amended 2026-09-03 for the 3.5.0 GA. Prior status for the record: Implemented.
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

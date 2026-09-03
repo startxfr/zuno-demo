@@ -411,7 +411,7 @@ failure and fix) in `docs/roadmap/evidence/adr-0536-node-failover-drill.md`.
 ## Status updates (then re-run check_docs.py)
 
 - Done: WP-105's State is `Done`, the Phase 22 table row in
-  `docs/roadmap/v0.1-v0.3-implementation-roadmap.md` reflects it, and
+  `docs/roadmap/implementation-roadmap.md` reflects it, and
   ADR-0536's Status is flipped from `Proposed` to `Implemented` (both Parts
   A and B live-verified end to end).
 

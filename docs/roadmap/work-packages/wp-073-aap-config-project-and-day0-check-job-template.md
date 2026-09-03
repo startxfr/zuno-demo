@@ -277,7 +277,7 @@ After all live acceptance checks pass:
   Keycloak authenticator gap from the Decision checkpoint remains open, in
   which case record that explicitly rather than claiming full
   implementation).
-- Update `docs/roadmap/v0.1-v0.3-implementation-roadmap.md` and
+- Update `docs/roadmap/implementation-roadmap.md` and
   `MEMORY.md`.
 - Run `python3 platform/docs/check_docs.py` again.
 

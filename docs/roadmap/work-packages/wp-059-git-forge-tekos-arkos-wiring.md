@@ -106,7 +106,7 @@ live call path WP-058 already covers.
 - `docs/adr/0121-restrict-git-forge-write-and-private-access-by-visibility.md`:
   already `Implemented` in this change (repo-provable).
 - `docs/adr/README.md`: ADR-0121 row → `Implemented` (already done).
-- `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`: WP-059 tracker row →
+- `docs/roadmap/implementation-roadmap.md`: WP-059 tracker row →
   `Done`.
 - `MEMORY.md`: one dated bullet describing the Tekos/Arkos wiring and the
   public/private split as implemented state.

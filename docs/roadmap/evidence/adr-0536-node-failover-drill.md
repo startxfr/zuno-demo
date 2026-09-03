@@ -4,7 +4,7 @@ Records the live-cluster proof behind
 [ADR-0536](../../adr/0536-live-node-failover-drill-for-qwen-model-fallback.md)
 (GPU-node failover drill for the qwen-normal/qwen-wesh fallback). Owned by
 [WP-105](../work-packages/wp-105-node-failover-drill-scenario-command.md) —
-see the [implementation roadmap](../v0.1-v0.3-implementation-roadmap.md).
+see the [implementation roadmap](../implementation-roadmap.md).
 
 **Status: both Part A and Part B live-verified end to end, 2026-08-30/31.**
 ADR-0526's "STILL NOT TRUE" caveat is now closed for the half this ADR

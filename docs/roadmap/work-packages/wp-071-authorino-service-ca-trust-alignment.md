@@ -280,7 +280,7 @@ Before editing:
 
 7. **Update roadmap state.**
 
-   Add WP-071 to `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`, linked to
+   Add WP-071 to `docs/roadmap/implementation-roadmap.md`, linked to
    WP-27 and WP-54. Those WPs must no longer claim that no repository-side fix
    exists; they should be marked blocked by WP-071 until its live acceptance
    checks pass.
@@ -433,7 +433,7 @@ After all live acceptance checks pass:
 - remove the TLS blocker from WP-27 and WP-54;
 - resume their remaining functional acceptance checks;
 - update `docs/adr/README.md`,
-  `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`, and `MEMORY.md`;
+  `docs/roadmap/implementation-roadmap.md`, and `MEMORY.md`;
 - run `python3 platform/docs/check_docs.py` again.
 
 ## Rollback

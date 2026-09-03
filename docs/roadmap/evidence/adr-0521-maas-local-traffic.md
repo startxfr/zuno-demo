@@ -4,7 +4,7 @@ Records the live-cluster proofs, discovered constraints, and recorded
 decisions behind
 [ADR-0521](../../adr/0521-route-local-model-traffic-through-maas.md)
 (route ai-gateway's local model traffic through MaaS). Owned by WP-076 —
-see the [implementation roadmap](../v0.1-v0.3-implementation-roadmap.md).
+see the [implementation roadmap](../implementation-roadmap.md).
 All live verification was performed 2026-08-25/26 against
 `demo222.startx.fr` (OpenShift AI 3.5 EA2, MaaS `models-as-a-service`
 tenant, `maas-default-gateway` in `openshift-ingress`).

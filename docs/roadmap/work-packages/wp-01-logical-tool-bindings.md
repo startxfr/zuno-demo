@@ -111,7 +111,7 @@ to Implemented once the checks pass and the change is merged.
 1. `docs/adr/0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md`:
    `- **Status:**` → `Implemented - see \`platform/bindings/tools/\`, \`components/mcp-gateway/app/bindings.py\`.`
 2. `docs/adr/README.md`: ADR-0116 row status cell → `Implemented`.
-3. `docs/roadmap/v0.1-v0.3-implementation-roadmap.md`: WP-01 tracker row → `Done`.
+3. `docs/roadmap/implementation-roadmap.md`: WP-01 tracker row → `Done`.
 4. This file: `- **State:**` → `Done`.
 5. `MEMORY.md`: one dated bullet in the MCP/tools section describing the
    binding registry as implemented state.

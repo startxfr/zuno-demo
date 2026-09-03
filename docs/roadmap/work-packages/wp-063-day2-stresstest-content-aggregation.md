@@ -217,7 +217,7 @@ generalization, bulk-interaction mode); live cluster confirmation pending
 platform/testing/day2_stresstest.py, platform/testing/day2_bulk.py,
 ansible/playbooks/day2_stresstest.yml`. Update `docs/adr/README.md`'s
 version-0 table, the roadmap Phase 7 tracker
-(`docs/roadmap/v0.1-v0.3-implementation-roadmap.md`), and `MEMORY.md`
+(`docs/roadmap/implementation-roadmap.md`), and `MEMORY.md`
 accordingly.
 
 ## Out of scope / deferred
