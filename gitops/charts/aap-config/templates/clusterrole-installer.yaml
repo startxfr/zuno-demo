@@ -173,6 +173,16 @@ rules:
       - dashboard.opendatahub.io
       - opendatahub.io
       - datasciencepipelinesapplications.opendatahub.io
+      # WP-129: the DSP operator's own KFP-native Pipeline/PipelineVersion
+      # CRDs live in a separate apiGroup from datasciencepipelinesapplications.
+      # opendatahub.io above (the DSPA operand CR) - missing here since
+      # WP-100 first needed it (that gap went unnoticed because the two
+      # PipelineVersions it created were applied out-of-band, not through
+      # this role), it silently blocked compile_pipeline_version.yml's
+      # `kubernetes.core.k8s: state: present` GET for every one of WP-129's
+      # 19 new PipelineVersions ("cannot get resource pipelineversions in
+      # API group pipelines.kubeflow.org", confirmed live 2026-09-03).
+      - pipelines.kubeflow.org
       - trustyai.opendatahub.io
       - mlflow.opendatahub.io
       - config.opendatahub.io
