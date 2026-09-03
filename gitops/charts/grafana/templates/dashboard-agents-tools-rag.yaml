@@ -658,13 +658,13 @@ spec:
             },
             {
               "id": 16,
-              "title": "Searches returning NOTHING (share)",
-              "type": "stat",
+              "title": "Searches returning NOTHING (share, by domain set)",
+              "type": "timeseries",
               "datasource": {
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "description": "Share of RAG searches that came back with zero rows. A search that finds nothing is outcome=ok, not an error - so the error-ratio stat beside this one stays green while retrieval is silently dead, and the p50/p95 panel above shows a low number rather than an alarming one. This is the shape of failure the repo has hit twice: an ingestion run reporting success while indexing nothing, and an embedding batch dropped behind a 503 that a green validate never noticed. READ THIS AS A TREND, NOT A THRESHOLD. A high baseline is currently CORRECT: knowledge.sales and knowledge.project are deliberately empty until Salesforce ingestion lands in v0.7 (ADR-0218), so every check-deal-status turn retrieves nothing by design - verified 2026-09-03, sales 0 rows against sxa-legacy 319841 and tech 68962, all three searching correctly. What matters is this line MOVING: a jump means a domain that was serving content stopped. zuno_rag_result_count carries no domain label, which is why this cannot separate the two cases on its own; the rag_search span (zuno.run_id, top_k, result_count) attributes one run, and a per-domain label on the metric is the real fix.",
+              "description": "Share of RAG searches that came back with zero rows, BY THE DOMAIN SET SEARCHED. A search that finds nothing is outcome=ok, not an error - so the error-ratio stat beside this one stays green while retrieval is silently dead, and the p50/p95 panel above shows a low number rather than an alarming one. This is the shape of failure the repo has hit twice: an ingestion run reporting success while indexing nothing, and an embedding batch dropped behind a 503 that a green validate never noticed. One series pegged at 1.0 is not automatically wrong: knowledge.sales is deliberately empty until Salesforce ingestion lands in v0.7 (ADR-0218), so it reads 1.00 and should - verified 2026-09-03 against 0 rows, while sxa-legacy (319841 rows) and tech (68962) read 0.00. What matters is a series MOVING UP: a domain that was serving content stopped. The unlabeled series from before 2026-09-03 is the old fleet-wide aggregate that could not tell those cases apart, and is not comparable to any of them. `domains` is the requested set joined by commas, one label rather than one point per domain - the fan-out that would inflate the metric the way zuno_bff_requests_total was inflated by Keycloak group.",
               "gridPos": {
                 "h": 8,
                 "w": 12,
@@ -683,8 +683,16 @@ spec:
                         "value": null
                       },
                       {
-                        "color": "text",
-                        "value": 0.0
+                        "color": "green",
+                        "value": null
+                      },
+                      {
+                        "color": "orange",
+                        "value": 0.25
+                      },
+                      {
+                        "color": "red",
+                        "value": 0.9
                       }
                     ]
                   }
@@ -696,8 +704,8 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "(sum(rate(zuno_rag_result_count_bucket{le=\"0.0\"}[$__rate_interval])) or vector(0)) / clamp_min(sum(rate(zuno_rag_result_count_count[$__rate_interval])), 0.0001)",
-                  "legendFormat": "empty retrievals"
+                  "expr": "(sum by (domains) (rate(zuno_rag_result_count_bucket{le=\"0.0\"}[$__rate_interval])) or vector(0)) / clamp_min(sum by (domains) (rate(zuno_rag_result_count_count[$__rate_interval])), 0.0001)",
+                  "legendFormat": "{{`{{domains}}`}}"
                 }
               ]
             },
