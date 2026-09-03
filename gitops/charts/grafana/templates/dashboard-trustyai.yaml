@@ -202,7 +202,7 @@ spec:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "Share of exchanges where the observer could not be reached at all. This catches TRANSPORT failure only - a dead Service, a NetworkPolicy, a wrong URL. It does NOT catch the observer answering happily and finding nothing, which is what every WP-120 contract defect looked like. Read it together with the two panels beside it: unavailable high = the observer is down; unavailable zero AND detections permanently flat = the observer is answering but its contract is broken.",
+          "description": "Share of exchanges where the observer could not be reached at all. This catches TRANSPORT failure only - a dead Service, a NetworkPolicy, a wrong URL. It does NOT catch the observer answering happily and finding nothing, which is what every WP-120 contract defect looked like. Read it with the coverage panel beside it, which catches the other failure: a half-configured backend makes the hook return before calling anything, so nothing errors and this stat stays at zero while no exchange is observed at all. Neither panel can see the third failure - an observer that answers cleanly but detects nothing because its request or response contract is wrong (all four WP-120 defects looked exactly like that). On this platform benign traffic legitimately produces long runs with no detections, so a flat detections series is not by itself evidence of anything; confirm the contract with a probe rather than by watching a counter.",
           "gridPos": {
             "h": 8,
             "w": 8,
@@ -253,7 +253,7 @@ spec:
           "description": "The observer is fire-and-forget and disables itself SILENTLY when its backend URL is unset or half-configured - observe_exchange returns before making any call, so nothing errors and nothing is recorded. That failure produces no unavailable outcome and no log line: the evaluations series simply flatlines while agent traffic continues. The two lines diverging IS the signal. They are not expected to be equal - most BFF requests are not chat turns, and evaluations lag by the length of the exchange - but observed traffic falling to zero while BFF traffic continues means the hook stopped running. Traffic is read from zuno_bff_request_duration_ms_milliseconds_count, NOT zuno_bff_requests_total: the latter deliberately records one point PER KEYCLOAK GROUP (see agent-bff RecordRequest), so a user in twelve groups counts as twelve requests. The histogram count is not broken out that way and is the only true request count on this platform - live, arkos reads 777 against a true 755.",
           "gridPos": {
             "h": 8,
-            "w": 10,
+            "w": 16,
             "x": 8,
             "y": 9
           },
@@ -281,67 +281,6 @@ spec:
               },
               "expr": "sum(rate(zuno_bff_request_duration_ms_milliseconds_count{code!~\"5..\"}[$__rate_interval]))",
               "legendFormat": "agent traffic (non-5xx BFF)"
-            }
-          ]
-        },
-        {
-          "id": 10,
-          "title": "Watchdog: observed, never detected (24h)",
-          "type": "stat",
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "description": "1 = the observer ran over the last 24h and found NOTHING, not once. This is the exact signature of every contract defect WP-120 found: a wrong ConfigMap key, options at the wrong nesting level, a missing model field, a log parsed one level too shallow. All four returned HTTP 200 and zero detections, so the detections panel went flat and every other panel stayed green. On real traffic a permanent zero is implausible - the eight classes include an email regex - so treat a sustained 1 as a broken observer until proven otherwise, NOT as clean traffic. 0 = either a detection landed (the chain is demonstrably working end to end) or fewer than 20 exchanges were observed in the window. That floor is deliberate: with a handful of exchanges 'no detections' carries no information, and a watchdog that cries wolf on quiet days is one people learn to ignore. Both sides carry `or vector(0)` so a metric that has never been written once reads as a real 0 rather than No data - an alert panel that goes blank when the thing it watches has never run is worse than useless.",
-          "gridPos": {
-            "h": 8,
-            "w": 6,
-            "x": 18,
-            "y": 9
-          },
-          "fieldConfig": {
-            "defaults": {
-              "unit": "short",
-              "min": 0,
-              "max": 1,
-              "mappings": [
-                {
-                  "type": "value",
-                  "options": {
-                    "0": {
-                      "text": "detecting",
-                      "color": "green",
-                      "index": 0
-                    },
-                    "1": {
-                      "text": "SILENT",
-                      "color": "red",
-                      "index": 1
-                    }
-                  }
-                }
-              ],
-              "thresholds": {
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 1
-                  }
-                ]
-              }
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "expr": "((sum(increase(zuno_guardrails_evaluations_total[24h])) or vector(0)) > bool 20) - ((sum(increase(zuno_guardrails_detections_total[24h])) or vector(0)) > bool 0)"
             }
           ]
         },
