@@ -305,6 +305,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0517](0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) | Proposed | Redeploy the full platform from scratch on a new demo333 cluster |
 | [ADR-0533](0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) | Implemented | Consolidate Advantage's and Finage's non-promotion into a dedicated decision |
+| [ADR-0546](0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md) | Proposed | Introduce a cross-cluster source bucket (`zuno-demo-sources`) and per-cluster S3 bucket convention (`zuno-<cluster>-xxx`) |
 
 ## v0.9
 
