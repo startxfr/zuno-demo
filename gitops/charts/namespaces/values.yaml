@@ -561,9 +561,23 @@ platformNamespaces:
     # the Job's events. Limits are overcommit (only requests reserve node
     # capacity, and requests stay at 12), so this is headroom, not a
     # reservation - but it does mean every new RHOAI operand lands here.
+    # 2026-09-03, rhods-operator 3.5.0-ea.2 -> 3.5.0 GA: the paragraph above
+    # predicted this a third time and was right. The GA dashboard ships six
+    # UI operands the EA build did not (automl-ui, autorag-ui, maas-ui,
+    # mlflow-ui, model-registry-ui, agent-ops-ui) plus model-catalog, and
+    # they all land here. requests.memory hit 20380Mi of 20480Mi - 100%, not
+    # 97% - so the NEXT pod created in this namespace would have been
+    # refused, whatever it was. requests.cpu (98%) and limits.cpu (97%) were
+    # one operand behind it.
+    #
+    # This raise moves REQUESTS as well, which the note above deliberately
+    # avoided: requests do reserve node capacity, limits do not. It is still
+    # only a ceiling - nothing reserves anything until a pod is actually
+    # created - but it is the dimension to watch on this namespace from here,
+    # because it is the one that now binds first.
     resourceQuota:
-      requests: { cpu: "12", memory: "20Gi" }
-      limits: { cpu: "40", memory: "56Gi" }
+      requests: { cpu: "20", memory: "32Gi" }
+      limits: { cpu: "64", memory: "80Gi" }
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "1Gi" }
@@ -606,9 +620,24 @@ platformNamespaces:
     # 1050m/1728Mi requests and 3500m limits.cpu, and the headroom over that
     # is one surge pod so a rolling update cannot deadlock against its own
     # quota the way this one did.
+    # 2026-09-03, rhods-operator 3.5.0-ea.2 -> 3.5.0 GA: a THIRD pass of the
+    # same failure, because the GA grew what this namespace runs. limits.cpu
+    # sat at exactly 6000m/6000m, so model-catalog-postgres never got a pod
+    # at all - and model-catalog then CrashLoopBackOff'd against a Service
+    # whose EndpointSlice was empty, reporting `tls error: connection reset
+    # by peer` at 5432, which reads like the mesh double-TLS trap and is not
+    # (there was simply no server). Measured effective per-pod cost as the
+    # quota actually counts it (LimitRange default 1 core applies to every
+    # container without an explicit limit, sidecar included): model-catalog
+    # 2500m/1024Mi, zuno 2500m/768Mi, zuno-postgres 1000m/768Mi,
+    # model-catalog-postgres 1000m/768Mi = 7000m/3328Mi steady, over the
+    # 6000m ceiling before any rollout. Sized here for that plus one 2500m
+    # surge pod plus headroom, on every dimension - the redhat-ods-operator
+    # entry above records why sizing to the computed peak exactly is not
+    # enough.
     resourceQuota:
-      requests: { cpu: "1500m", memory: "2560Mi" }
-      limits: { cpu: "6", memory: "5Gi" }
+      requests: { cpu: "3", memory: "5Gi" }
+      limits: { cpu: "12", memory: "8Gi" }
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "1Gi" }
@@ -640,9 +669,13 @@ platformNamespaces:
     # namespace gives ~1338m effective requests.cpu and ~9220m effective
     # limits.cpu; current values are set with headroom above a +40% margin
     # on that live-measured total.
+    # limits.cpu 14 -> 20 (2026-09-03, rhods-operator 3.5.0 GA): not wedged,
+    # but 12440m of 14000m (89%) with the GA still settling. Raised
+    # pre-emptively rather than waiting for the FailedCreate, since the other
+    # three RHOAI namespaces all reached their ceiling in the same upgrade.
     resourceQuota:
       requests: { cpu: "4", memory: "15Gi" }
-      limits: { cpu: "14", memory: "40Gi" }
+      limits: { cpu: "20", memory: "40Gi" }
     limitRange:
       defaultRequest: { cpu: "100m", memory: "256Mi" }
       default: { cpu: "1", memory: "2Gi" }
