@@ -796,12 +796,20 @@ def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
 # by name in prose instead of emitting a real tool_call - live-confirmed
 # 2026-09-02 on Comage's "mockup" wording (evaluations/comage/
 # stress_test.py::img-mockup_request), even though the 27-probe
-# tool_calling_conformance eval set (which has no "mockup"-worded probe)
-# measures 0% narration post-ef7b5c43. Detected narrowly - the literal
-# offered tool name appearing in the reply with zero tool_calls - rather
-# than a second classifier call: organic prose is very unlikely to
-# contain "generate_image"/"generate_diagram" verbatim, so this stays
-# cheap and rarely fires instead of taxing every single-shot turn.
+# tool_calling_conformance eval set measures 0% narration post-ef7b5c43.
+# (An earlier version of this comment said that corpus has no
+# "mockup"-worded probe - wrong: evaluations/comage/tool_probes.yaml's
+# img-04 is one. What it lacks is a *deal-proposal* mockup probe, the
+# wording that sits on check-deal-status's own marketing-vs-structured-
+# data boundary.) Detected narrowly - the literal offered tool name
+# appearing in the reply with zero tool_calls - rather than a second
+# classifier call: organic prose is very unlikely to contain
+# "generate_image"/"generate_diagram" verbatim, so this stays cheap and
+# rarely fires instead of taxing every single-shot turn. 2026-09-03 live
+# evidence showed the real limit of that: narration that describes using
+# "the tool" without naming it is not caught at all, which is why
+# agents/comage/prompts/check-deal-status.md now carries the same
+# explicit "actually invoke it" instruction that fixed Arkos (b0cb07f4).
 _VISUAL_TOOL_NAMES = {"generate_image", "generate_diagram"}
 _NARRATED_TOOL_NAME_PATTERN = re.compile(
     "|".join(re.escape(name) for name in _VISUAL_TOOL_NAMES), re.IGNORECASE,

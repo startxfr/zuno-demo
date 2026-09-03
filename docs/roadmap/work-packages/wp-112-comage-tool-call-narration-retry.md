@@ -1,18 +1,22 @@
 # WP-112: Design a retry for skipped tool calls on the single-shot graph shape
 
-- **State:** Repo work merged (2026-09-03) - NOT Done, and not just
-  pending infra: re-tested 2026-09-03 after WP-122 closed the MaaS 401s
-  that were blocking the 2026-09-02 attempt, and both named checks still
-  FAIL. This time the retry mechanism itself never fired - a real,
-  narrower-than-hoped detection gap in `_NARRATED_TOOL_NAME_PATTERN`
-  (name-substring match only), confirmed against a live French-language
-  narration that describes using "the tool" without ever saying
-  `generate_image`. The retry mechanism's own correctness is still
-  proven (2026-09-02 evidence: a real `generate_image` call reaching
-  `mcp-gateway`/`ai-gateway` for the first time) - what's missing is a
-  safe way to widen when it triggers. See both "Live verification"
-  sections below for the full evidence and the follow-up design question
-  this leaves open.
+- **State:** Repo work merged (2026-09-03) - NOT Done, pending a live
+  re-run of the second fix. History: the 2026-09-03 re-test (after WP-122
+  closed the MaaS 401s) showed both named checks still FAIL with the retry
+  never firing at all - `_NARRATED_TOOL_NAME_PATTERN` matches only the
+  literal tool name, and the live French narration describes using "the
+  tool" without ever saying `generate_image`. Rather than widen that
+  shared-runtime trigger first, a second fix landed the same day: the
+  explicit "actually invoke it" system-prompt instruction that closed the
+  identical defect for Arkos (`b0cb07f4`, 1/3 -> 3/3), which
+  `agents/comage/prompts/check-deal-status.md` had never had. Comage-only,
+  no shared-runtime change. Needs rebuild + `make d3 sign agents` +
+  `make d3 stresstest agents BULK=0` to confirm; widening the trigger
+  remains the designed next step if it does not close. The retry
+  mechanism's own correctness is still proven (2026-09-02 evidence: a real
+  `generate_image` call reaching `mcp-gateway`/`ai-gateway` for the first
+  time). See "Second fix (2026-09-03)" and both "Live verification"
+  sections below.
 - **ADRs:** ADR-0516 (Decision - the tool-schema/prompt contradiction ADR-0516
   accepted as an unmitigated risk; that risk has now manifested with live
   evidence). ADR-0516 itself stays `Implemented`/v0.4 - this WP does not
@@ -97,7 +101,12 @@ The eval-set precondition (does the current narration-rate data already
 cover this) came back **no**: ADR-0526's 27-probe
 `tool_calling_conformance.py` corpus measures 0% narration on the revised,
 currently-deployed corpus, but has zero probes using "mockup" wording - the
-exact live-failing phrasing (`evaluations/comage/stress_test.py:115`). This
+exact live-failing phrasing (`evaluations/comage/stress_test.py:115`).
+**Correction (2026-09-03): that last clause is wrong** - `tool_probes.yaml`'s
+`img-04` is a mockup-worded probe and predates this WP; what the corpus
+lacks is a *deal-proposal* mockup probe. See "Second fix (2026-09-03)",
+which also records that the 0% number was measured against a stale copy of
+the schema. This
 is the same wording-sensitivity pattern already found for Arkos's
 `generate_diagram` gap (imperative "draw" passes, "schema"/buried-request
 phrasing fails) - narration is not the systemic 46.7%-rate defect the
@@ -285,6 +294,101 @@ credential gap) - `status=500 expected=403` on scenario 12 is that same
 root cause surfacing through the MCP Gateway's own error path, not a new
 defect.
 
+## Second fix (2026-09-03) - the Arkos-precedent prompt instruction
+
+Reviewing the 2026-09-03 gap surfaced a cheaper lever the earlier design
+pass never considered, and one with a directly comparable precedent.
+
+Arkos had *this exact defect* on `generate_diagram` and it was closed
+(1/3 -> 3/3 PASS, commit `b0cb07f4`, live-verified) by a single
+system-prompt paragraph, not by runtime code -
+`agents/arkos/prompts/draft-architecture-testimonial.md:26-31`:
+
+    ... you must actually call the diagram-generation tool with real
+    diagram source - never write the diagram source yourself inside your
+    reply text and describe it as done.
+
+`agents/comage/prompts/check-deal-status.md` had **no equivalent
+instruction**. It carried only the *boundary* paragraph saying which of
+the two visual tools applies - and the live failing reply is Comage doing
+precisely that and nothing more: adjudicating the boundary in prose
+("c'est un mockup marketing, pas une visualisation de donnees
+structurees") and then stopping. The prompt told it how to choose and
+never told it to call.
+
+Fixed by appending the same shape of instruction Arkos uses, with an
+explicit decline clause so the deliberate-decline path stays open:
+
+    Once you have decided which of the two applies, you must actually
+    invoke that tool through the function-calling interface - never
+    describe which tool you would use, and never say you are producing a
+    visual, inside your reply text. [...] If neither tool applies, say so
+    plainly and call nothing.
+
+That last sentence is load-bearing: `sxa_visualization_boundary` (1/1
+passing) depends on Comage being able to refuse, and this instruction must
+not turn a correct refusal into a nudge to call something.
+
+**Chosen over widening `_NARRATED_TOOL_NAME_PATTERN` first**, deliberately:
+the trigger lives in `_make_reason_node`, which every agent on
+`retrieve_reason_respond` runs (Tekos, Comage, Advantage, Finage, Naveo -
+plus Arkos, which uses `plan_draft_write` but shares the same node
+factory), so widening it is a shared-runtime change with no eval corpus to
+validate the widened heuristic against. The prompt fix is Comage-only and
+has a proven precedent. Widening the trigger stays available as the next
+step if this does not close the two checks - the design for it is
+unchanged and recorded above.
+
+### Two documentation defects corrected in the same pass
+
+1. **"The 27-probe corpus has no mockup-worded probe" was wrong.** Stated
+   in this brief's "Design (2026-09-02)" section and repeated in the
+   comment at `components/agent-runtime/app/graph/nodes.py`.
+   `evaluations/comage/tool_probes.yaml`'s `img-04` ("Peux-tu me creer un
+   mockup visuel de notre stand pour le salon ?", `expects_tool:
+   generate_image`) is exactly such a probe and predates this WP. The real
+   gap is narrower and still open: no *deal-proposal* mockup probe - the
+   wording that sits on `check-deal-status`'s own marketing-vs-structured-
+   data boundary. Still ADR-0526/WP-087 corpus territory, still a
+   follow-up, but now stated accurately.
+
+2. **A real, silently-failing drift check.** `ef7b5c43` (2026-09-02)
+   qualified `_GENERATE_IMAGE_TOOL_SCHEMA`'s description in `nodes.py` but
+   never updated the copy in `evaluations/comage/tool_probes.yaml`.
+   `evaluations/tests/test_tool_calling_conformance.py::
+   test_probe_schemas_have_not_drifted_from_the_runtime` had been FAILING
+   since, unnoticed because neither that file nor
+   `components/agent-runtime/tests/test_reason_node_narration_retry.py` is
+   in `.github/workflows/lint.yml`'s `python` job. This matters to this
+   WP's own argument: the "0% narration post-`ef7b5c43`" number it leans on
+   was measured against the *stale, pre-`ef7b5c43`* schema - the very
+   description whose ambiguity `ef7b5c43` existed to remove. The fixture is
+   now regenerated from `nodes.py` (18/18 pass). Wiring these two suites
+   into CI is left as a separate follow-up rather than smuggled into this
+   WP.
+
+### Verified locally (no cluster)
+
+- `evaluations/tests/test_tool_calling_conformance.py` - 18/18 (was 17/18).
+- Full `components/agent-runtime` suite - 21 files, all green,
+  `test_reason_node_narration_retry.py` 5/5.
+- `python3 platform/okf/run_agent_contract_tests.py` - PASS.
+- `python3 platform/docs/check_docs.py` - PASS.
+
+### Still required to close this WP
+
+Prompts are baked into the image at `/app/agents`
+(`components/agent-runtime/app/registry.py`, `AGENTS_DIR`) and the signed
+bundle digest covers every file under `agents/<name>/`, so this is not a
+config-only change: push, rebuild `agent-runtime`, `make d3 sign agents`
+(ADR-0420), then re-run `make d3 stresstest agents BULK=0`. Confirm the
+OVHcloud SDXL path is reachable before reading the result - a `502` on
+`/v1/images/generations` is an infra result, not a WP-112 one. Diagnose
+the security check's *marketing* half separately: its prompt is
+unambiguous, carries no "mockup" wording, and no narration snippet was
+ever captured for it, so it may be a plain miss with no narration - a case
+no reply-text trigger could ever catch.
+
 ## Acceptance checks (for this WP's own scope)
 
 - A written, reviewed design (this WP's brief, updated in place, or a
@@ -296,9 +400,15 @@ defect.
 - No code changes to `agent-runtime` are required to close this WP if the
   design itself is the deliverable - a follow-up WP executes it. Judge at
   design time whether execution belongs in this same WP or a new one. -
-  judged in-scope, see "Design vs. execution"; live-verified against a
-  real deployment - retry mechanism confirmed working, full PASS blocked
-  by unrelated infra, see "Live verification" above.
+  judged in-scope, see "Design vs. execution". The retry mechanism is
+  live-confirmed working (2026-09-02); the two named regression checks are
+  NOT yet green. The 2026-09-02 reading of this bullet ("full PASS blocked
+  by unrelated infra") was falsified by the 2026-09-03 re-run and is
+  superseded by "Second fix (2026-09-03)" below - the remaining work was
+  never infra.
+- Both named live checks green in one `make d3 stresstest agents BULK=0`
+  run, with `sxa_visualization_boundary` still passing in the same run. -
+  **not yet**, see "Second fix (2026-09-03)".
 
 ## Out of scope / deferred
 

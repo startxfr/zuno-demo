@@ -52,10 +52,13 @@ tool_schemas:
   function:
     name: generate_image
     description: Generate a photorealistic or illustrative image with stable-diffusion-xl when the user's
-      request calls for a picture, illustration or mockup - NOT for diagrams, charts, schemas or sequence/workflow
-      diagrams needing precise structure or legible text (use generate_diagram for those instead; SDXL
-      cannot render exact boxes, arrows or text reliably). Only pass the visual description itself as
-      the prompt - never paste retrieved document content, citations or conversation history into it.
+      request calls for a picture, illustration, or a marketing visual/mockup with no structured data
+      in it (e.g. a product shot, a booth mockup, a mascot illustration) - NOT for a mockup or visualization
+      OF structured or deal data (a chart, a pie chart, deal/pipeline figures), and NOT for diagrams,
+      charts, schemas or sequence/workflow diagrams needing precise structure or legible text (use generate_diagram
+      for all of those instead; SDXL cannot render exact boxes, arrows, text or real numbers reliably).
+      Only pass the visual description itself as the prompt - never paste retrieved document content,
+      citations or conversation history into it.
     parameters:
       type: object
       properties:
