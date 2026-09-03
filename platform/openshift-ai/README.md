@@ -1,6 +1,8 @@
 # Platform: openshift-ai
 
-OpenShift AI Operator and platform prerequisites for the RHOAI 3.5 EA2 MVP.
+OpenShift AI Operator and platform prerequisites for the RHOAI 3.5 MVP
+(`rhods-operator.3.5.0` GA on the `stable-3.5` channel; ADR-0002 originally
+targeted the `3.5.0-ea.2` Early Access build on `beta`).
 
 `ansible/roles/openshift_ai` installs the operator (channel discovered
 from the cluster's own `PackageManifest` - see that role's

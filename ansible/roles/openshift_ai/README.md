@@ -19,14 +19,27 @@ creates or labels that `Namespace` itself.
 
 ## Channel discovery
 
-`tasks/install.yml` reads the `rhods-operator` `PackageManifest`'s
-published channels and selects the one matching the `3.5` family (falling
-back to the manifest's own `defaultChannel`, and failing with a clear
-diagnostic - listing every published channel - if neither is available)
-instead of a hardcoded `eus-3.5` guess, then passes it to the chart via
-`gitops_app_extra_helm_values` (`subscriptionChannel`). The exact
-EA2/GA channel name published by a given catalog snapshot isn't
-standardized.
+`tasks/discover_channel.yml` (included by `install.yml` and
+`reconcile.yml`) reads the `rhods-operator` `PackageManifest`'s published
+channels and prefers `stable-3.5` - the 3.5 z-stream, which serves the
+`3.5.0` GA the chart pins and later `3.5.z` patches, but never rolls to
+3.6. It falls back to the first channel matching the `3.5` family, then to
+the manifest's own `defaultChannel`, and fails with a clear diagnostic -
+listing every published channel - if none is available, instead of a
+hardcoded `eus-3.5` guess. The result is passed to the chart via
+`gitops_app_extra_helm_values`
+(`cluster-ods.operator.subscription.operator.channel`).
+
+That injection REPLACES the Application's `spec.source.helm.values`
+wholesale, so it, not `gitops/charts/openshift-ai/values.yaml`, is what a
+live cluster ends up running - the chart value is the fallback for a plain
+`helm template` or an ArgoCD sync with no Ansible in the loop. Both must
+stay pinned to the same channel.
+
+This preference used to be `beta`, which is where RHOAI 3.5 EA2 was
+published (ADR-0002). It must not go back: `beta` is frozen on
+`rhods-operator.3.5.0-ea.2`, so preferring it now resolves to a downgrade
+off the 3.5.0 GA.
 
 ## RawDeployment, not Serverless
 

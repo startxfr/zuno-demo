@@ -14,16 +14,31 @@
     msg: "rhods-operator PackageManifest not found in openshift-marketplace - run 'make d0 check openshift-ai' first."
   when: (_openshift_ai_pkg.resources | default([]) | length) == 0
 
-# Prefers a literal 'beta' channel (ADR-0002: target OpenShift AI 3.5 EA2,
-# published under 'beta' rather than a '3.5'-named channel), falling back
-# to whatever 3.5-family channel is actually published, rather than a
-# hardcoded guess (exact channel naming isn't standardized across catalogs).
-- name: "openshift_ai | select the beta channel if published, else the 3.5-family channel actually published by this cluster's catalog"
+# Prefers a literal 'stable-3.5' channel - the 3.5 z-stream, which serves
+# the 3.5.0 GA the chart pins and will serve 3.5.z patches without ever
+# rolling to 3.6 - falling back to whatever 3.5-family channel is actually
+# published, rather than a hardcoded guess (exact channel naming isn't
+# standardized across catalogs).
+#
+# This used to prefer 'beta' (ADR-0002 originally targeted 3.5 EA2, then
+# published only under 'beta'). That preference MUST NOT come back: 'beta'
+# is frozen on rhods-operator.3.5.0-ea.2 in the catalog, so preferring it
+# now drives a DOWNGRADE - install.yml injects the discovered channel into
+# the Application's helm values, so the next `make d0 install openshift-ai`
+# would push the Subscription back to 'beta' and OLM would resolve to the
+# EA build the cluster just upgraded off.
+#
+# The fallback returns the first 3.5-family channel in catalog order, which
+# is not necessarily the best one ('eus-3.5' and 'support-required-upgrade-
+# 3.5' both match); it exists only so a catalog that names the z-stream
+# differently still installs rather than failing. precheck.yml's WP-118 B9
+# check is what reports a channel/pin mismatch.
+- name: "openshift_ai | select the stable-3.5 channel if published, else the 3.5-family channel actually published by this cluster's catalog"
   ansible.builtin.set_fact:
     _openshift_ai_channel: >-
       {{
-        'beta'
-        if ('beta' in (_openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list))
+        'stable-3.5'
+        if ('stable-3.5' in (_openshift_ai_pkg.resources[0].status.channels | map(attribute='name') | list))
         else (
           ((_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | map(attribute='name') | list)[0])
           if (_openshift_ai_pkg.resources[0].status.channels | selectattr('name', 'search', '3\.5') | list | length) > 0

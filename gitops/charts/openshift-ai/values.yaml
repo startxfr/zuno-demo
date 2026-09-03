@@ -40,17 +40,29 @@ cluster-ods:
       name: rhods-operator
       namespace: redhat-ods-operator
       # Combined with operator.csv below to build startingCSV
-      # (rhods-operator.3.5.0-ea.2, the beta-channel EA2 build - ADR-0002).
-      version: "3.5.0-ea.2"
+      # (rhods-operator.3.5.0, the 3.5 GA). Was 3.5.0-ea.2 (the beta-channel
+      # Early Access build ADR-0002 originally targeted) until the GA landed
+      # in the catalog and the cluster was upgraded onto it.
+      version: "3.5.0"
       operator:
-        # Left empty; discovered and injected by
-        # ansible/roles/openshift_ai/tasks/install.yml at apply time. See
-        # templates/checks.yaml, which fails the render if still empty.
-        channel: "beta"
+        # Overwritten at apply time by the channel
+        # ansible/roles/openshift_ai/tasks/discover_channel.yml reads off the
+        # live PackageManifest (ADR-0048), injected via
+        # gitops_app_extra_helm_values. The value here is what a plain
+        # `helm template` / an ArgoCD sync without Ansible uses, so it must
+        # stay a real channel: templates/checks.yaml only fails the render if
+        # it is EMPTY, it cannot tell a stale channel from a current one.
+        #
+        # stable-3.5 is the 3.5 z-stream: it serves the pinned 3.5.0 GA and
+        # will serve 3.5.z patches, but never rolls to 3.6. Do NOT put 'beta'
+        # back - that channel is frozen on 3.5.0-ea.2 and would resolve to a
+        # downgrade. stable-3.x is also wrong here: it serves 3.5.0 today but
+        # is a moving channel that will advance past this pin.
+        channel: "stable-3.5"
         name: rhods-operator
-        # Pinned to startingCSV (rhods-operator.3.5.0-ea.2) below, so this
-        # must stay Manual: Automatic would approve the next install plan
-        # in the beta channel and immediately move past the pinned build.
+        # Pinned to startingCSV (rhods-operator.3.5.0) below, so this must
+        # stay Manual: Automatic would approve the next install plan on the
+        # channel and immediately move past the pinned build.
         installPlanApproval: Manual
         # Combined with subscription.version above to build startingCSV.
         csv: rhods-operator
