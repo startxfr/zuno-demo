@@ -171,10 +171,26 @@ backups:
   # gated behind s3.enabled, so this is insurance, not a live fix.
   maxRetention: 168h0m0s
   compression: gzip
+  # ADR-0546/WP-131 named these for the demo222 cluster. ansible overrides both
+  # from zuno_mariadb_backup_s3_{bucket,prefix}, so these are the fresh-clone
+  # defaults, not the live values.
+  #
+  # CHANGING EITHER ONE IS A DELETE-AND-RECREATE, never an in-place edit:
+  # PhysicalBackup's spec.storage is immutable, and the validating webhook
+  # vphysicalbackup-v1alpha1.kb.io rejects the patch outright
+  # ("'spec.storage' field is immutable"). ArgoCD does not translate that into
+  # a recreate - it retries the same patch and the Application sits SyncFailed
+  # indefinitely on this one resource while everything else stays Synced. Hit
+  # live 2026-09-04 on the WP-131 cutover. The fix is
+  # `oc delete physicalbackup mariadb-backup -n zuno-data` and letting
+  # automated+selfHeal recreate it, which is safe: the CR carries no finalizer
+  # and no ownerReferences, and the CRD applies maxRetention from the backup
+  # Job rather than on deletion, so nothing in S3 is touched. The recreated CR
+  # runs a backup immediately rather than waiting for the next cron slot.
   s3:
     enabled: false
-    bucket: zuno-mariadb-backups
-    prefix: zuno-mariadb
+    bucket: zuno-demo222-backups
+    prefix: mariadb
     region: eu-west-2
     endpoint: s3.eu-west-2.amazonaws.com
     secretName: mariadb-backup-s3

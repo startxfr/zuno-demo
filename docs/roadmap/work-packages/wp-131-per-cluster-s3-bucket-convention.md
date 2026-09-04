@@ -476,6 +476,35 @@ loudly; `components/mlops/tests/test_trainjob.py`'s fixture becomes a neutral
 value; `evaluations/register_conformance.py`'s mention is docstring provenance
 that stays true — **leave it**.
 
+### PhysicalBackup's spec.storage is immutable — the mariadb cutover is a recreate
+
+Found live 2026-09-04, and it is the one place in this WP where the ADR-0547
+two-step order is not enough on its own. Changing `bucket` or `prefix` makes the
+validating webhook `vphysicalbackup-v1alpha1.kb.io` reject the patch:
+
+```
+PhysicalBackup.k8s.mariadb.com "mariadb-backup" is invalid:
+spec.storage: Invalid value: {...}: 'spec.storage' field is immutable
+```
+
+**ArgoCD does not turn that into a recreate.** It retries the same patch, and
+the Application sits `SyncFailed` on this single resource — everything else
+Synced, MariaDB Ready — with no time limit. Nothing degrades, so nothing alerts;
+it simply never converges.
+
+The fix is `oc delete physicalbackup mariadb-backup -n zuno-data` and letting
+`automated`+`selfHeal` recreate it. Safe, and checked before doing it: the CR
+carries no finalizer and no ownerReferences, and the CRD applies `maxRetention`
+from the backup Job rather than on deletion, so no S3 object is touched. The
+recreated CR runs a backup **immediately** instead of waiting for its next cron
+slot, which is what proved the cutover: `physicalbackup-20260904131912.xb.gz`,
+4 MB, landed in `zuno-demo222-backups/mariadb/` within seconds, condition
+`Complete/Success`. The stale `Failed` condition described below went with it.
+
+Same question to ask of every other operand in this WP before flipping it: is
+the field being changed immutable? PGO's `spec.backups` is not — `repo2-path`
+and the `manual` block were both patched in place on the live PostgresCluster.
+
 ### The MariaDB backup-health trap
 
 `oc get physicalbackup -n zuno-data` shows `mariadb-backup` as **`STATUS Failed`**.
