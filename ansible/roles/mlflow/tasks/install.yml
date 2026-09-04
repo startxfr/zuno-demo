@@ -13,12 +13,47 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-mlflow-d0"
 
+# ADR-0546/WP-131: the artifact bucket is a cluster-scoped output, so it
+# stops being a chart literal. Soft-read (not a hard fail like vault's) -
+# omitting the four keys leaves the chart defaults in place. ADR-0517 B13:
+# a role that reads a confidential.yml variable without loading the file
+# gets an undefined variable and its `| default(chart)` fallback wins in
+# silence, which is why this stat/include_vars pair is not optional.
+# check_confidential_var_loaders() enforces it.
+- name: "mlflow | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _mlflow_confidential_file
+
+- name: "mlflow | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _mlflow_confidential_file.stat.exists
+
 - name: "mlflow | apply the mlflow GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "mlflow"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-mlflow-d1"
+    # apply_gitops_app.yml REPLACES spec.source.helm.values wholesale, so
+    # mlflowConfig.enabled has to be restated here even though it is already
+    # in gitops/apps/mlflow/application-d1.yaml - dropping it would render
+    # the whole component away. check_gitops_values_clobber() enforces that.
+    #
+    # server.artifactsDestination and artifact.* are two independent
+    # descriptions of the same bucket; they are derived from one pair of
+    # variables here so they cannot drift apart.
+    gitops_app_extra_helm_values:
+      mlflowConfig:
+        enabled: true
+      server:
+        artifactsDestination: "s3://{{ zuno_mlflow_artifacts_s3_bucket | default('zuno-corpus') }}/{{ zuno_mlflow_artifacts_s3_prefix | default('mlflow-artifacts') }}"
+      artifact:
+        bucket: "{{ zuno_mlflow_artifacts_s3_bucket | default('zuno-corpus') }}"
+        endpoint: "{{ zuno_mlflow_artifacts_s3_endpoint | default('https://s3.us-east-1.amazonaws.com') }}"
+        region: "{{ zuno_mlflow_artifacts_s3_region | default('us-east-1') }}"
+        rootPath: "{{ zuno_mlflow_artifacts_s3_prefix | default('mlflow-artifacts') }}"
 
 - name: "mlflow | wait for the MLflow server Deployment to become available"
   kubernetes.core.k8s_info:

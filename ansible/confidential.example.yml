@@ -194,6 +194,23 @@ zuno_rhoai_traces_s3_secret_access_key: "xxxxxx"
 zuno_models_s3_bucket: "zuno-demo-rag-corpus"
 zuno_models_s3_prefix: "models"
 
+# --- MLflow artifact store (ADR-0546/WP-131) --------------------------------
+# Where the MLflow tracking server writes run artifacts. Two independent
+# literals in gitops/charts/mlflow used to carry this: server.artifactsDestination
+# (a full s3:// URI on the cluster-singleton MLflow CR) and artifact.{bucket,
+# endpoint,region,rootPath} (the per-workspace MLflowConfig artifact
+# connection). They MUST move together - a mismatch makes the server serve
+# artifacts from one bucket while the dashboard's workspace connection reads
+# another, and nothing in either CR's status reports the divergence.
+# Omitting these keeps the chart defaults, which are the pre-ADR-0546 values.
+# The credential is still zuno_rag_s3_* (Vault zuno/rag/s3), whose IAM user
+# holds a zuno* wildcard - which is why this bucket can move before ADR-0546
+# clause 3's per-bucket identities exist.
+zuno_mlflow_artifacts_s3_bucket: "zuno-corpus"
+zuno_mlflow_artifacts_s3_endpoint: "https://s3.us-east-1.amazonaws.com"
+zuno_mlflow_artifacts_s3_region: "us-east-1"
+zuno_mlflow_artifacts_s3_prefix: "mlflow-artifacts"
+
 # --- AWS Route53 DNS-01 (ADR-0211: Let's Encrypt wildcard TLS) --------------
 # Optional: leave "xxxxxx" and the aws/route53-dns01 Vault seed is skipped
 # (the ACME issuers then can't validate - gitops/charts/cert-manager's
