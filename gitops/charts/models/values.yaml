@@ -323,12 +323,20 @@ llmInferenceService:
 # FUSED/packed QKV module unique to this hybrid-attention architecture)
 # whose packing convention this vLLM build's LoRA support does not
 # recognize. Reverted to [] to stop qwen35-9b's crash loop and restore
-# serving while a new adapter is trained with loraTargetModules
+# serving while a new adapter was trained with loraTargetModules
 # restricted to the plain (non-packed) self_attn.{q,k,v,o}_proj modules
 # only (gitops/charts/mlops/values.yaml's tekos entry) - see that value's
-# own comment for the detail. Re-promotion is a fresh PR once that run
-# passes AND is confirmed to actually attach in vLLM, not just register.
-loraAdapters: []
+# own comment for the detail. That retrain (wp126-20260904-201830)
+# succeeded end to end and registered a genuine adapter-only artifact
+# (s3://zuno-demo222-mlops/mlops/models/tekos/wp126-20260904-201830/adapter)
+# - promoting it here to verify it actually attaches in vLLM this time.
+loraAdapters:
+  - name: tekos-lora
+    registryModelName: tekos-lora
+    registryModelVersion: wp126-20260904-201830
+    sourceS3Uri: s3://zuno-demo222-mlops/mlops/models/tekos/wp126-20260904-201830/adapter
+    path: /mnt/loras/tekos-lora
+    classification: C1
 
 # WP-133: the image the adapter-download initContainer runs
 # (components/mlops/src/download_adapter.py). Reuses the mlops pipeline's
