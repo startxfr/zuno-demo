@@ -84,7 +84,12 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="Backfill one MLOps run into MLflow")
     p.add_argument("--agent", required=True)
     p.add_argument("--run-id", required=True)
-    p.add_argument("--bucket", default=os.environ.get("S3_BUCKET", "zuno-corpus"))
+    # ADR-0546/WP-131: no cluster-specific fallback. In the pod S3_BUCKET is
+    # always set from the mlops ConfigMap; run anywhere else, a hardcoded
+    # default would silently back-fill against ANOTHER cluster's bucket
+    # instead of failing. required when neither the env nor --bucket gives it.
+    p.add_argument("--bucket", default=os.environ.get("S3_BUCKET"),
+                   required="S3_BUCKET" not in os.environ)
     p.add_argument("--model-prefix", default=os.environ.get("S3_MODEL_PREFIX", "mlops/models"))
     p.add_argument("--eval-prefix", default=os.environ.get("S3_EVAL_PREFIX", "mlops/evaluations"))
     args = p.parse_args(argv)

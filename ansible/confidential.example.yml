@@ -208,9 +208,9 @@ zuno_models_s3_prefix: "models"
 # seeds any cluster and belongs in zuno-demo-sources. Deriving one from the
 # other would re-merge the two natures the ADR separates.
 # Omitting these keeps the chart defaults, which are the pre-ADR-0546 values.
-zuno_mlops_s3_bucket: "zuno-corpus"
-zuno_mlops_s3_region: "us-east-1"
-zuno_mlops_style_corpus_s3_uri: "s3://zuno-corpus/qwen-wesh-training-corpus.tgz"
+zuno_mlops_s3_bucket: "zuno-demo222-mlops"
+zuno_mlops_s3_region: "eu-west-2"
+zuno_mlops_style_corpus_s3_uri: "s3://zuno-demo-sources/training-corpus/qwen-wesh-training-corpus.tgz"
 
 # --- MLflow artifact store (ADR-0546/WP-131) --------------------------------
 # Where the MLflow tracking server writes run artifacts. Two independent

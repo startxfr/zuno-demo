@@ -50,8 +50,13 @@ externalSecrets:
 s3:
   type: aws
   endpoint: ""
-  bucket: zuno-corpus
-  region: us-east-1
+  # ADR-0546/WP-131: this cluster's pipeline-artifact bucket. ansible
+  # overrides both from zuno_mlops_s3_{bucket,region}, so these are the
+  # fresh-clone defaults. region drives more than it looks: the derived
+  # S3_ENDPOINT and the DSPA's externalStorage.host both follow it, so
+  # mesh egress moves with the bucket rather than needing its own change.
+  bucket: zuno-demo222-mlops
+  region: eu-west-2
   pathStyle: false
   secretName: mlops-s3-credentials
   externalSecret:
@@ -237,7 +242,10 @@ agents:
     # split at seed level, plus a 21-rule style specification. C1 by
     # construction - synthetic conversational material, no business,
     # customer or financial content - so the trained artifact inherits C1.
-    styleCorpusS3Uri: s3://zuno-corpus/qwen-wesh-training-corpus.tgz
+    # ADR-0546/WP-131: a cross-cluster INPUT, so it lives in the shared
+    # source bucket - NOT in s3.bucket above, which is this cluster's
+    # output. Overridden by zuno_mlops_style_corpus_s3_uri.
+    styleCorpusS3Uri: s3://zuno-demo-sources/training-corpus/qwen-wesh-training-corpus.tgz
     # ADR-0518: Qwen3.5-9B staged in S3 (same literal-bucket convention
     # gitops/charts/models' modelsS3 uses), replacing the HF repo id
     # ibm-granite/granite-3.1-2b-instruct that mlops.py pulled from

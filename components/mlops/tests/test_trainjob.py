@@ -27,7 +27,7 @@ _ENV = {
     "MLOPS_AGENT": "comage",
     "MLOPS_RUN_ID": "wesh-20260829-145123",
     "MLOPS_LORA_R": "8",
-    "S3_BUCKET": "zuno-corpus",
+    "S3_BUCKET": "test-bucket",  # ADR-0546/WP-131: neutral, never a real cluster bucket
     "PGHOST": "zuno-postgresql-primary.zuno-data.svc",
     "MLFLOW_TRACKING_URI": "https://mlflow.redhat-ods-applications.svc:8443/mlflow",
     "MLFLOW_WORKSPACE": "zuno-mlops",
