@@ -215,7 +215,7 @@ order.
 This is also the step that makes ADR-0211's staged rollout reproducible instead of
 implicit: staging rehearsal, then production issuer, then consumers.
 
-**Repo work done 2026-09-04; live apply pending operator approval.**
+**DONE 2026-09-04, live-verified.**
 
 The chart was already right. `gitops/charts/cert-manager/values.yaml` ships
 `acme.enabled: false`, `certificatesIssuer: letsencrypt-route53-staging` and both
@@ -271,6 +271,24 @@ Inertia proof, read-only, in three parts:
 
 The guard was tested both ways against the live Application: silent with
 `confidential.yml` loaded, fires without it.
+
+**Live-verified 2026-09-04** with `make d0 install cert-manager` (operator
+approved): `changed=0`, both guards evaluated and neither fired,
+`zuno-cert-manager-d1`'s values byte-identical to the pre-apply baseline. The
+whole track is intact — five ClusterIssuers Ready, `router-wildcard-tls`,
+`api-server-tls` and `keycloak-wildcard-tls` Ready, the `aws-route53-dns01`
+ExternalSecret Ready, `IngressController/default` still on `router-wildcard-tls`,
+the APIServer still serving `api.demo222.startx.fr` from `api-server-tls`, both
+Applications Synced/Healthy. ArgoCD reports **11 managed resources**, the same
+count the `helm template` proof predicted, with every one of the eight a dead
+mechanism would have pruned still present.
+
+This `changed=0` is the strongest one in this WP. The manifest no longer carries
+the four values at all, so if the parameter surface were dead the resolved values
+would be the chart's safe defaults and the apply would have rewritten the
+Application and pruned eight resources including the router's certificate. It
+reported no change and the values are the live ones — the mechanism is proven
+by what did **not** happen only because the alternative was loud.
 
 ### Step 4 — the rest of the `machines` chart's cluster shape
 
