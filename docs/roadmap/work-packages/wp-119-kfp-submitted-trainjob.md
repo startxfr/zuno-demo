@@ -1,7 +1,12 @@
 # WP-119: LoRA training compute as a KFP-submitted TrainJob
 
-- **State:** Repo work merged (2026-09-02) — shipped disabled
-  (`training.trainJob.enabled: false`); the live scale-from-zero probe has not been run
+- **State:** Done (2026-09-04, closed by
+  [WP-126](wp-126-finalize-lora-trainjob.md)) — the mechanism this WP built is now
+  live-proven: flag flipped to `true`, a real `TrainJob` reached `Complete`
+  end to end (scale-from-zero, training, S3 manifest, MLflow visibility,
+  scale-back-to-zero), with 4 live-only defects found and fixed along the way.
+  See ADR-0539's `Status: Implemented` line and WP-126's file for the full
+  evidence.
 - **ADRs:** [ADR-0539](../../adr/0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md)
 - **Depends on:** none
 - **Related:** [ADR-0538](../../adr/0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md)
@@ -63,24 +68,35 @@ start against a model that was never written.
 
 ## Remaining
 
-1. **The scale-from-zero probe, before any real run.** Whether the ClusterAutoscaler carries
-   MachineSet template labels into its simulated node for a *JobSet-owned* pod is unknown. If it
-   does not, the TrainJob pends until the 4h timeout. Probe with a short CPU-only TrainJob;
-   ADR-0351's documented fallback is to drop the node selector and keep the toleration plus the
-   whole-GPU request.
-2. Confirm `spec.trainer` overrides the container named `node`, and that the name is required —
-   both are mirrored from the operator's own runtimes, not from documentation.
-3. Confirm a JobSet-owned pod terminates under istio injection in `zuno-mlops`. Precedent is good
-   (the garak Jobs in `zuno-ai-run` reach `0/2 Completed`), and `zuno-mlops` has a chart-authored
-   NetworkPolicy rather than an operator-authored one — but read that file before blaming the
-   mesh, per WP-116's finding that an operator NetworkPolicy allowing only DNS and the database
-   strands the sidecar.
-4. Then `training.trainJob.enabled: true`, a full pipeline run, and the negative test that
-   matters: a deliberately broken `MLOPS_LORA_TARGET_MODULES` must fail the TrainJob, exit the
-   KFP step non-zero, and never start `merge-export`.
-5. One line left for WP-116 phase 4: `MLFLOW_TRACKING_URI` is already forwarded by prefix, but the
-   trainer pod authenticates as its own ServiceAccount — if that SA lacks workspace access,
-   tracking silently no-ops and looks like "no runs appeared".
+Closed by [WP-126](wp-126-finalize-lora-trainjob.md) (live-verified 2026-09-04):
+
+1. ~~The scale-from-zero probe.~~ Proven live twice: `zuno-gpu-burst-a` scaled
+   0→1 on two separate real `TrainJob` runs, with GPU device plugin
+   registration and training running to completion each time.
+2. ~~Confirm `spec.trainer` overrides the container named `node`.~~ WP-126
+   finding 4 found and fixed a structural bug (`trainjob-ancestor-step` label
+   one level too deep) that had been silently preventing any override;
+   confirmed live afterward: `command`/`args`/`env_count=48` all correctly
+   applied.
+3. Confirm a JobSet-owned pod terminates under istio injection in
+   `zuno-mlops`. Not explicitly called out in WP-126's write-up, but
+   implicitly confirmed: the run reached `AllJobsCompleted` with no mesh
+   issue reported. Treat as resolved; revisit only if a future run shows
+   sidecar-related hangs.
+5. `MLFLOW_TRACKING_URI`/trainer-pod SA access. Implicitly resolved: the
+   `wp126-20260904-075724` run is visible in MLflow (experiment 34), so the
+   trainer pod's ServiceAccount does have workspace access.
+
+Still open, minor, not a WP-119 close-out blocker — tracked here for whoever
+picks it up:
+
+4. **The negative test.** A deliberately broken `MLOPS_LORA_TARGET_MODULES`
+   must fail the TrainJob, exit the KFP step non-zero, and never start
+   `merge-export`. Not exercised by WP-126 (its own run failed, but on the
+   pre-existing `merge-export` overwrite guard, not on this path) and not
+   mentioned in any commit since. This is a live-cluster action (can trigger
+   a `zuno-gpu-burst-a` scale-up) — do not run without explicit operator
+   go-ahead first.
 
 ## Verification
 

@@ -47,7 +47,7 @@ server exposing AAP audits to agents) and ADR-0532, which accepts
 after a live verification (autonomy enabled, one full tune-evaluate cycle
 observed, one rollback forced), which closed the whole v0.1–v0.3 roadmap.
 
-**16 ADRs.** Open: ADR-0353 (stub); WP-34, WP-119.
+**16 ADRs.** Open: ADR-0353 (stub); WP-34.
 
 ## v0.4
 
@@ -96,7 +96,7 @@ model autoscaling (ADR-0542), and mistral/gpt-oss-120b as MaaS
 HardwareProfile half - blocked upstream, see that ADR's body).
 
 **13 ADRs.** Open: ADR-0111, ADR-0115 (both `Deferred`), ADR-0506 – ADR-0510,
-ADR-0538 – ADR-0540, ADR-0541; WP-48 – WP-53, WP-115, WP-119, WP-125.
+ADR-0538 – ADR-0540, ADR-0541; WP-48 – WP-53, WP-115, WP-125.
 
 ## v0.8
 
@@ -118,8 +118,8 @@ cluster-specific value becomes an Ansible parameter, seeded through Vault when
 secret — executed by WP-132, verified by WP-130's Day 0 readiness probe).
 ADR-0517's own run stays blocked on an operator provisioning `demo333`.
 
-**4 ADRs.** Open: ADR-0517, ADR-0546, ADR-0547. Open work packages: WP-130,
-WP-131, WP-132.
+**4 ADRs.** Open: ADR-0517, ADR-0546, ADR-0547. Open work packages: WP-131
+(WP-130 and WP-132 done 2026-09-04).
 
 ## v0.9
 
