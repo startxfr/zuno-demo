@@ -2,7 +2,7 @@
 
 Applies the namespace-scaffolding GitOps Applications (`gitops/apps/namespaces`
 → `gitops/charts/namespaces`): the
-`zuno-auth`/`zuno-data`/`zuno-monitoring`/`zuno-ai-platform`/`zuno-ai-run`/`zuno-ai-build`/`zuno-mlops`
+`zuno-auth`/`zuno-data`/`zuno-monitoring`/`zuno-ai-run`/`zuno-ai-build`/`zuno-mlops`
 platform namespaces (`-d0`), each with a `ResourceQuota` and a default-deny
 `NetworkPolicy` baseline (`-d1`). Agent workloads no longer get their own
 namespace - every active agent's FE/BFF deploys into the shared

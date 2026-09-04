@@ -30,7 +30,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101, WP-129 |
 | v0.7 | 14 | 10 | 25 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-125 |
-| v0.8 | 4 | 3 | 5 | WP-131 |
+| v0.8 | 5 | 4 | 5 | WP-131 |
 | v0.9 | 4 | 3 | 4 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
 

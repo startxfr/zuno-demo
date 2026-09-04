@@ -145,19 +145,6 @@ platformNamespaces:
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"
-  - name: zuno-ai-platform
-    displayName: Zuno AI Platform
-    description: >-
-      Formerly the shared OpenShift AI control plane (ADR-0328). RHOAI
-      operands now live in redhat-ods-applications instead (ADR-0331 -
-      trainer/ray/dashboard/mlflowoperator all broke under a custom
-      applicationsNamespace on RHOAI 3.5 EA2). Left in place, empty of RHOAI
-      operands, pending a follow-up decision on removal/repurposing.
-    allowedFromNamespaces: []
-    extraLabels:
-      opendatahub.io/dashboard: "true"
-      istio-injection: enabled
-      zuno.io/managed: "true"
   - name: zuno-ai-build
     displayName: Zuno AI Build
     description: >-
@@ -347,12 +334,6 @@ platformNamespaces:
       # invisible to NetworkPolicy checks scoped to that namespace alone)
       # and crash-loops on its startup probe.
       - rhoai-model-registries
-      # Pre-emptive: zuno-ai-platform is istio-injection: enabled (see its
-      # own entry above) but was missing from this allowlist too - same
-      # bug class as rhoai-model-registries just above. No live pod there
-      # yet to have hit it, but any workload deployed there would silently
-      # crash-loop on CA bootstrap the moment it's scheduled.
-      - zuno-ai-platform
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"

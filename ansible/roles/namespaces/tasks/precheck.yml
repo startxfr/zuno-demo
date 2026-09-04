@@ -7,12 +7,13 @@
   vars:
     gitops_app_name: "zuno-namespaces-d0"
 
-# ADR-0333 Day 0 topology check: confirm every namespace this ADR's decision
-# algorithm names actually exists and is Active - both Zuno-managed
-# (zuno-ai-platform/zuno-ai-build/zuno-mlops/zuno-ai-run, created by this
-# role's own Application above) and product-managed (redhat-ods-*,
-# openshift-ingress*, created by RHOAI/the Ingress Operator, not by this
-# role). Existence/Active-phase only, no per-component placement/diff checks.
+# ADR-0333 Day 0 topology check (zuno-ai-platform retired by ADR-0548):
+# confirm every namespace this ADR's decision algorithm names actually
+# exists and is Active - both Zuno-managed (zuno-ai-build/zuno-mlops/
+# zuno-ai-run, created by this role's own Application above) and
+# product-managed (redhat-ods-*, openshift-ingress*, created by RHOAI/the
+# Ingress Operator, not by this role). Existence/Active-phase only, no
+# per-component placement/diff checks.
 - name: "namespaces | look up required ADR-0333 namespaces"
   kubernetes.core.k8s_info:
     api_version: v1
@@ -36,7 +37,6 @@
       - redhat-ods-applications
       - openshift-ingress-operator
       - openshift-ingress
-      - zuno-ai-platform
       - zuno-ai-build
       - zuno-ai-run
       - zuno-mlops

@@ -505,15 +505,15 @@ not here.
   explicitly (edge-terminated Route), and gets its own dedicated
   `keycloak`/`keycloak` Postgres database/role on `zuno-postgresql`
   (not the shared `zunoapp` app-data database).
-- **Namespace consolidation** (ADR-0328/0329, 2026-08-12): `zuno-ai-platform`
-  exists in `gitops/charts/namespaces` as the future OpenShift AI
-  applications namespace (ADR-0328; DSC wiring to it is out of scope for
-  now). ADR-0329 supersedes ADR-0023: the per-agent `zuno-agent-<name>`
-  namespace model is retired — per-workload NetworkPolicies (ADR-0037)
-  already carried real isolation. All Tekos workloads now live in
-  `zuno-ai-run` alongside Agent Runtime/AI Gateway/MCP Gateway; the four
-  placeholder agents carry no namespace footprint until their FE/BFF
-  charts exist.
+- **Namespace consolidation** (ADR-0328/0329, 2026-08-12): ADR-0329
+  supersedes ADR-0023: the per-agent `zuno-agent-<name>` namespace model
+  is retired — per-workload NetworkPolicies (ADR-0037) already carried
+  real isolation. All Tekos workloads now live in `zuno-ai-run` alongside
+  Agent Runtime/AI Gateway/MCP Gateway; the four placeholder agents carry
+  no namespace footprint until their FE/BFF charts exist. ADR-0328's own
+  `zuno-ai-platform` shared-platform namespace was reverted for RHOAI
+  operands (ADR-0331) and, having never hosted any Zuno-managed shared
+  service either, removed entirely (ADR-0548, 2026-09-04).
 
 ### Dated entries (roadmap work packages, v0) — current status per ADR
 

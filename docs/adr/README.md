@@ -148,10 +148,10 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0321](0321-delegate-kueue-lifecycle-to-the-red-hat-build-of-kueue-operator.md) | Implemented | Delegate Kueue lifecycle to the Red Hat build of Kueue Operator |
 | [ADR-0323](0323-establish-canonical-generated-and-validated-platform-documentation.md) | Implemented | Establish canonical generated and validated platform documentation |
 | [ADR-0324](0324-reconcile-the-ci-build-inventory-with-the-repository-component-lifecycle.md) | Implemented | Reconcile the CI build inventory with the repository component lifecycle |
-| [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | Superseded in part by ADR-0331 | Separate the OpenShift AI control plane from AI build and run workload namespaces |
+| [ADR-0328](0328-separate-the-openshift-ai-control-plane-from-ai-build-and-run-workload-namespaces.md) | Superseded in part by ADR-0331 and ADR-0548 | Separate the OpenShift AI control plane from AI build and run workload namespaces |
 | [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md) | Implemented | Consolidate agent workloads into the shared zuno-ai-run namespace |
 | [ADR-0331](0331-revert-openshift-ai-to-the-default-applications-namespace.md) | Implemented | Revert OpenShift AI to the default applications namespace |
-| [ADR-0333](0333-separate-product-managed-ai-infrastructure-from-zuno-build-run-and-shared-platform-namespaces.md) | Implemented | Separate product-managed AI infrastructure from Zuno build, run, and shared platform namespaces |
+| [ADR-0333](0333-separate-product-managed-ai-infrastructure-from-zuno-build-run-and-shared-platform-namespaces.md) | Superseded in part by ADR-0548 | Separate product-managed AI infrastructure from Zuno build, run, and shared platform namespaces |
 
 ## v0.1
 
@@ -307,6 +307,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0533](0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) | Implemented | Consolidate Advantage's and Finage's non-promotion into a dedicated decision |
 | [ADR-0546](0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md) | Accepted | Introduce a cross-cluster source bucket (`zuno-demo-sources`) and per-cluster S3 bucket convention (`zuno-<cluster>-xxx`) |
 | [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md) | Proposed | Parameterize every cluster-specific value in Ansible, and seed it through Vault when secret |
+| [ADR-0548](0548-remove-the-unused-zuno-ai-platform-reserved-namespace.md) | Accepted | Remove the unused zuno-ai-platform reserved namespace |
 
 ## v0.9
 

@@ -1,6 +1,6 @@
 # ADR-0333: Separate product-managed AI infrastructure from Zuno build, run, and shared platform namespaces
 
-- **Status:** Implemented
+- **Status:** Superseded in part by ADR-0548 for the `zuno-ai-platform` reserved namespace; the product-managed-namespace rules (`redhat-ods-*`, `openshift-ingress*`, Gateway API, Connectivity Link/Kuadrant) and the build/run workload-namespace split remain in effect
 - **Target:** v0
 - **Date:** 2026-08-22
 - **Decision owners:** Zuno Demo architecture team

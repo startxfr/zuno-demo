@@ -1,7 +1,7 @@
 # namespaces chart
 
 Creates the platform namespaces (`values.yaml`'s `platformNamespaces`:
-`zuno-auth`, `zuno-vault`, `zuno-data`, `zuno-monitoring`, `zuno-ai-platform`,
+`zuno-auth`, `zuno-vault`, `zuno-data`, `zuno-monitoring`,
 `zuno-ai-build`, `zuno-ai-run`, `zuno-mesh`), and applies a default-deny-
 other-namespaces `NetworkPolicy` to each, with a small, explicit
 list of known real cross-namespace callers. `zuno-ai-run` is deliberately
