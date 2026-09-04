@@ -21,7 +21,7 @@ server:
   # requires one of serveArtifacts+artifactsDestination or
   # defaultArtifactRoot; it validates this, the schema does not show it.
   serveArtifacts: true
-  artifactsDestination: s3://zuno-corpus/mlflow-artifacts
+  artifactsDestination: s3://zuno-demo222-mlops/mlflow-artifacts
   # redhat-ods-applications is mesh-injected, so every MLflow pod gets an
   # istio sidecar - but the operator's own NetworkPolicies only allow egress
   # to DNS and the database, which strands that sidecar: it cannot reach
@@ -90,9 +90,9 @@ workspaceResources:
 artifact:
   # The MLflowConfig CRD CEL-validates this name; keep it as-is.
   secretName: mlflow-artifact-connection
-  bucket: zuno-corpus
-  endpoint: https://s3.us-east-1.amazonaws.com
-  region: us-east-1
+  bucket: zuno-demo222-mlops
+  endpoint: https://s3.eu-west-2.amazonaws.com
+  region: eu-west-2
   # The same S3 credential mlops and rag-ingestion already use.
   vaultPath: rag/s3
   rootPath: mlflow-artifacts

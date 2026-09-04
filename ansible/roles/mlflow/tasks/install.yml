@@ -36,6 +36,18 @@
     gitops_component_name: "mlflow"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-mlflow-d1"
+    # This apply CHANGES values, so it needs the explicit sync operation.
+    # Without it the wait races ArgoCD's own diff detection: the poll reads
+    # status.sync.status while it is still the stale Synced from before the
+    # apply, so the play reports Synced+Healthy and exits with the live objects
+    # untouched. Measured 2026-09-04 on the WP-131 mlflow cutover - the command
+    # said Synced/Healthy while both workspace Secrets and the MLflow CR still
+    # named the old bucket, and ArgoCD only converged ~30s later. Same race the
+    # long comment in apply_gitops_app.yml records for the refresh path; the
+    # default path has it too, just against diff latency instead of a cache.
+    # gitops_app_refresh patches spec.operation.sync and waits on
+    # operationState.phase == Succeeded, which is tied to THIS operation.
+    gitops_app_refresh: true
     # apply_gitops_app.yml REPLACES spec.source.helm.values wholesale, so
     # mlflowConfig.enabled has to be restated here even though it is already
     # in gitops/apps/mlflow/application-d1.yaml - dropping it would render
