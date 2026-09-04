@@ -138,6 +138,19 @@
           bucket: "{{ zuno_mariadb_backup_s3_bucket | default('') }}"
           endpoint: "{{ zuno_mariadb_backup_s3_endpoint | default('') }}"
           region: "{{ zuno_mariadb_backup_s3_region | default('') }}"
+          # ADR-0546/WP-131. The prefix was the last field of this component
+          # naming a cluster-specific location as a chart literal: bucket,
+          # endpoint and region were already variables, so a second cluster
+          # installed from this repo would have kept its backups apart by
+          # bucket but written them under the same zuno-mariadb/ key prefix -
+          # harmless while the buckets differ, wrong the moment they do not.
+          # The default is the pre-ADR-0546 value, so declaring it changes
+          # nothing until the variable moves.
+          prefix: "{{ zuno_mariadb_backup_s3_prefix | default('zuno-mariadb') }}"
+    # Values-changing apply: without this the Synced+Healthy wait can pass on
+    # the sync state from BEFORE the apply. See the same flag and reasoning in
+    # ansible/roles/mlflow/tasks/install.yml.
+    gitops_app_refresh: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

@@ -95,6 +95,13 @@ zuno_mariadb_backup_s3_endpoint: "xxxxxx"
 zuno_mariadb_backup_s3_region: "xxxxxx"
 zuno_mariadb_backup_s3_access_key_id: "xxxxxx"
 zuno_mariadb_backup_s3_secret_access_key: "xxxxxx"
+# ADR-0546/WP-131: the key prefix inside that bucket. Not a secret, and not
+# part of the five-field "all real or the schedule is off" gate above - it is
+# the last field of this component that named a cluster-specific location as a
+# chart literal. Omit it and the chart default (zuno-mariadb) applies. The
+# per-cluster convention puts MariaDB backups under mariadb/ inside
+# zuno-<cluster>-backups, beside the pgBackRest repo under postgresql/.
+zuno_mariadb_backup_s3_prefix: "mariadb"
 
 # --- Quay.io registry (stored in Vault for future cluster-side use, e.g. an
 # image pull secret; NOT the same credential ADR-0115's build-publish.yml CI
