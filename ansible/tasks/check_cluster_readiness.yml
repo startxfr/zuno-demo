@@ -1,0 +1,483 @@
+---
+# WP-130 (ADR-0517 clause 3, ADR-0547 clause 6): read-only probes for the things
+# a from-scratch cluster gets wrong, run before anything is applied.
+#
+# The pattern is ADR-0517 B9's, generalized. That gate - refusing to approve an
+# InstallPlan whose CSV differs from the pin - was correct and stayed; what was
+# wrong was WHEN the operator learned of it, mid-install on a cluster already an
+# hour old. So the same fact is now read from a PackageManifest during precheck.
+# Every probe below is the same trade: a hard failure that fires deep inside an
+# install becomes a finding that fires in ten seconds, before anything exists.
+#
+# CONTRACT - this file is a pure probe:
+#   * it sets exactly one fact, `cluster_readiness_findings`: a list of
+#     record_blocked_finding.yml-shaped dicts plus one extra key, `blocking`;
+#   * it NEVER calls record_blocked_finding.yml itself and NEVER fails.
+# Callers dispose of the list. day0_check.yml records every finding into
+# blocked_findings; day0_install.yml fails on the blocking subset only. That
+# split is why the contract matters: report_blocked_findings.yml fails the play
+# when blocked_report_fail is true, so routing an advisory finding (the MariaDB
+# backup keys, which mariadb/tasks/install.yml treats as legitimately optional)
+# through it would fail an otherwise perfect Day 0 install. Same shape as
+# check_gitops_app_state.yml, which sets a fact and lets its callers decide.
+#
+# SECRETS: no probe registers or prints a value from ansible/confidential.yml.
+# P5 reports variable NAMES and set/unset booleans only, computed inside a
+# task-scoped `vars:` so nothing survives the task. There is deliberately no
+# no_log anywhere here - the protection is structural (the facts hold no values)
+# and a no_log would suppress the one line an operator needs to debug the probe
+# while protecting nothing.
+
+- name: "readiness | reset the findings accumulator"
+  ansible.builtin.set_fact:
+    _readiness: []
+
+# --- P1: exactly one default StorageClass ----------------------------------
+# Mirrors resolve_cluster_default_storage_class.yml, which hard-fails here.
+# PVC storageClassName is immutable once bound, so a wrong answer strands every
+# volume this platform creates - which is why neither that task nor this one
+# guesses.
+- name: "readiness | P1: list StorageClasses"
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+  register: _readiness_scs
+  failed_when: false
+
+# Subscript with a quoted key, NEVER selectattr on the dotted annotation name:
+# Jinja splits a selectattr path on "." with no escape Ansible honours, so the
+# escaped form reads perfectly, raises nothing, and silently returns [].
+# WP-118 step 3a paid for this once.
+- name: "readiness | P1: collect the classes annotated as default"
+  ansible.builtin.set_fact:
+    _readiness_default_scs: >-
+      {{ (_readiness_default_scs | default([])) + [item['metadata']['name']] }}
+  loop: "{{ _readiness_scs.resources | default([]) }}"
+  loop_control:
+    label: "{{ item['metadata']['name'] }}"
+  when: >-
+    (item['metadata']['annotations'] | default({}))
+    ['storageclass.kubernetes.io/is-default-class']
+    | default('false') | string | lower == 'true'
+
+- name: "readiness | P1: record a finding when there is not exactly one default"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _finding:
+      component: admin-context
+      resource: "StorageClass (cluster-scoped)"
+      state: "{{ _readiness_default_scs | default([]) | length }} class(es) annotated is-default-class"
+      cause: "resolve_cluster_default_storage_class.yml requires exactly one default StorageClass and refuses to guess, because PVC storageClassName is immutable once bound - picking wrong strands every volume this platform creates. Five applies read it (postgresql, mariadb, grafana, models, and postgresql's restore)."
+      solution: "Annotate exactly one StorageClass with storageclass.kubernetes.io/is-default-class=true, or set zuno_cluster_storage_class in ansible/confidential.yml to name the class this platform should use."
+      auto_fix: "manual only - choosing a storage class is a cluster decision"
+      blocking: true
+  when:
+    - zuno_cluster_storage_class is not defined
+    - (_readiness_default_scs | default([]) | length) != 1
+
+# --- P2: AWS infrastructure identity ---------------------------------------
+- name: "readiness | P2: read the cluster Infrastructure"
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Infrastructure
+    name: cluster
+  register: _readiness_infra
+  failed_when: false
+
+- name: "readiness | P2: list MachineSets"
+  kubernetes.core.k8s_info:
+    api_version: machine.openshift.io/v1beta1
+    kind: MachineSet
+    namespace: openshift-machine-api
+  register: _readiness_ms
+  failed_when: false
+
+# The distinguishing label is machine.startx.io/group, which the cluster-machine
+# subchart stamps on everything it renders. NOT cluster-api-machine-role=worker:
+# our own GPU sets carry that too, so the role would bootstrap from its own
+# output and freeze a mistake in place. WP-118 step 2's first audit error.
+- name: "readiness | P2: keep the MachineSets this repo did not create"
+  ansible.builtin.set_fact:
+    _readiness_installer_ms: >-
+      {{ (_readiness_installer_ms | default([])) + [item] }}
+  loop: "{{ _readiness_ms.resources | default([]) }}"
+  loop_control:
+    label: "{{ item['metadata']['name'] }}"
+  when: "'machine.startx.io/group' not in (item['metadata']['labels'] | default({}))"
+
+- name: "readiness | P2: map each installer set's availability zone to its subnet"
+  ansible.builtin.set_fact:
+    _readiness_subnet_by_az: >-
+      {{ (_readiness_subnet_by_az | default({}))
+         | combine({ _ps['placement']['availabilityZone']: true }) }}
+  loop: "{{ _readiness_installer_ms | default([]) }}"
+  loop_control:
+    label: "{{ item['metadata']['name'] }}"
+  vars:
+    _ps: "{{ item['spec']['template']['spec']['providerSpec']['value'] }}"
+  when: item['spec']['template']['spec']['providerSpec']['value']['placement'] is defined
+
+- name: "readiness | P2: record a finding when the AWS identity is not discoverable"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _platform: >-
+      {{ ((_readiness_infra.resources | default([]) | first | default({}))
+          .get('status', {}).get('platformStatus', {}).get('type', 'unknown')) }}
+    _finding:
+      component: machines
+      resource: "Infrastructure/cluster and openshift-machine-api MachineSets"
+      state: "platform={{ _platform }}, installer MachineSets without machine.startx.io/group={{ _readiness_installer_ms | default([]) | length }}"
+      cause: "resolve_cluster_aws_identity.yml reads this cluster's id, region, AMI, security group and AZ-to-subnet map from Infrastructure/cluster plus the installer's own MachineSets, and hard-fails on a non-AWS cluster or when no installer MachineSet survives the filter. The AMI and subnet names are read rather than derived because the installer's naming changed across OCP versions, so a pattern is a guess and a live MachineSet is a fact."
+      solution: "On a non-AWS cluster, skip the machines component or port gitops/charts/machines. On a UPI cluster with no installer MachineSets, set zuno_machines_ami, zuno_machines_security_group_name and zuno_machines_subnet_by_az explicitly."
+      auto_fix: "manual only - the platform and its MachineSets are given, not reconcilable"
+      blocking: true
+  when: >-
+    ((_readiness_infra.resources | default([]) | first | default({}))
+     .get('status', {}).get('platformStatus', {}).get('type', '')) != 'AWS'
+    or (_readiness_installer_ms | default([]) | length) == 0
+
+# The gap ADR-0517's own risk list names: an AZ with no installer MachineSet is
+# simply absent from the discovered map, and inventing {id}-subnet-private-{az}
+# renders a MachineSet AWS rejects at first boot, hours later.
+- name: "readiness | P2: read the availability zones the machines chart declares"
+  ansible.builtin.set_fact:
+    _readiness_declared_azs: >-
+      {{ (lookup('ansible.builtin.file',
+                 zuno_repo_root + '/gitops/charts/machines/values.yaml')
+          | from_yaml)['cluster-machine']['machineSet']['list']
+         | default([]) | map(attribute='az') | list }}
+  failed_when: false
+
+- name: "readiness | P2: record a finding for a declared AZ with no installer MachineSet"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _region: >-
+      {{ ((_readiness_infra.resources | default([]) | first | default({}))
+          .get('status', {}).get('platformStatus', {}).get('aws', {}).get('region', '')) }}
+    _missing: >-
+      {{ _readiness_declared_azs | default([])
+         | map('regex_replace', '^', _region)
+         | reject('in', _readiness_subnet_by_az | default({}) | list) | list }}
+    _finding:
+      component: machines
+      resource: "MachineSet availability zones {{ _missing }}"
+      state: "declared in gitops/charts/machines/values.yaml, no installer MachineSet in that zone to read a subnet from"
+      cause: "The subnet name per availability zone is read from the installer's own MachineSets. A zone with none is absent from the discovered map, and machines/tasks/install.yml fails pre-flight rather than inventing a subnet name that AWS rejects at first boot, hours later."
+      solution: "Either provision an installer MachineSet in each declared zone, or edit gitops/charts/machines/values.yaml's machineSet.list to the zones this cluster actually has (instance types and zones are fleet design and stay a reviewed chart edit - see WP-132), or set zuno_machines_subnet_by_az explicitly."
+      auto_fix: "manual only - the zone layout is a cluster decision"
+      blocking: true
+  when:
+    - zuno_machines_subnet_by_az is not defined
+    - (_readiness_installer_ms | default([]) | length) > 0
+    - (_readiness_declared_azs | default([]) | length) > 0
+    - >-
+      (_readiness_declared_azs
+       | map('regex_replace', '^',
+             ((_readiness_infra.resources | default([]) | first | default({}))
+              .get('status', {}).get('platformStatus', {}).get('aws', {}).get('region', '')))
+       | reject('in', _readiness_subnet_by_az | default({}) | list) | list | length) > 0
+
+# --- P3: base domain -------------------------------------------------------
+- name: "readiness | P3: read the cluster Ingress config"
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Ingress
+    name: cluster
+  register: _readiness_ingress
+  failed_when: false
+
+- name: "readiness | P3: record a finding when the apps domain is unreadable"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _finding:
+      component: vault
+      resource: "Ingress.config.openshift.io/cluster"
+      state: "not readable, or spec.domain is empty"
+      cause: "resolve_cluster_base_domain.yml discovers the apps wildcard domain here and hard-fails without it. Every Route this platform creates, the acceptance gate's URLs and the ACME certificates all derive from it - vanilla Kubernetes has no such resource."
+      solution: "Point the current kubeconfig context at a real OpenShift cluster, or set cluster_base_domain explicitly in the inventory."
+      auto_fix: "manual only - this is a cluster property, not a reconcilable resource"
+      blocking: true
+  when: >-
+    ((_readiness_ingress.resources | default([]) | first | default({}))
+     .get('spec', {}).get('domain', '')) | length == 0
+
+# Advisory, not blocking: a custom appsDomain is legal. It matters because
+# acme-certificates.yaml derives the API server SAN as api.<domain minus "apps.">,
+# so a domain not shaped that way silently produces an api SAN equal to the apps
+# domain, and resolve_cluster_name.yml derives this cluster's short name the same
+# way.
+- name: "readiness | P3: record a finding when the apps domain has no apps. prefix"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _domain: >-
+      {{ ((_readiness_ingress.resources | default([]) | first | default({}))
+          .get('spec', {}).get('domain', '')) }}
+    _finding:
+      component: cert-manager
+      resource: "Ingress.config.openshift.io/cluster spec.domain"
+      state: "{{ _domain }} (does not start with 'apps.')"
+      cause: "gitops/charts/cert-manager derives the API server SAN by stripping a leading 'apps.' from this value, so a differently-shaped domain yields an api SAN equal to the apps domain. resolve_cluster_name.yml derives the cluster's short name from the same string."
+      solution: "Nothing to fix if the domain is deliberate - set zuno_cluster_name explicitly and check the api SAN that cert-manager renders before enabling the apiServerNamedCert consumer."
+      auto_fix: "manual only - advisory"
+      blocking: false
+  when:
+    - >-
+      ((_readiness_ingress.resources | default([]) | first | default({}))
+       .get('spec', {}).get('domain', '')) | length > 0
+    - not (((_readiness_ingress.resources | default([]) | first | default({}))
+            .get('spec', {}).get('domain', '')) is match('apps\\.'))
+
+# --- P4: ACME consumers ahead of their Certificates (ADR-0517 B11) ---------
+# WP-132 step 3 moved this state out of gitops/apps/cert-manager/application-d1.yaml
+# into operator variables defaulting to the chart's safe start, and added a guard
+# in the role against walking a live track backwards. What is left to detect is
+# the opposite mistake: an operator on a NEW cluster setting the consumer flips
+# before the Certificates exist. The chart's own comment is explicit that these
+# flip only after `oc get certificate -A` shows Ready, because the patches point
+# IngressController/default and the APIServer at Secrets that do not exist yet.
+- name: "readiness | P4: resolve the ACME rollout state this cluster would apply"
+  ansible.builtin.set_fact:
+    _readiness_acme:
+      enabled: "{{ zuno_certmanager_acme_enabled | default(_cm['enabled']) | bool }}"
+      router: >-
+        {{ zuno_certmanager_router_default_cert
+           | default(_cm['consumers']['routerDefaultCert']) | bool }}
+      api: >-
+        {{ zuno_certmanager_api_server_named_cert
+           | default(_cm['consumers']['apiServerNamedCert']) | bool }}
+  vars:
+    _cm: >-
+      {{ (lookup('ansible.builtin.file',
+                 zuno_repo_root + '/gitops/charts/cert-manager/values.yaml')
+          | from_yaml)['acme'] }}
+
+- name: "readiness | P4: look up the certificates the consumers depend on"
+  kubernetes.core.k8s_info:
+    api_version: cert-manager.io/v1
+    kind: Certificate
+    namespace: "{{ item }}"
+  register: _readiness_certs
+  loop:
+    - openshift-ingress
+    - openshift-config
+  failed_when: false
+  when: _readiness_acme['router'] | bool or _readiness_acme['api'] | bool
+
+- name: "readiness | P4: collect the certificates that are Ready"
+  ansible.builtin.set_fact:
+    _readiness_ready_certs: >-
+      {{ (_readiness_ready_certs | default([]))
+         + ((_readiness_certs.results | default([]))
+            | map(attribute='resources') | select('defined') | flatten
+            | selectattr('status', 'defined') | list
+            | rejectattr('status.conditions', 'undefined') | list
+            | map(attribute='metadata.name') | list) }}
+  when: _readiness_acme['router'] | bool or _readiness_acme['api'] | bool
+
+- name: "readiness | P4: record a finding when a consumer is enabled before its certificate exists"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _needed: >-
+      {{ (['router-wildcard-tls'] if _readiness_acme['router'] | bool else [])
+         + (['api-server-tls'] if _readiness_acme['api'] | bool else []) }}
+    _absent: "{{ _needed | reject('in', _readiness_ready_certs | default([])) | list }}"
+    _finding:
+      component: cert-manager
+      resource: "Certificate {{ _absent }}"
+      state: "ACME consumer flips enabled, but these Certificates do not exist yet"
+      cause: "ADR-0517 B11 - acme-cluster-patches.yaml points IngressController/default at router-wildcard-tls and adds an APIServer named certificate for api-server-tls. Pointing either at a Secret that does not exist breaks Console and route serving, which is why the chart flips them only after `oc get certificate -A` shows Ready."
+      solution: "Set zuno_certmanager_router_default_cert and zuno_certmanager_api_server_named_cert to false in ansible/confidential.yml, complete ADR-0211's staged rollout (enable ACME, rehearse on the staging issuer, cut over to letsencrypt-route53), then flip the consumers once all three Certificates are Ready."
+      auto_fix: "manual only - ADR-0211's rollout is staged deliberately"
+      blocking: true
+  when:
+    - _readiness_acme['router'] | bool or _readiness_acme['api'] | bool
+    - >-
+      ((['router-wildcard-tls'] if _readiness_acme['router'] | bool else [])
+       + (['api-server-tls'] if _readiness_acme['api'] | bool else []))
+      | reject('in', _readiness_ready_certs | default([])) | list | length > 0
+
+# --- P5: ansible/confidential.yml ------------------------------------------
+- name: "readiness | P5: is ansible/confidential.yml present"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _readiness_conf
+
+- name: "readiness | P5: record a finding when confidential.yml is missing"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _finding:
+      component: vault
+      resource: "ansible/confidential.yml"
+      state: "absent"
+      cause: "The vault role fails fast without it, and it is the only pre-seeding ADR-0517's decision clause 2 permits. ansible/confidential.example.yml is the authority on what it carries - 20 blocks, most of them optional."
+      solution: "Copy ansible/confidential.example.yml to ansible/confidential.yml and fill in the values this cluster needs. Fields left as xxxxxx are treated as not configured."
+      auto_fix: "manual only - the file holds operator credentials"
+      blocking: true
+  when: not _readiness_conf.stat.exists
+
+# Names and set/unset booleans only. Computed inside this task's own `vars:` so
+# no secret value ever becomes a fact, and deliberately NOT via include_vars,
+# which would inject every operator secret into play scope for the rest of the
+# run and change what every later role precheck sees.
+#
+# A static family list, not a diff against confidential.example.yml: most of
+# that file's blocks are optional by design (Jira has no consumer at all, the
+# LLM provider keys are individually optional), so a generic diff would fire on
+# a perfectly configured cluster and destroy the zero-findings acceptance test.
+# The list is exactly the families whose absence degrades the platform silently.
+- name: "readiness | P5: which documented families are still unset"
+  ansible.builtin.set_fact:
+    _readiness_unset_mariadb: "{{ _mariadb | reject('in', _set) | list }}"
+    _readiness_unset_route53: "{{ _route53 | reject('in', _set) | list }}"
+  vars:
+    _mariadb:
+      - zuno_mariadb_backup_s3_bucket
+      - zuno_mariadb_backup_s3_endpoint
+      - zuno_mariadb_backup_s3_region
+      - zuno_mariadb_backup_s3_access_key_id
+      - zuno_mariadb_backup_s3_secret_access_key
+    _route53:
+      - zuno_aws_route53_access_key_id
+      - zuno_aws_route53_secret_access_key
+    _set: >-
+      {{ (lookup('ansible.builtin.file', zuno_repo_root + '/ansible/confidential.yml')
+          | from_yaml | default({}, true))
+         | dict2items
+         | rejectattr('value', 'equalto', 'xxxxxx')
+         | rejectattr('value', 'equalto', None)
+         | map(attribute='key') | list }}
+  when: _readiness_conf.stat.exists
+
+- name: "readiness | P5: record the MariaDB backup gap (ADR-0517 B8)"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _finding:
+      component: mariadb
+      resource: "ansible/confidential.yml keys {{ _readiness_unset_mariadb }}"
+      state: "unset"
+      cause: "ADR-0517 B8 - with any of the five unset, backups.s3.enabled stays false, the ExternalSecret is never rendered, and NO MariaDB backup schedule exists at all. This cluster ran that way silently until 2026-09-02 because the variables were undocumented."
+      solution: "Fill in all five zuno_mariadb_backup_s3_* keys in ansible/confidential.yml - the block in confidential.example.yml names both traps: the _access_key_id/_secret_access_key suffixes, and the camelCase Vault properties."
+      auto_fix: "manual only - fill in the five keys, then re-run the vault and mariadb installs"
+      blocking: false
+  when:
+    - _readiness_conf.stat.exists
+    - (_readiness_unset_mariadb | default([]) | length) > 0
+
+- name: "readiness | P5: record the Route53 credential gap when ACME is enabled"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _finding:
+      component: cert-manager
+      resource: "ansible/confidential.yml keys {{ _readiness_unset_route53 }}"
+      state: "unset while zuno_certmanager_acme_enabled resolves to true"
+      cause: "These are the IAM credentials that WRITE the DNS-01 TXT records. Without them cert-manager cannot solve the challenge, so no Let's Encrypt certificate ever issues - while every other check still passes."
+      solution: "Set zuno_aws_route53_access_key_id and zuno_aws_route53_secret_access_key in ansible/confidential.yml, scoped to the hosted zone named by zuno_certmanager_route53_hosted_zone_id. A mismatch between the two gives AccessDenied at solve time and nowhere else."
+      auto_fix: "manual only - these are operator credentials"
+      blocking: true
+  when:
+    - _readiness_conf.stat.exists
+    - _readiness_acme['enabled'] | bool
+    - (_readiness_unset_route53 | default([]) | length) > 0
+
+# --- P6: S3 buckets belonging to another cluster (ADR-0517 B12) ------------
+# The one blocker on ADR-0517's list that damages the EXISTING cluster rather
+# than the new one. Seven buckets, none namespaced by cluster, so a demo333
+# installed today writes its RAG ingestion outputs, pgBackRest and MariaDB
+# backups, RHOAI traces and MLflow artifacts into demo222's buckets - a direct
+# violation of this ADR's own "demo222 is left untouched" criterion. And the
+# realistic way that happens is the obvious one: copying a working
+# confidential.yml onto the new cluster.
+#
+# Deliberately does NOT presuppose ADR-0546's naming convention, which is still
+# Proposed. It only compares this cluster's name against the owner an operator
+# declared, so it is silent when nothing was declared and silent on the owner
+# itself. WP-131 makes it obsolete.
+- name: "readiness | P6: resolve this cluster's short name"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_name.yml"
+  when:
+    - zuno_s3_bucket_owner_cluster is defined
+    - >-
+      ((_readiness_ingress.resources | default([]) | first | default({}))
+       .get('spec', {}).get('domain', '')) | length > 0
+
+- name: "readiness | P6: record a finding when the buckets belong to another cluster"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _finding:
+      component: vault
+      resource: "S3 buckets declared for cluster '{{ zuno_s3_bucket_owner_cluster }}'"
+      state: "this cluster resolves as '{{ cluster_name | default('unknown') }}'"
+      cause: "ADR-0517 B12 - the bucket names in ansible/confidential.yml and the charts are not namespaced by cluster, so installing here would write this cluster's RAG corpus, database backups, RHOAI traces and MLflow artifacts into '{{ zuno_s3_bucket_owner_cluster }}'s buckets. That breaks the existing cluster, not this one, and violates ADR-0517's own criterion that demo222 is left untouched."
+      solution: "Give this cluster its own buckets and credentials before installing - ADR-0546 decides the convention and WP-131 executes it. Until WP-131 lands, provision them by hand and point every bucket variable in ansible/confidential.yml at the new set, then update zuno_s3_bucket_owner_cluster to this cluster's name."
+      auto_fix: "manual only - provisioning S3 buckets is outside this repository"
+      blocking: true
+  when:
+    - zuno_s3_bucket_owner_cluster is defined
+    - cluster_name is defined
+    - cluster_name != zuno_s3_bucket_owner_cluster
+
+# --- P7: a placeholder that reached a live Application (ADR-0547 clause 6) --
+# The runtime half of ADR-0547. Chart defaults are deliberately invalid
+# placeholders so a lost value fails loudly - but "loudly" only helps if someone
+# is listening, and ADR-0517 B13 is what happens when nobody is: cert_manager
+# never loaded confidential.yml, so its three variables were permanently
+# undefined and the default() chain resolved to the placeholders. The next apply
+# would have written MYCLUSTERHOSTEDZONEID into the live Application.
+#
+# check_confidential_var_loaders catches the specific cause at lint time. This
+# catches the effect at run time, whatever the cause: if the string "mycluster"
+# is anywhere in a live Application's values, a placeholder leaked.
+- name: "readiness | P7: read every Application's rendered values"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: "{{ zuno_argocd_namespace | default('openshift-gitops') }}"
+  register: _readiness_apps
+  failed_when: false
+
+- name: "readiness | P7: collect the Applications carrying a placeholder"
+  ansible.builtin.set_fact:
+    _readiness_placeholder_apps: >-
+      {{ (_readiness_placeholder_apps | default([])) + [item['metadata']['name']] }}
+  loop: "{{ _readiness_apps.resources | default([]) }}"
+  loop_control:
+    label: "{{ item['metadata']['name'] }}"
+  when: >-
+    'mycluster' in (item['spec'] | default({})).get('source', {})
+                   .get('helm', {}).get('values', '') | string
+
+- name: "readiness | P7: record a finding for each leaked placeholder"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _finding:
+      component: argocd
+      resource: "Application {{ _readiness_placeholder_apps }}"
+      state: "helm values still contain a 'mycluster' placeholder"
+      cause: "ADR-0547 clause 3 - chart defaults are deliberately invalid placeholders so a lost value fails loudly rather than binding to the wrong thing. A placeholder reaching a live Application means the Ansible parameter that should have replaced it never resolved. ADR-0517 B13 is the worked example: a role that read three variables without loading ansible/confidential.yml, so the default() chain silently supplied the chart."
+      solution: "Find the role that applies this Application and check that it loads ansible/confidential.yml and that the variable is actually set - `python3 platform/docs/check_docs.py` catches the missing-loader case directly. Re-run that component's install once the value resolves."
+      auto_fix: "manual only - the missing value has to be identified first"
+      blocking: true
+  when: (_readiness_placeholder_apps | default([]) | length) > 0
+
+# --- publish -----------------------------------------------------------------
+- name: "readiness | publish the findings"
+  ansible.builtin.set_fact:
+    cluster_readiness_findings: "{{ _readiness }}"
+
+- name: "readiness | summary"
+  ansible.builtin.debug:
+    msg: >-
+      cluster readiness: {{ _readiness | length }} finding(s),
+      {{ _readiness | selectattr('blocking') | list | length }} blocking
+      {{ '- see the findings summary below' if (_readiness | length) > 0 else '- nothing to report' }}

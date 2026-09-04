@@ -1,6 +1,6 @@
 # WP-130: Turn the from-scratch failure modes into a Day 0 readiness gate
 
-- **State:** Not started
+- **State:** Done (2026-09-04 — seven probes wired into both Day 0 playbooks, silent on `demo222`, each proven able to fire)
 - **ADRs:** [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md)
   (clause 3 — B11 is detected here while WP-132 fixes it),
   [ADR-0547](../../adr/0547-parameterize-every-cluster-specific-value-in-ansible.md)
@@ -58,7 +58,7 @@ same findings differently without a mode flag.
 | P1 | Exactly one StorageClass annotated `is-default-class`, or `zuno_cluster_storage_class` set | yes | `resolve_cluster_default_storage_class.yml` |
 | P2 | Platform is AWS; at least one MachineSet lacks `machine.startx.io/group`; every AZ declared in `gitops/charts/machines/values.yaml` has a subnet | yes | `resolve_cluster_aws_identity.yml` |
 | P3 | `Ingress/cluster` readable; domain starts with `apps.`; Route53 identity still on the `mycluster` placeholders; `zuno_aws_route53_*` unset | yes, except the `apps.` prefix (advisory) | `resolve_cluster_base_domain.yml` |
-| P4 | **B11** — ACME consumer flips true while the three `cert-manager` Certificates are absent or not `Ready` | yes | new |
+| P4 | **B11** — the *resolved* ACME consumer flips are on while `router-wildcard-tls`/`api-server-tls` are absent or not `Ready` | yes | new |
 | P5 | `ansible/confidential.yml` present; documented families still unset | presence yes; MariaDB S3 (B8) advisory | `vault/tasks/install.yml:5-19` |
 | P6 | **B12** — `zuno_cluster_name` is not the cluster that owns the effective S3 bucket names | yes | new |
 | P7 | **ADR-0547 clause 6** — a chart default still carries a `mycluster-*` placeholder that no parameter replaces | yes | new |
@@ -140,6 +140,58 @@ It does not flip `consumers.routerDefaultCert`/`apiServerNamedCert` back to `fal
 `gitops/apps/cert-manager/application-d1.yaml`. That is a live `demo222` change
 (`targetRevision: main` + `selfHeal: true`) which would regress the ACME track ADR-0211
 has just stabilized. B11 is *detected* here and *parameterized* by WP-132.
+
+## Delivered 2026-09-04
+
+`ansible/tasks/check_cluster_readiness.yml`, 30 tasks, included by both
+`day0_check.yml` (records every finding into `blocked_findings`) and
+`day0_install.yml` (fails on the blocking subset only, before the component
+loop). `zuno_repo_root` was added to `day0_install.yml`'s play vars, mirroring
+`day0_check.yml` — it normally comes from the inventory's `group_vars`, which an
+AAP Job Template's Controller-managed inventory does not have, and the gate would
+have been silently un-included there.
+
+**P4's premise changed while this WP was being written.** WP-132 step 3 moved the
+ACME rollout state out of `application-d1.yaml` into operator variables and added
+a role guard against walking a live track backwards, so "the manifest ships the
+flips on" is no longer detectable — there is no manifest value left to read. P4
+now resolves the same four variables the role does and asks the remaining
+question: are the consumers on while the Certificates they point at do not exist?
+That is the mistake available on a *new* cluster, where an operator sets the
+variables ahead of the rollout.
+
+**P6 needed one new declaration.** `zuno_s3_bucket_owner_cluster` names the
+cluster that owns the buckets in `confidential.yml`. Unset, P6 is silent — it has
+nothing to compare. Set, it catches the realistic failure: copying a working
+`confidential.yml` onto the new cluster, which is exactly how B12 would happen.
+It does not presuppose ADR-0546's naming convention, still `Proposed`, and WP-131
+makes it obsolete.
+
+### Proving a silent probe is not a broken probe
+
+`cluster readiness: 0 finding(s), 0 blocking` on `demo222` is the acceptance
+test, and on its own it is worth nothing: a probe that returns zero because it is
+broken looks identical to one that returns zero because the cluster is fine. So
+each condition was driven to fire.
+
+P6 end to end against the live cluster, by declaring a different owner:
+`-e zuno_s3_bucket_owner_cluster=demo999` produced
+`cluster readiness: 1 finding(s), 1 blocking`, the finding reached
+`blocked_findings`, and `report_blocked_findings.yml` printed
+`BLOCKED RESOURCES (1)` with its cause and solution. That exercises the
+accumulator, the publish, the recording loop and the report in one run.
+
+P1, P2, P4 and P7's conditions were unit-tested against fabricated inputs, and
+**the P1 test found a real defect** — in the shipped resolver, not only here.
+`resolve_cluster_default_storage_class.yml` compares
+`... | default('false') | string == 'true'` and its comment claims `| string`
+protects against an annotation that deserializes as a bool. It does not:
+`True | string` renders `'True'`, which that comparison silently misses. The API
+returns `map[string]string` so it cannot bite through `k8s_info` today, but the
+expression was asserting a protection it did not have, in the one place that
+hard-fails five installs. Both copies now use `| string | lower`, and the
+resolver's comment says what it actually does. Re-verified afterwards: the probe
+is still silent and the resolver still returns `gp3-csi`.
 
 ## Verification (operator steps — ask before running)
 

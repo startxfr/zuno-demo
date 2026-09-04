@@ -34,7 +34,11 @@
 # backslash-escaped form reads perfectly and silently returns [] - verified
 # 2026-09-03 - which here would have failed all four installs with
 # "found 0 default StorageClasses" on a cluster that has exactly one.
-# `| string` because the annotation may deserialize as a bool.
+# `| string | lower` because the annotation may deserialize as a bool: the
+# API returns map[string]string so it is a string in practice, but a value
+# read from YAML elsewhere is a real bool and `True | string` renders
+# 'True', which a bare == 'true' silently misses. WP-130's unit test for
+# the identical expression caught it (2026-09-04); `| lower` closes both.
 - name: "cluster-storage | collect the classes annotated as default"
   ansible.builtin.set_fact:
     _resolve_cluster_default_scs: >-
@@ -48,7 +52,7 @@
     - >-
       (item.metadata.annotations | default({}))
       ['storageclass.kubernetes.io/is-default-class']
-      | default('false') | string == 'true'
+      | default('false') | string | lower == 'true'
 
 - name: "cluster-storage | fail if there is no single default StorageClass"
   ansible.builtin.fail:

@@ -226,6 +226,26 @@ zuno_aws_route53_secret_access_key: "xxxxxx"
 # zuno_certmanager_route53_region: "eu-west-3"
 # zuno_certmanager_email: "dev+zuno-acme@example.org"
 
+# --- S3 bucket ownership (ADR-0517 B12 / WP-130 probe P6) -------------------
+#
+# OPTIONAL and NOT secret. The short name of the cluster that owns the S3
+# buckets configured in this file.
+#
+# ADR-0546 records the problem: seven buckets, none namespaced by cluster. Until
+# WP-131 executes that decision, a second cluster installed from this repository
+# writes its RAG ingestion outputs, pgBackRest and MariaDB backups, RHOAI traces
+# and MLflow artifacts into the FIRST cluster's buckets - which damages the
+# existing cluster, not the new one, and violates ADR-0517's own criterion that
+# demo222 is left untouched.
+#
+# The realistic way that happens is the obvious one: copying a working
+# confidential.yml onto the new cluster. Declaring the owner here lets
+# `make d0 check` refuse the install instead, by comparing this value against the
+# cluster name derived from the apps domain. Leave it unset and the probe stays
+# silent - it has nothing to compare.
+#
+# zuno_s3_bucket_owner_cluster: "demo222"
+
 # --- ACME rollout state (ADR-0211 staged rollout / ADR-0517 B11 / WP-132) ---
 #
 # All four OPTIONAL and NOT secret. They are the position of THIS cluster in

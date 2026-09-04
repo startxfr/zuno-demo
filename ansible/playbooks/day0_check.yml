@@ -58,6 +58,25 @@
       ansible.builtin.set_fact:
         blocked_findings: []
 
+    # WP-130: cluster-wide, so it runs even for `make d0 check <one-component>`
+    # - five read-only API calls and three file reads, and `make d0 check
+    # machines` on a fresh cluster is exactly when the AWS probe is wanted.
+    # Placed after blocked_findings is initialized: record_blocked_finding.yml's
+    # own header warns the accumulator must never be shadowed by an include
+    # parameter, and before the component loop so readiness heads the summary.
+    - name: Probe fresh-cluster readiness (WP-130, read-only)
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_cluster_readiness.yml"
+
+    # The extra `blocking` key rides along harmlessly - report_blocked_findings.yml
+    # reads only the six documented keys.
+    - name: Record each readiness finding
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+      loop: "{{ cluster_readiness_findings | default([]) }}"
+      loop_control:
+        label: "{{ item.resource }}"
+      vars:
+        blocked_finding: "{{ item }}"
+
     - name: Run Day 0 component state checks
       ansible.builtin.include_role:
         name: "{{ item }}"

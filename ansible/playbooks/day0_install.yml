@@ -15,6 +15,10 @@
     # Which `make dN` accepts this component - drives the AUTO-FIX hints
     # in the shared blocked-findings tasks (ADR-0201 follow-up).
     zuno_day: d0
+    # Mirrors day0_check.yml: normally supplied by the inventory's
+    # group_vars, absent under an AAP Job Template's Controller-managed
+    # inventory - which would leave WP-130's gate silently un-included.
+    zuno_repo_root: "{{ playbook_dir }}/../.."
     day0_components:
       - argocd
       - admin_context
@@ -46,6 +50,34 @@
       ansible.builtin.set_fact:
         blocked_findings: []
         _run_component_any_failed: false
+
+    # WP-130: the same probe day0_check.yml runs, disposed of differently. Its
+    # findings deliberately do NOT enter blocked_findings here -
+    # report_blocked_findings.yml fails the play when blocked_report_fail is
+    # true, so an advisory finding (the MariaDB backup keys, which
+    # mariadb/tasks/install.yml treats as legitimately optional) would fail a
+    # Day 0 install that otherwise succeeded completely. Only the blocking
+    # subset gates, and it gates BEFORE anything is applied: today a
+    # from-scratch run dies forty minutes in, inside machines or postgresql,
+    # and in the S3 case it does not die at all - it quietly writes into
+    # another cluster's buckets.
+    - name: Probe fresh-cluster readiness before applying anything (WP-130)
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_cluster_readiness.yml"
+
+    - name: Refuse to install when a blocking readiness finding exists
+      ansible.builtin.fail:
+        msg: |-
+          This cluster is not ready for a Day 0 install. Nothing has been applied.
+
+          {% for f in cluster_readiness_findings | selectattr('blocking') %}
+          [{{ f.component }}] {{ f.resource }}
+            STATE:    {{ f.state }}
+            CAUSE:    {{ f.cause }}
+            SOLUTION: {{ f.solution }}
+          {% endfor %}
+          Re-run `make d0 check` after fixing these - it reports the advisory
+          findings too, which do not gate but do degrade the platform silently.
+      when: (cluster_readiness_findings | default([]) | selectattr('blocking') | list | length) > 0
 
     # A blocked component records its findings and the loop continues, so one
     # run reports EVERY blocked resource (summary + solution + auto-fix at the

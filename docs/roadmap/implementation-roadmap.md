@@ -30,7 +30,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101, WP-129 |
 | v0.7 | 14 | 12 | 25 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53, WP-115, WP-119, WP-125, WP-126 |
-| v0.8 | 4 | 3 | 5 | WP-130, WP-131 |
+| v0.8 | 4 | 3 | 5 | WP-131 |
 | v0.9 | 4 | 3 | 4 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -757,7 +757,7 @@ finding, WP-131 executes ADR-0546's bucket split.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-130 | [wp-130](work-packages/wp-130-fresh-cluster-readiness-gate.md) | 0517, 0547 | WP-118 | Not started | seven read-only probes behind `make d0 check` (default StorageClass, AWS installer identity and per-AZ subnets, base domain and Route53 identity, the ACME consumer flips, confidential.yml completeness, bucket ownership, leftover `mycluster-*` placeholders) plus a blocking gate on `make d0 install`; acceptance is zero findings on `demo222` |
+| WP-130 | [wp-130](work-packages/wp-130-fresh-cluster-readiness-gate.md) | 0517, 0547 | WP-118, WP-132 | Done (2026-09-04) | seven read-only probes wired into `make d0 check` and gating `make d0 install` (default StorageClass, AWS installer identity and per-AZ subnets, base domain and Route53 identity, the ACME consumer flips, confidential.yml completeness, bucket ownership, leftover `mycluster-*` placeholders) plus a blocking gate on `make d0 install`; zero findings on `demo222`, and each condition proven able to fire rather than trusted - P6 driven live, the rest unit-tested, which found a real bug in resolve_cluster_default_storage_class.yml's bool handling |
 | WP-131 | [wp-131](work-packages/wp-131-per-cluster-s3-bucket-convention.md) | 0546, 0517, 0547 | ADR-0546 to `Accepted`; manual AWS provisioning | Not started | provision `zuno-demo-sources` and the `zuno-demo222-*` set, migrate per ADR-0546's mapping, one IAM identity and Vault path per bucket, rewire eight charts, decommission the old buckets. Gates the ADR-0517 run: until it lands a `demo333` writes into `demo222`'s buckets |
 | WP-132 | [wp-132](work-packages/wp-132-cluster-parameterization.md) | 0547, 0517 | WP-118 | Done (2026-09-04) | steps 0-3 landed and live-verified (B13 — cert_manager never loaded confidential.yml, so WP-118 B6's ACME identity resolved to placeholders and the next install would have broken DNS-01 live on demo222; loader added plus a check_docs guard; `make d0 install cert-manager` then confirmed `changed=0` with the Applications byte-identical and the ACME track Ready — and that changed=0 proves something, because the chart defaults are placeholders now). the RHOAI version pin is now `zuno_openshift_ai_version` and `make d1 install openshift-ai` added exactly one line to the Application with everything downstream of startingCSV untouched. B11 closed - the ACME rollout state left application-d1.yaml for four operator variables defaulting to the chart's safe start, guarded against pruning a live track. steps 4 and 5 deliberately scoped out - the machines chart's AZ and instance types are fleet design rather than cluster identity and no discovery task can populate them, and no conversion produced a secret needing Vault; ADR-0547's acceptance criterion 1 is knowingly unmet and recorded in its implementation notes. Each landed step used the two-step order with an inertia proof that answers what a dead mechanism would have looked like |
 
