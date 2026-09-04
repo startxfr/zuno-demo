@@ -36,6 +36,9 @@ ADR-0546 was written from a static read. Measuring the buckets moved the work:
   2026-08-23) and `zuno-demo-rag-corpus/sxa_data/` (2026-08-21) with **no
   consumer anywhere** — an orphan, not a migration source.
 - **`zuno-corpus` is in `us-east-1`**, the only bucket outside `eu-west-2`.
+- Buckets are SSE-S3 (`AES256`, bucket keys on), **no versioning**, **no
+  lifecycle rules** — so nothing is silently expiring, and nothing is protected
+  against an accidental overwrite either.
 
 ## P0 — two pre-existing defects, to fix BEFORE any migration
 
@@ -116,14 +119,39 @@ not.
 A server-side S3 copy runs under **one principal**, which needs
 `s3:GetObject`+`s3:ListBucket` on the source **and**
 `s3:PutObject`+`s3:AbortMultipartUpload`+`s3:ListBucket` on the destination.
-**None of the six scoped app users can do this** — each is bucket-scoped by
-design. Create a dedicated, time-boxed `zuno-s3-migration-wp131` whose key lives
-only in the operator's shell (`AWS_PROFILE=zuno-migration`), never in
-`confidential.yml` and never in Vault, deleted when the migration ends. Not the
-account admin credentials — `confidential.example.yml` states that rule already.
+
+**Correction, 2026-09-04.** This brief previously said none of the app users
+could do that because each is bucket-scoped. That is false, and the truth
+matters more than the original claim. An IAM audit of account `791728029433`
+found the six credential families in `confidential.yml` are **three IAM users**,
+and **all three can read and write every `zuno*` bucket**:
+
+| Credential family in `confidential.yml` | IAM user | Grant |
+|---|---|---|
+| `zuno_rag_s3_*` | `zuno-demo-rag-corpus` | **`AmazonS3FullAccess`** + `AmazonS3FilesFullAccess` — account-wide |
+| `zuno_postgresql_backup_s3_*`, `zuno_mariadb_backup_s3_*` | `zuno-demo` | **`AmazonS3FullAccess`** — account-wide |
+| `zuno_sxa_corpus_s3_*`, `zuno_aap_hub_s3_*`, `zuno_rhoai_traces_s3_*` | `zuno-sxa-corpus-s3` | inline `sxa-corpus-bucket-only`, which despite its name allows `Get/Put/DeleteObject` on `arn:aws:s3:::zuno*/*` and `ListBucket` on `arn:aws:s3:::zuno*` |
+
+Three consequences. The migration **can** technically run under an existing
+credential — but it should not, and a dedicated identity is now a least-privilege
+choice rather than a capability requirement. WP-079's finding, that
+`zuno-sxa-corpus-s3` was reused for AAP Hub and RHOAI traces, is **still the live
+state**: only the missing grant was patched, the reuse was never undone. And
+most importantly, because the policies are keyed on the prefix `zuno*`,
+**creating the new buckets grants all three existing users full access to them
+automatically** — provisioning is not the isolation step. ADR-0546 clause 3 is
+therefore not a refinement but the remediation of a real over-grant, and its
+effect is measurable before and after.
+
+Create a dedicated, time-boxed `zuno-s3-migration-wp131` whose key lives only in
+the operator's shell (`AWS_PROFILE=zuno-migration`), never in `confidential.yml`
+and never in Vault, deleted when the migration ends. Not the account admin
+credentials — `confidential.example.yml` states that rule already.
 
 `s3:ListBucket` must be granted on the bucket ARN **separately** from
-`GetObject`/`PutObject` on `/*`. That is exactly the WP-079 bug.
+`GetObject`/`PutObject` on `/*` — that is the WP-079 bug — and the new
+per-bucket policies must name buckets **explicitly**, never `zuno*`, or they
+recreate exactly what they are meant to fix.
 
 If any source bucket uses SSE-KMS, the same principal also needs `kms:Decrypt`
 on the source key and `kms:GenerateDataKey` on the destination key, or every
