@@ -47,7 +47,15 @@ def _split_s3_uri(uri: str) -> tuple:
 
 
 def _s3_client():
+    # WP-133 (live, 2026-09-04): gitops/charts/models' modelsS3.endpoint is
+    # a bare hostname (s3.eu-west-2.amazonaws.com) - the convention its own
+    # serving.kserve.io/s3-endpoint annotation tolerates, but boto3's
+    # endpoint_url requires a full scheme-prefixed URL and raises
+    # ValueError("Invalid endpoint: ...") on a bare host. Confirmed live:
+    # the initContainer crash-looped on exactly this before the fix.
     endpoint = _env("S3_ENDPOINT") or None
+    if endpoint and not endpoint.startswith(("http://", "https://")):
+        endpoint = f"https://{endpoint}"
     region = _env("S3_REGION") or None
     path_style = _env("S3_PATH_STYLE").lower() == "true"
     client_kwargs = {

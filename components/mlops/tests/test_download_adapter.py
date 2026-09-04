@@ -42,6 +42,38 @@ class _FakeS3Client:
         pathlib.Path(dest).write_text("fake-adapter-bytes")
 
 
+def test_s3_client_prepends_https_to_a_bare_endpoint_hostname() -> None:
+    # WP-133 (live, 2026-09-04): gitops/charts/models' modelsS3.endpoint is
+    # a bare hostname (its own serving.kserve.io/s3-endpoint annotation
+    # tolerates that) - boto3.client's endpoint_url does not, and raised
+    # ValueError("Invalid endpoint: s3.eu-west-2.amazonaws.com") the first
+    # time this initContainer actually ran.
+    env = {
+        "AWS_ACCESS_KEY_ID": "AKIAFAKE",
+        "AWS_SECRET_ACCESS_KEY": "s3cr3t",
+        "S3_ENDPOINT": "s3.eu-west-2.amazonaws.com",
+        "S3_REGION": "eu-west-2",
+    }
+    with mock.patch.dict("os.environ", env, clear=True):
+        with mock.patch("download_adapter.boto3.client") as fake_client:
+            download_adapter._s3_client()
+            _, kwargs = fake_client.call_args
+            assert kwargs["endpoint_url"] == "https://s3.eu-west-2.amazonaws.com"
+
+
+def test_s3_client_leaves_a_scheme_prefixed_endpoint_untouched() -> None:
+    env = {
+        "AWS_ACCESS_KEY_ID": "AKIAFAKE",
+        "AWS_SECRET_ACCESS_KEY": "s3cr3t",
+        "S3_ENDPOINT": "http://localhost:9000",
+    }
+    with mock.patch.dict("os.environ", env, clear=True):
+        with mock.patch("download_adapter.boto3.client") as fake_client:
+            download_adapter._s3_client()
+            _, kwargs = fake_client.call_args
+            assert kwargs["endpoint_url"] == "http://localhost:9000"
+
+
 def test_split_s3_uri_rejects_a_non_s3_scheme() -> None:
     try:
         download_adapter._split_s3_uri("https://example.com/x")
@@ -125,6 +157,8 @@ def test_main_downloads_using_env_configured_client() -> None:
 
 
 TESTS = [
+    test_s3_client_prepends_https_to_a_bare_endpoint_hostname,
+    test_s3_client_leaves_a_scheme_prefixed_endpoint_untouched,
     test_split_s3_uri_rejects_a_non_s3_scheme,
     test_split_s3_uri_rejects_a_bucket_with_no_prefix,
     test_download_adapter_writes_every_object_under_the_prefix_relative_to_dest,
