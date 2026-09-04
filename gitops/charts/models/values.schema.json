@@ -10,12 +10,21 @@
       "items": {
         "type": "object",
         "additionalProperties": true,
-        "required": ["name", "path", "classification"],
+        "required": ["name", "path", "classification", "sourceS3Uri"],
         "properties": {
           "name": { "type": "string" },
           "registryModelName": { "type": "string" },
           "registryModelVersion": { "type": "string" },
-          "path": { "type": "string" },
+          "sourceS3Uri": {
+            "type": "string",
+            "pattern": "^s3://",
+            "description": "WP-133: push-registry's own registration.json artifact_uri, copied verbatim - the initContainer downloads this prefix to `path`."
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^/mnt/loras/",
+            "description": "WP-133: must be under the one emptyDir shared between the download-adapter initContainer and the main container (templates/llminferenceservice-qwen35.yaml) - anywhere else is invisible to vLLM."
+          },
           "classification": { "type": "string", "enum": ["C1", "C2", "C3"] }
         }
       }

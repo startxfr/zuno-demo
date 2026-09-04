@@ -32,6 +32,12 @@ COPY components/mlops/src/mlflow_tracking.py /opt/app-root/src/mlflow_tracking.p
 # dispatcher imports this one, so a missing COPY would fail at runtime in
 # the pipeline pod while every local test passed.
 COPY components/mlops/src/trainjob.py /opt/app-root/src/trainjob.py
+# WP-133: standalone (no mlops.py import - see its own docstring for why),
+# run as gitops/charts/models' init-container command override, not via
+# the mlops-run ENTRYPOINT below - same per-file-COPY trap as the two
+# lines above, a missing one here is a ModuleNotFoundError only a live
+# serving pod would ever hit.
+COPY components/mlops/src/download_adapter.py /opt/app-root/src/download_adapter.py
 COPY components/mlops/mlops-run /opt/app-root/src/mlops-run
 RUN chmod 0755 /opt/app-root/src/mlops-run
 COPY evaluations /opt/app-root/src/evaluations

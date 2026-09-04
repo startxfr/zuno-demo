@@ -217,6 +217,15 @@ def mlops_pipeline_{{ $name | replace "-" "_" }}(run_id: str):
     # is even attempted - .after() enforces the DAG ordering; evaluate's
     # own non-zero exit on a failing gate (components/mlops/src/mlops.py)
     # stops the pipeline here, before push-registry's task ever starts.
+{{- if $agent.skipMerge }}
+    # ADR-0301 point 1/WP-133: this agent proves the ORIGINAL mechanism -
+    # push-registry registers the adapter itself (its own fallback for "no
+    # merge_manifest.json"), not a merged standalone checkpoint. No
+    # merge_export task is rendered into this agent's DAG at all, so this
+    # run can never collide with mergedModel.s3Uri (a single shared value,
+    # not per-agent, and the live-served wesh model's own destination).
+    evaluated = configure(evaluate(run_id=run_id).after(trained), agent="{{ $name }}")
+{{- else }}
     # ADR-0526 (WP-087) decision 1: merge the adapter into a standalone
     # checkpoint BEFORE evaluate, so push-registry can register the merged
     # artifact's URI rather than the adapter's. No GPU here - but see
@@ -255,6 +264,7 @@ def mlops_pipeline_{{ $name | replace "-" "_" }}(run_id: str):
         label_value="{{ $root.Values.merge.nodeSelector.value }}",
     )
     evaluated = configure(evaluate(run_id=run_id).after(merged), agent="{{ $name }}")
+{{- end }}
     configure(push_registry(run_id=run_id).after(evaluated), agent="{{ $name }}")
 
 

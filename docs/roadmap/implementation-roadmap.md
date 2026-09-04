@@ -25,7 +25,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0 | 72 | — | 7 | — |
 | v0.1 | 29 | — | 18 | — |
 | v0.2 | 14 | — | 17 | WP-098 |
-| v0.3 | 16 | 1 | 18 | WP-34 |
+| v0.3 | 16 | 1 | 19 | WP-34, WP-133 |
 | v0.4 | 34 | 9 | 27 | WP-55, WP-093, WP-101 |
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101, WP-129 |
@@ -760,6 +760,21 @@ finding, WP-131 executes ADR-0546's bucket split.
 | WP-130 | [wp-130](work-packages/wp-130-fresh-cluster-readiness-gate.md) | 0517, 0547 | WP-118, WP-132 | Done (2026-09-04) | seven read-only probes wired into `make d0 check` and gating `make d0 install` (default StorageClass, AWS installer identity and per-AZ subnets, base domain and Route53 identity, the ACME consumer flips, confidential.yml completeness, bucket ownership, leftover `mycluster-*` placeholders) plus a blocking gate on `make d0 install`; zero findings on `demo222`, and each condition proven able to fire rather than trusted - P6 driven live, the rest unit-tested, which found a real bug in resolve_cluster_default_storage_class.yml's bool handling |
 | WP-131 | [wp-131](work-packages/wp-131-per-cluster-s3-bucket-convention.md) | 0546, 0517, 0547 | manual AWS provisioning; P0-a and P0-b in the brief | Not started | ADR-0546 moved to `Accepted` 2026-09-04 and this brief now carries the full runbook: mapping, server-side copy commands, the pgBackRest P0-P13 sequence and the per-component cutover order. A live read-only inventory reshaped it - `models/` is 164.6 GB of the ~165 GB total, `zuno-aap-hub` is empty, `mlflow-artifacts/` does not exist yet, the SXA dump has an orphaned older duplicate with no consumer, and pgBackRest writes under `pgbackrest/repo2/` rather than the bucket root. Planning it also surfaced two pre-existing defects that gate the work: the S3 backup check never sets `repo2-path`, so it has always reported no backup and a rebuild would bootstrap an empty database while three real full backups sit in the bucket; and `make d3 backup postgresql` cannot trigger a backup at all. Gates the ADR-0517 run |
 | WP-132 | [wp-132](work-packages/wp-132-cluster-parameterization.md) | 0547, 0517 | WP-118 | Done (2026-09-04) | steps 0-3 landed and live-verified (B13 — cert_manager never loaded confidential.yml, so WP-118 B6's ACME identity resolved to placeholders and the next install would have broken DNS-01 live on demo222; loader added plus a check_docs guard; `make d0 install cert-manager` then confirmed `changed=0` with the Applications byte-identical and the ACME track Ready — and that changed=0 proves something, because the chart defaults are placeholders now). the RHOAI version pin is now `zuno_openshift_ai_version` and `make d1 install openshift-ai` added exactly one line to the Application with everything downstream of startingCSV untouched. B11 closed - the ACME rollout state left application-d1.yaml for four operator variables defaulting to the chart's safe start, guarded against pruning a live track. steps 4 and 5 deliberately scoped out - the machines chart's AZ and instance types are fleet design rather than cluster identity and no discovery task can populate them, and no conversion produced a secret needing Vault; ADR-0547's acceptance criterion 1 is knowingly unmet and recorded in its implementation notes. Each landed step used the two-step order with an inertia proof that answers what a dead mechanism would have looked like |
+
+### Phase 38 — prove the original LoRA-adapter mechanism and close ADR-0301/ADR-0302 (added 2026-09-04)
+
+ADR-0301/ADR-0302 carry `Superseded in part by ADR-0526`, but each still has
+decision points explicitly left "in effect" that WP-34 coded and no run has
+ever exercised - WP-087/WP-126's own live runs proved the KFP pipeline works,
+but via ADR-0526's merged-standalone-checkpoint path, deliberately bypassing
+`loraAdapters`/vLLM multi-LoRA entirely. WP-133 targets Tekos/`knowledge.tech`
+(real, non-zero data unlike comage's own two domains) with merge-export
+skipped, to finally register and serve a genuine adapter and close both ADRs
+as written rather than around them.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-133 | [wp-133](work-packages/wp-133-lora-adapter-live-proof.md) | 0302, 0301 | WP-34, WP-126 | Repo work merged (2026-09-04) | raise the `zuno-ai-run-gpu-cap` quota (currently saturated, 3/3 + 2/2); compile/upload the `tekos` PipelineVersion and launch the run; review the `loraAdapters` promotion PR; roll out `qwen35-9b` with the adapter attached and confirm live |
 
 ### OKF stream phases
 

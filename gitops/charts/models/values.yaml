@@ -280,16 +280,31 @@ llmInferenceService:
 #                         registered under (components/mlops's
 #                         push-registry stage, ADR-0302 point 6) - never
 #                         an unversioned/untracked location (point 3).
+#   sourceS3Uri        - WP-133: the exact artifact_uri push-registry's
+#                         registration.json recorded for this version -
+#                         copy it verbatim from there, never a hand-typed
+#                         S3 location, so this stays traceable to the
+#                         registry entry above rather than becoming a
+#                         second, driftable source of truth. One
+#                         initContainer per loraAdapters entry
+#                         (templates/llminferenceservice-qwen35.yaml)
+#                         downloads this prefix to `path` below before
+#                         vLLM starts - components/mlops/src/
+#                         download_adapter.py, reusing the same S3
+#                         credential this model's own base-weights
+#                         download already mounts.
 #   path               - where vLLM reads the adapter FROM on this pod's
-#                         filesystem. UNVERIFIED against a live cluster:
-#                         no adapter-download mechanism exists yet in
-#                         this chart (unlike modelStorage's own
-#                         job-model-download.yaml for the base model) -
-#                         an operator promoting an adapter today must
-#                         also arrange for it to land at this path (e.g.
-#                         a follow-up PVC/init-container, out of this
-#                         WP's own ~4-file estimate) before this actually
-#                         serves traffic.
+#                         filesystem, and where the initContainer above
+#                         writes it to. MUST be under /mnt/loras - that is
+#                         the one emptyDir shared between every
+#                         download-adapter initContainer and the main
+#                         container (templates/llminferenceservice-
+#                         qwen35.yaml); a path outside it lands only in
+#                         the initContainer's own ephemeral layer and
+#                         vLLM will never see it. Live-verification of the
+#                         whole download-then-serve path is WP-133's own
+#                         operator follow-up - nothing has attached an
+#                         adapter on a real cluster yet.
 #   classification     - C1/C2/C3 (ADR-0301 point 4/ADR-0034): inherited
 #                         from the adapter's own training dataset
 #                         (components/mlops's train_manifest.json). Gated
@@ -300,11 +315,22 @@ loraAdapters: []
 # Example (uncomment and fill in once an adapter has been trained,
 # evaluated and registered - see components/mlops/README's own pipeline
 # stages):
-#   - name: comage-lora
-#     registryModelName: comage-lora
+#   - name: tekos-lora
+#     registryModelName: tekos-lora
 #     registryModelVersion: run-0001
-#     path: /mnt/loras/comage-lora
-#     classification: C2
+#     sourceS3Uri: s3://zuno-corpus/mlops/models/tekos/run-0001/adapter
+#     path: /mnt/loras/tekos-lora
+#     classification: C1
+
+# WP-133: the image the adapter-download initContainer runs
+# (components/mlops/src/download_adapter.py). Reuses the mlops pipeline's
+# own image rather than introducing a second one solely for this - it
+# already ships boto3 and the same S3-download logic (ArtifactStore.
+# download_prefix), and is built by the same ansible/roles/mlops_build
+# this chart has no reason to duplicate. Only rendered when loraAdapters
+# is non-empty.
+loraAdapterDownload:
+  image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/mlops:latest
 
 # ADR-0521: the legacy HF-predownload PVC/Job mode (pvc-model.yaml,
 # job-model-download.yaml) was qwen-only and is removed along with the

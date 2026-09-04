@@ -191,7 +191,10 @@ pipeline:
   # v1 was never actually applied - the pipeline has 0 versions and 0 runs -
   # so this rename is free today, and the convention now exists before the
   # first real bump.
-  version: v0-2-1
+  # WP-133: bumped for the new conditional merge_export DAG shape (per
+  # agent.skipMerge) - comage's own rendered DAG is unchanged byte-for-byte,
+  # but the compiled DAG SOURCE changed, which is this comment's own rule.
+  version: v0-3-0
   displayName: "MLOps: dataset-to-model LoRA/PEFT pipeline"
   description: "prepare-dataset -> train-lora -> evaluate -> push-registry (ADR-0301/ADR-0302)"
   createPipelineResource: true
@@ -254,6 +257,45 @@ agents:
     # ADR-0526's own stated mitigation against catastrophic forgetting,
     # and a register shift is an output-distribution shift that does not
     # need the FFN.
+    loraTargetModules: 'model\.language_model\.layers\.\d+\.(self_attn\.(q|k|v|o)_proj|linear_attn\.(in_proj_qkv|out_proj))'
+  # WP-133: proves ADR-0301/0302's ORIGINAL mechanism (a registered LoRA
+  # adapter loaded by vLLM's native multi-LoRA support) rather than
+  # ADR-0526's merged-standalone-model path above - the two are mutually
+  # exclusive by design (stage_merge_export vs push-registry's own
+  # adapter-only fallback), so this needs its own agent entry, not a
+  # variant of comage's.
+  #
+  # Tekos + knowledge.tech is the one ADR-0302 point 2-compliant source
+  # with real, non-zero data as of 2026-09-04 (WP-100/WP-129: 570+
+  # document_embeddings rows) - comage's own two domains
+  # (knowledge.sales/knowledge.project) are exactly why WP-34's original
+  # objective never ran (see comage's own knowledgeDomains comment above).
+  tekos:
+    enabled: true
+    # Literal metadata->>'domain' value rag-ingestion writes for tech
+    # content (components/rag-ingestion/src/rag_ingestion.py) - "tech"
+    # alone matches zero rows, a silent-empty-dataset trap this comment
+    # exists to stop from recurring.
+    knowledgeDomains: ["knowledge.tech"]
+    # No styleCorpusS3Uri: prepare-dataset takes the domain-grounding
+    # branch (_fetch_domain_grounding_rows), the actual ADR-0302 point 2
+    # mechanism, not ADR-0526's override.
+    styleCorpusS3Uri: ""
+    baseModel: s3://zuno-demo-rag-corpus/models/qwen3.5-9b
+    # ADR-0301 point 1/WP-133: skips merge-export entirely - this run must
+    # register the ADAPTER itself (push-registry's existing
+    # merge-manifest-absent fallback), never a merged checkpoint, and must
+    # never write to mergedModel.s3Uri above (the live-served wesh
+    # prefix - mergedModel is a single shared value, not per-agent).
+    # files/pipeline.py.tpl reads this at chart-render time to omit the
+    # merge_export task from this agent's compiled DAG.
+    skipMerge: true
+    loraR: 8
+    loraAlpha: 16
+    loraDropout: 0.05
+    # Same anchored regex as comage's own (see that entry's long comment) -
+    # both train against the identical qwen3.5-9b checkpoint, so the same
+    # module map applies unchanged.
     loraTargetModules: 'model\.language_model\.layers\.\d+\.(self_attn\.(q|k|v|o)_proj|linear_attn\.(in_proj_qkv|out_proj))'
 
 # ADR-0351: GPU wiring for the train-lora pipeline task - the ONLY stage

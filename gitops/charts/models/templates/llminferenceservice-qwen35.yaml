@@ -27,6 +27,27 @@ model.safetensors.index.json whose weight_map names match the real shard
 objects) and declares text_config.dtype: bfloat16 - it is the unquantized
 checkpoint ADR-0526 decision 1 requires, not a quantized one.
 */ -}}
+{{- /*
+WP-133: qwen3.5-9b is the SECOND runtime loraAdapters can attach to,
+alongside qwen3.6-27b-instruct (llminferenceservice-qwen.yaml, WP-34 Part
+B's original wiring) - ported here because this is the base model
+components/mlops actually trains against (both comage's and tekos's
+baseModel in gitops/charts/mlops/values.yaml) and the one Tekos/Comage
+routing actually names (policies/model-routing/model-routing-policy.yaml),
+unlike qwen3.6-27b-instruct which no LoRA-trained agent targets. Same gate,
+same annotation, same args shape as the qwen.yaml original - see that
+file's own header comment for the full rationale this one does not repeat.
+UNVERIFIED against a live cluster: no adapter has ever been trained
+without merging (ADR-0526's own run always merges) or attached here -
+WP-133's own operator follow-up is the first live proof.
+*/ -}}
+{{- if .Values.maas.enabled }}
+{{- range .Values.loraAdapters }}
+{{- if ne .classification "C1" }}
+{{- fail (printf "loraAdapters[%s].classification=%s cannot attach while maas.enabled is true (externally-eligible serving path) - ADR-0301 point 4/ADR-0021" .name .classification) }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- $qwen35Maas := "" }}
 {{- range .Values.maas.models }}
 {{- if eq .backendInferenceServiceName $.Values.qwen35Model.inferenceServiceName }}
@@ -49,6 +70,12 @@ metadata:
     # this annotation was added to, correction live-verified 2026-09-02.
     opendatahub.io/hardware-profile-name: {{ .Values.hardwareProfiles.mig1g24gb.name }}
     opendatahub.io/hardware-profile-namespace: {{ .Values.hardwareProfiles.namespace }}
+{{- if .Values.loraAdapters }}
+    # ADR-0034: classification propagates to the adapter, not just its
+    # outputs - see llminferenceservice-qwen.yaml's own copy of this
+    # annotation for the full rationale.
+    zuno.io/lora-adapter-classifications: {{ .Values.loraAdapters | mustToJson | quote }}
+{{- end }}
 spec:
   {{- if .Values.qwen35Model.llmInferenceService.podAnnotations }}
   annotations:
@@ -97,6 +124,36 @@ spec:
                 app.kubernetes.io/name: {{ .Values.weshModel.inferenceServiceName }}
     {{- end }}
     serviceAccountName: {{ .Values.qwen35Model.llmInferenceService.serviceAccountName }}
+    {{- if .Values.loraAdapters }}
+    # WP-133: one initContainer per adapter, downloading push-registry's
+    # own registered artifact (sourceS3Uri) to the exact local path the
+    # main container's --lora-modules flag below reads from. Same S3
+    # credential the base model's own storage-initializer already uses
+    # (s3-serving-credentials-qwen35.yaml's Secret carries plain
+    # AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY keys alongside its
+    # serving.kserve.io/s3-* annotations) - no new ExternalSecret needed.
+    initContainers:
+      {{- range .Values.loraAdapters }}
+      - name: download-adapter-{{ .name }}
+        image: {{ $.Values.loraAdapterDownload.image }}
+        command: ["python3", "/opt/app-root/src/download_adapter.py"]
+        env:
+          - name: ADAPTER_SOURCE_S3URI
+            value: {{ .sourceS3Uri | quote }}
+          - name: ADAPTER_DEST_PATH
+            value: {{ .path | quote }}
+          - name: S3_ENDPOINT
+            value: {{ $.Values.modelsS3.endpoint | quote }}
+          - name: S3_REGION
+            value: {{ $.Values.modelsS3.region | quote }}
+        envFrom:
+          - secretRef:
+              name: {{ $.Values.qwen35Model.inferenceServiceName }}-s3-credentials
+        volumeMounts:
+          - name: loras
+            mountPath: /mnt/loras
+      {{- end }}
+    {{- end }}
     containers:
       - name: main
         args:
@@ -119,8 +176,25 @@ spec:
           - "publishers/{{ .Values.namespace }}/models/{{ .Values.qwen35Model.inferenceServiceName }}"
           - "{{ .Values.namespace }}/{{ $qwen35Maas.publishedName }}"
           {{- end }}
+          {{- if .Values.loraAdapters }}
+          - --enable-lora
+          - --lora-modules
+          {{- range .Values.loraAdapters }}
+          - {{ printf "%s=%s" .name .path | quote }}
+          {{- end }}
+          {{- end }}
+        {{- if .Values.loraAdapters }}
+        volumeMounts:
+          - name: loras
+            mountPath: /mnt/loras
+        {{- end }}
         resources:
           {{- toYaml .Values.qwen35Model.resources | nindent 10 }}
+    {{- if .Values.loraAdapters }}
+    volumes:
+      - name: loras
+        emptyDir: {}
+    {{- end }}
   router:
     gateway:
       refs:
