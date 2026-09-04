@@ -458,7 +458,7 @@ manifests — `mlflowConfig.enabled` for mlflow, `acceptanceGate.keycloakUrl` an
 | **aap** — **DONE 2026-09-04** | `zuno_aap_hub_s3_bucket_name`; no chart change, and nothing to flip in git either — the example file carries placeholders | Low, both buckets empty |
 | **mlops** | `s3.bucket`, `s3.region`, `styleCorpusS3Uri`. Not yet `mergedModel.s3Uri` or `trainjob.baseModel` — those name the *models* bucket | Medium — in-flight runs break |
 | **rag-ingestion** | `s3.bucket` → `-data`; `sxaDump` → `zuno-demo-sources` with `sxa-dump/…` keys | **High** — the corpus vanishes from the app's view until re-ingestion; the DSPA reconciles and kills in-flight runs |
-| **openshift-ai** | `zuno_rhoai_traces_s3_bucket_name`; no chart change | Medium — **historical traces become unqueryable** |
+| **openshift-ai** — **DONE 2026-09-04** | `zuno_rhoai_traces_s3_bucket_name`; no chart change. History COPIED, reversing ADR-0546's assumption — see below | Low in the end, not medium |
 | **postgresql** | Bucket + `path` | **Highest** — see above |
 | **models** | **Copy only.** Land the per-model cutover mechanism, inert | None if the defaults are right |
 
@@ -475,6 +475,50 @@ one model, reversible.
 loudly; `components/mlops/tests/test_trainjob.py`'s fixture becomes a neutral
 value; `evaluations/register_conformance.py`'s mention is docstring provenance
 that stays true — **leave it**.
+
+### RHOAI traces: the history was copied after all, and the index must not be
+
+ADR-0546 decided not to migrate traces, assuming a large historical archive.
+Measured 2026-09-04, it was **258 objects / 143 MB covering two days** - so a
+dry cutover would have thrown away two days of traces to save a copy costing
+seconds. Operator decision, recorded here rather than by amending an Accepted
+ADR: copy them.
+
+Verification, and the framing matters more than the numbers. First attempt used
+`aws s3 ls` timestamps to spot post-cutover writes - **`aws s3 ls` prints LOCAL
+time, not UTC**, so a UTC marker silently compared against a moment two hours
+earlier and reported 262 "new" objects that were merely the copied ones. Redone
+with `s3api ... LastModified`:
+
+  - new bucket: 11 objects written after the flip
+  - old bucket: **0**
+
+Both halves. Writes started in the new bucket AND stopped in the old one -
+either alone would be consistent with a half-applied cutover.
+
+Tempo then rebuilt its tenant index in the new bucket and **compacted a copied
+block** (`415cb3a4/meta.compacted.json`), which is the proof that mattered: it
+reads and operates on the copied history, not merely writes beside it. The
+index lists 53 blocks spanning 2026-09-02T16:51Z to 2026-09-04T17:14Z - the
+whole window, queryable.
+
+**Do not sync the index files backwards.** `index.json.gz` and `index.pb.zst`
+are mutated in place, exactly like pgBackRest's `archive.info`/`backup.info`,
+so a delta sync that includes them overwrites the live index with a stale one.
+The closing delta is:
+
+```bash
+aws s3 sync s3://zuno-demo-rhoai-traces/ s3://zuno-demo222-traces/ \
+  --exclude "*/index.json.gz" --exclude "*/index.pb.zst" --only-show-errors
+```
+
+The compactor picks the copied blocks up on its next scan. Same rule, same
+reason, as P8 in the pgBackRest sequence.
+
+The whole TempoStack rolled on the credential change (compactor, distributor,
+gateway, ingester, querier, query-frontend), Ready=True after. One ingester
+warning at restart - `failed to replay block. removing.` on an incomplete WAL
+block - is a normal restart artifact, not an S3 failure.
 
 ### AAP Hub: the cutover is three hops, and only the last one counts
 
