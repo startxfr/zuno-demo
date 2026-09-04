@@ -90,12 +90,54 @@
     (_rag_ingestion_vault_ca.resources | default([]) | length) == 0 or
     (_rag_ingestion_service_ca.resources | default([]) | length) == 0
 
+# ADR-0546/WP-131: two buckets with opposite natures, and keeping them apart is
+# the point of the ADR. The corpus bucket is this cluster's ingestion OUTPUT
+# (zuno-<cluster>-data); the SXA dump is a cross-cluster INPUT that seeds any
+# cluster (zuno-demo-sources). Soft-read - omitting the variables leaves the
+# chart defaults. ADR-0517 B13: without this stat/include_vars pair the
+# variables are simply undefined and `| default(chart)` wins in silence.
+# check_confidential_var_loaders() enforces it.
+- name: "rag_ingestion | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _rag_ingestion_confidential_file
+
+- name: "rag_ingestion | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _rag_ingestion_confidential_file.stat.exists
+
 - name: "rag_ingestion | apply the rag-ingestion GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "rag-ingestion"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-rag-ingestion-d1"
+    # A literal dict is safe here only because gitops/apps/rag-ingestion/
+    # application-d1.yaml declares NO helm values - there is nothing to clobber.
+    # If any are ever added there, this must switch to the merge-from-manifest
+    # idiom cert_manager and mlops use; check_gitops_values_clobber() fails the
+    # build if it is not.
+    #
+    # The SXA dump's bucket and its two KEYS move together. The objects went
+    # from s3://zuno-demo-sxa-corpus/sxa.{schema,data}.sql to
+    # s3://zuno-demo-sources/sxa-dump/sxa.{schema,data}.sql, so moving the
+    # bucket alone gives ingestion a 404 on a bucket that exists - which reads
+    # as a missing dump, not as a misconfiguration.
+    gitops_app_extra_helm_values:
+      s3:
+        bucket: "{{ zuno_rag_corpus_s3_bucket | default('zuno-demo-rag-corpus') }}"
+        region: "{{ zuno_rag_corpus_s3_region | default('eu-west-2') }}"
+      domains:
+        sxa-legacy:
+          sxaDump:
+            schemaS3Key: "{{ zuno_sxa_dump_schema_s3_key | default('sxa.schema.sql') }}"
+            dataS3Key: "{{ zuno_sxa_dump_data_s3_key | default('sxa.data.sql') }}"
+            s3:
+              bucket: "{{ zuno_sxa_dump_s3_bucket | default('zuno-demo-sxa-corpus') }}"
+              region: "{{ zuno_sxa_dump_s3_region | default('eu-west-2') }}"
+    # Values-changing apply - see ansible/roles/mlflow/tasks/install.yml.
+    gitops_app_refresh: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

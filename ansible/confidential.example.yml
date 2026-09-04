@@ -201,6 +201,25 @@ zuno_rhoai_traces_s3_secret_access_key: "xxxxxx"
 zuno_models_s3_bucket: "zuno-demo-rag-corpus"
 zuno_models_s3_prefix: "models"
 
+# --- RAG corpus and SXA dump (ADR-0546/WP-131) -----------------------------
+# Two buckets with opposite natures. zuno_rag_corpus_s3_* is this cluster's
+# ingestion OUTPUT and belongs in zuno-<cluster>-data; the outputs are NOT
+# migrated between clusters, each cluster re-ingests through its own pipeline
+# (ADR-0546 clause 1), so pointing a new cluster here costs nothing.
+# zuno_sxa_dump_* is a cross-cluster INPUT - the authoritative legacy export
+# that seeds any cluster - and belongs in zuno-demo-sources under sxa-dump/.
+#
+# The dump's bucket and its two KEYS move together: the objects moved from the
+# bucket root into an sxa-dump/ prefix, so changing only the bucket gives
+# ingestion a 404 that reads as a missing dump rather than a misconfiguration.
+# Omitting any of these keeps the chart default.
+zuno_rag_corpus_s3_bucket: "zuno-demo-rag-corpus"
+zuno_rag_corpus_s3_region: "eu-west-2"
+zuno_sxa_dump_s3_bucket: "zuno-demo-sxa-corpus"
+zuno_sxa_dump_s3_region: "eu-west-2"
+zuno_sxa_dump_schema_s3_key: "sxa.schema.sql"
+zuno_sxa_dump_data_s3_key: "sxa.data.sql"
+
 # --- MLOps pipeline artifacts and training corpus (ADR-0546/WP-131) ---------
 # Two DIFFERENT buckets on purpose, and the split is the whole point of
 # ADR-0546: the pipeline artifacts are this cluster's OUTPUT and belong in

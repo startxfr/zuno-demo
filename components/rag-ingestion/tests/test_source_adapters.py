@@ -557,7 +557,7 @@ def _sxa_config(**overrides):
         INGESTION_DOMAIN="knowledge.sxa-legacy",
         SXA_DUMP_SCHEMA_S3_KEY="sxa.schema.sql",
         SXA_DUMP_DATA_S3_KEY="sxa.data.sql",
-        SXA_S3_BUCKET="zuno-demo-sxa-corpus",
+        SXA_S3_BUCKET="test-sxa-bucket",
     )
     base.update(overrides)
     return _config(**base)
@@ -655,7 +655,7 @@ def test_load_sxa_dump_short_circuits_when_dump_checksum_is_unchanged():
 
 
 def test_load_sxa_dump_refuses_non_dump_content_and_missing_key():
-    config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy", SXA_S3_BUCKET="zuno-demo-sxa-corpus")
+    config = _config(INGESTION_DOMAIN="knowledge.sxa-legacy", SXA_S3_BUCKET="test-sxa-bucket")
     try:
         _run_source_adapter(SOURCE_ADAPTERS["load-sxa-dump"], config, FakeStore())
         raise AssertionError("expected SystemExit for missing keys")
