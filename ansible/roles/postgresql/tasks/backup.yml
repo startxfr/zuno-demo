@@ -73,9 +73,20 @@
     - (_mb['id'] | default('')) == _postgresql_backup_id
     - (_mb['finished'] | default(false)) | bool
     - (_mb['succeeded'] | default(0)) | int > 0
-  retries: 60
+  # 30 minutes, not 10. Measured on this cluster 2026-09-04: a repo2 full of a
+  # 7.7 GB database took 755s (12m35s), and the 2026-08-30 scheduled one took
+  # 633s - so the previous 60x10s window was already under the observed range,
+  # and this task reported FAILURE on a backup that had in fact succeeded and
+  # landed 2.9 GB in S3. A backup's duration grows with the database, so the
+  # window has to have real headroom rather than track today's number; failing
+  # early here is strictly worse than waiting, because the operator then has to
+  # work out whether a "failed" backup exists.
+  retries: 180
   delay: 10
 
+# A timeout above is not proof the backup failed - it usually means it is still
+# running. Say so, and say where to look, rather than leaving a bare
+# "Unknown error" and 200 lines of dumped resource.
 - name: "postgresql | report backup completion"
   ansible.builtin.debug:
     msg: >-
