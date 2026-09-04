@@ -299,18 +299,29 @@ def check_auto_fix_commands() -> List[Finding]:
 DEBUG_PLACEHOLDER_RE = re.compile(r"[<\[{|]")
 
 
-def _debug_tasks(tasks) -> List[dict]:
-    """Every debug task in a playbook, including inside block/rescue/always."""
+def _debug_tasks(tasks, modules=("debug",)) -> List[dict]:
+    """Every debug (or fail) task in a playbook, including inside block/rescue/always.
+
+    `modules` exists because a `fail` msg is the same operator surface as a
+    `debug` msg, only louder: it is the last thing printed before the run stops,
+    so it is the message an operator is most likely to act on verbatim. ADR-0344
+    is the cost of not checking it - `make d0 reconcile openshift-ai` was
+    published as the authoritative remedy by nine findings and had never once
+    worked, because reconcile was a Day 0 verb and openshift-ai is a Day 1
+    component. WP-132 then found the same wrong day surviving in
+    discover_channel.yml's own fail message.
+    """
     found: List[dict] = []
     for task in tasks or []:
         if not isinstance(task, dict):
             continue
-        debug = task.get("ansible.builtin.debug") or task.get("debug")
-        if isinstance(debug, dict):
-            found.append(debug)
+        for module in modules:
+            body = task.get(f"ansible.builtin.{module}") or task.get(module)
+            if isinstance(body, dict):
+                found.append(body)
         for key in ("block", "rescue", "always"):
             if isinstance(task.get(key), list):
-                found += _debug_tasks(task[key])
+                found += _debug_tasks(task[key], modules)
     return found
 
 
@@ -349,7 +360,7 @@ def check_debug_make_commands() -> List[Finding]:
         if not isinstance(document, list):
             continue
         rel = path.relative_to(REPO_ROOT)
-        for debug in _debug_tasks(document):
+        for debug in _debug_tasks(document, ("debug", "fail")):
             text = f"{debug.get('msg', '')} {debug.get('var', '')}"
             for day, verb, component in MAKE_COMMAND_RE.findall(text):
                 if "{{" in day or "{{" in verb:
@@ -358,7 +369,7 @@ def check_debug_make_commands() -> List[Finding]:
                 if DEBUG_PLACEHOLDER_RE.search(component) or "{{" in component:
                     component = ""
                 findings += _check_one_make_command(
-                    day, verb, component, lists, f"{rel}: debug msg", "debug_make_commands")
+                    day, verb, component, lists, f"{rel}: debug/fail msg", "debug_make_commands")
     return findings
 
 

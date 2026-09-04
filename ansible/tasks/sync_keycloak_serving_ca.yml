@@ -39,7 +39,7 @@
   ansible.builtin.fail:
     msg: >-
       openshift-config/keycloak-serving-ca not found - run
-      `make d0 install openshift-oauth` first (it publishes the CA
+      `make d1 install openshift-oauth` first (it publishes the CA
       bundle every Keycloak-dialing workload in this repo trusts).
   when: (_sync_keycloak_ca_source.resources | default([]) | length) == 0
 

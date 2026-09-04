@@ -11,7 +11,7 @@
 
 - name: "openshift_ai | fail if the package manifest is unavailable"
   ansible.builtin.fail:
-    msg: "rhods-operator PackageManifest not found in openshift-marketplace - run 'make d0 check openshift-ai' first."
+    msg: "rhods-operator PackageManifest not found in openshift-marketplace - run 'make d1 check openshift-ai' first."
   when: (_openshift_ai_pkg.resources | default([]) | length) == 0
 
 # Prefers a literal 'stable-3.5' channel - the 3.5 z-stream, which serves
@@ -24,7 +24,7 @@
 # published only under 'beta'). That preference MUST NOT come back: 'beta'
 # is frozen on rhods-operator.3.5.0-ea.2 in the catalog, so preferring it
 # now drives a DOWNGRADE - install.yml injects the discovered channel into
-# the Application's helm values, so the next `make d0 install openshift-ai`
+# the Application's helm values, so the next `make d1 install openshift-ai`
 # would push the Subscription back to 'beta' and OLM would resolve to the
 # EA build the cluster just upgraded off.
 #

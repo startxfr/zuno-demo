@@ -86,7 +86,7 @@
   ansible.builtin.fail:
     msg: >-
       openshift-config/keycloak-serving-ca not found - run
-      `make d0 install openshift-oauth` first (it publishes the internal
+      `make d1 install openshift-oauth` first (it publishes the internal
       root CA the platform's Routes chain to). Same requirement
       run_acceptance_gate.yml/stresstest_job_run_one.yml already have -
       every HTTPS call this probe makes (Keycloak) chains to Vault's

@@ -1,0 +1,60 @@
+---
+# WP-132 step 2 (ADR-0547 clause 1): resolves the effective RHOAI version pin,
+# shared by install.yml and precheck.yml exactly as discover_channel.yml is
+# shared by install.yml and reconcile.yml. Sets _openshift_ai_version.
+#
+# ADR-0517 B9 is the reason this exists. install.yml refuses to approve an
+# InstallPlan whose CSV differs from the pinned startingCSV, and that refusal is
+# kept deliberately - auto-approving whatever a catalog publishes is how a
+# platform stops being reproducible. But a cluster provisioned later than the pin
+# is legitimately offered a different build, so SOMEONE has to record a different
+# version. Until now the only place to record it was the chart default, and this
+# repo renders charts from git main with selfHeal - so writing down "demo333 runs
+# 3.6.1" was a live change to demo222.
+#
+# Deliberate deviation from ADR-0547 clause 3: the chart default stays a REAL
+# version rather than becoming a fail-loud placeholder. Two reasons. The RHOAI
+# version is a platform decision, not cluster identity - every cluster should run
+# the same build unless its catalog cannot serve it, which is the opposite of a
+# bucket name or a hosted zone. And gitops/charts/openshift-ai/values.yaml states
+# an explicit constraint that a plain `helm template` or an ArgoCD sync without
+# Ansible must still render: a placeholder version would build the startingCSV
+# `rhods-operator.mycluster-version`, which OLM rejects. So the chart holds the
+# platform's chosen version and the variable is the per-cluster escape hatch.
+- name: "openshift_ai | check for ansible/confidential.yml (optional, only for the version pin)"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _openshift_ai_confidential_file
+
+- name: "openshift_ai | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _openshift_ai_confidential_file.stat.exists
+
+# Default read from the chart file itself rather than restated here, the shape
+# WP-118 B6 used for cert-manager's ACME identity: one source of truth, and the
+# apply stays byte-identical until an operator actually sets the variable.
+# Subscripts throughout, never dotted paths.
+- name: "openshift_ai | resolve the effective version pin"
+  ansible.builtin.set_fact:
+    _openshift_ai_version: "{{ zuno_openshift_ai_version | default(_oai_chart_version) }}"
+  vars:
+    _oai_chart_version: >-
+      {{ (lookup('ansible.builtin.file',
+                 zuno_repo_root + '/gitops/charts/openshift-ai/values.yaml')
+          | from_yaml)['cluster-ods']['operator']['subscription']['version'] }}
+
+# An empty pin builds the startingCSV "rhods-operator." and OLM would reject the
+# Subscription with a diagnostic naming neither this repo nor this variable.
+# Fail here instead, where the message can name both.
+- name: "openshift_ai | fail if the version pin resolved empty"
+  ansible.builtin.fail:
+    msg: >-
+      The RHOAI version pin resolved empty. Either
+      gitops/charts/openshift-ai/values.yaml's
+      cluster-ods.operator.subscription.version is missing, or
+      zuno_openshift_ai_version is set to an empty value in
+      ansible/confidential.yml. startingCSV is built from it
+      (rhods-operator.<version>), so an empty pin produces a Subscription OLM
+      cannot resolve.
+  when: (_openshift_ai_version | default('') | trim | length) == 0

@@ -74,7 +74,7 @@
   ansible.builtin.fail:
     msg: >-
       openshift-config/keycloak-serving-ca not found - run
-      `make d0 install openshift-oauth` first (it publishes the internal
+      `make d1 install openshift-oauth` first (it publishes the internal
       root CA the platform's Routes chain to).
   when: (_gate_ca_cm.resources | default([]) | length) == 0
 
@@ -112,7 +112,7 @@
   ansible.builtin.fail:
     msg: >-
       demo-personas-password / {{ _gate_agent }}-frontend-client-secret not
-      found in zuno-auth - run `make d0 configure keycloak` first (see
+      found in zuno-auth - run `make d0 install keycloak` first (see
       ansible/roles/keycloak/README.md).
   when: >-
     (_gate_demo_password_secret.resources | default([]) | length) == 0 or

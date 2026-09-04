@@ -2,6 +2,9 @@
 - name: "openshift_ai | discover the operator channel (ADR-0048)"
   ansible.builtin.include_tasks: discover_channel.yml
 
+- name: "openshift_ai | resolve the effective version pin (WP-132)"
+  ansible.builtin.include_tasks: resolve_version_pin.yml
+
 - name: "openshift_ai | apply the openshift-ai GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -21,6 +24,11 @@
         operator:
           enabled: true
           subscription:
+            # WP-132: the pin comes from resolve_version_pin.yml, so a cluster
+            # whose catalog cannot serve the chart's version is recorded in
+            # ansible/confidential.yml instead of by editing the chart - which
+            # renders from git main with selfHeal, i.e. a live change everywhere.
+            version: "{{ _openshift_ai_version }}"
             operator:
               channel: "{{ _openshift_ai_channel }}"
         # DSCInitialization is NOT enabled here (or in the re-apply below) -
@@ -86,7 +94,7 @@
       resource: "InstallPlan/{{ _openshift_ai_installplan.resources[0].metadata.name }} (redhat-ods-operator)"
       state: "CSV drift: targets {{ _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames }}"
       cause: "The InstallPlan targets a different CSV than the pinned startingCSV {{ _openshift_ai_subscription.resources[0].spec.startingCSV }}"
-      solution: "Investigate and approve manually, or update gitops/charts/openshift-ai/values.yaml's subscription.version/operator.csv"
+      solution: "Investigate and approve manually, then set zuno_openshift_ai_version in ansible/confidential.yml (or update gitops/charts/openshift-ai/values.yaml's subscription.version/operator.csv to change it for every cluster)"
       auto_fix: "manual only - reconcile refuses to approve drifted InstallPlans"
   when: _openshift_ai_installplan.resources[0].spec.clusterServiceVersionNames != [_openshift_ai_subscription.resources[0].spec.startingCSV]
 
@@ -128,6 +136,11 @@
         operator:
           enabled: true
           subscription:
+            # WP-132: the pin comes from resolve_version_pin.yml, so a cluster
+            # whose catalog cannot serve the chart's version is recorded in
+            # ansible/confidential.yml instead of by editing the chart - which
+            # renders from git main with selfHeal, i.e. a live change everywhere.
+            version: "{{ _openshift_ai_version }}"
             operator:
               channel: "{{ _openshift_ai_channel }}"
       userWorkloadMonitoring:
@@ -174,7 +187,7 @@
       the service_mesh Day 0 component (and cert-manager-istio-csr within
       it) must be installed and have reconciled that namespace before
       openshift_ai's maas-default-gateway Istio proxy pod can start. Run
-      `make d0 check service-mesh` first.
+      `make d1 check service-mesh` first.
   when: (_openshift_ai_istio_ca_root_cert.resources | default([]) | length) == 0
 
 - name: "openshift_ai | copy istio-ca-root-cert into openshift-ingress for the maas-default-gateway Istio proxy pod"

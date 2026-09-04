@@ -226,6 +226,31 @@ zuno_aws_route53_secret_access_key: "xxxxxx"
 # zuno_certmanager_route53_region: "eu-west-3"
 # zuno_certmanager_email: "dev+zuno-acme@example.org"
 
+# --- OpenShift AI version pin (ADR-0517 B9 / WP-132) ------------------------
+#
+# OPTIONAL, and NOT secret - it is here because it is per-cluster operator
+# configuration, like the Route53 identity above.
+#
+# The install refuses to approve an InstallPlan whose CSV differs from the
+# pinned startingCSV (ansible/roles/openshift_ai/tasks/install.yml). That
+# refusal is deliberate and stays: auto-approving whatever a catalog publishes
+# is how a platform stops being reproducible. But a cluster provisioned later
+# than the pin is legitimately offered a different build, so the version has to
+# be recordable per cluster - and editing the chart is not that, because every
+# Application renders from git main with selfHeal, so a chart edit changes every
+# cluster at the next sync.
+#
+# Leave it unset and the pin is gitops/charts/openshift-ai/values.yaml's
+# cluster-ods.operator.subscription.version (the platform's chosen build,
+# 3.5.0 GA today). Set it only when THIS cluster's catalog cannot serve that
+# version. `make d1 check openshift-ai` compares the effective pin against the
+# channel head and prints the exact value to paste here.
+#
+# Version only, without the `rhods-operator.` prefix - startingCSV is built as
+# `<subscription.operator.csv>.<version>`.
+#
+# zuno_openshift_ai_version: "3.5.0"
+
 # --- LLM external provider API keys -----------------------------------------
 # Each optional: leave "xxxxxx" and the ModelRouter fails over to the next
 # eligible provider (the local model always works with none filled in).

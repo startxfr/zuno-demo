@@ -272,10 +272,22 @@
 # never-failing, per precheck's reporting contract: this records a finding
 # so `make d0 check` prints the exact value to paste, it does not gate
 # _state_is_installed.
-- name: "openshift_ai | precheck: read the pinned startingCSV from the chart values"
+# WP-132: the version half now comes from resolve_version_pin.yml, so this
+# reports the pin the install would actually apply. Reading the chart directly
+# here would tell a demo333 operator who correctly set zuno_openshift_ai_version
+# that they are still DRIFTED - B9's own failure mode reintroduced one level up,
+# in the very check that exists to prevent it. The csv prefix and the channel
+# still come from the chart: neither is per-cluster (the channel is separately
+# discovered from the live PackageManifest at apply time, and on a fresh cluster
+# there is no Subscription to read either from - which is why this reads files
+# and not the cluster).
+- name: "openshift_ai | precheck: resolve the effective version pin (WP-132)"
+  ansible.builtin.include_tasks: resolve_version_pin.yml
+
+- name: "openshift_ai | precheck: build the pinned startingCSV from the effective pin"
   ansible.builtin.set_fact:
     _oai_pinned_csv: >-
-      {{ (_oai_chart_sub['operator']['csv']) ~ '.' ~ (_oai_chart_sub['version']) }}
+      {{ (_oai_chart_sub['operator']['csv']) ~ '.' ~ _openshift_ai_version }}
     _oai_pinned_channel: "{{ _oai_chart_sub['operator']['channel'] }}"
   vars:
     _oai_chart_sub: >-
@@ -317,7 +329,7 @@
       resource: "PackageManifest/rhods-operator channel {{ _oai_pinned_channel }} (openshift-marketplace)"
       state: "catalog publishes {{ _oai_catalog_csv }}, chart pins {{ _oai_pinned_csv }}"
       cause: "WP-118 B9 - the pinned startingCSV is not what this cluster's catalog serves on that channel. install.yml will refuse to approve the resulting InstallPlan rather than silently install a different build. Expected on a cluster provisioned later than the pin (ADR-0517's demo333 case), and NOT a defect: the refusal is what keeps the platform reproducible."
-      solution: "Decide the version deliberately, then set gitops/charts/openshift-ai/values.yaml cluster-ods.operator.subscription.version to '{{ _oai_catalog_csv | regex_replace('^rhods-operator\\.', '') }}' (and re-check operator.channel) before running the install. Pinning to an older CSV than the channel head is also valid - point subscription.operator.channel at a pinned channel such as eus-3.5 instead."
+      solution: "Decide the version deliberately, then set zuno_openshift_ai_version to '{{ _oai_catalog_csv | regex_replace('^rhods-operator\\.', '') }}' in ansible/confidential.yml before running the install - per-cluster, no chart edit and no live change to other clusters. Change gitops/charts/openshift-ai/values.yaml's subscription.version only to move the whole fleet. Pinning to an older CSV than the channel head is also valid."
       auto_fix: "manual only - choosing a platform version is a decision, not a reconcile"
   when:
     - _oai_catalog_csv | length > 0

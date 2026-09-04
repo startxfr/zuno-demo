@@ -116,9 +116,23 @@ never-failing, per precheck's contract. On `demo222` today it reports ALIGNED
 and records nothing.
 
 The residual manual step is therefore accepted and bounded: one deliberate
-version choice before Day 0, surfaced by `make d0 check` instead of by a
-failure. Pinning to a fixed channel such as `eus-3.5` rather than `beta` is the
-obvious follow-up if the churn ever costs more than it buys.
+version choice, surfaced by a check instead of by a failure.
+
+(Corrected 2026-09-04, WP-132.) This paragraph said `make d0 check`, and that
+command rejects the component: `openshift-ai` is in `DAY1_RUN_COMPONENTS`, so
+the probe runs under `make d1 check openshift-ai`. On a from-scratch run the
+drift therefore surfaces after Day 0 completes and before the Day 1 openshift-ai
+install — still hours earlier than the mid-install failure it replaces, but not
+"before Day 0" as written. This is ADR-0344's defect class resurfacing in the
+prose of the fix for it, and it was living in `discover_channel.yml`'s own
+`fail` message too. WP-130's Day 0 readiness probe is the natural home if the
+decision really should precede Day 0.
+
+WP-132 also made the pin settable per cluster (`zuno_openshift_ai_version`), so
+recording "this cluster runs a different build" no longer means editing a chart
+default that every cluster renders from `main`. Pinning to a fixed channel such
+as `eus-3.5` rather than a moving one is still the obvious follow-up if the
+churn ever costs more than it buys.
 
 B1, B5 and B6's mechanism were closed by WP-118 steps 2 and 3 on 2026-09-03, each in the
 two-step order this constraint demands: apply live so the Application carries the

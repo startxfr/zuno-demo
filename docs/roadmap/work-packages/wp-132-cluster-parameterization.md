@@ -126,6 +126,64 @@ home rather than being left pointing at a stale default — otherwise a `demo333
 who sets the parameter correctly still gets a DRIFTED report, which is B9's own failure
 mode reintroduced one level up.
 
+**Landed 2026-09-04**, repo work complete, live apply still pending.
+
+New `ansible/roles/openshift_ai/tasks/resolve_version_pin.yml`, shared by
+`install.yml` and `precheck.yml` exactly as `discover_channel.yml` is shared by
+`install.yml` and `reconcile.yml`. It loads `confidential.yml` (step 0's lesson,
+now enforced by `check_confidential_var_loaders`), resolves
+`zuno_openshift_ai_version` with the chart file as its default, and fails hard on
+an empty pin — `startingCSV` is built as `<csv>.<version>`, so an empty value
+produces a Subscription OLM cannot resolve and a diagnostic naming neither this
+repo nor the variable.
+
+Injected into **both** d0 applies in `install.yml`. `apply_gitops_app.yml`
+replaces `spec.source.helm.values` wholesale, so a key present in only one of
+them is dropped by the other — the grafana trap WP-118 step 1 hit.
+
+`precheck.yml` now builds `_oai_pinned_csv` from the effective pin instead of
+reading the chart directly. Leaving it on the chart would have told a `demo333`
+operator who correctly set the variable that they were still DRIFTED — B9's own
+failure mode reintroduced inside the check that exists to prevent it.
+
+**Deliberate deviation from ADR-0547 clause 3:** the chart default stays a real
+version rather than a fail-loud placeholder. The RHOAI version is a *platform*
+decision, not cluster identity — every cluster should run the same build unless
+its catalog cannot serve it — and the chart states an explicit constraint that a
+plain `helm template` or an Ansible-less ArgoCD sync must still render, which a
+placeholder version would break by building `rhods-operator.mycluster-version`.
+
+Inertia proof, read-only, before any apply: the resolver returns `3.5.0`, which
+equals the live Subscription's `startingCSV` (`rhods-operator.3.5.0`) and the
+installed CSV. `helm template` of the chart with the injected key added to the
+live Application's own values is **byte-identical** to the render without it, 4
+documents, `startingCSV: "rhods-operator.3.5.0"` either way. And per step 0's
+rule — what would this look like if the mechanism were dead? — injecting `9.9.9`
+renders `rhods-operator.9.9.9`, so the key really drives `startingCSV` rather
+than being inert decoration. `make d1 check openshift-ai` run locally exercises
+the new task and still reports ALIGNED with no finding.
+
+**Still pending:** the live `make d1 install openshift-ai`, which will be
+`changed=1` (the Application gains the `version` key) with a byte-identical
+render.
+
+#### A wrong-day defect found alongside it
+
+`openshift-ai` is a Day 1 component, and both this WP's first draft and
+ADR-0517/WP-118's own B9 prose said `make d0 check openshift-ai`, which the Day 0
+dispatcher rejects outright. `discover_channel.yml`'s `fail` message said it too.
+This is exactly ADR-0344's defect class — `make d0 reconcile openshift-ai` was
+published as the authoritative remedy by nine findings and had never once worked.
+
+`check_debug_make_commands` already validated `debug` messages; it now validates
+`fail` messages too, which is the louder surface — the last thing printed before
+a run stops is the message an operator is most likely to type verbatim. That
+found five further live instances, all fixed here: four `make d0 install
+openshift-oauth` (Day 1), one `make d0 check service-mesh` (Day 1), and one
+`make d0 configure keycloak` (no such verb; the secrets come from `make d0
+install keycloak`). This matters more on a fresh cluster than a running one,
+where these messages fire constantly and every wrong instruction costs a cycle.
+
 ### Step 3 — the ACME issuer and consumer flips (B11)
 
 `gitops/apps/cert-manager/application-d1.yaml` ships `certificatesIssuer:

@@ -253,7 +253,7 @@ names the exact `subscription.version` value to set. Verified on `demo222`: pin
 records nothing.
 
 Residual manual step, accepted and bounded: one deliberate version choice before Day 0,
-surfaced by `make d0 check` rather than by a failure. Pinning `subscription.operator.channel`
+surfaced by `make d1 check openshift-ai` rather than by a failure (this brief said `make d0 check`; corrected 2026-09-04 by WP-132 - openshift-ai is a Day 1 component and the Day 0 dispatcher rejects it). Pinning `subscription.operator.channel`
 to a fixed channel such as `eus-3.5` instead of `beta` is the obvious follow-up if the
 churn ever costs more than it buys.
 

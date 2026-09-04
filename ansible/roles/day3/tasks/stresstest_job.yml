@@ -55,7 +55,7 @@
   ansible.builtin.fail:
     msg: >-
       openshift-config/keycloak-serving-ca not found - run
-      `make d0 install openshift-oauth` first (see
+      `make d1 install openshift-oauth` first (see
       ansible/roles/agents/tasks/run_acceptance_gate.yml's own identical
       precondition).
   when: (_day2_stress_ca_cm.resources | default([]) | length) == 0
