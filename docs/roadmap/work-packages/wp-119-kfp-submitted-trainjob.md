@@ -86,17 +86,19 @@ Closed by [WP-126](wp-126-finalize-lora-trainjob.md) (live-verified 2026-09-04):
 5. `MLFLOW_TRACKING_URI`/trainer-pod SA access. Implicitly resolved: the
    `wp126-20260904-075724` run is visible in MLflow (experiment 34), so the
    trainer pod's ServiceAccount does have workspace access.
+4. ~~The negative test.~~ **Live-verified 2026-09-04** (run `wp126-20260904-095517`,
+   `TrainJob lora-comage-xwv7z`): the `comage` agent's ConfigMap
+   `MLOPS_LORA_TARGET_MODULES` was live-patched to `nonexistent_module_xyz`
+   (ArgoCD `automated` sync paused first, restored after). `peft.get_peft_model`
+   raised `ValueError: Target modules nonexistent_module_xyz not found in the
+   base model` after the base model loaded, the Job failed (`backoffLimit: 0`),
+   the TrainJob reached `Failed:FailedJobs`, the KFP `train-lora` step exited
+   `status 1`, and no `merge-export` pod was ever created for the run
+   (confirmed by listing every pod for the run). ConfigMap reverted, ArgoCD
+   `Synced`/`Healthy` confirmed afterward, `zuno-gpu-burst-a` scaled back to 0
+   ~7.7 minutes after the pod failed.
 
-Still open, minor, not a WP-119 close-out blocker — tracked here for whoever
-picks it up:
-
-4. **The negative test.** A deliberately broken `MLOPS_LORA_TARGET_MODULES`
-   must fail the TrainJob, exit the KFP step non-zero, and never start
-   `merge-export`. Not exercised by WP-126 (its own run failed, but on the
-   pre-existing `merge-export` overwrite guard, not on this path) and not
-   mentioned in any commit since. This is a live-cluster action (can trigger
-   a `zuno-gpu-burst-a` scale-up) — do not run without explicit operator
-   go-ahead first.
+All five items are now closed. WP-119 has no remaining open engineering work.
 
 ## Verification
 
