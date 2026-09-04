@@ -54,7 +54,7 @@ spec:
   baseRefs:
     - name: {{ .Values.weshModel.llmInferenceService.baseRef }}
   model:
-    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.weshModel.servedModelName }}/"
+    uri: {{ include "models.modelUri" (list $ .Values.weshModel.s3Source .Values.weshModel.servedModelName) | quote }}
     name: {{ .Values.weshModel.servedModelName | quote }}
   replicas: {{ .Values.weshModel.minReplicas }}
   template:

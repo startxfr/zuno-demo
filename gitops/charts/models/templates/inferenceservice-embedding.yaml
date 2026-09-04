@@ -70,6 +70,6 @@ spec:
       runtime: {{ .Values.embeddingModel.servingRuntimeName }}
       # <prefix>/<servedModelName>/ is the bucket's layout convention,
       # same as the chat predictor.
-      storageUri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.embeddingModel.servedModelName }}/"
+      storageUri: {{ include "models.modelUri" (list $ .Values.embeddingModel.s3Source .Values.embeddingModel.servedModelName) | quote }}
       resources:
         {{- toYaml .Values.embeddingModel.resources | nindent 8 }}

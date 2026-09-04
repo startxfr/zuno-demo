@@ -55,7 +55,7 @@ spec:
   baseRefs:
     - name: {{ .Values.gptOssModel.llmInferenceService.baseRef }}
   model:
-    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.gptOssModel.servedModelName }}/"
+    uri: {{ include "models.modelUri" (list $ .Values.gptOssModel.s3Source .Values.gptOssModel.servedModelName) | quote }}
     name: {{ .Values.gptOssModel.servedModelName | quote }}
   {{- /*
   ADR-0542/WP-121. spec.scaling and spec.replicas are mutually exclusive

@@ -84,7 +84,7 @@ spec:
   baseRefs:
     - name: {{ .Values.qwen35Model.llmInferenceService.baseRef }}
   model:
-    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.qwen35Model.servedModelName }}/"
+    uri: {{ include "models.modelUri" (list $ .Values.qwen35Model.s3Source .Values.qwen35Model.servedModelName) | quote }}
     name: {{ .Values.qwen35Model.servedModelName | quote }}
   replicas: {{ .Values.qwen35Model.minReplicas }}
   template:

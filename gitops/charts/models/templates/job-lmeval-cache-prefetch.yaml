@@ -22,6 +22,15 @@ timeout, matching job-schema-apply.yaml's documented reasoning.
 {{- if .Values.lmEval.enabled }}
 {{- range .Values.lmEval.jobs }}
 {{- if .datasetCachePvc }}
+{{- /* ADR-0546/WP-131: this Job pulls the tokenizer for a model that may
+       already have moved to the shared source bucket, so it resolves the SAME
+       per-model s3Source the model's own LLMInferenceService uses. A per-job
+       s3Source overrides it; omitted, it follows the chart-wide default.
+       Leaving this pinned to modelsS3 while a model moved would make lmeval
+       jobs 404 on a tokenizer whose weights serve perfectly well - the two
+       would then disagree about where that one model lives, which is a far
+       more confusing failure than either being wrong on its own. */}}
+{{- $s3 := include "models.s3Block" (list $ (.s3Source | default $.Values.s3Source)) | fromYaml }}
 {{- $tokenizerDir := "" }}
 {{- range .modelArgs }}
 {{- if eq .name "tokenizer" }}
@@ -145,21 +154,21 @@ spec:
               import boto3
               from botocore.config import Config
 
-              bucket = {{ $.Values.modelsS3.bucket | quote }}
+              bucket = {{ $s3.bucket | quote }}
               # ADR-0534/WP-109: per-job S3 model dir (jobs now benchmark
               # more than the chart's own primary model - qwen3.5-9b and
               # its wesh PEFT variant for the base-vs-candidate
               # comparison); falls back to the chart-wide servedModelName
               # for the original qwen3.6 job.
-              prefix = {{ printf "%s/%s" $.Values.modelsS3.prefix (.s3ModelName | default $.Values.servedModelName) | quote }}
+              prefix = {{ printf "%s/%s" $s3.prefix (.s3ModelName | default $.Values.servedModelName) | quote }}
               dest = {{ $tokenizerDir | quote }}
               files = ["tokenizer.json", "tokenizer_config.json", "vocab.json", "merges.txt"]
 
               os.makedirs(dest, exist_ok=True)
               s3 = boto3.client(
                   "s3",
-                  endpoint_url={{ printf "https://%s" $.Values.modelsS3.endpoint | quote }},
-                  region_name={{ $.Values.modelsS3.region | quote }},
+                  endpoint_url={{ printf "https://%s" $s3.endpoint | quote }},
+                  region_name={{ $s3.region | quote }},
                   config=Config(signature_version="s3v4"),
               )
 

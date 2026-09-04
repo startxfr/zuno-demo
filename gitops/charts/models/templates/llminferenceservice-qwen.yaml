@@ -86,7 +86,7 @@ spec:
   baseRefs:
     - name: {{ .Values.llmInferenceService.baseRef }}
   model:
-    uri: "s3://{{ .Values.modelsS3.bucket }}/{{ .Values.modelsS3.prefix }}/{{ .Values.servedModelName }}/"
+    uri: {{ include "models.modelUri" (list $ .Values.s3Source .Values.servedModelName) | quote }}
     name: {{ .Values.servedModelName | quote }}
   replicas: {{ .Values.minReplicas }}
   template:

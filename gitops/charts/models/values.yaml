@@ -145,6 +145,10 @@ modelId: Qwen/Qwen3.6-27B-FP8
 # ("The model `qwen2.5-7b-instruct` does not exist") - the two ids are
 # different concerns.
 servedModelName: qwen3.6-27b-instruct
+# ADR-0546/WP-131: which bucket this model's weights are read from -
+# "models" (the per-cluster bucket, unchanged) or "sources" (the shared
+# cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
+s3Source: models
 # ADR-0518: 32768 (was 8192 on the 7B model) - Qwen3.6-27B-FP8 leaves
 # ~18GB of the 2g.48gb slice for KV after its ~28GB of weights, comfortable
 # for this length at demo concurrency. If multi-agent load starts
@@ -394,6 +398,21 @@ modelsS3:
     accessKeyProperty: accessKeyId
     secretKeyProperty: secretAccessKey
 
+# ADR-0546/WP-131: the shared cross-cluster source bucket. Model weights are an
+# INPUT that seeds any cluster, so they belong here rather than in a per-cluster
+# bucket - but they move one model at a time, selected by each model's s3Source
+# below, never by flipping modelsS3.bucket (which would move all five at once).
+# Same credential: the Vault rag/s3 identity carries a zuno* wildcard, so no new
+# Secret is needed. Same region and endpoint as modelsS3 on purpose - the shared
+# KServe serving credential carries only one endpoint/region annotation pair,
+# and templates/_models-s3.tpl refuses to render a model pointed at a source
+# that disagrees.
+sourcesS3:
+  bucket: zuno-demo-sources
+  prefix: models
+  endpoint: s3.eu-west-2.amazonaws.com
+  region: eu-west-2
+
 # Additive second model: text embeddings for rag-ingestion (see
 # gitops/charts/rag-ingestion's embedding.endpoint/dimensions) and
 # rag-service's query-side embedding calls. inferenceServiceName is
@@ -422,6 +441,10 @@ embeddingModel:
   # chat model above - rag-service's EMBEDDING_MODEL_NAME expects the
   # short canonical id.
   servedModelName: qwen3-embedding-0.6b
+  # ADR-0546/WP-131: which bucket this model's weights are read from -
+  # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
+  # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
+  s3Source: models
   # ADR-0518: Qwen/Qwen3-Embedding-0.6B, 1024-dim, replaces
   # BAAI/bge-small-en-v1.5 (384-dim, English-only) - the live corpus is
   # French Confluence content, so an MTEB-multilingual-topping model is
@@ -501,6 +524,10 @@ gptOssModel:
   # Same modelId-vs-API-id split as the chat model; also the S3 directory
   # name under modelsS3 (<prefix>/<servedModelName>/).
   servedModelName: gpt-oss-20b
+  # ADR-0546/WP-131: which bucket this model's weights are read from -
+  # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
+  # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
+  s3Source: models
   # 131k native; capped well below to bound KV growth while still giving
   # reasoning tasks far more room than the qwen chat model's 8192.
   maxModelLen: 32768
@@ -724,6 +751,10 @@ weshModel:
   # (<prefix>/<servedModelName>/) - the exact prefix components/mlops's
   # merge-export stage uploads the merged bf16 checkpoint to.
   servedModelName: qwen3.5-9b-wesh
+  # ADR-0546/WP-131: which bucket this model's weights are read from -
+  # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
+  # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
+  s3Source: models
   # The variant carries all of Comage's traffic and sits in the larger
   # 48GB slice, so it keeps the same 32768 the other 48GB model uses.
   maxModelLen: 32768
@@ -786,6 +817,10 @@ weshModel:
 qwen35Model:
   inferenceServiceName: qwen35-9b
   servedModelName: qwen3.5-9b
+  # ADR-0546/WP-131: which bucket this model's weights are read from -
+  # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
+  # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
+  s3Source: models
   # Deliberately BELOW the 32768 the 48GB models use - see the block
   # comment above. Raising this is the first thing to suspect if the pod
   # OOMs or vLLM fails to allocate its KV pool at startup.
