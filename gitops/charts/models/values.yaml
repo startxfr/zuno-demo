@@ -315,19 +315,20 @@ llmInferenceService:
 #                         below and in values.schema.json - a C2/C3
 #                         adapter cannot attach to a serving path with
 #                         maas.enabled (externally-eligible).
-# WP-133 (2026-09-04): the first adapter this mechanism has ever served -
-# registered live by a real run of the tekos/knowledge.tech mlops pipeline
-# (Model Registry model id 7, version id 8; gate PASS: acceptance 0.8,
-# no register/tool-calling halves - this is a grounding-domain run, not a
-# style one). Promotion PR per ADR-0302 point 7 - reviewed here, not
-# pushed automatically by the pipeline.
-loraAdapters:
-  - name: tekos-lora
-    registryModelName: tekos-lora
-    registryModelVersion: wp126-20260904-161639
-    sourceS3Uri: s3://zuno-corpus/mlops/models/tekos/wp126-20260904-161639/adapter
-    path: /mnt/loras/tekos-lora
-    classification: C1
+# WP-133 (2026-09-04): tekos-lora (Model Registry version
+# wp126-20260904-161639) was promoted here and loaded live, but vLLM
+# crashed activating it - AttributeError: 'NoneType' object has no
+# attribute 'shape' in vllm/lora/layers/column_parallel_linear.py's
+# expand_packed_lora, loading the adapter's linear_attn.in_proj_qkv (a
+# FUSED/packed QKV module unique to this hybrid-attention architecture)
+# whose packing convention this vLLM build's LoRA support does not
+# recognize. Reverted to [] to stop qwen35-9b's crash loop and restore
+# serving while a new adapter is trained with loraTargetModules
+# restricted to the plain (non-packed) self_attn.{q,k,v,o}_proj modules
+# only (gitops/charts/mlops/values.yaml's tekos entry) - see that value's
+# own comment for the detail. Re-promotion is a fresh PR once that run
+# passes AND is confirmed to actually attach in vLLM, not just register.
+loraAdapters: []
 
 # WP-133: the image the adapter-download initContainer runs
 # (components/mlops/src/download_adapter.py). Reuses the mlops pipeline's
