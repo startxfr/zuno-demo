@@ -1,6 +1,7 @@
 # WP-132: Convert every remaining cluster-specific value into an Ansible parameter
 
-- **State:** Repo work in review
+- **State:** Done (2026-09-04 — steps 0-3 landed and live-verified on `demo222`;
+  steps 4 and 5 deliberately scoped out, see below)
 - **ADRs:** [ADR-0547](../../adr/0547-parameterize-every-cluster-specific-value-in-ansible.md)
   (the execution of that decision),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md)
@@ -290,35 +291,43 @@ Application and pruned eight resources including the router's certificate. It
 reported no change and the values are the live ones — the mechanism is proven
 by what did **not** happen only because the alternative was loud.
 
-### Step 4 — the rest of the `machines` chart's cluster shape
+### Steps 4 and 5 — deliberately not done (2026-09-04)
 
-WP-118 step 2 parameterized the AWS *identity* (cluster id, region, AMI, security group,
-AZ→subnet map) and deliberately left `machineSet.list` as the authoring surface, since
-`machines/tasks/install.yml` reads it from `values.yaml` on every run and replaces only
-the identity fields. The availability zones and instance types in that list are still
-cluster-specific: `values.yaml` records that g7e exists only in `eu-west-2a` and
-`eu-west-2c`, which is a fact about one region.
+Both were scoped out at the operator's decision, and the reasoning is worth
+recording because "we ran out of steps" and "the remaining steps were not worth
+their risk" are different outcomes.
 
-Parameterize the AZ set and instance types while keeping the chart as the place where a
-taint or a MIG profile is authored.
+**Step 4 (the `machines` chart's AZ set and instance types).** WP-118 already
+parameterized the AWS *identity* — cluster id, region, AMI, security group and
+the AZ→subnet map — all of it discovered from live resources. What is left in
+`gitops/charts/machines/values.yaml` is the availability zones and instance
+types, and that is **fleet design, not cluster identity**. `values.yaml` records
+that g7e exists only in `eu-west-2a` and `eu-west-2c`; a `demo333` in another
+region will want different instance types entirely, which is a human decision and
+not something a `resolve_cluster_*.yml` task can discover. Converting it would
+have bought a variable nobody can populate correctly without thinking, at the
+price of the one edit in this WP that can **prune live GPU MachineSets**. The
+risk/value ratio is materially worse than steps 0–3 and the step was dropped.
 
-**This step can prune live GPU MachineSets** if the enable toggles are dropped from the
-dict. WP-118's three guards stay: build from `application-d0.yaml`'s own values so the
-toggles come along by construction; assert all three toggles are true and the list still
-has as many entries as the chart declares; and fail pre-flight if a declared AZ has no
-installer MachineSet to read a subnet from.
+The residual gap it would have closed is covered anyway: WP-130's probe P2 fails
+when a declared availability zone has no installer MachineSet to read a subnet
+from, which is the failure mode ADR-0517's risk list actually names. An operator
+provisioning `demo333` edits the chart's `machineSet.list` as a normal reviewed
+change, which is the right shape for a fleet-design decision.
 
-### Step 5 — Vault for anything secret
+**Step 5 (Vault paths for new secrets).** Nothing to carry. All five variables
+this WP introduced — `zuno_cluster_name`, `zuno_openshift_ai_version`,
+`zuno_certmanager_acme_enabled`, `_issuer`, `_router_default_cert`,
+`_api_server_named_cert` — are non-secret per-cluster configuration, so
+`ansible/confidential.yml` is their correct home under ADR-0547 clause 2. Putting
+non-secrets in Vault buys nothing and adds a failure mode. The step existed in
+case a conversion turned up a secret; none did.
 
-Any value introduced above that is secret gets its own Vault path and its own consumer
-identity, seeded through `ansible/tasks/vault_seed_if_missing.yml`. ADR-0345 is what makes
-re-running the seed safe: it writes only missing paths and does not rotate existing
-secrets, correcting the belief — true when `mariadb/README.md` was written on 2026-08-12,
-false the next day — that a `make d0 install vault` re-run rotates everything.
-
-Most of what this WP touches is *not* secret. A hosted zone ID is a published DNS fact and
-an operator channel name is public; those belong in `confidential.yml`, not Vault. Putting
-non-secrets in Vault buys nothing and adds a failure mode.
+**Consequence for ADR-0547.** Its acceptance criterion 1 — every value in
+Decision clause 1 is an Ansible parameter — is therefore **not met**, and
+deliberately so: availability zones and instance types remain chart defaults.
+That exception is recorded in ADR-0547's implementation notes rather than left as
+silent drift, which is the whole point of having the criterion.
 
 ## What NOT to touch
 

@@ -126,8 +126,34 @@ missing is the statement that they are mandatory.
 
 ## Implementation notes
 
-*(empty — WP-132 carries the conversions, WP-130 the probe, WP-131 the S3
-family; entries are added as each lands.)*
+- **2026-09-04, WP-132 — one deliberate exception to Decision clause 1.** The
+  `machines` chart's availability zones and instance types stay chart defaults.
+  Clause 1 lists them, so **acceptance criterion 1 is knowingly unmet** and this
+  note is the record of it rather than silent drift. The reasoning: WP-118
+  already parameterized everything in that chart that a
+  `resolve_cluster_*.yml` task can discover (cluster id, region, AMI, security
+  group, AZ→subnet map). What remains is fleet *design* — `values.yaml` records
+  that g7e exists only in `eu-west-2a` and `eu-west-2c`, and a cluster in another
+  region wants different instance types entirely, which is a human decision no
+  discovery task can make. Converting it would have produced a variable nobody
+  can populate without thinking, at the cost of the one edit in that WP capable
+  of pruning live GPU MachineSets. WP-130's probe P2 covers the failure mode that
+  actually matters — a declared AZ with no installer MachineSet to read a subnet
+  from — so the gap is detected rather than parameterized.
+
+  This is a narrowing worth watching, not a licence: the clause stands, and a
+  future value that *is* cluster identity does not get to cite this note.
+
+- **2026-09-04, WP-132 — clause 3's placeholder rule has one reasoned
+  exception too.** The RHOAI version pin keeps a real chart default rather than a
+  fail-loud placeholder, because the version is a platform decision rather than
+  cluster identity and the chart states an explicit constraint that a plain
+  `helm template` must render. See WP-132 step 2.
+
+- **2026-09-04, WP-132 — clause 2's Vault surface went unused.** All five
+  variables the WP introduced are non-secret per-cluster configuration and
+  belong in `ansible/confidential.yml`. Putting non-secrets in Vault buys
+  nothing and adds a failure mode.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives,
 Consequences, Security/Operational considerations, Migration/evolution and
