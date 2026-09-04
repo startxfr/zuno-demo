@@ -64,8 +64,9 @@ anything a workload needs comes from an `ExternalSecret`.
 
 Before the first `make day0|d0 install` (specifically before installing
 `vault`), copy `ansible/confidential.example.yml` to `ansible/confidential.yml`
-and fill in the values (Google OAuth client, SMTP technical credentials,
-Atlassian Confluence token) - the `vault` role fails fast if this file is
+and fill in what this cluster needs - `ansible/confidential.example.yml` is the
+authority, 20 blocks with per-variable prose, most of them optional, and
+fields left as `xxxxxx` treated as not configured - the `vault` role fails fast if this file is
 missing, and reads it on every run to (re-)seed Vault, so it can be deleted
 again afterwards unless Vault needs to be reinstalled. `ansible/confidential.yml`
 is gitignored; never commit it.

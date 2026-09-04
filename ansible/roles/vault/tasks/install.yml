@@ -12,8 +12,11 @@
     msg: >-
       ansible/confidential.yml is missing. Copy
       ansible/confidential.example.yml to ansible/confidential.yml and fill
-      in the values (Google OAuth client, SMTP technical credentials,
-      Atlassian Confluence token) before running `make d0 install vault`.
+      in what this cluster needs - that file is the authority, 20 blocks with
+      per-variable prose, most of them optional, and fields left as xxxxxx
+      treated as not configured - before running `make d0 install vault`.
+      docs/platform/prerequisites.md lists what else must be true or decided
+      first.
       This role reads it on every run, so the file can be deleted again
       afterwards - unless Vault needs to be reinstalled later.
   when: not _vault_confidential_file.stat.exists

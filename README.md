@@ -54,8 +54,14 @@ Each agent has a dedicated frontend and BFF deployment while consuming shared pl
 
 ## Operator workflow
 
-The only manual input for the entire install is the OpenShift API endpoint
-and a cluster-admin token (ADR-0024) - everything else is automated:
+Three manual inputs, and no secret is ever committed (ADR-0024): the
+OpenShift API endpoint and a cluster-admin token; `ansible/confidential.yml`,
+copied from the gitignored example and holding this environment's credentials
+and per-cluster configuration; and, on a cluster whose catalog has moved past
+the pinned build, a deliberate OpenShift AI version choice. Everything else is
+automated - `make d0 check` reports anything missing before a first install and
+applies nothing. See
+[docs/platform/prerequisites.md](docs/platform/prerequisites.md).
 
 ```bash
 oc login https://api.mycluster.com:6443 --token=<cluster-admin token>
