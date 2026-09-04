@@ -118,8 +118,18 @@ cluster-specific value becomes an Ansible parameter, seeded through Vault when
 secret — executed by WP-132, verified by WP-130's Day 0 readiness probe).
 ADR-0517's own run stays blocked on an operator provisioning `demo333`.
 
-**4 ADRs.** Open: ADR-0517, ADR-0546, ADR-0547. Open work packages: WP-131
-(WP-130 and WP-132 done 2026-09-04).
+**Update (2026-09-04).** ADR-0546 moved to `Accepted`, and WP-131 now carries
+the full S3 migration runbook — mapping, server-side copy commands, the
+pgBackRest cutover sequence and the per-component order. That leaves **B12 as
+the last open blocker**: the seven buckets are still not namespaced by cluster,
+so a `demo333` installed today would write into `demo222`'s data. It is blocked
+on manual AWS provisioning and on two pre-existing defects the planning
+surfaced — the S3 backup check never sets `repo2-path`, so it has always
+reported "no backup" while three real full backups exist, and
+`make d3 backup postgresql` cannot trigger one.
+
+**4 ADRs.** Open: ADR-0517, ADR-0546 (`Accepted`, executing via WP-131),
+ADR-0547. Open work packages: WP-131 (WP-130 and WP-132 done 2026-09-04).
 
 ## v0.9
 

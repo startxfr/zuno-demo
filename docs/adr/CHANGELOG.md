@@ -9,6 +9,30 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Acceptance note (2026-09-04) - ADR-0546 Proposed -> Accepted
+
+Its own acceptance criteria decided this: criterion 2 (a follow-up work package
+exists) was met when WP-131 was authored on 2026-09-03, and criterion 3 (no
+demo222 bucket, credential or chart is touched by the ADR itself) holds by
+construction, because clause 5 makes the record a decision and nothing else.
+
+Accepting it also unblocks the last open blocker on ADR-0517's list. B12 - seven
+buckets, none namespaced by cluster - is the only one there that damages the
+EXISTING cluster rather than the new one: a demo333 installed today writes its
+RAG corpus, database backups, traces and MLflow artifacts into demo222's
+buckets, which is a direct violation of ADR-0517's own "demo222 is left
+untouched" criterion.
+
+A live read-only inventory taken the same day corrected two rows of the Mapping
+table and added four facts that change what the execution costs; all of it is in
+the ADR's implementation notes rather than rewritten into the body, per the
+index's rule that only Status and dated notes are editable. The corrections are
+the lmeval tokenizer cache (a read of the models prefix, not a -data object) and
+pgBackRest's repo path (pgbackrest/repo2/, not the bucket root). The facts are
+that models/ is 164.6 GB of the ~165 GB total, zuno-aap-hub is empty,
+mlflow-artifacts/ does not exist yet, and the SXA dump has an orphaned older
+duplicate with no consumer.
+
 ## Authoring note (2026-09-03) - ADR-0547, and why ADR-0517 grew three blockers
 
 ADR-0517 bounded its own remediation to nine blockers in an explicit clause,

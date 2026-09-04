@@ -1,6 +1,6 @@
 # ADR-0546: Introduce a cross-cluster source bucket and per-cluster S3 bucket convention
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.8
 - **Date:** 2026-09-03
 - **Decision owners:** Zuno Demo architecture team
@@ -132,6 +132,41 @@ Anomalies found along the way, independent of the cross-cluster question:
 | MariaDB backups | `zuno-data-pgbackups` | `zuno-demo222-backups/mariadb/` |
 | AAP Hub content | `zuno-aap-hub` | `zuno-demo222-aap-hub` |
 | RHOAI traces | `zuno-demo-rhoai-traces` | `zuno-demo222-traces` |
+
+## Implementation notes
+
+*(This ADR creates nothing by itself — Decision clause 5. Execution is WP-131.)*
+
+**Accepted 2026-09-04.** Acceptance criterion 2 was satisfied on 2026-09-03 when
+WP-131 was authored, and criterion 3 holds by construction. ADR-0517 records the
+sharing problem as blocker B12 — the only blocker on that list which damages the
+*existing* cluster rather than the new one — so WP-131 gates the `demo333` run.
+
+**Two factual corrections from the live inventory (2026-09-04, read-only).** The
+Context and Mapping above were written from a static read; measuring the buckets
+changed two rows and left the decision itself untouched.
+
+- **The lmeval tokenizer cache row is wrong.** Mapping sends it to
+  `zuno-demo222-data`. It is not a bucket-resident cache: `models`'
+  `job-lmeval-cache-prefetch.yaml` *reads* `models/<name>/` into the
+  `lmeval-hf-cache` PVC. It follows the weights to `zuno-demo-sources` and
+  nothing about it lands in `-data`.
+- **pgBackRest does not write at the bucket root.** It writes under
+  `pgbackrest/repo2/{archive,backup}/`, PGO's default path for a cloud repo. The
+  target `zuno-demo222-backups/postgresql/` therefore requires a `repo2-path`
+  setting that exists nowhere in the repository today, and moving a pgBackRest
+  repo is a sequenced operation rather than a copy — see WP-131.
+
+**Four facts worth recording, because they change what the work costs.**
+`models/` is **164.6 GB across 226 objects**, which is 99% of everything that
+moves; all the rest fits in ~850 MB. `zuno-aap-hub` is **empty**, so that row is
+a configuration change with no migration. `zuno-corpus` has **no
+`mlflow-artifacts/` prefix yet**, making MLflow the cheapest cutover and the
+natural rehearsal. And the raw SXA dump exists **twice** — `zuno-demo-sxa-corpus`
+(authoritative, 2026-08-23) and an older copy at
+`zuno-demo-rag-corpus/sxa_data/` (2026-08-21) that this ADR does not mention and
+that has **no consumer anywhere in the tree**; it is an orphan and dies with the
+old bucket rather than being migrated.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives, Consequences,
 Security/Operational considerations, Migration/evolution and Review evidence.
