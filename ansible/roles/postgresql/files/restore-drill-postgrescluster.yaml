@@ -1,0 +1,100 @@
+# WP-131 P2 / ADR-0112: the non-destructive restore drill for repo2.
+#
+# Applied by hand (`oc apply -f`), watched, then deleted - it is deliberately
+# not wired into a make verb, because creating a second PostgresCluster with
+# 100Gi of PVCs is not something to make one keystroke away.
+#
+# Run 2026-09-04, the first time repo2 has ever been restored from: the
+# 2026-08-18 and 2026-08-25 drills both used repo1, the local PVC that
+# disappears with the cluster it protects. Restore Job 7m40s, 19 databases,
+# and the acceptance was content rather than liveness -
+# rag-sxa-legacy 319841 = 319841, rag-tech 69755 = 69755, keycloak realms
+# master,zuno on both, and an md5 over 500 real corpus rows identical on both
+# sides (97069428e06b07cee52a1d5962c78fff). "The pods are Ready" would have
+# proved none of that.
+#
+# WP-131 P2: throwaway restore drill. Bootstrapped STRAIGHT FROM S3 via
+# spec.dataSource.pgbackrest (the "cloud" form) so it never touches
+# zuno-postgresql. repo2 has never been restored from - the 2026-08-18 and
+# 2026-08-25 drills both used repo1, the local PVC that disappears with the
+# cluster it protects. Deleted, with its PVCs, as soon as the row counts match.
+apiVersion: postgres-operator.crunchydata.com/v1beta1
+kind: PostgresCluster
+metadata:
+  name: zuno-postgresql-drill
+  namespace: zuno-data
+  labels:
+    zuno.io/managed-by: zuno-ansible-drill
+spec:
+  postgresVersion: 18
+  openshift: true
+  # Same extension the source cluster preloads; without it the restored
+  # instance refuses to start on databases that carry timescaledb objects.
+  config:
+    parameters:
+      shared_preload_libraries: timescaledb
+  dataSource:
+    pgbackrest:
+      stanza: db
+      priorityClassName: zuno-platform-weak
+      configuration:
+        - secret:
+            name: zuno-postgresql-backup-s3
+      # The dataSource repo is named repo2, NOT repo1, and that is not
+      # cosmetic: pgBackRest derives its option names from the repo name, so a
+      # repo called repo1 demands repo1-s3-key while the real credential
+      # Secret - reused here unchanged, which is the point - carries
+      # repo2-s3-key. Naming it repo1 fails with
+      # "restore command requires option: repo1-s3-key", which reads as a
+      # missing credential rather than a naming mismatch. Hit on the first
+      # attempt, 2026-09-04.
+      global:
+        repo2-path: /pgbackrest/repo2
+      repo:
+        name: repo2
+        s3:
+          bucket: zuno-data-pgbackups
+          endpoint: s3.eu-west-2.amazonaws.com
+          region: eu-west-2
+      resources:
+        requests: {cpu: 200m, memory: 512Mi}
+        limits: {cpu: "2", memory: 4Gi}
+  instances:
+    - name: instance1
+      replicas: 1
+      priorityClassName: zuno-platform-weak
+      metadata:
+        annotations:
+          traffic.sidecar.istio.io/excludeInboundPorts: "5432,8432"
+          traffic.sidecar.istio.io/excludeOutboundPorts: "5432,8432"
+      resources:
+        requests: {cpu: 500m, memory: 2Gi}
+        limits: {cpu: "2", memory: 8Gi}
+      dataVolumeClaimSpec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: gp3-csi
+        resources: {requests: {storage: 40Gi}}
+      walVolumeClaimSpec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: gp3-csi
+        resources: {requests: {storage: 20Gi}}
+  backups:
+    pgbackrest:
+      # PGO requires at least one repo on the new cluster. A small local PVC,
+      # never written to by a schedule: this cluster exists for minutes.
+      metadata:
+        annotations:
+          traffic.sidecar.istio.io/excludeInboundPorts: "5432,8432"
+          traffic.sidecar.istio.io/excludeOutboundPorts: "5432,8432"
+      repoHost:
+        priorityClassName: zuno-platform-weak
+        resources:
+          requests: {cpu: 50m, memory: 256Mi}
+          limits: {cpu: "1", memory: 512Mi}
+      repos:
+        - name: repo1
+          volume:
+            volumeClaimSpec:
+              accessModes: [ReadWriteOnce]
+              storageClassName: gp3-csi
+              resources: {requests: {storage: 40Gi}}

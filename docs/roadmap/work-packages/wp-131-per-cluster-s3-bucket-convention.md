@@ -508,6 +508,50 @@ uses, writes one tiny object and removes it. Absence of errors in the pod logs
 proves nothing here: the Hub had never written to either bucket, so a broken
 configuration and a correct idle one look identical.
 
+### P0, P1, P2 — done 2026-09-04, before anything touched a bucket
+
+**P0.** `make d3 check postgresql` reports *"S3 repo2 holds 3 completed
+backup(s) in stanza(s) db at path /pgbackrest/repo2 - the bucket agrees with
+the operator's 5 successful scheduled backup(s)"*. Run again with
+`EXTRA_VARS='-e zuno_postgresql_backup_s3_path=/deliberately-wrong'` it reports
+**zero** and names the failure mode. Both halves matter: the first alone cannot
+tell a probe that reads the path from one that answers three regardless.
+
+**P1.** The first on-demand backup this cluster has ever completed —
+`status.pgbackrest.manualBackup` was `null` until now, so P0-b's fix had never
+run. It also exposed one more check that lies: the task waited 600s while the
+backup took **755s**, so it reported failure on a backup that succeeded and
+landed 2.9 GB across 11,112 objects. Window widened to 30 minutes (the
+2026-08-30 scheduled full already took 633s, so 600s was under the observed
+range, not merely unlucky). Re-run: 744s, reported clean.
+
+**P2 — repo2 restored from, for the first time ever.** Both prior drills
+(2026-08-18, 2026-08-25) used repo1, the local PVC that disappears with the
+cluster it protects; the off-cluster repo, the one that matters in the case
+backups exist for, had never been exercised. A throwaway
+`zuno-postgresql-drill` bootstrapped straight from S3 via
+`spec.dataSource.pgbackrest` never touched `zuno-postgresql`. Manifest kept at
+`ansible/roles/postgresql/files/restore-drill-postgrescluster.yaml`.
+
+Restore Job 7m40s, 19 databases. Acceptance was **content, not liveness**:
+
+| Check | Source | Restored |
+|---|---|---|
+| `rag-sxa-legacy` embeddings | 319,841 | 319,841 |
+| `rag-tech` embeddings | 69,755 | 69,755 |
+| `keycloak` realms | `master,zuno` | `master,zuno` |
+| md5 over 500 real corpus rows | `97069428e0…` | `97069428e0…` |
+
+One trap, hit on the first attempt: **name the dataSource repo `repo2`, not
+`repo1`.** pgBackRest derives its option names from the repo name, so a repo
+called `repo1` demands `repo1-s3-key` while the real credential Secret — reused
+unchanged, which is the point of the drill — carries `repo2-s3-key`. It fails
+with *"restore command requires option: repo1-s3-key"*, which reads as a
+missing credential rather than a naming mismatch.
+
+The drill cluster and its PVCs were deleted; `zuno-postgresql` stayed 3/3 with
+its PgBouncer at 2 replicas throughout.
+
 ### PhysicalBackup's spec.storage is immutable — the mariadb cutover is a recreate
 
 Found live 2026-09-04, and it is the one place in this WP where the ADR-0547
