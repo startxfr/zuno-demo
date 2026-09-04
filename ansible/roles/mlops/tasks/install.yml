@@ -100,7 +100,12 @@
         template:
           metadata:
             annotations:
-              zuno.io/ca-bundle-restarted-at: "{{ ansible_date_time.iso8601 }}"
+              # WP-133 (live, 2026-09-04): ansible_date_time is unset here
+              # (day2_install.yml runs with gather_facts: false and nothing
+              # gathers it) - exactly the same latent bug WP-129 fixed in
+              # rag_ingestion's own copy of this task and predicted would
+              # also hit this one. now() is Ansible's fact-free equivalent.
+              zuno.io/ca-bundle-restarted-at: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}"
   when: _mlops_ca_bundle_apply is defined and _mlops_ca_bundle_apply.changed | default(false)
 
 # UNVERIFIED against a live cluster - same caveat
