@@ -100,7 +100,12 @@
         template:
           metadata:
             annotations:
-              zuno.io/ca-bundle-restarted-at: "{{ ansible_date_time.iso8601 }}"
+              # ansible_date_time is unset here (day2_install.yml runs
+              # with gather_facts: false and nothing gathers it) - unlike
+              # the mlops role's own copy of this same restart task, use
+              # the fact-free now() global instead of silently rendering
+              # an empty/undefined timestamp into the annotation.
+              zuno.io/ca-bundle-restarted-at: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}"
   when: _rag_ingestion_ca_bundle_apply is defined and _rag_ingestion_ca_bundle_apply.changed | default(false)
 
 # UNVERIFIED against a live cluster - the DataSciencePipelinesApplication
