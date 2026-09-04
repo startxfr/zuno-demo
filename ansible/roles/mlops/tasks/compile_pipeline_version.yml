@@ -23,8 +23,9 @@
 - name: "mlops | set the list of pipeline compile targets"
   # One entry per values.yaml `agents:` entry with enabled: true. Extend
   # this list when a second candidate agent flips on.
+  # WP-133: tekos added (knowledge.tech domain-grounding, skipMerge: true).
   ansible.builtin.set_fact:
-    _mlops_compile_targets: ["comage"]
+    _mlops_compile_targets: ["comage", "tekos"]
 
 - name: "mlops | ensure the compiler venv (kfp SDK) exists"
   ansible.builtin.pip:

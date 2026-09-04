@@ -106,17 +106,25 @@ registry entry points at the adapter itself.
    `evaluate.after(trained)` directly, omitting `merge_export` from that
    agent's compiled DAG entirely; comage's own branch (the `{{- else }}`)
    is byte-for-byte unchanged.
+3. **Fixed a real gap found before launching anything:**
+   `ansible/roles/mlops/tasks/compile_pipeline_version.yml`'s
+   `_mlops_compile_targets` was hardcoded to `["comage"]` - despite this
+   WP's own first-pass claim, per-agent compilation was NOT actually
+   generic; a new agent's `PipelineVersion` would never have been compiled
+   or uploaded without this fix. Now `["comage", "tekos"]`, per that task's
+   own comment ("extend this list when a second candidate agent flips
+   on").
 
 ### Part B — serving (`gitops/charts/models/`)
 
-3. `templates/llminferenceservice-qwen35.yaml`: ported the classification
+4. `templates/llminferenceservice-qwen35.yaml`: ported the classification
    gate (`{{ fail }}` on a non-C1 adapter while `maas.enabled`), the
    `zuno.io/lora-adapter-classifications` annotation, and
    `--enable-lora`/`--lora-modules` args from `llminferenceservice-qwen.yaml`
    (qwen3.6-27b-instruct, WP-34 Part B's original target) - qwen3.5-9b is
    the model Tekos/Comage's routing and the mlops pipeline's `baseModel`
    actually name, unlike the 27B model no LoRA-trained agent targets.
-4. **New:** `components/mlops/src/download_adapter.py` - the
+5. **New:** `components/mlops/src/download_adapter.py` - the
    adapter-download mechanism WP-34 documented as an out-of-scope gap and
    nothing since has built. Standalone (does not import `mlops.py`/
    `load_config()`, which assume a KFP stage's full env contract a serving
@@ -125,7 +133,7 @@ registry entry points at the adapter itself.
    and the base model's existing S3 credential Secret (no new
    ExternalSecret). One `emptyDir` (`/mnt/loras`) shared between every
    download-adapter initContainer and the main container.
-5. `values.yaml`/`values.schema.json`: `loraAdapters[]` gains a required
+6. `values.yaml`/`values.schema.json`: `loraAdapters[]` gains a required
    `sourceS3Uri` field (push-registry's own `registration.json`
    `artifact_uri`, copied verbatim - never a hand-typed location, per
    ADR-0301 point 3); `path` is now schema-constrained to `/mnt/loras/*`
@@ -135,7 +143,7 @@ registry entry points at the adapter itself.
 
 ### Part C — tests
 
-6. `components/mlops/tests/test_download_adapter.py`: 6 unit tests
+7. `components/mlops/tests/test_download_adapter.py`: 6 unit tests
    (S3 URI parsing, the empty-prefix refusal, `main()`'s required env vars,
    an end-to-end fake-S3-client download) - fakes only, no live S3/GPU.
 
@@ -171,7 +179,11 @@ registry entry points at the adapter itself.
   pre-existing, unrelated failure in `ai-gateway`)
 - `python3 platform/supply-chain/check_build_matrix.py` (two pre-existing,
   unrelated missing-matrix-entry findings)
-- `ansible-playbook ansible/playbooks/day1_{build,install,check}.yml --syntax-check`
+- `ansible-playbook ansible/playbooks/day2_{build,install,check}.yml --syntax-check`
+  and `day3_run.yml --syntax-check` (`mlops`/`models` are Day 2 components,
+  `mlops`'s run verb is Day 3 - ADR-0060's restructuring; the ORIGINAL WP-34
+  brief predates it and still says Day 1, a mismatch this pass corrected
+  before running anything)
 - `python3 platform/docs/check_docs.py` → `RESULT: PASS`
 
 ## Operator / human follow-up (not executable by the model)
@@ -196,9 +208,10 @@ resource request plus one initContainer that declares no `resources:` at
 all - it does not consume additional quota either. No quota change is
 needed anywhere in this WP.
 
-1. `make d1 build mlops`, compile and upload the `tekos` `PipelineVersion`
-   (`ansible/roles/mlops/tasks/compile_one_pipeline_version.yml`, already
-   generic per agent), launch the run.
+1. `make d2 build mlops`, then `make d2 install mlops` (which compiles and
+   uploads every `_mlops_compile_targets` `PipelineVersion`, `tekos`
+   included per this pass's ansible fix), then launch the run:
+   `make d3 run mlops AGENT=tekos`.
 2. Confirm live: `prepare-dataset` reads real `knowledge.tech` rows (not
    zero) → `train-lora` (`TrainJob`, WP-126's already-proven path) →
    `evaluate` (ADR-0027/0028 gate) PASS → `push-registry` registers a
@@ -210,7 +223,7 @@ needed anywhere in this WP.
    `train_manifest.json`).
 4. Sync, confirm `qwen35-9b` rolls out with the adapter's initContainer
    completing and vLLM's `--lora-modules` accepted, and `/v1/models` +
-   `make d1 check models` show it loaded and healthy.
+   `make d2 check models` show it loaded and healthy.
 
 ## Status updates (then re-run `check_docs.py`)
 
