@@ -226,6 +226,43 @@ zuno_aws_route53_secret_access_key: "xxxxxx"
 # zuno_certmanager_route53_region: "eu-west-3"
 # zuno_certmanager_email: "dev+zuno-acme@example.org"
 
+# --- ACME rollout state (ADR-0211 staged rollout / ADR-0517 B11 / WP-132) ---
+#
+# All four OPTIONAL and NOT secret. They are the position of THIS cluster in
+# ADR-0211's staged rollout, which is per-cluster by definition.
+#
+# They used to live in gitops/apps/cert-manager/application-d1.yaml, which meant
+# demo222's finished state was committed to git and inherited by any new cluster
+# on its first sync - and that combination is destructive, not merely wrong: the
+# consumer patches point IngressController/default and the APIServer at
+# Certificates that cannot exist before ACME has issued them, so Console and
+# route serving break before the ACME track could ever succeed.
+#
+# Unset, they default to gitops/charts/cert-manager/values.yaml, which ships the
+# safe START of the rollout: ACME off, staging issuer, both consumers off. Walk
+# the rollout by setting them in order, verifying at each step - the sequence is
+# documented in that chart's own acme comment:
+#
+#   1. zuno_certmanager_acme_enabled: true      (needs the aws/route53-dns01
+#                                                Vault seed to exist first)
+#   2. leave the staging issuer until `oc get certificate -A` shows all three
+#      Ready - a staging rehearsal costs nothing and Let's Encrypt production
+#      has rate limits a broken DNS-01 loop will exhaust
+#   3. zuno_certmanager_issuer: "letsencrypt-route53"   (production cutover)
+#   4. the two consumer flips, ONLY once the three production Certificates are
+#      Ready with real Let's Encrypt chains
+#
+# The consumers are two variables and not one deliberately: each points a
+# different control-plane surface (the default router certificate, the API
+# server's named certificates) at a Secret, and that is not a place to be
+# ambiguous about which one you just changed. Setting either while
+# zuno_certmanager_acme_enabled is false is refused with a diagnostic.
+#
+# zuno_certmanager_acme_enabled: true
+# zuno_certmanager_issuer: "letsencrypt-route53"
+# zuno_certmanager_router_default_cert: true
+# zuno_certmanager_api_server_named_cert: true
+
 # --- OpenShift AI version pin (ADR-0517 B9 / WP-132) ------------------------
 #
 # OPTIONAL, and NOT secret - it is here because it is per-cluster operator

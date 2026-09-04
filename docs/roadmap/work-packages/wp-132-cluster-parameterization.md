@@ -215,6 +215,63 @@ order.
 This is also the step that makes ADR-0211's staged rollout reproducible instead of
 implicit: staging rehearsal, then production issuer, then consumers.
 
+**Repo work done 2026-09-04; live apply pending operator approval.**
+
+The chart was already right. `gitops/charts/cert-manager/values.yaml` ships
+`acme.enabled: false`, `certificatesIssuer: letsencrypt-route53-staging` and both
+consumers `false` — precisely the state ADR-0211's staged rollout starts from.
+The defect was entirely in `gitops/apps/cert-manager/application-d1.yaml`, which
+the role reads and applies: it carried `enabled: true`, the production issuer and
+both consumer flips `true`. Its own comment still described the intended design
+— *"ships disabled - the operator flips `enabled: true` here"* — directly above
+the code contradicting it. The per-cluster flip had been committed.
+
+Four values moved into `_cert_manager_acme_identity`, defaulting to the chart:
+`zuno_certmanager_acme_enabled`, `zuno_certmanager_issuer`,
+`zuno_certmanager_router_default_cert`, `zuno_certmanager_api_server_named_cert`.
+Two consumer variables and not one, deliberately: each points a different
+control-plane surface at a Secret, and that is not a place to be ambiguous about
+which one just changed. A cluster that sets nothing now gets the safe beginning
+of the rollout instead of another cluster's end of it, and the progression
+becomes four operator variables instead of four commits to a shared file.
+
+**Two guards, because this is the step that can break the control plane.**
+
+The first refuses ACME consumers while ACME itself is disabled. The chart
+templates are already `and .Values.acme.enabled .Values.acme.consumers.*` so it
+cannot render, but silently rendering nothing is a poor answer on a fresh
+cluster and an actively bad one where the patches already exist.
+
+The second is what makes the whole step safe to have attempted. Rendering this
+chart with the four values at their chart defaults produces **3 documents instead
+of 11**: both ClusterIssuers, all three Certificates, the Route53 ExternalSecret,
+the IngressController patch and the APIServer patch all disappear — and this
+Application syncs with `prune: true`, so on a cluster where they exist that is
+not a no-op, it is an outage that takes the router's certificate with it. An
+operator running the role from a working copy whose `confidential.yml` lacks the
+variables would do exactly that. So the role reads what the live Application
+actually carries and refuses to walk `enabled` or either consumer from true to
+false, naming the missing variables, unless
+`zuno_certmanager_allow_acme_downgrade=true` says the rollback is deliberate.
+Same shape as the assert WP-118 step 2 put in front of the machines role: the
+edit is cheap to get wrong and expensive to have gotten wrong.
+
+Ordering mattered and was respected: the four values went into
+`ansible/confidential.yml` **before** the manifest lost them, so there was never
+a tree state where an apply would have pruned anything.
+
+Inertia proof, read-only, in three parts:
+- the merged values the role would now send are **semantically identical** to
+  what `zuno-cert-manager-d1` carries live;
+- `helm template` of the chart with each is **byte-identical**, all 11 documents;
+- and the dead-mechanism question — what would this look like if the variables
+  did not work? — answers itself loudly: 11 documents become 3. That is what
+  makes the first two proofs mean something, and it is the check WP-118 B6's
+  `changed=0` never had.
+
+The guard was tested both ways against the live Application: silent with
+`confidential.yml` loaded, fires without it.
+
 ### Step 4 — the rest of the `machines` chart's cluster shape
 
 WP-118 step 2 parameterized the AWS *identity* (cluster id, region, AMI, security group,

@@ -105,9 +105,40 @@
     file: "{{ zuno_repo_root }}/ansible/confidential.yml"
   when: _cert_manager_confidential_file.stat.exists
 
-- name: "cert_manager | resolve the ACME DNS identity (WP-118 B6)"
+# WP-132 step 3 (ADR-0517 B11) extends this fact from the DNS identity to the
+# whole ACME rollout state. gitops/apps/cert-manager/application-d1.yaml used to
+# carry `enabled: true`, `certificatesIssuer: letsencrypt-route53` and both
+# consumer flips `true` - demo222's END STATE, committed to git and inherited by
+# any other cluster on its first sync. Its own comment described the intended
+# design ("ships disabled - the operator flips enabled: true here") while the
+# code beneath it said otherwise; the per-cluster flip had been committed.
+#
+# On a fresh cluster that combination is destructive, not merely wrong:
+# acme-cluster-patches.yaml points IngressController/default at
+# router-wildcard-tls and adds an APIServer named certificate for
+# api-server-tls, neither of which can exist before a Certificate has issued -
+# so Console and route serving break before ACME could ever succeed. The chart's
+# own comment says these flip ONLY after `oc get certificate -A` shows Ready.
+#
+# The defaults below are the chart's, and the chart already ships exactly the
+# state ADR-0211's staged rollout starts from: acme off, staging issuer, both
+# consumers off. So a cluster that sets nothing gets the safe beginning of the
+# rollout rather than another cluster's end of it, and the progression
+# (staging rehearsal -> production issuer -> consumer flips) becomes four
+# operator variables instead of four commits to a shared file.
+- name: "cert_manager | resolve the ACME identity and rollout state (WP-118 B6, WP-132 B11)"
   ansible.builtin.set_fact:
     _cert_manager_acme_identity:
+      enabled: "{{ zuno_certmanager_acme_enabled | default(_cm_chart_acme['enabled']) | bool }}"
+      certificatesIssuer: >-
+        {{ zuno_certmanager_issuer | default(_cm_chart_acme['certificatesIssuer']) }}
+      consumers:
+        routerDefaultCert: >-
+          {{ zuno_certmanager_router_default_cert
+             | default(_cm_chart_acme['consumers']['routerDefaultCert']) | bool }}
+        apiServerNamedCert: >-
+          {{ zuno_certmanager_api_server_named_cert
+             | default(_cm_chart_acme['consumers']['apiServerNamedCert']) | bool }}
       email: "{{ zuno_certmanager_email | default(_cm_chart_acme['email']) }}"
       route53:
         region: "{{ zuno_certmanager_route53_region | default(_cm_chart_acme['route53']['region']) }}"
@@ -119,6 +150,88 @@
       {{ (lookup('ansible.builtin.file',
                  zuno_repo_root + '/gitops/charts/cert-manager/values.yaml')
           | from_yaml)['acme'] }}
+
+# Refuse the one combination that breaks a cluster: pointing the router or the
+# API server at Certificates while ACME itself is off. The chart's templates are
+# already `and .Values.acme.enabled .Values.acme.consumers.*`, so this cannot
+# render - but it means a typo silently produces a cluster with no consumer
+# patches and no explanation, and on a cluster where the patches already exist
+# a pruning sync would REMOVE them. Fail here, where the message can name the
+# variable.
+# The guard that makes step 3 safe to have done at all. Rendering this chart
+# with the four values at their chart defaults produces 3 documents instead of
+# 11: both ClusterIssuers, all three Certificates, the Route53 ExternalSecret,
+# the IngressController patch and the APIServer patch all disappear - and this
+# Application syncs with prune: true, so on a cluster where they exist that is
+# not a no-op, it is an outage that takes the router's certificate with it.
+#
+# Which means an operator running this from a machine whose confidential.yml
+# lacks the variables would silently tear down a working ACME track. Read what
+# the live Application actually carries and refuse to walk anything backwards,
+# rather than trusting that every future working copy is configured. Same
+# shape as the assert WP-118 step 2 put in front of the machines role, and for
+# the same reason: the edit is cheap to get wrong and expensive to get wrong.
+#
+# Absent Application (a fresh cluster) means nothing to protect - skip.
+- name: "cert_manager | read the live Application's current ACME state (WP-132 guard)"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    name: "zuno-cert-manager-d1"
+    namespace: "{{ zuno_argocd_namespace | default('openshift-gitops') }}"
+  register: _cert_manager_live_app
+  failed_when: false
+
+- name: "cert_manager | extract the live ACME toggles"
+  ansible.builtin.set_fact:
+    _cert_manager_live_acme: >-
+      {{ ((_cert_manager_live_app.resources | default([]) | first | default({}))
+          .get('spec', {}).get('source', {}).get('helm', {}).get('values', '')
+          | from_yaml | default({}, true)).get('acme', {}) }}
+
+- name: "cert_manager | refuse to disable an ACME track that is live"
+  ansible.builtin.fail:
+    msg: >-
+      zuno-cert-manager-d1 currently has acme.enabled={{ _cert_manager_live_acme['enabled'] | default('unset') }},
+      consumers.routerDefaultCert={{ (_cert_manager_live_acme['consumers'] | default({}))['routerDefaultCert'] | default('unset') }},
+      consumers.apiServerNamedCert={{ (_cert_manager_live_acme['consumers'] | default({}))['apiServerNamedCert'] | default('unset') }},
+      but this run resolved
+      enabled={{ _cert_manager_acme_identity['enabled'] }},
+      routerDefaultCert={{ _cert_manager_acme_identity['consumers']['routerDefaultCert'] }},
+      apiServerNamedCert={{ _cert_manager_acme_identity['consumers']['apiServerNamedCert'] }}.
+      Applying that would prune the ClusterIssuers, the Certificates and the
+      IngressController/APIServer patches this cluster is serving TLS from.
+      Almost certainly ansible/confidential.yml on this machine is missing
+      zuno_certmanager_acme_enabled / _issuer / _router_default_cert /
+      _api_server_named_cert - set them to the live values above. If you really
+      are rolling the ACME track back, set
+      zuno_certmanager_allow_acme_downgrade=true to say so deliberately.
+  vars:
+    _cm_live_consumers: "{{ _cert_manager_live_acme['consumers'] | default({}) }}"
+  when:
+    - not (zuno_certmanager_allow_acme_downgrade | default(false) | bool)
+    - (_cert_manager_live_acme | default({})) | length > 0
+    - (_cert_manager_live_acme['enabled'] | default(false) | bool
+       and not (_cert_manager_acme_identity['enabled'] | bool))
+      or (_cm_live_consumers['routerDefaultCert'] | default(false) | bool
+          and not (_cert_manager_acme_identity['consumers']['routerDefaultCert'] | bool))
+      or (_cm_live_consumers['apiServerNamedCert'] | default(false) | bool
+          and not (_cert_manager_acme_identity['consumers']['apiServerNamedCert'] | bool))
+
+- name: "cert_manager | refuse ACME consumers while ACME itself is disabled"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_certmanager_router_default_cert / _api_server_named_cert is true but
+      zuno_certmanager_acme_enabled is false. The consumer patches point
+      IngressController/default and the APIServer at Certificates that only the
+      ACME track issues, so this combination either renders nothing or, on a
+      cluster where the patches already exist, prunes them and drops the router
+      back to its self-signed certificate. Enable ACME first, complete
+      ADR-0211's staged rollout, then flip the consumers.
+  when:
+    - not (_cert_manager_acme_identity['enabled'] | bool)
+    - (_cert_manager_acme_identity['consumers']['routerDefaultCert'] | bool)
+      or (_cert_manager_acme_identity['consumers']['apiServerNamedCert'] | bool)
 
 - name: "cert_manager | apply the cert-manager GitOps Application (d1: Vault-backed ClusterIssuer + ADR-0211 ACME track)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

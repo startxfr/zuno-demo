@@ -27,26 +27,35 @@ spec:
         # ClusterIssuer; every internal certificate (Keycloak TLS,
         # istio-csr chain) renews through it.
         vaultServiceName: zuno-vault
-        # ADR-0211: ships disabled - the operator flips `enabled: true`
-        # here (a normal reviewed Git change) once the aws/route53-dns01
-        # Vault seed exists, then follows the staged rollout documented
-        # in gitops/charts/cert-manager/values.yaml's acme comment
-        # (staging rehearsal -> production issuer -> consumer flags).
+        # ADR-0211's rollout state does NOT live here (WP-132 step 3,
+        # ADR-0517 B11). It used to: this file carried `enabled: true`,
+        # `certificatesIssuer: letsencrypt-route53` and both consumer
+        # flips `true` - demo222's end state, committed to git and
+        # inherited by every other cluster on its first sync. The comment
+        # that stood here still described the intended design ("ships
+        # disabled - the operator flips enabled: true here") while the
+        # code below it said otherwise.
+        #
+        # That combination is destructive on a fresh cluster:
+        # acme-cluster-patches.yaml points IngressController/default at
+        # router-wildcard-tls and adds an APIServer named certificate for
+        # api-server-tls, neither of which can exist before a Certificate
+        # has issued - so Console and route serving break before ACME
+        # could ever succeed.
+        #
+        # The four values are now operator variables resolved in
+        # ansible/roles/cert_manager/tasks/install.yml, defaulting to
+        # gitops/charts/cert-manager/values.yaml - which already ships the
+        # safe start of the rollout (acme off, staging issuer, consumers
+        # off). Set zuno_certmanager_acme_enabled, _issuer,
+        # _router_default_cert and _api_server_named_cert in
+        # ansible/confidential.yml to walk the staged rollout that chart's
+        # acme comment documents: staging rehearsal -> production issuer
+        # -> consumer flips.
         acme:
-          enabled: true
           # Substituted with the real cluster domain by
           # ansible/tasks/apply_gitops_app.yml.
           clusterBaseDomain: apps.mycluster.example.com
-          # Production cutover: staging rehearsal proved all three
-          # Certificates issue and validate (Ready:True) with the IAM
-          # identity and DNS-01 self-check both working end to end.
-          certificatesIssuer: letsencrypt-route53
-          # Consumer flip: all 3 production Certificates are Ready with
-          # real Let's Encrypt chains - safe to point the router and API
-          # server at them.
-          consumers:
-            routerDefaultCert: true
-            apiServerNamedCert: true
   destination:
     server: https://kubernetes.default.svc
     namespace: cert-manager
