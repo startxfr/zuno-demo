@@ -294,7 +294,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | Implemented | Integrate TrustyAI for AI evaluation and guardrails |
 | [ADR-0538](0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md) | Accepted | Adopt RHOAI 3.5 workload surfaces - MLflow tracking, queued workloads, training-jobs UI |
 | [ADR-0539](0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md) | Implemented | Delegate LoRA training compute to a KFP-submitted Kubeflow TrainJob |
-| [ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md) | Accepted | Express guardrail policy as NeMo rails configuration, not in-image detector parameters |
+| [ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md) | Implemented | Express guardrail policy as NeMo rails configuration, not in-image detector parameters |
 | [ADR-0541](0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md) | Proposed | Integrate mistral and gpt-oss-120b as MaaS ExternalModels |
 | [ADR-0542](0542-autoscale-one-served-model-through-llminferenceservice-spec-scaling.md) | Implemented | Autoscale a served model through LLMInferenceService spec.scaling |
 | [ADR-0545](0545-scope-remaining-rhoai-kubeflow-component-adoption.md) | Accepted | Scope the remaining RHOAI/Kubeflow component adoption - finalize TrainJob, explore Kueue priority, evaluate InferenceGraph, exclude NIM |
@@ -305,7 +305,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0517](0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) | Proposed | Redeploy the full platform from scratch on a new demo333 cluster |
 | [ADR-0533](0533-consolidate-advantage-and-finage-non-promotion-into-a-dedicated-decision.md) | Implemented | Consolidate Advantage's and Finage's non-promotion into a dedicated decision |
-| [ADR-0546](0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md) | Proposed | Introduce a cross-cluster source bucket (`zuno-demo-sources`) and per-cluster S3 bucket convention (`zuno-<cluster>-xxx`) |
+| [ADR-0546](0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md) | Accepted | Introduce a cross-cluster source bucket (`zuno-demo-sources`) and per-cluster S3 bucket convention (`zuno-<cluster>-xxx`) |
 | [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md) | Proposed | Parameterize every cluster-specific value in Ansible, and seed it through Vault when secret |
 
 ## v0.9

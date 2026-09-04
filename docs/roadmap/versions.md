@@ -96,7 +96,7 @@ model autoscaling (ADR-0542), and mistral/gpt-oss-120b as MaaS
 HardwareProfile half - blocked upstream, see that ADR's body).
 
 **13 ADRs.** Open: ADR-0111, ADR-0115 (both `Deferred`), ADR-0506 – ADR-0510,
-ADR-0538 – ADR-0540, ADR-0541; WP-48 – WP-53, WP-115, WP-125.
+ADR-0538, ADR-0541; WP-48 – WP-53, WP-115, WP-125.
 
 ## v0.8
 

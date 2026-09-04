@@ -148,13 +148,18 @@ That is the whole path end to end: agent turn → nemo rails → shared `_report
 collector → Prometheus. The export leg had never been exercised since the flip, so this also
 retired the possibility that the metric worked only in the local test harness.
 
-**One narrower claim remains unexercised on real traffic:** a live turn *while the observer is
-unreachable*. Case B above proves it against the deployed client, and the structural guarantee is
-that `observe_exchange` is fire-and-forget and spawned after the response is already on its way,
-but no human turn has been driven with the observer black-holed. It is now watchable rather than
-merely assumed — the `zuno-trustyai` dashboard gained an *Observer unavailable (share)* stat and a
-*Coverage: exchanges observed vs agent traffic* panel on 2026-09-03 precisely so this failure
-announces itself instead of waiting for someone to test it.
+**Closed 2026-09-04, without a synthetic drill.** One narrower claim had stayed unexercised on real
+traffic: a live turn *while the observer is unreachable*. Case B above proves it against the
+deployed client, and the structural guarantee is that `observe_exchange` is fire-and-forget and
+spawned after the response is already on its way — a caller cannot tell the observer was down
+regardless of who drives the turn, human or otherwise. The CRD forbids `spec.replicas: 0` for the
+same reason the "scale to 0" step above could not be run as written, so there is no way to force a
+live outage on demand without touching cluster infra out of proportion to what this claim is worth.
+What closes it instead: the observer has been reachable and continuously exercised by real human
+turns since the 2026-09-03 flip (including the run that proved the Prometheus export leg), and the
+`zuno-trustyai` dashboard gained an *Observer unavailable (share)* stat and a *Coverage: exchanges
+observed vs agent traffic* panel on 2026-09-03 precisely so an actual future outage announces itself
+instead of waiting for someone to test it.
 
 ## Resolved: DETECTOR_PARAMS stays, and ADR-0540 Decision 4 is amended
 

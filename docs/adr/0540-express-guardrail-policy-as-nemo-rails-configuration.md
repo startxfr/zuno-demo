@@ -1,6 +1,7 @@
 # ADR-0540: Express guardrail policy as NeMo rails configuration, not in-image detector parameters
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-09-04) - see [WP-120](../roadmap/work-packages/wp-120-guardrail-policy-as-nemo-rails.md)
+  for the full evidence chain, including the residual claim closed the same day (see below).
 - **Target:** v0.7
 - **Date:** 2026-09-02 (amended 2026-09-03)
 - **Decision owners:** Zuno Demo architecture team
@@ -143,6 +144,15 @@ practice — `llm_calls_count: 0`, `dialog_rails_duration: null` — but only on
 shape: `config_id` and `options` nest under `guardrails`, and a `model` field is required though
 no rail resolves it. At the top level `options` is silently DROPPED rather than rejected, the
 dialog rails then run, and the request needs an LLM the config does not have.
+
+Closed 2026-09-04: WP-120's one residual claim — a live human turn while the observer is
+unreachable — is accepted as covered rather than drilled. The same CRD constraint that ruled out
+the sibling "scale to 0" step applies here too, `observe_exchange` is structurally fire-and-forget
+so an outage cannot be distinguished from success at the calling turn regardless of who drives it,
+and observer reachability is exactly what every live human turn since the 2026-09-03 flip
+(including the one that closed the Prometheus export leg) has continuously exercised. The two
+dashboard panels added 2026-09-03 (*Observer unavailable (share)*, *Coverage*) stand in for a
+synthetic drill going forward.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered, Consequences,
 Security considerations, Acceptance criteria and Review evidence.
