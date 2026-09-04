@@ -1,6 +1,6 @@
 # WP-131: Execute ADR-0546's cross-cluster source bucket and per-cluster S3 convention
 
-- **State:** Not started (P0-a, P0-b and the P1 `path` parameter landed 2026-09-04; steps 1 (mlflow) and 2 (mariadb) are also landed and live-verified on demo222; aap, mlops, openshift-ai, rag-ingestion and the postgresql P2–P14 sequence remain)
+- **State:** Operator pending — seven of eight components cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion; step 8 `models` landed deliberately inert). postgresql P0/P1/P2 green and the P4 bulk copy complete; **P5–P14 remain**. Owner as of 2026-09-04 evening: `zuno-demo-c0`.
 - **ADRs:** [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (`Accepted` 2026-09-04 — this WP satisfied its acceptance criterion 2),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) (B12),
@@ -635,6 +635,84 @@ in S3 (five of them, through 2026-09-04T07:24). **That column is not a health
 signal.** When verifying the mariadb cutover, read `status.lastScheduleTime`, the
 `mariadb-backup-*` pod phases, and the bucket itself — a green flip judged from
 that column would be judged from a value that has not moved in two days.
+
+### Steps 3–6 and 8 — cut over and live-verified, 2026-09-04
+
+Each was proven by an effect the component itself produced, never by reading
+back the configuration that was just written.
+
+| Step | Commits | What actually proved it |
+|---|---|---|
+| 3 aap hub | `79d5f794` | The Hub wrote **and deleted** a file through its own Django storage backend — a Vault-only cutover, so nothing in the chart changed |
+| 4 openshift-ai traces | `d60df81a` | Tempo wrote 11 objects to the new bucket and **0** to the old, rebuilt its index, and compacted a copied block |
+| 5 mlops | `3db0c06c`, `c5538820` | DSPA reports `ObjectStoreAvailable=True` |
+| 6 rag-ingestion | `5e6ed3bc`, `e78ea3dd` | All surfaces plus the DSPA moved together; embeddings intact at 319,841 / 69,755; an ingestion run then completed against the new bucket (`manifests-tech-confluence/manifest.json` rewritten — only `validate` does that) |
+| 8 models | `1fe475d6` | Landed **inert on purpose**: no `storageUri` moved. Render byte-identical with `s3Source: models`, and proven to move when the key is switched |
+
+Two things this sequence cost, both recorded because neither was visible from
+configuration:
+
+- **The mlops cutover appeared to break `mlops-dspa`'s TLS trust to MLflow.**
+  It had not. The pod predated the flip and its signer was unchanged. The cause
+  was the `>-` folded scalar in the CA-bundle task emitting a **literal** `\n`,
+  breaking the PEM boundary so the second certificate was silently dropped —
+  the exact defect WP-129 fixed in `rag_ingestion` and explicitly predicted for
+  `mlops`, out of scope there because that ConfigMap is only rewritten when the
+  task re-runs. `make d2 install mlops` re-ran it. Fixed in `97edabac`, verified
+  by TLS rather than by reading: `curl --cacert /dsp-custom-certs/dsp-ca.crt`
+  against `https://mlflow…:8443/mlflow/` returns **HTTP 200**.
+- **`apply_gitops_app.yml`'s Synced+Healthy wait polls the pre-apply state.**
+  The mlflow cutover looked applied and was not. Fixed by `gitops_app_refresh:
+  true` on every role this WP touches. A wait that can pass against the state it
+  was meant to replace is not a wait.
+
+### P4 — the 112 GB repo2 copy, complete 2026-09-04
+
+Verified against the four things that can actually be wrong, not against the
+total object count (the source is live, so the totals never match exactly):
+
+```
+source  s3://zuno-data-pgbackups/pgbackrest/repo2/   75,279 objects  112,261,846,249 B
+dest    s3://zuno-demo222-backups/postgresql/        75,278 objects  112,261,819,935 B
+```
+
+1. **All five backup sets present** in the destination — `20260816-030006F`,
+   `20260823-131414F`, `20260830-030007F`, plus P1/P2's `20260904-161547F` and
+   `20260904-162940F` — with `backup.history/`.
+2. **The mutable info files match by md5** (single-part ETag, so the ETag *is*
+   the md5): `archive.info` `b20dc551b173374a837218e097f108ac`, `backup.info`
+   `7af63bb1f60246521f45692921455581`, identical on both sides. These are the
+   only two files where re-syncing later destroys information, so they are the
+   only two worth checksumming rather than counting.
+3. **The remaining delta is 4 newly-archived WAL segments**, all under
+   `archive/db/18-12/0000001F0000004E/`. Expected: the source keeps archiving.
+   This is what P5 exists to carry.
+4. The destination was **empty** before the copy, so nothing pre-existing could
+   have masked a partial transfer.
+
+### `corpus.deleteOrphans` — the exit criterion is per-domain, not a count
+
+Pinned `false` on `zuno-rag-ingestion-d1` for the duration of the migration.
+An earlier reading of the exit criterion — "wait until `raw/` in
+`zuno-demo222-data` approaches the old bucket's 628,075 objects" — **was
+wrong**, and wrong in the dangerous direction: 628,075 is the sum over all 21
+`raw-*/` prefixes, dominated by SXA.
+
+Measured 2026-09-04: `raw-tech-confluence/` holds **499 objects in both
+buckets, byte-identical** — that domain is *complete*, not 0.08 % done. But it
+is **1 of 21**. The other 20 have their `manifests-*/` copied into
+`zuno-demo222-data` with **zero** objects under their own `raw-*/`:
+
+```
+sxa-legacy            : manifests=3  raw=0
+tech-redhat-openshift : manifests=2  raw=0
+tech-helm             : manifests=2  raw=0
+```
+
+That is precisely the "in the manifest, absent under `raw/`" condition
+`detect-changes` reads as *deleted*. So `true` is safe only for domains whose
+own `raw-*/` has been repopulated; a global flip now purges the other twenty.
+The ingestion schedules fire unattended **Sunday 02:00 Europe/Paris**.
 
 ## Vault paths
 
