@@ -1,13 +1,15 @@
 # WP-129: generic fetch-oss-docs adapter + per-family knowledge.tech pipelines
 
-- **State:** Operator pending (2026-09-03) - repo work merged AND deployed
-  live: all 19 `PipelineVersion`s compiled, all 19 KFP recurring runs
-  `ENABLED` with the staggered schedule, the `argocd`/`helm` families each
-  triggered and confirmed with a real document-count delta (460/110
-  `document_embeddings` rows, DB-verified). Two items remain, see
-  "Live rollout (2026-09-03)" below: the other 17 families have not yet had
-  their first run (scheduled, not yet due), and the concurrent-run race
-  fix has not been deliberately exercised live.
+- **State:** Done (2026-09-04) - all 19 `PipelineVersion`s compiled, all 19
+  KFP recurring runs `ENABLED` with the staggered schedule, and all three
+  operator actions from "Remaining" below are now live-verified: every
+  family has had its first run (17/19 cold-refetched today, `argocd`/
+  `helm` the day before), the concurrent-run race fix held under a
+  genuine two-runs-same-family race, and citations were confirmed to
+  resolve to real upstream URLs - which also surfaced and fixed a real
+  MLflow CA-trust bug and a cross-family document-collision bug neither
+  one caused by this WP but both blocking it. See "Live verification
+  (2026-09-04)" below for the full account.
 - **ADRs:** ADR-0105 (amended a second time, this WP). ADR-0202's
   single-`knowledge.tech`-database constraint is preserved unaffected by
   this split, not itself amended - see "Goal" below.
@@ -193,20 +195,79 @@ Environment is missing the `kustomize` binary, failing
 routing layer for that one run - the EE gap itself is unrelated to
 rag-ingestion and not fixed here.
 
-## Remaining (operator actions, not yet done)
+## Live verification (2026-09-04)
 
-1. The other 17 families (everything except `argocd`/`helm`) have not yet
-   had their first run - they're scheduled, not yet due. Their first run
-   under the new suffixed S3 prefix will be a full cold re-fetch, not
-   incremental - expect week-one runtimes higher than steady-state,
-   especially `redhat-openshift`'s ~3-4h. Not a regression.
-2. Deliberately exercise the race fix live: trigger two sibling family
-   pipelines concurrently (or one scheduled + one on-demand) and confirm
-   both `manifest-tech-<family>.json` files converge correctly with no
-   lost `deleted_ids`, and each `detect-changes` log shows only its own
-   family's doc counts.
-3. Once there's more signal on the upstream sources' actual coverage
-   (right now `argocd`/`helm` chunks aren't broken down by which of the 3
-   sources per family they came from), check citations resolve to the new
-   upstream URLs specifically, not just `len(citations) > 0` - then decide
-   whether to drop the Red Hat chapter stopgap entries.
+All three items from the previous "Remaining" section, closed out in one
+session, in order:
+
+**1. First run for the other 17 families.** 3 (`redhat-acs`/`redhat-acm`/
+`redhat-aap`) fired on their own schedule overnight and had already
+`SUCCEEDED`. The remaining 13 needed a manual on-demand trigger - but that
+hit a real blocker first: `CreateRun` failed with a 504 every time, root-
+caused to `ds-pipeline-rag-dspa`'s api-server never having trusted the
+`openshift-service-serving-signer` CA that signs `mlflow.redhat-ods-
+applications.svc`'s cert (WP-116's `OnBeforeRunCreation` MLflow hook
+retried the TLS handshake until it ate the whole 30s Route timeout).
+mlops hit the identical defect in WP-126 (ADR-0545) and fixed it by
+merging a Vault-root + service-ca ConfigMap into `spec.apiServer.cABundle`
+- reproducing that exact pattern for `rag-dspa` still 504'd, because a
+`>-` folded YAML block scalar performs zero escape processing, so the
+`"\n"` separator between the two certs' PEM blocks landed in the merged
+ConfigMap as the two literal characters `\`+`n`, not a real newline -
+silently truncating the second cert. Root-caused with a throwaway
+isolated playbook (`'A' ~ "\n" ~ 'B'` reproduced it with zero live data
+involved) and fixed by switching to a double-quoted YAML scalar, which
+does perform escape processing before Jinja ever runs. Fix:
+`ansible/roles/rag_ingestion/tasks/install.yml`,
+`gitops/charts/rag-ingestion/templates/dspa.yaml`. (mlops's own copy of
+this task has the same latent bug - out of scope to fix here.)
+
+With that fixed, all 13 triggered and ran. One (`redhat-satellite`) hit a
+transient scheduling preemption (cluster CPU contention from running 13
+families at once) and was simply retried. `redhat-openshift` (the long
+pole, ~76 sources across two OCP minor versions) crawled cleanly in
+~3h11 but then hit a second, unrelated live defect: cert-manager's
+routine scheduled renewal of `mariadb-server-cert` bounced the `mariadb-
+0` pod mid-write, and the KFP v2 launcher doesn't retry a lost MLMD
+connection - it panics (`nil pointer dereference` in
+`UpdateDAGExecutionsState`) and fails the whole run, even though the
+actual chunking work (185 docs -> 55,050 chunks) had already completed
+successfully. Recovered with KFP's native `POST /runs/{id}:retry`, which
+resumes from the failed node and reuses the already-succeeded ~3h crawl
+rather than re-running it - confirmed live before relying on it. All 19
+families: `SUCCEEDED`.
+
+**2. Concurrent-run race fix.** Triggered `redhat-quay` twice, 2 seconds
+apart - both `detect-changes` steps ran within 20ms of each other
+(genuine overlap, not a fluke of scheduling). Both computed the identical
+diff (`0 new, 1 changed, 0 deleted, 39 unchanged`), both `SUCCEEDED`, and
+`manifests-tech-redhat-quay/manifest.json` came out well-formed with
+exactly 40 entries - no duplication, no corruption. Each run's artifacts
+were correctly namespaced by both family and run_id
+(`rag-corpus-ingestion-tech-redhat-quay/<run_id>/...`). Caveat: this pair
+had nothing to delete, so the specific "no lost `deleted_ids`" scenario
+wasn't stress-tested with real deletion data - the write path's
+correctness under concurrency is otherwise fully demonstrated, including
+implicitly by all 14 families in point 1 running genuinely concurrently
+for hours with zero cross-family bleed (each family's `manifests-tech-
+<family>/` S3 prefix is fully separate by construction).
+
+**3. Citations vs. upstream URLs, and the Red Hat chapter stopgaps.**
+Confirmed both in the DB and via a live `POST /v1/search` call:
+`technology=argocd` (460 chunks/51 pages) resolves exclusively to
+`argo-cd.readthedocs.io`, `technology=helm` (110 chunks/17 pages)
+exclusively to `helm.sh/docs` - zero Red Hat chapter content under either
+tag. Investigating why the Helm chapter stopgap (OCP `building_applications`,
+both 4.21/4.22) showed zero rows despite being configured surfaced a real
+bug: `document_embeddings`' uniqueness is `(source, chunk_index)`, not
+scoped by family, and that exact URL is also crawled by
+`redhat-openshift`'s own source list - so `redhat-openshift`'s cold-
+refetch today silently overwrote the rows Helm's stopgap had indexed the
+day before, relabelling `metadata.technology` from `helm` to `openshift`.
+Not a deliberate merge - a race on a shared row, resolved by whichever
+family touched it last. Dropped the two Helm chapter entries (upstream
+already covers Helm well on its own, and keeping them just re-loses the
+same collision every future run). The `argocd` family's two "Red Hat
+OpenShift GitOps" chapter entries stay: their URLs aren't shared with any
+other family, so they're distinct, uncorrupted content, not a broken
+stopgap. Fix: `gitops/charts/rag-ingestion/values.yaml`.
