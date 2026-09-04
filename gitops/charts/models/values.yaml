@@ -311,16 +311,19 @@ llmInferenceService:
 #                         below and in values.schema.json - a C2/C3
 #                         adapter cannot attach to a serving path with
 #                         maas.enabled (externally-eligible).
-loraAdapters: []
-# Example (uncomment and fill in once an adapter has been trained,
-# evaluated and registered - see components/mlops/README's own pipeline
-# stages):
-#   - name: tekos-lora
-#     registryModelName: tekos-lora
-#     registryModelVersion: run-0001
-#     sourceS3Uri: s3://zuno-corpus/mlops/models/tekos/run-0001/adapter
-#     path: /mnt/loras/tekos-lora
-#     classification: C1
+# WP-133 (2026-09-04): the first adapter this mechanism has ever served -
+# registered live by a real run of the tekos/knowledge.tech mlops pipeline
+# (Model Registry model id 7, version id 8; gate PASS: acceptance 0.8,
+# no register/tool-calling halves - this is a grounding-domain run, not a
+# style one). Promotion PR per ADR-0302 point 7 - reviewed here, not
+# pushed automatically by the pipeline.
+loraAdapters:
+  - name: tekos-lora
+    registryModelName: tekos-lora
+    registryModelVersion: wp126-20260904-161639
+    sourceS3Uri: s3://zuno-corpus/mlops/models/tekos/wp126-20260904-161639/adapter
+    path: /mnt/loras/tekos-lora
+    classification: C1
 
 # WP-133: the image the adapter-download initContainer runs
 # (components/mlops/src/download_adapter.py). Reuses the mlops pipeline's
