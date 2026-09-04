@@ -29,6 +29,13 @@ pipelineServer:
   name: rag-dspa
   pipelineStore: kubernetes
   cacheEnabled: false
+  # ADR-0545/WP-129: name only - ansible/roles/rag_ingestion/tasks/
+  # install.yml owns this ConfigMap's data (merged Vault root +
+  # openshift-service-ca), same split as gitops/charts/mlops/values.yaml's
+  # own trustedCABundle entry.
+  trustedCABundle:
+    configMapName: dsp-mlflow-trust-rag-dspa
+    configMapKey: ca-bundle.crt
   objectStorage:
     useCorpusS3: true
   metadataDatabase:

@@ -23,6 +23,20 @@ spec:
     pipelineStore: {{ .Values.pipelineServer.pipelineStore }}
     cacheEnabled: {{ .Values.pipelineServer.cacheEnabled }}
     enableSamplePipeline: false
+    # ADR-0545/WP-129: same trap mlops hit in WP-126 (see
+    # gitops/charts/mlops/templates/dspa.yaml) - rag-dspa's own trust
+    # bundle only ever carried the cluster-wide Vault root, never the
+    # openshift-service-serving-signer CA that signs mlflow.redhat-ods-
+    # applications.svc's cert, so WP-116's MLflow CreateRun hook failed
+    # every manual on-demand run with "x509: certificate signed by
+    # unknown authority" - live-caught 2026-09-04 triggering WP-129's
+    # remaining per-family first runs. The ConfigMap *name* is templated
+    # here; only its data-write belongs in Ansible (two live cluster
+    # sources Helm cannot see at chart-render time) - see
+    # ansible/roles/rag_ingestion/tasks/install.yml.
+    cABundle:
+      configMapName: {{ .Values.pipelineServer.trustedCABundle.configMapName }}
+      configMapKey: {{ .Values.pipelineServer.trustedCABundle.configMapKey }}
   workflowController:
     deploy: true
   mlmd:
