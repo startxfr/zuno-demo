@@ -176,24 +176,39 @@ registry entry points at the adapter itself.
 
 ## Operator / human follow-up (not executable by the model)
 
-1. Raise the `zuno-ai-run-gpu-cap` `ResourceQuota` - `requests.mig-1g.24gb`
-   and `requests.mig-2g.48gb` both read fully consumed (3/3, 2/2) as of
-   2026-09-04, and a `ResourceQuota` is a hard namespace-level admission
-   cap independent of the burst MachineSet's own capacity - a training pod
-   will be refused admission, not merely delayed, until this is raised.
-2. `make d1 build mlops`, compile and upload the `tekos` `PipelineVersion`
+**Correction (2026-09-04, caught before launching anything):** an earlier
+pass of this WP wrongly concluded the saturated `zuno-ai-run-gpu-cap`
+`ResourceQuota` (`requests.mig-1g.24gb` 3/3, `requests.mig-2g.48gb` 2/2)
+blocks this run and needs raising first. It does not: that quota is scoped
+to the `zuno-ai-run` namespace only (`gitops/charts/namespaces/templates/
+resourcequota-gpu.yaml`, `.Values.openshiftAi.namespace`), which holds the
+four *serving* LLMInferenceServices, not the mlops training pipeline.
+`zuno-mlops` (where every KFP stage pod and the TrainJob's own trainer pod
+actually run) ships with **no ResourceQuota/LimitRange at all, by explicit
+design** (`gitops/charts/namespaces/values.yaml`'s own `zuno-mlops` entry:
+"No resourceQuota/limitRange here, deliberately mirroring zuno-ai-build:
+mlops's train-lora stage needs unconstrained nvidia.com/gpu requests on the
+tainted GPU-burst node") - WP-126 already proved this live (a real
+`TrainJob` reached `Complete` under this exact saturated `zuno-ai-run`
+quota, unaffected by it). The later serving-side step (4 below) is a
+rollout-restart of the already-running `qwen35-9b` pod with the same
+resource request plus one initContainer that declares no `resources:` at
+all - it does not consume additional quota either. No quota change is
+needed anywhere in this WP.
+
+1. `make d1 build mlops`, compile and upload the `tekos` `PipelineVersion`
    (`ansible/roles/mlops/tasks/compile_one_pipeline_version.yml`, already
    generic per agent), launch the run.
-3. Confirm live: `prepare-dataset` reads real `knowledge.tech` rows (not
+2. Confirm live: `prepare-dataset` reads real `knowledge.tech` rows (not
    zero) → `train-lora` (`TrainJob`, WP-126's already-proven path) →
    `evaluate` (ADR-0027/0028 gate) PASS → `push-registry` registers a
    version whose `artifact_uri` is the adapter's own S3 prefix, not a
    merged checkpoint.
-4. Review and merge the promotion PR: `gitops/charts/models/values.yaml`'s
+3. Review and merge the promotion PR: `gitops/charts/models/values.yaml`'s
    `loraAdapters` gains one entry (`sourceS3Uri` = the registration's own
    `artifact_uri`, `path` under `/mnt/loras/`, `classification` from
    `train_manifest.json`).
-5. Sync, confirm `qwen35-9b` rolls out with the adapter's initContainer
+4. Sync, confirm `qwen35-9b` rolls out with the adapter's initContainer
    completing and vLLM's `--lora-modules` accepted, and `/v1/models` +
    `make d1 check models` show it loaded and healthy.
 

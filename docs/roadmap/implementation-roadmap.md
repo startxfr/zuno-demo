@@ -774,7 +774,7 @@ as written rather than around them.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-133 | [wp-133](work-packages/wp-133-lora-adapter-live-proof.md) | 0302, 0301 | WP-34, WP-126 | Repo work merged (2026-09-04) | raise the `zuno-ai-run-gpu-cap` quota (currently saturated, 3/3 + 2/2); compile/upload the `tekos` PipelineVersion and launch the run; review the `loraAdapters` promotion PR; roll out `qwen35-9b` with the adapter attached and confirm live |
+| WP-133 | [wp-133](work-packages/wp-133-lora-adapter-live-proof.md) | 0302, 0301 | WP-34, WP-126 | Repo work merged (2026-09-04) | compile/upload the `tekos` PipelineVersion and launch the run (the `zuno-ai-run-gpu-cap` quota does NOT block this - it scopes only the serving namespace, and `zuno-mlops` ships with no quota by design, see the brief's own correction note); review the `loraAdapters` promotion PR; roll out `qwen35-9b` with the adapter attached and confirm live |
 
 ### OKF stream phases
 
