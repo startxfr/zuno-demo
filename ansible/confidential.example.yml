@@ -201,6 +201,17 @@ zuno_rhoai_traces_s3_secret_access_key: "xxxxxx"
 zuno_models_s3_bucket: "zuno-demo-rag-corpus"
 zuno_models_s3_prefix: "models"
 
+# --- MLOps pipeline artifacts and training corpus (ADR-0546/WP-131) ---------
+# Two DIFFERENT buckets on purpose, and the split is the whole point of
+# ADR-0546: the pipeline artifacts are this cluster's OUTPUT and belong in
+# zuno-<cluster>-mlops, while the style corpus is a cross-cluster INPUT that
+# seeds any cluster and belongs in zuno-demo-sources. Deriving one from the
+# other would re-merge the two natures the ADR separates.
+# Omitting these keeps the chart defaults, which are the pre-ADR-0546 values.
+zuno_mlops_s3_bucket: "zuno-corpus"
+zuno_mlops_s3_region: "us-east-1"
+zuno_mlops_style_corpus_s3_uri: "s3://zuno-corpus/qwen-wesh-training-corpus.tgz"
+
 # --- MLflow artifact store (ADR-0546/WP-131) --------------------------------
 # Where the MLflow tracking server writes run artifacts. Two independent
 # literals in gitops/charts/mlflow used to carry this: server.artifactsDestination

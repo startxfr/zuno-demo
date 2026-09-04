@@ -75,12 +75,58 @@
     (_mlops_vault_ca.resources | default([]) | length) == 0 or
     (_mlops_service_ca.resources | default([]) | length) == 0
 
+# ADR-0546/WP-131: the pipeline-artifact bucket and the style-corpus URI are
+# cluster-scoped, so they stop being chart literals. Soft-read - omitting the
+# variables leaves the chart defaults. ADR-0517 B13: a role that reads a
+# confidential.yml variable without loading the file gets an undefined variable
+# and its `| default(chart)` fallback wins in silence, which is why this pair is
+# not optional. check_confidential_var_loaders() enforces it.
+- name: "mlops | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _mlops_confidential_file
+
+- name: "mlops | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _mlops_confidential_file.stat.exists
+
 - name: "mlops | apply the mlops GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "mlops"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-mlops-d1"
+    # Start from the manifest's OWN values and merge in only what is discovered
+    # at run time, the same idiom cert_manager uses. A plain literal dict here
+    # would silently drop acceptanceGate.keycloakUrl/.frontendUrl, because
+    # apply_gitops_app.yml REPLACES spec.source.helm.values rather than merging
+    # - which is exactly ADR-0517 B3 coming back. The replace() mirrors that
+    # file's token substitution, which acts on the file it reads and cannot
+    # reach this dict; it is evaluated lazily inside the include, so
+    # cluster_base_domain is already resolved.
+    #
+    # Subscript ['values'], never .values - dot notation resolves to the dict
+    # method and combine() then fails with "expected dicts but got a 'method'".
+    #
+    # styleCorpusS3Uri is a SEPARATE variable from s3.bucket on purpose: the
+    # training corpus is a cross-cluster INPUT (zuno-demo-sources) while the
+    # pipeline artifacts are this cluster's OUTPUT (zuno-<cluster>-mlops).
+    # Deriving one from the other would re-merge the two natures ADR-0546
+    # exists to separate.
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/mlops/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+        | combine({'s3': {'bucket': zuno_mlops_s3_bucket | default('zuno-corpus'),
+                          'region': zuno_mlops_s3_region | default('us-east-1')}}, recursive=True)
+        | combine({'agents': {'comage': {'styleCorpusS3Uri':
+                     zuno_mlops_style_corpus_s3_uri
+                     | default('s3://zuno-corpus/qwen-wesh-training-corpus.tgz')}}}, recursive=True)
+      }}
+    # Values-changing apply - see ansible/roles/mlflow/tasks/install.yml.
+    gitops_app_refresh: true
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 
