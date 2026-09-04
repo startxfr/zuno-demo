@@ -217,6 +217,7 @@
           bucket: "{{ zuno_postgresql_backup_s3_bucket | default('') }}"
           endpoint: "{{ zuno_postgresql_backup_s3_endpoint | default('') }}"
           region: "{{ zuno_postgresql_backup_s3_region | default('') }}"
+          path: "{{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }}"
     gitops_app_wait_retries: 60
   when: not (_postgresql_auto_restored | default(false))
 

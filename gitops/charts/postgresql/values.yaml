@@ -131,11 +131,35 @@ backups:
         cpu: "1"
         memory: 512Mi
   storageSize: 500Gi
+  # PGO only runs an on-demand backup when spec.backups.pgbackrest.manual is
+  # declared AND the pgbackrest-backup annotation changes. Without this block
+  # the annotation is inert, which is what made `make d3 backup postgresql`
+  # patch nothing and then wait for a SCHEDULED backup (WP-131 P0-b).
+  # Declaring it does not trigger anything on its own.
+  manual:
+    # Empty means repo2 when the S3 repo is enabled, else repo1 - an on-demand
+    # backup should land off-cluster when an off-cluster repo exists.
+    repoName: ""
+    options:
+      - --type=full
   s3:
     enabled: false
     bucket: ""
     endpoint: ""
     region: ""
+    # The prefix INSIDE the bucket that pgBackRest reads and writes, rendered
+    # as repo2-path in spec.backups.pgbackrest.global. The default is what PGO
+    # already writes when the key is absent, so declaring it changes nothing -
+    # and makes the location a value rather than an implicit operator default.
+    #
+    # Deliberately NOT a `mycluster-*` fail-loud placeholder, unlike the other
+    # WP-118/ADR-0547 conversions. A wrong repo path does not fail loudly: an
+    # empty prefix is indistinguishable from a repo with no backups, which is
+    # exactly how ADR-0517/WP-131's P0-a went unnoticed. The safe default is
+    # the real current value; WP-131 flips it through
+    # zuno_postgresql_backup_s3_path so the cutover and its rollback are each
+    # one line.
+    path: "/pgbackrest/repo2"
     secretName: zuno-postgresql-backup-s3  # synced from Vault, only used when s3.enabled
 
 credentials:

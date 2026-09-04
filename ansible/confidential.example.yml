@@ -55,6 +55,23 @@ zuno_postgresql_backup_s3_endpoint: "xxxxxx"
 zuno_postgresql_backup_s3_region: "xxxxxx"
 zuno_postgresql_backup_s3_access_key: "xxxxxx"
 zuno_postgresql_backup_s3_secret_key: "xxxxxx"
+#
+# OPTIONAL, and not one of the five that enable repo2: the path INSIDE the
+# bucket that pgBackRest reads and writes. Leave it unset unless you are moving
+# the repo (ADR-0546/WP-131).
+#
+# The default below is what PGO already writes today, and it is deliberately
+# NOT pgBackRest's own default of /var/lib/pgbackrest. Those two disagreeing is
+# what made ansible/roles/postgresql/tasks/check_s3_backup.yml report "no
+# backup" for as long as it has existed, against a repo holding real backups -
+# and because that probe gates the auto-restore in install.yml, a rebuild would
+# have bootstrapped an EMPTY database while announcing a fresh environment.
+# The probe and the operand now read this one variable so they cannot drift.
+#
+# Changing it points pgBackRest at a different prefix. On its own that is a
+# silent break, not a loud one - an empty prefix looks exactly like a repo with
+# no backups - so change it only as part of WP-131's sequenced cutover.
+# zuno_postgresql_backup_s3_path: "/pgbackrest/repo2"
 
 # --- MariaDB PhysicalBackup, S3 storage (WP-118 B7/B8) ---------------------
 # Optional, same shape as the PostgreSQL repo2 above: MariaDB has no local

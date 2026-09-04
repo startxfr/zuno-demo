@@ -23,16 +23,24 @@
 # triggering, so completion below can be detected as "something newer than
 # this appeared" rather than mistaking an old backup for the one just
 # triggered.
-- name: "postgresql | record the most recent backup before triggering"
+# WP-131 P0-b. This used to watch status.pgbackrest.scheduledBackups and wait
+# for a newer completionTime than the one recorded before the patch. Two things
+# were wrong with that, and together they meant the command could never do what
+# it claimed. The chart declared no spec.backups.pgbackrest.manual block, so
+# PGO ignored the annotation entirely and nothing was triggered; and even if
+# something had been, an on-demand backup is reported under manualBackup, never
+# under scheduledBackups. So the task patched an inert annotation and then
+# waited up to ten minutes for the next SCHEDULED backup - succeeding by
+# coincidence if a weekly cron happened to land inside the window, and
+# otherwise failing while claiming the backup did not complete.
+#
+# The annotation value is now generated once and kept, because PGO copies it
+# verbatim into status.pgbackrest.manualBackup.id. That turns the wait into an
+# identity check on the run this task started, rather than a timestamp
+# comparison that cannot tell one backup from another.
+- name: "postgresql | generate the on-demand backup id"
   ansible.builtin.set_fact:
-    _postgresql_backup_before: >-
-      {{
-        (
-          (_postgresql_backup_cluster_lookup.resources[0].status.pgbackrest.scheduledBackups | default([]))
-          | selectattr('succeeded', 'defined') | selectattr('succeeded', 'greaterthan', 0)
-          | map(attribute='completionTime') | sort | last | default('')
-        )
-      }}
+    _postgresql_backup_id: "{{ ansible_date_time.iso8601 | default(lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}"
 
 - name: "postgresql | trigger an on-demand backup"
   kubernetes.core.k8s:
@@ -44,32 +52,33 @@
     definition:
       metadata:
         annotations:
-          postgres-operator.crunchydata.com/pgbackrest-backup: "{{ ansible_date_time.iso8601 | default(lookup('pipe', 'date -u +%Y-%m-%dT%H:%M:%SZ')) }}"
+          postgres-operator.crunchydata.com/pgbackrest-backup: "{{ _postgresql_backup_id }}"
 
-- name: "postgresql | wait for a newer successful backup to appear"
+# `finished` alone is not success - oc explain says so explicitly ("does not
+# indicate success or failure") - so succeeded must be checked too, and the id
+# must match or a previous manual backup still in status would satisfy this
+# immediately.
+- name: "postgresql | wait for this on-demand backup to finish successfully"
   kubernetes.core.k8s_info:
     api_version: postgres-operator.crunchydata.com/v1beta1
     kind: PostgresCluster
     namespace: zuno-data
     name: zuno-postgresql
   register: _postgresql_backup_poll
-  until: >-
-    (
-      (_postgresql_backup_poll.resources[0].status.pgbackrest.scheduledBackups | default([]))
-      | selectattr('succeeded', 'defined') | selectattr('succeeded', 'greaterthan', 0)
-      | map(attribute='completionTime') | sort | last | default('')
-    ) > _postgresql_backup_before
+  vars:
+    _mb: >-
+      {{ (_postgresql_backup_poll.resources[0].status.pgbackrest.manualBackup
+          | default({}, true)) }}
+  until:
+    - (_mb['id'] | default('')) == _postgresql_backup_id
+    - (_mb['finished'] | default(false)) | bool
+    - (_mb['succeeded'] | default(0)) | int > 0
   retries: 60
   delay: 10
 
 - name: "postgresql | report backup completion"
   ansible.builtin.debug:
     msg: >-
-      On-demand backup completed:
-      {{
-        (
-          (_postgresql_backup_poll.resources[0].status.pgbackrest.scheduledBackups | default([]))
-          | selectattr('succeeded', 'defined') | selectattr('succeeded', 'greaterthan', 0)
-          | sort(attribute='completionTime') | last
-        )
-      }}
+      On-demand backup {{ _postgresql_backup_id }} completed on repo
+      {{ (_postgresql_backup_cluster_lookup.resources[0].spec.backups.pgbackrest.manual.repoName | default('?')) }}:
+      {{ (_postgresql_backup_poll.resources[0].status.pgbackrest.manualBackup | default({}, true)) }}

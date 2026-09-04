@@ -1,6 +1,6 @@
 # WP-131: Execute ADR-0546's cross-cluster source bucket and per-cluster S3 convention
 
-- **State:** Not started
+- **State:** Not started (P0-a, P0-b and the P1 `path` parameter landed 2026-09-04; the migration itself is untouched)
 - **ADRs:** [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (`Accepted` 2026-09-04 — this WP satisfied its acceptance criterion 2),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) (B12),
@@ -58,8 +58,13 @@ is true and no `PostgresCluster` exists — so **any rebuild of `zuno-postgresql
 bootstraps an empty database** while announcing a genuinely fresh environment,
 and `make d3 restore postgresql` refuses to restore a backup that exists.
 
-Fix: add `PGBACKREST_REPO2_PATH` from the same variable the operand will use.
-Land it alone, and prove it by seeing the probe report the real backup set.
+**Fixed 2026-09-04.** `PGBACKREST_REPO2_PATH` now comes from
+`zuno_postgresql_backup_s3_path`, the same variable the operand uses, so probe
+and operand cannot drift again. Default `/pgbackrest/repo2` — what PGO already
+writes. **Live verification still owed**: the probe runs only from `install.yml`
+(gated on the PostgresCluster being absent, so inert on `demo222`) and from
+`restore.yml` (which would then actually restore), so it has to be exercised
+standalone rather than through either entry point.
 
 ### P0-b — `make d3 backup postgresql` cannot trigger a backup
 
@@ -71,6 +76,15 @@ patches an inert annotation and waits for a scheduled run.
 
 This matters here because the single most important step of the cutover is
 "take a new full backup on the new path immediately".
+
+**Fixed 2026-09-04.** The chart now declares `spec.backups.pgbackrest.manual`
+(`repoName` resolving to `repo2` when the S3 repo is enabled, else `repo1`;
+`--type=full`), and `backup.yml` waits on `status.pgbackrest.manualBackup`
+instead. The wait is now an identity check — PGO copies the annotation value
+verbatim into `manualBackup.id`, so the task waits for *the run it started*
+rather than comparing timestamps that cannot tell one backup from another. It
+also checks `succeeded > 0` and not only `finished`, which `oc explain` states
+does not indicate success.
 
 ## Mapping
 
@@ -221,10 +235,13 @@ happened.
 ```
 P0   Fix P0-a. Apply. Confirm the probe reports the three real backups.
      Nothing else starts until it does.
-P1   Land the `path` parameter (chart + install.yml + BOTH restore.yml blocks +
-     check_s3_backup.yml), defaulting to /pgbackrest/repo2. Apply. The inertia
-     proof is that PGO's GENERATED pgbackrest config is unchanged, not just the
-     rendered PostgresCluster.
+P1   DONE 2026-09-04 (repo work): the `path` parameter is wired through the
+     chart's global block, install.yml and BOTH restore.yml blocks, defaulting
+     to /pgbackrest/repo2. `helm template` against the live Application's own
+     values adds exactly one line, repo2-path: "/pgbackrest/repo2", equal to
+     what PGO already writes; with s3 disabled it renders nothing. STILL OWED:
+     the live apply, whose inertia proof is that PGO's GENERATED pgbackrest
+     config is unchanged, not just the rendered PostgresCluster.
 P2   Baseline: pgbackrest info --stanza=db --repo=2 --output=json. Keep it.
 P3   Pick a window OUTSIDE Sunday 02:00-04:00 (repo1 full 0 2 * * 0, repo1 diff
      0 2 * * 1-6, repo2 full 0 3 * * 0). A backup split across two paths is

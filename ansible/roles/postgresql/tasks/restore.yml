@@ -70,6 +70,7 @@
           bucket: "{{ zuno_postgresql_backup_s3_bucket }}"
           endpoint: "{{ zuno_postgresql_backup_s3_endpoint }}"
           region: "{{ zuno_postgresql_backup_s3_region }}"
+          path: "{{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }}"
     gitops_app_wait_retries: 60
 
 # Same readiness signal install.yml's normal path waits on (PGO never sets
@@ -126,4 +127,5 @@
           bucket: "{{ zuno_postgresql_backup_s3_bucket }}"
           endpoint: "{{ zuno_postgresql_backup_s3_endpoint }}"
           region: "{{ zuno_postgresql_backup_s3_region }}"
+          path: "{{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }}"
     gitops_app_wait_retries: 30

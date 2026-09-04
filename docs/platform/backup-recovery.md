@@ -22,6 +22,28 @@ already configures two pgBackRest repos:
   500Gi), full backup weekly (`0 2 * * 0`) and differential backup daily
   (`0 2 * * 1-6`), 4 full backups retained (`repo1-retention-full: "4"`) —
   worst-case data loss is well inside the 24h RPO objective.
+> **2026-09-04 (WP-131 P0).** Two defects on the repo2 path were found and
+> fixed, and both were silent. `check_s3_backup.yml` never set
+> `PGBACKREST_REPO2_PATH`, so it listed pgBackRest's own default
+> `/var/lib/pgbackrest` while PGO writes `/pgbackrest/repo2` — the prefix it
+> read does not exist. `pgbackrest info` on an empty prefix returns `[]` and
+> exits 0, so the probe **succeeded while reporting no backup**, against a
+> bucket holding three full backups (2026-08-16, -23, -30). Because that result
+> gates the auto-restore in `install.yml`, a rebuild of `zuno-postgresql` would
+> have bootstrapped an empty database while announcing a genuinely fresh
+> environment, and `make d3 restore postgresql` refused a backup that exists.
+> Separately, the chart declared no `spec.backups.pgbackrest.manual` block, so
+> `make d3 backup postgresql` patched an annotation PGO ignores and then waited
+> for a *scheduled* backup. Both are fixed; the repo path is now the single
+> variable `zuno_postgresql_backup_s3_path`, read by the probe and the operand
+> alike so they cannot drift again.
+>
+> Note also that repo2 has **no retention policy** — only `repo1-retention-full`
+> exists — so full backups have accumulated since 2026-08-16 and `archive/` is
+> never pruned. WP-131 sets retention as its last step, deliberately not before
+> the migration: `expire` runs after each backup and would delete history that
+> had just been copied.
+
 - **repo2** (opt-in, `backups.s3.enabled`, default `false`): off-cluster
   S3, full backup weekly (`0 3 * * 0`). Bucket/region/endpoint are chart
   values; credentials are synced by Vault/ExternalSecrets

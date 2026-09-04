@@ -102,6 +102,23 @@
                         value: "{{ zuno_postgresql_backup_s3_endpoint }}"
                       - name: PGBACKREST_REPO2_S3_REGION
                         value: "{{ zuno_postgresql_backup_s3_region }}"
+                      # WP-131 P0-a. Without this the probe used pgBackRest's
+                      # own default repo-path, /var/lib/pgbackrest, while PGO
+                      # writes /pgbackrest/repo2 - so it listed a prefix that
+                      # does not exist. `pgbackrest info` on an empty prefix
+                      # returns [] and exits 0, so this Job SUCCEEDED while
+                      # reporting no backup, against a bucket holding three
+                      # full backups (verified 2026-09-04).
+                      #
+                      # That is not a cosmetic check: _postgresql_s3_has_backup
+                      # gates the auto-restore in install.yml, so a rebuild of
+                      # zuno-postgresql bootstrapped an EMPTY database and said
+                      # it looked like a genuinely fresh environment - and
+                      # `make d3 restore postgresql` refused a backup that
+                      # exists. Same variable as the operand (install.yml,
+                      # restore.yml) so the two cannot drift again.
+                      - name: PGBACKREST_REPO2_PATH
+                        value: "{{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }}"
                     volumeMounts:
                       - name: s3-creds
                         mountPath: /etc/pgbackrest/conf.d

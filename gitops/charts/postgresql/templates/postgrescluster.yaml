@@ -145,6 +145,26 @@ spec:
       global:
         repo1-retention-full: "4"
         repo1-retention-full-type: count
+{{- if .Values.backups.s3.enabled }}
+{{- /*
+repo2 needs its own `if` because `global:` sits outside the s3.enabled guard
+that wraps `repos:` below. The value equals PGO's own default for a cloud repo,
+so adding it is inert - it exists so WP-131 can move the repo by changing a
+variable instead of discovering where PGO decided to write. Deliberately no
+repo2 retention key: setting one makes the next backup `expire` older sets,
+which during a migration deletes the history just copied (WP-131 P12, never P6).
+*/}}
+        repo2-path: {{ .Values.backups.s3.path | quote }}
+{{- end }}
+{{- /*
+Required for `make d3 backup postgresql` to do anything at all: PGO acts on the
+pgbackrest-backup annotation only when this block exists. Declaring it starts
+no backup by itself - PGO waits for the annotation's value to change.
+*/}}
+      manual:
+        repoName: {{ .Values.backups.manual.repoName | default (ternary "repo2" "repo1" .Values.backups.s3.enabled) | quote }}
+        options:
+{{ toYaml .Values.backups.manual.options | indent 10 }}
       # WP-083 follow-up: the repo host ran with NO requests and NO limits at
       # all - its only QoS came from the injected istio sidecar. That made it
       # invisible to the scheduler and, more to the point, the first candidate
