@@ -126,7 +126,7 @@ home rather than being left pointing at a stale default — otherwise a `demo333
 who sets the parameter correctly still gets a DRIFTED report, which is B9's own failure
 mode reintroduced one level up.
 
-**Landed 2026-09-04**, repo work complete, live apply still pending.
+**DONE 2026-09-04, live-verified.**
 
 New `ansible/roles/openshift_ai/tasks/resolve_version_pin.yml`, shared by
 `install.yml` and `precheck.yml` exactly as `discover_channel.yml` is shared by
@@ -163,9 +163,20 @@ renders `rhods-operator.9.9.9`, so the key really drives `startingCSV` rather
 than being inert decoration. `make d1 check openshift-ai` run locally exercises
 the new task and still reports ALIGNED with no finding.
 
-**Still pending:** the live `make d1 install openshift-ai`, which will be
-`changed=1` (the Application gains the `version` key) with a byte-identical
-render.
+**Live-verified 2026-09-04** with `make d1 install openshift-ai` (operator
+approved, run through AAP so it exercised the pushed code): `changed=1`, and the
+diff of `zuno-openshift-ai-d0`'s values against the pre-apply baseline is
+**exactly one added line**, `version: 3.5.0`. `zuno-openshift-ai-d1`'s values are
+byte-identical. The Subscription still reads `startingCSV=rhods-operator.3.5.0`,
+`channel=stable-3.5`, `installPlanApproval=Manual`, `currentCSV=rhods-operator.3.5.0`;
+the CSV is still `Succeeded`; no new InstallPlan was created; `default-dsci` and
+`zuno-dsc` are both still `Ready`; both Applications Synced/Healthy.
+
+Predicted delta, observed delta, nothing else — which is the standard step 0
+set. `changed=1` was expected here (the Application genuinely gains a key), so
+the count carries no information; the evidence is that the *content* of the
+change is the single line the design calls for, and that everything downstream of
+`startingCSV` is untouched.
 
 #### A wrong-day defect found alongside it
 
