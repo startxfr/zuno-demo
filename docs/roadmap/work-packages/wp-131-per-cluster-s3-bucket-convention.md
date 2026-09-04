@@ -1,6 +1,6 @@
 # WP-131: Execute ADR-0546's cross-cluster source bucket and per-cluster S3 convention
 
-- **State:** Not started (P0-a, P0-b and the P1 `path` parameter landed 2026-09-04; the migration itself is untouched)
+- **State:** Not started (P0-a, P0-b and the P1 `path` parameter landed 2026-09-04; steps 1 (mlflow) and 2 (mariadb) are also landed and live-verified on demo222; aap, mlops, openshift-ai, rag-ingestion and the postgresql P2–P14 sequence remain)
 - **ADRs:** [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (`Accepted` 2026-09-04 — this WP satisfied its acceptance criterion 2),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) (B12),
@@ -453,9 +453,9 @@ manifests — `mlflowConfig.enabled` for mlflow, `acceptanceGate.keycloakUrl` an
 
 | Component | Cutover | Live risk |
 |---|---|---|
-| **mlflow** | `zuno-corpus`/us-east-1 → `zuno-demo222-mlops`/eu-west-2; `artifactsDestination` **and** `artifact.bucket` are two independent literals that move together | **Low — `mlflow-artifacts/` does not exist.** Do it first, as the rehearsal |
-| **mariadb** | Bucket via the existing variable; **prefix `zuno-mariadb` → `mariadb`**, the only unparameterized field | Low |
-| **aap** | `zuno_aap_hub_s3_bucket_name`; **no chart change** — bucket and region come from Vault | Low, bucket empty |
+| **mlflow** — **DONE 2026-09-04** | `zuno-corpus`/us-east-1 → `zuno-demo222-mlops`/eu-west-2. Both workspace Secrets and the MLflow CR moved together | Low, as expected — nothing had ever been written |
+| **mariadb** — **DONE 2026-09-04** | Bucket + the newly parameterized prefix. Needed a **delete-and-recreate**: spec.storage is immutable, see below | Low, but not the shape expected |
+| **aap** — **DONE 2026-09-04** | `zuno_aap_hub_s3_bucket_name`; no chart change, and nothing to flip in git either — the example file carries placeholders | Low, both buckets empty |
 | **mlops** | `s3.bucket`, `s3.region`, `styleCorpusS3Uri`. Not yet `mergedModel.s3Uri` or `trainjob.baseModel` — those name the *models* bucket | Medium — in-flight runs break |
 | **rag-ingestion** | `s3.bucket` → `-data`; `sxaDump` → `zuno-demo-sources` with `sxa-dump/…` keys | **High** — the corpus vanishes from the app's view until re-ingestion; the DSPA reconciles and kills in-flight runs |
 | **openshift-ai** | `zuno_rhoai_traces_s3_bucket_name`; no chart change | Medium — **historical traces become unqueryable** |
@@ -475,6 +475,38 @@ one model, reversible.
 loudly; `components/mlops/tests/test_trainjob.py`'s fixture becomes a neutral
 value; `evaluations/register_conformance.py`'s mention is docstring provenance
 that stays true — **leave it**.
+
+### AAP Hub: the cutover is three hops, and only the last one counts
+
+`zuno_aap_hub_s3_bucket_name` → Vault `zuno/aap/hub-s3` → ExternalSecret
+`aap-hub-s3-credentials` → **the operator-generated `aap-hub-server` Secret's
+settings.py** → a rolling restart of api/content/worker. Measured 2026-09-04:
+the credentials Secret updated within seconds of `make d0 install vault`, and
+`settings.py` still named the old bucket for **six more minutes** before the AAP
+operator regenerated it and rolled the pods. Reading the credentials Secret is
+therefore not a verification — it is the hop that moves first and proves least.
+
+`make d0 install vault` does overwrite this path: the "seed only if missing"
+guard (`vault_seed_if_missing.yml`) covers only the self-generatable secrets,
+not operator-supplied ones like `zuno/aap/hub-s3`, which use a plain `kv put`.
+
+Proof used, and the shape worth reusing: a write through the Hub's OWN storage
+backend rather than an inference from config.
+
+```bash
+oc exec -n zuno-aap deploy/aap-hub-api -- bash -lc 'pulpcore-manager shell -c "
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.conf import settings
+print(settings.AWS_STORAGE_BUCKET_NAME)
+n = default_storage.save(\"wp131-probe.txt\", ContentFile(b\"wp131\"))
+print(default_storage.exists(n)); default_storage.delete(n)"'
+```
+
+It exercises credentials, bucket, region and the boto3 path the Hub actually
+uses, writes one tiny object and removes it. Absence of errors in the pod logs
+proves nothing here: the Hub had never written to either bucket, so a broken
+configuration and a correct idle one look identical.
 
 ### PhysicalBackup's spec.storage is immutable — the mariadb cutover is a recreate
 
