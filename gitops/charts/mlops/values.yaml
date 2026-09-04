@@ -92,7 +92,19 @@ artifacts:
 # Read-only access to document_embeddings (rag-service's own table,
 # ADR-0015) - this pipeline never writes to Postgres (ADR-0302 point 2).
 postgres:
-  host: zuno-postgresql-rw.zuno-data.svc.cluster.local
+  # WP-133 (live, 2026-09-04): zuno-postgresql-rw does not exist - no
+  # service in zuno-data has ever been named that (confirmed: `oc get svc
+  # -n zuno-data` lists zuno-postgresql-{ha,ha-config,pgbouncer,pods,
+  # primary,replicas} only). Fixed to the exact host rag-ingestion's own
+  # top-level postgres: block already uses successfully in production for
+  # this same rag-tech database/knowledge.tech domain
+  # (gitops/charts/rag-ingestion/values.yaml) - pgBouncer's transaction
+  # pooling is safe here because mlops.py's SET search_path and the SELECT
+  # it guards run inside one uncommitted connection (autocommit=False),
+  # never split across a commit boundary. Unreachable on the WP-087 style
+  # objective (never opens a PG connection at all), so this stayed wrong
+  # until this WP's tekos run was the first to actually try.
+  host: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
   port: 5432
   database: rag-tech
   # rag, not public. document_embeddings lives in the `rag` schema
