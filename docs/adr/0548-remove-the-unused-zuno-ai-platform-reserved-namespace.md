@@ -1,6 +1,6 @@
 # ADR-0548: Remove the unused zuno-ai-platform reserved namespace
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.8
 - **Date:** 2026-09-04
 - **Decision owners:** Zuno Demo architecture team
@@ -51,11 +51,10 @@ ArgoCD is the removal mechanism: both `zuno-namespaces-d0` and `zuno-namespaces-
 
 ## Acceptance criteria
 
-- `gitops/charts/namespaces/values.yaml` no longer lists `zuno-ai-platform` in `platformNamespaces` or the mesh-egress allowlist.
-- `ansible/roles/namespaces/tasks/precheck.yml`'s required namespace topology no longer includes `zuno-ai-platform`.
-- The live cluster's `zuno-ai-platform` `Namespace` object is gone (verified after ArgoCD syncs the merged change), pruned by ArgoCD rather than deleted by hand.
-- `make d0 check` passes without expecting `zuno-ai-platform` to exist.
-- `platform/docs/check_docs.py` passes: ADR-0328 and ADR-0333's `Status` lines and their `docs/adr/README.md` index rows agree, and both name ADR-0548.
+- [x] `gitops/charts/namespaces/values.yaml` no longer lists `zuno-ai-platform` in `platformNamespaces` or the mesh-egress allowlist.
+- [x] `ansible/roles/namespaces/tasks/precheck.yml`'s required namespace topology no longer includes `zuno-ai-platform`.
+- [x] The live cluster's `zuno-ai-platform` `Namespace` object is gone: live-verified 2026-09-04 after commit `b2d02cff` merged to `main` - `zuno-namespaces-d0`/`zuno-namespaces-d1` (ArgoCD) picked it up on a hard refresh, transitioned the namespace to `Terminating`, and it was fully deleted within ~2 minutes. Pruned by ArgoCD (`syncPolicy.automated.prune: true`), no manual `oc delete namespace` used. Both Applications are `Synced`/`Healthy` afterward; no other namespace or resource was affected.
+- [x] `platform/docs/check_docs.py` passes: ADR-0328 and ADR-0333's `Status` lines and their `docs/adr/README.md` index rows agree, and both name ADR-0548.
 
 ## Related ADRs
 
