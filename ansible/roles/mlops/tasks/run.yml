@@ -1,0 +1,61 @@
+---
+# `make day3|d3 run mlops` (WP-126). Triggers one real KFP v2 run of the
+# per-agent LoRA training pipeline - the same kfp.Client().run_pipeline()
+# sequence proven live during WP-126 (2026-09-03/04: real scale-from-zero
+# of zuno-gpu-burst-a, real training loop), wrapped here as a repeatable
+# operator command instead of an ad hoc script.
+#
+# This is a Day 3 verb, not folded into `make d2 install mlops`: it acts
+# on an already-installed platform and spends real, costly compute (a GPU
+# burst-node scale-up, several minutes of training), same tier as
+# backup/restore/sign - never a side effect of install.
+#
+# `agent` (default comage - the only agent with a compiled per-agent
+# PipelineVersion today, ADR-0526/WP-119) selects which Pipeline to run;
+# override with `-e agent=<other>` once a second agent's version exists.
+
+- name: "mlops | resolve the caller's OpenShift bearer token for the DSPA API"
+  ansible.builtin.command: oc whoami -t
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  register: _mlops_run_token
+  changed_when: false
+
+- name: "mlops | look up the mlops-dspa API server Route"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: "{{ mlops_namespace | default('zuno-mlops') }}"
+    name: "ds-pipeline-mlops-dspa"
+  register: _mlops_run_route
+
+- name: "mlops | fail loudly if the DSPA route or token could not be resolved"
+  ansible.builtin.fail:
+    msg: >-
+      Could not resolve a bearer token or the ds-pipeline-mlops-dspa Route in
+      {{ mlops_namespace | default('zuno-mlops') }} - confirm `oc whoami` works
+      and the mlops-dspa DSPA is deployed (`make d2 check mlops`).
+  when: >-
+    (_mlops_run_token.stdout | default('') | trim) == '' or
+    (_mlops_run_route.resources | default([]) | length) == 0
+
+- name: "mlops | ensure the compiler/runner venv (kfp SDK) exists"
+  ansible.builtin.pip:
+    requirements: "{{ zuno_repo_root }}/components/mlops/tooling/requirements.txt"
+    virtualenv: "{{ zuno_repo_root }}/components/mlops/tooling/.venv"
+    virtualenv_command: "python3 -m venv"
+
+- name: "mlops | trigger the pipeline run for agent '{{ agent | default('comage') }}'"
+  ansible.builtin.command:
+    cmd: >-
+      {{ zuno_repo_root }}/components/mlops/tooling/.venv/bin/python
+      trigger_run.py --agent {{ agent | default('comage') }}
+    chdir: "{{ zuno_repo_root }}/components/mlops/tooling"
+  environment:
+    KFP_HOST: "https://{{ _mlops_run_route.resources[0].spec.host }}"
+    KFP_TOKEN: "{{ _mlops_run_token.stdout | trim }}"
+  register: _mlops_run_result
+  changed_when: true
+
+- name: "mlops | report the triggered run"
+  ansible.builtin.debug:
+    var: _mlops_run_result.stdout_lines

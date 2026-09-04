@@ -161,6 +161,13 @@ jobTemplates:
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
     surveyComponents: [agents]
+  # WP-126: triggers a real GPU burst-node scale-up and training compute,
+  # same tier as backup/restore/sign. WP-103: gated (launch-RBAC)
+  - name: zuno-day3-run
+    playbook: ansible/playbooks/day3_run.yml
+    credential: zuno-aap-installer
+    askVariablesOnLaunch: true
+    surveyComponents: [mlops]
 
   # WP-105/ADR-0536 Part B: the two halves of the node failover drill, each
   # its own Job Template (not one shared template with a target_component,

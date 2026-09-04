@@ -165,9 +165,11 @@ this is now purely "run it again and watch it finish":
    etc. - see that memory) before touching mlops.
 2. Confirm `zuno-gpu-burst-a` is back at 0 replicas (it should have scaled down on its own once the
    interrupted pod's node was torn down by the cluster stop - verify rather than assume).
-3. Trigger one more real run the same way (`kfp.Client.run_pipeline`, see git history around
-   2026-09-04 for the exact invocation) and let it run to completion uninterrupted - training alone
-   took ~13 minutes for 224 steps on the previous attempt, so budget for the full pipeline
+3. Trigger one more real run with `make d3 run mlops` (`AGENT=<agent>` overrides the default
+   `comage`) - wraps the exact `kfp.Client.run_pipeline` sequence proven live 2026-09-03/04 as a
+   repeatable command (`ansible/roles/mlops/tasks/run.yml`,
+   `components/mlops/tooling/trigger_run.py`). Let it run to completion uninterrupted - training
+   alone took ~13 minutes for 224 steps on the previous attempt, so budget for the full pipeline
    (dataset-prep + train + merge-export + evaluate + push-registry) rather than just the training
    loop.
 4. Verify the acceptance checks below, then close out this WP's `State` line and ADR-0539's

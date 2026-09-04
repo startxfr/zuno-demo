@@ -104,8 +104,14 @@ DAY3_SIGN_COMPONENTS := agents
 # across day tiers - checking only the operator would report healthy while the
 # OLSConfig operand is absent, and vice versa.
 DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow
-DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS))
-DAY3_VERBS := test stresstest backup restore check sign scenario-failover-node
+# WP-126: triggering a real pipeline run spends real, costly compute (a GPU
+# burst-node scale-up, several minutes of training) against an
+# already-installed platform - the same tier as backup/restore/sign, never
+# a side effect of `make d2 install mlops`. Its own component list, same
+# per-verb split as backup/restore.
+DAY3_RUN_COMPONENTS := mlops
+DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS))
+DAY3_VERBS := test stresstest backup restore check sign run scenario-failover-node
 
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
 # recipe below sources to route mutating/read verbs through AAP when
@@ -211,6 +217,7 @@ help:
 	  '  make day3|d3 test [component]        Check availability only (ADR-0057)' \
 	  '  make day3|d3 stresstest [component]  Run every existing test layer per agent, plus a bulk-interaction load pass (ADR-0058)' \
 	  '  make day3|d3 sign [component]        Re-sign the OKF bundles and verify them (ADR-0420) - run after ANY change under agents/<name>/' \
+	  '  make day3|d3 run [component]         Trigger one real pipeline run (WP-126) - AGENT=<agent> overrides the default (comage)' \
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
@@ -267,6 +274,7 @@ _complete-components:
 	  3) case "$(VERB)" in \
 	       backup|restore) echo "$(DAY3_BACKUP_COMPONENTS) all" ;; \
 	       sign) echo "$(DAY3_SIGN_COMPONENTS) all" ;; \
+	       run) echo "$(DAY3_RUN_COMPONENTS) all" ;; \
 	       *) echo "$(DAY3_COMPONENTS) all" ;; \
 	     esac ;; \
 	esac
@@ -534,6 +542,7 @@ if [[ -z "$$verb" ]]; then \
     '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
     '  sign         Re-sign every OKF bundle against the deployed agent-runtime image, then verify (ADR-0420)' \
     '               The signed digest covers every file under agents/<name>/, tasks/ included - not just agent.okf.md' \
+    '  run          Trigger one real KFP pipeline run (WP-126) - spends real GPU burst-node compute' \
     '  scenario-failover-node   Live GPU-node failover drill (WP-105/ADR-0536): cordon+kill the qwen3.5-9b-wesh' \
     '               pod, verify Comage fails over to qwen3.5-9b (Tekos pinned to ovhcloud-gpt-oss-120b as the' \
     '               decoupling control), pause for human' \
@@ -550,12 +559,16 @@ if [[ -z "$$verb" ]]; then \
     'Components (sign; optional, default: all):' \
     '  $(DAY3_SIGN_COMPONENTS)' \
     '' \
+    'Components (run; optional, default: all):' \
+    '  $(DAY3_RUN_COMPONENTS)' \
+    '' \
     'Day 3 check-only components:' \
     '  $(DAY3_CHECK_ONLY_COMPONENTS)' \
     '' \
     'Report format: text (default) | json | csv - REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"' \
     'Bulk interaction count (stresstest only): BULK=<n> (skips the interactive prompt; BULK=0 disables it)' \
     'Remove test-generated conversations after the run (stresstest only): CLEANUP=<0|1> (default: remove; skips the interactive prompt)' \
+    'Agent to train (run only): AGENT=<agent> (default: comage - the only agent with a compiled pipeline version today)' \
     '' \
     'Example: make d3 test agents' \
     'Example: make d3 stresstest BULK=25' \
@@ -563,6 +576,7 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 backup postgresql' \
     'Example: make d3 restore postgresql' \
     'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything' \
+    'Example: make d3 run mlops   # triggers one real LoRA training run (WP-126) - scales up zuno-gpu-burst-a' \
     'Example: make d3 scenario-failover-node   # interactive - pauses for confirmation between cordon+kill and uncordon+restore'; \
   exit 0; \
 fi; \
@@ -613,6 +627,11 @@ case "$$verb" in \
     case " $(DAY3_SIGN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 sign component: '$$component' (expected one of: $(DAY3_SIGN_COMPONENTS) or all)" >&2; exit 2;; esac; \
     aap_route job zuno-day3-sign "{\"target_component\": \"$$component\"}"; rc=$$?; \
     if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_sign.yml -e "target_component=$$component" $(EXTRA_VARS); else exit $$rc; fi ;; \
+  run) \
+    case " $(DAY3_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 run component: '$$component' (expected one of: $(DAY3_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    agent="$${AGENT:-comage}"; \
+    aap_route job zuno-day3-run "{\"target_component\": \"$$component\", \"agent\": \"$$agent\"}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_run.yml -e "target_component=$$component" -e "agent=$$agent" $(EXTRA_VARS); else exit $$rc; fi ;; \
   scenario-failover-node) \
     if [[ ! -t 0 ]]; then \
       echo "day3 scenario-failover-node requires an interactive terminal - it mutates live shared GPU infra and needs a human to confirm the failover before restoring (ADR-0536). Refusing to run non-interactively." >&2; \
