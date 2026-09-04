@@ -71,6 +71,76 @@
          else 'STALE: exceeds the 24h RPO objective (ADR-0112), investigate.' }}
   when: _postgresql_last_backup | length > 0
 
+# WP-131 P0. Everything above this point reads status.pgbackrest, which is
+# the OPERATOR's opinion of its own backups - it says a scheduled backup
+# succeeded, and says nothing about whether that data is reachable at the
+# path the operand is configured to use. That is exactly the blind spot
+# P0-a lived in: check_s3_backup.yml queried pgBackRest's built-in default
+# repo path (/var/lib/pgbackrest) while PGO writes /pgbackrest/repo2, so it
+# listed a prefix that does not exist - and `pgbackrest info` on an empty
+# prefix returns [] and exits 0. The probe SUCCEEDED while reporting no
+# backup, against a bucket holding three full backups.
+#
+# So this check now asks the bucket itself, and reports the two answers side
+# by side. A disagreement (the CR claims recent successful backups, the
+# bucket at the configured path holds none) is the signature of a wrong
+# repo path, and is invisible to either source read alone.
+#
+# The probe is a throwaway Job that cleans up its own Secret; it only runs
+# from a `check` verb (precheck.yml has no other caller - day0/1/2/3_check),
+# never from an install path.
+#
+# To exercise the probe itself rather than trust it - the counter-test that
+# tells a working probe apart from a dead one:
+#   make d3 check postgresql EXTRA_VARS='-e zuno_postgresql_backup_s3_path=/wrong'
+# must report zero backup sets. A probe that reports three either way is
+# not reading the path at all.
+- name: "postgresql | cross-check the S3 backup repo against the bucket (WP-131 P0)"
+  ansible.builtin.include_tasks: check_s3_backup.yml
+
+- name: "postgresql | summarise what the S3 repo actually holds"
+  ansible.builtin.set_fact:
+    _postgresql_s3_backup_count: >-
+      {{ (_postgresql_s3_stanzas | default([]))
+         | map(attribute='backup', default=[]) | map('length') | sum }}
+    _postgresql_s3_stanza_names: >-
+      {{ (_postgresql_s3_stanzas | default([])) | map(attribute='name', default='?') | list }}
+
+- name: "postgresql | report the S3 repo contents against the operator's own claim"
+  ansible.builtin.debug:
+    msg: >-
+      {% if not (_postgresql_backup_s3_enabled | default(false) | bool) -%}
+      No S3 backup repo configured (repo2 absent) - repo1's local PVC is the
+      only pgBackRest repository, and it disappears with the cluster. Fill in
+      the zuno_postgresql_backup_s3_* fields in ansible/confidential.yml.
+      {%- elif not (_postgresql_s3_check_succeeded | default(false) | bool) -%}
+      COULD NOT QUERY S3 repo2 at path
+      {{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }} in
+      bucket {{ zuno_postgresql_backup_s3_bucket | default('?') }} - this is
+      NOT the same as "no backup exists" (credentials/connectivity?). See the
+      check Job output above.
+      {%- elif (_postgresql_s3_backup_count | int) == 0 -%}
+      MISMATCH RISK: S3 repo2 is reachable at path
+      {{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }} in
+      bucket {{ zuno_postgresql_backup_s3_bucket | default('?') }} but holds
+      NO completed backup, while the operator reports
+      {{ _postgresql_successful_backups | length }} successful scheduled
+      backup(s). On a freshly provisioned cluster that is expected; on a
+      cluster the operator says it has been backing up, it means the
+      configured repo path is not where the backups are - and a rebuild
+      would bootstrap an EMPTY database while announcing a fresh
+      environment. Verify with `oc get postgrescluster zuno-postgresql -n
+      zuno-data -o jsonpath='{.spec.backups.pgbackrest.global}'`.
+      {%- else -%}
+      S3 repo2 holds {{ _postgresql_s3_backup_count }} completed backup(s)
+      in stanza(s) {{ _postgresql_s3_stanza_names | join(', ') }} at path
+      {{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }} in
+      bucket {{ zuno_postgresql_backup_s3_bucket | default('?') }} - the
+      bucket agrees with the operator's
+      {{ _postgresql_successful_backups | length }} successful scheduled
+      backup(s).
+      {%- endif %}
+
 - name: "postgresql | compute install state"
   ansible.builtin.set_fact:
     _state_is_installed: >-

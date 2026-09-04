@@ -40,6 +40,64 @@ ADR-0546 was written from a static read. Measuring the buckets moved the work:
   lifecycle rules** — so nothing is silently expiring, and nothing is protected
   against an accidental overwrite either.
 
+## Execution record — the copies, 2026-09-04
+
+The six buckets exist and every cross-cluster copy has been made and verified.
+
+| Bucket | Objects | Bytes | Versioning |
+|---|---|---|---|
+| `zuno-demo-sources` | 231 | 164,721,928,015 | **Enabled** + `expire-noncurrent-30d` |
+| `zuno-demo222-mlops` | 307 | 674,847,712 | off, deliberately |
+| `zuno-demo222-backups` | 6 | 38,699,588 | off, deliberately |
+| `zuno-demo222-data` | 0 | 0 | off |
+| `zuno-demo222-traces` | 0 | 0 | off |
+| `zuno-demo222-aap-hub` | 0 | 0 | off |
+
+All six: `eu-west-2`, SSE-S3 `AES256`, all four public-access blocks on,
+`BucketOwnerEnforced`. `zuno-demo-sources`'s 231 objects are exactly
+226 (`models/`) + 2 (`sxa-dump/`) + 3 (`training-corpus/`).
+
+The three empty buckets are **empty by design**, not incomplete: the RAG corpus
+is re-ingested rather than copied (ADR-0546 clause 1), RHOAI traces are knowingly
+not carried over, and `zuno-aap-hub` was itself empty.
+
+Completeness was proven per copy with `aws s3 sync --dryrun`, which printed
+nothing for all five. On its own that is not evidence — a dryrun that silently
+failed prints nothing too — so the probe was exercised against an empty
+destination first and did list the work, which is what makes the empty results
+mean something.
+
+### The probe idiom that produced a false "ABSENT"
+
+Checking the new buckets with
+
+```bash
+aws s3api head-bucket --bucket "$B" 2>/dev/null && echo "existe" || echo "ABSENT"
+```
+
+reported three buckets ABSENT that the console showed plainly. `head-bucket`
+requires `s3:ListBucket`, and without it S3 answers **403 Forbidden**, not 404.
+The shell still had `AWS_PROFILE=zuno-migration` exported, and that identity's
+policy names only the five buckets involved in the copies. `2>/dev/null` then
+threw away the one word — Forbidden — that distinguished a permission denial
+from a missing bucket.
+
+**Rule for every probe in this WP: never discard stderr, and never collapse a
+non-zero exit into a single meaning.** Use:
+
+```bash
+for B in ...; do
+  printf "%-24s " "$B"
+  OUT=$(aws s3api head-bucket --bucket "$B" 2>&1) && echo "OK" \
+    || echo "FAIL :: $(echo "$OUT" | tr '\n' ' ' | cut -c1-160)"
+done
+```
+
+This is the same failure shape as P0-a below, and the same one recorded for
+`changed=0` inertia proofs: a silent probe and a broken probe are
+indistinguishable unless you ask what the output would be if the mechanism were
+dead.
+
 ## P0 — two pre-existing defects, to fix BEFORE any migration
 
 Neither is caused by this WP. Both block it, and the first is live today.
@@ -272,61 +330,106 @@ and uniquely named**, so copying them twice is free and idempotent. But
 `archive.info` and `backup.info` are **mutated in place** — they are the only
 files where "sync again later" destroys information.
 
+**Volume, measured 2026-09-04 — repo2 is 105.4 GB across 52,469 objects**, not
+the handful of small backup sets the mapping table implies. The three backup sets
+are only 3.2 GB (17 MB / 387 MB / 2.9 GB); **102.2 GB across 32,104 objects is
+archived WAL** accumulated since 2026-08-16 for a 7.7 GB database, because repo2
+has no retention rule at all — only `repo1-retention-full` exists. Decision
+(operator, 2026-09-04): **copy it all as-is**, and set repo2 retention only after
+the restore drill passes on the new bucket, so the old bucket stays an intact
+fallback and no restore point is destroyed to save transfer.
+
 Do **not** quiesce PostgreSQL: it buys nothing, the WAL archiving has already
 happened.
 
 ```
-P0   Fix P0-a. Apply. Confirm the probe reports the three real backups.
-     Nothing else starts until it does.
+P0   LIVE-VERIFY P0-a - it has never actually run. check_s3_backup.yml is only
+     called when the PostgresCluster is ABSENT (install.yml's auto-restore
+     gate), so on a live cluster the fixed probe is inert. precheck.yml now
+     carries the same probe, so:
+       make d3 check postgresql
+     must report the three real backup sets (20260816-030006F, 20260823-131414F,
+     20260830-030007F) and say the bucket agrees with the operator.
+     COUNTER-TEST, mandatory - a probe that reports three either way is not
+     reading the path at all:
+       make d3 check postgresql EXTRA_VARS='-e zuno_postgresql_backup_s3_path=/wrong'
+     must report zero. Keep `pgbackrest info --repo=2 --output=json` as the
+     baseline for P10.
 P1   DONE 2026-09-04 (repo work): the `path` parameter is wired through the
      chart's global block, install.yml and BOTH restore.yml blocks, defaulting
-     to /pgbackrest/repo2. `helm template` against the live Application's own
-     values adds exactly one line, repo2-path: "/pgbackrest/repo2", equal to
-     what PGO already writes; with s3 disabled it renders nothing. STILL OWED:
-     the live apply, whose inertia proof is that PGO's GENERATED pgbackrest
-     config is unchanged, not just the rendered PostgresCluster.
-P2   Baseline: pgbackrest info --stanza=db --repo=2 --output=json. Keep it.
-P3   Pick a window OUTSIDE Sunday 02:00-04:00 (repo1 full 0 2 * * 0, repo1 diff
+     to /pgbackrest/repo2. Confirmed live: the PostgresCluster carries
+     repo2-path: /pgbackrest/repo2 and manual: {repoName: repo2,
+     options: [--type=full]}, both applied by selfHeal.
+P2   BACKUP TEST - the first on-demand backup this cluster has ever completed
+     (status.pgbackrest.manualBackup is null, so any non-null result is caused
+     by this run, which is what makes it a proof):
+       make d3 backup postgresql
+     Requires all three: manualBackup.id equals the generated id, finished:
+     true, succeeded > 0 - AND a new F set under
+     s3://zuno-data-pgbackups/pgbackrest/repo2/backup/db/.
+P3   RESTORE DRILL from the CURRENT repo2, non-destructively. repo2 has NEVER
+     been restored from: the 2026-08-18 and 2026-08-25 drills both used repo1,
+     the local PVC. A throwaway PostgresCluster (zuno-postgresql-drill, in
+     zuno-data) bootstrapped straight from S3 via spec.dataSource.pgbackrest -
+     the "cloud" form, confirmed present in the installed CRD - never touches
+     zuno-postgresql. Sizing: the whole database is 7.7 GB (rag-sxa-legacy
+     5.2 GB, rag-tech 2.2 GB), so ~30Gi pgdata and a minimal repo1 suffice.
+     Acceptance is a REAL row count on rag-sxa-legacy compared against the live
+     cluster, not "the pods are Ready". Then delete the cluster and its PVCs.
+     Nothing touches a bucket until this is green.
+P4   Pick a window OUTSIDE Sunday 02:00-04:00 (repo1 full 0 2 * * 0, repo1 diff
      0 2 * * 1-6, repo2 full 0 3 * * 0). A backup split across two paths is
      unrecoverable as a unit.
-P4   Bulk copy:  aws s3 cp --recursive pgbackrest/repo2/ -> postgresql/
-P5   Delta immediately before the flip: aws s3 sync (NEVER --delete). This pass
+P5   Bulk copy, 105.4 GB / 52,469 objects, intra-region, server-side:
+       aws s3 sync s3://zuno-data-pgbackups/pgbackrest/repo2/ \
+                   s3://zuno-demo222-backups/postgresql/
+     sync, not cp --recursive, so a resume after any interruption is
+     incremental over 52k objects rather than a restart.
+P6   Delta immediately before the flip: same command, NEVER --delete. This pass
      carries archive.info and backup.info, which is what makes the new path a
      VALID stanza instead of an empty one. Confirm both files arrived.
-P6   FLIP: zuno_postgresql_backup_s3_{path,bucket} in confidential.yml, then
+P7   FLIP: zuno_postgresql_backup_s3_{path,bucket} in confidential.yml, then
      make d0 install postgresql. stanza-create becomes a no-op and adopts the
-     history.
-P7   Close the flip-window WAL hole - ARCHIVE ONLY, info files EXCLUDED:
+     history. Also re-run make d0 install vault so zuno/postgresql/backup-s3
+     stays consistent (its kv put rewrites all five keys together) - no effect
+     on demo222, required for demo333.
+P8   Close the flip-window WAL hole - ARCHIVE ONLY, info files EXCLUDED:
        aws s3 sync .../repo2/archive/ .../postgresql/archive/ \
          --exclude "*/archive.info" --exclude "*/archive.info.copy"
      Do NOT re-sync backup/ after the flip.
-P8   select pg_switch_wal(); confirm the new bucket gains a segment and the old
+P9   select pg_switch_wal(); confirm the new bucket gains a segment and the old
      one does not.
-P9   pgbackrest verify, then info; diff against the P2 baseline.
-P10  New full backup on the new path - needs P0-b fixed first.
-P11  Restore drill from the NEW repo with repoName: repo2. The 2026-08-18 and
-     2026-08-25 drills both used repo1; repo2 has never been exercised.
-P12  Only now: repo2 retention, and the chart default flip.
-P13  Old bucket read-only (explicit Deny policy) for a full cycle, then delete.
+P10  pgbackrest verify, then info; diff against the P0 baseline.
+P11  New full backup on the new path: make d3 backup postgresql.
+P12  SECOND RESTORE DRILL, from the NEW bucket, same throwaway-cluster
+     mechanism as P3. This is the acceptance criterion for the cutover.
+P13  Only now: repo2 retention (repo2-retention-full and the archive retention
+     that follows it). Expiring 102 GB of WAL is safe here because it happens
+     in the NEW bucket while the old one is still intact; set in P7 it would
+     have deleted the history just migrated. Then the chart default flip.
+P14  Old bucket read-only (explicit Deny policy) for a full cycle, then delete.
 ```
 
 ### What is lost if the order is wrong
 
 | Mistake | Consequence | Detectable? |
 |---|---|---|
-| Skip P0 | Any rebuild bootstraps an **empty database**. Total, silent. **Exists today** | No — the probe reports success |
-| Flip before P5 | `stanza-create` builds an empty stanza; no off-cluster restore point | Yes, `info` is empty |
-| Skip P7 | **WAL hole.** Backups look perfect; PITR silently cannot roll forward across the window. You find out during an incident | **No** |
-| P7 without the `.info` exclusions | Overwrites live info files with pre-flip copies | Only via `verify` |
-| Retention set at P6 | The first `expire` **deletes the history just migrated** | Too late |
+| Skip P0 | Any rebuild bootstraps an **empty database** while announcing a fresh environment. Total, silent | No — the probe reports success |
+| Skip P0's counter-test | A probe that ignores the path reports three backups whether or not it works | No — that is the whole point |
+| Skip P3 | The migration is built on a repo nobody has ever restored from | Only during a real incident |
+| Flip before P6 | `stanza-create` builds an empty stanza; no off-cluster restore point | Yes, `info` is empty |
+| Skip P8 | **WAL hole.** Backups look perfect; PITR silently cannot roll forward across the window. You find out during an incident | **No** |
+| P8 without the `.info` exclusions | Overwrites live info files with pre-flip copies | Only via `verify` |
+| Retention set at P7 | The first `expire` **deletes the history just migrated** | Too late |
 | A broken repo2 left in place | `archive-push` fails for all repos, WAL is not released, the WAL volume fills and **PostgreSQL halts** | Yes, loudly |
 
-That last row is why P6 is a single reversible variable: rollback is one line in
-`confidential.yml` plus one `make d0 install postgresql`.
+That last row is why P7 is a single reversible variable pair: rollback is two
+lines in `confidential.yml` plus one `make d0 install postgresql`.
 
 **repo2 has no retention at all today** — only `repo1-retention-full` exists — so
-fulls have accumulated since 2026-08-16 and `archive/` is never pruned. Fix it,
-but at **P12**, never at P6, and count what was copied first.
+fulls have accumulated since 2026-08-16 and `archive/` is never pruned, which is
+where the 102.2 GB comes from. Fix it at **P13**, never at P7, and only once a
+drill has passed against the new bucket.
 
 ## Rewiring, in ADR-0547 clause 4's two-step order
 
@@ -372,6 +475,17 @@ one model, reversible.
 loudly; `components/mlops/tests/test_trainjob.py`'s fixture becomes a neutral
 value; `evaluations/register_conformance.py`'s mention is docstring provenance
 that stays true — **leave it**.
+
+### The MariaDB backup-health trap
+
+`oc get physicalbackup -n zuno-data` shows `mariadb-backup` as **`STATUS Failed`**.
+It is not failing. The `Complete` condition's `lastTransitionTime` is frozen at
+2026-09-02T21:52:43Z — the first run, which did fail — and the operator never
+cleared it, while every scheduled run since has Completed and landed its object
+in S3 (five of them, through 2026-09-04T07:24). **That column is not a health
+signal.** When verifying the mariadb cutover, read `status.lastScheduleTime`, the
+`mariadb-backup-*` pod phases, and the bucket itself — a green flip judged from
+that column would be judged from a value that has not moved in two days.
 
 ## Vault paths
 
