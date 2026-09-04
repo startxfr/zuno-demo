@@ -42,36 +42,40 @@ class _FakeS3Client:
         pathlib.Path(dest).write_text("fake-adapter-bytes")
 
 
-def test_s3_client_prepends_https_to_a_bare_endpoint_hostname() -> None:
-    # WP-133 (live, 2026-09-04): gitops/charts/models' modelsS3.endpoint is
-    # a bare hostname (its own serving.kserve.io/s3-endpoint annotation
-    # tolerates that) - boto3.client's endpoint_url does not, and raised
-    # ValueError("Invalid endpoint: s3.eu-west-2.amazonaws.com") the first
-    # time this initContainer actually ran.
-    env = {
-        "AWS_ACCESS_KEY_ID": "AKIAFAKE",
-        "AWS_SECRET_ACCESS_KEY": "s3cr3t",
-        "S3_ENDPOINT": "s3.eu-west-2.amazonaws.com",
-        "S3_REGION": "eu-west-2",
-    }
+def test_s3_client_passes_region_with_no_explicit_endpoint_override() -> None:
+    # WP-133 (live, 2026-09-04): an explicit endpoint_url override is
+    # exactly what caused this script's PermanentRedirect the first time it
+    # ran against the adapter's real bucket (us-east-1) using
+    # gitops/charts/models' modelsS3 region (eu-west-2) - boto3 must derive
+    # the endpoint from region_name alone, the same as mlops.py's own
+    # ArtifactStore.
+    env = {"AWS_ACCESS_KEY_ID": "AKIAFAKE", "AWS_SECRET_ACCESS_KEY": "s3cr3t"}
     with mock.patch.dict("os.environ", env, clear=True):
         with mock.patch("download_adapter.boto3.client") as fake_client:
-            download_adapter._s3_client()
+            download_adapter._s3_client(region="us-east-1", path_style=False)
             _, kwargs = fake_client.call_args
-            assert kwargs["endpoint_url"] == "https://s3.eu-west-2.amazonaws.com"
+            assert kwargs["region_name"] == "us-east-1"
+            assert "endpoint_url" not in kwargs
 
 
-def test_s3_client_leaves_a_scheme_prefixed_endpoint_untouched() -> None:
-    env = {
-        "AWS_ACCESS_KEY_ID": "AKIAFAKE",
-        "AWS_SECRET_ACCESS_KEY": "s3cr3t",
-        "S3_ENDPOINT": "http://localhost:9000",
-    }
+def test_bucket_region_defaults_to_us_east_1_on_an_empty_location_constraint() -> None:
+    # S3's own historical quirk: GetBucketLocation omits LocationConstraint
+    # entirely for us-east-1 buckets rather than naming it.
+    env = {"AWS_ACCESS_KEY_ID": "AKIAFAKE", "AWS_SECRET_ACCESS_KEY": "s3cr3t"}
+    fake_bootstrap = mock.MagicMock()
+    fake_bootstrap.get_bucket_location.return_value = {}
     with mock.patch.dict("os.environ", env, clear=True):
-        with mock.patch("download_adapter.boto3.client") as fake_client:
-            download_adapter._s3_client()
-            _, kwargs = fake_client.call_args
-            assert kwargs["endpoint_url"] == "http://localhost:9000"
+        with mock.patch("download_adapter.boto3.client", return_value=fake_bootstrap):
+            assert download_adapter._bucket_region("zuno-corpus", path_style=False) == "us-east-1"
+
+
+def test_bucket_region_reads_a_non_default_location_constraint() -> None:
+    env = {"AWS_ACCESS_KEY_ID": "AKIAFAKE", "AWS_SECRET_ACCESS_KEY": "s3cr3t"}
+    fake_bootstrap = mock.MagicMock()
+    fake_bootstrap.get_bucket_location.return_value = {"LocationConstraint": "eu-west-2"}
+    with mock.patch.dict("os.environ", env, clear=True):
+        with mock.patch("download_adapter.boto3.client", return_value=fake_bootstrap):
+            assert download_adapter._bucket_region("zuno-demo-rag-corpus", path_style=False) == "eu-west-2"
 
 
 def test_split_s3_uri_rejects_a_non_s3_scheme() -> None:
@@ -138,7 +142,7 @@ def test_main_requires_adapter_source_and_dest_env_vars() -> None:
             assert "ADAPTER_SOURCE_S3URI is required" in str(exc)
 
 
-def test_main_downloads_using_env_configured_client() -> None:
+def test_main_downloads_using_the_discovered_bucket_region() -> None:
     downloaded: list = []
     pages = [{"Contents": [{"Key": "mlops/models/tekos/run-1/adapter/adapter_model.safetensors"}]}]
     fake_client = _FakeS3Client(pages, downloaded)
@@ -151,20 +155,23 @@ def test_main_downloads_using_env_configured_client() -> None:
             "AWS_SECRET_ACCESS_KEY": "s3cr3t",
         }
         with mock.patch.dict("os.environ", env, clear=True):
-            with mock.patch.object(download_adapter, "_s3_client", return_value=fake_client):
-                assert download_adapter.main() == 0
+            with mock.patch.object(download_adapter, "_bucket_region", return_value="us-east-1") as fake_region:
+                with mock.patch.object(download_adapter, "_s3_client", return_value=fake_client):
+                    assert download_adapter.main() == 0
+            fake_region.assert_called_once_with("zuno-corpus", path_style=False)
         assert (pathlib.Path(tmp) / "adapter_model.safetensors").is_file()
 
 
 TESTS = [
-    test_s3_client_prepends_https_to_a_bare_endpoint_hostname,
-    test_s3_client_leaves_a_scheme_prefixed_endpoint_untouched,
+    test_s3_client_passes_region_with_no_explicit_endpoint_override,
+    test_bucket_region_defaults_to_us_east_1_on_an_empty_location_constraint,
+    test_bucket_region_reads_a_non_default_location_constraint,
     test_split_s3_uri_rejects_a_non_s3_scheme,
     test_split_s3_uri_rejects_a_bucket_with_no_prefix,
     test_download_adapter_writes_every_object_under_the_prefix_relative_to_dest,
     test_download_adapter_refuses_to_leave_the_destination_empty,
     test_main_requires_adapter_source_and_dest_env_vars,
-    test_main_downloads_using_env_configured_client,
+    test_main_downloads_using_the_discovered_bucket_region,
 ]
 
 

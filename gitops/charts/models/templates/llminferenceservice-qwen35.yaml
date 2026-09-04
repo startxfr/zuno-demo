@@ -132,6 +132,12 @@ spec:
     # (s3-serving-credentials-qwen35.yaml's Secret carries plain
     # AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY keys alongside its
     # serving.kserve.io/s3-* annotations) - no new ExternalSecret needed.
+    # No S3_REGION/S3_ENDPOINT here: the adapter's own artifact bucket
+    # (components/mlops's s3.bucket, us-east-1) is NOT modelsS3 (eu-west-2)
+    # - download_adapter.py discovers the real region itself
+    # (GetBucketLocation) rather than assuming modelsS3's, confirmed live
+    # (a hardcoded modelsS3.region/endpoint here caused a PermanentRedirect
+    # on every call before this comment was written).
     initContainers:
       {{- range .Values.loraAdapters }}
       - name: download-adapter-{{ .name }}
@@ -142,10 +148,6 @@ spec:
             value: {{ .sourceS3Uri | quote }}
           - name: ADAPTER_DEST_PATH
             value: {{ .path | quote }}
-          - name: S3_ENDPOINT
-            value: {{ $.Values.modelsS3.endpoint | quote }}
-          - name: S3_REGION
-            value: {{ $.Values.modelsS3.region | quote }}
         envFrom:
           - secretRef:
               name: {{ $.Values.qwen35Model.inferenceServiceName }}-s3-credentials
