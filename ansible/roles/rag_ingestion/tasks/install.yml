@@ -56,18 +56,24 @@
         name: dsp-mlflow-trust-rag-dspa
         namespace: zuno-ai-build
       data:
-        # WP-129 live finding: Jinja's `+` string concat rendered the "\n"
-        # separator as the literal two-char sequence backslash-n (not a
-        # real newline byte) when this playbook ran through the AWX/
-        # controller execution path - same template text as the mlops
-        # role's copy of this task, but that one apparently ran through a
-        # different path where `+` behaved correctly. `~` is Ansible's
-        # documented string-concatenation operator specifically because
-        # `+` has this class of escaping/type-coercion gotcha - use it
-        # unconditionally instead of relying on which path executes this.
-        ca-bundle.crt: >-
-          {{ (_rag_ingestion_vault_ca.resources[0].data['ca-bundle.crt'] | default('')) ~ "\n"
-             ~ (_rag_ingestion_service_ca.resources[0].data['service-ca.crt'] | default('')) }}
+        # WP-129 live finding, root-caused by isolating the exact template
+        # in a throwaway playbook: a `>-` folded block scalar does ZERO
+        # YAML escape processing, so the "\n" inside the Jinja expression
+        # below reaches Jinja as the two raw characters backslash+n - and
+        # under this cluster's ansible-core (2.19.11), Jinja's own string-
+        # literal lexer does NOT unescape it back into a newline byte in
+        # this context, so it landed in the ConfigMap as the literal text
+        # "\n" instead of a real line break, corrupting the PEM boundary
+        # between the two certs and making the DSP operator's PEM decode
+        # silently drop the second one. A double-quoted YAML scalar DOES
+        # perform escape processing at the YAML layer, converting "\n" to
+        # a real newline before Jinja ever runs - proven with a minimal
+        # isolated reproduction before applying here. mlops's copy of this
+        # same task (ansible/roles/mlops/tasks/install.yml) has the
+        # identical `>-` scalar and is presumably subject to the same bug;
+        # out of scope to fix here since that ConfigMap only gets rewritten
+        # if mlops's install task actually re-runs the merge.
+        ca-bundle.crt: "{{ (_rag_ingestion_vault_ca.resources[0].data['ca-bundle.crt'] | default('')) ~ '\n' ~ (_rag_ingestion_service_ca.resources[0].data['service-ca.crt'] | default('')) }}"
   register: _rag_ingestion_ca_bundle_apply
   when: >-
     (_rag_ingestion_vault_ca.resources | default([]) | length) > 0 and
