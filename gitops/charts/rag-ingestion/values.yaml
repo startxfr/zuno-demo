@@ -1203,38 +1203,37 @@ redhat:
     fetchMode: html
     include: []
     exclude: []
-  - enabled: true
-    product: "Helm"                                          # no independent version - an OpenShift Container Platform doc chapter (Building applications), same shape as Migration Toolkit above.
-    productSlug: "helm"
-    family: "helm"
-    version: "4.22"
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/building_applications/index"
-    languages: [en-US]
-    fetchMode: html
-    include: []
-    exclude: []
-  - enabled: true
-    product: "Helm"
-    productSlug: "helm"
-    family: "helm"
-    version: "4.21"                                          # versioned alongside OCP 4.21 above - same inference caveat as Migration Toolkit
-    documentationUrl: "https://docs.redhat.com/en/documentation/openshift_container_platform/4.21/html-single/building_applications/index"
-    languages: [en-US]
-    fetchMode: html
-    include: []
-    exclude: []
-  # Phase 4 (rag-ingestion redesign): real upstream sources for the argocd/
-  # helm families, added ALONGSIDE the two Red-Hat-chapter entries above
-  # rather than replacing them yet - run both for one ingestion cycle,
-  # compare corpus quality via evaluations/tekos/stress_test.py's
-  # qa-argocd/qa-helm probes (check the citations' actual source/url, not
-  # just len(citations) > 0), then drop the Red Hat chapter entries above
-  # once confirmed. crawlStrategy: generic restricts link discovery to the
-  # same netloc AND the same path prefix as documentationUrl, so these
-  # stay inside /en/stable/ and /docs/ respectively rather than wandering
-  # into unrelated site content. Both URLs confirmed to return 200 before
-  # being added (2026-09-03) - a wrong URL yields a green run that indexes
-  # nothing.
+  # WP-129 point 3 (2026-09-04): the two "Helm" Red-Hat-chapter entries that
+  # used to live here (productSlug "helm", the OCP 4.21/4.22
+  # building_applications chapters) are REMOVED, not just superseded by the
+  # upstream entry below - they were never a clean stopgap to begin with.
+  # document_embeddings' uniqueness is (source, chunk_index), NOT scoped by
+  # family, and that exact URL is also crawled by the redhat-openshift
+  # family's own much larger source list. Live-caught 2026-09-04: the
+  # redhat-openshift family's same-day cold-refetch silently overwrote the
+  # rows these two entries had indexed the day before, relabelling them
+  # metadata.technology helm -> openshift - not a deliberate merge, a race
+  # on a shared row that happened to resolve in whichever family touched it
+  # last. Keeping the config entries would just re-lose that race on every
+  # future run for no benefit, now that upstream (below) is confirmed to
+  # cover Helm well on its own (110 chunks / 17 pages, all helm.sh/docs).
+  # The argocd family's own two Red-Hat-chapter entries above (Red Hat
+  # OpenShift GitOps) do NOT have this problem - their documentationUrls
+  # are unique to this family, not shared with any other - so those stay:
+  # they're distinct, uncorrupted content (Red Hat's own productized
+  # GitOps docs), not a stopgap for missing upstream coverage.
+  #
+  # Phase 4 (rag-ingestion redesign): the upstream Argo CD/Helm sources
+  # below were added alongside the (then-two-family) Red-Hat-chapter
+  # entries to compare corpus quality via evaluations/tekos/
+  # stress_test.py's qa-argocd/qa-helm probes (check the citations' actual
+  # source/url, not just len(citations) > 0) before deciding what to keep -
+  # WP-129 point 3 is that comparison, resolved above. crawlStrategy:
+  # generic restricts link discovery to the same netloc AND the same path
+  # prefix as documentationUrl, so these stay inside /en/stable/ and /docs/
+  # respectively rather than wandering into unrelated site content. Both
+  # URLs confirmed to return 200 before being added (2026-09-03) - a wrong
+  # URL yields a green run that indexes nothing.
   - enabled: true
     product: "Argo CD"
     productSlug: "argocd-upstream"
