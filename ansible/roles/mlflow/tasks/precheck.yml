@@ -16,22 +16,43 @@
 # The CR reaching Ready is not the same as the server serving: report both
 # the instance and its workspace configs, the pair an operator needs to see
 # before trusting the dashboard's Experiments page.
+# The default is 'mlflow', not 'zuno': the CRD rejects any other name outright
+# ("MLflow resource name must be 'mlflow'"), it is a cluster singleton - see
+# gitops/charts/mlflow/values.yaml's server.name. The default used to be 'zuno',
+# so this lookup asked for a CR that CANNOT exist and the report below could
+# only ever say ABSENT. Nobody saw it, because the report crashed before
+# reaching that point (see the next task).
 - name: "mlflow | read the MLflow server instance"
   kubernetes.core.k8s_info:
     api_version: mlflow.opendatahub.io/v1
     kind: MLflow
-    name: "{{ mlflow_server_name | default('zuno') }}"
+    name: "{{ mlflow_server_name | default('mlflow') }}"
   register: _mlflow_cr
   failed_when: false
 
+# Three defects were stacked here, each hiding the next, all found live
+# 2026-09-04 on the first `make d3 check mlflow` anyone ran:
+#
+#   1. `x | length > 0 | ternary(a, b)` - Jinja binds `|` tighter than `>`, so
+#      this compared an int to a string and raised before evaluating anything.
+#   2. json_query needs the jmespath package under ANSIBLE's interpreter
+#      (python3.11 here), where it is absent even though `python3` has it. The
+#      repo already avoids the filter for this reason - see the comment in
+#      ansible/tasks/resolve_cluster_aws_identity.yml. Plain map(attribute=)
+#      needs no dependency.
+#   3. `ternary` is a function call, so BOTH branches are evaluated eagerly.
+#      With no CR, `(resources | default([{}]))[0]` indexes an empty list -
+#      `default` fills in for undefined, never for empty - so the ABSENT branch
+#      was unreachable by the very case it existed to report. An inline
+#      if/else is lazy and does not have that problem.
 - name: "mlflow | report the MLflow server state"
   ansible.builtin.debug:
     msg: >-
-      MLflow server '{{ mlflow_server_name | default('zuno') }}':
-      {{ (_mlflow_cr.resources | default([]) | length) > 0
-         | ternary('conditions=' ~ ((_mlflow_cr.resources | default([{}]))[0].status | default({})
-                   | json_query('conditions[].type') | default([]) | join(',')),
-                   'ABSENT') }}
+      MLflow server '{{ mlflow_server_name | default('mlflow') }}':
+      {{ ('conditions=' ~ (((_mlflow_cr.resources | first).status | default({})).get('conditions', [])
+                           | map(attribute='type') | join(',')))
+         if (_mlflow_cr.resources | default([]) | length) > 0
+         else 'ABSENT - the CRD forces the name "mlflow" (cluster singleton); check the operator log' }}
 
 - name: "mlflow | read the per-workspace MLflowConfigs"
   kubernetes.core.k8s_info:

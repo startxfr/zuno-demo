@@ -70,11 +70,18 @@
   delay: 15
   failed_when: false
 
+# The comparison MUST stay parenthesised. Jinja binds `|` tighter than `>`,
+# so `x | length > 0 | ternary(a, b)` parses as `x|length > (0 | ternary(a, b))`
+# - an int compared to a string, which raises "'>' not supported between
+# instances of 'int' and 'str'" and fails the play on its very last task,
+# after the Application is already applied, Synced and Healthy. Hit live
+# 2026-09-04 on `make d2 install mlflow`: every real step had succeeded and
+# the command still exited non-zero, blaming a template.
 - name: "mlflow | install summary"
   ansible.builtin.debug:
     msg: >-
       MLflow tracking server:
-      {{ (_mlflow_deploy.resources | default([]) | length) > 0
+      {{ ((_mlflow_deploy.resources | default([]) | length) > 0)
          | ternary('deployment present, available replicas=' ~
                    (_mlflow_deploy.resources | map(attribute='status.availableReplicas', default=0) | sum),
                    'NO deployment found - check the MLflow CR status and the operator log') }}
