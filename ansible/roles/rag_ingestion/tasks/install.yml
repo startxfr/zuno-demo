@@ -56,9 +56,18 @@
         name: dsp-mlflow-trust-rag-dspa
         namespace: zuno-ai-build
       data:
+        # WP-129 live finding: Jinja's `+` string concat rendered the "\n"
+        # separator as the literal two-char sequence backslash-n (not a
+        # real newline byte) when this playbook ran through the AWX/
+        # controller execution path - same template text as the mlops
+        # role's copy of this task, but that one apparently ran through a
+        # different path where `+` behaved correctly. `~` is Ansible's
+        # documented string-concatenation operator specifically because
+        # `+` has this class of escaping/type-coercion gotcha - use it
+        # unconditionally instead of relying on which path executes this.
         ca-bundle.crt: >-
-          {{ (_rag_ingestion_vault_ca.resources[0].data['ca-bundle.crt'] | default('')) + "\n"
-             + (_rag_ingestion_service_ca.resources[0].data['service-ca.crt'] | default('')) }}
+          {{ (_rag_ingestion_vault_ca.resources[0].data['ca-bundle.crt'] | default('')) ~ "\n"
+             ~ (_rag_ingestion_service_ca.resources[0].data['service-ca.crt'] | default('')) }}
   register: _rag_ingestion_ca_bundle_apply
   when: >-
     (_rag_ingestion_vault_ca.resources | default([]) | length) > 0 and
