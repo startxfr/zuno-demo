@@ -157,6 +157,19 @@ If any source bucket uses SSE-KMS, the same principal also needs `kms:Decrypt`
 on the source key and `kms:GenerateDataKey` on the destination key, or every
 copy fails `AccessDenied` on an object it can plainly list.
 
+The migration policy must include the **tagging** actions, and this was learned
+the hard way on 2026-09-04: a first attempt granted only
+`GetObject`/`ListBucket` on the sources and every large object failed with
+`AccessDenied ... s3:GetObjectTagging`. The failure is size-dependent and
+therefore easy to misread — below the multipart threshold the CLI issues a
+single `CopyObject` with `x-amz-tagging-directive: COPY` and never reads tags,
+while above it the multipart copy must read them explicitly. 126 small objects
+copied fine and all 100 `.safetensors` failed. Grant `s3:GetObjectTagging` and
+`s3:GetObjectVersionTagging` on the sources and `s3:PutObjectTagging` on the
+destinations. (`--copy-props metadata-directive` avoids the tag calls entirely
+and is the alternative if the grant is unwanted; it drops object tags, which is
+acceptable only if there are none to keep.)
+
 Cost: #1 is intra-region, so 164.6 GB moves with no transfer charge. #5 and #8
 are `us-east-1` → `eu-west-2`, ~674 MB of egress, negligible.
 
@@ -209,8 +222,10 @@ aws configure set --profile zuno-migration s3.multipart_chunksize 512MB
 ```bash
 export AWS_PROFILE=zuno-migration
 
-# 1. Weights - 164.6 GB, intra-region (the long one)
-aws s3 cp --recursive s3://zuno-demo-rag-corpus/models/ s3://zuno-demo-sources/models/ \
+# 1. Weights - 164.6 GB, intra-region (the long one). `sync`, not
+# `cp --recursive`: sync skips what is already there, so a re-run after a
+# failure resumes instead of recopying 164 GB.
+aws s3 sync s3://zuno-demo-rag-corpus/models/ s3://zuno-demo-sources/models/ \
   --source-region eu-west-2 --region eu-west-2 --only-show-errors
 
 # 3. Authoritative SXA dump (NOT the 2026-08-21 sxa_data/ copy)
