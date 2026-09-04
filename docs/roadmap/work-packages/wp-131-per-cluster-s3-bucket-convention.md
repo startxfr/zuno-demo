@@ -1,6 +1,6 @@
 # WP-131: Execute ADR-0546's cross-cluster source bucket and per-cluster S3 convention
 
-- **State:** Operator pending — seven of eight components cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion; step 8 `models` landed deliberately inert). postgresql P0/P1/P2 green and the P4 bulk copy complete; **P5–P14 remain**. Owner as of 2026-09-04 evening: `zuno-demo-c0`.
+- **State:** Operator pending — seven of eight components cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion; step 8 `models` landed deliberately inert). postgresql **P0–P12 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, and a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5). **P13 (retention) is a deliberate stop — not yet done, awaiting explicit go-ahead**; P14 (old-bucket lockdown/decommission) after that. Owner as of 2026-09-04 evening: `zuno-demo-c0`.
 - **ADRs:** [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (`Accepted` 2026-09-04 — this WP satisfied its acceptance criterion 2),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) (B12),
@@ -377,37 +377,52 @@ P3   RESTORE DRILL from the CURRENT repo2, non-destructively. repo2 has NEVER
      Acceptance is a REAL row count on rag-sxa-legacy compared against the live
      cluster, not "the pods are Ready". Then delete the cluster and its PVCs.
      Nothing touches a bucket until this is green.
-P4   Pick a window OUTSIDE Sunday 02:00-04:00 (repo1 full 0 2 * * 0, repo1 diff
-     0 2 * * 1-6, repo2 full 0 3 * * 0). A backup split across two paths is
-     unrecoverable as a unit.
-P5   Bulk copy, 105.4 GB / 52,469 objects, intra-region, server-side:
-       aws s3 sync s3://zuno-data-pgbackups/pgbackrest/repo2/ \
-                   s3://zuno-demo222-backups/postgresql/
-     sync, not cp --recursive, so a resume after any interruption is
-     incremental over 52k objects rather than a restart.
-P6   Delta immediately before the flip: same command, NEVER --delete. This pass
-     carries archive.info and backup.info, which is what makes the new path a
-     VALID stanza instead of an empty one. Confirm both files arrived.
-P7   FLIP: zuno_postgresql_backup_s3_{path,bucket} in confidential.yml, then
-     make d0 install postgresql. stanza-create becomes a no-op and adopts the
-     history. Also re-run make d0 install vault so zuno/postgresql/backup-s3
-     stays consistent (its kv put rewrites all five keys together) - no effect
-     on demo222, required for demo333.
-P8   Close the flip-window WAL hole - ARCHIVE ONLY, info files EXCLUDED:
-       aws s3 sync .../repo2/archive/ .../postgresql/archive/ \
-         --exclude "*/archive.info" --exclude "*/archive.info.copy"
-     Do NOT re-sync backup/ after the flip.
-P9   select pg_switch_wal(); confirm the new bucket gains a segment and the old
-     one does not.
-P10  pgbackrest verify, then info; diff against the P0 baseline.
-P11  New full backup on the new path: make d3 backup postgresql.
-P12  SECOND RESTORE DRILL, from the NEW bucket, same throwaway-cluster
-     mechanism as P3. This is the acceptance criterion for the cutover.
-P13  Only now: repo2 retention (repo2-retention-full and the archive retention
-     that follows it). Expiring 102 GB of WAL is safe here because it happens
-     in the NEW bucket while the old one is still intact; set in P7 it would
-     have deleted the history just migrated. Then the chart default flip.
-P14  Old bucket read-only (explicit Deny policy) for a full cycle, then delete.
+P4   DONE 2026-09-04 (zuno-demo-c0). Window used: Thursday evening, well
+     outside Sunday 02:00-04:00.
+P5   DONE 2026-09-04. Bulk copy landed (grew to 112.26 GB / 75,281 objects by
+     completion - repo2 keeps accumulating WAL in real time, see P8).
+P6   DONE 2026-09-04. Final delta re-run with no --delete, no excludes.
+     archive.info/backup.info confirmed md5-identical both sides
+     (b20dc551b173374a837218e097f108ac / 7af63bb1f60246521f45692921455581)
+     before the flip - a valid stanza, not an empty one.
+P7   DONE 2026-09-04, live-verified. Flipped zuno_postgresql_backup_s3_{bucket,path}
+     to zuno-demo222-backups//postgresql, ran make d0 install postgresql.
+     First apply's Synced+Healthy wait passed on a STALE pre-apply status
+     (zuno-postgresql-d1 read OutOfSync right after) - the same
+     gitops_app_refresh gap recorded elsewhere in this doc, not yet closed
+     for the postgresql role. Re-ran with EXTRA_VARS='-e gitops_app_refresh=true';
+     confirmed live: repo2-path=/postgresql, bucket=zuno-demo222-backups,
+     Application Synced+Healthy at the applied commit. pgbackrest info --repo=2
+     showed status ok with all 5 pre-existing backup sets intact - stanza-create
+     adopted the history rather than creating an empty one.
+P8   DONE 2026-09-04. Archive-only delta, info files excluded, ran after P7.
+P9   DONE 2026-09-04. pg_switch_wal() forced; confirmed the new bucket gained
+     fresh segments (19:28:xx) while the old bucket's last segment stayed at
+     19:09:02 - archiving fully moved.
+P10  DONE 2026-09-04. pgbackrest verify --repo=2 --stanza=db ran ~2h04
+     (7,452,707ms) over all 112 GB: "completed successfully", zero
+     errors/warnings/invalid/missing. (One orphaned duplicate verify process
+     from an earlier client-side timeout was found running concurrently and
+     killed - harmless since verify is read-only, but wasteful.) info matches
+     the pre-flip baseline: same 5 backup sets, same 12 archive db-ids.
+P11  DONE 2026-09-04. make d3 backup postgresql: on-demand backup
+     2026-09-04T19:34:57Z completed on repo2, succeeded=1, ~12m45s. New set
+     20260904-193513F confirmed in pgbackrest info on the new bucket.
+P12  DONE 2026-09-04, the acceptance criterion for the cutover. Second
+     throwaway drill (zuno-postgresql-drill), this time spec.dataSource.pgbackrest
+     pointed at zuno-demo222-backups//postgresql instead of the old bucket -
+     same manifest shape as P3, bucket/path substituted. Restore ~8 min.
+     Content match against the LIVE cluster, not just row counts: rag-sxa-legacy
+     319,841 = 319,841, rag-tech 69,755 = 69,755, AND an md5 over a 500-row
+     ordered id sample identical on both sides
+     (2b9c1eece7b83a9272b9dcad7969fcfb). Drill cluster and PVCs deleted after.
+P13  NOT YET DONE - deliberate stop. repo2 retention (repo2-retention-full and
+     the archive retention that follows it). Expiring 102 GB of WAL is safe
+     here because it happens in the NEW bucket while the old one is still
+     intact; set at P7 it would have deleted the history just migrated. Then
+     the chart default flip. Awaiting explicit operator go-ahead.
+P14  NOT YET DONE. Old bucket read-only (explicit Deny policy) for a full
+     cycle, then delete.
 ```
 
 ### What is lost if the order is wrong
