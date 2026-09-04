@@ -125,6 +125,27 @@
     # bucket alone gives ingestion a 404 on a bucket that exists - which reads
     # as a missing dump, not as a misconfiguration.
     gitops_app_extra_helm_values:
+      # ADR-0546/WP-131. corpus.deleteOrphans is parameterized because moving
+      # the corpus bucket invalidates the premise the fetch stage documents for
+      # itself: _fetch_oss_docs_one's conditional GET is
+      # "safe because nothing ever purges raw/<domain>/ between runs, so
+      # detect-changes still finds the existing file". A cutover to an empty
+      # bucket purges raw/ in exactly that sense.
+      #
+      # The consequence is not the re-fetch - that is merely slower. It is that
+      # detect-changes derives deleted_ids from "in the manifest but not under
+      # raw/", so a source that is temporarily unreachable used to be harmless
+      # (its record from a previous run was still there) and now means its
+      # documents are DELETED from the pgvector index. 389,596 embeddings were
+      # at stake here, and the schedules fire unattended at 02:00 on a Sunday.
+      #
+      # So the first run in a new bucket must not be able to delete anything.
+      # Set zuno_rag_corpus_delete_orphans back to true once raw/ has been
+      # repopulated by a full successful run and its object count matches the
+      # old bucket's - until then, keeping genuinely-removed upstream documents
+      # in the index for one cycle is the far milder error.
+      corpus:
+        deleteOrphans: "{{ zuno_rag_corpus_delete_orphans | default(true) | bool }}"
       s3:
         bucket: "{{ zuno_rag_corpus_s3_bucket | default('zuno-demo-rag-corpus') }}"
         region: "{{ zuno_rag_corpus_s3_region | default('eu-west-2') }}"

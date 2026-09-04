@@ -213,12 +213,19 @@ zuno_models_s3_prefix: "models"
 # bucket root into an sxa-dump/ prefix, so changing only the bucket gives
 # ingestion a 404 that reads as a missing dump rather than a misconfiguration.
 # Omitting any of these keeps the chart default.
-zuno_rag_corpus_s3_bucket: "zuno-demo-rag-corpus"
+zuno_rag_corpus_s3_bucket: "zuno-demo222-data"
 zuno_rag_corpus_s3_region: "eu-west-2"
-zuno_sxa_dump_s3_bucket: "zuno-demo-sxa-corpus"
+zuno_sxa_dump_s3_bucket: "zuno-demo-sources"
 zuno_sxa_dump_s3_region: "eu-west-2"
-zuno_sxa_dump_schema_s3_key: "sxa.schema.sql"
-zuno_sxa_dump_data_s3_key: "sxa.data.sql"
+zuno_sxa_dump_schema_s3_key: "sxa-dump/sxa.schema.sql"
+zuno_sxa_dump_data_s3_key: "sxa-dump/sxa.data.sql"
+# ADR-0546/WP-131: leave unset (chart default true) on a settled cluster. Set
+# to false for the FIRST ingestion run after moving the corpus bucket: raw/ is
+# empty in the new bucket, and detect-changes treats "in the manifest but not
+# under raw/" as deleted - so one unreachable source would drop its documents
+# from the pgvector index. Restore to true once a full run has repopulated
+# raw/ and its object count matches the old bucket's.
+zuno_rag_corpus_delete_orphans: true
 
 # --- MLOps pipeline artifacts and training corpus (ADR-0546/WP-131) ---------
 # Two DIFFERENT buckets on purpose, and the split is the whole point of

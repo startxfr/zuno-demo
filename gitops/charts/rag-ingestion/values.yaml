@@ -1522,7 +1522,10 @@ s3:
   type: aws
   # Empty endpoint means the chart derives https://s3.<region>.amazonaws.com.
   endpoint: ""
-  bucket: "zuno-demo-rag-corpus"
+  # ADR-0546/WP-131: this cluster's ingestion OUTPUT. ansible overrides it
+  # from zuno_rag_corpus_s3_bucket; outputs are never migrated between
+  # clusters (ADR-0546 clause 1), each re-ingests through its own pipeline.
+  bucket: "zuno-demo222-data"
   region: "eu-west-2"         # replace with the actual AWS region
   pathStyle: false
   secretName: rag-s3
@@ -1907,8 +1910,8 @@ domains:
       # explicit snapshot id. Split schema/data pair, not one combined
       # mysqldump - same shape as sxaCorpus below, since this is the same
       # underlying export.
-      schemaS3Key: "sxa.schema.sql"
-      dataS3Key: "sxa.data.sql"
+      schemaS3Key: "sxa-dump/sxa.schema.sql"
+      dataS3Key: "sxa-dump/sxa.data.sql"
       snapshotId: ""
       # 2026-08-23 amendment: reuses ADR-0217/WP-067's dedicated bucket
       # (zuno-demo-sxa-corpus) instead of a separate dedicated raw-dump
@@ -1919,7 +1922,12 @@ domains:
       s3:
         type: aws
         endpoint: ""
-        bucket: "zuno-demo-sxa-corpus"
+        # ADR-0546/WP-131: a cross-cluster INPUT, so it lives in the shared
+        # source bucket. The two S3 KEYS above moved with it (the objects
+        # went from the bucket root into an sxa-dump/ prefix) - changing
+        # one without the other gives ingestion a 404 that reads as a
+        # missing dump rather than a misconfiguration.
+        bucket: "zuno-demo-sources"
         region: "eu-west-2"
         pathStyle: false
         secretName: rag-sxa-s3
