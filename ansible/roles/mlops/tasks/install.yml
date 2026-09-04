@@ -56,9 +56,28 @@
         name: dsp-mlflow-trust-mlops-dspa
         namespace: zuno-mlops
       data:
-        ca-bundle.crt: >-
-          {{ (_mlops_vault_ca.resources[0].data['ca-bundle.crt'] | default('')) + "\n"
-             + (_mlops_service_ca.resources[0].data['service-ca.crt'] | default('')) }}
+        # WP-129 predicted this exact bug here and left it, on the reasoning
+        # that "that ConfigMap only gets rewritten if mlops's install task
+        # actually re-runs the merge". WP-131's cutover re-ran it, twice, and
+        # the prediction came true: mlops-dspa started failing every KFP
+        # CreateRun with "x509: certificate signed by unknown authority" against
+        # https://mlflow.redhat-ods-applications.svc:8443, and the retries ate
+        # enough wall-clock that the outer request 504'd at the gateway.
+        #
+        # The mechanism, root-caused under WP-129 with an isolated repro: a `>-`
+        # folded block scalar does ZERO YAML escape processing, so the "\n"
+        # inside the Jinja expression reaches Jinja as the two raw characters
+        # backslash+n, and under this cluster's ansible-core (2.19.11) Jinja's
+        # string-literal lexer does not unescape it in this context either. It
+        # lands in the ConfigMap as literal "\n" rather than a line break,
+        # corrupting the PEM boundary so the DSP operator's decode silently
+        # drops the second certificate. A double-quoted YAML scalar performs
+        # the escape processing at the YAML layer, before Jinja runs.
+        #
+        # A latent defect nobody can see is still a defect: this one sat here
+        # from the moment rag_ingestion's twin was fixed until the next command
+        # that happened to touch it. Keep this a double-quoted scalar.
+        ca-bundle.crt: "{{ (_mlops_vault_ca.resources[0].data['ca-bundle.crt'] | default('')) ~ '\n' ~ (_mlops_service_ca.resources[0].data['service-ca.crt'] | default('')) }}"
   register: _mlops_ca_bundle_apply
   when: >-
     (_mlops_vault_ca.resources | default([]) | length) > 0 and
