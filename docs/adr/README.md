@@ -293,7 +293,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | Proposed | Make the AIAgent operator watch the zuno-okf repository |
 | [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | Implemented | Integrate TrustyAI for AI evaluation and guardrails |
 | [ADR-0538](0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md) | Accepted | Adopt RHOAI 3.5 workload surfaces - MLflow tracking, queued workloads, training-jobs UI |
-| [ADR-0539](0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md) | Accepted | Delegate LoRA training compute to a KFP-submitted Kubeflow TrainJob |
+| [ADR-0539](0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md) | Implemented | Delegate LoRA training compute to a KFP-submitted Kubeflow TrainJob |
 | [ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md) | Accepted | Express guardrail policy as NeMo rails configuration, not in-image detector parameters |
 | [ADR-0541](0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md) | Proposed | Integrate mistral and gpt-oss-120b as MaaS ExternalModels |
 | [ADR-0542](0542-autoscale-one-served-model-through-llminferenceservice-spec-scaling.md) | Implemented | Autoscale a served model through LLMInferenceService spec.scaling |

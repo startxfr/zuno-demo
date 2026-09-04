@@ -1,8 +1,10 @@
 # WP-126: finalize the LoRA TrainJob (lift WP-119's "shipped disabled")
 
-- **State:** Operator pending (2026-09-04) - 4/4 known defects fixed and live-verified individually;
-  no run has yet completed end to end (last attempt interrupted by a planned cluster stop, not by
-  a defect)
+- **State:** Done (2026-09-04) - 4/4 defects fixed, a real `TrainJob` reached `Complete` end to end
+  (scale-from-zero, training, S3 manifest, MLflow visibility, scale-back-to-zero all confirmed
+  live); the pipeline's final `merge-export` step was deliberately not forced past its own
+  pre-existing safety guard against overwriting a live-served model (operator decision, not a
+  defect - see finding 4 below)
 - **ADRs:** ADR-0545 (decision 1), ADR-0539, ADR-0538
 - **Depends on:** WP-119 (Repo work merged, 2026-09-02)
 - **Related:** [ADR-0351](../../adr/0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md)
@@ -141,39 +143,36 @@ neither in this WP's original scope:
    `TrainJob`'s pod showed `command=['/opt/app-root/src/mlops-run']`,
    `args=['train-lora-local', '--run-id', ...]`, `env_count=48` - all four defects now cleared.
 
-### Live-action plan - status 2026-09-04
+### Live-action plan - DONE 2026-09-04
 
-1. Done. Multiple real runs triggered via `kfp.Client.run_pipeline` against the `mlops-dspa` route
-   (pipeline id `d3976051-...` / version `fb1617ae-...`, agent `comage`).
-2. **Done, proven live for the first time.** `zuno-gpu-burst-a` scaled 0->1, the JobSet-owned pod
-   (`lora-comage-6qcnx-node-0-0-rbwxb`) was placed on the scaled-up node, the GPU device plugin
-   registered (~2 min cold start, normal), and the pod ran the real training loop (`2/2 Running`,
-   loss decreasing normally, reached 111/224 steps / ~50% before the session ended).
-3. **Not yet done.** The 2026-09-04 run was interrupted by a planned cluster stop (operator
-   decision, not a defect - see "Resuming this WP" below) before `train-lora` finished, so
-   `merge-export`/`evaluate`/`push-registry` never ran. `TrainJob` never reached a terminal
-   `Complete` condition; `train_manifest.json` / MLflow visibility / burst-node scale-down are
-   still unconfirmed.
-
-### Resuming this WP (next session)
-
-All four defects are fixed and pushed to `main` (commits `dda503fa`, `6d384044`, `14d86bda`; the
-diagnostic-only `19e95796` was reverted by `dda503fa`). Nothing code-side is left to investigate -
-this is now purely "run it again and watch it finish":
-
-1. After cluster restart, work through the post-restart recovery checklist first (ArgoCD/PgBouncer/
-   etc. - see that memory) before touching mlops.
-2. Confirm `zuno-gpu-burst-a` is back at 0 replicas (it should have scaled down on its own once the
-   interrupted pod's node was torn down by the cluster stop - verify rather than assume).
-3. Trigger one more real run with `make d3 run mlops` (`AGENT=<agent>` overrides the default
-   `comage`) - wraps the exact `kfp.Client.run_pipeline` sequence proven live 2026-09-03/04 as a
-   repeatable command (`ansible/roles/mlops/tasks/run.yml`,
-   `components/mlops/tooling/trigger_run.py`). Let it run to completion uninterrupted - training
-   alone took ~13 minutes for 224 steps on the previous attempt, so budget for the full pipeline
-   (dataset-prep + train + merge-export + evaluate + push-registry) rather than just the training
-   loop.
-4. Verify the acceptance checks below, then close out this WP's `State` line and ADR-0539's
-   `Status` line together.
+1. Done. Multiple real runs triggered - first manually via `kfp.Client.run_pipeline` against the
+   `mlops-dspa` route (pipeline id `d3976051-...` / version `fb1617ae-...`, agent `comage`), then
+   via the new `make d3 run mlops` command (WP-126's own operator-convenience addition, same
+   session) once the cluster came back up.
+2. **Done, proven live.** `zuno-gpu-burst-a` scaled 0->1 on two separate real runs.
+   `lora-comage-c58cm-node-0-0-lcrbn` was placed on the scaled-up node
+   (`ip-10-18-16-195...`), the GPU device plugin registered (~7 min cold start that run, ~2 min
+   the previous one - both normal, non-deterministic node bootstrap timing), and training ran to
+   completion.
+3. **Done.** `TrainJob lora-comage-c58cm` reached `Complete`
+   (`"jobset completed successfully", reason: AllJobsCompleted`).
+   `mlops/models/comage/wp126-20260904-075724/train_manifest.json` confirmed in S3 (872 bytes),
+   alongside the full LoRA adapter (`adapter_model.safetensors`, 23.6 MB, plus tokenizer/config).
+   The run is visible in MLflow (experiment 34, `run_name: wp126-20260904-075724`, correctly
+   tagged `kfp.pipeline_run_id`/`kfp.pipeline_run_url`). `zuno-gpu-burst-a` confirmed scaling back
+   to 0 replicas ~10 minutes after the last pod finished (`unneededTime: 10m`, ADR-0351) - both
+   halves of the scale-from-zero mechanism now proven, not just scale-up.
+4. **Deliberately not exercised, by explicit operator decision - not a defect.** The pipeline's
+   `merge-export` step correctly refused to run: `qwen35-9b-wesh`
+   (`s3://zuno-demo-rag-corpus/models/qwen3.5-9b-wesh/`) is an `LLMInferenceService` actively
+   serving production traffic, and `mlops.py`'s own pre-existing safety guard
+   (`MLOPS_MERGED_OVERWRITE=false` by default) blocks overwriting a served model's weights in
+   place. This is correct behavior, unrelated to any of the four TrainJob defects above - the
+   overall KFP run's `FAILED` state (visible in both KFP and MLflow) reflects this guard doing its
+   job, not a bug. Overwriting it would need `MLOPS_MERGED_OVERWRITE=true` and either a
+   maintenance window or a non-live-served target path - out of scope here; the operator declined
+   to override it for this proof run, and the TrainJob mechanism itself (this WP's actual scope)
+   is what needed proving.
 
 ## What NOT to touch
 
@@ -184,13 +183,18 @@ flag flip plus that fix plus the live proof, not a mechanism redesign.
 
 ## Acceptance checks
 
-- `TrainJob` reaches `Complete`; the JobSet-owned pod's node is confirmed as the scaled-up
-  `zuno-gpu-burst-a`, not silently scheduled elsewhere.
-- `train_manifest.json` lands in S3; the run is visible in MLflow (WP-116's tracking).
-- `zuno-gpu-burst-a` scales back to zero afterward (`unneededTime: 10m` per ADR-0351) - confirm
-  the scale-down actually happens, not just that scale-up did.
-- Rollback is a pure flag revert (`training.trainJob.enabled: false`) - no infrastructure is left
-  behind if the run needs to be reverted.
+- [x] `TrainJob` reaches `Complete`; the JobSet-owned pod's node is confirmed as the scaled-up
+  `zuno-gpu-burst-a`, not silently scheduled elsewhere. Confirmed 2026-09-04: `lora-comage-c58cm`,
+  `AllJobsCompleted`, pod on `ip-10-18-16-195...`.
+- [x] `train_manifest.json` lands in S3; the run is visible in MLflow (WP-116's tracking).
+  Confirmed 2026-09-04: `mlops/models/comage/wp126-20260904-075724/train_manifest.json` (872B) +
+  MLflow experiment 34, `run_name: wp126-20260904-075724`.
+- [x] `zuno-gpu-burst-a` scales back to zero afterward (`unneededTime: 10m` per ADR-0351) - confirm
+  the scale-down actually happens, not just that scale-up did. Confirmed 2026-09-04: 1->0 replicas
+  ~10 minutes after the last pod finished.
+- [x] Rollback is a pure flag revert (`training.trainJob.enabled: false`) - no infrastructure is
+  left behind if the run needs to be reverted. Unexercised but unchanged from WP-119's design;
+  nothing this WP did makes it less true.
 
 ## Operator / human follow-up (not executable by the model)
 

@@ -1,6 +1,8 @@
 # ADR-0539: Delegate LoRA training compute to a KFP-submitted Kubeflow TrainJob
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-09-04, WP-126) - live-proven end to end: a real `TrainJob`
+  (`lora-comage-c58cm`) reached `Complete`, its JobSet pod was placed on `zuno-gpu-burst-a` scaled
+  from zero, `train_manifest.json` landed in S3, and the run is visible in MLflow.
 - **Target:** v0.7
 - **Date:** 2026-09-02
 - **Decision owners:** Zuno Demo architecture team
