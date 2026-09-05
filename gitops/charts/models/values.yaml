@@ -148,7 +148,7 @@ servedModelName: qwen3.6-27b-instruct
 # ADR-0546/WP-131: which bucket this model's weights are read from -
 # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
 # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
-s3Source: models
+s3Source: sources
 # ADR-0518: 32768 (was 8192 on the 7B model) - Qwen3.6-27B-FP8 leaves
 # ~18GB of the 2g.48gb slice for KV after its ~28GB of weights, comfortable
 # for this length at demo concurrency. If multi-agent load starts
