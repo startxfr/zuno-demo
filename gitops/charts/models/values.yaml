@@ -774,7 +774,9 @@ weshModel:
   # ADR-0546/WP-131: which bucket this model's weights are read from -
   # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
   # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
-  s3Source: models
+  # Flipped 2026-09-05: verified byte-identical to modelsS3 first (226
+  # objects, same sizes, empty aws s3 sync --dryrun).
+  s3Source: sources
   # The variant carries all of Comage's traffic and sits in the larger
   # 48GB slice, so it keeps the same 32768 the other 48GB model uses.
   maxModelLen: 32768
