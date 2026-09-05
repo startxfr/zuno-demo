@@ -309,6 +309,100 @@ def test_prefer_key_still_works_unchanged_alongside_new_schema_entries() -> None
         os.unlink(path)
 
 
+# --- ADR-0550: per-task local_only_for classification tiers ---------------
+
+
+def test_local_only_for_is_resolved_for_declared_classifications() -> None:
+    path = _write_policy_doc({"preferences": [
+        {
+            "agent": "arkos", "task": "draft-architecture-testimonial",
+            "prefer": ["ovhcloud-gpt-oss-120b", "local-gpt-oss", "local"],
+            "local_only_for": ["C2", "C3"],
+        },
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.local_only_for_classification("arkos", "draft-architecture-testimonial", "C1") is False
+        assert policy.local_only_for_classification("arkos", "draft-architecture-testimonial", "C2") is True
+        assert policy.local_only_for_classification("arkos", "draft-architecture-testimonial", "C3") is True
+        # Case-insensitive, matching every other classification comparison
+        # in this codebase (X-Zuno-Data-Classification is upper-cased too).
+        assert policy.local_only_for_classification("arkos", "draft-architecture-testimonial", "c2") is True
+    finally:
+        os.unlink(path)
+
+
+def test_local_only_for_absent_defaults_false() -> None:
+    """An (agent, task) with a preference entry but no local_only_for key
+    must behave exactly as it did before ADR-0550 - no restriction."""
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "workshop-presentation", "prefer": ["ovhcloud-gpt-oss-120b", "local"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.local_only_for_classification("arkos", "workshop-presentation", "C2") is False
+    finally:
+        os.unlink(path)
+
+
+def test_local_only_for_does_not_leak_to_other_agents_or_tasks() -> None:
+    """Regression guard for the exact incident this field exists to avoid:
+    Comage/Cognos legitimately reach ovhcloud-gpt-oss-120b at C2 through
+    their own (agent, task) entries - Arkos DAT's own local_only_for must
+    never affect them."""
+    path = _write_policy_doc({"preferences": [
+        {
+            "agent": "arkos", "task": "draft-architecture-testimonial",
+            "prefer": ["ovhcloud-gpt-oss-120b", "local"], "local_only_for": ["C2", "C3"],
+        },
+        {"agent": "comage", "task": "compare-historical-deals", "prefer": ["ovhcloud-gpt-oss-120b", "local"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.local_only_for_classification("arkos", "draft-architecture-testimonial", "C2") is True
+        assert policy.local_only_for_classification("comage", "compare-historical-deals", "C2") is False
+    finally:
+        os.unlink(path)
+
+
+def test_local_only_for_missing_file_or_agent_task_returns_false() -> None:
+    policy = ModelRoutingPolicy("/nonexistent/model-routing-policy.yaml")
+    assert policy.local_only_for_classification("arkos", "draft-architecture-testimonial", "C2") is False
+    assert policy.local_only_for_classification("", "draft-architecture-testimonial", "C2") is False
+    assert policy.local_only_for_classification("arkos", "", "C2") is False
+
+
+def test_local_only_for_empty_list_is_treated_as_absent() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["local"], "local_only_for": []},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.local_only_for_classification("arkos", "draft-architecture-testimonial", "C2") is False
+    finally:
+        os.unlink(path)
+
+
+def test_local_only_for_reload_picks_up_changes() -> None:
+    path = _write_policy_doc({"preferences": [
+        {"agent": "arkos", "task": "draft-architecture-testimonial", "prefer": ["local"]},
+    ]})
+    try:
+        policy = ModelRoutingPolicy(path)
+        assert policy.local_only_for_classification("arkos", "draft-architecture-testimonial", "C2") is False
+        with open(path, "w") as fh:
+            yaml.safe_dump({"preferences": [
+                {
+                    "agent": "arkos", "task": "draft-architecture-testimonial",
+                    "prefer": ["local"], "local_only_for": ["C2", "C3"],
+                },
+            ]}, fh)
+        policy.reload()
+        assert policy.local_only_for_classification("arkos", "draft-architecture-testimonial", "C2") is True
+    finally:
+        os.unlink(path)
+
+
 TESTS = [
     test_declared_adapter_is_resolved,
     test_undeclared_agent_task_returns_none,
@@ -332,6 +426,12 @@ TESTS = [
     test_fallback_only_with_no_preferred_key,
     test_preferred_fallback_present_but_both_empty_is_malformed,
     test_prefer_key_still_works_unchanged_alongside_new_schema_entries,
+    test_local_only_for_is_resolved_for_declared_classifications,
+    test_local_only_for_absent_defaults_false,
+    test_local_only_for_does_not_leak_to_other_agents_or_tasks,
+    test_local_only_for_missing_file_or_agent_task_returns_false,
+    test_local_only_for_empty_list_is_treated_as_absent,
+    test_local_only_for_reload_picks_up_changes,
 ]
 
 

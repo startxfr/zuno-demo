@@ -107,20 +107,26 @@ preferences:
     task: check-my-drive-docs
     preferred: [local-qwen35-maas, local-qwen35, local-wesh-maas, local-wesh, local-maas, local, local-gpt-oss-maas, local-gpt-oss, ovhcloud-gpt-oss-120b]
     fallback: [openai, gemini, anthropic, mistral]
-  # Plan->draft->reflect->write document workflow; C3 by agent seed - the
-  # flagship local-only reflexional case. draft_node's own call is always
-  # C3 (effective_classification starts from the agent's C3 seed and only
-  # ever escalates, ADR-0034) so ovhcloud-gpt-oss-120b never applies
-  # there; this entry's practical effect (ADR-0416) is scoped to
-  # reflect_node's explicit fixed-C2-ceiling call, which shares this same
-  # (agent, task) preference key.
+  # ADR-0550 decisions 2-4: plan->draft->reflect->write document workflow,
+  # classification now derived from the selected project (C1 with no
+  # project) rather than a fixed agent seed - draft_node's and
+  # reflect_node's calls both follow that same effective_classification
+  # (app/graph/arkos_nodes.py). ovhcloud-gpt-oss-120b is globally eligible
+  # for C1 AND C2 (provider-routing.yaml), which would otherwise let a
+  # C2/C3 DAT turn still reach it here - `local_only_for` closes that gap
+  # for this task specifically (ADR-0550 decision 3: C2/C3 DAT must never
+  # externalize, even though other agents/tasks legitimately reach
+  # ovhcloud-gpt-oss-120b at C2). See model_routing_policy.py's
+  # local_only_for_classification docstring for the mechanism.
   - agent: arkos
     task: draft-architecture-testimonial
     prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-maas, local]
-  # ADR-0514: workshop-presentation shares draft-architecture-
-  # testimonial's exact reasoning - same plan/retrieve/draft/reflect/write
-  # shape, same C3 agent seed, same reflect-slot C2 ceiling that's what
-  # actually makes ovhcloud-gpt-oss-120b reachable at this preference.
+    local_only_for: [C2, C3]
+  # ADR-0514: workshop-presentation is NOT in ADR-0550's scope and keeps
+  # its original C3 agent seed and fixed reflect-slot C2 ceiling unchanged
+  # (app/graph/arkos_nodes.py) - that's what actually makes
+  # ovhcloud-gpt-oss-120b reachable at this preference for THIS task; no
+  # `local_only_for` here.
   - agent: arkos
     task: workshop-presentation
     prefer: [ovhcloud-gpt-oss-120b, local-gpt-oss-maas, local-gpt-oss, local-maas, local]

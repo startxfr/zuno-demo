@@ -268,7 +268,16 @@ async def chat_completions(
     x_zuno_max_tokens: str = Header(default="", alias="X-Zuno-Max-Tokens"),
 ):
     classification = x_zuno_data_classification.upper()
-    local_only = x_zuno_local_only.strip().lower() == "true"
+    # ADR-0550: a per-(agent,task) local_only_for declaration ORs into the
+    # caller's own X-Zuno-Local-Only flag - it can only ever add a
+    # restriction, never lift one. Needed because a provider can be
+    # globally eligible for this classification (e.g. ovhcloud-gpt-oss-120b
+    # at C2, shared with other agents/tasks that legitimately use it there)
+    # while still being forbidden for THIS task at that same classification -
+    # see model_routing_policy.py's local_only_for_classification docstring.
+    local_only = x_zuno_local_only.strip().lower() == "true" or model_routing_policy.local_only_for_classification(
+        x_zuno_agent, x_zuno_task, classification
+    )
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
     run_id = x_zuno_run_id.strip() or None
     quota_class = x_zuno_quota_class.strip() or "standard"
