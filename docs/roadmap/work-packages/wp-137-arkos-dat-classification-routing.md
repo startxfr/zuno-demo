@@ -1,6 +1,6 @@
 # WP-137: Make Arkos DAT routing project-classification driven
 
-- **State:** Not started
+- **State:** Operator pending (2026-09-05 - repo-side mechanism complete: DAT baseline is project-derived (C1 default), reflect_node follows effective_classification instead of a fixed C2 ceiling, ai-gateway's new `local_only_for` policy field fail-closes C2/C3 to local providers, and the OKF authorization matrix regenerates clean. Automated tests 1, 2 (implied by 1's C1 code path), 3, 4, 5, 8, 9, 10 pass; tests 6/7 exercise pre-existing, unmodified mechanisms (`local_only_required`, provider-failure fallback) already covered elsewhere in the suite. The live C1/C2 comparison below is unrun.)
 - **ADRs:** ADR-0550
 - **Depends on:** ADR-0527 project classification, ADR-0034 effective classification, ADR-0416 OVH provider, existing `gpt-oss-20b` local serving
 - **Estimated effort:** 1.5–2 days
@@ -131,6 +131,13 @@ Run the same DAT prompt from C1 and C2 and record:
 - local model serving evidence for the C2 path.
 
 C3 may use a short smoke request if a full long-form generation would consume webinar rehearsal time unnecessarily.
+
+## Operator / human follow-up (not executable by the model without explicit go-ahead)
+
+1. Repo-side is complete: `components/agent-runtime/app/graph/arkos_nodes.py`'s DAT baseline/reflect changes, `components/ai-gateway`'s new `local_only_for` policy field, `policies/model-routing/model-routing-policy.yaml`'s tiered DAT entry, and the regenerated `agents/arkos/agent.okf.md` authorization matrix are all merged and covered by automated tests (`components/agent-runtime/tests/test_arkos_nodes.py`, `components/ai-gateway/tests/test_model_routing_policy.py`, `components/ai-gateway/tests/test_arkos_dat_classification_tiering.py`).
+2. A real finding from that repo-side work worth verifying live: `retrieve_node`'s pre-existing, task-agnostic live-read escalation (ADR-0034's `_LIVE_READ_CLASSIFICATION`) bumps `effective_classification` to at least C2 on ANY successful Confluence search, even zero hits. A live no-project/C1-project DAT rehearsal must pick a topic that genuinely returns no Confluence hits, or Step 1 of the ADR-0550 webinar sequence will show C2 (still routed to OVHcloud, since it is eligible there too, but not the "C1" the script names) instead of a clean C1.
+3. Operator: run the "Live verification" scenario above (real frontend/BFF, the three demo projects, C1 and C2 DAT prompts) and record effective classification, selected provider/model, request/trace id, and local-serving evidence for C2.
+4. Once verified: this WP's tracker -> `Done`; contributes toward ADR-0550 `Status` -> `Implemented` once WP-135/WP-136 are verified too.
 
 ## Out of scope
 

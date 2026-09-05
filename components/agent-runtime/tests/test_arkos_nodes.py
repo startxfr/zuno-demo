@@ -170,6 +170,40 @@ async def test_retrieve_node_dat_never_downgrades_a_c3_project() -> None:
     assert result["effective_classification"] == "C3"
 
 
+async def test_retrieve_node_dat_c1_project_escalates_to_c2_from_a_retrieved_doc() -> None:
+    """ADR-0550 acceptance #7 / WP-137 test 5: a C1 project's DAT baseline
+    must still escalate to C2 when the RAG corpus itself returns a C2-
+    classified document - the project floor and the monotonic doc
+    escalation are independent inputs to the same MAX, neither overrides
+    the other."""
+    saved_resolve = arkos_nodes.resolve_authorized_domains
+    saved_search = arkos_nodes.search
+    saved_invoke_tool = arkos_nodes.invoke_tool
+
+    def fake_resolve(**kwargs):
+        return KnowledgeDecision(authorized_domains=["knowledge.tech"], denied={})
+
+    async def fake_search(**kwargs):
+        return [{"id": "d1", "source": "rag:d1", "title": "Doc", "classification": "C2"}]
+
+    async def fake_invoke_tool(**kwargs):
+        raise arkos_nodes.McpClientError("confluence unavailable in this test")
+
+    try:
+        arkos_nodes.resolve_authorized_domains = fake_resolve
+        arkos_nodes.search = fake_search
+        arkos_nodes.invoke_tool = fake_invoke_tool
+        result = await arkos_nodes.retrieve_node(
+            {"message": "draft a DAT", "bearer_token": "t", "project_classification": "C1"}
+        )
+    finally:
+        arkos_nodes.resolve_authorized_domains = saved_resolve
+        arkos_nodes.search = saved_search
+        arkos_nodes.invoke_tool = saved_invoke_tool
+
+    assert result["effective_classification"] == "C2"
+
+
 async def test_retrieve_node_dat_confluence_success_escalates_a_c1_baseline_to_c2() -> None:
     """Pre-existing, task-agnostic behavior (ADR-0034's
     _LIVE_READ_CLASSIFICATION), newly consequential after ADR-0550/WP-137:
@@ -1250,6 +1284,7 @@ TESTS = [
     test_retrieve_node_dat_baseline_comes_from_the_projects_classification,
     test_retrieve_node_dat_defaults_to_c1_with_no_project_selected,
     test_retrieve_node_dat_never_downgrades_a_c3_project,
+    test_retrieve_node_dat_c1_project_escalates_to_c2_from_a_retrieved_doc,
     test_retrieve_node_dat_confluence_success_escalates_a_c1_baseline_to_c2,
     test_retrieve_node_workshop_kind_keeps_the_agent_ambient_seed,
     test_reflect_node_dat_follows_effective_classification_not_a_fixed_ceiling,
