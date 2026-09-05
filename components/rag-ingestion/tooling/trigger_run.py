@@ -66,14 +66,24 @@ def _post(host: str, token: str, path: str, body: dict) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--family", required=True)
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--family", help="a knowledge.tech source, e.g. redhat-odf")
+    group.add_argument(
+        "--domain",
+        help="a non-tech domain whose pipeline display name has no "
+        "'tech-' prefix (values.yaml's top-level `domains:`, e.g. sxa-legacy)",
+    )
     parser.add_argument("--tag", default="wp129-manual")
     args = parser.parse_args()
 
     host = os.environ["KFP_HOST"]
     token = os.environ["KFP_TOKEN"]
 
-    display_name = f"RAG corpus ingestion (tech-{args.family})"
+    display_name = (
+        f"RAG corpus ingestion (tech-{args.family})"
+        if args.family
+        else f"RAG corpus ingestion ({args.domain})"
+    )
     pipelines = _get(host, token, "/apis/v2beta1/pipelines?page_size=100").get(
         "pipelines", []
     )
@@ -104,7 +114,8 @@ def main() -> int:
         return 1
     experiment_id = default_experiments[0]["experiment_id"]
 
-    run_name = f"tech-{args.family}-{args.tag}-{datetime.datetime.now():%Y%m%d%H%M%S}"
+    run_name_prefix = f"tech-{args.family}" if args.family else args.domain
+    run_name = f"{run_name_prefix}-{args.tag}-{datetime.datetime.now():%Y%m%d%H%M%S}"
     run = _post(
         host,
         token,

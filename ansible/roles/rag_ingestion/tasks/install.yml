@@ -147,7 +147,11 @@
       corpus:
         deleteOrphans: "{{ zuno_rag_corpus_delete_orphans | default(true) | bool }}"
       s3:
-        bucket: "{{ zuno_rag_corpus_s3_bucket | default('zuno-demo-rag-corpus') }}"
+        # ADR-0547 clause 3: an invalid placeholder, not zuno-demo-rag-corpus
+        # (deleted WP-131 2026-09-05) - a plausible-looking default risks
+        # silently resolving to whatever AWS account next registers that
+        # bucket name. Same fix as sxaDump.s3.bucket below.
+        bucket: "{{ zuno_rag_corpus_s3_bucket | default('ZUNO_S3_BUCKET_NOT_SET') }}"
         region: "{{ zuno_rag_corpus_s3_region | default('eu-west-2') }}"
       domains:
         sxa-legacy:
