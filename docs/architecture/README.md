@@ -21,14 +21,14 @@ The architecture documentation is intentionally split into complementary views.
 ```mermaid
 flowchart LR
     U[User] --> FE[Agent Frontend]
-    FE --> BFF[Agent BFF]
-    BFF --> RT[Agent Runtime]
-    RT --> MCPG[MCP Gateway]
-    MCPG --> MCP[MCP Servers]
-    RT --> AIGW[AI / Inference Gateway]
-    AIGW --> LOCAL[Local models on OpenShift AI]
-    AIGW --> SAAS[SaaS model providers]
-    RT --> RAG[RAG / pgvector]
+    FE      --> BFF[Agent BFF]
+    BFF     --> RT[Agent Runtime]
+    RT      --> MCPG[MCP Gateway]
+    MCPG    --> MCP[MCP Servers]
+    RT      --> AIGW[AI / Inference Gateway]
+    AIGW    --> LOCAL[Local models on OpenShift AI]
+    AIGW    --> SAAS[SaaS model providers]
+    RT      --> RAG[RAG / pgvector]
     KC[Keycloak] -. identity and policy .-> FE
     KC -. identity and policy .-> BFF
     KC -. authorization .-> RT
