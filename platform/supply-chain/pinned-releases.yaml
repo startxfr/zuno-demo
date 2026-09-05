@@ -1,11 +1,17 @@
-# ADR-0115 release-pinning audit ledger - append-only, written by pin_release.py.
-# Each entry records one pin_release.py run: which chart values.yaml/path fields were
-# repointed to which immutable tag (and digest, when the release manifest supplied
-# one - see pin_release.py's own docstring for why the digest isn't also
-# embedded in values.yaml). This is evidence for ADR-0115's completion criterion
-# "at least one real release proves source -> build -> SBOM -> scan -> signature
-# -> immutable GitOps reference -> deployment traceability", not a mechanism consumed
-# by any deployment - never hand-edit.
+# ADR-0115/ADR-0549 release ledger - append-only. Two writers:
+#  - pin_release.py (ADR-0115/WP-04, mothballed for day-to-day use -
+#    see its own dated note): rewrote values.yaml tag fields for the
+#    one real Quay-published release. Entries may have digest: null
+#    and no 'signed' key.
+#  - tag_local_release.py --record-release (ADR-0549/WP-134, current
+#    mechanism): builds + RHTAS-signs a component in-cluster at
+#    <component>:<release_tag>, never touches values.yaml/
+#    targetRevision. Entries always set a real digest and
+#    signed/signed_at.
+# This is evidence for ADR-0111/ADR-0549's completion criterion (a
+# real release proves build -> sign -> immutable-reference
+# traceability, entirely in-cluster) - never a mechanism consumed by
+# any deployment, never hand-edit.
 
 releases:
 - release_tag: v0.1.0
@@ -154,6 +160,122 @@ releases:
     path: images.mlops.tag
     reason: no in-cluster BuildConfig/ImageStream exists for mlops at all - a separate,
       pre-existing gap
+  - chart_values: gitops/charts/rag-ingestion/values.yaml
+    path: images.compiler.tag
+    reason: rag-pipeline-compiler has no BuildConfig - unused by any template today
+      per the chart's own comment
+- release_tag: v0.2.0
+  pinned_at: '2026-09-05T12:23:19Z'
+  pins:
+  - chart_values: gitops/charts/advantage/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:1b1d2439958a8bb59465a5241bcc41b17432e6e3a5bcce3ab5e30a1963aaca30
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/agent-runtime/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:c8aaf523e2b434063c669739b5261d7cf4c2da0b66c55aa3490b5ba66cbfb0c7
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/ai-gateway/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:e504608840de0258bc67b032988ce27bc98fb6edbc4c93c6f29f51a3a4ed2177
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/aiagent-operator/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:a026e8834d965c91a39508c3e9a2cfa3edcc778cc4b9230b3dfd97198c141816
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/arkos/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:1b1d2439958a8bb59465a5241bcc41b17432e6e3a5bcce3ab5e30a1963aaca30
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/comage/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:1b1d2439958a8bb59465a5241bcc41b17432e6e3a5bcce3ab5e30a1963aaca30
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/diagram-render/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:ba1c94c0fdca4519ef9618150a22ac54adde4e625a1c1faedefd413c2ff0f3cb
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/finage/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:1b1d2439958a8bb59465a5241bcc41b17432e6e3a5bcce3ab5e30a1963aaca30
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/mcp-aap/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:b0edc96fe5cbeb9e51cf41795d235a4aa868704777babefc23935b01b82a9729
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/mcp-confluence/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:2f6f08b786822017163c746dbaae5c3f1492bd97222c598ec9875e72beae14f4
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/mcp-gateway/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:d73e840deab04aa7e96ad3cdf3ed18e0bb2c5afb63b332a299b993d82abeed40
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/mcp-git-forge/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:99b9eb5cfb52c9c1278d9be74c3400bbbe15324298e0138efd861148a35be774
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/mcp-salesforce/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:efc75ca391abff8c0acee5358dd37f7b23ee7e83a56c357a8782774a944080ce
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/mlops/values.yaml
+    path: images.mlops.tag
+    tag: v0.2.0
+    digest: sha256:c86fc68f49ac23fd5b7a34fca8f9572d02e5e6c07640e9d0b554abd66e68467a
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/naveo/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:1b1d2439958a8bb59465a5241bcc41b17432e6e3a5bcce3ab5e30a1963aaca30
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/rag-ingestion/values.yaml
+    path: images.ingestion.tag
+    tag: v0.2.0
+    digest: sha256:569033dbb9f4874c0e8985b95eea311be2a14eb3068647903c716f590a28d1a2
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/rag-service/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:9d4c6409ce85ff6d07505a3f1928f57109a42156216d1aced21fef1f53f61f74
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  - chart_values: gitops/charts/tekos/values.yaml
+    path: image.tag
+    tag: v0.2.0
+    digest: sha256:1b1d2439958a8bb59465a5241bcc41b17432e6e3a5bcce3ab5e30a1963aaca30
+    signed: true
+    signed_at: '2026-09-05T12:23:19Z'
+  skipped:
   - chart_values: gitops/charts/rag-ingestion/values.yaml
     path: images.compiler.tag
     reason: rag-pipeline-compiler has no BuildConfig - unused by any template today

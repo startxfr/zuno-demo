@@ -118,12 +118,23 @@
                 # needed) instead of disabling verification. SSL_CERT_FILE
                 # (not SSL_CERT_DIR) since this is one PEM bundle file, not
                 # a hashed-symlink directory Go's loader would expect.
+                # Found live 2026-09-05 (ADR-0549's first release run):
+                # `cosign initialize` failed "mkdir /.sigstore: permission
+                # denied" - sign_in_cluster.py's own
+                # `env.setdefault("HOME", ...)` only fills HOME in if it is
+                # truly absent from os.environ; this image (or its base)
+                # apparently presents HOME=/ already set, so the
+                # Python-side fallback never fires. Same fix as
+                # verify_image_signatures.yml's identical, already-working
+                # HOME override - force it at the pod level instead of
+                # relying on the in-process fallback.
                 env: >-
                   {{
                     [
                       {'name': 'SSL_CERT_FILE', 'value': '/etc/ssl/openshift-service-ca/service-ca.crt'},
                       {'name': 'RHTAS_KEYCLOAK_TOKEN_URL', 'value': 'https://keycloak.' + cluster_base_domain + '/realms/zuno/protocol/openid-connect/token'},
-                      {'name': 'RHTAS_CLIENT_SECRET_PATH', 'value': '/etc/rhtas/signer-client-secret/client_secret'}
+                      {'name': 'RHTAS_CLIENT_SECRET_PATH', 'value': '/etc/rhtas/signer-client-secret/client_secret'},
+                      {'name': 'HOME', 'value': '/tmp'}
                     ]
                     +
                     ([{'name': 'RHTAS_KC_CA_FILE', 'value': '/etc/rhtas/keycloak-ca/ca-bundle.crt'}]
