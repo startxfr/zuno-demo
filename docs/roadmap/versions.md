@@ -132,8 +132,15 @@ surfaced — the S3 backup check never sets `repo2-path`, so it has always
 reported "no backup" while three real full backups exist, and
 `make d3 backup postgresql` cannot trigger one.
 
-**4 ADRs.** Open: ADR-0517, ADR-0546 (`Accepted`, executing via WP-131),
-ADR-0547. Open work packages: WP-131 (WP-130 and WP-132 done 2026-09-04).
+**Update (2026-09-06).** ADR-0546 and ADR-0547 are both `Implemented`. WP-131
+closed 2026-09-05 — all eight components cut over and live-verified on
+`demo222`, all six legacy buckets deleted — which closed B12, the last of
+ADR-0517's thirteen blockers. ADR-0547's flip is recorded with its one known
+exception (the `machines` chart's AZ/instance types stay fleet design, covered
+by WP-130's probe P2) and a fresh zero-finding `make d0 check` run post-WP-131.
+
+**4 ADRs.** Open: ADR-0517 only, blocked on an operator provisioning `demo333`.
+All work packages done: WP-130 and WP-132 (2026-09-04), WP-131 (2026-09-05).
 
 ## v0.9
 

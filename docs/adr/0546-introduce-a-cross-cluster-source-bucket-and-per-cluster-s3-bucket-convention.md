@@ -1,6 +1,6 @@
 # ADR-0546: Introduce a cross-cluster source bucket and per-cluster S3 bucket convention
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.8
 - **Date:** 2026-09-03
 - **Decision owners:** Zuno Demo architecture team
@@ -167,6 +167,18 @@ natural rehearsal. And the raw SXA dump exists **twice** — `zuno-demo-sxa-corp
 `zuno-demo-rag-corpus/sxa_data/` (2026-08-21) that this ADR does not mention and
 that has **no consumer anywhere in the tree**; it is an orphan and dies with the
 old bucket rather than being migrated.
+
+**Implemented 2026-09-06.** Decision clause 5's execution, WP-131, closed on
+2026-09-05: all eight components (mlflow, mariadb, aap hub, mlops, openshift-ai
+traces, rag-ingestion, postgresql, models) are cut over to the new convention
+and live-verified on `demo222` — postgresql through a full `pgbackrest verify`
+of 112 GB and a restore drill from the new bucket, the five served models each
+re-proven by a real inference call, rag-ingestion by re-running the real
+pipeline per domain (clause 1 — re-ingest, not copy). All six legacy buckets
+are deleted, confirmed gone via `head-bucket` 404s. The formal acceptance
+criteria above were already met at `Accepted`; this note records that the
+convention the ADR decided is now the only one that exists. The mapping's full
+execution record, including the traps it surfaced, lives in WP-131.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives, Consequences,
 Security/Operational considerations, Migration/evolution and Review evidence.

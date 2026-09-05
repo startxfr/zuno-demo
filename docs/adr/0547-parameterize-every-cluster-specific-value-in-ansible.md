@@ -1,6 +1,6 @@
 # ADR-0547: Parameterize every cluster-specific value in Ansible, and seed it through Vault when secret
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.8
 - **Date:** 2026-09-03
 - **Decision owners:** Zuno Demo architecture team
@@ -154,6 +154,31 @@ missing is the statement that they are mandatory.
   variables the WP introduced are non-secret per-cluster configuration and
   belong in `ansible/confidential.yml`. Putting non-secrets in Vault buys
   nothing and adds a failure mode.
+
+- **2026-09-06 — Implemented.** The three carrying work packages are closed:
+  WP-132 (the conversions, Done 2026-09-04), WP-130 (the readiness probe, Done
+  2026-09-04), WP-131 (the ADR-0546 bucket split, Done 2026-09-05 with all six
+  legacy buckets deleted). Against the acceptance criteria:
+
+  - *Criterion 1* — met **with the one recorded exception above**: the
+    `machines` chart's availability zones and instance types stay chart
+    defaults as fleet design, with WP-130's probe P2 covering the failure mode
+    that matters. The 2026-09-04 note stands as the record; this flip does not
+    widen it.
+  - *Criterion 2* — every landed conversion used clause 4's two-step order
+    with its inertia proof recorded in WP-132 (and WP-131 for the bucket
+    values), each proof answering what a dead mechanism would have shown.
+  - *Criterion 3* — met vacuously: no conversion produced a secret, so the
+    Vault surface went unused (2026-09-04 note above). The rule stands for the
+    next value that is one.
+  - *Criterion 4* — re-proven live on `demo222` on 2026-09-06, *after*
+    WP-131's bucket migration finished reshaping the values this ADR governs:
+    `make d0 check` completed with `failed=0`, all thirteen Day 0 components
+    reporting installed, the probe reporting verbatim "cluster readiness: 0
+    finding(s), 0 blocking - nothing to report", and zero blocked resources
+    ("All resources Synced/Healthy - nothing blocked"). The fresh-cluster half
+    of the criterion is carried by WP-130's gate on `make d0 install`, each
+    probe proven able to fire (P6 driven live, the rest unit-tested).
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives,
 Consequences, Security/Operational considerations, Migration/evolution and
