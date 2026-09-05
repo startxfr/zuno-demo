@@ -1,6 +1,6 @@
 # WP-131: Execute ADR-0546's cross-cluster source bucket and per-cluster S3 convention
 
-- **State:** Operator pending. All eight components now cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion, postgresql, models). postgresql **P0–P13 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), and P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven). **P14 is fully done**: the 5 old buckets that were locked (counter-tested Deny policy, read-only cooling period) were deleted the same day, confirmed gone via `head-bucket` 404s; `zuno-demo-rag-corpus` deliberately never locked/deleted (still live, models moved out of it 2026-09-05 — see "Step 8" below). **Step 8 (`models`) closed 2026-09-05**: all 5 served models cut over live, one at a time, accepted downtime; `models/` (226 objects, 164.6 GB) deleted from `zuno-demo-rag-corpus`. A stale Jinja `default('zuno-corpus')`/`default('zuno-demo-sxa-corpus')` fallback found in 3 roles during the P14 audit was fixed the same day (ADR-0547 clause 3, commit `b8065a4d`) — see "P14" below. Owner as of 2026-09-05: `zuno-demo-c0`.
+- **State:** Operator pending. All eight components now cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion, postgresql, models). postgresql **P0–P13 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), and P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven). **P14 is fully done**: the 5 old buckets that were locked (counter-tested Deny policy, read-only cooling period) were deleted the same day, confirmed gone via `head-bucket` 404s; `zuno-demo-rag-corpus` deliberately never locked/deleted (still live, models moved out of it 2026-09-05 — see "Step 8" below). **Step 8 (`models`) closed 2026-09-05**: all 5 served models cut over live, one at a time, accepted downtime; `models/` (226 objects, 164.6 GB) deleted from `zuno-demo-rag-corpus`. A stale Jinja `default('zuno-corpus')`/`default('zuno-demo-sxa-corpus')` fallback found in 3 roles during the P14 audit was fixed the same day (ADR-0547 clause 3, commit `b8065a4d`) — see "P14" below. **`zuno-demo-rag-corpus` closed 2026-09-05**: all 20 non-`sales` RAG-ingestion domains re-cut-over by forcing a real pipeline run per domain (ADR-0546 clause 1 — re-ingest, don't copy), `corpus.deleteOrphans` flipped `true`, and the bucket itself deleted — see "Closing WP-131" below. All six legacy buckets are now deleted; only **P13** (postgresql repo2 retention, deliberately deferred) remains open on this WP. Owner as of 2026-09-05: `zuno-demo-c0`.
 - **ADRs:** [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (`Accepted` 2026-09-04 — this WP satisfied its acceptance criterion 2),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) (B12),
@@ -805,6 +805,105 @@ real completion.
 Finished with the explicitly-authorized final step: `s3://zuno-demo-rag-corpus/models/`
 (226 objects, 164.6 GB) deleted (`aws s3 rm --recursive`), confirmed empty
 afterward.
+
+### Closing WP-131 — the RAG-ingestion re-cutover and the final bucket, 2026-09-05
+
+The blocker described above (20 of 21 domains had their `manifests-*/` copied
+but zero objects under their own `raw-*/`) was closed by re-running the real
+ingestion pipeline per domain rather than copying — ADR-0546 clause 1's
+explicit instruction — via `components/rag-ingestion/tooling/trigger_run.py`
+(WP-129), generalized in this step to accept `--domain` for pipelines whose
+display name has no `tech-` prefix (`sxa-legacy`), not only `--family`.
+
+Two already-advanced domains (`tech-confluence`, always-on every 6h;
+`tech-redhat-openstack`, its staggered weekly cron had already fired) were
+left untouched. The other 17 `techSources` domains were force-triggered.
+`sxa-legacy` needed one extra step first: `_load_sxa_dump`'s checksum
+short-circuit (`manifests-sxa-legacy/sxa-dump-checksum.json`, itself one of
+the 48 manifest-only objects copied on 2026-09-04) makes a real run write
+**zero** `raw/` if the dump's checksum is unchanged — not "nothing new", a
+full no-op. Deleting that one file first forced a real reparse of the dump
+already sitting in `zuno-demo-sources/sxa-dump/`. `sales` was confirmed to
+have no live manifest entries in either bucket and stayed out of scope,
+matching the chart's `enabled: false`.
+
+**A self-inflicted DiskPressure incident.** Triggering all 17 runs at once
+saturated ephemeral-storage on this cluster's master nodes (workload pods
+apparently schedule there), evicting 7 of 17 runs. No cascade into the
+service mesh (istio-csr stayed Running throughout). Fixed by waiting for
+kubelet's image/container GC to self-heal, then retriggering the 7 failures
+**one at a time with a DiskPressure check between each**, not batched. Two
+needed extra handling: `redhat-openshift-ai` failed a second time on a
+master that had not been in the original watch list (fixed by checking
+*all* master nodes, not just the ones that had already shown pressure);
+`redhat-mtv` got stuck `PENDING` forever because the Argo Workflow
+controller never created a Workflow CR for that run (`oc get workflows`
+showed nothing) — a re-trigger worked.
+
+**Validation, before trusting any of it**: an isolated one-off Pod running
+only the `detect-changes` stage (never `index-pgvector` — the only stage
+that touches pgvector) with `CORPUS_DELETE_ORPHANS=true` forced on, reading
+each domain's real ConfigMap/Secrets. Every domain reported `0 deleted`
+except one.
+
+**`sxa-legacy` reported 311,913 deleted** — not zero. Investigation found
+`manifests-sxa-legacy/manifest.json` carries 622,437 entries accumulated
+over the platform's history (long predating WP-131), against a real live
+corpus and pgvector row count both around 310,000-320,000: the manifest is
+roughly 2x the size of anything that has ever been live at once. Arithmetic
+bound on the actual risk (not a precise per-URL cross-reference, which
+would have taken much longer): at most ~3% of the current 319,841 pgvector
+rows for that domain could be true orphans, the rest is manifest bloat
+predating today. **Operator decision, presented via explicit choice**:
+accept that bound and proceed rather than doing the slower precise
+verification or excluding `sxa-legacy` from the flip.
+
+The isolated test pod for `sxa-legacy` itself had a side effect worth
+naming: because `detect-changes` writes `changeset.json` even when run
+standalone, that test overwrote the *live* file with its
+`CORPUS_DELETE_ORPHANS=true` result. A second isolated run with the flag
+forced back to `false` restored it (confirmed: `0 new, 0 changed, 0
+deleted, 310524 unchanged`, matching the pre-test state) before any real
+pipeline run could read the contaminated version.
+
+`redhat-mtc`'s isolated validation could not be cleanly confirmed: it
+repeatedly failed with `botocore.exceptions.ResponseStreamingError:
+Connection broken: IncompleteRead` reading a >9 MB JSON object, reproduced
+after DiskPressure had cleared and after the concurrently-running
+`sxa-legacy` job (the original suspected cause) had finished — ruling out
+both hypotheses. This looks like a real, separate infrastructure defect (a
+mesh/network stream limit on large S3 GETs, still unconfirmed) rather than
+a data-integrity risk: a `detect-changes` run that errors writes no
+changeset, so it cannot silently delete anything. `redhat-mtc`'s actual
+production pipeline run (triggered earlier, via the normal path) had
+already completed successfully end-to-end, so the domain's real corpus was
+correctly re-ingested regardless. Left open as a defect to investigate
+separately, not blocking this WP.
+
+With that accepted, `zuno_rag_corpus_delete_orphans` was flipped `true` in
+`confidential.yml`, applied via `make d2 install rag-ingestion
+EXTRA_VARS='-e gitops_app_refresh=true'` (rag-ingestion is a **Day 2**
+component, not Day 0 — `rag_ingestion` with an underscore is not a valid
+component name), confirmed live on every domain's ConfigMap and
+`zuno-rag-ingestion-d1` Synced+Healthy.
+
+`ansible/roles/rag_ingestion/tasks/install.yml:150`'s
+`s3.bucket: "{{ zuno_rag_corpus_s3_bucket | default('zuno-demo-rag-corpus') }}"`
+was fixed to `default('ZUNO_S3_BUCKET_NOT_SET')` in the same pass as the P14
+stale-default fixes above (ADR-0547 clause 3) — this one had been missed
+because the original P14 audit looked at the `mlflow`/`mlops` roles, not
+`rag_ingestion`'s own `s3.bucket` key six lines above the already-fixed
+`sxaDump.s3.bucket`.
+
+**`zuno-demo-rag-corpus` deleted 2026-09-05**, immediately once the above
+validated (operator's explicit choice — no read-only cooling period like
+the other five, since nothing serves reads from it once re-ingestion
+completes). `aws s3 rb --force` took ~2h40 wall-clock to enumerate and
+delete every object (no versioning, so not a delete-marker issue — just
+genuine volume: the legacy unscoped `raw/`/`sxa_data/` prefixes plus
+whatever remained of the per-domain `raw-*/normalized-*/manifests-*`
+history). Confirmed gone via `head-bucket` → 404. This closes the last open
+WP-131 bucket; all six legacy buckets are now deleted.
 
 ## Vault paths
 
