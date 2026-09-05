@@ -98,15 +98,17 @@
             ]
           }}
 
-    - name: "demo-check | print exact creation guidance for any missing demo project"
+    - name: "demo-check | print creation guidance for any missing demo project"
       ansible.builtin.debug:
         msg: >-
           Project '{{ item.key }}' ({{ item.value }}) not found for the
-          sale-01 persona - create it live through the frontend (any
-          agent's "New project" action) before the webinar, title exactly
-          "{{ item.key }}", classification {{ item.value }}. WP-136
-          deliberately does not create projects itself (the existing
-          frontend/BFF mechanism is the only one - ADR-0527).
+          sale-01 persona - run `make demo-reset` to create it
+          automatically (via the same POST /v1/projects the frontend uses,
+          granted to the consultant and sales groups), or create it live
+          through the frontend yourself if you want the audience to see it
+          created (any agent's "New project" action, title exactly
+          "{{ item.key }}", classification {{ item.value }}). demo-check
+          stays read-only and never creates it itself.
       loop: "{{ demo_required_projects | dict2items }}"
       loop_control:
         label: "{{ item.key }}"

@@ -58,6 +58,8 @@ webinar-restricted   C3
 
 Project creation already exists in the frontend/BFF; do not add a second project mechanism.
 
+**Amendment (2026-09-05):** after the first live `make demo-check` run confirmed all three projects were missing, the user asked for automatic creation instead of a mandatory manual UI step before every rehearsal. `make demo-reset` now creates any missing one via that same existing `POST /v1/projects` endpoint (`evaluations/demo_presenter_probe.py --ensure-projects`, run inside the same in-cluster Job `make demo-check` already used to detect them) - still not a second mechanism. A cross-persona gap was found while implementing this: the probe authenticates as `sale-01` (Comage, `/sales` group), and `POST /v1/projects` only auto-grants the creating subject - so each created project also grants `admin` to both the `consultant` and `sales` business-role groups, since `consultant-01` (the persona `evaluations/arkos`/`evaluations/tekos` use) is in a disjoint Keycloak group with no overlap otherwise. `make demo-check` stays strictly read-only and only detects/reports; its guidance message now points at `make demo-reset` first, with live frontend creation kept as an option if the presenter wants the audience to see it happen. A project that exists with the wrong classification is still only reported, never auto-corrected.
+
 ### Models/providers
 
 Verify:

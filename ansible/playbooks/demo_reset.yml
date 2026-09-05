@@ -15,6 +15,38 @@
 # "only if doing so is safe and documented" - no such mechanism exists
 # yet in this repo, so this is a deliberate no-op, not an oversight) and
 # never deletes training/model-registry evidence.
+#
+# WP-136 amendment (2026-09-05): also ensures the three named demo
+# projects exist, via the same in-cluster persona probe `make demo-check`
+# uses - see ansible/tasks/demo_persona_probe_job.yml and
+# evaluations/demo_presenter_probe.py's own docstring for why this calls
+# the existing POST /v1/projects endpoint rather than a new mechanism, and
+# why each created project grants both the consultant and sales
+# business-role groups.
+- name: "Demo reset: ensure the demo projects exist"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve the cluster base domain
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "demo-reset | ensure webinar-public/webinar-confidential/webinar-restricted exist"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/demo_persona_probe_job.yml"
+      vars:
+        demo_persona_probe_ensure_projects: true
+
+    - name: "demo-reset | print the project-provisioning result"
+      ansible.builtin.debug:
+        msg: >-
+          demo projects: present={{ demo_persona_probe_result.auth.projects | map(attribute='title') | list }}
+          created-this-run={{ demo_persona_probe_result.auth.created | default([]) }}
+          still-missing={{ demo_persona_probe_result.auth.missing | default([]) }}
+          - {{ demo_persona_probe_result.auth.detail }}
+
 - import_playbook: day3_scenario_failover_node_restore.yml
 
 - name: "Demo reset: final summary"

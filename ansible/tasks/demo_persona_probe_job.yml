@@ -108,6 +108,17 @@
     namespace: zuno-ai-run
     wait: true
 
+# WP-136 amendment (2026-09-05): `make demo-reset` sets
+# demo_persona_probe_ensure_projects: true so this Job also creates any
+# missing demo project (via the same POST /v1/projects the frontend uses -
+# see evaluations/demo_presenter_probe.py's own docstring). `make
+# demo-check` never sets this var, so it defaults to false and this stays
+# purely read-only there, matching that playbook's own "never mutates
+# cluster state" contract.
+- name: "demo-persona-probe | resolve extra probe-script arguments"
+  ansible.builtin.set_fact:
+    _dpp_extra_args: "{{ '--ensure-projects' if demo_persona_probe_ensure_projects | default(false) else '' }}"
+
 - name: "demo-persona-probe | run the probe Job"
   kubernetes.core.k8s:
     state: present
@@ -141,7 +152,7 @@
                     CERTIFI=$(python3 -c 'import certifi; print(certifi.where())') &&
                     cat /gate-ca/ca.crt >> "$CERTIFI" &&
                     export SSL_CERT_FILE="$CERTIFI" &&
-                    python3 /gate/demo_presenter_probe.py --persona sale-01
+                    python3 /gate/demo_presenter_probe.py --persona sale-01 {{ _dpp_extra_args }}
                 workingDir: /gate
                 resources:
                   requests:
@@ -240,7 +251,7 @@
   ansible.builtin.set_fact:
     demo_persona_probe_result: >-
       {{
-        {"auth": {"auth_ok": false, "persona": "sale-01", "projects": [], "missing": ["webinar-public", "webinar-confidential", "webinar-restricted"],
+        {"auth": {"auth_ok": false, "persona": "sale-01", "projects": [], "missing": ["webinar-public", "webinar-confidential", "webinar-restricted"], "created": [],
                   "detail": "zuno-demo-persona-probe produced no JSON verdict line - see the raw log: " + (_dpp_log.log_lines | default(['no pod/log found']) | join(' | '))},
          "models": [{"model": "gpt-oss-20b", "ok": false, "detail": "no verdict"}, {"model": "qwen3.5-9b", "ok": false, "detail": "no verdict"}, {"model": "qwen3.5-9b-wesh", "ok": false, "detail": "no verdict"}]}
       }}
