@@ -116,6 +116,35 @@ spec:
                   kserve.io/component: workload
     {{- end }}
     serviceAccountName: {{ .Values.inferenceServiceName }}-s3
+    {{- if .Values.loraAdapters }}
+    # WP-133: one initContainer per adapter, downloading the push-registry's
+    # own registered artifact (sourceS3Uri) to the exact local path the
+    # main container's --lora-modules flag below reads from - same
+    # mechanism as llminferenceservice-qwen35.yaml (see that file's
+    # comment for the S3-region rationale). This was the missing half of
+    # ADR-0301 point 4's port from the retired vllm-runtime ServingRuntime:
+    # the --enable-lora/--lora-modules args landed here, but nothing ever
+    # populated /mnt/loras, so this template crashlooped
+    # (LoRAAdapterNotFoundError) the moment loraAdapters went non-empty -
+    # caught live 2026-09-05 during WP-131's model S3-source cutover.
+    initContainers:
+      {{- range .Values.loraAdapters }}
+      - name: download-adapter-{{ .name }}
+        image: {{ $.Values.loraAdapterDownload.image }}
+        command: ["python3", "/opt/app-root/src/download_adapter.py"]
+        env:
+          - name: ADAPTER_SOURCE_S3URI
+            value: {{ .sourceS3Uri | quote }}
+          - name: ADAPTER_DEST_PATH
+            value: {{ .path | quote }}
+        envFrom:
+          - secretRef:
+              name: {{ $.Values.inferenceServiceName }}-s3-credentials
+        volumeMounts:
+          - name: loras
+            mountPath: /mnt/loras
+      {{- end }}
+    {{- end }}
     containers:
       - name: main
         args:
@@ -157,8 +186,18 @@ spec:
           - {{ printf "%s=%s" .name .path | quote }}
           {{- end }}
           {{- end }}
+        {{- if .Values.loraAdapters }}
+        volumeMounts:
+          - name: loras
+            mountPath: /mnt/loras
+        {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
+    {{- if .Values.loraAdapters }}
+    volumes:
+      - name: loras
+        emptyDir: {}
+    {{- end }}
   router:
     # An explicit ref is mandatory: an empty gateway: {} does not
     # auto-create or reuse a Gateway on this RHOAI build, and omitting the
