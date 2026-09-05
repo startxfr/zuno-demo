@@ -105,11 +105,13 @@ def _preference_names(entry: Dict) -> List[str]:
 
 
 def _load_model_routing() -> Tuple[
-    Dict[Tuple[str, str], List[str]], Dict[Tuple[str, str], str], Dict[Tuple[str, str], bool]
+    Dict[Tuple[str, str], List[str]], Dict[Tuple[str, str], str], Dict[Tuple[str, str], bool],
+    Dict[Tuple[str, str], set],
 ]:
     doc = yaml.safe_load(MODEL_ROUTING_POLICY_PATH.read_text(encoding="utf-8")) or {}
     preferences: Dict[Tuple[str, str], List[str]] = {}
     strict: Dict[Tuple[str, str], bool] = {}
+    local_only_for: Dict[Tuple[str, str], set] = {}
     for entry in doc.get("preferences") or []:
         key = (entry["agent"], entry["task"])
         preferences[key] = _preference_names(entry)
@@ -118,10 +120,16 @@ def _load_model_routing() -> Tuple[
         # reachable fallbacks when at runtime none are - see
         # _effective_model_chain's own docstring for the consequence.
         strict[key] = bool(entry.get("strict", False))
+        # ADR-0550: mirrors components/ai-gateway/app/model_routing_policy.py's
+        # own parsing of this field - see _render_section's use of it below
+        # for why a task declaring it needs two rows, not one.
+        tiers = {str(c).upper() for c in (entry.get("local_only_for") or [])}
+        if tiers:
+            local_only_for[key] = tiers
     adapters: Dict[Tuple[str, str], str] = {}
     for entry in doc.get("adapters") or []:
         adapters[(entry["agent"], entry["task"])] = entry.get("adapter", "?")
-    return preferences, adapters, strict
+    return preferences, adapters, strict, local_only_for
 
 
 def _effective_model_chain(
@@ -210,7 +218,8 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
                     knowledge_policy: Dict[str, Dict], quota_classes: Dict[str, Dict],
                     providers: List[Dict], model_preferences: Dict[Tuple[str, str], List[str]],
                     model_adapters: Dict[Tuple[str, str], str],
-                    model_strict: Dict[Tuple[str, str], bool]) -> str:
+                    model_strict: Dict[Tuple[str, str], bool],
+                    model_local_only_for: Dict[Tuple[str, str], set]) -> str:
     frontmatter, _, _ = _split_document(agent_dir / "agent.okf.md")
     zuno = frontmatter.get("zuno") or {}
     name = zuno.get("name", agent_dir.name)
@@ -339,6 +348,7 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
             strict = model_strict.get((name, task_name), False)
             adapter = model_adapters.get((name, task_name))
             adapter_cell = f"`{adapter}`" if adapter else "—"
+            local_only_for = model_local_only_for.get((name, task_name)) or set()
 
             # ADR-0419: a slot's own row uses its own classification_ceiling
             # (falling back to the task's own ceiling if a slot doesn't
@@ -347,22 +357,64 @@ def _render_section(agent_dir: pathlib.Path, tool_policy: Dict[str, Dict],
             # list (see PromptSlot's docstring for why), only their own
             # ceiling. Rendered before the primary row so the primary
             # task's own chain (below) reads as "everything else".
-            for slot_name, slot_zuno in task_prompts.items():
-                slot_zuno = slot_zuno or {}
-                slot_classification = slot_zuno.get("classification_ceiling", classification)
-                if slot_classification not in ("C1", "C2", "C3"):
-                    continue
-                slot_chain = _effective_model_chain(
-                    slot_classification, providers, prefer, local_only=local_only, strict=strict
-                )
-                available_models.update(slot_chain)
-                slot_reference = _annotated(slot_chain[0], provider_meta) if slot_chain else "(none eligible)"
-                slot_fallback = ", ".join(f"`{p}`" for p in slot_chain[1:]) or "—"
-                slot_label = f"{task_label} → `{slot_name}`"
-                lines.append(
-                    f"| {slot_label} | `{slot_classification}` | {slot_reference} | {slot_fallback} | {adapter_cell} | "
-                    f"`policies/model-routing/model-routing-policy.yaml` |"
-                )
+            #
+            # ADR-0550: a task with local_only_for (today, only Arkos's
+            # draft-architecture-testimonial) no longer has a single static
+            # classification ceiling for the agent to seed a slot ceiling
+            # from - its reflect call follows the SAME per-request effective
+            # classification the primary row below is rendered at two tiers
+            # for, making a slot's own frontmatter-declared
+            # classification_ceiling stale/superseded (see that task's own
+            # file). Skip per-slot rows entirely for such a task rather than
+            # render a fixed-ceiling row nothing at runtime honors anymore.
+            if not local_only_for:
+                for slot_name, slot_zuno in task_prompts.items():
+                    slot_zuno = slot_zuno or {}
+                    slot_classification = slot_zuno.get("classification_ceiling", classification)
+                    if slot_classification not in ("C1", "C2", "C3"):
+                        continue
+                    slot_chain = _effective_model_chain(
+                        slot_classification, providers, prefer, local_only=local_only, strict=strict
+                    )
+                    available_models.update(slot_chain)
+                    slot_reference = _annotated(slot_chain[0], provider_meta) if slot_chain else "(none eligible)"
+                    slot_fallback = ", ".join(f"`{p}`" for p in slot_chain[1:]) or "—"
+                    slot_label = f"{task_label} → `{slot_name}`"
+                    lines.append(
+                        f"| {slot_label} | `{slot_classification}` | {slot_reference} | {slot_fallback} | {adapter_cell} | "
+                        f"`policies/model-routing/model-routing-policy.yaml` |"
+                    )
+
+            if local_only_for:
+                # ADR-0550: this task's classification is derived from the
+                # selected project (or C1 with none) rather than the agent's
+                # own static ceiling - one row cannot describe both real
+                # outcomes, so render the unrestricted tier(s) and the
+                # forced-local tier(s) as two separate rows instead of the
+                # single row below. Tiers producing an identical chain are
+                # merged into a single label (e.g. `C2/C3`) rather than
+                # repeated - every local provider in provider-routing.yaml
+                # today is eligible for C1/C2/C3 alike, so C2 and C3 forced
+                # local resolve to the exact same chain.
+                baseline_tiers = [t for t in ("C1", "C2", "C3") if t not in local_only_for]
+                restricted_tiers = [t for t in ("C1", "C2", "C3") if t in local_only_for]
+                for tiers, forced_local, suffix in (
+                    (baseline_tiers, local_only, "no project / baseline"),
+                    (restricted_tiers, True, "in a classified project"),
+                ):
+                    if not tiers:
+                        continue
+                    tier_chain = _effective_model_chain(
+                        tiers[0], providers, prefer, local_only=forced_local, strict=strict
+                    )
+                    available_models.update(tier_chain)
+                    tier_reference = _annotated(tier_chain[0], provider_meta) if tier_chain else "(none eligible)"
+                    tier_fallback = ", ".join(f"`{p}`" for p in tier_chain[1:]) or "—"
+                    lines.append(
+                        f"| {task_label} ({suffix}) | `{'/'.join(tiers)}` | {tier_reference} | {tier_fallback} | "
+                        f"{adapter_cell} | `policies/model-routing/model-routing-policy.yaml` |"
+                    )
+                continue
 
             chain = _effective_model_chain(
                 classification, providers, prefer, local_only=local_only, strict=strict
@@ -424,7 +476,7 @@ def main() -> int:
     knowledge_policy = _load_knowledge_policy()
     quota_classes = _load_quota_classes()
     providers = _load_providers()
-    model_preferences, model_adapters, model_strict = _load_model_routing()
+    model_preferences, model_adapters, model_strict, model_local_only_for = _load_model_routing()
 
     failures: List[str] = []
     written: List[str] = []
@@ -432,7 +484,8 @@ def main() -> int:
         index_path = agent_dir / "agent.okf.md"
         _, frontmatter_text, body = _split_document(index_path)
         expected = _render_section(agent_dir, tool_policy, knowledge_policy, quota_classes,
-                                   providers, model_preferences, model_adapters, model_strict)
+                                   providers, model_preferences, model_adapters, model_strict,
+                                   model_local_only_for)
         current = _current_section(body)
 
         if args.check:
