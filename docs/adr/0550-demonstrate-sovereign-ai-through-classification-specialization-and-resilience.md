@@ -403,17 +403,30 @@ For each step they:
 16. `make demo-reset` returns the environment to the documented initial state.
 17. Two consecutive timed rehearsals complete the planned scenario in twenty minutes without unplanned CLI repair.
 
-**Status note (2026-09-05):** WP-135, WP-136 and WP-137 each closed their
-repo-side mechanism (`Operator pending`) - the classification-tiered DAT
-routing (criteria 1-2, 4-7), the routing-decision explainability panel
-(criterion 8), and the `demo-check`/`demo-reset`/`demo-step-*` tooling
-(criteria 15-16) are merged and unit/contract-tested. None of the 17
-criteria above has been proven against a live cluster yet: this ADR moves
-to `Accepted`, not `Implemented`, until an operator runs the live C1/C2/C3
-comparison (WP-137), drives the six demo cases from the real frontend
-including the WP-105 failover drill (WP-135), and completes two full
-20-minute rehearsals from `make demo-reset` (WP-136) - see each WP's own
-"Operator / human follow-up" section for the exact remaining actions.
+**Status note (2026-09-05, updated after WP-136's live rehearsal 1/2):**
+WP-135 and WP-137 are now `Done` - each WP's own "Required demo cases"/
+"Live verification" scope was driven live from the real frontend during
+this rehearsal (real cluster, real browser, real AAP workflow job #709).
+Criteria 1, 8-16 above are live-proven; criteria 4 (C2 leg) and 5 (C2 leg)
+are live-proven, their C3 legs and criteria 2 (explicit C1-project
+selection, as opposed to no-project), 3, 6, 7 rest on each WP's own
+automated test coverage rather than a live exercise this round (WP-137's
+own "Live verification" section explicitly scopes C3 as an optional short
+smoke, and criterion 7's escalation path was live-exercised only
+indirectly, through the four now-fixed live-only defects WP-137 records
+under items 2/2b/2c/2d - the *clean*, non-escalating C1 case is what was
+proven, not a genuine C1->C2 mid-DAT escalation).
+
+WP-136 stays `Operator pending`: rehearsal 1/2 completed live with zero
+unplanned CLI repair and fully correct routing (criterion 17's substance),
+but took ~24m55s against the original 20-minute ceiling - see WP-136's own
+"Rehearsal log" for the field-by-field record and the revised ~25-minute
+budget now printed by `demo_step_4.yml`/`demo_step_5.yml`. This ADR stays
+at `Accepted`, not `Implemented`, until: (a) rehearsal 2/2 completes, and
+(b) whoever signs off the webinar decides whether the original 20-minute
+ceiling in criterion 17 stands or is amended to the revised ~25-minute
+figure now that a real Wesh cold-start has been measured - that decision
+is out of scope for this note.
 
 ## Related ADRs
 

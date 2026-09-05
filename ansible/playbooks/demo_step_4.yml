@@ -3,7 +3,7 @@
 # demo_step_1.yml's header comment for the shared "never auto-submits
 # chat" convention. No new training run is launched here (WP-136 "Out of
 # scope").
-- name: "Demo step 4: Wesh training/model ownership (3 min)"
+- name: "Demo step 4: Wesh training/model ownership (5 min)"
   hosts: localhost
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
@@ -32,9 +32,12 @@
         msg:
           - "OBJECTIVE: Wesh (qwen3.5-9b-wesh) is a real fine-tuned artifact this platform trained and owns, not a vendor black box."
           - "TRAINJOB EVIDENCE (zuno-mlops, app.kubernetes.io/part-of=mlops): {{ _demo_step4_trainjobs.resources | default([]) | map(attribute='metadata.name') | list | join(', ') | default('none found - run `make d3 run mlops` well before the webinar, WP-126', true) }}"
-          - "OPEN (in order): (1) OpenShift AI Dashboard > Experiments/Runs for the TrainJob above, (2) the registered merged model artifact in the model registry, (3) https://{{ cluster_base_domain }}'s OpenShift AI model-serving view for qwen3.5-9b-wesh."
+          - "OPEN https://rhods-dashboard-redhat-ods-applications.{{ cluster_base_domain }} then click, in order (live-rehearsed click-path, 2026-09-05 - the generic 'OpenShift AI Dashboard' pointer alone cost ~2 extra minutes of on-stage navigation the first time):"
+          - "  (1) Data Science Projects -> zuno-mlops -> tab 'Experiments and runs' -> the TrainJob above (most recent: lora-tekos-sclvp)."
+          - "  (2) Model Registry (top-level left-nav item, not under a project) -> registry 'zuno' -> the merged qwen3.5-9b-wesh model entry. NOTE: model-registry-operator-controller-manager may show CrashLoopBackOff (pre-existing, unrelated to WP-137) - the 'zuno' registry backend itself stays up and browsable regardless; do not stop to investigate it live."
+          - "  (3) Data Science Projects -> zuno-ai-run -> tab 'Models' -> qwen3.5-9b-wesh, status Ready."
           - "THEN OPEN: https://comage.{{ cluster_base_domain }} and send a short normal request (no failure injected)."
           - "EXPECTED: agent=comage, model=qwen3.5-9b-wesh, provider=local-wesh(-maas)."
           - "POINT AT: the routing-details panel's Model/Provider fields, right after the training-evidence screens above."
-          - "TIME BUDGET: 3 minutes."
+          - "TIME BUDGET: 5 minutes (raised from the original 3: rehearsal #1, 2026-09-05, measured ~4 min for steps 3+4 combined against the RHOAI Dashboard navigation alone, before this click-path existed)."
           - "RECOVERY: if Comage did not select Wesh, run `make demo-check` first (its demo-failover rows report pod/anti-affinity/cache state) before touching anything live."

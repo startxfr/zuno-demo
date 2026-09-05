@@ -8,7 +8,7 @@
 # interactive-terminal/human-confirmation gate WP-105/ADR-0536 already
 # requires for that command (see Makefile's own DAY3_RECIPE: it refuses
 # to run non-interactively).
-- name: "Demo step 5: AAP model failover (6 min)"
+- name: "Demo step 5: AAP model failover (8 min)"
   hosts: localhost
   gather_facts: false
   environment: "{{ k8s_auth_environment | default({}) }}"
@@ -26,6 +26,6 @@
           - "WHILE Wesh is unavailable: open/refresh https://comage.{{ cluster_base_domain }} and show the routing-details panel reporting fallback_used=true, model=qwen3.5-9b, fallback_from=qwen3.5-9b-wesh."
           - "RETURN to AAP Controller and click the existing human-approval node to let Restore proceed."
           - "AFTER restore: refresh Comage and show the routing-details panel back to model=qwen3.5-9b-wesh, fallback_used=false."
-          - "TIME BUDGET: 6 minutes (00:00-04:00 inject+observe, 04:00-06:00 approve+restore+observe, per the WP's suggested schedule)."
+          - "TIME BUDGET: 8 minutes (00:00-04:00 inject+observe, 04:00-08:00 approve+restore+observe - raised from an original 6/2 split after rehearsal #1, 2026-09-05, measured a real Restore-to-Ready cold start of ~4 minutes, not 2)."
           - "TIMING RISK: WP-105 records real cold-start/telemetry delays - use the routing panel and AAP workflow state as the primary visual proof, not Prometheus/Grafana, which are only corroborating evidence."
           - "RECOVERY: if the model is inside the short transition interval and the chat request times out, explain the transient cutover and retry once per the rehearsed runbook - never improvise a cluster change live. If GPU MIG quota is still saturated (WP-131, 2026-09-05), the manual ReplicaSet-scaling workaround belongs in the rehearsed runbook, decided during rehearsal, not discovered live."

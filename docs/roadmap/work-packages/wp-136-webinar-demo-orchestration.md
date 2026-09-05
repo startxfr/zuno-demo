@@ -1,6 +1,10 @@
 # WP-136: Build deterministic `make demo-*` webinar orchestration
 
-- **State:** Operator pending (2026-09-05 - repo-side mechanism complete: `make demo-check` runs a read-only, report-everything-then-decide-once preflight reusing existing building blocks (agent/platform availability, Keycloak reachability, presenter-persona auth + the three webinar projects via a new `evaluations/demo_presenter_probe.py`, local model `/v1/models` readiness, external-provider config eligibility, the WP-105 failover drill's read-only preconditions, and Wesh TrainJob evidence); `make demo-reset` reuses `day3_scenario_failover_node_restore.yml` wholesale via `import_playbook` (already safely idempotent on its own); `make demo-step-1..5` print each presenter step's objective/UI/prompt/expected routing without ever submitting a chat message, and step 5 explicitly delegates the actual failover launch to the existing `make d3 scenario-failover-node` rather than reimplementing it. Two full 20-minute rehearsals and every "Rehearsal requirements" field below are unrun - they need a live cluster.)
+- **State:** Operator pending (2026-09-05 - repo-side mechanism complete, rehearsal 1/2 done live. `make demo-check` runs a read-only, report-everything-then-decide-once preflight reusing existing building blocks (agent/platform availability, Keycloak reachability, presenter-persona auth + the three webinar projects via a new `evaluations/demo_presenter_probe.py`, local model `/v1/models` readiness, external-provider config eligibility, the WP-105 failover drill's read-only preconditions, and Wesh TrainJob evidence); `make demo-reset` reuses `day3_scenario_failover_node_restore.yml` wholesale via `import_playbook` (already safely idempotent on its own); `make demo-step-1..5` print each presenter step's objective/UI/prompt/expected routing without ever submitting a chat message, and step 5 explicitly delegates the actual failover launch to the existing `make d3 scenario-failover-node` rather than reimplementing it.
+
+  **Rehearsal 1/2 (2026-09-05, live, from `make demo-reset` + `make demo-check` 30/30 PASS)** - see the "Rehearsal log" section below for the full field-by-field record. Result: every step's model/provider/classification routing was correct with zero unplanned CLI repair, but **total duration was ~24m55s against the original 20-minute ceiling** (+~25%), so this WP's own completion criterion ("two consecutive rehearsals complete in <=20 minutes") is not yet met. Root causes were identified and fixed in the presenter contract itself (not code bugs): step 4's "open the OpenShift AI Dashboard" pointer was too vague and cost ~2 minutes of on-stage navigation confusion (`demo_step_4.yml` now prints an exact click-path); step 5's Restore phase budgeted an optimistic 2-minute cold start against a real, WP-105-documented ~4-minute one. The suggested time budget below and `demo_step_4.yml`/`demo_step_5.yml`'s own printed budgets (3->5 min, 6->8 min) were raised accordingly - a **revised ceiling of ~25 minutes**, not the original 20, is what rehearsal 2 should be measured against; the alternative (leave the 20-minute bar as-is and treat this as still-failing) is a call for whoever signs off the webinar, not one made unilaterally here.
+
+  Rehearsal 2/2 is still required before this WP can close.)
 - **ADRs:** ADR-0550
 - **Depends on:** WP-137, WP-135; reuses WP-105, ADR-0526, ADR-0416, ADR-0417
 - **Estimated effort:** 0.5–1 day
@@ -236,13 +240,40 @@ A rehearsal fails if unplanned shell surgery is required.
 
 ## Suggested time budget
 
+**Revised 2026-09-05 after rehearsal 1/2** (original budget totaled 20:00; see the "Rehearsal log" section below for the live measurement that drove this change):
+
 ```text
 00:00-04:00  Arkos C1 -> OVH gpt-oss-120b
 04:00-08:00  Arkos C2 -> local gpt-oss-20b + RHOAI/OCP
 08:00-11:00  Tekos -> Codestral
-11:00-14:00  Wesh training evidence + Comage
-14:00-20:00  AAP failover Wesh -> Qwen -> Wesh
+11:00-16:00  Wesh training evidence + Comage (was 11:00-14:00; RHOAI Dashboard navigation needed a printed click-path, not just a pointer - see demo_step_4.yml)
+16:00-25:00  AAP failover Wesh -> Qwen -> Wesh (was 14:00-20:00; real Restore-to-Ready cold start measured ~4 min, not 2 - see demo_step_5.yml)
 ```
+
+## Rehearsal log
+
+### Rehearsal 1/2 - 2026-09-05, live, from `make demo-reset` (30/30 `make demo-check` PASS beforehand)
+
+| Field | Value |
+|---|---|
+| total demo duration | ~24m55s (chrono start to Wesh confirmed restored) vs original 20:00 budget |
+| step 1 duration | 3:53 (budget 4:00) |
+| step 2 duration | 1:55 core interaction (budget 4:00) |
+| steps 3+4 duration | 9:52 combined (budget 6:00) - see root cause below |
+| step 5 inject->approve | 5:18 (budget 4:00) |
+| step 5 restore->Wesh Ready | 3:57 (budget 2:00) - real cold start, not a process error |
+| actual model/provider (step 1) | `gpt-oss-120b` / `ovhcloud-gpt-oss-120b`, classification C1, execution external |
+| actual model/provider (step 2) | `gpt-oss-20b` / `local-gpt-oss-maas`, project `webinar-confidential`, classification C2, execution local |
+| Codestral trigger success | yes - `write-code` / `codestral-latest` / `mistral-codestral`, C1 external |
+| Wesh training evidence paths | RHOAI Dashboard > Data Science Projects > `zuno-mlops` > Experiments and runs (TrainJob `lora-tekos-sclvp`); Model Registry > `zuno`; Data Science Projects > `zuno-ai-run` > Models > `qwen3.5-9b-wesh` |
+| AAP workflow job id | Controller workflow job #709 (`zuno-day3-scenario-failover-node-workflow`) |
+| failover duration (cordon to fallback observed) | ~5:18 |
+| restore duration (uncordon to Wesh Ready) | ~3:57 |
+| manual recovery needed | no - zero unplanned CLI repair; two of Comage's three live queries during the drill window landed on the fallback/pre-Ready path and returned the expected "no live Salesforce read" refusal rather than a wrong answer, which is correct task behavior, not a defect |
+
+Root cause of the step 3+4 overrun: the original step 4 guidance ("open the OpenShift AI Dashboard") named a destination but not a path, and the presenter lost time locating Experiments/Runs, Model Registry, and the Models tab live. Fixed by printing the exact click-path in `demo_step_4.yml` (see WP note above) - not yet re-measured live.
+
+Rehearsal 2/2: not yet run.
 
 ## Out of scope
 
