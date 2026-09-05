@@ -461,10 +461,25 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
         update["errors"] = errors + [f"retrieve: confluence search: {exc}"]
         return update
 
-    update["effective_classification"] = escalated
     update["tool_results"] = {"confluence.page.search": result}
-    if not result.get("external_model_policy", {}).get("allow_context", True):
-        update["local_only_required"] = True
+
+    # ADR-0034 escalates when Confluence CONTENT enters context, not merely
+    # on a successful call - live-caught 2026-09-05 rehearsing ADR-0550's
+    # step 1 (Arkos DAT outside a project should stay C1 -> OVHcloud):
+    # every DAT turn declares confluence.page.search in task.allowed_tools
+    # (this function's own docstring - "unconditionally, no trigger to
+    # evaluate first"), so escalating on call success alone made
+    # effective_classification C2 for literally every DAT turn, even ones
+    # matching zero Confluence pages - C1 was never reachable in practice,
+    # contradicting ADR-0034's own written text ("escalated ... when
+    # Confluence content enters context"). Gating on non-empty results
+    # keeps the ADR-0035 fail-closed direction intact (a real match still
+    # escalates and still forces local-only via the policy check below) -
+    # it only stops a no-hit search from raising the floor.
+    if result.get("result", {}).get("results"):
+        update["effective_classification"] = escalated
+        if not result.get("external_model_policy", {}).get("allow_context", True):
+            update["local_only_required"] = True
     return update
 
 

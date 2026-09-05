@@ -204,19 +204,44 @@ async def test_retrieve_node_dat_c1_project_escalates_to_c2_from_a_retrieved_doc
     assert result["effective_classification"] == "C2"
 
 
-async def test_retrieve_node_dat_confluence_success_escalates_a_c1_baseline_to_c2() -> None:
-    """Pre-existing, task-agnostic behavior (ADR-0034's
-    _LIVE_READ_CLASSIFICATION), newly consequential after ADR-0550/WP-137:
-    ANY successful Confluence search - even with zero hits - escalates
-    effective_classification to at least C2, since a live read of an
-    internal system is presumed C2-sensitive by default. This was
-    invisible before this change (Arkos's C3 ambient seed already
-    dominated it), but a real no-project DAT turn now only stays at C1 if
-    this call fails outright - see WP-137's live-verification notes for
-    why Step 1 of the webinar sequence must be rehearsed against a topic
-    that genuinely returns no Confluence hits."""
+async def test_retrieve_node_dat_confluence_zero_hits_does_not_escalate() -> None:
+    """Live-caught 2026-09-05 rehearsing ADR-0550's step 1 (Arkos DAT
+    outside a project should stay C1 -> OVHcloud): every DAT turn declares
+    confluence.page.search in task.allowed_tools (unconditionally, no
+    trigger to evaluate first), so escalating effective_classification on
+    ANY successful call - even a zero-hit search - made C1 unreachable in
+    practice for every real DAT turn. Fixed to match ADR-0034's own
+    written text ("escalated ... when Confluence CONTENT enters context"):
+    a search that matches nothing must not raise the floor."""
     async def fake_invoke_tool(**kwargs):
         return {"result": {"results": []}}
+
+    saved_resolve = arkos_nodes.resolve_authorized_domains
+    saved_invoke_tool = arkos_nodes.invoke_tool
+
+    def fake_resolve(**kwargs):
+        return KnowledgeDecision(authorized_domains=[], denied={})
+
+    try:
+        arkos_nodes.resolve_authorized_domains = fake_resolve
+        arkos_nodes.invoke_tool = fake_invoke_tool
+        result = await arkos_nodes.retrieve_node(
+            {"message": "draft a DAT", "bearer_token": "t", "project_classification": None}
+        )
+    finally:
+        arkos_nodes.resolve_authorized_domains = saved_resolve
+        arkos_nodes.invoke_tool = saved_invoke_tool
+
+    assert result["effective_classification"] == "C1"
+    assert result["tool_results"]["confluence.page.search"] == {"result": {"results": []}}
+
+
+async def test_retrieve_node_dat_confluence_with_hits_still_escalates_to_c2() -> None:
+    """The other half of the fix above: a search that DOES match real
+    Confluence content must still escalate, exactly as ADR-0034 requires -
+    only the zero-hit case changed."""
+    async def fake_invoke_tool(**kwargs):
+        return {"result": {"results": [{"title": "Internal notes", "url": "https://x", "excerpt": "..."}]}}
 
     saved_resolve = arkos_nodes.resolve_authorized_domains
     saved_invoke_tool = arkos_nodes.invoke_tool
@@ -1285,7 +1310,8 @@ TESTS = [
     test_retrieve_node_dat_defaults_to_c1_with_no_project_selected,
     test_retrieve_node_dat_never_downgrades_a_c3_project,
     test_retrieve_node_dat_c1_project_escalates_to_c2_from_a_retrieved_doc,
-    test_retrieve_node_dat_confluence_success_escalates_a_c1_baseline_to_c2,
+    test_retrieve_node_dat_confluence_zero_hits_does_not_escalate,
+    test_retrieve_node_dat_confluence_with_hits_still_escalates_to_c2,
     test_retrieve_node_workshop_kind_keeps_the_agent_ambient_seed,
     test_reflect_node_dat_follows_effective_classification_not_a_fixed_ceiling,
     test_reflect_node_dat_defaults_to_c1_when_effective_classification_is_absent,
