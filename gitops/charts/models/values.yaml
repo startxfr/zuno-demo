@@ -453,7 +453,16 @@ embeddingModel:
   # ADR-0546/WP-131: which bucket this model's weights are read from -
   # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
   # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
-  s3Source: models
+  # Flipped 2026-09-05: verified byte-identical to modelsS3 first (226
+  # objects, same sizes, empty aws s3 sync --dryrun).
+  s3Source: sources
+  # WP-131: RollingUpdate's default maxSurge tries to schedule a second GPU
+  # pod before killing the first, which cannot succeed under a saturated
+  # GPU quota (zuno-ai-run-gpu-cap) - Recreate kills the old pod first,
+  # trading a brief outage for a rollout that actually completes instead of
+  # hanging on Pending forever. Only settable here: LLMInferenceService's
+  # CRD (the other 4 models) has no equivalent field.
+  deploymentStrategy: Recreate
   # ADR-0518: Qwen/Qwen3-Embedding-0.6B, 1024-dim, replaces
   # BAAI/bge-small-en-v1.5 (384-dim, English-only) - the live corpus is
   # French Confluence content, so an MTEB-multilingual-topping model is

@@ -21,6 +21,13 @@ metadata:
     opendatahub.io/hardware-profile-namespace: {{ .Values.hardwareProfiles.namespace }}
 spec:
   predictor:
+    {{- if .Values.embeddingModel.deploymentStrategy }}
+    # WP-131: RollingUpdate (the KServe default) surges a second GPU pod
+    # before killing the first, which cannot schedule under a saturated
+    # GPU quota - see values.yaml's embeddingModel.deploymentStrategy.
+    deploymentStrategy:
+      type: {{ .Values.embeddingModel.deploymentStrategy }}
+    {{- end }}
     {{- if .Values.embeddingModel.podAnnotations }}
     # ADR-0523 (WP-082): predictor-level annotations reach the generated
     # Deployment's pod template (KServe ComponentExtensionSpec) - the
