@@ -235,6 +235,8 @@ type apiChatResponse struct {
 	// BFF can set zuno.project_id on its own span for the non-streaming
 	// path. Never the Salesforce opportunity id.
 	ProjectID string `json:"project_id"`
+	// ADR-0550 (WP-135): see runtime.RoutingMetadata's own comment.
+	Routing runtime.RoutingMetadata `json:"routing"`
 }
 
 type apiErrorResponse struct {
@@ -597,6 +599,7 @@ func chatHandler(verifier *jwks.Verifier, runtimeClient *runtime.Client, agentNa
 			RunID:      resp.RunID,
 			SourceMode: resp.SourceMode,
 			ProjectID:  resp.ProjectID,
+			Routing:    resp.Routing,
 		})
 		if identity != nil {
 			identity.projectID = resp.ProjectID // ADR-0528

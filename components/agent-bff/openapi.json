@@ -1518,7 +1518,8 @@
           "citations",
           "images",
           "run_id",
-          "source_mode"
+          "source_mode",
+          "routing"
         ],
         "properties": {
           "reply": {
@@ -1554,6 +1555,69 @@
           "project_id": {
             "type": "string",
             "description": "ADR-0528: the server-resolved project this turn belonged to, so agent-bff can set the zuno.project_id span attribute on the non-streaming path. Empty outside a project. Never the Salesforce opportunity id."
+          },
+          "routing": {
+            "$ref": "#/components/schemas/RoutingMetadata"
+          }
+        }
+      },
+      "RoutingMetadata": {
+        "type": "object",
+        "description": "ADR-0550 (WP-135): the real, server-side model-routing decision for this turn - which agent/task/project/classification produced it, which provider/model actually served it, and whether a fallback was used. Every field degrades to an empty/false placeholder rather than being omitted when the underlying ai-gateway fetch fails (never a routing or security control, purely explainability).",
+        "required": [
+          "agent",
+          "task",
+          "project_id",
+          "project_classification",
+          "effective_classification",
+          "selected_model",
+          "selected_provider",
+          "execution_location",
+          "fallback_used",
+          "local_only_required",
+          "routing_reason"
+        ],
+        "properties": {
+          "agent": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "project_classification": {
+            "type": "string"
+          },
+          "effective_classification": {
+            "type": "string"
+          },
+          "selected_model": {
+            "type": "string"
+          },
+          "selected_provider": {
+            "type": "string"
+          },
+          "execution_location": {
+            "type": "string",
+            "enum": [
+              "local",
+              "external",
+              "unknown"
+            ]
+          },
+          "fallback_used": {
+            "type": "boolean"
+          },
+          "fallback_from": {
+            "type": "string"
+          },
+          "local_only_required": {
+            "type": "boolean"
+          },
+          "routing_reason": {
+            "type": "string"
           }
         }
       },

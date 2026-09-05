@@ -135,6 +135,10 @@ func TestCitationMatchesOpenAPISpec(t *testing.T) {
 	assertMatchesSchema(t, loadOpenAPISpec(t), runtime.Citation{}, "Citation")
 }
 
+func TestRoutingMetadataMatchesOpenAPISpec(t *testing.T) {
+	assertMatchesSchema(t, loadOpenAPISpec(t), runtime.RoutingMetadata{}, "RoutingMetadata")
+}
+
 // ADR-0212 wire structs.
 
 func TestConversationMatchesOpenAPISpec(t *testing.T) {

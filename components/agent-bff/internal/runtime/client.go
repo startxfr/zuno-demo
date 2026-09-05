@@ -286,6 +286,29 @@ type CloneConversationResponse struct {
 	ProjectID string `json:"project_id"`
 }
 
+// RoutingMetadata mirrors components/agent-runtime/app/schemas.py's
+// RoutingMetadata (ADR-0550, WP-135) - the real per-request model-routing
+// decision. Declared as its own Go struct rather than a raw map, for the
+// exact ADR-0215 reason ChatResponse's own docstring below documents:
+// encoding/json silently drops any JSON field this BFF's Go structs don't
+// declare, so this field needed an explicit type here to reach
+// apiChatResponse at all, not just the SSE streaming path (proxySSE is a
+// raw byte relay and already forwards it with zero code change).
+type RoutingMetadata struct {
+	Agent                   string `json:"agent"`
+	Task                    string `json:"task"`
+	ProjectID               string `json:"project_id"`
+	ProjectClassification   string `json:"project_classification"`
+	EffectiveClassification string `json:"effective_classification"`
+	SelectedModel           string `json:"selected_model"`
+	SelectedProvider        string `json:"selected_provider"`
+	ExecutionLocation       string `json:"execution_location"`
+	FallbackUsed            bool   `json:"fallback_used"`
+	FallbackFrom            string `json:"fallback_from,omitempty"`
+	LocalOnlyRequired       bool   `json:"local_only_required"`
+	RoutingReason           string `json:"routing_reason"`
+}
+
 // ChatResponse is the Agent Runtime's documented response body.
 //
 // ADR-0215: RunID/SourceMode were silently dropped here until this fix -
@@ -307,6 +330,8 @@ type ChatResponse struct {
 	// non-streaming path (the streaming path reads it from the SSE start
 	// event instead).
 	ProjectID string `json:"project_id"`
+	// ADR-0550 (WP-135): see RoutingMetadata's own comment above.
+	Routing RoutingMetadata `json:"routing"`
 }
 
 // Client calls one agent's chat endpoint on the shared Agent Runtime.
