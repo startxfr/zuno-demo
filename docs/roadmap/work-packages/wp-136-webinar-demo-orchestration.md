@@ -1,6 +1,6 @@
 # WP-136: Build deterministic `make demo-*` webinar orchestration
 
-- **State:** Not started
+- **State:** Operator pending (2026-09-05 - repo-side mechanism complete: `make demo-check` runs a read-only, report-everything-then-decide-once preflight reusing existing building blocks (agent/platform availability, Keycloak reachability, presenter-persona auth + the three webinar projects via a new `evaluations/demo_presenter_probe.py`, local model `/v1/models` readiness, external-provider config eligibility, the WP-105 failover drill's read-only preconditions, and Wesh TrainJob evidence); `make demo-reset` reuses `day3_scenario_failover_node_restore.yml` wholesale via `import_playbook` (already safely idempotent on its own); `make demo-step-1..5` print each presenter step's objective/UI/prompt/expected routing without ever submitting a chat message, and step 5 explicitly delegates the actual failover launch to the existing `make d3 scenario-failover-node` rather than reimplementing it. Two full 20-minute rehearsals and every "Rehearsal requirements" field below are unrun - they need a live cluster.)
 - **ADRs:** ADR-0550
 - **Depends on:** WP-137, WP-135; reuses WP-105, ADR-0526, ADR-0416, ADR-0417
 - **Estimated effort:** 0.5–1 day
@@ -260,3 +260,10 @@ WP-136 is done when:
 - `demo-reset` recovers the known failover state safely;
 - each helper gives deterministic web guidance and expected output;
 - two consecutive rehearsals complete in <=20 minutes with no unplanned CLI repair.
+
+## Operator / human follow-up (not executable by the model without explicit go-ahead)
+
+1. Repo-side is complete: `ansible/playbooks/demo_check.yml`, `demo_reset.yml` and `demo_step_1.yml`..`demo_step_5.yml`, the new `ansible/tasks/demo_persona_probe_job.yml` + `evaluations/demo_presenter_probe.py`, and the seven flat Makefile targets are all merged. Every playbook passed `ansible-playbook --syntax-check`; `demo_persona_probe_job.yml`'s script passed `python3 -m py_compile`; `python3 platform/docs/check_docs.py` passes.
+2. Two known, documented scope limits to account for while rehearsing: (a) `demo-check`'s external-provider check (OVHcloud, Codestral) is static config only (`eligible_for` in `provider-routing.yaml`) - no repo mechanism makes a live external smoke call on every `make demo-check` run, so real reachability is only proven by actually rehearsing steps 1 and 3; (b) `demo-check`'s AAP precondition confirms the failover workflow template exists in Controller but does not independently re-verify the presenter's own launch/approval RBAC (that grant is wired once by `ansible/roles/aap_config/tasks/wire_launch_rbac.yml` and trusted here, not re-checked per call).
+3. Operator: create the three named demo projects live through the frontend if `make demo-check` reports them missing (webinar-public/C1, webinar-confidential/C2, webinar-restricted/C3 - this WP deliberately does not create them itself), then run `make demo-reset` followed by `make demo-check` against the real cluster, then execute at least two complete rehearsals starting from `make demo-reset`, recording every field the "Rehearsal requirements" table above lists (total/per-step duration, actual model/provider, Codestral trigger success, Wesh training evidence paths, AAP workflow job id, failover/restore duration, manual recovery needed).
+4. Once verified: this WP's tracker -> `Done`; contributes toward ADR-0550 `Status` -> `Implemented` once WP-135 and WP-137 are verified too (all three are prerequisites for that final ADR status flip).
