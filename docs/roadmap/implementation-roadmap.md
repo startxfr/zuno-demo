@@ -31,7 +31,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 4 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | 3 | 5 | WP-131 |
-| v0.9 | 5 | 4 | 5 | WP-134 |
+| v0.9 | 5 | 3 | 5 | — |
 | v0.10 | 5 | 5 | 6 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -790,7 +790,7 @@ now superseded by ADR-0549.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-134 | [wp-134](work-packages/wp-134-in-cluster-release-ledger.md) | 0549 | WP-111 | Operator pending (2026-09-05 — repo-side mechanism complete) | one real `make d3 release TAG=<tag>` run against the live cluster, plus the live-verification checklist in the brief's Operator follow-up |
+| WP-134 | [wp-134](work-packages/wp-134-in-cluster-release-ledger.md) | 0549 | WP-111 | Done (2026-09-05 — live-verified: `make d3 release TAG=v0.2.0` built/signed/ledgered all 14 components; found+fixed a real HOME bug in the signing Job along the way) | none |
 
 ### Phase 40 — webinar sovereign-AI demonstration (added 2026-09-05)
 

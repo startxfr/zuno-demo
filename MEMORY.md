@@ -674,7 +674,14 @@ not here.
   never `targetRevision`, `main` keeps deploying `:latest` unchanged per
   ADR-0059). Enforcement moved from `check_no_latest_tags.py`
   (`.github/workflows/lint.yml`, removed) to `check_release_ledger.py`
-  (`make d2 check supply-chain`, in-cluster).
+  (`make d2 check supply-chain`, in-cluster). **Live-verified same day**:
+  `make d3 release TAG=v0.2.0` built/RHTAS-signed/ledgered all 14
+  components (`:latest` and every live pod confirmed untouched); found
+  and fixed a real bug along the way — `run_image_signing_job.yml` never
+  set `HOME`, unlike `verify_image_signatures.yml`'s already-working fix
+  for the identical cosign TUF-cache-init failure — which also explained
+  and was fixed alongside an unrelated `:latest` signature breakage
+  (`make d2 check supply-chain` is green again). ADR-0549 → Implemented.
 - **ADR-0101 + ADR-0102 (WP-12)**: HA-capable shape for shared services.
   PostgreSQL/Redis were already replica+PDB-complete by default; added
   `topologySpreadConstraints` to PostgreSQL (skipped for Redis, single-pod

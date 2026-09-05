@@ -312,7 +312,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | Proposed | Expand the agent catalog beyond the initial five agents |
 | [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | Implemented | Adopt RHTAS as the artifact trust and supply-chain service |
-| [ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md) | Accepted | Close ADR-0111's last SecNumCloud gap with an in-cluster release ledger |
+| [ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md) | Implemented | Close ADR-0111's last SecNumCloud gap with an in-cluster release ledger |
 
 ## v0.10
 

@@ -141,7 +141,8 @@ Adopt RHTAS as the platform's artifact trust and supply-chain service
 (ADR-0535) — a product-demonstration decision superseding ADR-0420's Vault
 Transit signing, not a reversal of its technical reasoning. OKF bundle trust,
 AI/model artifact trust and admission enforcement are deliberately left to
-later ADRs. ADR-0549 (2026-09-05) reuses that RHTAS mechanism unchanged to
+later ADRs. ADR-0549 (2026-09-05, **Implemented**, live-verified via a real
+`make d3 release TAG=v0.2.0` run) reuses that RHTAS mechanism unchanged to
 close ADR-0111's last SecNumCloud gap with an in-cluster named-release
 ledger — the Sigstore Policy Controller admission gate ADR-0535 left dormant
 stays a later ADR's concern. The band also carries the two agent-onboarding
@@ -149,8 +150,7 @@ decisions parked behind it (ADR-0307, ADR-0410 — WP-41 was cancelled
 2026-08-23) and the day-0 internal/external tiering effort (ADR-0352), which
 has no work package yet.
 
-**5 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410, ADR-0549 (`Accepted`);
-WP-134 (operator live-verification pass pending).
+**5 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410. No open work packages.
 
 ## v0.10
 

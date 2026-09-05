@@ -1,9 +1,32 @@
 # ADR-0549: Close ADR-0111's last SecNumCloud gap with an in-cluster release ledger
 
-- **Status:** Accepted
+- **Status:** Implemented - live-verified 2026-09-05: `make d3 release TAG=v0.2.0` built, RHTAS-signed and ledgered all 14 components (`platform/supply-chain/pinned-releases.yaml`, 18 pins/1 skipped, every digest real and `signed: true`); `:latest` digests and every live `zuno-ai-run` pod were confirmed untouched throughout; `make d2 check supply-chain` (signature verification + `check_release_ledger.py`) is green. A real, pre-existing bug was found and fixed along the way - see the Implementation note below.
 - **Target:** v0.9
 - **Date:** 2026-09-05
 - **Decision owners:** Zuno Demo architecture team
+
+## Implementation note (2026-09-05) — a real bug found and fixed live
+
+The first `make d3 release TAG=v0.2.0` run built all 14 components
+successfully, then failed at signing: every `run_image_signing_job.yml`
+invocation errored with `cosign initialize (TUF root, ...) failed: Error:
+creating cached local store: mkdir /.sigstore: permission denied`.
+`ansible/tasks/verify_image_signatures.yml` had already carried the fix
+for this exact failure mode (`HOME: /tmp` in the pod env, with a comment
+explaining why `sign_in_cluster.py`'s own `env.setdefault("HOME", ...)`
+isn't sufficient) since WP-070 - but `run_image_signing_job.yml`, the
+signing job this ADR's mechanism reuses, had never carried the matching
+fix. Fixed by adding the identical `HOME: /tmp` override.
+
+This also explained an unrelated, independently-discovered symptom: an
+`image-signing-supply-chain-signer` Job had failed with the same error
+~87 minutes before this ADR's first release attempt (a routine
+post-build signing, nothing to do with this ADR), and `make d2 check
+supply-chain` was failing for all 14 `:latest` images ("no matching
+signatures") - both were the same bug hitting whatever `:latest` builds
+ran during the window before the fix landed. Re-running the (now-fixed)
+signing job for all 14 `:latest` images resolved that too; `make d2
+check supply-chain` is green again.
 
 ## Context
 

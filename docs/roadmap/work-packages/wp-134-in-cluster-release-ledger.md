@@ -1,12 +1,17 @@
 # WP-134: In-cluster release ledger (promotes ADR-0549)
 
-- **State:** Operator pending (2026-09-05 - repo-side mechanism complete:
-  `tag_local_release.py` corrected and extended, `release_ledger.py`/
-  `check_release_ledger.py` added, `day3_release.yml`/`make d3 release
-  TAG=<tag>` wired, `check_no_latest_tags.py` removed from
-  `.github/workflows/lint.yml`. Remaining: the one live verification pass -
-  see Operator follow-up below.)
-- **ADRs:** ADR-0549 (Accepted -> Implemented after the live pass)
+- **State:** Done (2026-09-05 - live-verified: `make d3 release TAG=v0.2.0`
+  built, RHTAS-signed and ledgered all 14 components end to end;
+  `pinned-releases.yaml` gained a real entry (18 pins/1 skipped, every
+  digest real and `signed: true`); `:latest` digests and every live
+  `zuno-ai-run` pod confirmed untouched; `check_release_ledger.py` and
+  `make d2 check supply-chain` both green. Found and fixed a real
+  pre-existing bug along the way - `run_image_signing_job.yml` never set
+  `HOME`, unlike `verify_image_signatures.yml`'s identical existing fix
+  for the same cosign TUF-cache-init failure - see ADR-0549's own
+  Implementation note for the full trace, including the unrelated
+  `:latest` signature breakage it also explained and fixed.)
+- **ADRs:** ADR-0549 (Implemented)
 - **Depends on:** WP-111 (RHTAS signing, Done - reused unchanged)
 - **Blocks:** nothing further; closes ADR-0111's last open control-matrix row
 - **Estimated files touched:** ~15
@@ -113,20 +118,24 @@ existing ledger; `python3 platform/docs/check_docs.py` PASS; `helm lint`
 on any touched chart; `ansible-playbook --syntax-check
 ansible/playbooks/day3_release.yml`.
 
-## Operator / human follow-up (not executable by the model without explicit go-ahead)
+## Operator / human follow-up (done, 2026-09-05)
 
-1. Operator: `git tag <tag> && git push origin <tag>`, then
-   `make d3 release TAG=<tag>` against the live cluster - real builds and
-   real RHTAS signing Jobs.
-2. Verify: `oc get imagestreamtag <component>:<tag> -n zuno-ai-build` for
-   every `tag_local_release.py` `COMPONENTS` entry; `:latest` digests
-   unchanged before/after; no live pod/Deployment disturbed; a new
-   `pinned-releases.yaml` entry with every pin `signed: true` and a real
-   digest; `check_release_ledger.py` PASS on it specifically; `make d2
-   check supply-chain` still green.
-3. Once verified: ADR-0549 `Status` -> `Implemented`; ADR-0111 index row
-   -> `Retired`; this WP's tracker -> `Done` (repo-side already is);
-   MEMORY.md dated bullet.
+1. ~~Operator: `git tag <tag> && git push origin <tag>`, then `make d3
+   release TAG=<tag>` against the live cluster.~~ Done:
+   `v0.2.0` tagged/pushed, `make d3 release TAG=v0.2.0` run (two prior
+   attempts failed - a real pre-existing HOME bug, then a Jinja syntax
+   slip in this WP's own fix - both fixed before the successful run;
+   see ADR-0549's Implementation note).
+2. ~~Verify...~~ Done: all 14 `ImageStreamTag`s exist at `:v0.2.0`;
+   `:latest` digests and every live `zuno-ai-run` pod confirmed
+   untouched; ledger entry has 18 real, `signed: true` pins (1
+   documented skip); `check_release_ledger.py` PASS on it specifically;
+   `make d2 check supply-chain` green (also required re-signing the 14
+   `:latest` images, whose signatures had independently broken during
+   the same pre-fix bug window - see the ADR's note).
+3. ~~Once verified: ADR-0549 Status -> Implemented...~~ Done: ADR-0549
+   `Implemented`; ADR-0111 already `Superseded by ADR-0549` (Retired
+   table); this WP's tracker -> `Done`; MEMORY.md dated bullet below.
 
 ## Out of scope / deferred
 
