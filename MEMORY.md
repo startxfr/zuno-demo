@@ -665,6 +665,16 @@ not here.
   `check_workload_hardening.py`'s `check_no_hardcoded_secret_values`.
   Partially implemented — remaining gap rows owned by WP-12 (HA/PDB),
   WP-13 (backup) and WP-26 (binding auth-mode), each closed below.
+  **2026-09-05: Superseded by ADR-0549/WP-134.** The matrix's last
+  `gap` row (deployable chart image tags are immutable) was blocked on
+  WP-04's external GitHub Actions billing lock; closed instead by a
+  100%-in-cluster mechanism (`make d3 release TAG=<tag>` — build via
+  `tag_local_release.py`, sign via RHTAS/WP-111, record in an
+  append-only ledger, `pinned-releases.yaml` — never `values.yaml`,
+  never `targetRevision`, `main` keeps deploying `:latest` unchanged per
+  ADR-0059). Enforcement moved from `check_no_latest_tags.py`
+  (`.github/workflows/lint.yml`, removed) to `check_release_ledger.py`
+  (`make d2 check supply-chain`, in-cluster).
 - **ADR-0101 + ADR-0102 (WP-12)**: HA-capable shape for shared services.
   PostgreSQL/Redis were already replica+PDB-complete by default; added
   `topologySpreadConstraints` to PostgreSQL (skipped for Redis, single-pod

@@ -1,5 +1,13 @@
 # WP-04: Supply-chain completion (three stages)
 
+> **2026-09-05:** ADR-0111's last remaining gap this WP left open
+> (deployable chart image tags are immutable, the reason this WP stayed
+> "Closed — deferred") is closed by
+> [WP-134](wp-134-in-cluster-release-ledger.md)/[ADR-0549](../../adr/0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md),
+> via a different, 100%-in-cluster mechanism than this WP's GitHub
+> Actions/Quay path (still legitimately mothballed, unchanged - see that
+> ADR). This WP's own state/history below is untouched.
+
 > ADR-0115 retargeted to v0.7 (GitHub-Actions-based release automation) on 2026-08-24 — see `docs/roadmap/versions.md`.
 
 - **State:** Closed — deferred (2026-08-22): GitHub Actions publish pipeline

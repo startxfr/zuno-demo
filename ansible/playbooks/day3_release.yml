@@ -1,0 +1,282 @@
+---
+# `make day3|d3 release [supply-chain] TAG=<tag>`. ADR-0549/WP-134.
+#
+# Closes ADR-0111's last remaining SecNumCloud gap (immutable chart image
+# tags) with an in-cluster-only mechanism: on demand, rebuild every
+# locally-buildable component from an exact tagged commit into
+# `<component>:<release_tag>` (tag_local_release.py --apply, unchanged
+# since ADR-0115/WP-04 - `:latest` is never the build output during this
+# whole run, see that script's own docstring), sign every result keyless
+# via RHTAS (the same run_image_signing_job.yml every routine build
+# already uses, generalized to accept a non-":latest" tag), verify the
+# signatures independently (same mechanism `make d2 check supply-chain`
+# uses for `:latest` images), then record tag+digest+signature evidence
+# in platform/supply-chain/pinned-releases.yaml.
+#
+# What this deliberately never touches: any gitops/charts/*/values.yaml,
+# any gitops/apps/*/targetRevision. `main` keeps deploying `:latest`,
+# continuously, exactly as before - a release is a signed provenance
+# snapshot, never a deployment target (ADR-0549's Decision; ADR-0059's
+# Consequences explain why `:latest` must stay load-bearing for `main`).
+#
+# Precondition the operator must satisfy before running this: release_tag
+# must already exist as a real, pushed git tag (`git tag <tag> && git
+# push origin <tag>`) - `oc start-build --commit=<tag>` needs that ref to
+# exist in the BuildConfig's source (origin/main's history), the same
+# requirement tag_local_release.py always had, just never written down
+# until now.
+- name: "Day 3: cut an immutable, signed, in-cluster release"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Reject an unsupported release component
+      ansible.builtin.fail:
+        msg: >-
+          Unsupported day3 release component '{{ target_component }}' - only
+          'supply-chain' (or 'all') is supported.
+      when: target_component | default('all') not in ['supply-chain', 'all']
+
+    - name: Reject a missing or invalid release_tag
+      ansible.builtin.fail:
+        msg: >-
+          release_tag is required and must not be 'latest' or empty (got
+          {{ release_tag | default('') | quote }}). Example:
+          make d3 release TAG=v0.2.0
+      when: (release_tag | default('')) in ['', 'latest']
+
+    - name: Resolve the cluster base domain (for the Fulcio OIDC issuer)
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: List the components tag_local_release.py builds
+      ansible.builtin.command:
+        cmd: python3 platform/supply-chain/tag_local_release.py --list-components
+        chdir: "{{ zuno_repo_root }}"
+      register: _release_components_raw
+      changed_when: false
+
+    - name: Parse the component list
+      ansible.builtin.set_fact:
+        _release_components: "{{ _release_components_raw.stdout | from_json }}"
+
+    # The one real cluster mutation with side effects beyond this play:
+    # rebuilds every component from the exact tagged commit, landing each
+    # result at <component>:<release_tag>. :latest is never the build
+    # output at any point (tag_local_release.py's own guarantee - reverted
+    # in a `finally` even on failure), so live pods pulling :latest are
+    # undisturbed throughout, even across a real build failure.
+    - name: "release | build every component at {{ release_tag }} (tag_local_release.py --apply)"
+      ansible.builtin.command:
+        cmd: python3 platform/supply-chain/tag_local_release.py --release-tag {{ release_tag }} --apply
+        chdir: "{{ zuno_repo_root }}"
+      register: _release_build
+
+    - name: "release | show the build output"
+      ansible.builtin.debug:
+        msg: "{{ _release_build.stdout_lines }}"
+
+    # Reuses the exact Job/RHTAS wiring every routine `make d1/d2 build
+    # <component>` already signs with - only the tag differs. Any
+    # component's signing failure aborts the whole play here (the
+    # included task's own fail condition), before the ledger is ever
+    # touched.
+    - name: "release | sign every freshly built component (RHTAS, ADR-0535)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_image_signing_job.yml"
+      loop: "{{ _release_components }}"
+      loop_control:
+        loop_var: sign_image_name
+      vars:
+        sign_image_tag: "{{ release_tag }}"
+
+    - name: "release | resolve every component's :{{ release_tag }} digest, for the ledger"
+      ansible.builtin.command:
+        cmd: python3 platform/supply-chain/tag_local_release.py --release-tag {{ release_tag }} --resolve-digests
+        chdir: "{{ zuno_repo_root }}"
+      register: _release_digests_raw
+      changed_when: false
+
+    - name: "release | write the resolved digests to a temp refs file"
+      ansible.builtin.tempfile:
+        state: file
+        suffix: -release-digests.json
+      register: _release_digests_file
+
+    - name: "release | persist the resolved digests"
+      ansible.builtin.copy:
+        dest: "{{ _release_digests_file.path }}"
+        content: "{{ _release_digests_raw.stdout }}"
+
+    # Independent verification pass - proves each signature is actually
+    # retrievable/valid, not just that `cosign sign` exited 0. Same Job
+    # mechanism as ansible/tasks/verify_image_signatures.yml
+    # (`make d2 check supply-chain`), pointed at this release's refs
+    # instead of the routine :latest ones.
+    - name: "release | emit refs for independent signature verification"
+      ansible.builtin.command:
+        cmd: python3 platform/supply-chain/tag_local_release.py --release-tag {{ release_tag }} --emit-verify-refs
+        chdir: "{{ zuno_repo_root }}"
+      register: _release_verify_refs_raw
+      changed_when: false
+
+    - name: "release | write the verify refs into a ConfigMap"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: supply-chain-check-refs
+            namespace: zuno-ai-build
+            labels:
+              zuno.io/managed-by: zuno-ansible
+          data:
+            refs.json: "{{ _release_verify_refs_raw.stdout }}"
+
+    - name: "release | delete any previous verify Job (idempotent-by-recreation)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: batch/v1
+        kind: Job
+        name: supply-chain-verify-images
+        namespace: zuno-ai-build
+        wait: true
+
+    - name: "release | run the image-verification Job (same mechanism as make d2 check supply-chain)"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: Job
+          metadata:
+            name: supply-chain-verify-images
+            namespace: zuno-ai-build
+            labels:
+              zuno.io/managed-by: zuno-ansible
+          spec:
+            backoffLimit: 2
+            template:
+              metadata:
+                annotations:
+                  sidecar.istio.io/inject: "false"
+              spec:
+                restartPolicy: Never
+                serviceAccountName: zuno-signer
+                priorityClassName: zuno-platform-weak
+                containers:
+                  - name: verify
+                    image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer:latest"
+                    args:
+                      - verify-images
+                      - --refs-file
+                      - /work/refs.json
+                    env:
+                      # Same TLS-trust/HOME fixes as
+                      # verify_image_signatures.yml, for the same reasons.
+                      - name: SSL_CERT_FILE
+                        value: /etc/ssl/openshift-service-ca/service-ca.crt
+                      - name: HOME
+                        value: /tmp
+                      - name: RHTAS_CERT_OIDC_ISSUER
+                        value: "https://keycloak.{{ cluster_base_domain }}/realms/zuno"
+                    volumeMounts:
+                      - name: openshift-service-ca
+                        mountPath: /etc/ssl/openshift-service-ca
+                        readOnly: true
+                      - name: refs
+                        mountPath: /work
+                        readOnly: true
+                volumes:
+                  - name: openshift-service-ca
+                    configMap:
+                      name: openshift-service-ca.crt
+                  - name: refs
+                    configMap:
+                      name: supply-chain-check-refs
+
+    - name: "release | wait for the verify Job to reach a terminal state"
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        namespace: zuno-ai-build
+        name: supply-chain-verify-images
+      register: _release_verify_job
+      until: >-
+        (_release_verify_job.resources[0].status.succeeded | default(0)) > 0 or
+        (_release_verify_job.resources[0].status.conditions | default([])
+          | selectattr('type', 'in', ['Complete', 'Failed']) | selectattr('status', 'equalto', 'True') | list | length) > 0
+      retries: 20
+      delay: 10
+
+    - name: "release | fetch the verify Job's pod(s)"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: zuno-ai-build
+        label_selectors:
+          - "job-name=supply-chain-verify-images"
+      register: _release_verify_pod
+
+    - name: "release | select the most recent verify pod"
+      ansible.builtin.set_fact:
+        _release_verify_pod_name: >-
+          {{ (_release_verify_pod.resources | sort(attribute='metadata.creationTimestamp'))[-1].metadata.name }}
+      when: (_release_verify_pod.resources | default([]) | length) > 0
+
+    - name: "release | fetch the verify Job's log"
+      kubernetes.core.k8s_log:
+        namespace: zuno-ai-build
+        name: "{{ _release_verify_pod_name }}"
+        container: verify
+      register: _release_verify_log
+      when: (_release_verify_pod.resources | default([]) | length) > 0
+
+    - name: "release | print the verify Job's output"
+      ansible.builtin.debug:
+        msg: "{{ _release_verify_log.log_lines | default(['no pod/log found']) }}"
+
+    - name: "release | fail if the verify Job did not succeed"
+      ansible.builtin.fail:
+        msg: >-
+          supply-chain-verify-images Job did not succeed for release
+          {{ release_tag }} (succeeded=
+          {{ _release_verify_job.resources[0].status.succeeded | default(0) }}
+          failed={{ _release_verify_job.resources[0].status.failed | default(0) }}) -
+          see the output above. The ledger was NOT written.
+      when: (_release_verify_job.resources[0].status.succeeded | default(0)) == 0
+
+    # The real record. Every pin is written signed:true - reaching this
+    # step at all is the proof (both the signing loop and the verify Job
+    # above would already have failed the whole play otherwise).
+    - name: "release | record the release in the ledger"
+      ansible.builtin.command:
+        cmd: >-
+          python3 platform/supply-chain/tag_local_release.py
+          --release-tag {{ release_tag }} --record-release
+          --refs-file {{ _release_digests_file.path }}
+        chdir: "{{ zuno_repo_root }}"
+      register: _release_record
+
+    - name: "release | show the ledger result"
+      ansible.builtin.debug:
+        msg: "{{ _release_record.stdout_lines }}"
+
+    - name: "release | self-check the ledger's structural integrity"
+      ansible.builtin.command:
+        cmd: python3 platform/supply-chain/check_release_ledger.py
+        chdir: "{{ zuno_repo_root }}"
+      changed_when: false
+
+    - name: "release | clean up the temp digests file"
+      ansible.builtin.file:
+        path: "{{ _release_digests_file.path }}"
+        state: absent
+
+    - name: "release | print a closing summary"
+      ansible.builtin.debug:
+        msg: >-
+          Release {{ release_tag }} recorded: {{ _release_components | length }}
+          component(s) built, signed (RHTAS) and ledgered. main's
+          values.yaml and gitops/apps/*/targetRevision were never touched -
+          :latest keeps tracking main exactly as before (ADR-0549).

@@ -20,21 +20,19 @@ jobs:
           python-version: "3.11"
       - run: pip install pyyaml openapi-spec-validator
       - uses: sigstore/cosign-installer@v3
-      # ADR-0115 (2026-08-21, WP-04 local-registry tagging): 16 of 18
-      # previously-latest fields are now pinned via
-      # platform/supply-chain/tag_local_release.py + pin_release.py, both
-      # exercised against the real v0.1.0 tag without moving
-      # image.repository off the in-cluster BuildConfig/ImageStream
-      # (operator decision: stay local, Quay stays the provenance-proof
-      # path only - see ADR-0115's dated notes). Still known-failing: 2
-      # fields with no in-cluster build path at all (mlops has no
-      # BuildConfig; rag-ingestion's images.compiler targets an unwired
-      # rag-pipeline-compiler image) - a separate, pre-existing gap.
-      # Staying non-blocking until those close too; flipping this now
-      # would fail every PR over an issue this change didn't create.
-      - name: Reject non-immutable image tags (ADR-0115)
-        run: python3 platform/supply-chain/check_no_latest_tags.py
-        continue-on-error: true
+      # ADR-0111/ADR-0549 (2026-09-05): the "immutable image tags" check
+      # that used to run here (check_no_latest_tags.py, non-blocking) is
+      # removed - zero GitHub Actions dependency for this compliance
+      # story now (ADR-0549's explicit decision). Its premise ("a chart's
+      # tag must never say latest") permanently contradicts ADR-0059 by
+      # design: main's charts keep `tag: latest` forever, since that's
+      # what the image.openshift.io/triggers auto-redeploy annotation
+      # watches. Enforcement moved in-cluster instead: `make d3 release
+      # TAG=<tag>` (ansible/playbooks/day3_release.yml) builds, RHTAS-signs
+      # and ledgers a named release on demand, and
+      # platform/supply-chain/check_release_ledger.py (wired into `make d2
+      # check supply-chain`) validates that ledger's structural integrity.
+      # See check_no_latest_tags.py's own dated note for the full detail.
       # ADR-0420/WP-070 (2026-08-22): removed from this CI lint gate -
       # verify_signatures.py now resolves each component's live
       # ImageStreamTag digest via `oc get istag`, which a GitHub-hosted

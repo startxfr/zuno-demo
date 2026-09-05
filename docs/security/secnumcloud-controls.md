@@ -1,4 +1,4 @@
-# SecNumCloud-oriented control matrix (ADR-0111)
+# SecNumCloud-oriented control matrix (ADR-0111, superseded by ADR-0549)
 
 Derived documentation - the authoritative sources are the policy/checker
 files each row cites, not this file. Status values: `enforced-in-ci`
@@ -20,8 +20,8 @@ against a live deployment, not re-derivable from the repo alone),
 |---|---|---|
 | Every first-party image is built, scanned (Trivy, HIGH/CRITICAL blocking) and SBOM'd in CI | `enforced-in-ci` | `.github/workflows/build-publish.yml` (ADR-0115) |
 | The build inventory is reconciled against the real Dockerfile set | `enforced-in-ci` | `platform/supply-chain/check_build_matrix.py` (ADR-0324) |
-| Every first-party image is signed with an in-cluster Vault Transit key (not keyless GitHub OIDC - ADR-0420 superseded that mechanism 2026-08-22) and verified before trusted deployment | `enforced-in-cluster` | `ansible/tasks/run_image_signing_job.yml` signs every image on an explicit build; `make d2 check supply-chain` (`ansible/roles/supply_chain`, `platform/supply-chain/verify_signatures.py`) verifies all 14 live-verified 2026-08-22 |
-| Deployable chart image tags are immutable (no `latest`) | `gap` (checker exists, non-blocking) | `platform/supply-chain/check_no_latest_tags.py`, `continue-on-error: true` in `lint.yml` until WP-04 stage 3 |
+| Every first-party image is signed keyless via RHTAS (not GitHub OIDC - ADR-0535/WP-111 cut over from the in-cluster Vault Transit mechanism ADR-0420 originally used, 2026-09-02) and verified before trusted deployment | `enforced-in-cluster` | `ansible/tasks/run_image_signing_job.yml` signs every image on an explicit build; `make d2 check supply-chain` (`ansible/roles/supply_chain`, `platform/supply-chain/verify_signatures.py`) verifies all 14, keyless, Fulcio+Rekor, live-verified 2026-09-02 |
+| Every named point-in-time release is immutable, signed and traceable end-to-end (deployed chart tags permanently track `:latest` by design - ADR-0059's auto-redeploy trigger requires it) | `enforced-in-cluster` (2026-09-05) | `platform/supply-chain/tag_local_release.py --apply` (build) + RHTAS signing (`ansible/tasks/run_image_signing_job.yml`) + append-only ledger (`platform/supply-chain/pinned-releases.yaml`), produced on demand via `make day3\|d3 release TAG=<tag>` (ADR-0549/WP-134); structural integrity blocking-checked by `platform/supply-chain/check_release_ledger.py` (`make d2 check supply-chain`) - zero GitHub Actions dependency |
 | OKF agent bundles are signed and schema/policy-validated | `enforced-in-cluster` (signature, `ZUNO_REQUIRE_SIGNED_BUNDLES=true` live 2026-08-22 - ADR-0420/WP-069); `enforced-in-ci` (schema/policy) | `platform/supply-chain/sign_okf_bundle.py`, `validate_okf_bundle.py` (ADR-0106/ADR-0420) |
 
 ## Identity

@@ -29,9 +29,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.4 | 34 | 9 | 27 | WP-55, WP-093, WP-101 |
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
-| v0.7 | 9 | 5 | 19 | WP-115, WP-125 |
+| v0.7 | 9 | 4 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | 3 | 5 | WP-131 |
-| v0.9 | 4 | 3 | 4 | — |
+| v0.9 | 5 | 4 | 5 | WP-134 |
 | v0.10 | 5 | 5 | 6 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -776,6 +776,21 @@ as written rather than around them.
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-133 | [wp-133](work-packages/wp-133-lora-adapter-live-proof.md) | 0302, 0301 | WP-34, WP-126 | Done | none |
+
+### Phase 39 — close ADR-0111's last SecNumCloud gap with an in-cluster release ledger (added 2026-09-05)
+
+ADR-0111's sole remaining control-matrix `gap` row (deployable chart
+image tags are immutable) stayed open because its owner, WP-04, is
+blocked on an external GitHub Actions billing lock with no repo-side
+fix. Per an explicit operator decision not to wait on or route around
+that external dependency, WP-134 closes it instead with a 100%-in-cluster
+mechanism, reusing RHTAS signing (WP-111) and `tag_local_release.py`
+(WP-04's own prep work) rather than building anything new. ADR-0111 is
+now superseded by ADR-0549.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-134 | [wp-134](work-packages/wp-134-in-cluster-release-ledger.md) | 0549 | WP-111 | Operator pending (2026-09-05 — repo-side mechanism complete) | one real `make d3 release TAG=<tag>` run against the live cluster, plus the live-verification checklist in the brief's Operator follow-up |
 
 ### OKF stream phases
 

@@ -15,20 +15,37 @@
 # beyond talking to Keycloak/Fulcio/Rekor.
 #
 # Requires: sign_image_name set by the caller (e.g. "agent-runtime").
+# Optional: sign_image_tag (default "latest") - set to a release tag by
+# ADR-0549/WP-134's day3_release.yml to sign a `tag_local_release.py`
+# -built `<component>:<release_tag>` image instead of the routine
+# `:latest` one. Every existing caller is unaffected (defaults to the
+# same `:latest` behavior this task always had).
 # Requires: cluster_base_domain resolved (ansible/tasks/
 # resolve_cluster_base_domain.yml) by the including role - the Fulcio
 # OIDC issuer is the external Keycloak route, cluster-specific.
+- name: "image-signing | set the target tag and Job name facts"
+  ansible.builtin.set_fact:
+    _image_signing_tag: "{{ sign_image_tag | default('latest') }}"
+    # Suffix the Job name only for a non-":latest" tag, so this task's
+    # long-standing "image-signing-<component>" name (and every existing
+    # log/status reference to it) is untouched for the routine build
+    # path, while a release-tagged run can't collide with a concurrent
+    # routine one for the same component.
+    _image_signing_job_name: >-
+      {{ 'image-signing-' + sign_image_name if (sign_image_tag | default('latest')) == 'latest'
+         else 'image-signing-' + sign_image_name + '-' + (sign_image_tag | default('latest')) }}
+
 - name: "image-signing | resolve {{ sign_image_name }}'s live ImageStreamTag digest"
   kubernetes.core.k8s_info:
     api_version: image.openshift.io/v1
     kind: ImageStreamTag
     namespace: zuno-ai-build
-    name: "{{ sign_image_name }}:latest"
+    name: "{{ sign_image_name }}:{{ _image_signing_tag }}"
   register: _image_signing_istag
 
 - name: "image-signing | fail if the ImageStreamTag doesn't exist yet"
   ansible.builtin.fail:
-    msg: "{{ sign_image_name }}:latest not found in zuno-ai-build - the build above should have created it."
+    msg: "{{ sign_image_name }}:{{ _image_signing_tag }} not found in zuno-ai-build - the build above should have created it."
   when: (_image_signing_istag.resources | default([]) | length) == 0
 
 - name: "image-signing | set the image@digest fact"
@@ -60,7 +77,7 @@
     state: absent
     api_version: batch/v1
     kind: Job
-    name: "image-signing-{{ sign_image_name }}"
+    name: "{{ _image_signing_job_name }}"
     namespace: zuno-ai-build
     wait: true
 
@@ -71,7 +88,7 @@
       apiVersion: batch/v1
       kind: Job
       metadata:
-        name: "image-signing-{{ sign_image_name }}"
+        name: "{{ _image_signing_job_name }}"
         namespace: zuno-ai-build
         labels:
           zuno.io/managed-by: zuno-ansible
@@ -143,7 +160,7 @@
     api_version: batch/v1
     kind: Job
     namespace: zuno-ai-build
-    name: "image-signing-{{ sign_image_name }}"
+    name: "{{ _image_signing_job_name }}"
   register: _image_signing_job
   until: >-
     (_image_signing_job.resources[0].status.succeeded | default(0)) > 0 or
@@ -157,7 +174,7 @@
     kind: Pod
     namespace: zuno-ai-build
     label_selectors:
-      - "job-name=image-signing-{{ sign_image_name }}"
+      - "job-name={{ _image_signing_job_name }}"
   register: _image_signing_pod
 
 # backoffLimit means multiple pods can share this label across retries -
@@ -185,7 +202,7 @@
 - name: "image-signing | fail if the signing Job did not succeed"
   ansible.builtin.fail:
     msg: >-
-      image-signing-{{ sign_image_name }} Job did not succeed (succeeded=
+      {{ _image_signing_job_name }} Job did not succeed (succeeded=
       {{ _image_signing_job.resources[0].status.succeeded | default(0) }}
       failed={{ _image_signing_job.resources[0].status.failed | default(0) }}) -
       see the output above.

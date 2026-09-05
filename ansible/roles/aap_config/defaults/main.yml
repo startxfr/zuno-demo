@@ -46,6 +46,9 @@ aap_config_ee_job_templates:
   # WP-126: `oc whoami -t` shells out directly, same criterion as the
   # entries above.
   - zuno-day3-run
+  # ADR-0549/WP-134: tag_local_release.py shells out to `oc`/`python3`
+  # directly on localhost, same criterion as the entries above.
+  - zuno-day3-release
   # WP-105/ADR-0536 Part B: both playbooks run `ansible.builtin.command: oc
   # adm cordon/uncordon` directly, same "shells out to oc on localhost"
   # criterion as the other entries above.
@@ -106,6 +109,10 @@ aap_config_job_templates:
     credential: zuno-aap-installer
     gated: true
     survey_components: [mlops]
+  - name: zuno-day3-release
+    credential: zuno-aap-installer
+    gated: true
+    survey_components: [supply-chain]
   # WP-105/ADR-0536 Part B: no survey_components - both playbooks resolve
   # their target pod/node dynamically and take no per-launch choice.
   - name: zuno-day3-scenario-failover-node-inject

@@ -284,7 +284,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | Deferred | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | Deferred | Use immutable and verifiable software supply chain artifacts |
 | [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | Implemented | Integrate TrustyAI for AI evaluation and guardrails |
 | [ADR-0538](0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md) | Accepted | Adopt RHOAI 3.5 workload surfaces - MLflow tracking, queued workloads, training-jobs UI |
@@ -312,6 +311,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | Proposed | Expand the agent catalog beyond the initial five agents |
 | [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | Implemented | Adopt RHTAS as the artifact trust and supply-chain service |
+| [ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md) | Accepted | Close ADR-0111's last SecNumCloud gap with an in-cluster release ledger |
 
 ## v0.10
 
@@ -347,6 +347,7 @@ part of its decision is still in force.
 | [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) | v0 | Superseded by ADR-0322 | Use OGX with LangChain and LangGraph for agentic workflows |
 | [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md) | v0 | Superseded by ADR-0329 | Use a namespace-per-agent isolation model |
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v0.1 | Superseded by ADR-0322 | Abstract the RAG backend and integrate OpenShift AI OGX |
+| [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Superseded by ADR-0549 | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Superseded by ADR-0118 | Use Zuno as a policy router in front of OpenShift AI MaaS |
 | [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.6 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
 | [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) | v0.2 | Superseded by ADR-0219 | Import real SXA content via S3 into MariaDB, served through MCP and RAG |

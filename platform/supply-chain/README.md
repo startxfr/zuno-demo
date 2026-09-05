@@ -29,9 +29,13 @@ charts still on `:latest` (13 as of 2026-08-20 - it grows as new
 components are added, and that's fine: it's supposed to stay red until a
 real release is cut).
 
-Wired into `.github/workflows/lint.yml` alongside other policy-as-code
-checks (`platform/security/check_workload_hardening.py`,
-`platform/api/lint_openapi.py`) - see that workflow.
+**Note (2026-09-05, ADR-0549):** no longer wired into
+`.github/workflows/lint.yml` (removed) or any `make` gate - see this
+script's own dated docstring note for why: `main`'s charts now keep
+`tag: latest` permanently, by design (ADR-0059), so this check's premise
+can never pass for them. ADR-0111's control-matrix row this used to back
+is now enforced by `check_release_ledger.py` instead - see the
+**tag_local_release.py / check_release_ledger.py** section below.
 
 ## check_build_matrix.py
 
@@ -88,6 +92,54 @@ ledger, `pinned-releases.yaml` in this directory - never embedded in
 ```bash
 python3 platform/supply-chain/pin_release.py --manifest <path> [--dry-run]
 ```
+
+**Note (2026-09-05, ADR-0549):** mothballed for the in-cluster release
+flow - permanently rewriting `main`'s `image.tag` away from `latest` is
+out of scope by design (ADR-0059). Stays correct and available, unedited,
+for the day ADR-0353's still-unwritten external-registry cutover is ever
+adopted. See the section below for the mechanism actually in use today.
+
+## tag_local_release.py / release_ledger.py / check_release_ledger.py (ADR-0549/WP-134)
+
+Closes ADR-0111's SecNumCloud gap without depending on `pin_release.py`'s
+`values.yaml` edits or Quay/GitHub Actions at all. `tag_local_release.py`
+already did the hard part (in-cluster build to a real immutable tag,
+proven live 2026-08-19/21); this ADR completes it into a full,
+self-contained release flow:
+
+```bash
+python3 platform/supply-chain/tag_local_release.py --list-components
+python3 platform/supply-chain/tag_local_release.py --release-tag v0.2.0 --apply
+python3 platform/supply-chain/tag_local_release.py --release-tag v0.2.0 --resolve-digests
+python3 platform/supply-chain/tag_local_release.py --release-tag v0.2.0 --emit-verify-refs
+python3 platform/supply-chain/tag_local_release.py --release-tag v0.2.0 --record-release --refs-file <path>
+```
+
+Orchestrated end-to-end by `make day3|d3 release TAG=<tag>`
+(`ansible/playbooks/day3_release.yml`): build (`--apply`) → sign every
+freshly built image keyless via RHTAS (`ansible/tasks/
+run_image_signing_job.yml`, the same mechanism every routine `:latest`
+build already uses) → independently verify each signature (same Job
+mechanism as `make d2 check supply-chain`) → record the release
+(`--record-release`, via `release_ledger.py` - a small module extracted
+from `pin_release.py`'s original ledger-writing logic, shared by both
+scripts). **No `values.yaml` or `gitops/apps/*/targetRevision` is ever
+written** - the `pinned-releases.yaml` ledger entry (real digest,
+`signed: true`, per component) is the release artifact.
+
+`check_release_ledger.py` validates that ledger's structural integrity -
+static, no cluster access, wired into `make day2|d2 check supply-chain`
+(`ansible/roles/supply_chain/tasks/check.yml`). Passes on an empty/absent
+ledger (no release cut yet is not a failure); fails only if a *recorded*
+release entry is malformed or unsigned.
+
+```bash
+python3 platform/supply-chain/check_release_ledger.py
+```
+
+See [RELEASING.md](../../RELEASING.md)'s path 3 and
+[docs/adr/0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md](../../docs/adr/0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md)
+for the full design.
 
 ## sign_okf_bundle.py / validate_okf_bundle.py (WP-05, mechanism replaced by WP-069/ADR-0420)
 

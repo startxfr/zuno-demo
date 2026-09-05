@@ -20,6 +20,20 @@ pass.
 Run from the repository root:
 
     python3 platform/supply-chain/check_no_latest_tags.py
+
+Note (2026-09-05, ADR-0549): no longer wired into any gate - removed
+from `.github/workflows/lint.yml`, never added to any `make` verb. Its
+literal premise ("a chart's tag must never say `latest`") now permanently
+contradicts ADR-0059 by design: `main`'s `gitops/apps/*` charts keep
+`tag: latest` forever, since that's what the `image.openshift.io/
+triggers` auto-redeploy annotation watches. ADR-0111's control-matrix row
+this check used to back is now enforced instead by
+`check_release_ledger.py` (validates named-release provenance, not
+`values.yaml` literals). This script is kept, unchanged, only because it
+becomes meaningful again the day ADR-0353's still-unwritten external-
+registry cutover is ever adopted (at which point `.repository` really
+would move off the in-cluster mirror and `latest` really would become a
+live bug again) - see `pin_release.py`'s matching dated note.
 """
 from __future__ import annotations
 

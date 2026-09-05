@@ -110,8 +110,12 @@ DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflo
 # a side effect of `make d2 install mlops`. Its own component list, same
 # per-verb split as backup/restore.
 DAY3_RUN_COMPONENTS := mlops
-DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS))
-DAY3_VERBS := test stresstest backup restore check sign run scenario-failover-node
+# ADR-0549/WP-134: cutting a named, signed, in-cluster release is an
+# on-demand operator action against an already-installed platform, spends
+# real build+sign compute - same tier as sign/run, its own component list.
+DAY3_RELEASE_COMPONENTS := supply-chain
+DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS) $(DAY3_RELEASE_COMPONENTS))
+DAY3_VERBS := test stresstest backup restore check sign run release scenario-failover-node
 
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
 # recipe below sources to route mutating/read verbs through AAP when
@@ -233,6 +237,7 @@ help:
 	  'Day 3 components (test/stresstest/check): $(DAY3_TEST_COMPONENTS)' \
 	  'Day 3 components (backup/restore):        $(DAY3_BACKUP_COMPONENTS)' \
 	  'Day 3 components (check only):            $(DAY3_CHECK_ONLY_COMPONENTS)' \
+	  'Day 3 components (release):               $(DAY3_RELEASE_COMPONENTS)' \
 	  'Day 3 report format: text (default) | json | csv - set via REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"'
 
 # ADR-0119: scaffold a new MCP server from the confluence-shaped template
@@ -275,6 +280,7 @@ _complete-components:
 	       backup|restore) echo "$(DAY3_BACKUP_COMPONENTS) all" ;; \
 	       sign) echo "$(DAY3_SIGN_COMPONENTS) all" ;; \
 	       run) echo "$(DAY3_RUN_COMPONENTS) all" ;; \
+	       release) echo "$(DAY3_RELEASE_COMPONENTS) all" ;; \
 	       *) echo "$(DAY3_COMPONENTS) all" ;; \
 	     esac ;; \
 	esac
@@ -543,6 +549,9 @@ if [[ -z "$$verb" ]]; then \
     '  sign         Re-sign every OKF bundle against the deployed agent-runtime image, then verify (ADR-0420)' \
     '               The signed digest covers every file under agents/<name>/, tasks/ included - not just agent.okf.md' \
     '  run          Trigger one real KFP pipeline run (WP-126) - spends real GPU burst-node compute' \
+    '  release      Cut a named, signed, in-cluster release (ADR-0549/WP-134) - builds+RHTAS-signs' \
+    '               every component at TAG, records it in pinned-releases.yaml. Never touches' \
+    '               values.yaml/targetRevision - main keeps deploying `:latest` unchanged.' \
     '  scenario-failover-node   Live GPU-node failover drill (WP-105/ADR-0536): cordon+kill the qwen3.5-9b-wesh' \
     '               pod, verify Comage fails over to qwen3.5-9b (Tekos pinned to ovhcloud-gpt-oss-120b as the' \
     '               decoupling control), pause for human' \
@@ -562,6 +571,9 @@ if [[ -z "$$verb" ]]; then \
     'Components (run; optional, default: all):' \
     '  $(DAY3_RUN_COMPONENTS)' \
     '' \
+    'Components (release; optional, default: all):' \
+    '  $(DAY3_RELEASE_COMPONENTS)' \
+    '' \
     'Day 3 check-only components:' \
     '  $(DAY3_CHECK_ONLY_COMPONENTS)' \
     '' \
@@ -569,6 +581,7 @@ if [[ -z "$$verb" ]]; then \
     'Bulk interaction count (stresstest only): BULK=<n> (skips the interactive prompt; BULK=0 disables it)' \
     'Remove test-generated conversations after the run (stresstest only): CLEANUP=<0|1> (default: remove; skips the interactive prompt)' \
     'Agent to train (run only): AGENT=<agent> (default: comage - the only agent with a compiled pipeline version today)' \
+    'Release tag (release only, REQUIRED, no default): TAG=<tag> - must already be a real, pushed git tag' \
     '' \
     'Example: make d3 test agents' \
     'Example: make d3 stresstest BULK=25' \
@@ -577,6 +590,7 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 restore postgresql' \
     'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything' \
     'Example: make d3 run mlops   # triggers one real LoRA training run (WP-126) - scales up zuno-gpu-burst-a' \
+    'Example: git tag v0.2.0 && git push origin v0.2.0 && make d3 release TAG=v0.2.0   # named in-cluster release (ADR-0549)' \
     'Example: make d3 scenario-failover-node   # interactive - pauses for confirmation between cordon+kill and uncordon+restore'; \
   exit 0; \
 fi; \
@@ -632,6 +646,12 @@ case "$$verb" in \
     agent="$${AGENT:-comage}"; \
     aap_route job zuno-day3-run "{\"target_component\": \"$$component\", \"agent\": \"$$agent\"}"; rc=$$?; \
     if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_run.yml -e "target_component=$$component" -e "agent=$$agent" $(EXTRA_VARS); else exit $$rc; fi ;; \
+  release) \
+    case " $(DAY3_RELEASE_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 release component: '$$component' (expected one of: $(DAY3_RELEASE_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    if [[ -z "$${TAG:-}" ]]; then echo "day3 release requires TAG=<release_tag>, e.g. TAG=v0.2.0 (must already be a real, pushed git tag)" >&2; exit 2; fi; \
+    tag="$$TAG"; \
+    aap_route job zuno-day3-release "{\"target_component\": \"$$component\", \"release_tag\": \"$$tag\"}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_release.yml -e "target_component=$$component" -e "release_tag=$$tag" $(EXTRA_VARS); else exit $$rc; fi ;; \
   scenario-failover-node) \
     if [[ ! -t 0 ]]; then \
       echo "day3 scenario-failover-node requires an interactive terminal - it mutates live shared GPU infra and needs a human to confirm the failover before restoring (ADR-0536). Refusing to run non-interactively." >&2; \

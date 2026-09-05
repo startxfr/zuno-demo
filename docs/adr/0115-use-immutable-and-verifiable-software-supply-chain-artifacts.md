@@ -7,6 +7,24 @@
 - **Renumbered:** formerly ADR-0051, retargeted v0 -> v0.1 (2026-08-13 roadmap reorganization; the remaining gaps are release-cycle work)
 - **Last reviewed:** 2026-08-22
 
+## Correction (2026-09-05)
+
+[ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md)
+independently closes ADR-0111's control-matrix gap that this ADR's gap 2
+("deployable chart image tags are immutable") also covers - using a
+wholly different, 100%-in-cluster mechanism (named releases via
+`tag_local_release.py --apply` + RHTAS signing + an append-only ledger,
+never Quay, never GitHub Actions, `values.yaml` never touched). This does
+**not** resolve any of this ADR's own gaps 2, 3, 4, 6 or 7 as originally
+scoped here - those are specifically about the GitHub Actions + Quay
+path, which stays exactly as legitimately mothballed as the 2026-08-22
+note below describes (the billing lock is unchanged; `pin_release.py`
+stays available, unedited, for that path). This ADR stays **Deferred**.
+See ADR-0549's Context for the full reasoning, including why permanently
+pinning `main`'s `image.tag` (this ADR's original gap-2 approach) turned
+out to be structurally incompatible with ADR-0059's auto-redeploy
+trigger, not just blocked on Quay.
+
 ## Implementation note (2026-08-22) — closed, pipeline disabled
 
 WP-04 closed. The 2026-08-21 operator decision below (stay on the

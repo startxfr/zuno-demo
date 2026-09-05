@@ -1,6 +1,6 @@
-# Releasing (ADR-0115)
+# Releasing (ADR-0115, ADR-0549)
 
-**Two independent, parallel image paths exist — don't conflate them.**
+**Three independent, parallel image paths exist — don't conflate them.**
 
 Deploying to a live cluster (`make day0|d0`, `make day1|d1`) only uses the
 first path and never needs anything below this note.
@@ -37,7 +37,30 @@ first path and never needs anything below this note.
    for a future ADR to reactivate by restoring its triggers; the
    step-by-step process below still documents exactly how.
 
-This project has never cut a release: every GitOps `Application`
+3. **Named in-cluster release (ADR-0549, `make d3 release TAG=<tag>`,
+   current mechanism).** Closes ADR-0111's SecNumCloud gap without
+   depending on path 2's GitHub Actions/Quay pipeline at all. Rebuilds
+   every locally-buildable component in-cluster from an exact tagged
+   commit into `<component>:<tag>` (the same internal ImageStream mirror
+   as path 1, never Quay), signs each keyless via RHTAS (the same
+   mechanism `make d1/d2 build` already signs `:latest` builds with), and
+   records tag+digest+signature evidence in
+   `platform/supply-chain/pinned-releases.yaml` — an append-only ledger,
+   never a `values.yaml` edit. **Deliberately never touches
+   `gitops/charts/*/values.yaml` or `gitops/apps/*/targetRevision`** —
+   `main` keeps deploying `:latest`, continuously, exactly as path 1
+   describes; this is a signed provenance snapshot, not a deployment
+   target (see ADR-0059 for why `:latest` must stay load-bearing for
+   `main`, and ADR-0549's Context for why path 2's `pin_release.py`
+   approach was not reused). See [WP-134](docs/roadmap/work-packages/wp-134-in-cluster-release-ledger.md)
+   for the full mechanism.
+
+   ```
+   git tag v0.2.0 && git push origin v0.2.0
+   make day3|d3 release TAG=v0.2.0
+   ```
+
+This project has never cut a path-2 release: every GitOps `Application`
 (`gitops/apps/*/application.yaml`, `gitops/root-app-of-apps.yaml`) still
 tracks `targetRevision: main`. ADR-0115 wants that replaced with an
 immutable, reviewed Git revision or tag, but rewriting `targetRevision`
@@ -45,9 +68,11 @@ before any tag exists would point every Application at a ref that
 doesn't exist and break every deployment — a deliberate sequencing gap,
 not an oversight. The tooling exists
 (`.github/workflows/build-publish.yml`); cutting the first release is a
-maintainer decision, not something to fabricate a tag for.
+maintainer decision, not something to fabricate a tag for. Path 3
+(ADR-0549) is unaffected by this and deliberately never touches
+`targetRevision` at all, ever — see point 3 above.
 
-## The process, once a maintainer is ready to cut `v0.1.0`
+## Path 2's process, once a maintainer is ready to cut `v0.1.0` via Quay
 
 1. Ensure `main` is at the commit you want to release.
 2. `git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0`.

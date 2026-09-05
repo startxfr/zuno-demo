@@ -86,16 +86,18 @@ delivered; the band exists to formalize their retargeted status.
 ## v0.7
 
 Automate the release/supply-chain pipeline using GitHub Actions (build, sign,
-publish, promote). ADR-0111 and ADR-0115 are both hard-blocked on an external
-GitHub-billing/Quay-cutover decision with no repo-side fix. The band also
-carries the RHOAI 3.5 workload surfaces (ADR-0538 – ADR-0540), TrustyAI
-(ADR-0534), model autoscaling (ADR-0542), and mistral/gpt-oss-120b as MaaS
-`ExternalModel`s (ADR-0541, split 2026-09-03 from ADR-0537's now-Implemented
-HardwareProfile half - blocked upstream, see that ADR's body). The OKF
-extraction-and-reconciliation chain (ADR-0506 – ADR-0510) moved out to its own
-v0.10 band on 2026-09-05.
+publish, promote). ADR-0115 is hard-blocked on an external GitHub-billing/
+Quay-cutover decision with no repo-side fix (ADR-0111, formerly grouped here
+for the same reason, is now fully superseded by ADR-0549 - a 100%-in-cluster
+mechanism unblocked by that lock - see v0.9; retired out of this band
+2026-09-05). The band also carries the RHOAI 3.5 workload surfaces (ADR-0538
+– ADR-0540), TrustyAI (ADR-0534), model autoscaling (ADR-0542), and
+mistral/gpt-oss-120b as MaaS `ExternalModel`s (ADR-0541, split 2026-09-03
+from ADR-0537's now-Implemented HardwareProfile half - blocked upstream, see
+that ADR's body). The OKF extraction-and-reconciliation chain (ADR-0506 –
+ADR-0510) moved out to its own v0.10 band on 2026-09-05.
 
-**9 ADRs.** Open: ADR-0111, ADR-0115 (both `Deferred`), ADR-0538, ADR-0541;
+**8 ADRs.** Open: ADR-0115 (`Deferred`), ADR-0538, ADR-0541;
 WP-115, WP-125.
 
 ## v0.8
@@ -137,11 +139,16 @@ Adopt RHTAS as the platform's artifact trust and supply-chain service
 (ADR-0535) — a product-demonstration decision superseding ADR-0420's Vault
 Transit signing, not a reversal of its technical reasoning. OKF bundle trust,
 AI/model artifact trust and admission enforcement are deliberately left to
-later ADRs. The band also carries the two agent-onboarding decisions parked
-behind it (ADR-0307, ADR-0410 — WP-41 was cancelled 2026-08-23) and the day-0
-internal/external tiering effort (ADR-0352), which has no work package yet.
+later ADRs. ADR-0549 (2026-09-05) reuses that RHTAS mechanism unchanged to
+close ADR-0111's last SecNumCloud gap with an in-cluster named-release
+ledger — the Sigstore Policy Controller admission gate ADR-0535 left dormant
+stays a later ADR's concern. The band also carries the two agent-onboarding
+decisions parked behind it (ADR-0307, ADR-0410 — WP-41 was cancelled
+2026-08-23) and the day-0 internal/external tiering effort (ADR-0352), which
+has no work package yet.
 
-**4 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410. No open work packages.
+**5 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410, ADR-0549 (`Accepted`);
+WP-134 (operator live-verification pass pending).
 
 ## v0.10
 

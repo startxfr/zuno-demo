@@ -1,6 +1,23 @@
 # ADR-0111: Strengthen SecNumCloud-oriented security controls
 
-- **Status:** Deferred - control matrix and first increment merged (`docs/security/secnumcloud-controls.md`, `platform/security/check_workload_hardening.py`'s new NetworkPolicy-coverage audit and hardcoded-secret check); the audit found and closed a real gap (`zuno-ai-run` was silently receiving an all-ports same-namespace NetworkPolicy, contradicting ADR-0037/0052's stated design - confirmed not yet live on the cluster, `policy.enabled` is currently false there) (2026-08-14, roadmap WP-11)
+- **Status:** Superseded by ADR-0549 (2026-09-05) - not a reversal of this ADR's control matrix or first-increment work (WP-11), which stand unchanged; only the sole remaining `gap` row's closure path changes.
+- **Status (historical):** Deferred - control matrix and first increment merged (`docs/security/secnumcloud-controls.md`, `platform/security/check_workload_hardening.py`'s new NetworkPolicy-coverage audit and hardcoded-secret check); the audit found and closed a real gap (`zuno-ai-run` was silently receiving an all-ports same-namespace NetworkPolicy, contradicting ADR-0037/0052's stated design - confirmed not yet live on the cluster, `policy.enabled` is currently false there) (2026-08-14, roadmap WP-11)
+
+## Superseded (2026-09-05)
+
+The sole remaining `gap` row this ADR's matrix carried - "deployable chart
+image tags are immutable (no `latest`)", owned by WP-04, blocked on an
+external GitHub Actions billing lock with no repo-side fix - is closed by
+[ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md):
+a 100%-in-cluster mechanism (named releases, `make d3 release TAG=<tag>`
+- build, RHTAS-sign, ledger, never Quay/GitHub Actions), reframing
+"immutable" as a property of on-demand named releases rather than of
+`main`'s continuously-deployed chart values (which must keep `tag:
+latest` permanently, by design - see ADR-0059). See ADR-0549's Context
+for the full trace of why WP-04's original GitHub Actions/Quay path was
+not pursued further. This ADR's control matrix
+(`docs/security/secnumcloud-controls.md`) and the WP-11 first increment
+below stand unchanged as historical record.
 
 ## Implementation note (2026-08-15)
 

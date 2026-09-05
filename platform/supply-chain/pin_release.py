@@ -60,6 +60,19 @@ build-publish.yml run output):
 Run from the repository root:
 
     python3 platform/supply-chain/pin_release.py --manifest <path> [--dry-run]
+
+Note (2026-09-05, ADR-0549): the in-cluster release flow this repo
+actually uses now (`make d3 release TAG=<tag>`) does NOT call this
+script - permanently repointing `main`'s `image.tag` away from `latest`
+is out of scope by design (ADR-0059: the tag is load-bearing for
+auto-redeploy, and `gitops/apps/*` deliberately stays on
+`targetRevision: main`, never a release tag - see ADR-0549's Decision).
+`tag_local_release.py --record-release` writes the ledger directly
+instead, via `release_ledger.py`, without ever touching `values.yaml`.
+This script stays correct and available, unchanged, for the day
+ADR-0353's still-unwritten external-registry cutover is ever adopted -
+the one scenario where rewriting `values.yaml`'s `tag:` fields would
+become the right move again.
 """
 from __future__ import annotations
 
@@ -68,13 +81,14 @@ import pathlib
 import re
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Tuple
 
 import yaml
 
+import release_ledger
+
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-LEDGER_PATH = REPO_ROOT / "platform" / "supply-chain" / "pinned-releases.yaml"
+LEDGER_PATH = release_ledger.LEDGER_PATH
 
 # Kept identical to check_no_latest_tags.py's own definition on purpose -
 # this tool must find exactly the same gaps that check reports, or a
@@ -276,7 +290,7 @@ def main() -> int:
             )
 
     if not args.dry_run:
-        _update_ledger(manifest.get("release_tag"), ledger_entries, skipped)
+        release_ledger.append_entry(manifest.get("release_tag"), ledger_entries, skipped)
         print(f"\nRESULT: PASS - pinned {len(ledger_entries)} field(s), skipped {len(skipped)}. "
               f"Ledger updated at {LEDGER_PATH.relative_to(REPO_ROOT)}. Run check_no_latest_tags.py "
               "to confirm (skipped fields will still show as non-immutable, as expected).")
@@ -284,33 +298,6 @@ def main() -> int:
         print(f"\nRESULT: PASS (dry run) - {len(manifest_keys)} field(s) would be pinned, "
               f"{len(skipped)} skipped; no files written.")
     return 0
-
-
-def _update_ledger(release_tag: Any, entries: List[Dict[str, Any]], skipped: List[Dict[str, Any]]) -> None:
-    ledger: Dict[str, Any] = {"releases": []}
-    if LEDGER_PATH.exists():
-        ledger = yaml.safe_load(LEDGER_PATH.read_text()) or {"releases": []}
-    entry: Dict[str, Any] = {
-        "release_tag": release_tag,
-        "pinned_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "pins": entries,
-    }
-    if skipped:
-        entry["skipped"] = skipped
-    ledger.setdefault("releases", []).append(entry)
-    LEDGER_PATH.write_text(
-        "# ADR-0115 release-pinning audit ledger - append-only, written by "
-        "pin_release.py.\n# Each entry records one pin_release.py run: which "
-        "chart values.yaml/path fields were\n# repointed to which immutable "
-        "tag (and digest, when the release manifest supplied\n# one - see "
-        "pin_release.py's own docstring for why the digest isn't also\n"
-        "# embedded in values.yaml). This is evidence for ADR-0115's "
-        "completion criterion\n# \"at least one real release proves source "
-        "-> build -> SBOM -> scan -> signature\n# -> immutable GitOps "
-        "reference -> deployment traceability\", not a mechanism consumed\n"
-        "# by any deployment - never hand-edit.\n\n"
-        + yaml.dump(ledger, sort_keys=False, default_flow_style=False)
-    )
 
 
 if __name__ == "__main__":

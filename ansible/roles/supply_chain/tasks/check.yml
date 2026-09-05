@@ -3,3 +3,14 @@
 # ansible/tasks/verify_image_signatures.yml for the actual mechanism.
 - name: "supply_chain | verify every first-party image's signature"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/verify_image_signatures.yml"
+
+# ADR-0111/ADR-0549/WP-134: validates pinned-releases.yaml's structural
+# integrity - the in-cluster replacement for check_no_latest_tags.py's
+# former (now removed, see its own dated note) lint.yml gate. No cluster
+# access needed - runs directly from the controller, same reasoning as
+# verify_signatures.py --list-refs above.
+- name: "supply_chain | validate the release ledger's structural integrity"
+  ansible.builtin.command:
+    cmd: python3 platform/supply-chain/check_release_ledger.py
+    chdir: "{{ zuno_repo_root }}"
+  changed_when: false
