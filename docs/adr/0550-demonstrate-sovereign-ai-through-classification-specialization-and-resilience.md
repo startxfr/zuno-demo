@@ -1,6 +1,6 @@
 # ADR-0550: Demonstrate sovereign AI through classification, specialization and resilience
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.4
 - **Date:** 2026-09-05
 - **Decision owners:** Zuno Demo architecture team
@@ -402,6 +402,18 @@ For each step they:
 15. `make demo-check` validates all critical webinar prerequisites.
 16. `make demo-reset` returns the environment to the documented initial state.
 17. Two consecutive timed rehearsals complete the planned scenario in twenty minutes without unplanned CLI repair.
+
+**Status note (2026-09-05):** WP-135, WP-136 and WP-137 each closed their
+repo-side mechanism (`Operator pending`) - the classification-tiered DAT
+routing (criteria 1-2, 4-7), the routing-decision explainability panel
+(criterion 8), and the `demo-check`/`demo-reset`/`demo-step-*` tooling
+(criteria 15-16) are merged and unit/contract-tested. None of the 17
+criteria above has been proven against a live cluster yet: this ADR moves
+to `Accepted`, not `Implemented`, until an operator runs the live C1/C2/C3
+comparison (WP-137), drives the six demo cases from the real frontend
+including the WP-105 failover drill (WP-135), and completes two full
+20-minute rehearsals from `make demo-reset` (WP-136) - see each WP's own
+"Operator / human follow-up" section for the exact remaining actions.
 
 ## Related ADRs
 

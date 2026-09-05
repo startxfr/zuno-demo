@@ -60,8 +60,8 @@ observability and project work actually delivered during it — ADR-0516,
 ADR-0518 – ADR-0520, ADR-0524 – ADR-0531, ADR-0536, plus the webinar
 sovereign-AI demonstration (ADR-0550).
 
-**34 ADRs.** Open: ADR-0401 – ADR-0409 (stubs), ADR-0550; WP-55, WP-093,
-WP-101, WP-112, WP-135, WP-136, WP-137.
+**34 ADRs.** Open: ADR-0401 – ADR-0409 (stubs), ADR-0550 (`Accepted`);
+WP-55, WP-093, WP-101, WP-112, WP-135, WP-136, WP-137.
 
 ## v0.5
 
