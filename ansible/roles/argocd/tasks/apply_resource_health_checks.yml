@@ -66,3 +66,39 @@
               hs = {}
               hs.status = "Healthy"
               return hs
+          # WP-133, user-approved live finding (2026-09-05): ArgoCD's generic
+          # health check flags a resource Progressing on ANY False condition
+          # in status.conditions[], not just the authoritative "Ready" one.
+          # KServe's InferenceService intentionally carries multiple granular,
+          # informational conditions alongside Ready - e.g. LatestDeploymentReady
+          # can sit False forever (reason AuthProxyPreserved, a deliberate
+          # optimization to skip restarting the auth-proxy sidecar) while the
+          # resource is genuinely Ready=True. Without this override, ArgoCD
+          # never considers such an InferenceService Healthy, so self-heal
+          # refuses to advance to a newer git revision while it's the current
+          # sync target - a wedge that survives app-controller/repo-server/
+          # redis restarts and even a full cluster restart, because nothing
+          # about the underlying condition ever changes.
+          - group: serving.kserve.io
+            kind: InferenceService
+            check: |
+              hs = {}
+              if obj.status ~= nil and obj.status.conditions ~= nil then
+                for i, condition in ipairs(obj.status.conditions) do
+                  if condition.type == "Ready" then
+                    if condition.status == "True" then
+                      hs.status = "Healthy"
+                      hs.message = condition.message or "Ready"
+                      return hs
+                    end
+                    if condition.status == "False" then
+                      hs.status = "Progressing"
+                      hs.message = condition.message or "Not ready"
+                      return hs
+                    end
+                  end
+                end
+              end
+              hs.status = "Progressing"
+              hs.message = "Waiting for InferenceService to report a Ready condition"
+              return hs
