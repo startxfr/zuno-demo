@@ -106,7 +106,9 @@ triggers (degraded RAGAS at scale, or a documented relevance complaint).
 ## Status updates (then re-run check_docs.py)
 
 `State: Done` reflected in this brief and its `docs/roadmap/implementation-roadmap.md` tracker row
-together. No ADR status change - ADR-0545 stays `Accepted` (decisions 1/2 are tracked separately);
+together. No ADR status change - ADR-0545 stays `Accepted` (decisions 1/2 are tracked separately)
+(*correction 2026-09-06*: with WP-126/127/128 all `Done` and decision 2's design-only scope ruled
+complete by the demo owner, ADR-0545 is now `Implemented` - see WP-127's Status updates note);
 a follow-up ADR is needed only if a reranker is adopted later.
 
 ## Out of scope / deferred

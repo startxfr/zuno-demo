@@ -99,8 +99,10 @@ from ADR-0537's now-Implemented HardwareProfile half - blocked upstream, see
 that ADR's body). The OKF extraction-and-reconciliation chain (ADR-0506 –
 ADR-0510) moved out to its own v0.10 band on 2026-09-05.
 
-**8 ADRs.** Open: ADR-0115 (`Deferred`), ADR-0538, ADR-0541;
-WP-115, WP-125.
+**8 ADRs.** Open: ADR-0115 (`Deferred`), ADR-0541; WP-115, WP-125.
+(ADR-0538 and ADR-0545 flipped to `Implemented` 2026-09-06 - all their WPs
+`Done`; ADR-0545's priority-class live rollout stays a future WP on request,
+per WP-127.)
 
 ## v0.8
 

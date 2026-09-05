@@ -87,6 +87,10 @@ neither in this WP's original scope:
    its size growing by exactly the new content's byte count) - the deployment needs an explicit
    `oc rollout restart` afterward, since the pod does not reload its trust store from the changed
    file on its own. **Not yet backported to GitOps** - live-only fix, see Follow-up below.
+   (*Stale as of 2026-09-06*: the backport has since landed - `gitops/charts/mlops/values.yaml`
+   `apiServer.cABundle.configMapName: dsp-mlflow-trust-mlops-dspa`,
+   `gitops/charts/mlops/templates/dspa.yaml` renders `cABundle:`, the ConfigMap is built by
+   `ansible/roles/mlops/tasks/install.yml`, with the same pattern in the rag-ingestion twins.)
 2. **The running `mlops:latest` image predates WP-119 by two commits and has no dispatcher at
    all.** The first real run's `train-lora` step executed `stage_train_lora`'s OLD body (`import
    tempfile` inline, no `import trainjob`) straight into the S3 base-model download - on a

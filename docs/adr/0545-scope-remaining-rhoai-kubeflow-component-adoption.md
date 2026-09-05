@@ -1,6 +1,12 @@
 # ADR-0545: Scope the remaining RHOAI/Kubeflow component adoption - finalize TrainJob, explore Kueue priority, evaluate InferenceGraph, exclude NIM
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-09-06) - all three executing WPs are `Done`: WP-126 (TrainJob
+  live-proven `Complete`, 2026-09-04, flipped ADR-0539), WP-127 (priority-tier design,
+  2026-09-03), WP-128 (InferenceGraph research, "no reranker for now", 2026-09-03). Decision 2
+  is complete *as scoped* - the ADR deliberately scoped it as "Design (not yet apply)", and per
+  Migration/evolution the live application of the `priorityClassName` additions stays a future
+  decision (its own WP on request, staged one Job at a time under disk watch - see WP-127's
+  operator follow-up). Decisions 4/5 are scope exclusions, in effect by construction.
 - **Target:** v0.7
 - **Date:** 2026-09-03 (amended 2026-09-03)
 - **Decision owners:** Zuno Demo architecture team

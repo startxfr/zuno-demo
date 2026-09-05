@@ -1,6 +1,11 @@
 # ADR-0538: Adopt RHOAI 3.5 workload surfaces - MLflow tracking, queued workloads, training-jobs UI
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-09-06) - every executing WP is `Done` live-verified on demo222:
+  WP-116 (MLflow CR + pipeline logging + backfill, 2026-09-02/03), WP-117 (GPU-MIG
+  ResourceFlavor/ClusterQueue, first real admitted workloads, 2026-09-03), WP-123 (dashboard
+  flags reconciled by Ansible, operator sign-off, 2026-09-03); decision 4's deferred TrainJob
+  adoption was since finished by ADR-0545 decision 1 (WP-119/WP-126, `Complete` end to end
+  2026-09-04).
 - **Target:** v0.7
 - **Date:** 2026-09-02
 - **Amended:** 2026-09-03 (WP-123): decision 5's MECHANISM only - the flags are

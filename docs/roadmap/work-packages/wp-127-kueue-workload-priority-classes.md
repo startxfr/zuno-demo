@@ -144,6 +144,13 @@ Jobs.
 row together. ADR-0545 itself stays `Accepted` - decision 2 is designed, not yet live, and
 decisions 1/3 (WP-126/WP-128) are tracked separately.
 
+*Correction (2026-09-06)* - the "stays `Accepted`" sentence above is superseded: with WP-126 and
+WP-128 also `Done`, the demo owner ruled that design-only IS decision 2's complete scope (the ADR
+itself says "Design (not yet apply)" and defers the live apply to a future decision), so ADR-0545
+is now `Implemented`. The live rollout of the three `priorityClassName` additions remains a
+future WP on request, under the staged/disk-watch conditions the operator follow-up above
+documents - those warnings stay fully in force.
+
 ## Out of scope / deferred
 
 Live application (future WP, on request). `WorkloadPriorityClass`/`Cohort`/`AdmissionCheck`
