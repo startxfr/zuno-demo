@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""WP-136/ADR-0550: verify the webinar presenter persona can authenticate
-and see the three named demo projects, as `make demo-check` prompter's
-"Zuno application" and "Projects" sections require.
+"""WP-136/ADR-0550: verify the webinar presenter persona can authenticate,
+can see the three named demo projects, and that the three local models
+answer - as `make demo-check`'s "Zuno application"/"Projects"/"Models"
+sections require.
 
 Reuses evaluations/tekos/run_scenarios.py's Keycloak auth helper rather
 than reimplementing a token exchange - same cross-agent trick
@@ -13,15 +14,24 @@ agent-agnostic (ADR-0527 clause 6 - a project is cross-agent), so any one
 agent's persona token is sufficient to prove the check; AGENT defaults to
 comage to match this repo's existing demo-persona ("sale-01") fixture.
 
+The three local models are probed from THIS SAME in-cluster Job rather
+than from the Ansible control node - live-caught 2026-09-05 running
+`make demo-check` from a plain workstation: the control node has no route
+to `*.svc.cluster.local` DNS names at all (`urlopen error [Errno -2] Nom
+ou service inconnu`), while this Job's pod (same acceptance-gate identity
+already proven able to reach agent-runtime for the projects check above)
+does.
+
 Usage:
     AGENT=comage python3 evaluations/demo_presenter_probe.py --persona sale-01
 
 Prints one JSON object to stdout:
-{"ok", "persona", "projects": [{"title", "classification"}, ...],
- "missing": [...], "detail"}
-Exit code 0 whether or not the probe itself succeeded - failure is
-reported IN the JSON body, so the calling playbook can add it as one more
-row to the demo-check report rather than aborting the whole check early.
+{"auth": {"auth_ok", "persona", "projects": [{"title", "classification"}, ...],
+          "missing": [...], "detail"},
+ "models": [{"model", "ok", "detail"}, ...]}
+Exit code 0 regardless of whether any individual probe succeeded - every
+failure is reported IN the JSON body, so the calling playbook can add each
+as its own row to the demo-check report rather than aborting early.
 """
 from __future__ import annotations
 
@@ -46,16 +56,33 @@ REQUIRED_PROJECTS = {
     "webinar-restricted": "C3",
 }
 
+# ADR-0521-style workload Service naming (<name>-kserve-workload-svc), same
+# three local models WP-136's demo-check section lists.
+LOCAL_MODELS = [
+    {"model": "gpt-oss-20b", "service": "gpt-oss-20b-kserve-workload-svc"},
+    {"model": "qwen3.5-9b", "service": "qwen35-9b-kserve-workload-svc"},
+    {"model": "qwen3.5-9b-wesh", "service": "qwen35-9b-wesh-kserve-workload-svc"},
+]
 
-def probe(persona: str, timeout_seconds: float = 30) -> dict:
+
+def probe_auth_and_projects(persona: str, timeout_seconds: float = 30) -> dict:
+    """auth_ok reflects whether the HTTP call itself succeeded (the persona
+    really authenticated and agent-runtime really answered) - independent
+    of whether the required demo projects happen to exist yet. Conflating
+    the two into one flag was a real bug (live-caught 2026-09-05): a
+    persona that authenticates fine against a cluster with none of the
+    three demo projects created yet showed as "persona-auth: FAIL", which
+    reads as an auth problem when it is actually a project-provisioning
+    step the operator has not done yet (see the separate `missing` field).
+    """
     try:
         resp = httpx.get(f"{RUNTIME_URL}/v1/projects", headers=auth_headers(persona), timeout=timeout_seconds)
     except Exception as exc:
-        return {"ok": False, "persona": persona, "projects": [], "missing": list(REQUIRED_PROJECTS), "detail": str(exc)}
+        return {"auth_ok": False, "persona": persona, "projects": [], "missing": list(REQUIRED_PROJECTS), "detail": str(exc)}
 
     if resp.status_code != 200:
         return {
-            "ok": False,
+            "auth_ok": False,
             "persona": persona,
             "projects": [],
             "missing": list(REQUIRED_PROJECTS),
@@ -68,11 +95,24 @@ def probe(persona: str, timeout_seconds: float = 30) -> dict:
     mismatched = [
         name for name, want in REQUIRED_PROJECTS.items() if name in seen and seen[name] != want
     ]
-    ok = not missing and not mismatched
-    detail = "all three demo projects present with the expected classification" if ok else (
-        f"missing={missing} mismatched_classification={mismatched}"
+    detail = "authenticated; all three demo projects present with the expected classification" if not missing and not mismatched else (
+        f"authenticated; missing={missing} mismatched_classification={mismatched}"
     )
-    return {"ok": ok, "persona": persona, "projects": projects, "missing": missing, "detail": detail}
+    return {"auth_ok": True, "persona": persona, "projects": projects, "missing": missing, "detail": detail}
+
+
+def probe_models(timeout_seconds: float = 10) -> list:
+    results = []
+    for entry in LOCAL_MODELS:
+        url = f"https://{entry['service']}.zuno-ai-run.svc.cluster.local:8000/v1/models"
+        try:
+            resp = httpx.get(url, timeout=timeout_seconds, verify=False)
+            ok = resp.status_code == 200
+            detail = "reachable" if ok else f"status={resp.status_code}"
+        except Exception as exc:
+            ok, detail = False, str(exc)
+        results.append({"model": entry["model"], "ok": ok, "detail": detail})
+    return results
 
 
 def main() -> int:
@@ -80,7 +120,10 @@ def main() -> int:
     parser.add_argument("--persona", required=True)
     parser.add_argument("--timeout-seconds", type=float, default=30)
     args = parser.parse_args()
-    print(json.dumps(probe(args.persona, args.timeout_seconds)))
+    print(json.dumps({
+        "auth": probe_auth_and_projects(args.persona, args.timeout_seconds),
+        "models": probe_models(),
+    }))
     return 0
 
 

@@ -29,10 +29,6 @@
       webinar-public: C1
       webinar-confidential: C2
       webinar-restricted: C3
-    demo_local_workloads:
-      - { model: gpt-oss-20b, service: gpt-oss-20b-kserve-workload-svc }
-      - { model: qwen3.5-9b, service: qwen35-9b-kserve-workload-svc }
-      - { model: qwen3.5-9b-wesh, service: qwen35-9b-wesh-kserve-workload-svc }
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
@@ -81,7 +77,7 @@
 
     # --- Zuno application: presenter persona can authenticate; Projects --
 
-    - name: "demo-check | run the presenter persona/projects probe"
+    - name: "demo-check | run the presenter persona/projects/models probe"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/demo_persona_probe_job.yml"
 
     - name: "demo-check | record the persona-auth and projects results"
@@ -91,12 +87,12 @@
             _demo_check_results + [
               {
                 "agent": "comage", "layer": "availability", "id": "persona-auth", "category": "demo-persona",
-                "passed": demo_persona_probe_result.ok, "detail": demo_persona_probe_result.detail, "duration_ms": 0
+                "passed": demo_persona_probe_result.auth.auth_ok, "detail": demo_persona_probe_result.auth.detail, "duration_ms": 0
               },
               {
                 "agent": "platform", "layer": "availability", "id": "demo-projects", "category": "demo-project",
-                "passed": (demo_persona_probe_result.missing | default([]) | length) == 0,
-                "detail": "projects=" + (demo_persona_probe_result.projects | default([]) | to_json) + " missing=" + (demo_persona_probe_result.missing | default([]) | join(',')),
+                "passed": (demo_persona_probe_result.auth.missing | default([]) | length) == 0,
+                "detail": "projects=" + (demo_persona_probe_result.auth.projects | default([]) | to_json) + " missing=" + (demo_persona_probe_result.auth.missing | default([]) | join(',')),
                 "duration_ms": 0
               }
             ]
@@ -114,38 +110,22 @@
       loop: "{{ demo_required_projects | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
-      when: item.key in (demo_persona_probe_result.missing | default([]))
+      when: item.key in (demo_persona_probe_result.auth.missing | default([]))
 
-    # --- Models/providers --------------------------------------------------
-
-    - name: "demo-check | query each local model workload's /v1/models"
-      ansible.builtin.uri:
-        url: "https://{{ item.service }}.{{ demo_namespace }}.svc.cluster.local:8000/v1/models"
-        method: GET
-        status_code: [200]
-        validate_certs: false
-        timeout: 10
-      register: _demo_check_model_probes
-      ignore_errors: true
-      loop: "{{ demo_local_workloads }}"
-      loop_control:
-        label: "{{ item.model }}"
+    # --- Models/providers ----------------------------------------------------
+    # Probed from inside the same in-cluster Job as the persona/projects check
+    # above, not from the Ansible control node - live-caught 2026-09-05
+    # running `make demo-check` from a plain workstation: `*.svc.cluster.local`
+    # DNS names are unresolvable from outside the cluster network, the same
+    # reachability boundary ansible/roles/day3/tasks/platform_health_check.yml
+    # already works around with an in-cluster Job.
 
     - name: "demo-check | record local model readiness results"
       ansible.builtin.set_fact:
-        _demo_check_results: "{{ _demo_check_results + [_demo_check_model_row] }}"
-      loop: "{{ _demo_check_model_probes.results }}"
+        _demo_check_results: "{{ _demo_check_results + [{'agent': item.model, 'layer': 'availability', 'id': 'v1-models', 'category': 'demo-model', 'passed': item.ok, 'detail': item.detail, 'duration_ms': 0}] }}"
+      loop: "{{ demo_persona_probe_result.models | default([]) }}"
       loop_control:
-        label: "{{ item.item.model }}"
-      vars:
-        _demo_check_model_row:
-          agent: "{{ item.item.model }}"
-          layer: availability
-          id: v1-models
-          category: demo-model
-          passed: "{{ (item.status | default(0)) == 200 }}"
-          detail: "status={{ item.status | default(item.msg | default('no response')) }}"
-          duration_ms: "{{ ((item.elapsed | default(0)) | float) * 1000 }}"
+        label: "{{ item.model }}"
 
     # External providers (OVHcloud, Codestral): no live smoke-test
     # mechanism exists in this repo (evaluations/tekos/gate_checks.py only
