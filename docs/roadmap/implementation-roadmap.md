@@ -807,7 +807,7 @@ reuses WP-105's failover drill and WP-526's Wesh lifecycle unchanged.
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-137 | [wp-137](work-packages/wp-137-arkos-dat-classification-routing.md) | 0550 | ADR-0527, ADR-0034, ADR-0416 | Operator pending (2026-09-05 — repo-side mechanism complete) | the live C1/C2 comparison through the real frontend/BFF, plus the live-verification checklist in the brief's Live verification section |
-| WP-135 | [wp-135](work-packages/wp-135-routing-decision-explainability.md) | 0550 | WP-137 | Not started | none yet |
+| WP-135 | [wp-135](work-packages/wp-135-routing-decision-explainability.md) | 0550 | WP-137 | Operator pending (2026-09-05 — repo-side mechanism complete) | the six live demo-case verifications through the real frontend, plus a real browser check (Node 16 here cannot build agent-frontend) |
 | WP-136 | [wp-136](work-packages/wp-136-webinar-demo-orchestration.md) | 0550 | WP-137, WP-135 | Not started | none yet |
 
 ### OKF stream phases
