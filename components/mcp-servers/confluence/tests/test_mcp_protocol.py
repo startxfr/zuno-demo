@@ -181,6 +181,63 @@ async def test_search_pages_strips_stopwords_from_a_long_question(transport) -> 
     )
 
 
+async def test_is_relevant_result_requires_majority_of_significant_words_in_title(transport) -> None:
+    """Live-caught 2026-09-05 (ADR-0550 webinar rehearsal): unit-level
+    coverage of the post-filter itself, independent of the MCP transport -
+    see server._is_relevant_result's own docstring for the full rationale.
+    Also proves the real, live-verified ADR-0330 precedent ("version
+    4.14" -> "Procedure UPGRADE 4.13 vers 4.14 cluster data-preprod",
+    3 of 5 significant words) still passes, so the fix does not regress
+    the one scenario it was calibrated against."""
+    query = "What does the latest internal Confluence doc say about the OpenShift upgrade procedure to version 4.14?"
+    assert server._is_relevant_result(query, "Procedure UPGRADE 4.13 vers 4.14 cluster data-preprod")
+    assert not server._is_relevant_result(
+        "Draft an architecture testimonial about a hospital's electronic health records migration to the cloud.",
+        "Quarterly sales pipeline review - EMEA region",
+    )
+    assert server._is_relevant_result("model serving", "OpenShift AI 3.5 EA2 - Model Serving Runbook")
+    # A query with no significant words at all (rare) is never filtered -
+    # nothing to check relevance against.
+    assert server._is_relevant_result("the a an", "anything")
+
+
+async def test_search_pages_filters_out_a_cql_hit_that_does_not_match_the_title(transport) -> None:
+    """Integration-level companion to the unit test above: proves
+    search_pages itself drops an irrelevant CQL hit from both `results`
+    and `count`, not just that the pure function returns False in
+    isolation."""
+    fake_search_payload = {
+        "results": [
+            {
+                "id": "123",
+                "title": "OpenShift AI 3.5 EA2 - Model Serving Runbook",
+                "space": {"key": "TECH"},
+                "version": {"number": 3},
+                "_links": {"webui": "/spaces/TECH/pages/123", "base": "https://example.atlassian.net"},
+            },
+            {
+                "id": "456",
+                "title": "Quarterly sales pipeline review - EMEA region",
+                "space": {"key": "SALES"},
+                "version": {"number": 1},
+                "_links": {"webui": "/spaces/SALES/pages/456", "base": "https://example.atlassian.net"},
+            },
+        ]
+    }
+    fake_client = _FakeConfluenceClient([_FakeResponse(200, fake_search_payload)])
+
+    with _patch_client(fake_client):
+        async with await _open_session(transport, GATEWAY_HEADERS) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool("search_pages", {"query": "model serving"})
+
+    assert not result.is_error, result.content
+    payload = result.structured_content["result"]
+    assert payload["count"] == 1, payload
+    assert [r["id"] for r in payload["results"]] == ["123"]
+
+
 async def test_read_page_not_found_reports_as_a_tool_error_not_a_crash(transport) -> None:
     fake_client = _FakeConfluenceClient([_FakeResponse(404)])
 
@@ -265,6 +322,8 @@ TESTS = [
     test_tools_list_reports_exactly_the_four_declared_tools,
     test_search_pages_round_trip,
     test_search_pages_strips_stopwords_from_a_long_question,
+    test_is_relevant_result_requires_majority_of_significant_words_in_title,
+    test_search_pages_filters_out_a_cql_hit_that_does_not_match_the_title,
     test_read_page_not_found_reports_as_a_tool_error_not_a_crash,
     test_create_page_round_trip,
     test_update_page_reads_current_version_then_increments_it,

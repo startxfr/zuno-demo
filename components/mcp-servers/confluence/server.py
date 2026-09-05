@@ -45,10 +45,11 @@ Starlette-middleware pattern as salesforce.
 from __future__ import annotations
 
 import hmac
+import math
 import os
 import string
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 from fastapi import FastAPI
@@ -128,6 +129,30 @@ _QUERY_STOPWORDS = frozenset({
     "confluence", "internal", "latest",
 })
 _QUERY_WORD_THRESHOLD = 5
+# Live-caught 2026-09-05 (ADR-0550 webinar rehearsal): three deliberately
+# unrelated multi-word queries (a container-platform topic, a hospital EHR
+# migration, renewable energy) each still came back with non-empty
+# `results` from Confluence Cloud's own CQL `text~` ranking - it behaves
+# closer to a fuzzy per-word OR match than an AND/phrase match, so any
+# query sharing even one common IT word with a real page counts as a
+# "hit" upstream. ADR-0034 escalates effective_classification to C2 the
+# moment this tool returns ANY result, so an over-permissive match here
+# has a real security-classification consequence, not just noisy search
+# results - hence the post-filter in `_is_relevant_result` below, not just
+# a search-quality nicety.
+_MIN_TITLE_RELEVANCE_RATIO = 0.5
+
+
+def _significant_words(query: str) -> List[str]:
+    """Query words surviving stopword-stripping - shared by
+    `_cql_query_text` (what CQL actually searches for) and
+    `_is_relevant_result` (the post-filter below), so both always agree
+    on what "significant" means for a given query."""
+    return [
+        stripped
+        for w in query.split()
+        if (stripped := w.strip(string.punctuation)) and stripped.lower() not in _QUERY_STOPWORDS
+    ]
 
 
 def _cql_query_text(query: str) -> str:
@@ -136,12 +161,30 @@ def _cql_query_text(query: str) -> str:
     words = query.split()
     if len(words) <= _QUERY_WORD_THRESHOLD:
         return query
-    significant = [
-        stripped
-        for w in words
-        if (stripped := w.strip(string.punctuation)) and stripped.lower() not in _QUERY_STOPWORDS
-    ]
-    return " ".join(significant) or query
+    return " ".join(_significant_words(query)) or query
+
+
+def _is_relevant_result(query: str, title: str) -> bool:
+    """Re-checks a CQL hit against the page TITLE only - the sole field
+    `search_pages`'s `expand=space,version` actually fetches, not the
+    body - requiring at least half of the query's own significant words
+    (case-insensitive substring, minimum 1) to appear in it.
+
+    Chosen over an all-words-must-match rule because the one real,
+    live-verified match this server already relies on (ADR-0330's
+    "version 4.14" -> "Procedure UPGRADE 4.13 vers 4.14 cluster
+    data-preprod") only hits 3 of its 5 significant words in the title
+    ("OpenShift" and "version" are absent from that real title) - a
+    full-AND rule would have broken that known-good scenario. A query
+    with no significant words at all (rare - a short query of only
+    stopwords) is never filtered, since there is nothing to check
+    relevance against."""
+    significant = _significant_words(query)
+    if not significant:
+        return True
+    title_lower = (title or "").lower()
+    hits = sum(1 for word in significant if word.lower() in title_lower)
+    return hits >= max(1, math.ceil(len(significant) * _MIN_TITLE_RELEVANCE_RATIO))
 
 
 mcp_server = MCPServer(
@@ -188,6 +231,11 @@ async def search_pages(query: str, space: Optional[str] = None, limit: int = 10)
         payload = resp.json()
 
     results = [_summarize(item) for item in payload.get("results", [])]
+    # ADR-0034/live-caught 2026-09-05: drop hits CQL's own fuzzy ranking
+    # returned but that don't actually look like the query - see
+    # _is_relevant_result's own docstring for why this matters beyond
+    # search quality.
+    results = [r for r in results if _is_relevant_result(query, r.get("title") or "")]
     return {"query": query, "results": results, "count": len(results)}
 
 
