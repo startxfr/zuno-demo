@@ -32,14 +32,55 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
+import httpx
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_openai import ChatOpenAI
 
 logger = logging.getLogger("agent_runtime.model_router")
 
 AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc:8080")
+
+
+async def fetch_routing_decision(request_id: Optional[str], bearer_token: str) -> Optional[Dict[str, Any]]:
+    """ADR-0550 (WP-135): best-effort fetch of ai-gateway's own record of
+    which provider/model actually served this turn's model call(s),
+    published via components/ai-gateway/app/routing_decisions.py and keyed
+    by the same request_id every model call in this turn already forwards
+    as X-Zuno-Request-Id.
+
+    This client genuinely cannot recover that from the model call's own
+    return value: `langchain_openai.ChatOpenAI` only parses the standard
+    OpenAI response schema, silently dropping ai-gateway's own
+    `zuno_provider` extension field, and the streaming SSE path this
+    gateway actually uses for every real chat turn carries no equivalent
+    field at all - see ai-gateway's schemas.py/routing_decisions.py
+    docstrings. Called once per turn (app/main.py), not once per internal
+    model call - a turn with more than one call (e.g. Arkos's draft then
+    reflect) shares one request_id, so this naturally reports whichever
+    call ran last, the same "what actually answered you" a user expects.
+
+    Never raises - a fetch failure (network, 404, malformed body) degrades
+    to None, and the caller must fall back to its own placeholder routing
+    metadata. This is purely an ADR-0550 decision 9 observability feature,
+    never a routing or security control.
+    """
+    if not request_id:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(
+                f"{AI_GATEWAY_URL}/v1/routing-decisions/{request_id}",
+                headers={"Authorization": f"Bearer {bearer_token}"},
+            )
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return resp.json()
+    except Exception as exc:  # noqa: BLE001 - a fetch failure must never affect the chat turn already served
+        logger.warning("routing-decision fetch failed for request_id=%s: %s", request_id, exc)
+        return None
 
 
 @dataclass

@@ -751,7 +751,7 @@ def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
     async def code_node(state: AgentState) -> Dict[str, Any]:
         if code_task is None:
             logger.error("%s: code_node reached with no 'write-code' task declared", agent.name)
-            return {"reply": "Code generation is not available for this assistant.", "provider_used": None}
+            return {"reply": "Code generation is not available for this assistant.", "provider_used": None, "task_name": None}
 
         context_parts = _build_context_parts(state)
         code_prefix = (
@@ -813,11 +813,12 @@ def _make_code_node(agent: AgentDefinition, task: TaskDefinition):
                     "right now. Please try again shortly."
                 ),
                 "provider_used": None,
+                "task_name": code_task.name,
                 "errors": state.get("errors", []) + [f"code: {exc}"],
             }
 
         reply_text = result.content if hasattr(result, "content") else str(result)
-        return {"reply": reply_text, "provider_used": provider.name}
+        return {"reply": reply_text, "provider_used": provider.name, "task_name": code_task.name}
 
     return code_node
 
@@ -1151,6 +1152,7 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
                     "right now. Please try again shortly."
                 ),
                 "provider_used": None,
+                "task_name": task.name,
                 "errors": state.get("errors", []) + [f"reason: {exc}"],
             }
 
@@ -1181,7 +1183,7 @@ def _make_reason_node(agent: AgentDefinition, task: TaskDefinition):
             )
             if retried is not None:
                 return retried
-        return {"reply": reply_text, "provider_used": provider.name}
+        return {"reply": reply_text, "provider_used": provider.name, "task_name": task.name}
 
     return reason_node
 

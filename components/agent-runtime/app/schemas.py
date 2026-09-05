@@ -52,6 +52,34 @@ class ImageArtifact(BaseModel):
     alt: str
 
 
+class RoutingMetadata(BaseModel):
+    """ADR-0550 (WP-135): the real, server-side model-routing decision for
+    this turn, exposed so the frontend can show WHY a model was chosen -
+    never re-derived/re-implemented client-side (the decision itself is
+    made in components/ai-gateway and components/agent-runtime's graph
+    nodes; this is a read-only projection of it). Every field degrades to
+    an empty/False placeholder rather than raising when the underlying
+    ai-gateway fetch fails (app/clients/model_router.py's
+    fetch_routing_decision) - see app/main.py's _build_routing_metadata."""
+
+    agent: str
+    task: str = ""
+    project_id: str = ""
+    project_classification: str = ""
+    effective_classification: str = ""
+    selected_model: str = ""
+    selected_provider: str = ""
+    # "local" | "external" | "unknown" (fetch failed/no decision published)
+    execution_location: str = "unknown"
+    fallback_used: bool = False
+    fallback_from: Optional[str] = None
+    local_only_required: bool = False
+    # Deterministic, canned prose (see _routing_reason) - never raw
+    # provider/exception text, which could leak upstream error detail to
+    # every chat user.
+    routing_reason: str = ""
+
+
 class ChatResponse(BaseModel):
     reply: str
     citations: List[Citation]
@@ -71,6 +99,8 @@ class ChatResponse(BaseModel):
     # for the non-streaming path; the streaming path carries the same value
     # on the SSE start event. Never the Salesforce opportunity id.
     project_id: str = ""
+    # ADR-0550 (WP-135): see RoutingMetadata's own docstring.
+    routing: RoutingMetadata
 
 
 class RenameConversationRequest(BaseModel):

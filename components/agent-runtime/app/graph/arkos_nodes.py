@@ -305,6 +305,7 @@ async def code_node(state: AgentState) -> Dict[str, Any]:
                 "generation right now. Please try again shortly."
             ),
             "provider_used": None,
+            "task_name": _WRITE_CODE_TASK.name,
             "citations": [],
             "source_mode": "none",
             "errors": state.get("errors", []) + [f"code: {exc}"],
@@ -313,7 +314,10 @@ async def code_node(state: AgentState) -> Dict[str, Any]:
     reply_text = result.content if hasattr(result, "content") else str(result)
     # citations/source_mode set explicitly - this is the first Arkos path
     # that skips write_node, the only other place that normally sets them.
-    return {"reply": reply_text, "provider_used": provider.name, "citations": [], "source_mode": "none"}
+    return {
+        "reply": reply_text, "provider_used": provider.name, "task_name": _WRITE_CODE_TASK.name,
+        "citations": [], "source_mode": "none",
+    }
 
 
 async def demo_node(state: AgentState) -> Dict[str, Any]:
@@ -352,13 +356,17 @@ async def demo_node(state: AgentState) -> Dict[str, Any]:
                 "this demo right now. Please try again shortly."
             ),
             "provider_used": None,
+            "task_name": _STRUCTURE_DEMO_TASK.name,
             "citations": [],
             "source_mode": "none",
             "errors": state.get("errors", []) + [f"demo: {exc}"],
         }
 
     reply_text = result.content if hasattr(result, "content") else str(result)
-    return {"reply": reply_text, "provider_used": provider.name, "citations": [], "source_mode": "none"}
+    return {
+        "reply": reply_text, "provider_used": provider.name, "task_name": _STRUCTURE_DEMO_TASK.name,
+        "citations": [], "source_mode": "none",
+    }
 
 
 async def retrieve_node(state: AgentState) -> Dict[str, Any]:
@@ -605,6 +613,7 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
                 "right now. Please try again shortly."
             ),
             "provider_used": None,
+            "task_name": task.name,
             "errors": state.get("errors", []) + [f"draft: {exc}"],
         }
 
@@ -653,7 +662,7 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
         }
 
     draft_text = result.content if hasattr(result, "content") else str(result)
-    return {"document_draft": draft_text, "provider_used": provider.name}
+    return {"document_draft": draft_text, "provider_used": provider.name, "task_name": task.name}
 
 
 async def reflect_node(state: AgentState) -> Dict[str, Any]:
@@ -733,7 +742,7 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
         return {"errors": state.get("errors", []) + [f"reflect: {exc}"]}
 
     refined = result.content if hasattr(result, "content") else str(result)
-    return {"document_draft": refined, "provider_used": provider.name}
+    return {"document_draft": refined, "provider_used": provider.name, "task_name": task.name}
 
 
 def _citations(state: AgentState):

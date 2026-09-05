@@ -25,6 +25,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from app import conversations, project_binding, projects
 from app.auth import CallerIdentity, validate_token
 from app.clients import guardrails_client, project_memory_client
+from app.clients.model_router import fetch_routing_decision
 from app.graph import history as history_mod
 from app.graph.build import GraphFactory, validate_shapes
 from app.graph.classification import _escalate
@@ -37,6 +38,7 @@ from app.schemas import (
     CreateProjectRequest,
     RenameConversationRequest,
     ReorderConversationsRequest,
+    RoutingMetadata,
     SaveProjectRequest,
 )
 from app.telemetry import api_request_span, graph_run_span, init_telemetry
@@ -1200,7 +1202,8 @@ async def agent_chat(
                 graph, initial_state, config, request_id, run_id,
                 agent=agent_def.name, graph_shape=agent_def.graph_shape,
                 conversations_pool=conversations_pool, write_lock_holder=write_lock_holder,
-                project_id=resolved_project_id,
+                project_id=resolved_project_id, project_classification=project_classification,
+                bearer_token=identity.token,
             ),
             media_type="text/event-stream",
             headers={
@@ -1244,6 +1247,17 @@ async def agent_chat(
         retrieved_doc_count=len(final_state.get("retrieved_docs") or []),
     )
 
+    routing = await _build_routing_metadata(
+        agent=agent_def.name,
+        task_name=final_state.get("task_name"),
+        project_id=resolved_project_id,
+        project_classification=project_classification,
+        effective_classification=final_state.get("effective_classification"),
+        local_only_required=bool(final_state.get("local_only_required", False)),
+        request_id=request_id,
+        bearer_token=identity.token,
+    )
+
     return ChatResponse(
         reply=final_state.get("reply", ""),
         citations=final_state.get("citations", []),
@@ -1253,6 +1267,81 @@ async def agent_chat(
         # ADR-0528: lets agent-bff tag its own span on the non-streaming
         # path (the streaming path reads it from the SSE start event).
         project_id=resolved_project_id or "",
+        routing=routing,
+    )
+
+
+def _routing_reason(*, execution_location: str, effective_classification: str, local_only_required: bool, fallback_used: bool) -> str:
+    """ADR-0550 (WP-135): deterministic, canned prose only - never raw
+    provider/exception text, which could leak upstream error detail
+    (endpoint URLs, stack traces) to every chat user reading this panel."""
+    if execution_location == "unknown":
+        return "Routing details are unavailable for this response."
+    classification = effective_classification or "an unknown classification"
+    if fallback_used:
+        return (
+            f"The preferred provider for this request was unavailable, so a fallback "
+            f"candidate served this response at classification {classification}."
+        )
+    if execution_location == "local":
+        if local_only_required:
+            return (
+                f"A source used in this turn requires local-only inference, so this "
+                f"response was served by a local model at classification {classification}."
+            )
+        return f"This request at classification {classification} is routed to a local model."
+    return (
+        f"This request at classification {classification} is eligible for an external "
+        f"provider and was served externally."
+    )
+
+
+async def _build_routing_metadata(
+    *,
+    agent: str,
+    task_name: Optional[str],
+    project_id: Optional[str],
+    project_classification: Optional[str],
+    effective_classification: Optional[str],
+    local_only_required: bool,
+    request_id: str,
+    bearer_token: str,
+) -> RoutingMetadata:
+    """ADR-0550 (WP-135): assembles the real routing-decision contract for
+    the frontend's disclosure panel. `agent`/`task_name`/`project_*`/
+    `effective_classification`/`local_only_required` are all already known
+    to the caller (resolved server-side before or during the graph run);
+    `selected_model`/`selected_provider`/`execution_location`/
+    `fallback_used`/`fallback_from` come from a single best-effort fetch
+    of ai-gateway's own routing_decisions side-channel, keyed by this
+    turn's request_id (see fetch_routing_decision's own docstring for why
+    this can't be read off the model call's return value directly). A
+    failed/absent fetch degrades every one of those fields to an empty/
+    False placeholder rather than raising - this is an observability
+    feature, never a routing or security control."""
+    decision = await fetch_routing_decision(request_id, bearer_token)
+    kind = decision.get("kind") if decision else None
+    execution_location = "local" if kind == "local" else ("external" if kind else "unknown")
+    fallback_used = bool(decision.get("fallback_used")) if decision else False
+    resolved_classification = effective_classification or (decision.get("classification") if decision else "") or ""
+    return RoutingMetadata(
+        agent=agent,
+        task=task_name or "",
+        project_id=project_id or "",
+        project_classification=project_classification or "",
+        effective_classification=resolved_classification,
+        selected_model=(decision.get("model") if decision else "") or "",
+        selected_provider=(decision.get("provider") if decision else "") or "",
+        execution_location=execution_location,
+        fallback_used=fallback_used,
+        fallback_from=decision.get("fallback_from") if decision else None,
+        local_only_required=local_only_required,
+        routing_reason=_routing_reason(
+            execution_location=execution_location,
+            effective_classification=resolved_classification,
+            local_only_required=local_only_required,
+            fallback_used=fallback_used,
+        ),
     )
 
 
@@ -1295,6 +1384,8 @@ async def _stream_chat(
     conversations_pool: Optional[Any] = None,
     write_lock_holder: Optional[str] = None,
     project_id: Optional[str] = None,
+    project_classification: Optional[str] = None,
+    bearer_token: str = "",
 ) -> AsyncIterator[str]:
     """Streams token deltas from the `reason` node's underlying chat model
     via LangGraph's `astream_events` (v2), which surfaces
@@ -1344,6 +1435,18 @@ async def _stream_chat(
             citations: Any = []
             images: Any = []
             source_mode = "indexed"
+            # ADR-0550 (WP-135): captured the same way citations/source_mode
+            # above are - from whichever node's own on_chain_end output
+            # actually carries it, last one wins. Deliberately a presence
+            # check rather than a node-name allowlist (unlike citations/
+            # source_mode's "respond"/"reason"/"draft" checks below): every
+            # node that calls _model_router.invoke_with_fallback sets these
+            # next to its own provider_used, whichever one that is for this
+            # turn's graph shape (reason/code/demo for Tekos/Arkos's early
+            # exits, draft/reflect for Arkos's document shape).
+            task_name: Optional[str] = None
+            effective_classification: Optional[str] = None
+            local_only_required = False
             # One bounded retry, same rationale as _ainvoke_with_retry, but only
             # safe to take before any token has reached the client (ADR-0029-style
             # precedent: components/ai-gateway/app/main.py's _stream_completion
@@ -1418,6 +1521,22 @@ async def _stream_chat(
                                 output = event["data"].get("output") or {}
                                 if output.get("generated_images"):
                                     images = output["generated_images"]
+                            # ADR-0550 (WP-135): a separate, unconditional check
+                            # (not another `elif` in the name-gated chain above) -
+                            # every node that calls _model_router.invoke_with_
+                            # fallback sets task_name next to its own
+                            # provider_used, regardless of which node that is for
+                            # this turn's graph shape (reason/code/demo, or
+                            # draft/reflect), so this must not be short-circuited
+                            # by an earlier branch already having matched on name.
+                            if kind == "on_chain_end" and isinstance(event["data"].get("output"), dict):
+                                node_output = event["data"]["output"]
+                                if "task_name" in node_output:
+                                    task_name = node_output["task_name"]
+                                if "effective_classification" in node_output:
+                                    effective_classification = node_output["effective_classification"]
+                                if "local_only_required" in node_output:
+                                    local_only_required = bool(node_output["local_only_required"])
                         if lease_lost:
                             # ADR-0527: another collaborator legitimately
                             # took the lease over after ours expired.
@@ -1476,7 +1595,23 @@ async def _stream_chat(
                         break
                 graph_recorder.source_mode = source_mode
 
-            yield _sse("done", {"citations": citations, "images": images, "source_mode": source_mode})
+            routing = await _build_routing_metadata(
+                agent=agent or "",
+                task_name=task_name,
+                project_id=project_id,
+                project_classification=project_classification,
+                effective_classification=effective_classification,
+                local_only_required=local_only_required,
+                request_id=request_id,
+                bearer_token=bearer_token,
+            )
+            yield _sse(
+                "done",
+                {
+                    "citations": citations, "images": images, "source_mode": source_mode,
+                    "routing": routing.model_dump(),
+                },
+            )
 
             # ADR-0534/WP-109: observe-only guardrails on the streaming
             # path - the common one in production, so skipping it would

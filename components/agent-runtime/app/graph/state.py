@@ -93,6 +93,16 @@ class AgentState(TypedDict, total=False):
     tool_results: Dict[str, Any]
     reply: str
     citations: List[Citation]
+    # ADR-0550 (WP-135): which declared task actually produced this turn's
+    # model call - agents like Arkos/Tekos route internally among several
+    # tasks (DAT vs workshop vs write-code vs structure-demo) within one
+    # compiled graph, so app/main.py cannot know this without it. Set by
+    # the node that calls _model_router.invoke_with_fallback, next to its
+    # own `provider_used`. Declared here for the same non-optional reason
+    # run_id/project_context are: LangGraph only carries declared schema
+    # fields, so an undeclared entry would make every
+    # state.get("task_name") silently return None with no error anywhere.
+    task_name: Optional[str]
     # ADR-0415: images generate_image produced this turn, accumulated
     # across the whole thread the same way ADR-0103's checkpointer already
     # persists every other state channel - no separate database/table.
