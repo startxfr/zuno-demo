@@ -25,7 +25,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0 | 72 | — | 7 | — |
 | v0.1 | 29 | — | 18 | — |
 | v0.2 | 14 | — | 17 | WP-098 |
-| v0.3 | 16 | 1 | 19 | WP-34, WP-133 |
+| v0.3 | 16 | 1 | 19 | — |
 | v0.4 | 34 | 9 | 27 | WP-55, WP-093, WP-101 |
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
@@ -189,7 +189,7 @@ agents; WP-38 (operator) closes ADR-0350. WP-39–WP-42 close the roadmap.
 | WP-31 | [wp-31](work-packages/wp-31-arkos-slice.md) | 0326 (capstone); closes 0209+0342 | WP-30, WP-28, WP-26, Ph.2 | Done (2026-08-30 — live gate, retroactive) | none - scenario 9 (structure-demo) timeout is a known, non-blocking finding |
 | WP-32 | [wp-32](work-packages/wp-32-cdp-scoped-capabilities.md) | 0340 | WP-01, WP-20 | Done | none |
 | WP-33 | [wp-33](work-packages/wp-33-comage-slice.md) | 0326 (capstone) | WP-31, WP-22 (adapters merged, non-blocking), WP-23, WP-24, WP-32 | Done (2026-08-30 — live gate, retroactive) | live Salesforce read/write carved out to WP-101 (v0.7) |
-| WP-34 | [wp-34](work-packages/wp-34-lora-mlops.md) | 0302, 0301 | WP-33a, WP-10 | Operator pending | GPU pipeline run; promotion PR; adapter download wiring |
+| WP-34 | [wp-34](work-packages/wp-34-lora-mlops.md) | 0302, 0301 | WP-33a, WP-10 | Done | none - closed by WP-133 |
 | WP-35 | [wp-35](work-packages/wp-35-advantage-slice.md) | 0326 (capstone); closes 0532 | WP-33, WP-22 (adapter merged, non-blocking) | Done (2026-08-30 — closed placeholder, ADR-0532) | none - stays `placeholder` by decision |
 | WP-36 | [wp-36](work-packages/wp-36-finage-slice.md) | 0326 (capstone, closes it) | WP-35 | Done (2026-08-30 — closed placeholder, D10) | none - stays `placeholder` by decision |
 | WP-37 | [wp-37](work-packages/wp-37-aiagent-crd-contract.md) | 0327 | WP-31 (+WP-33) | Done | none |
@@ -774,7 +774,7 @@ as written rather than around them.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-133 | [wp-133](work-packages/wp-133-lora-adapter-live-proof.md) | 0302, 0301 | WP-34, WP-126 | Repo work merged (2026-09-04) | compile/upload the `tekos` PipelineVersion and launch the run (the `zuno-ai-run-gpu-cap` quota does NOT block this - it scopes only the serving namespace, and `zuno-mlops` ships with no quota by design, see the brief's own correction note); review the `loraAdapters` promotion PR; roll out `qwen35-9b` with the adapter attached and confirm live |
+| WP-133 | [wp-133](work-packages/wp-133-lora-adapter-live-proof.md) | 0302, 0301 | WP-34, WP-126 | Done | none |
 
 ### OKF stream phases
 

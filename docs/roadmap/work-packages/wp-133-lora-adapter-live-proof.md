@@ -1,10 +1,17 @@
 # WP-133: Prove the original LoRA-adapter mechanism and close ADR-0301/ADR-0302
 
-- **State:** Repo work merged (2026-09-04) — Parts A-C below merged; the
-  GPU pipeline run, adapter promotion PR and live serving verification are
-  operator follow-up, not yet done. No status line on ADR-0301/ADR-0302
-  changes in this pass - only a live-passing run earns that (Status updates
-  below).
+- **State:** Done (2026-09-05) — full live proof completed: the tekos KFP
+  run (`prepare-dataset` → `train-lora` → `evaluate` PASS → `push-registry`)
+  produced a genuine adapter-only Model Registry version
+  (`wp126-20260904-201830`); a first attempt with the unrestricted
+  `loraTargetModules` regex registered successfully but crashed vLLM on load
+  (packed `linear_attn.in_proj_qkv` module - see
+  `gitops/charts/mlops/values.yaml`'s tekos entry comment); retrained with
+  `loraTargetModules` restricted to unfused `self_attn.{q,k,v,o}_proj`,
+  promoted via `gitops/charts/models/values.yaml`'s `loraAdapters`, and
+  confirmed live: vLLM logged `Loaded new LoRA adapter: name 'tekos-lora'`,
+  `/v1/models` lists it, and a real `/v1/completions` request against it
+  returned a completion. ADR-0301/ADR-0302 `Status:` lines updated below.
 - **ADRs:** ADR-0302 then ADR-0301 (their non-superseded decision points -
   see ADR references below; the superseded ones, ADR-0301 pt.1/5 and
   ADR-0302 pt.2/4, stay superseded by ADR-0526 and are untouched here)

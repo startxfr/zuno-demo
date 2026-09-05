@@ -1,6 +1,6 @@
 # ADR-0301: Introduce LoRA and PEFT model customization
 
-- **Status:** Superseded in part by ADR-0526 for the adapter objective and serving mechanism (decisions 1 and 5); the static-selection, artifact-registration and classification-inheritance rules (decisions 2-4) remain in effect. Prior status for the record: Partially implemented - serving configuration and classification gating merged.
+- **Status:** Superseded in part by ADR-0526 for the adapter objective and serving mechanism (decisions 1 and 5); the static-selection, artifact-registration and classification-inheritance rules (decisions 2-4) remain in effect and are now live-verified (WP-133, 2026-09-05): a genuine non-merged adapter (`tekos-lora`, Model Registry version `wp126-20260904-201830`) was statically selected via `loraAdapters`, loaded by vLLM's native multi-LoRA serving, and served a real completion at `/v1/models`/`/v1/completions`. Prior status for the record: Partially implemented - serving configuration and classification gating merged.
 - **Target:** v0.3
 - **Date:** 2026-08-12
 - **Decision owners:** Zuno Demo architecture team
