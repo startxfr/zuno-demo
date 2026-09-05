@@ -129,6 +129,13 @@ _WORKSHOP_REFLECT_CLASSIFICATION_CEILING, _WORKSHOP_REFLECT_SYSTEM_PROMPT = _res
 ARKOS_BASE_CLASSIFICATION = _ARKOS.preferred_classification  # from agent.okf.md's zuno.model
 RAG_TOP_K = _ARKOS.rag_top_k or 5  # Arkos declares no zuno.rag block; AgentDefinition defaults to 5
 
+# ADR-0550 decision 2: draft-architecture-testimonial's baseline is no
+# longer the agent's ambient ARKOS_BASE_CLASSIFICATION seed above - it is
+# the selected project's own classification, or C1 when no project is
+# selected. Scoped to the DAT task only; workshop-presentation keeps the
+# agent seed unchanged (see retrieve_node/_active_reflect below).
+_DAT_BASE_CLASSIFICATION = "C1"
+
 # ADR-0417: fixed ceiling for code_node's call only - mirrors reflect_node's
 # ADR-0416 C2 override; mistral-codestral is eligible_for: [C1, C2] only,
 # never reachable at Arkos's ambient C3 seed without this.
@@ -188,11 +195,17 @@ def _active_task(state: AgentState) -> TaskDefinition:
     return _WORKSHOP_TASK if kind == "workshop" else _DRAFT_TASK
 
 
-def _active_reflect(state: AgentState) -> tuple[str, str]:
+def _active_reflect(state: AgentState) -> tuple[Optional[str], str]:
+    """Returns (classification_ceiling, prompt) for reflect_node's call.
+    ADR-0550 decision 4 removed the DAT task's fixed-C2 ceiling: a `None`
+    ceiling tells reflect_node to use the turn's own effective_classification
+    instead, the same placement draft_node's own call already follows.
+    workshop-presentation is not in ADR-0550's scope and keeps ADR-0416/
+    ADR-0514's fixed ceiling unchanged."""
     kind = (state.get("doc_plan") or {}).get("kind", "dat")
     if kind == "workshop":
         return _WORKSHOP_REFLECT_CLASSIFICATION_CEILING, _WORKSHOP_REFLECT_SYSTEM_PROMPT
-    return _REFLECT_CLASSIFICATION_CEILING, _REFLECT_SYSTEM_PROMPT
+    return None, _REFLECT_SYSTEM_PROMPT
 
 
 # Arkos-local trigger, unlike _code_request_trigger_reason (app/graph/
@@ -384,7 +397,16 @@ async def retrieve_node(state: AgentState) -> Dict[str, Any]:
     topic = (state.get("doc_plan") or {}).get("topic") or state["message"]
 
     docs = []
-    effective_classification = ARKOS_BASE_CLASSIFICATION
+    # ADR-0550 decision 2: DAT's baseline comes from the selected project's
+    # classification (C1 when no project is selected), never the agent's
+    # ambient seed - workshop-presentation is unaffected. The escalation
+    # loop below (retrieved docs, then Confluence) still applies on top of
+    # whichever baseline is chosen, so this can only ever raise the floor,
+    # never lower it (ADR-0034).
+    if task is _DRAFT_TASK:
+        effective_classification = state.get("project_classification") or _DAT_BASE_CLASSIFICATION
+    else:
+        effective_classification = ARKOS_BASE_CLASSIFICATION
     errors = list(state.get("errors", []))
 
     if not authorized_domains:
@@ -635,27 +657,27 @@ async def draft_node(state: AgentState) -> Dict[str, Any]:
 
 
 async def reflect_node(state: AgentState) -> Dict[str, Any]:
-    """ADR-0416: a self-review/refinement pass over draft_node's output -
-    reads and writes only `document_draft` (Arkos's own already-generated
-    prose), never `retrieved_docs`/the Confluence tool result draft_node
-    was grounded in. That narrow scope is what makes it safe to evaluate
-    at a fixed classification ceiling below (ADR-0419: declared as this
-    task's `reflect` prompt slot, `_REFLECT_CLASSIFICATION_CEILING` -
-    "C2" today, see agents/arkos/tasks/draft-architecture-testimonial.md),
-    the same scoped-exception pattern ADR-0415 established for
-    generate_image: that call's payload is also a short agent-authored
-    string rather than raw source material, so it can be evaluated below
-    the turn's own effective_classification without the genuinely
-    C3-classified source content this turn may have touched ever entering
-    the call.
+    """A self-review/refinement pass over draft_node's output - reads and
+    writes only `document_draft` (Arkos's own already-generated prose),
+    never `retrieved_docs`/the Confluence tool result draft_node was
+    grounded in.
+
+    ADR-0550 decision 4: for the DAT task, that narrow scope no longer
+    buys a fixed classification ceiling - `_active_reflect` returns a
+    `None` ceiling for `kind == "dat"`, and this call follows the turn's
+    own `effective_classification` instead, exactly like draft_node's own
+    call. workshop-presentation is untouched by ADR-0550 and keeps
+    ADR-0416/ADR-0419/ADR-0514's fixed C2 ceiling (the same scoped-
+    exception reasoning ADR-0415 established for generate_image still
+    applies there: that call's payload is also a short agent-authored
+    string rather than raw source material).
 
     Still honors `local_only_required` (ADR-0035) unconditionally - that
     flag means a source explicitly forbids ITS OWN influence from
     reaching any external model, and the draft may already have been
-    shaped by that source's content. The ceiling below overrides
-    classification ESCALATION only (state's `effective_classification`,
-    which for Arkos starts at its C3 seed and only ever climbs, ADR-0034);
-    it never overrides this separate source-level restriction.
+    shaped by that source's content. workshop's fixed ceiling overrides
+    classification ESCALATION only; it never overrides this separate
+    source-level restriction.
 
     Tagged "zuno-internal" (ADR-0215) for the same reason
     app/graph/history.py:compact is: this is a second nested chat-model
@@ -688,11 +710,14 @@ async def reflect_node(state: AgentState) -> Dict[str, Any]:
     human = HumanMessage(content=truncate_to_token_budget(draft, draft_budget))
 
     local_only = state.get("local_only_required", False) or _ARKOS.local_only
+    # ADR-0550 decision 4: `reflect_ceiling` is None for the DAT task -
+    # fall back to the turn's own effective_classification, the same
+    # placement draft_node's call already follows. workshop-presentation
+    # still supplies its fixed ceiling here (see docstring above).
+    classification = reflect_ceiling or state.get("effective_classification", _DAT_BASE_CLASSIFICATION)
     try:
         result, provider = await _model_router.invoke_with_fallback(
-            # ADR-0416/ADR-0419/ADR-0514: fixed ceiling for this call
-            # only - see the docstring above for why that's safe here.
-            classification=reflect_ceiling,
+            classification=classification,
             messages=[system, human],
             bearer_token=state["bearer_token"],
             local_only=local_only,

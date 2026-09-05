@@ -29,6 +29,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import a
 
 from app.clients.model_router import ModelRouterError, ProviderCandidate  # noqa: E402
 from app.graph import arkos_nodes, nodes  # noqa: E402
+from app.knowledge import KnowledgeDecision  # noqa: E402
 
 
 class _FakeModelResult:
@@ -115,16 +116,120 @@ def test_drive_result_url_is_none_when_absent() -> None:
 
 
 # --------------------------------------------------------------------------
-# ADR-0416: reflect_node's fixed-C2-ceiling override
+# ADR-0550 decision 2: retrieve_node's DAT baseline is project-derived
 # --------------------------------------------------------------------------
 
 
-async def test_reflect_node_uses_a_fixed_c2_ceiling_regardless_of_effective_classification() -> None:
-    """Arkos's effective_classification is C3 for essentially every real
-    turn (it starts at the agent's C3 seed and only escalates,
-    ADR-0034) - reflect_node must still evaluate its own call at C2, not
-    state['effective_classification'], since that's the whole point of
-    the ADR-0416 scoped exception."""
+async def _run_retrieve_node(state):
+    """retrieve_node always evaluates the Confluence live-read branch for
+    the DAT/workshop tasks (both declare confluence.page.search
+    unconditionally) - stub resolve_authorized_domains to skip RAG search
+    (no authorized domain, the fast no-op path) and make the Confluence
+    call fail, so these tests isolate the baseline/escalation logic under
+    test from the pre-existing, unrelated ADR-0034/_LIVE_READ_CLASSIFICATION
+    bump a *successful* live Confluence call unconditionally applies
+    (state["effective_classification"] = escalate(..., "C2") on ANY
+    success, even zero hits) - see retrieve_node's own success path below
+    the invoke_tool call for that separate, pre-existing mechanism."""
+    saved_resolve = arkos_nodes.resolve_authorized_domains
+    saved_invoke_tool = arkos_nodes.invoke_tool
+
+    def fake_resolve(**kwargs):
+        return KnowledgeDecision(authorized_domains=[], denied={})
+
+    async def fake_invoke_tool(**kwargs):
+        raise arkos_nodes.McpClientError("confluence unavailable in this test")
+
+    try:
+        arkos_nodes.resolve_authorized_domains = fake_resolve
+        arkos_nodes.invoke_tool = fake_invoke_tool
+        return await arkos_nodes.retrieve_node(state)
+    finally:
+        arkos_nodes.resolve_authorized_domains = saved_resolve
+        arkos_nodes.invoke_tool = saved_invoke_tool
+
+
+async def test_retrieve_node_dat_baseline_comes_from_the_projects_classification() -> None:
+    result = await _run_retrieve_node(
+        {"message": "draft a DAT", "bearer_token": "t", "project_classification": "C2"}
+    )
+    assert result["effective_classification"] == "C2"
+
+
+async def test_retrieve_node_dat_defaults_to_c1_with_no_project_selected() -> None:
+    result = await _run_retrieve_node(
+        {"message": "draft a DAT", "bearer_token": "t", "project_classification": None}
+    )
+    assert result["effective_classification"] == "C1"
+
+
+async def test_retrieve_node_dat_never_downgrades_a_c3_project() -> None:
+    result = await _run_retrieve_node(
+        {"message": "draft a DAT", "bearer_token": "t", "project_classification": "C3"}
+    )
+    assert result["effective_classification"] == "C3"
+
+
+async def test_retrieve_node_dat_confluence_success_escalates_a_c1_baseline_to_c2() -> None:
+    """Pre-existing, task-agnostic behavior (ADR-0034's
+    _LIVE_READ_CLASSIFICATION), newly consequential after ADR-0550/WP-137:
+    ANY successful Confluence search - even with zero hits - escalates
+    effective_classification to at least C2, since a live read of an
+    internal system is presumed C2-sensitive by default. This was
+    invisible before this change (Arkos's C3 ambient seed already
+    dominated it), but a real no-project DAT turn now only stays at C1 if
+    this call fails outright - see WP-137's live-verification notes for
+    why Step 1 of the webinar sequence must be rehearsed against a topic
+    that genuinely returns no Confluence hits."""
+    async def fake_invoke_tool(**kwargs):
+        return {"result": {"results": []}}
+
+    saved_resolve = arkos_nodes.resolve_authorized_domains
+    saved_invoke_tool = arkos_nodes.invoke_tool
+
+    def fake_resolve(**kwargs):
+        return KnowledgeDecision(authorized_domains=[], denied={})
+
+    try:
+        arkos_nodes.resolve_authorized_domains = fake_resolve
+        arkos_nodes.invoke_tool = fake_invoke_tool
+        result = await arkos_nodes.retrieve_node(
+            {"message": "draft a DAT", "bearer_token": "t", "project_classification": None}
+        )
+    finally:
+        arkos_nodes.resolve_authorized_domains = saved_resolve
+        arkos_nodes.invoke_tool = saved_invoke_tool
+
+    assert result["effective_classification"] == "C2"
+
+
+async def test_retrieve_node_workshop_kind_keeps_the_agent_ambient_seed() -> None:
+    """ADR-0550 decision 2 is scoped to the DAT task only - workshop-
+    presentation must keep using ARKOS_BASE_CLASSIFICATION even when a C1
+    project is selected, since the project-derived baseline never applied
+    to it."""
+    result = await _run_retrieve_node(
+        {
+            "message": "prepare an odyssey workshop",
+            "bearer_token": "t",
+            "doc_plan": {"kind": "workshop"},
+            "project_classification": "C1",
+        }
+    )
+    assert result["effective_classification"] == arkos_nodes.ARKOS_BASE_CLASSIFICATION
+
+
+# --------------------------------------------------------------------------
+# ADR-0416/ADR-0550: reflect_node's classification placement
+# --------------------------------------------------------------------------
+
+
+async def test_reflect_node_dat_follows_effective_classification_not_a_fixed_ceiling() -> None:
+    """ADR-0550 decision 4: the DAT task's reflect call no longer evaluates
+    at a fixed C2 ceiling - it follows the turn's own
+    effective_classification exactly like draft_node's own call, so a C3
+    turn's reflect call must also request C3, never silently downgraded to
+    C2."""
     captured = {}
 
     async def fake_invoke(**kwargs):
@@ -146,7 +251,7 @@ async def test_reflect_node_uses_a_fixed_c2_ceiling_regardless_of_effective_clas
         arkos_nodes._model_router.invoke_with_fallback = saved_invoke
 
     assert captured, "reflect_node never called the model router"
-    assert captured["classification"] == "C2", "must not inherit the turn's escalated C3"
+    assert captured["classification"] == "C3", "DAT reflect must follow effective_classification, not a fixed ceiling"
     assert captured["local_only"] is False
     # ADR-0215: must never stream visibly - draft_node's own call already
     # streamed the pre-refinement draft to the user in the same graph run;
@@ -154,6 +259,33 @@ async def test_reflect_node_uses_a_fixed_c2_ceiling_regardless_of_effective_clas
     # call's tokens too, showing the user the draft twice concatenated.
     assert captured["tags"] == ["zuno-internal"]
     assert result["document_draft"] == "a refined draft"
+
+
+async def test_reflect_node_dat_defaults_to_c1_when_effective_classification_is_absent() -> None:
+    """Defensive default only - retrieve_node always runs first on the real
+    graph and always sets effective_classification, but a direct-call test
+    (or a future graph change) must not silently fall back to workshop's
+    C2 ceiling for the DAT task."""
+    captured = {}
+
+    async def fake_invoke(**kwargs):
+        captured.update(kwargs)
+        return _FakeModelResult("a refined draft"), ProviderCandidate(name="ai-gateway")
+
+    saved_invoke = arkos_nodes._model_router.invoke_with_fallback
+    try:
+        arkos_nodes._model_router.invoke_with_fallback = fake_invoke
+        state = {
+            "document_draft": "the original draft",
+            "local_only_required": False,
+            "bearer_token": "t",
+            "request_id": "req-1",
+        }
+        await arkos_nodes.reflect_node(state)
+    finally:
+        arkos_nodes._model_router.invoke_with_fallback = saved_invoke
+
+    assert captured["classification"] == arkos_nodes._DAT_BASE_CLASSIFICATION
 
 
 async def test_reflect_node_still_honors_local_only_required() -> None:
@@ -1115,7 +1247,13 @@ TESTS = [
     test_drive_result_url_unwraps_the_gateway_result_envelope,
     test_drive_result_url_falls_back_to_a_flat_shape,
     test_drive_result_url_is_none_when_absent,
-    test_reflect_node_uses_a_fixed_c2_ceiling_regardless_of_effective_classification,
+    test_retrieve_node_dat_baseline_comes_from_the_projects_classification,
+    test_retrieve_node_dat_defaults_to_c1_with_no_project_selected,
+    test_retrieve_node_dat_never_downgrades_a_c3_project,
+    test_retrieve_node_dat_confluence_success_escalates_a_c1_baseline_to_c2,
+    test_retrieve_node_workshop_kind_keeps_the_agent_ambient_seed,
+    test_reflect_node_dat_follows_effective_classification_not_a_fixed_ceiling,
+    test_reflect_node_dat_defaults_to_c1_when_effective_classification_is_absent,
     test_reflect_node_still_honors_local_only_required,
     test_reflect_node_is_a_noop_without_a_draft,
     test_reflect_node_bypasses_review_for_a_skip_reflect_draft,

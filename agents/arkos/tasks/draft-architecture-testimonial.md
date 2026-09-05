@@ -31,15 +31,19 @@ zuno:
   allowed_knowledge:
     - knowledge.tech
     - knowledge.project
-  # ADR-0419: the reflect step (app/graph/arkos_nodes.py::reflect_node,
-  # ADR-0416) is a distinct call within this same task - a self-review
-  # pass over draft_node's own output, evaluated at a fixed C2 ceiling
-  # rather than this task's ambient classification. Declared here instead
-  # of hardcoded in Python; prompts/draft-architecture-testimonial--reflect.md
-  # is its prompt text.
+  # ADR-0419: the reflect step (app/graph/arkos_nodes.py::reflect_node) is
+  # a distinct call within this same task - a self-review pass over
+  # draft_node's own output. `classification_ceiling` below is superseded
+  # by ADR-0550 decision 4 for THIS task: reflect_node now ignores it here
+  # and follows the turn's own effective_classification instead, the same
+  # placement draft_node's call already uses. Left declared (rather than
+  # removed) only because this slot still carries the reflect prompt text
+  # override; workshop-presentation's own `reflect` slot is unaffected and
+  # still honors its `classification_ceiling` as a real fixed ceiling
+  # (ADR-0416/ADR-0514).
   prompts:
     reflect:
-      classification_ceiling: C2
+      classification_ceiling: C2  # superseded for this task, see above
   # ADR-0515: editable starters. Shown in the chat empty state, and in the
   # composer's slash menu (agent-frontend web/src/chat/TaskPromptMenu.tsx).
   # UX only - never parsed or enforced server-side, and picking one does NOT
@@ -76,14 +80,18 @@ the same outcome a live Drive write failure would have produced, just
 without depending on an absent service to get there. Re-add both once a
 real `google-workspace` MCP server exists.
 
-ADR-0416: the reflect step prefers `ovhcloud-gpt-oss-120b` (OVHcloud AI
-Endpoints) for its self-review pass over the draft - evaluated at a fixed
-C2 ceiling since
-that call's payload is only the draft's own prose, never the raw
-retrieved/Confluence context draft_node was grounded in. Still honors any
+ADR-0550 decision 2/4: this task's classification is derived from the
+selected project (C1 with no project selected) rather than Arkos's own
+ambient agent seed, and the reflect step's self-review pass over the
+draft now follows that same effective classification instead of a fixed
+ceiling - a C1 turn can still reach `ovhcloud-gpt-oss-120b` (OVHcloud AI
+Endpoints) for both the draft and the reflect call, but a C2/C3 turn
+never reaches an external provider for either. Still honors any
 source-level `local_only_required` restriction that turn's retrieval may
-have set (ADR-0035) - the C2 ceiling overrides classification escalation
-only, never that separate restriction.
+have set (ADR-0035) regardless of classification. This supersedes
+ADR-0416's fixed-C2 external reflection exception for this task only;
+workshop-presentation's own reflect call keeps that fixed ceiling
+unchanged.
 
 v0 scope, honestly: this proves the plan -> retrieve -> draft -> write
 mechanism end to end in one turn. The full v1 DAT workflow described in
