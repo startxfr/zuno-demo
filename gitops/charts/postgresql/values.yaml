@@ -159,7 +159,13 @@ backups:
     # the real current value; WP-131 flips it through
     # zuno_postgresql_backup_s3_path so the cutover and its rollback are each
     # one line.
-    path: "/pgbackrest/repo2"
+    #
+    # WP-131 P13, second half: flipped 2026-09-05 now that the cutover to
+    # zuno-demo222-backups is live-verified (P7-P12) - this default is the
+    # ADR-0547 clause-4 second step, after the Application-level pin already
+    # proved the render byte-identical. /pgbackrest/repo2 is demo222's OLD
+    # path, kept only as history in git blame if a rollback ever needs it.
+    path: "/postgresql"
     secretName: zuno-postgresql-backup-s3  # synced from Vault, only used when s3.enabled
 
 credentials:
