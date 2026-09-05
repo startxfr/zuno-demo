@@ -1,0 +1,31 @@
+---
+# `make demo-step-5` (WP-136/ADR-0550). Presenter prompter only - prints
+# the presenter flow and expected transitions. Deliberately does NOT
+# launch the AAP workflow itself (WP-136: "Do not create a new failover
+# workflow" / reuse zuno-day3-scenario-failover-node-workflow as-is) -
+# the presenter runs `make d3 scenario-failover-node` (or its AAP
+# Controller UI equivalent) as a SEPARATE, explicit step, same
+# interactive-terminal/human-confirmation gate WP-105/ADR-0536 already
+# requires for that command (see Makefile's own DAY3_RECIPE: it refuses
+# to run non-interactively).
+- name: "Demo step 5: AAP model failover (6 min)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve the cluster base domain
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "demo-step-5 | print the presenter contract"
+      ansible.builtin.debug:
+        msg:
+          - "OBJECTIVE: prove resilience - a live GPU-node failure fails Comage over to qwen3.5-9b, then restores Wesh, without any manual model reconfiguration."
+          - "OPEN: the AAP Controller UI (https://aap.{{ cluster_base_domain }})."
+          - "LAUNCH: the existing zuno-day3-scenario-failover-node-workflow (run `make d3 scenario-failover-node` from a terminal - it is interactive by design and pauses for human confirmation between inject and restore, ADR-0536 Decision 2)."
+          - "SHOW: the baseline/Inject stage completing in the Controller UI."
+          - "WHILE Wesh is unavailable: open/refresh https://comage.{{ cluster_base_domain }} and show the routing-details panel reporting fallback_used=true, model=qwen3.5-9b, fallback_from=qwen3.5-9b-wesh."
+          - "RETURN to AAP Controller and click the existing human-approval node to let Restore proceed."
+          - "AFTER restore: refresh Comage and show the routing-details panel back to model=qwen3.5-9b-wesh, fallback_used=false."
+          - "TIME BUDGET: 6 minutes (00:00-04:00 inject+observe, 04:00-06:00 approve+restore+observe, per the WP's suggested schedule)."
+          - "TIMING RISK: WP-105 records real cold-start/telemetry delays - use the routing panel and AAP workflow state as the primary visual proof, not Prometheus/Grafana, which are only corroborating evidence."
+          - "RECOVERY: if the model is inside the short transition interval and the chat request times out, explain the transient cutover and retry once per the rehearsed runbook - never improvise a cluster change live. If GPU MIG quota is still saturated (WP-131, 2026-09-05), the manual ReplicaSet-scaling workaround belongs in the rehearsed runbook, decided during rehearsal, not discovered live."

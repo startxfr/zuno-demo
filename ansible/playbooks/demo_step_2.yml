@@ -1,0 +1,24 @@
+---
+# `make demo-step-2` (WP-136/ADR-0550). Presenter prompter only - see
+# demo_step_1.yml's header comment for the shared "never auto-submits
+# chat" convention.
+- name: "Demo step 2: Arkos C2 local reasoning (4 min)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve the cluster base domain
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "demo-step-2 | print the presenter contract"
+      ansible.builtin.debug:
+        msg:
+          - "OBJECTIVE: the SAME agent/task, one project classification higher, now stays local - classification (not agent identity) drives placement (WP-137/ADR-0550 decision 2/4)."
+          - "OPEN: https://arkos.{{ cluster_base_domain }}"
+          - "SELECT: the webinar-confidential (C2) project - Draft Architecture Testimonial task."
+          - "PROMPT: the same or nearly identical request used in step 1."
+          - "EXPECTED: classification=C2, model=gpt-oss-20b, execution=local, fallback=no."
+          - "THEN OPEN (in order): (1) OpenShift AI Dashboard model-serving view, (2) OpenShift Console workload/pod view, (3) the GPU-backed local serving object (gpt-oss-20b-kserve-workload-svc, namespace zuno-ai-run) - to show the request never left the cluster."
+          - "POINT AT: the routing-details panel's Classification/Model/Execution location fields, alongside the console views above."
+          - "TIME BUDGET: 4 minutes."
+          - "RECOVERY: if classification/execution do not match, `oc get llminferenceservice -n zuno-ai-run` and `make demo-check` are the emergency diagnostics - not the primary demo path."

@@ -1,0 +1,23 @@
+---
+# `make demo-step-3` (WP-136/ADR-0550). Presenter prompter only - see
+# demo_step_1.yml's header comment for the shared "never auto-submits
+# chat" convention.
+- name: "Demo step 3: Tekos Codestral task specialization (3 min)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve the cluster base domain
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "demo-step-3 | print the presenter contract"
+      ansible.builtin.debug:
+        msg:
+          - "OBJECTIVE: show task specialization is independent of classification - a coding task always reaches Codestral, the model built for it."
+          - "OPEN: https://tekos.{{ cluster_base_domain }}"
+          - "SELECT: no project or a C1 project - a short coding request known to reach the write-code task."
+          - "PROMPT: a short C1 coding prompt validated during rehearsal to reliably trigger write-code, e.g. 'Write a Python function that validates an email address with a regex.'"
+          - "EXPECTED: agent=tekos, task=write-code, model=codestral-latest, provider=mistral-codestral."
+          - "POINT AT: the routing-details panel's Task/Model/Provider fields."
+          - "TIME BUDGET: 3 minutes."
+          - "RECOVERY: if the reply did not reach write-code (Task shows something else), rephrase to a more explicit code-generation request per the rehearsed runbook - do not improvise a new prompt live."

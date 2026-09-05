@@ -1,0 +1,40 @@
+---
+# `make demo-step-4` (WP-136/ADR-0550). Presenter prompter only - see
+# demo_step_1.yml's header comment for the shared "never auto-submits
+# chat" convention. No new training run is launched here (WP-136 "Out of
+# scope").
+- name: "Demo step 4: Wesh training/model ownership (3 min)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve the cluster base domain
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    # Reused from demo_check.yml's own training-evidence lookup (WP-119/
+    # ADR-0539) - printed here as the exact artifact to open, not merely
+    # asserted pass/fail.
+    - name: "demo-step-4 | look up recent Wesh TrainJobs"
+      kubernetes.core.k8s_info:
+        api_version: trainer.kubeflow.org/v1alpha1
+        kind: TrainJob
+        namespace: zuno-mlops
+        label_selectors:
+          - app.kubernetes.io/part-of=mlops
+      register: _demo_step4_trainjobs
+      ignore_errors: true
+
+    - name: "demo-step-4 | print the presenter contract"
+      ansible.builtin.debug:
+        msg:
+          - "OBJECTIVE: Wesh (qwen3.5-9b-wesh) is a real fine-tuned artifact this platform trained and owns, not a vendor black box."
+          - "TRAINJOB EVIDENCE (zuno-mlops, app.kubernetes.io/part-of=mlops): {{ _demo_step4_trainjobs.resources | default([]) | map(attribute='metadata.name') | list | join(', ') | default('none found - run `make d3 run mlops` well before the webinar, WP-126', true) }}"
+          - "OPEN (in order): (1) OpenShift AI Dashboard > Experiments/Runs for the TrainJob above, (2) the registered merged model artifact in the model registry, (3) https://{{ cluster_base_domain }}'s OpenShift AI model-serving view for qwen3.5-9b-wesh."
+          - "THEN OPEN: https://comage.{{ cluster_base_domain }} and send a short normal request (no failure injected)."
+          - "EXPECTED: agent=comage, model=qwen3.5-9b-wesh, provider=local-wesh(-maas)."
+          - "POINT AT: the routing-details panel's Model/Provider fields, right after the training-evidence screens above."
+          - "TIME BUDGET: 3 minutes."
+          - "RECOVERY: if Comage did not select Wesh, run `make demo-check` first (its demo-failover rows report pod/anti-affinity/cache state) before touching anything live."

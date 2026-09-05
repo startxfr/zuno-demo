@@ -1,0 +1,23 @@
+---
+# `make demo-step-1` (WP-136/ADR-0550). Presenter prompter only - prints
+# what to say/click/type and what to expect; never submits a chat message
+# itself (WP-136: "the audience should see the real UI interaction").
+- name: "Demo step 1: Arkos C1 external reasoning (4 min)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve the cluster base domain
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "demo-step-1 | print the presenter contract"
+      ansible.builtin.debug:
+        msg:
+          - "OBJECTIVE: show a C1 (public) DAT request routes to OVHcloud - sovereign AI does not mean 'always local'."
+          - "OPEN: https://arkos.{{ cluster_base_domain }}"
+          - "SELECT: no project (or an explicit C1 project) - Draft Architecture Testimonial task."
+          - "PROMPT: a short, deterministic DAT request, e.g. 'Draft a one-paragraph architecture summary for a public reference case about container platform modernization.' (validate the exact wording during rehearsal - it must reliably stay short)."
+          - "EXPECTED: classification=C1, model=gpt-oss-120b, provider=OVHcloud, execution=external, fallback=no."
+          - "POINT AT: the collapsed 'Show routing details' panel under the reply - expand it and read Classification/Model/Provider/Execution location."
+          - "TIME BUDGET: 4 minutes."
+          - "RECOVERY: if the panel shows execution=local or is empty, re-run `make demo-check` - a missing/misconfigured webinar-public project or a stale ai-gateway policy is the most likely cause, not a code regression (see WP-137's live-verification note)."

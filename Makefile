@@ -183,7 +183,7 @@ endef
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo-check demo-reset demo-all-check new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo-check demo-reset demo-all-check demo-step-1 demo-step-2 demo-step-3 demo-step-4 demo-step-5 new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -225,6 +225,7 @@ help:
 	  '' \
 	  '  make demo-check   Read-only webinar presenter preflight (WP-136/ADR-0550) - app/project/model/failover-topology/training readiness' \
 	  '  make demo-reset   Idempotent recovery to a safe demo baseline (uncordons any node the failover drill left cordoned)' \
+	  '  make demo-step-1..5   Print each presenter step'"'"'s objective/UI/prompt/expected routing - never submits chat on your behalf; step 5 tells you to run `make d3 scenario-failover-node` separately' \
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
@@ -266,6 +267,28 @@ demo-all-check: demo-check
 
 demo-reset: credentials-check
 	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_reset.yml $(EXTRA_VARS)
+
+# demo-step-1..5: one flat target per presenter step (WP-136), not a
+# verb-group dispatch - each is a fixed, numbered point in the 20-minute
+# script, never a variable "component" argument.
+demo-step-1: credentials-check
+	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_1.yml $(EXTRA_VARS)
+
+demo-step-2: credentials-check
+	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_2.yml $(EXTRA_VARS)
+
+demo-step-3: credentials-check
+	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_3.yml $(EXTRA_VARS)
+
+demo-step-4: credentials-check
+	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_4.yml $(EXTRA_VARS)
+
+# demo-step-5 deliberately never calls `make d3 scenario-failover-node`
+# itself - that command is interactive-only and mutates live shared GPU
+# infra (ADR-0536), so it must stay a separate, explicit action the
+# presenter runs themselves, not a side effect of a prompter target.
+demo-step-5: credentials-check
+	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_5.yml $(EXTRA_VARS)
 
 # Bash completion for `make day0|d0/day1|d1/day2|d2/day3|d3 <verb> [component]`.
 # _complete-verbs/_complete-components are the single source of truth for
