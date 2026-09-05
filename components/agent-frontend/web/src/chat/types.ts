@@ -35,9 +35,32 @@ export interface ToolEventData {
   status: "started" | "finished";
 }
 
+// ADR-0550 (WP-135): the real, server-side model-routing decision for
+// this turn - see components/agent-runtime/app/schemas.py's
+// RoutingMetadata (the source of truth) and components/agent-bff's own
+// mirrored Go struct. Every field degrades to an empty/false placeholder
+// rather than being omitted when the underlying ai-gateway fetch fails -
+// this is a read-only, explainability-only projection, never re-derived
+// or re-implemented client-side.
+export interface RoutingMetadata {
+  agent: string;
+  task: string;
+  project_id: string;
+  project_classification: string;
+  effective_classification: string;
+  selected_model: string;
+  selected_provider: string;
+  execution_location: "local" | "external" | "unknown";
+  fallback_used: boolean;
+  fallback_from?: string | null;
+  local_only_required: boolean;
+  routing_reason: string;
+}
+
 export interface DoneEventData {
   citations: Citation[];
   images?: ImageArtifact[];
+  routing?: RoutingMetadata;
 }
 
 export interface ErrorEventData {
@@ -52,5 +75,6 @@ export interface ChatMessage {
   content: string;
   citations?: Citation[];
   images?: ImageArtifact[];
+  routing?: RoutingMetadata;
   pending?: boolean;
 }

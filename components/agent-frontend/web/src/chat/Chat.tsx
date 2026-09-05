@@ -7,6 +7,7 @@ import {
   ContentVariants,
   EmptyState,
   EmptyStateBody,
+  ExpandableSection,
   Flex,
   FlexItem,
   Form,
@@ -54,6 +55,7 @@ import type {
   DoneEventData,
   ErrorEventData,
   ImageArtifact,
+  RoutingMetadata,
   StartEventData,
   ToolEventData,
 } from "./types";
@@ -440,6 +442,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
       let accumulated = "";
       let citations: Citation[] | undefined;
       let images: ImageArtifact[] | undefined;
+      let routing: RoutingMetadata | undefined;
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -474,6 +477,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
             const data = JSON.parse(evt.data) as DoneEventData;
             citations = data.citations;
             images = data.images;
+            routing = data.routing;
             updateTab(tab.id, (t) => ({ ...t, toolStatus: null }));
           } else if (evt.event === "error") {
             const data = JSON.parse(evt.data) as ErrorEventData;
@@ -486,6 +490,7 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
         content: accumulated || "(empty reply)",
         citations,
         images,
+        routing,
         pending: false,
       });
     } catch (err) {
@@ -859,6 +864,44 @@ export function Chat({ config }: { config: ChatConfig }): React.ReactElement {
   );
 }
 
+// ADR-0550 (WP-135): the real, server-side routing decision for one
+// agent reply - collapsed by default (the ADR's own decision 9 requires
+// this not compete with the reply itself), a plain label/value list
+// rather than a heavier PatternFly table since it's always exactly this
+// one fixed set of fields.
+function RoutingDetails({ routing }: { routing: RoutingMetadata }): React.ReactElement {
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const rows: [string, string][] = [
+    ["Agent", routing.agent],
+    ["Task", routing.task || "—"],
+    ["Project", routing.project_id || "(none)"],
+    ["Project classification", routing.project_classification || "—"],
+    ["Effective classification", routing.effective_classification || "—"],
+    ["Selected model", routing.selected_model || "—"],
+    ["Provider", routing.selected_provider || "—"],
+    ["Execution location", routing.execution_location],
+    ["Fallback used", routing.fallback_used ? `yes (from ${routing.fallback_from || "?"})` : "no"],
+    ["Local-only required", routing.local_only_required ? "yes" : "no"],
+  ];
+  return (
+    <ExpandableSection
+      toggleText={isExpanded ? "Hide routing details" : "Show routing details"}
+      isExpanded={isExpanded}
+      onToggle={(_event, expanded) => setIsExpanded(expanded)}
+      style={{ marginTop: "0.5rem" }}
+    >
+      <Flex direction={{ default: "column" }} gap={{ default: "gapXs" }} style={{ fontSize: "0.85rem" }}>
+        {rows.map(([label, value]) => (
+          <FlexItem key={label}>
+            <strong>{label}:</strong> {value}
+          </FlexItem>
+        ))}
+        <FlexItem>{routing.routing_reason}</FlexItem>
+      </Flex>
+    </ExpandableSection>
+  );
+}
+
 function MessageBubble({ message }: { message: ChatMessage }): React.ReactElement {
   return (
     <div
@@ -912,6 +955,7 @@ function MessageBubble({ message }: { message: ChatMessage }): React.ReactElemen
           ))}
         </Flex>
       )}
+      {message.role === "agent" && message.routing && <RoutingDetails routing={message.routing} />}
     </div>
   );
 }
