@@ -1,6 +1,6 @@
 # WP-131: Execute ADR-0546's cross-cluster source bucket and per-cluster S3 convention
 
-- **State:** Operator pending — seven of eight components cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion; step 8 `models` landed deliberately inert). postgresql **P0–P13 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), and P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven). **P14's lockdown half is done**: 5 of 7 old buckets carry a counter-tested Deny policy (read-only cooling period); `zuno-demo-rag-corpus` deliberately excluded (still live); actual deletion of the locked buckets is the one thing left, after the cooling period. Owner as of 2026-09-04 evening: `zuno-demo-c0`.
+- **State:** All eight components now cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion, postgresql, models). postgresql **P0–P13 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), and P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven). **P14's lockdown half is done**: 5 of 7 old buckets carry a counter-tested Deny policy (read-only cooling period); `zuno-demo-rag-corpus` deliberately excluded (still live, models moved out of it 2026-09-05 — see "Step 8" below); actual deletion of the locked buckets is the one thing left, after the cooling period. **Step 8 (`models`) closed 2026-09-05**: all 5 served models cut over live, one at a time, accepted downtime; `models/` (226 objects, 164.6 GB) deleted from `zuno-demo-rag-corpus`. Owner as of 2026-09-05: `zuno-demo-c0`.
 - **ADRs:** [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (`Accepted` 2026-09-04 — this WP satisfied its acceptance criterion 2),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) (B12),
@@ -742,6 +742,56 @@ That is precisely the "in the manifest, absent under `raw/`" condition
 `detect-changes` reads as *deleted*. So `true` is safe only for domains whose
 own `raw-*/` has been repopulated; a global flip now purges the other twenty.
 The ingestion schedules fire unattended **Sunday 02:00 Europe/Paris**.
+
+### Step 8 (`models`) — all 5 served models cut over live, 2026-09-05
+
+Content was byte-identical between `zuno-demo-rag-corpus/models/` and
+`zuno-demo-sources/models/` before anything was touched (per-file checksum
+comparison, not just object counts). With that confirmed, each of the 5
+served models was flipped one at a time (`values.yaml`'s per-model
+`s3Source: models` → `sources`), applied, and verified with a real inference
+call before moving to the next:
+
+| Model | Type | Strategy after this WP | Verified |
+|---|---|---|---|
+| `embeddings` | classic `InferenceService` | **`Recreate`** (only one of the 5 where this is possible — see below) | `/v1/embeddings` returned a 1024-dim vector |
+| `gpt-oss-20b` | `LLMInferenceService` | RollingUpdate (unchanged) | `/v1/chat/completions` → `"content":"Paris"` |
+| `qwen35-9b-wesh` | `LLMInferenceService` | RollingUpdate (unchanged) | `/v1/chat/completions` → `"content":"\n\nParis."` |
+| `qwen35-9b` | `LLMInferenceService` | RollingUpdate (unchanged) | `/v1/chat/completions` → `"content":"\n\nParis"` (with `tekos-lora` adapter loaded) |
+| `qwen36-27b-instruct` | `LLMInferenceService` | RollingUpdate (unchanged) | `/v1/chat/completions` → `"content":"\n\nParis"` (with `tekos-lora` adapter loaded) |
+
+**`deploymentStrategy: Recreate` is only settable on `embeddings`.** KServe's
+classic `InferenceService` exposes `spec.predictor.deploymentStrategy.type`;
+the newer `LLMInferenceService` (the other 4 models) has no such field —
+`spec.template`/`spec.worker` are bare PodSpecs with no Deployment-strategy
+knob. Confirmed by reading both CRDs, not assumed.
+
+**Every RollingUpdate flip needed a manual ReplicaSet dance** because
+`zuno-ai-run-gpu-cap`'s ResourceQuota was fully saturated (`mig-1g.24gb`
+3/3, `mig-2g.48gb` 2/2, zero headroom): the surged pod always went
+`FailedCreate` on quota until the old ReplicaSet was scaled to 0
+(`oc scale replicaset <old> --replicas=0`), which freed the slice for the
+new one to schedule. `embeddings`' `Recreate` strategy needed none of this —
+it tears down the old pod itself before creating the new one.
+
+**A real, pre-existing production defect was found and fixed live in this
+step, unrelated to the S3 bucket flip itself**: reapplying the chart rolled
+`qwen36-27b-instruct`'s Deployment for the first time since WP-133 added
+`loraAdapters` to `values.yaml`, and the new pod crashlooped
+(`LoRAAdapterNotFoundError: No adapter found for /mnt/loras/tekos-lora`).
+Root cause: `llminferenceservice-qwen35.yaml` got the WP-133
+adapter-download `initContainer` + `emptyDir` volume wiring, but
+`llminferenceservice-qwen.yaml` (the top-level `qwen36-27b-instruct`
+template) only got the `--enable-lora`/`--lora-modules` args — nothing ever
+populated `/mnt/loras` for it. Silent for days because no pod recreation
+had happened since `loraAdapters` went non-empty. Fixed by porting the same
+initContainer/volume mechanism qwen35 already had (commit `c46476c3`);
+verified live with `tekos-lora` correctly listed under `/v1/models` and a
+real completion.
+
+Finished with the explicitly-authorized final step: `s3://zuno-demo-rag-corpus/models/`
+(226 objects, 164.6 GB) deleted (`aws s3 rm --recursive`), confirmed empty
+afterward.
 
 ## Vault paths
 
