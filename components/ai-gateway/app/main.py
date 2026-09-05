@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from app import quota, semantic_cache
+from app import quota, routing_decisions, semantic_cache
 from app.auth import CallerIdentity, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
 from app.image_routing import ImageRoutingError, ImageRoutingTable
@@ -37,6 +37,7 @@ from app.schemas import (
     ImageGenerationData,
     ImageGenerationRequest,
     ImageGenerationResponse,
+    RoutingDecision,
 )
 from app.telemetry import init_telemetry, model_call_span, record_cache_outcome
 
@@ -358,6 +359,26 @@ async def chat_completions(
     )
 
 
+@app.get("/v1/routing-decisions/{request_id}")
+async def get_routing_decision(
+    request_id: str,
+    identity: CallerIdentity = Depends(validate_token),
+) -> RoutingDecision:
+    """ADR-0550 (WP-135): components/agent-runtime polls this once its own
+    model call completes, to recover the real provider/model/fallback
+    attribution neither the streaming SSE path nor LangChain's parsed
+    non-streaming response can carry - see routing_decisions.py's module
+    docstring. Authenticated the same as every other endpoint here;
+    `request_id` itself is a short-TTL, per-call value, not a capability
+    token, so this intentionally does not check that the caller "owns"
+    the request_id (agent-runtime is the only real caller and always asks
+    about its own immediately-preceding call)."""
+    decision = await routing_decisions.get_routing_decision(request_id)
+    if decision is None:
+        raise HTTPException(status_code=404, detail=f"no routing decision found for request_id={request_id!r}")
+    return RoutingDecision(**decision)
+
+
 @app.post("/v1/images/generations")
 async def images_generations(
     payload: ImageGenerationRequest,
@@ -516,6 +537,33 @@ async def _invoke_with_fallback(
             # default_factory here, since a response's own id/timestamp
             # describing "when was this returned" should reflect this
             # call, not the original one that populated the cache entry.
+            #
+            # ADR-0550 (WP-135): a cache hit never re-runs the fallback loop
+            # below, so the ORIGINAL call's fallback_used/fallback_from are
+            # not recoverable here - published as False/None rather than
+            # left unpublished, which would make the routing panel show
+            # stale data from an unrelated earlier request_id instead.
+            cached_provider = cached.get("zuno_provider", "")
+            try:
+                cached_kind = routing_table.provider_config(cached_provider).get("kind", "local")
+            except StopIteration:
+                # provider_config() raises if the cached name no longer
+                # matches any entry (provider-routing.yaml changed since
+                # this response was cached) - never let a best-effort
+                # observability lookup take down an otherwise-successful
+                # cached response.
+                cached_kind = "local"
+            await routing_decisions.set_routing_decision(
+                request_id,
+                {
+                    "provider": cached_provider,
+                    "model": cached.get("model", ""),
+                    "kind": cached_kind,
+                    "classification": classification,
+                    "fallback_used": False,
+                    "fallback_from": None,
+                },
+            )
             return ChatCompletionResponse(**cached)
 
     errors: List[str] = []
@@ -627,6 +675,22 @@ async def _invoke_with_fallback(
         if cache_key is not None:
             cacheable = response.model_dump(include={"model", "choices", "usage", "zuno_provider"})
             await semantic_cache.set_cached_response(cache_key, cacheable)
+        # ADR-0550 (WP-135): published unconditionally (not gated on
+        # anything cache-related) - agent-runtime fetches this by
+        # request_id regardless of whether the response itself was served
+        # from cache, since a cache hit still needs a real answer to "what
+        # would have served this request".
+        await routing_decisions.set_routing_decision(
+            request_id,
+            {
+                "provider": candidate.name,
+                "model": effective_model_name,
+                "kind": candidate.kind,
+                "classification": classification,
+                "fallback_used": idx > 0,
+                "fallback_from": candidates[0].name if idx > 0 else None,
+            },
+        )
         return response
 
     raise HTTPException(
@@ -782,6 +846,24 @@ async def _stream_completion(
                 yield "data: [DONE]\n\n"
                 return
             continue
+
+        # ADR-0550 (WP-135): this is the ONLY routing-attribution channel
+        # for a streaming call - see schemas.py's own ChatCompletionResponse
+        # docstring ("streaming responses do not carry an equivalent
+        # field") and routing_decisions.py's module docstring for why.
+        # agent-runtime always streams, so without this the routing panel
+        # would only ever work for non-agent-runtime callers.
+        await routing_decisions.set_routing_decision(
+            request_id,
+            {
+                "provider": candidate.name,
+                "model": effective_model_name,
+                "kind": candidate.kind,
+                "classification": classification,
+                "fallback_used": idx > 0,
+                "fallback_from": candidates[0].name if idx > 0 else None,
+            },
+        )
 
         final_tool_calls = getattr(final_chunk, "tool_calls", None) or []
         if final_tool_calls:

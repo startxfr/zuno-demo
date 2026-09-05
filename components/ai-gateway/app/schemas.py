@@ -84,6 +84,20 @@ class ChatCompletionResponse(BaseModel):
     zuno_provider: str
 
 
+class RoutingDecision(BaseModel):
+    """ADR-0550 (WP-135): the real per-request routing decision, published
+    to app/routing_decisions.py's Redis side-channel and fetched via
+    GET /v1/routing-decisions/{request_id} - see that module's docstring
+    for why this can't just ride ChatCompletionResponse.zuno_provider."""
+
+    provider: str
+    model: str
+    kind: str
+    classification: str
+    fallback_used: bool
+    fallback_from: Optional[str] = None
+
+
 class ImageGenerationRequest(BaseModel):
     """ADR-0415: OpenAI images-API-compatible request for
     POST /v1/images/generations. `model` is accepted for wire-format
