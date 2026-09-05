@@ -26,7 +26,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.1 | 29 | — | 18 | — |
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
-| v0.4 | 34 | 9 | 27 | WP-55, WP-093, WP-101 |
+| v0.4 | 35 | 10 | 30 | WP-55, WP-093, WP-101, WP-135, WP-136, WP-137 |
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 4 | 19 | WP-115, WP-125 |
@@ -791,6 +791,24 @@ now superseded by ADR-0549.
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-134 | [wp-134](work-packages/wp-134-in-cluster-release-ledger.md) | 0549 | WP-111 | Operator pending (2026-09-05 — repo-side mechanism complete) | one real `make d3 release TAG=<tag>` run against the live cluster, plus the live-verification checklist in the brief's Operator follow-up |
+
+### Phase 40 — webinar sovereign-AI demonstration (added 2026-09-05)
+
+ADR-0550 picks three routing dimensions already live in the platform
+(effective classification, task specialization, runtime availability) as
+the spine of a twenty-minute webinar, deliberately rejecting a demo-only
+`SOVEREIGN` policy overlay. WP-137 makes Arkos' `draft-architecture-testimonial`
+task project-classification driven (the prerequisite the other two need,
+despite its number sorting last); WP-135 surfaces the real routing decision
+in the frontend so the audience can see *why* a model was chosen; WP-136
+turns the result into a rehearsable `make demo-*` presenter workflow that
+reuses WP-105's failover drill and WP-526's Wesh lifecycle unchanged.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-137 | [wp-137](work-packages/wp-137-arkos-dat-classification-routing.md) | 0550 | ADR-0527, ADR-0034, ADR-0416 | Not started | none yet |
+| WP-135 | [wp-135](work-packages/wp-135-routing-decision-explainability.md) | 0550 | WP-137 | Not started | none yet |
+| WP-136 | [wp-136](work-packages/wp-136-webinar-demo-orchestration.md) | 0550 | WP-137, WP-135 | Not started | none yet |
 
 ### OKF stream phases
 
