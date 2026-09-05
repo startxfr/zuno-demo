@@ -117,6 +117,15 @@ DAY3_RELEASE_COMPONENTS := supply-chain
 DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS) $(DAY3_RELEASE_COMPONENTS))
 DAY3_VERBS := test stresstest backup restore check sign run release scenario-failover-node
 
+# WP-136/ADR-0550 presenter tooling, regrouped as a `make demo <verb>`
+# verb group (originally flat demo-* targets). Unlike day0-3 there is no
+# component argument and no AAP routing - these are read-only-or-idempotent
+# presenter conveniences against an already-installed platform, never an
+# install/operational action with its own AAP Job/Workflow Template.
+# "all-check" is WP-136's suggested alias for "check" - it dispatches to
+# the same playbook, never a second implementation.
+DEMO_VERBS := check all-check reset step-1 step-2 step-3 step-4 step-5
+
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
 # recipe below sources to route mutating/read verbs through AAP when
 # zuno_make_aap_mode allows it, instead of always running ansible-playbook
@@ -183,7 +192,7 @@ endef
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo-check demo-reset demo-all-check demo-step-1 demo-step-2 demo-step-3 demo-step-4 demo-step-5 new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo new-mcp-server completion _complete-top _complete-verbs _complete-components $(DEMO_VERBS) $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -223,14 +232,14 @@ help:
 	  '  make day3|d3 sign [component]        Re-sign the OKF bundles and verify them (ADR-0420) - run after ANY change under agents/<name>/' \
 	  '  make day3|d3 run [component]         Trigger one real pipeline run (WP-126) - AGENT=<agent> overrides the default (comage)' \
 	  '' \
-	  '  make demo-check   Read-only webinar presenter preflight (WP-136/ADR-0550) - app/project/model/failover-topology/training readiness' \
-	  '  make demo-reset   Idempotent recovery to a safe demo baseline (uncordons any node the failover drill left cordoned)' \
-	  '  make demo-step-1..5   Print each presenter step'"'"'s objective/UI/prompt/expected routing - never submits chat on your behalf; step 5 tells you to run `make d3 scenario-failover-node` separately' \
+	  '  make demo check       Read-only webinar presenter preflight (WP-136/ADR-0550) - app/project/model/failover-topology/training readiness (alias: all-check)' \
+	  '  make demo reset       Idempotent recovery to a safe demo baseline (uncordons any node the failover drill left cordoned)' \
+	  '  make demo step-1..5   Print each presenter step'"'"'s objective/UI/prompt/expected routing - never submits chat on your behalf; step 5 tells you to run `make d3 scenario-failover-node` separately' \
 	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
-	  '  make completion   Print a bash completion function for day0|d0/day1|d1/day2|d2/day3|d3' \
-	  '                    (verb-then-component aware). Wire it up once, in ~/.bashrc:' \
+	  '  make completion   Print a bash completion function for day0|d0/day1|d1/day2|d2/day3|d3/demo' \
+	  '                    (first-word and verb-then-component aware). Wire it up once, in ~/.bashrc:' \
 	  '                    eval "$$(cd $(CURDIR) && make completion)"' \
 	  '' \
 	  'Day 0 components: $(DAY0_COMPONENTS)' \
@@ -254,56 +263,61 @@ new-mcp-server:
 	python3 platform/scaffolding/new_mcp_server.py "$(NAME)" $(if $(DESCRIPTION),--description "$(DESCRIPTION)")
 
 # WP-136/ADR-0550: presenter tooling for the 20-minute sovereign-AI
-# webinar demo. Deliberately flat targets (not another day0-3 verb group,
-# no aap_route dispatch) - these are read-only-or-idempotent presenter
-# conveniences against an already-installed platform, never an
-# install/operational action with its own AAP Job/Workflow Template.
-demo-check: credentials-check
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_check.yml $(EXTRA_VARS)
+# webinar demo, dispatched as `make demo <verb>` (same MAKECMDGOALS
+# word-2 mechanism as day0-3, see DEMO_VERBS above for why there is no
+# component argument and no aap_route dispatch). Each verb maps 1:1 to
+# ansible/playbooks/demo_<verb with - replaced by _>.yml; "all-check" is
+# rewritten to "check" first (WP-136's alias, single implementation).
+# The step-5 prompter deliberately never calls
+# `make d3 scenario-failover-node` itself - that command is
+# interactive-only and mutates live shared GPU infra (ADR-0536), so it
+# must stay a separate, explicit action the presenter runs themselves,
+# not a side effect of a prompter target.
+define DEMO_RECIPE
+@verb="$(DAY_VERB)"; \
+if [[ -z "$$verb" ]]; then \
+  printf '%s\n' \
+    'Zuno Demo - webinar presenter tooling (WP-136/ADR-0550)' \
+    '' \
+    'Usage: make demo <verb>' \
+    '' \
+    '  check       Read-only presenter preflight - app/project/model/failover-topology/training readiness' \
+    '  all-check   Alias for check' \
+    '  reset       Idempotent recovery to a safe demo baseline (uncordons any node the failover drill left cordoned)' \
+    '  step-1..5   Print each presenter step'"'"'s objective/UI/prompt/expected routing - never submits chat on your' \
+    '              behalf; step 5 tells you to run `make d3 scenario-failover-node` separately' \
+    '' \
+    'Example: make demo check'; \
+  exit 0; \
+fi; \
+case " $(DEMO_VERBS) " in *" $$verb "*) ;; *) echo "Unsupported demo verb: '$$verb' (expected one of: $(DEMO_VERBS))" >&2; exit 2;; esac; \
+if [[ "$$verb" == "all-check" ]]; then verb=check; fi; \
+$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) "ansible/playbooks/demo_$${verb//-/_}.yml" $(EXTRA_VARS)
+endef
 
-# WP-136's suggested alias for demo-check - do not add a second real
-# implementation, just dispatch to the one above.
-demo-all-check: demo-check
+demo: $(if $(DAY_VERB),credentials-check)
+	$(DEMO_RECIPE)
 
-demo-reset: credentials-check
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_reset.yml $(EXTRA_VARS)
+# Bash completion for `make <top-level target>`, then
+# `make day0|d0/day1|d1/day2|d2/day3|d3 <verb> [component]` and
+# `make demo <verb>`. _complete-top/_complete-verbs/_complete-components
+# are the single source of truth for what to offer at each position -
+# they just echo the same DAY*_VERBS/DEMO_VERBS/DAY*_RUN_COMPONENTS/
+# DAY*_BUILD_COMPONENTS variables the real recipes validate against
+# above, so the completion list can never drift from what a command
+# would actually accept. `completion` emits a bash function that shells
+# out to them live (one `make` call per Tab press), rather than baking
+# a static word list into the emitted script.
+_complete-top:
+	@echo "day0 d0 day1 d1 day2 d2 day3 d3 demo new-mcp-server completion help"
 
-# demo-step-1..5: one flat target per presenter step (WP-136), not a
-# verb-group dispatch - each is a fixed, numbered point in the 20-minute
-# script, never a variable "component" argument.
-demo-step-1: credentials-check
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_1.yml $(EXTRA_VARS)
-
-demo-step-2: credentials-check
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_2.yml $(EXTRA_VARS)
-
-demo-step-3: credentials-check
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_3.yml $(EXTRA_VARS)
-
-demo-step-4: credentials-check
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_4.yml $(EXTRA_VARS)
-
-# demo-step-5 deliberately never calls `make d3 scenario-failover-node`
-# itself - that command is interactive-only and mutates live shared GPU
-# infra (ADR-0536), so it must stay a separate, explicit action the
-# presenter runs themselves, not a side effect of a prompter target.
-demo-step-5: credentials-check
-	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_step_5.yml $(EXTRA_VARS)
-
-# Bash completion for `make day0|d0/day1|d1/day2|d2/day3|d3 <verb> [component]`.
-# _complete-verbs/_complete-components are the single source of truth for
-# what to offer at each position - they just echo the same
-# DAY*_VERBS/DAY*_RUN_COMPONENTS/DAY*_BUILD_COMPONENTS variables the real
-# recipes validate against above, so the completion list can never drift
-# from what a command would actually accept. `completion` emits a bash
-# function that shells out to them live (one `make` call per Tab press),
-# rather than baking a static word list into the emitted script.
 _complete-verbs:
 	@case "$(DAY)" in \
 	  0) echo "$(DAY0_VERBS)" ;; \
 	  1) echo "$(DAY1_VERBS)" ;; \
 	  2) echo "$(DAY2_VERBS)" ;; \
 	  3) echo "$(DAY3_VERBS)" ;; \
+	  demo) echo "$(DEMO_VERBS)" ;; \
 	esac
 
 _complete-components:
@@ -331,11 +345,16 @@ completion:
 	  '_zuno_demo_make_complete() {' \
 	  '  local cur day verb' \
 	  '  cur=$$2' \
+	  '  if [[ $$COMP_CWORD -eq 1 ]]; then' \
+	  '    COMPREPLY=( $$(compgen -W "$$(command make -s -C "$(CURDIR)" _complete-top 2>/dev/null)" -- "$$cur") )' \
+	  '    return 0' \
+	  '  fi' \
 	  '  case "$${COMP_WORDS[1]}" in' \
 	  '    day0|d0) day=0 ;;' \
 	  '    day1|d1) day=1 ;;' \
 	  '    day2|d2) day=2 ;;' \
 	  '    day3|d3) day=3 ;;' \
+	  '    demo) day=demo ;;' \
 	  '    *) return 0 ;;' \
 	  '  esac' \
 	  '  if [[ $$COMP_CWORD -eq 2 ]]; then' \
@@ -716,9 +735,9 @@ d3: $(if $(DAY_VERB),credentials-check)
 	$(DAY3_RECIPE)
 
 # Verb/component tokens are intentionally no-op Make targets. The day0/d0/
-# day1/d1/day2/d2/day3/d3 recipes read MAKECMDGOALS words 2 and 3
-# directly, so e.g. `make d0 check postgresql` needs "check" and
-# "postgresql" to resolve to *something* as Make goals without erroring
-# as unknown targets.
-$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)):
+# day1/d1/day2/d2/day3/d3/demo recipes read MAKECMDGOALS words 2 and 3
+# directly, so e.g. `make d0 check postgresql` or `make demo step-1`
+# needs "check"/"postgresql"/"step-1" to resolve to *something* as Make
+# goals without erroring as unknown targets.
+$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DEMO_VERBS)):
 	@:

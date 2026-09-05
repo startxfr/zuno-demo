@@ -1,5 +1,5 @@
 ---
-# `make demo-step-5` (WP-136/ADR-0550). Presenter prompter only - prints
+# `make demo step-5` (WP-136/ADR-0550). Presenter prompter only - prints
 # the presenter flow and expected transitions. Deliberately does NOT
 # launch the AAP workflow itself (WP-136: "Do not create a new failover
 # workflow" / reuse zuno-day3-scenario-failover-node-workflow as-is) -

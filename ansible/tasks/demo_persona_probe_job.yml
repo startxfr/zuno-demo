@@ -108,11 +108,11 @@
     namespace: zuno-ai-run
     wait: true
 
-# WP-136 amendment (2026-09-05): `make demo-reset` sets
+# WP-136 amendment (2026-09-05): `make demo reset` sets
 # demo_persona_probe_ensure_projects: true so this Job also creates any
 # missing demo project (via the same POST /v1/projects the frontend uses -
 # see evaluations/demo_presenter_probe.py's own docstring). `make
-# demo-check` never sets this var, so it defaults to false and this stays
+# demo check` never sets this var, so it defaults to false and this stays
 # purely read-only there, matching that playbook's own "never mutates
 # cluster state" contract.
 - name: "demo-persona-probe | resolve extra probe-script arguments"

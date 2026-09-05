@@ -1,5 +1,5 @@
 ---
-# `make demo-step-2` (WP-136/ADR-0550). Presenter prompter only - see
+# `make demo step-2` (WP-136/ADR-0550). Presenter prompter only - see
 # demo_step_1.yml's header comment for the shared "never auto-submits
 # chat" convention.
 - name: "Demo step 2: Arkos C2 local reasoning (4 min)"
@@ -21,4 +21,4 @@
           - "THEN OPEN (in order): (1) OpenShift AI Dashboard model-serving view, (2) OpenShift Console workload/pod view, (3) the GPU-backed local serving object (gpt-oss-20b-kserve-workload-svc, namespace zuno-ai-run) - to show the request never left the cluster."
           - "POINT AT: the routing-details panel's Classification/Model/Execution location fields, alongside the console views above."
           - "TIME BUDGET: 4 minutes."
-          - "RECOVERY: if classification/execution do not match, `oc get llminferenceservice -n zuno-ai-run` and `make demo-check` are the emergency diagnostics - not the primary demo path."
+          - "RECOVERY: if classification/execution do not match, `oc get llminferenceservice -n zuno-ai-run` and `make demo check` are the emergency diagnostics - not the primary demo path."

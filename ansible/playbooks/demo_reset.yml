@@ -1,5 +1,5 @@
 ---
-# `make demo-reset` (WP-136/ADR-0550). Returns the environment to a safe,
+# `make demo reset` (WP-136/ADR-0550). Returns the environment to a safe,
 # deterministic initial state before a rehearsal or the real webinar.
 #
 # Reuses day3_scenario_failover_node_restore.yml's own uncordon/reschedule/
@@ -17,7 +17,7 @@
 # never deletes training/model-registry evidence.
 #
 # WP-136 amendment (2026-09-05): also ensures the three named demo
-# projects exist, via the same in-cluster persona probe `make demo-check`
+# projects exist, via the same in-cluster persona probe `make demo check`
 # uses - see ansible/tasks/demo_persona_probe_job.yml and
 # evaluations/demo_presenter_probe.py's own docstring for why this calls
 # the existing POST /v1/projects endpoint rather than a new mechanism, and
@@ -64,5 +64,5 @@
         msg: >-
           DEMO RESET: READY - no node left cordoned, qwen3.5-9b and
           qwen3.5-9b-wesh are both Running, Comage is back on local-wesh.
-          Run `make demo-check` next to verify the full presenter
+          Run `make demo check` next to verify the full presenter
           preflight before rehearsing.

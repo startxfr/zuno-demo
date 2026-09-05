@@ -1,5 +1,5 @@
 ---
-# `make demo-step-1` (WP-136/ADR-0550). Presenter prompter only - prints
+# `make demo step-1` (WP-136/ADR-0550). Presenter prompter only - prints
 # what to say/click/type and what to expect; never submits a chat message
 # itself (WP-136: "the audience should see the real UI interaction").
 - name: "Demo step 1: Arkos C1 external reasoning (4 min)"
@@ -20,4 +20,4 @@
           - "EXPECTED: classification=C1, model=gpt-oss-120b, provider=OVHcloud, execution=external, fallback=no."
           - "POINT AT: the collapsed 'Show routing details' panel under the reply - expand it and read Classification/Model/Provider/Execution location."
           - "TIME BUDGET: 4 minutes."
-          - "RECOVERY: if the panel shows classification=C2 or execution=local, first suspect the prompt wording (see above) or a genuine Confluence match on the chosen topic before re-running `make demo-check` - a missing/misconfigured webinar-public project or a stale ai-gateway policy is the next most likely cause, not a code regression (see WP-137's live-verification note)."
+          - "RECOVERY: if the panel shows classification=C2 or execution=local, first suspect the prompt wording (see above) or a genuine Confluence match on the chosen topic before re-running `make demo check` - a missing/misconfigured webinar-public project or a stale ai-gateway policy is the next most likely cause, not a code regression (see WP-137's live-verification note)."

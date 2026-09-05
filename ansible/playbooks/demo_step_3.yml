@@ -1,5 +1,5 @@
 ---
-# `make demo-step-3` (WP-136/ADR-0550). Presenter prompter only - see
+# `make demo step-3` (WP-136/ADR-0550). Presenter prompter only - see
 # demo_step_1.yml's header comment for the shared "never auto-submits
 # chat" convention.
 - name: "Demo step 3: Tekos Codestral task specialization (3 min)"

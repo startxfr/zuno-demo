@@ -801,7 +801,7 @@ the spine of a twenty-minute webinar, deliberately rejecting a demo-only
 task project-classification driven (the prerequisite the other two need,
 despite its number sorting last); WP-135 surfaces the real routing decision
 in the frontend so the audience can see *why* a model was chosen; WP-136
-turns the result into a rehearsable `make demo-*` presenter workflow that
+turns the result into a rehearsable `make demo <verb>` presenter workflow that
 reuses WP-105's failover drill and WP-526's Wesh lifecycle unchanged.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |

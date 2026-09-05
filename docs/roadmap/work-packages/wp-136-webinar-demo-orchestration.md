@@ -20,27 +20,29 @@ The Makefile acts as a prompter, preflight checker and recovery assistant.
 
 ## Commands
 
-Implement:
+Implement (originally flat `demo-*` targets; regrouped 2026-09-06 as the
+`make demo <verb>` verb group, same dispatch mechanism as `make day0-3`
+but with no component argument and no AAP routing):
 
 ```text
-make demo-check
-make demo-reset
-make demo-step-1
-make demo-step-2
-make demo-step-3
-make demo-step-4
-make demo-step-5
+make demo check
+make demo reset
+make demo step-1
+make demo step-2
+make demo step-3
+make demo step-4
+make demo step-5
 ```
 
 Optionally add:
 
 ```text
-make demo-all-check
+make demo all-check
 ```
 
-as an alias to `demo-check`; do not create multiple competing entry points if one is sufficient.
+as an alias to `demo check`; do not create multiple competing entry points if one is sufficient.
 
-## `make demo-check`
+## `make demo check`
 
 Validate without mutating the intended demo state:
 
@@ -64,7 +66,7 @@ webinar-restricted   C3
 
 Project creation already exists in the frontend/BFF; do not add a second project mechanism.
 
-**Amendment (2026-09-05):** after the first live `make demo-check` run confirmed all three projects were missing, the user asked for automatic creation instead of a mandatory manual UI step before every rehearsal. `make demo-reset` now creates any missing one via that same existing `POST /v1/projects` endpoint (`evaluations/demo_presenter_probe.py --ensure-projects`, run inside the same in-cluster Job `make demo-check` already used to detect them) - still not a second mechanism. A cross-persona gap was found while implementing this: the probe authenticates as `sale-01` (Comage, `/sales` group), and `POST /v1/projects` only auto-grants the creating subject - so each created project also grants `admin` to both the `consultant` and `sales` business-role groups, since `consultant-01` (the persona `evaluations/arkos`/`evaluations/tekos` use) is in a disjoint Keycloak group with no overlap otherwise. `make demo-check` stays strictly read-only and only detects/reports; its guidance message now points at `make demo-reset` first, with live frontend creation kept as an option if the presenter wants the audience to see it happen. A project that exists with the wrong classification is still only reported, never auto-corrected.
+**Amendment (2026-09-05):** after the first live `make demo check` run confirmed all three projects were missing, the user asked for automatic creation instead of a mandatory manual UI step before every rehearsal. `make demo reset` now creates any missing one via that same existing `POST /v1/projects` endpoint (`evaluations/demo_presenter_probe.py --ensure-projects`, run inside the same in-cluster Job `make demo check` already used to detect them) - still not a second mechanism. A cross-persona gap was found while implementing this: the probe authenticates as `sale-01` (Comage, `/sales` group), and `POST /v1/projects` only auto-grants the creating subject - so each created project also grants `admin` to both the `consultant` and `sales` business-role groups, since `consultant-01` (the persona `evaluations/arkos`/`evaluations/tekos` use) is in a disjoint Keycloak group with no overlap otherwise. `make demo check` stays strictly read-only and only detects/reports; its guidance message now points at `make demo reset` first, with live frontend creation kept as an option if the presenter wants the audience to see it happen. A project that exists with the wrong classification is still only reported, never auto-corrected.
 
 ### Models/providers
 
@@ -91,7 +93,7 @@ Reuse WP-105 preconditions:
 
 Verify the successful Wesh training/evaluation/registry run and serving artifact remain available to show.
 
-## `make demo-reset`
+## `make demo reset`
 
 Return the environment to a safe deterministic initial state.
 
@@ -110,7 +112,7 @@ The command must be idempotent.
 
 ## Presenter step contract
 
-Each `demo-step-N` prints:
+Each `make demo step-N` prints:
 
 1. objective/message to say;
 2. web UI to open;
@@ -221,7 +223,7 @@ If the model is inside the short transition interval and the chat request times 
 
 ## Rehearsal requirements
 
-Run at least two complete rehearsals from `make demo-reset`.
+Run at least two complete rehearsals from `make demo reset`.
 
 Record for each:
 
@@ -316,6 +318,6 @@ WP-136 is done when:
 ## Operator / human follow-up (not executable by the model without explicit go-ahead)
 
 1. Repo-side is complete: `ansible/playbooks/demo_check.yml`, `demo_reset.yml` and `demo_step_1.yml`..`demo_step_5.yml`, the new `ansible/tasks/demo_persona_probe_job.yml` + `evaluations/demo_presenter_probe.py`, and the seven flat Makefile targets are all merged. Every playbook passed `ansible-playbook --syntax-check`; `demo_persona_probe_job.yml`'s script passed `python3 -m py_compile`; `python3 platform/docs/check_docs.py` passes.
-2. Two known, documented scope limits to account for while rehearsing: (a) `demo-check`'s external-provider check (OVHcloud, Codestral) is static config only (`eligible_for` in `provider-routing.yaml`) - no repo mechanism makes a live external smoke call on every `make demo-check` run, so real reachability is only proven by actually rehearsing steps 1 and 3; (b) `demo-check`'s AAP precondition confirms the failover workflow template exists in Controller but does not independently re-verify the presenter's own launch/approval RBAC (that grant is wired once by `ansible/roles/aap_config/tasks/wire_launch_rbac.yml` and trusted here, not re-checked per call).
-3. Operator: create the three named demo projects live through the frontend if `make demo-check` reports them missing (webinar-public/C1, webinar-confidential/C2, webinar-restricted/C3 - this WP deliberately does not create them itself), then run `make demo-reset` followed by `make demo-check` against the real cluster, then execute at least two complete rehearsals starting from `make demo-reset`, recording every field the "Rehearsal requirements" table above lists (total/per-step duration, actual model/provider, Codestral trigger success, Wesh training evidence paths, AAP workflow job id, failover/restore duration, manual recovery needed).
+2. Two known, documented scope limits to account for while rehearsing: (a) `demo-check`'s external-provider check (OVHcloud, Codestral) is static config only (`eligible_for` in `provider-routing.yaml`) - no repo mechanism makes a live external smoke call on every `make demo check` run, so real reachability is only proven by actually rehearsing steps 1 and 3; (b) `demo-check`'s AAP precondition confirms the failover workflow template exists in Controller but does not independently re-verify the presenter's own launch/approval RBAC (that grant is wired once by `ansible/roles/aap_config/tasks/wire_launch_rbac.yml` and trusted here, not re-checked per call).
+3. Operator: create the three named demo projects live through the frontend if `make demo check` reports them missing (webinar-public/C1, webinar-confidential/C2, webinar-restricted/C3 - this WP deliberately does not create them itself), then run `make demo reset` followed by `make demo check` against the real cluster, then execute at least two complete rehearsals starting from `make demo reset`, recording every field the "Rehearsal requirements" table above lists (total/per-step duration, actual model/provider, Codestral trigger success, Wesh training evidence paths, AAP workflow job id, failover/restore duration, manual recovery needed).
 4. **Done 2026-09-05**: both rehearsals executed live (logs above), all "Rehearsal requirements" fields recorded, and the webinar owner explicitly signed off rehearsal 2's ~21 minutes against the 20-minute target as validating the scenario. WP-135 and WP-137 were verified during the same day's rehearsals; ADR-0550 `Status` -> `Implemented`.

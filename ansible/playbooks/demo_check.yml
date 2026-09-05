@@ -1,5 +1,5 @@
 ---
-# `make demo-check` (WP-136/ADR-0550). Read-only presenter preflight for
+# `make demo check` (WP-136/ADR-0550). Read-only presenter preflight for
 # the 20-minute sovereign-AI webinar demo - never mutates cluster state
 # (unlike day3_scenario_failover_node_inject.yml, which this playbook
 # deliberately does NOT call: only its READ-ONLY precondition checks are
@@ -102,7 +102,7 @@
       ansible.builtin.debug:
         msg: >-
           Project '{{ item.key }}' ({{ item.value }}) not found for the
-          sale-01 persona - run `make demo-reset` to create it
+          sale-01 persona - run `make demo reset` to create it
           automatically (via the same POST /v1/projects the frontend uses,
           granted to the consultant and sales groups), or create it live
           through the frontend yourself if you want the audience to see it
@@ -164,7 +164,7 @@
     # External providers (OVHcloud, Codestral): no live smoke-test
     # mechanism exists in this repo (evaluations/tekos/gate_checks.py only
     # asserts static config) - a real reachability call against a paid
-    # external provider is deliberately NOT made on every `make demo-check`
+    # external provider is deliberately NOT made on every `make demo check`
     # run. This is a documented scope limit (see WP-136's own doc), not an
     # oversight: real reachability is proven live by rehearsing steps 1
     # and 3 themselves.
@@ -293,7 +293,7 @@
               {
                 "agent": "platform", "layer": "availability", "id": "no-node-cordoned", "category": "demo-failover",
                 "passed": (_demo_check_cordoned_nodes | length) == 0,
-                "detail": "cordoned=" + (_demo_check_cordoned_nodes | join(',')) + " - run `make demo-reset` first if non-empty",
+                "detail": "cordoned=" + (_demo_check_cordoned_nodes | join(',')) + " - run `make demo reset` first if non-empty",
                 "duration_ms": 0
               },
               {

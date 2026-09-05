@@ -1,5 +1,5 @@
 ---
-# `make demo-step-4` (WP-136/ADR-0550). Presenter prompter only - see
+# `make demo step-4` (WP-136/ADR-0550). Presenter prompter only - see
 # demo_step_1.yml's header comment for the shared "never auto-submits
 # chat" convention. No new training run is launched here (WP-136 "Out of
 # scope").
@@ -40,4 +40,4 @@
           - "EXPECTED: agent=comage, model=qwen3.5-9b-wesh, provider=local-wesh(-maas)."
           - "POINT AT: the routing-details panel's Model/Provider fields, right after the training-evidence screens above."
           - "TIME BUDGET: 5 minutes (raised from the original 3: rehearsal #1, 2026-09-05, measured ~4 min for steps 3+4 combined against the RHOAI Dashboard navigation alone, before this click-path existed)."
-          - "RECOVERY: if Comage did not select Wesh, run `make demo-check` first (its demo-failover rows report pod/anti-affinity/cache state) before touching anything live."
+          - "RECOVERY: if Comage did not select Wesh, run `make demo check` first (its demo-failover rows report pod/anti-affinity/cache state) before touching anything live."

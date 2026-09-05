@@ -17,7 +17,7 @@ Zuno already provides most capabilities needed for a concrete sovereign-AI demon
 - the Qwen/Wesh failover has already been exercised live through a reusable Day 3 scenario and AAP Workflow Template;
 - OpenShift AI MaaS `ExternalModel` remains a target transport for external providers but is not required to exercise Zuno's policy decisions.
 
-The webinar has approximately twenty minutes for the live demonstration. The demo must primarily use web interfaces (Zuno, OpenShift AI Dashboard, OpenShift Console and AAP), with `make demo-*` commands acting as presenter assistance and deterministic preflight/reset tooling.
+The webinar has approximately twenty minutes for the live demonstration. The demo must primarily use web interfaces (Zuno, OpenShift AI Dashboard, OpenShift Console and AAP), with `make demo <verb>` commands acting as presenter assistance and deterministic preflight/reset tooling.
 
 A previously considered operational `SOVEREIGN` mode would have required a new runtime policy overlay plus an AAP/GitOps mutation workflow. Those components are useful platform capabilities but are unnecessary to prove the webinar's central points and would add demo-specific implementation risk.
 
@@ -327,16 +327,19 @@ Message: model availability is handled as an operational concern without changin
 
 ## Demo automation
 
-Add presenter-oriented helpers:
+Add presenter-oriented helpers (originally flat `demo-*` targets;
+regrouped 2026-09-06 as the `make demo <verb>` verb group, same dispatch
+mechanism as `make day0-3` but with no component argument and no AAP
+routing):
 
 ```text
-make demo-check
-make demo-reset
-make demo-step-1
-make demo-step-2
-make demo-step-3
-make demo-step-4
-make demo-step-5
+make demo check
+make demo reset
+make demo step-1
+make demo step-2
+make demo step-3
+make demo step-4
+make demo step-5
 ```
 
 The helpers do not replace the web UI.
@@ -350,9 +353,9 @@ For each step they:
 - execute only safe, repeatable setup operations;
 - refuse to continue if the expected platform state is absent.
 
-`demo-step-5` reuses WP-105 artifacts rather than implementing failover again.
+`demo step-5` reuses WP-105 artifacts rather than implementing failover again.
 
-`demo-reset` verifies that any GPU node touched by the failover drill is uncordoned and that both Qwen models are back to their expected running/ready state.
+`demo reset` verifies that any GPU node touched by the failover drill is uncordoned and that both Qwen models are back to their expected running/ready state.
 
 ## Security considerations
 
@@ -399,8 +402,8 @@ For each step they:
 12. The existing AAP failover workflow can be launched from the Controller UI.
 13. During failure, Comage traffic is served by `qwen3.5-9b`.
 14. After approval/restoration, Comage returns to `qwen3.5-9b-wesh`.
-15. `make demo-check` validates all critical webinar prerequisites.
-16. `make demo-reset` returns the environment to the documented initial state.
+15. `make demo check` validates all critical webinar prerequisites.
+16. `make demo reset` returns the environment to the documented initial state.
 17. Two consecutive timed rehearsals complete the planned scenario in twenty minutes without unplanned CLI repair.
 
 **Status note (2026-09-05, updated after WP-136's live rehearsal 1/2):**

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """WP-136/ADR-0550: verify the webinar presenter persona can authenticate
-and can see the three named demo projects, as `make demo-check`'s "Zuno
+and can see the three named demo projects, as `make demo check`'s "Zuno
 application"/"Projects" sections require.
 
 Reuses evaluations/tekos/run_scenarios.py's Keycloak auth helper rather
@@ -14,7 +14,7 @@ agent's persona token is sufficient to prove the check; AGENT defaults to
 comage to match this repo's existing demo-persona ("sale-01") fixture.
 
 Does NOT probe the three local models - live-caught 2026-09-05 running
-`make demo-check` from a plain workstation (DNS to `*.svc.cluster.local`
+`make demo check` from a plain workstation (DNS to `*.svc.cluster.local`
 unresolvable there) and then from this same in-cluster Job (DNS resolves,
 but the connection is reset: gitops/charts/models's own NetworkPolicies
 (networkpolicy-gptoss.yaml/networkpolicy-qwen35.yaml) allow ingress on
@@ -28,8 +28,8 @@ LLMInferenceService `Ready` condition directly from the Kubernetes API
 already trusts) - a control-plane read, never subject to a workload
 NetworkPolicy.
 
-`--ensure-projects` (used by `make demo-reset`, never by the read-only
-`make demo-check`) creates any missing demo project via this same
+`--ensure-projects` (used by `make demo reset`, never by the read-only
+`make demo check`) creates any missing demo project via this same
 POST /v1/projects endpoint the frontend's own "New project" dialog calls -
 not a second creation mechanism. Each created project grants `admin` to
 BOTH the `consultant` and `sales` business-role groups: `sale-01` (this
@@ -65,8 +65,8 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent / "tekos"))
 import httpx  # noqa: E402
 from run_scenarios import RUNTIME_URL, auth_headers  # noqa: E402
 
-# ADR-0550/WP-136: the three demo projects `make demo-check` expects to
-# exist - created via --ensure-projects (`make demo-reset`) or live through
+# ADR-0550/WP-136: the three demo projects `make demo check` expects to
+# exist - created via --ensure-projects (`make demo reset`) or live through
 # the frontend if the presenter wants the audience to see it happen.
 REQUIRED_PROJECTS = {
     "webinar-public": "C1",
