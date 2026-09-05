@@ -10,3 +10,15 @@ The AI architecture uses Red Hat OpenShift AI 3.5 as the primary AI platform. Th
 - **Model Registry / Pipelines / LM-Eval / guardrails**: included as architecture capabilities and activated according to MVP feasibility and component maturity.
 
 SaaS provider default preference/fallback order is OpenAI, Gemini, Anthropic and Mistral, subject to C1/C2/C3 data policy.
+
+![OpenShift AI + Kueue + JobSet + LeaderWorkerSet Low Level Design](../assets/img/zuno-lld-rhoai.png)
+
+OpenShift AI's `DataScienceCluster` provides notebooks, pipelines, KServe/ModelMesh serving and the Model Registry; Kueue queues and fair-shares GPU/CPU workloads, JobSet drives distributed training jobs, and LeaderWorkerSet coordinates distributed multi-pod inference/training (e.g. vLLM).
+
+![TrustyAI Low Level Design](../assets/img/zuno-lld-trustyai.png)
+
+TrustyAI (via OpenShift AI) runs LM-Eval batch/online evaluation, RAG-specific evaluation (retrieval and groundedness) and safety/quality checks (jailbreak, toxicity, bias) against agents, RAG pipelines and models, before and after deployment (ADR-0534).
+
+![Red Hat Lightspeed Low Level Design](../assets/img/zuno-lld-lightspeed.png)
+
+Red Hat Lightspeed (ADR-0524) brings generative developer assistance (IDE chat/completion) to platform teams, served by the same local OpenShift AI model backend and able to draw on the platform's RAG/knowledge sources and MCP tools.
