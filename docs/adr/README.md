@@ -286,11 +286,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | Deferred | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | Deferred | Use immutable and verifiable software supply chain artifacts |
-| [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | Proposed | Extract OKF content into a standalone zuno-okf repository |
-| [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | Proposed | Consume the zuno-okf repository through a single pinned reference |
-| [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
-| [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | Proposed | Deliver OKF content as mounted versioned artifacts |
-| [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | Proposed | Make the AIAgent operator watch the zuno-okf repository |
 | [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | Implemented | Integrate TrustyAI for AI evaluation and guardrails |
 | [ADR-0538](0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md) | Accepted | Adopt RHOAI 3.5 workload surfaces - MLflow tracking, queued workloads, training-jobs UI |
 | [ADR-0539](0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md) | Implemented | Delegate LoRA training compute to a KFP-submitted Kubeflow TrainJob |
@@ -317,6 +312,16 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Proposed | Run day-0 platform services in internal or external mode |
 | [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | Proposed | Expand the agent catalog beyond the initial five agents |
 | [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | Implemented | Adopt RHTAS as the artifact trust and supply-chain service |
+
+## v0.10
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | Proposed | Extract OKF content into a standalone zuno-okf repository |
+| [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | Proposed | Consume the zuno-okf repository through a single pinned reference |
+| [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
+| [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | Proposed | Deliver OKF content as mounted versioned artifacts |
+| [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | Proposed | Make the AIAgent operator watch the zuno-okf repository |
 
 ## OKF v0.1
 

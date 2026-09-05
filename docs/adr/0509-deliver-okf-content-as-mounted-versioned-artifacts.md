@@ -1,7 +1,7 @@
 # ADR-0509: Deliver OKF content as mounted versioned artifacts
 
 - **Status:** Proposed
-- **Target:** v0.7 (retargeted from OKF v0.3 on 2026-08-30 — see ADR-0506's note)
+- **Target:** v0.10 (retargeted from v0.7 on 2026-09-05 — see ADR-0506's note. Previously retargeted from OKF v0.3 on 2026-08-30 — see ADR-0506's note)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
 

@@ -34,18 +34,19 @@ copy would drift unvalidated).
   moved content is cut over out of this repository; every consuming
   component isolates its OKF parsing behind one adaptation hook validated
   by a shared conformance suite. ADR-0506/ADR-0507/ADR-0508 retargeted out
-  of this milestone to platform v0.7 on 2026-08-30 (all `Proposed`,
-  gated on an owner-created `zuno-okf` repository not yet provisioned) —
-  see change log; WP-48/WP-49/WP-50/WP-51 stay tracked in this file's own
-  Tracker below, only their ADRs' version `Target` moved.
+  of this milestone to platform v0.7 on 2026-08-30, then to platform v0.10
+  on 2026-09-05 (all `Proposed`, gated on an owner-created `zuno-okf`
+  repository not yet provisioned) — see change log; WP-48/WP-49/WP-50/WP-51
+  stay tracked in this file's own Tracker below, only their ADRs' version
+  `Target` moved.
 - **OKF v0.3 — live reconciliation** (ADR-0509 – 0510): OKF content reaches
   running components as operator-materialized mounted artifacts instead of
   baked image copies, and the AIAgent operator watches the `zuno-okf`
   repository to reconcile running agent configuration within CR-declared
   boundaries. ADR-0509/ADR-0510 retargeted out of this milestone to
-  platform v0.7 on 2026-08-30 alongside ADR-0506–0508 — see change log;
-  WP-52/WP-53 stay tracked in this file's own Tracker below, only their
-  ADRs' version `Target` moved.
+  platform v0.7 on 2026-08-30 alongside ADR-0506–0508, then to platform
+  v0.10 on 2026-09-05 — see change log; WP-52/WP-53 stay tracked in this
+  file's own Tracker below, only their ADRs' version `Target` moved.
 
 ## Execution model
 
@@ -111,6 +112,15 @@ WP-43 ─┬─ WP-44 ─┬──────────────┬─ WP-
 
 ## Change log
 
+- 2026-09-05 — ADR-0506, ADR-0507, ADR-0508, ADR-0509, ADR-0510
+  (v0.7 -> v0.10) retargeted again, this time to a dedicated v0.10 band
+  of their own, separating the OKF extraction-and-reconciliation chain
+  from v0.7's unrelated release/supply-chain automation scope. Docs-only
+  move: `docs/adr/README.md` (new v0.10 section), `docs/adr/0506..0510-*.md`
+  (`Target` field), `docs/roadmap/versions.md` (new v0.10 band),
+  `platform/docs/check_docs.py` (`v0.10` added to `ADR_VERSIONS`), and this
+  file. WP-48–WP-53 stay tracked in this file's own Tracker; only the ADRs'
+  `Target` moved. `python3 platform/docs/check_docs.py` passes.
 - 2026-08-30 — ADR-0506, ADR-0507, ADR-0508 (OKF v0.2 -> v0.7) and
   ADR-0509, ADR-0510 (OKF v0.3 -> v0.7) retargeted to the platform
   roadmap's v0.7 band, alongside its other not-yet-started work

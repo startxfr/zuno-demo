@@ -9,6 +9,18 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Retargeting note (2026-09-05)
+
+ADR-0506, ADR-0507, ADR-0508, ADR-0509, ADR-0510 (all v0.7 -> v0.10) - the
+OKF extraction-and-reconciliation chain moves out of v0.7 into a new,
+dedicated v0.10 band, separating it from v0.7's unrelated release/
+supply-chain automation scope (ADR-0111/ADR-0115/ADR-0534/ADR-0538 -
+ADR-0542/ADR-0545). Numbering is unchanged; only `Target` moves. All five
+ADRs remain `Proposed`; WP-48 - WP-53 stay tracked as phases 34-35 of the
+[implementation roadmap](../roadmap/implementation-roadmap.md). See
+`docs/roadmap/versions.md` and `docs/roadmap/okf-roadmap.md`'s matching
+change-log entry.
+
 ## Acceptance note (2026-09-04) - ADR-0546 Proposed -> Accepted
 
 Its own acceptance criteria decided this: criterion 2 (a follow-up work package

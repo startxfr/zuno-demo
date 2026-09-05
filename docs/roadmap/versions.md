@@ -88,15 +88,15 @@ delivered; the band exists to formalize their retargeted status.
 Automate the release/supply-chain pipeline using GitHub Actions (build, sign,
 publish, promote). ADR-0111 and ADR-0115 are both hard-blocked on an external
 GitHub-billing/Quay-cutover decision with no repo-side fix. The band also
-carries the OKF extraction-and-reconciliation chain (ADR-0506 – ADR-0510),
-gated on an owner-created `zuno-okf` repository that does not yet exist, and
-the RHOAI 3.5 workload surfaces (ADR-0538 – ADR-0540), TrustyAI (ADR-0534),
-model autoscaling (ADR-0542), and mistral/gpt-oss-120b as MaaS
+carries the RHOAI 3.5 workload surfaces (ADR-0538 – ADR-0540), TrustyAI
+(ADR-0534), model autoscaling (ADR-0542), and mistral/gpt-oss-120b as MaaS
 `ExternalModel`s (ADR-0541, split 2026-09-03 from ADR-0537's now-Implemented
-HardwareProfile half - blocked upstream, see that ADR's body).
+HardwareProfile half - blocked upstream, see that ADR's body). The OKF
+extraction-and-reconciliation chain (ADR-0506 – ADR-0510) moved out to its own
+v0.10 band on 2026-09-05.
 
-**13 ADRs.** Open: ADR-0111, ADR-0115 (both `Deferred`), ADR-0506 – ADR-0510,
-ADR-0538, ADR-0541; WP-48 – WP-53, WP-115, WP-125.
+**9 ADRs.** Open: ADR-0111, ADR-0115 (both `Deferred`), ADR-0538, ADR-0541;
+WP-115, WP-125.
 
 ## v0.8
 
@@ -143,6 +143,20 @@ internal/external tiering effort (ADR-0352), which has no work package yet.
 
 **4 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410. No open work packages.
 
+## v0.10
+
+The OKF extraction-and-reconciliation chain, given its own band on
+2026-09-05 (moved from v0.7, where it sat alongside unrelated release/
+supply-chain automation work): the `zuno-okf` repository is bootstrapped,
+`zuno-demo` builds consume it through a single pinned reference, every
+consuming component isolates its OKF parsing behind one adaptation hook,
+OKF content reaches running components as operator-materialized mounted
+artifacts, and the AIAgent operator watches `zuno-okf` to reconcile running
+agents within CR-declared boundaries. Gated on an owner-created `zuno-okf`
+repository that does not yet exist.
+
+**5 ADRs, all `Proposed`.** Open: ADR-0506 – ADR-0510; WP-48 – WP-53.
+
 ## OKF stream
 
 A standalone version line for the Open Knowledge Format initiative, decoupled
@@ -154,6 +168,7 @@ from the platform bands — [OKF roadmap](okf-roadmap.md).
   **8 ADRs.** Open: ADR-0501. No open work packages.
 - **OKF v0.2 / OKF v0.3** — extraction into `zuno-okf` and live operator
   reconciliation. Both milestones are **vacant**: every ADR that defined them
-  (ADR-0506 – ADR-0510) was retargeted to platform v0.7 on 2026-08-30. Their
-  work packages (WP-48 – WP-53) are tracked as phases 34–35 of the
+  (ADR-0506 – ADR-0510) was retargeted to platform v0.7 on 2026-08-30, then
+  to its own platform v0.10 band on 2026-09-05. Their work packages
+  (WP-48 – WP-53) are tracked as phases 34–35 of the
   [implementation roadmap](implementation-roadmap.md).
