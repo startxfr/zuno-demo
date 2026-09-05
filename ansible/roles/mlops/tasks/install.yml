@@ -138,11 +138,14 @@
         ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/mlops/application-d1.yaml')
           | replace('apps.mycluster.example.com', cluster_base_domain)
           | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
-        | combine({'s3': {'bucket': zuno_mlops_s3_bucket | default('zuno-corpus'),
+        # ADR-0547 clause 3: an invalid placeholder, not zuno-corpus (deleted
+        # WP-131 2026-09-05) - a plausible-looking default risks silently
+        # resolving to whatever AWS account next registers that bucket name.
+        | combine({'s3': {'bucket': zuno_mlops_s3_bucket | default('ZUNO_S3_BUCKET_NOT_SET'),
                           'region': zuno_mlops_s3_region | default('us-east-1')}}, recursive=True)
         | combine({'agents': {'comage': {'styleCorpusS3Uri':
                      zuno_mlops_style_corpus_s3_uri
-                     | default('s3://zuno-corpus/qwen-wesh-training-corpus.tgz')}}}, recursive=True)
+                     | default('s3://ZUNO_S3_BUCKET_NOT_SET/qwen-wesh-training-corpus.tgz')}}}, recursive=True)
       }}
     # Values-changing apply - see ansible/roles/mlflow/tasks/install.yml.
     gitops_app_refresh: true

@@ -155,7 +155,11 @@
             schemaS3Key: "{{ zuno_sxa_dump_schema_s3_key | default('sxa.schema.sql') }}"
             dataS3Key: "{{ zuno_sxa_dump_data_s3_key | default('sxa.data.sql') }}"
             s3:
-              bucket: "{{ zuno_sxa_dump_s3_bucket | default('zuno-demo-sxa-corpus') }}"
+              # ADR-0547 clause 3: an invalid placeholder, not
+              # zuno-demo-sxa-corpus (deleted WP-131 2026-09-05) - a
+              # plausible-looking default risks silently resolving to
+              # whatever AWS account next registers that bucket name.
+              bucket: "{{ zuno_sxa_dump_s3_bucket | default('ZUNO_S3_BUCKET_NOT_SET') }}"
               region: "{{ zuno_sxa_dump_s3_region | default('eu-west-2') }}"
     # Values-changing apply - see ansible/roles/mlflow/tasks/install.yml.
     gitops_app_refresh: true
