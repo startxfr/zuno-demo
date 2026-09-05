@@ -26,7 +26,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.1 | 29 | — | 18 | — |
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
-| v0.4 | 35 | 10 | 30 | WP-55, WP-093, WP-101, WP-136 |
+| v0.4 | 35 | 9 | 30 | WP-55, WP-093, WP-101 |
 | v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 4 | 19 | WP-115, WP-125 |
@@ -808,7 +808,7 @@ reuses WP-105's failover drill and WP-526's Wesh lifecycle unchanged.
 |---|---|---|---|---|---|
 | WP-137 | [wp-137](work-packages/wp-137-arkos-dat-classification-routing.md) | 0550 | ADR-0527, ADR-0034, ADR-0416 | Done (2026-09-05 — live C1/C2 comparison verified) | none |
 | WP-135 | [wp-135](work-packages/wp-135-routing-decision-explainability.md) | 0550 | WP-137 | Done (2026-09-05 — all six live demo cases verified through the real frontend) | none |
-| WP-136 | [wp-136](work-packages/wp-136-webinar-demo-orchestration.md) | 0550 | WP-137, WP-135 | Operator pending (2026-09-05 — rehearsal 1/2 done live, ~24m55s vs the original 20-min ceiling) | rehearsal 2/2 from `make demo-reset`, plus a sign-off decision on whether the 20-min ceiling stands or the revised ~25-min budget applies |
+| WP-136 | [wp-136](work-packages/wp-136-webinar-demo-orchestration.md) | 0550 | WP-137, WP-135 | Done (2026-09-05 — both live rehearsals complete, ~21-min run 2 signed off against the 20-min target) | none |
 
 ### OKF stream phases
 

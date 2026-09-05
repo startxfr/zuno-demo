@@ -1,6 +1,6 @@
 # ADR-0550: Demonstrate sovereign AI through classification, specialization and resilience
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.4
 - **Date:** 2026-09-05
 - **Decision owners:** Zuno Demo architecture team
@@ -417,16 +417,18 @@ indirectly, through the four now-fixed live-only defects WP-137 records
 under items 2/2b/2c/2d - the *clean*, non-escalating C1 case is what was
 proven, not a genuine C1->C2 mid-DAT escalation).
 
-WP-136 stays `Operator pending`: rehearsal 1/2 completed live with zero
-unplanned CLI repair and fully correct routing (criterion 17's substance),
-but took ~24m55s against the original 20-minute ceiling - see WP-136's own
-"Rehearsal log" for the field-by-field record and the revised ~25-minute
-budget now printed by `demo_step_4.yml`/`demo_step_5.yml`. This ADR stays
-at `Accepted`, not `Implemented`, until: (a) rehearsal 2/2 completes, and
-(b) whoever signs off the webinar decides whether the original 20-minute
-ceiling in criterion 17 stands or is amended to the revised ~25-minute
-figure now that a real Wesh cold-start has been measured - that decision
-is out of scope for this note.
+**Final status note (2026-09-05, later the same day):** WP-136 is `Done`
+and this ADR moves to `Implemented`. Rehearsal 2/2 ran live the same
+evening from a fully wiped state (all conversations/checkpoints/projects
+purged, then recreated by `make demo-reset`; `make demo-check` 30/30):
+~21 minutes total, steps 1-4 in ~8 minutes, AAP workflow job #716
+successful with zero unplanned CLI repair - see WP-136's "Rehearsal log"
+for both field-by-field records. Criterion 17's 20-minute ceiling was
+explicitly signed off by the webinar owner against rehearsal 2's ~21
+minutes ("not failing the scenario over one minute"); the known
+compression lever (launching the drill workflow at the start of step 4 so
+its ~4-minute pre-cordon baseline probe overlaps the RHOAI evidence
+screens) is recorded in WP-136 for the live webinar's runbook.
 
 ## Related ADRs
 
