@@ -1,6 +1,6 @@
 # WP-131: Execute ADR-0546's cross-cluster source bucket and per-cluster S3 convention
 
-- **State:** Operator pending — seven of eight components cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion; step 8 `models` landed deliberately inert). postgresql **P0–P13 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), and P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven). **Only P14 remains** (old-bucket lockdown/decommission). Owner as of 2026-09-04 evening: `zuno-demo-c0`.
+- **State:** Operator pending — seven of eight components cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion; step 8 `models` landed deliberately inert). postgresql **P0–P13 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), and P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven). **P14's lockdown half is done**: 5 of 7 old buckets carry a counter-tested Deny policy (read-only cooling period); `zuno-demo-rag-corpus` deliberately excluded (still live); actual deletion of the locked buckets is the one thing left, after the cooling period. Owner as of 2026-09-04 evening: `zuno-demo-c0`.
 - **ADRs:** [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (`Accepted` 2026-09-04 — this WP satisfied its acceptance criterion 2),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) (B12),
@@ -421,8 +421,22 @@ P13  NOT YET DONE - deliberate stop. repo2 retention (repo2-retention-full and
      here because it happens in the NEW bucket while the old one is still
      intact; set at P7 it would have deleted the history just migrated. Then
      the chart default flip. Awaiting explicit operator go-ahead.
-P14  NOT YET DONE. Old bucket read-only (explicit Deny policy) for a full
-     cycle, then delete.
+P14  LOCKDOWN DONE 2026-09-05, deletion still pending the cooling period.
+     Five of the seven old buckets now carry a WP131-P14-ReadOnlyCoolingPeriod
+     Deny policy (blocks Put/Delete/Tag/DeleteBucket, allows read),
+     counter-tested with a real PutObject attempt on each (AccessDenied with
+     an explicit-deny message, not just a config read-back):
+       zuno-aap-hub, zuno-demo-rhoai-traces (zuno-demo-65, confirmed empty)
+       zuno-data-pgbackups, zuno-corpus, zuno-demo-sxa-corpus (zuno-demo-c0 -
+       confirmed via both a repo-wide grep for live references AND a live
+       S3 last-write timestamp check per bucket, independently cross-checked
+       by zuno-demo-65; oldest live write 2026-09-04T19:09:02Z, i.e. exactly
+       when the P7 postgresql flip stopped writing there)
+     zuno-demo-rag-corpus is DELIBERATELY NOT locked - still serves live
+     model weights and rag-ingestion's re-ingestion into zuno-demo222-data
+     is not complete (corpus.deleteOrphans still pinned false). Deletion of
+     the five locked buckets is a separate, later step after the cooling
+     period - not done yet.
 ```
 
 ### What is lost if the order is wrong
