@@ -150,11 +150,18 @@ spec:
 repo2 needs its own `if` because `global:` sits outside the s3.enabled guard
 that wraps `repos:` below. The value equals PGO's own default for a cloud repo,
 so adding it is inert - it exists so WP-131 can move the repo by changing a
-variable instead of discovering where PGO decided to write. Deliberately no
-repo2 retention key: setting one makes the next backup `expire` older sets,
-which during a migration deletes the history just copied (WP-131 P12, never P6).
+variable instead of discovering where PGO decided to write.
 */}}
         repo2-path: {{ .Values.backups.s3.path | quote }}
+        # WP-131 P13: retention added only after the cutover's second restore
+        # drill passed against the NEW bucket (P12) - setting this any earlier
+        # would have made the next backup `expire` the history the migration
+        # had just copied, while the old bucket was the only intact copy.
+        # Mirrors repo1's count-based retention; repo2-retention-archive
+        # follows repo2-retention-full by pgBackRest's own default (its type
+        # defaults to "full"), so no separate archive key is needed.
+        repo2-retention-full: "4"
+        repo2-retention-full-type: count
 {{- end }}
 {{- /*
 Required for `make d3 backup postgresql` to do anything at all: PGO acts on the
