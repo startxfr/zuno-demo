@@ -77,7 +77,7 @@
 
     # --- Zuno application: presenter persona can authenticate; Projects --
 
-    - name: "demo-check | run the presenter persona/projects/models probe"
+    - name: "demo-check | run the presenter persona/projects probe"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/demo_persona_probe_job.yml"
 
     - name: "demo-check | record the persona-auth and projects results"
@@ -87,12 +87,12 @@
             _demo_check_results + [
               {
                 "agent": "comage", "layer": "availability", "id": "persona-auth", "category": "demo-persona",
-                "passed": demo_persona_probe_result.auth.auth_ok, "detail": demo_persona_probe_result.auth.detail, "duration_ms": 0
+                "passed": demo_persona_probe_result.auth_ok, "detail": demo_persona_probe_result.detail, "duration_ms": 0
               },
               {
                 "agent": "platform", "layer": "availability", "id": "demo-projects", "category": "demo-project",
-                "passed": (demo_persona_probe_result.auth.missing | default([]) | length) == 0,
-                "detail": "projects=" + (demo_persona_probe_result.auth.projects | default([]) | to_json) + " missing=" + (demo_persona_probe_result.auth.missing | default([]) | join(',')),
+                "passed": (demo_persona_probe_result.missing | default([]) | length) == 0,
+                "detail": "projects=" + (demo_persona_probe_result.projects | default([]) | to_json) + " missing=" + (demo_persona_probe_result.missing | default([]) | join(',')),
                 "duration_ms": 0
               }
             ]
@@ -112,22 +112,54 @@
       loop: "{{ demo_required_projects | dict2items }}"
       loop_control:
         label: "{{ item.key }}"
-      when: item.key in (demo_persona_probe_result.auth.missing | default([]))
+      when: item.key in (demo_persona_probe_result.missing | default([]))
 
     # --- Models/providers ----------------------------------------------------
-    # Probed from inside the same in-cluster Job as the persona/projects check
-    # above, not from the Ansible control node - live-caught 2026-09-05
-    # running `make demo-check` from a plain workstation: `*.svc.cluster.local`
-    # DNS names are unresolvable from outside the cluster network, the same
-    # reachability boundary ansible/roles/day3/tasks/platform_health_check.yml
-    # already works around with an in-cluster Job.
+    # Reads each local model's LLMInferenceService Ready condition straight
+    # from the Kubernetes API - not a workload HTTP call. Live-caught
+    # 2026-09-05: a direct /v1/models call from the Ansible control node hits
+    # unresolvable *.svc.cluster.local DNS from a plain workstation, and the
+    # SAME call from inside the acceptance-gate Job (which does resolve it)
+    # gets "Connection reset by peer" - gitops/charts/models's own
+    # NetworkPolicies (networkpolicy-gptoss.yaml/networkpolicy-qwen35.yaml)
+    # allow port 8000 only from ai-gateway/rag-service/the MaaS gateway/
+    # lightspeed/monitoring/lm-eval, never from acceptance-gate. Widening
+    # that allow-list for a presenter preflight tool would be a real
+    # security-boundary change this WP does not make unilaterally. The
+    # Ready condition is a control-plane read (kube-apiserver, via the
+    # operator's own kubeconfig) and is never subject to a workload
+    # NetworkPolicy - same mechanism
+    # ansible/roles/argocd/tasks/apply_resource_health_checks.yml already
+    # trusts for KServe health.
+    - name: "demo-check | look up each local model's LLMInferenceService"
+      kubernetes.core.k8s_info:
+        api_version: serving.kserve.io/v1alpha2
+        kind: LLMInferenceService
+        namespace: "{{ demo_namespace }}"
+        name: "{{ item }}"
+      register: _demo_check_model_isvcs
+      ignore_errors: true
+      loop: ["gpt-oss-20b", "qwen35-9b", "qwen35-9b-wesh"]
+      loop_control:
+        label: "{{ item }}"
 
     - name: "demo-check | record local model readiness results"
       ansible.builtin.set_fact:
-        _demo_check_results: "{{ _demo_check_results + [{'agent': item.model, 'layer': 'availability', 'id': 'v1-models', 'category': 'demo-model', 'passed': item.ok, 'detail': item.detail, 'duration_ms': 0}] }}"
-      loop: "{{ demo_persona_probe_result.models | default([]) }}"
+        _demo_check_results: "{{ _demo_check_results + [_demo_check_model_row] }}"
+      loop: "{{ _demo_check_model_isvcs.results }}"
       loop_control:
-        label: "{{ item.model }}"
+        label: "{{ item.item }}"
+      vars:
+        _demo_check_model_found: "{{ (item.resources | default([]) | length) > 0 }}"
+        _demo_check_model_ready: "{{ (item.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) if _demo_check_model_found else 'False' }}"
+        _demo_check_model_row:
+          agent: "{{ item.item }}"
+          layer: availability
+          id: llminferenceservice-ready
+          category: demo-model
+          passed: "{{ _demo_check_model_ready == 'True' }}"
+          detail: "{{ 'Ready' if _demo_check_model_ready == 'True' else ('LLMInferenceService not found' if not _demo_check_model_found else 'Ready condition status=' + _demo_check_model_ready) }}"
+          duration_ms: 0
 
     # External providers (OVHcloud, Codestral): no live smoke-test
     # mechanism exists in this repo (evaluations/tekos/gate_checks.py only

@@ -42,10 +42,10 @@
     - name: "demo-reset | print the project-provisioning result"
       ansible.builtin.debug:
         msg: >-
-          demo projects: present={{ demo_persona_probe_result.auth.projects | map(attribute='title') | list }}
-          created-this-run={{ demo_persona_probe_result.auth.created | default([]) }}
-          still-missing={{ demo_persona_probe_result.auth.missing | default([]) }}
-          - {{ demo_persona_probe_result.auth.detail }}
+          demo projects: present={{ demo_persona_probe_result.projects | map(attribute='title') | list }}
+          created-this-run={{ demo_persona_probe_result.created | default([]) }}
+          still-missing={{ demo_persona_probe_result.missing | default([]) }}
+          - {{ demo_persona_probe_result.detail }}
 
 - import_playbook: day3_scenario_failover_node_restore.yml
 

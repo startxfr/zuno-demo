@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""WP-136/ADR-0550: verify the webinar presenter persona can authenticate,
-can see the three named demo projects, and that the three local models
-answer - as `make demo-check`'s "Zuno application"/"Projects"/"Models"
-sections require.
+"""WP-136/ADR-0550: verify the webinar presenter persona can authenticate
+and can see the three named demo projects, as `make demo-check`'s "Zuno
+application"/"Projects" sections require.
 
 Reuses evaluations/tekos/run_scenarios.py's Keycloak auth helper rather
 than reimplementing a token exchange - same cross-agent trick
@@ -14,13 +13,20 @@ agent-agnostic (ADR-0527 clause 6 - a project is cross-agent), so any one
 agent's persona token is sufficient to prove the check; AGENT defaults to
 comage to match this repo's existing demo-persona ("sale-01") fixture.
 
-The three local models are probed from THIS SAME in-cluster Job rather
-than from the Ansible control node - live-caught 2026-09-05 running
-`make demo-check` from a plain workstation: the control node has no route
-to `*.svc.cluster.local` DNS names at all (`urlopen error [Errno -2] Nom
-ou service inconnu`), while this Job's pod (same acceptance-gate identity
-already proven able to reach agent-runtime for the projects check above)
-does.
+Does NOT probe the three local models - live-caught 2026-09-05 running
+`make demo-check` from a plain workstation (DNS to `*.svc.cluster.local`
+unresolvable there) and then from this same in-cluster Job (DNS resolves,
+but the connection is reset: gitops/charts/models's own NetworkPolicies
+(networkpolicy-gptoss.yaml/networkpolicy-qwen35.yaml) allow ingress on
+port 8000 only from ai-gateway/rag-service/the MaaS gateway/lightspeed/
+monitoring/lm-eval - never from this acceptance-gate-labeled pod, and
+widening that allow-list for a presenter preflight tool is a real
+security-boundary change, not this WP's call to make unilaterally).
+ansible/playbooks/demo_check.yml instead reads each model's
+LLMInferenceService `Ready` condition directly from the Kubernetes API
+(same mechanism ansible/roles/argocd/tasks/apply_resource_health_checks.yml
+already trusts) - a control-plane read, never subject to a workload
+NetworkPolicy.
 
 `--ensure-projects` (used by `make demo-reset`, never by the read-only
 `make demo-check`) creates any missing demo project via this same
@@ -39,12 +45,11 @@ Usage:
     AGENT=comage python3 evaluations/demo_presenter_probe.py --persona sale-01 [--ensure-projects]
 
 Prints one JSON object to stdout:
-{"auth": {"auth_ok", "persona", "projects": [{"title", "classification"}, ...],
-          "missing": [...], "created": [...], "detail"},
- "models": [{"model", "ok", "detail"}, ...]}
-Exit code 0 regardless of whether any individual probe succeeded - every
-failure is reported IN the JSON body, so the calling playbook can add each
-as its own row to the demo-check report rather than aborting early.
+{"auth_ok", "persona", "projects": [{"title", "classification"}, ...],
+ "missing": [...], "created": [...], "detail"}
+Exit code 0 regardless of whether the probe itself succeeded - failure is
+reported IN the JSON body, so the calling playbook can add it as one more
+row to the demo-check report rather than aborting the whole check early.
 """
 from __future__ import annotations
 
@@ -73,14 +78,6 @@ REQUIRED_PROJECTS = {
 # this module's own docstring for why a single creator-only grant is not
 # enough (sale-01/consultant-01 are in disjoint Keycloak groups).
 _DEMO_PROJECT_GRANT_GROUPS = ["consultant", "sales"]
-
-# ADR-0521-style workload Service naming (<name>-kserve-workload-svc), same
-# three local models WP-136's demo-check section lists.
-LOCAL_MODELS = [
-    {"model": "gpt-oss-20b", "service": "gpt-oss-20b-kserve-workload-svc"},
-    {"model": "qwen3.5-9b", "service": "qwen35-9b-kserve-workload-svc"},
-    {"model": "qwen3.5-9b-wesh", "service": "qwen35-9b-wesh-kserve-workload-svc"},
-]
 
 
 def _list_projects(persona: str, timeout_seconds: float):
@@ -155,30 +152,13 @@ def probe_auth_and_projects(persona: str, timeout_seconds: float = 30, ensure_pr
     return {"auth_ok": True, "persona": persona, "projects": projects, "missing": missing, "created": created, "detail": detail}
 
 
-def probe_models(timeout_seconds: float = 10) -> list:
-    results = []
-    for entry in LOCAL_MODELS:
-        url = f"https://{entry['service']}.zuno-ai-run.svc.cluster.local:8000/v1/models"
-        try:
-            resp = httpx.get(url, timeout=timeout_seconds, verify=False)
-            ok = resp.status_code == 200
-            detail = "reachable" if ok else f"status={resp.status_code}"
-        except Exception as exc:
-            ok, detail = False, str(exc)
-        results.append({"model": entry["model"], "ok": ok, "detail": detail})
-    return results
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--persona", required=True)
     parser.add_argument("--timeout-seconds", type=float, default=30)
     parser.add_argument("--ensure-projects", action="store_true", default=False)
     args = parser.parse_args()
-    print(json.dumps({
-        "auth": probe_auth_and_projects(args.persona, args.timeout_seconds, ensure_projects=args.ensure_projects),
-        "models": probe_models(),
-    }))
+    print(json.dumps(probe_auth_and_projects(args.persona, args.timeout_seconds, ensure_projects=args.ensure_projects)))
     return 0
 
 

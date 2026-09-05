@@ -251,8 +251,7 @@
   ansible.builtin.set_fact:
     demo_persona_probe_result: >-
       {{
-        {"auth": {"auth_ok": false, "persona": "sale-01", "projects": [], "missing": ["webinar-public", "webinar-confidential", "webinar-restricted"], "created": [],
-                  "detail": "zuno-demo-persona-probe produced no JSON verdict line - see the raw log: " + (_dpp_log.log_lines | default(['no pod/log found']) | join(' | '))},
-         "models": [{"model": "gpt-oss-20b", "ok": false, "detail": "no verdict"}, {"model": "qwen3.5-9b", "ok": false, "detail": "no verdict"}, {"model": "qwen3.5-9b-wesh", "ok": false, "detail": "no verdict"}]}
+        {"auth_ok": false, "persona": "sale-01", "projects": [], "missing": ["webinar-public", "webinar-confidential", "webinar-restricted"], "created": [],
+         "detail": "zuno-demo-persona-probe produced no JSON verdict line - see the raw log: " + (_dpp_log.log_lines | default(['no pod/log found']) | join(' | '))}
       }}
   when: demo_persona_probe_result is not defined
