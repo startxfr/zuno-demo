@@ -842,7 +842,7 @@ qwen35Model:
   # ADR-0546/WP-131: which bucket this model's weights are read from -
   # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
   # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
-  s3Source: models
+  s3Source: sources
   # Deliberately BELOW the 32768 the 48GB models use - see the block
   # comment above. Raising this is the first thing to suspect if the pod
   # OOMs or vLLM fails to allocate its KV pool at startup.
