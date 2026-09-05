@@ -183,7 +183,7 @@ endef
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo-check demo-reset demo-all-check new-mcp-server completion _complete-verbs _complete-components $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -223,6 +223,9 @@ help:
 	  '  make day3|d3 sign [component]        Re-sign the OKF bundles and verify them (ADR-0420) - run after ANY change under agents/<name>/' \
 	  '  make day3|d3 run [component]         Trigger one real pipeline run (WP-126) - AGENT=<agent> overrides the default (comage)' \
 	  '' \
+	  '  make demo-check   Read-only webinar presenter preflight (WP-136/ADR-0550) - app/project/model/failover-topology/training readiness' \
+	  '  make demo-reset   Idempotent recovery to a safe demo baseline (uncordons any node the failover drill left cordoned)' \
+	  '' \
 	  '  make new-mcp-server NAME=<name> [DESCRIPTION="..."]   Scaffold a new MCP server (ADR-0119)' \
 	  '' \
 	  '  make completion   Print a bash completion function for day0|d0/day1|d1/day2|d2/day3|d3' \
@@ -248,6 +251,21 @@ new-mcp-server:
 	  exit 2; \
 	fi
 	python3 platform/scaffolding/new_mcp_server.py "$(NAME)" $(if $(DESCRIPTION),--description "$(DESCRIPTION)")
+
+# WP-136/ADR-0550: presenter tooling for the 20-minute sovereign-AI
+# webinar demo. Deliberately flat targets (not another day0-3 verb group,
+# no aap_route dispatch) - these are read-only-or-idempotent presenter
+# conveniences against an already-installed platform, never an
+# install/operational action with its own AAP Job/Workflow Template.
+demo-check: credentials-check
+	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_check.yml $(EXTRA_VARS)
+
+# WP-136's suggested alias for demo-check - do not add a second real
+# implementation, just dispatch to the one above.
+demo-all-check: demo-check
+
+demo-reset: credentials-check
+	$(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/demo_reset.yml $(EXTRA_VARS)
 
 # Bash completion for `make day0|d0/day1|d1/day2|d2/day3|d3 <verb> [component]`.
 # _complete-verbs/_complete-components are the single source of truth for

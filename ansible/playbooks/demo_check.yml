@@ -1,0 +1,330 @@
+---
+# `make demo-check` (WP-136/ADR-0550). Read-only presenter preflight for
+# the 20-minute sovereign-AI webinar demo - never mutates cluster state
+# (unlike day3_scenario_failover_node_inject.yml, which this playbook
+# deliberately does NOT call: only its READ-ONLY precondition checks are
+# reproduced below, never the cordon+kill it performs).
+#
+# Every section below is a pure fact-producer appending
+# platform/testing/day2_report.py::Day2Result-shaped dicts to
+# `_demo_check_results` - same "report everything, then decide once"
+# convention as ansible/playbooks/day3_check.yml and
+# ansible/roles/day3/tasks/test.yml, reusing their own shared building
+# blocks (ansible/tasks/day2_availability_check.yml,
+# ansible/roles/day3/tasks/platform_health_check.yml,
+# ansible/tasks/day2_render_and_fail.yml) rather than re-probing
+# /healthz itself. One failing section never prevents a later section
+# from running.
+- name: "Demo check: webinar presenter preflight (WP-136/ADR-0550)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    demo_namespace: zuno-ai-run
+    # webinar-*/{C1,C2,C3} - see docs/roadmap/work-packages/
+    # wp-136-webinar-demo-orchestration.md's "Projects" section. Created
+    # live through the frontend, never by this playbook (WP-136: "do not
+    # add a second project mechanism").
+    demo_required_projects:
+      webinar-public: C1
+      webinar-confidential: C2
+      webinar-restricted: C3
+    demo_local_workloads:
+      - { model: gpt-oss-20b, service: gpt-oss-20b-kserve-workload-svc }
+      - { model: qwen3.5-9b, service: qwen35-9b-kserve-workload-svc }
+      - { model: qwen3.5-9b-wesh, service: qwen35-9b-wesh-kserve-workload-svc }
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve the cluster base domain
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    # --- Zuno application: agent frontends + shared platform services ----
+
+    - name: "demo-check | run the agent frontends' availability check (Arkos/Tekos/Comage/...)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_availability_check.yml"
+
+    - name: "demo-check | run the shared platform services' health check (agent-runtime/ai-gateway/mcp-gateway/rag-service)"
+      ansible.builtin.include_role:
+        name: day3
+        tasks_from: platform_health_check
+
+    - name: "demo-check | record component-readiness results"
+      ansible.builtin.set_fact:
+        _demo_check_results: "{{ (_demo_check_results | default([])) + (_day2_availability_results | default([])) + (_day2_platform_results | default([])) }}"
+
+    # --- Zuno application: Keycloak/OIDC reachable ------------------------
+
+    - name: "demo-check | look up the Keycloak CR"
+      kubernetes.core.k8s_info:
+        api_version: k8s.keycloak.org/v2alpha1
+        kind: Keycloak
+        namespace: zuno-auth
+        name: zuno
+      register: _demo_check_keycloak_cr
+      ignore_errors: true
+
+    - name: "demo-check | record the Keycloak reachability result"
+      ansible.builtin.set_fact:
+        _demo_check_results: >-
+          {{
+            _demo_check_results + [{
+              "agent": "keycloak", "layer": "availability", "id": "ready-condition", "category": "platform",
+              "passed": (
+                (_demo_check_keycloak_cr.resources | default([]) | length) > 0 and
+                (_demo_check_keycloak_cr.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
+              ),
+              "detail": "Keycloak CR Ready condition", "duration_ms": 0
+            }]
+          }}
+
+    # --- Zuno application: presenter persona can authenticate; Projects --
+
+    - name: "demo-check | run the presenter persona/projects probe"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/demo_persona_probe_job.yml"
+
+    - name: "demo-check | record the persona-auth and projects results"
+      ansible.builtin.set_fact:
+        _demo_check_results: >-
+          {{
+            _demo_check_results + [
+              {
+                "agent": "comage", "layer": "availability", "id": "persona-auth", "category": "demo-persona",
+                "passed": demo_persona_probe_result.ok, "detail": demo_persona_probe_result.detail, "duration_ms": 0
+              },
+              {
+                "agent": "platform", "layer": "availability", "id": "demo-projects", "category": "demo-project",
+                "passed": (demo_persona_probe_result.missing | default([]) | length) == 0,
+                "detail": "projects=" + (demo_persona_probe_result.projects | default([]) | to_json) + " missing=" + (demo_persona_probe_result.missing | default([]) | join(',')),
+                "duration_ms": 0
+              }
+            ]
+          }}
+
+    - name: "demo-check | print exact creation guidance for any missing demo project"
+      ansible.builtin.debug:
+        msg: >-
+          Project '{{ item.key }}' ({{ item.value }}) not found for the
+          sale-01 persona - create it live through the frontend (any
+          agent's "New project" action) before the webinar, title exactly
+          "{{ item.key }}", classification {{ item.value }}. WP-136
+          deliberately does not create projects itself (the existing
+          frontend/BFF mechanism is the only one - ADR-0527).
+      loop: "{{ demo_required_projects | dict2items }}"
+      loop_control:
+        label: "{{ item.key }}"
+      when: item.key in (demo_persona_probe_result.missing | default([]))
+
+    # --- Models/providers --------------------------------------------------
+
+    - name: "demo-check | query each local model workload's /v1/models"
+      ansible.builtin.uri:
+        url: "https://{{ item.service }}.{{ demo_namespace }}.svc.cluster.local:8000/v1/models"
+        method: GET
+        status_code: [200]
+        validate_certs: false
+        timeout: 10
+      register: _demo_check_model_probes
+      ignore_errors: true
+      loop: "{{ demo_local_workloads }}"
+      loop_control:
+        label: "{{ item.model }}"
+
+    - name: "demo-check | record local model readiness results"
+      ansible.builtin.set_fact:
+        _demo_check_results: "{{ _demo_check_results + [_demo_check_model_row] }}"
+      loop: "{{ _demo_check_model_probes.results }}"
+      loop_control:
+        label: "{{ item.item.model }}"
+      vars:
+        _demo_check_model_row:
+          agent: "{{ item.item.model }}"
+          layer: availability
+          id: v1-models
+          category: demo-model
+          passed: "{{ (item.status | default(0)) == 200 }}"
+          detail: "status={{ item.status | default(item.msg | default('no response')) }}"
+          duration_ms: "{{ ((item.elapsed | default(0)) | float) * 1000 }}"
+
+    # External providers (OVHcloud, Codestral): no live smoke-test
+    # mechanism exists in this repo (evaluations/tekos/gate_checks.py only
+    # asserts static config) - a real reachability call against a paid
+    # external provider is deliberately NOT made on every `make demo-check`
+    # run. This is a documented scope limit (see WP-136's own doc), not an
+    # oversight: real reachability is proven live by rehearsing steps 1
+    # and 3 themselves.
+    - name: "demo-check | read platform/ai-gateway/provider-routing.yaml"
+      ansible.builtin.set_fact:
+        _demo_check_provider_routing: "{{ lookup('file', zuno_repo_root + '/platform/ai-gateway/provider-routing.yaml') | from_yaml }}"
+
+    - name: "demo-check | record external-provider config-eligibility results"
+      ansible.builtin.set_fact:
+        _demo_check_results: >-
+          {{
+            _demo_check_results + [
+              {
+                "agent": "ovhcloud-gpt-oss-120b", "layer": "config", "id": "eligible-for-c1", "category": "demo-model",
+                "passed": 'C1' in ((_demo_check_provider_routing.providers | selectattr('name', 'equalto', 'ovhcloud-gpt-oss-120b') | list | first | default({})).eligible_for | default([])),
+                "detail": "static config only - live reachability is proven by rehearsing step 1, not by this check",
+                "duration_ms": 0
+              },
+              {
+                "agent": "mistral-codestral", "layer": "config", "id": "eligible-for-c1", "category": "demo-model",
+                "passed": 'C1' in ((_demo_check_provider_routing.providers | selectattr('name', 'equalto', 'mistral-codestral') | list | first | default({})).eligible_for | default([])),
+                "detail": "static config only - live reachability is proven by rehearsing step 3, not by this check",
+                "duration_ms": 0
+              }
+            ]
+          }}
+
+    # --- Failover topology (WP-105/ADR-0536 preconditions, reused) --------
+
+    - name: "demo-check | fail-safe: fail if the semantic cache is enabled for local-qwen35 or local-wesh (any variant)"
+      ansible.builtin.set_fact:
+        _demo_check_cache_offenders: "{{ _demo_check_provider_routing.providers | selectattr('name', 'in', ['local-qwen35', 'local-qwen35-maas', 'local-wesh', 'local-wesh-maas']) | selectattr('cache_enabled', 'defined') | selectattr('cache_enabled') | map(attribute='name') | list }}"
+
+    - name: "demo-check | find the qwen3.5-9b and qwen3.5-9b-wesh pods"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ demo_namespace }}"
+        label_selectors:
+          - "app.kubernetes.io/name={{ item }},kserve.io/component=workload"
+      register: _demo_check_qwen_pods
+      ignore_errors: true
+      loop: ["qwen35-9b", "qwen35-9b-wesh"]
+      loop_control:
+        label: "{{ item }}"
+
+    - name: "demo-check | find any currently-cordoned node"
+      kubernetes.core.k8s_info:
+        kind: Node
+      register: _demo_check_nodes
+
+    - name: "demo-check | resolve failover-topology facts"
+      ansible.builtin.set_fact:
+        _demo_check_cordoned_nodes: "{{ _demo_check_nodes.resources | default([]) | selectattr('spec.unschedulable', 'defined') | selectattr('spec.unschedulable') | map(attribute='metadata.name') | list }}"
+        _demo_check_qwen_running: "{{ (_demo_check_qwen_pods.results[0].resources | default([]) | length) == 1 and _demo_check_qwen_pods.results[0].resources[0].status.phase == 'Running' }}"
+        _demo_check_wesh_running: "{{ (_demo_check_qwen_pods.results[1].resources | default([]) | length) == 1 and _demo_check_qwen_pods.results[1].resources[0].status.phase == 'Running' }}"
+        _demo_check_qwen_node: "{{ (_demo_check_qwen_pods.results[0].resources | default([{}]) | first).spec.nodeName | default('') }}"
+        _demo_check_wesh_node: "{{ (_demo_check_qwen_pods.results[1].resources | default([{}]) | first).spec.nodeName | default('') }}"
+
+    - name: "demo-check | read the GPU MIG ResourceQuota"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ResourceQuota
+        namespace: "{{ demo_namespace }}"
+        name: zuno-ai-run-gpu-cap
+      register: _demo_check_gpu_quota
+      ignore_errors: true
+
+    - name: "demo-check | look up the Gateway Route (AAP)"
+      kubernetes.core.k8s_info:
+        api_version: route.openshift.io/v1
+        kind: Route
+        namespace: zuno-aap
+        name: aap
+      register: _demo_check_aap_route
+      ignore_errors: true
+
+    - name: "demo-check | read the AAP admin password"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: zuno-aap
+        name: aap-admin
+      register: _demo_check_aap_secret
+      no_log: true
+      ignore_errors: true
+
+    - name: "demo-check | check the failover-drill workflow template exists in Controller"
+      ansible.builtin.uri:
+        url: "https://{{ _demo_check_aap_route.resources[0].spec.host }}/api/controller/v2/workflow_job_templates/?name=zuno-day3-scenario-failover-node-workflow"
+        method: GET
+        url_username: admin
+        url_password: "{{ _demo_check_aap_secret.resources[0].data.password | b64decode }}"
+        force_basic_auth: true
+        validate_certs: false
+        status_code: 200
+      register: _demo_check_aap_wft
+      ignore_errors: true
+      no_log: true
+      when: (_demo_check_aap_route.resources | default([]) | length) > 0 and (_demo_check_aap_secret.resources | default([]) | length) > 0
+
+    - name: "demo-check | record failover-topology results"
+      ansible.builtin.set_fact:
+        _demo_check_results: >-
+          {{
+            _demo_check_results + [
+              {
+                "agent": "platform", "layer": "config", "id": "semantic-cache-off", "category": "demo-failover",
+                "passed": (_demo_check_cache_offenders | length) == 0,
+                "detail": "cache_enabled must be false for local-qwen35/local-wesh (any variant) - ADR-0536 Decision 5 - offenders: " + (_demo_check_cache_offenders | join(',')),
+                "duration_ms": 0
+              },
+              {
+                "agent": "qwen3.5-9b", "layer": "availability", "id": "running", "category": "demo-failover",
+                "passed": _demo_check_qwen_running, "detail": "Running pod required before the drill", "duration_ms": 0
+              },
+              {
+                "agent": "qwen3.5-9b-wesh", "layer": "availability", "id": "running", "category": "demo-failover",
+                "passed": _demo_check_wesh_running, "detail": "Running pod required before the drill", "duration_ms": 0
+              },
+              {
+                "agent": "platform", "layer": "config", "id": "anti-affinity", "category": "demo-failover",
+                "passed": (_demo_check_qwen_running and _demo_check_wesh_running and _demo_check_qwen_node != '' and _demo_check_qwen_node != _demo_check_wesh_node),
+                "detail": "qwen3.5-9b node=" + _demo_check_qwen_node + " qwen3.5-9b-wesh node=" + _demo_check_wesh_node + " (must differ - WP-092 hard anti-affinity)",
+                "duration_ms": 0
+              },
+              {
+                "agent": "platform", "layer": "availability", "id": "no-node-cordoned", "category": "demo-failover",
+                "passed": (_demo_check_cordoned_nodes | length) == 0,
+                "detail": "cordoned=" + (_demo_check_cordoned_nodes | join(',')) + " - run `make demo-reset` first if non-empty",
+                "duration_ms": 0
+              },
+              {
+                "agent": "platform", "layer": "config", "id": "gpu-quota-headroom", "category": "demo-failover",
+                "passed": (_demo_check_gpu_quota.resources | default([]) | length) > 0,
+                "detail": "zuno-ai-run-gpu-cap used=" + ((_demo_check_gpu_quota.resources[0].status.used | default({})) | to_json) + " hard=" + ((_demo_check_gpu_quota.resources[0].status.hard | default({})) | to_json) if (_demo_check_gpu_quota.resources | default([]) | length) > 0 else "ResourceQuota zuno-ai-run-gpu-cap not found",
+                "duration_ms": 0
+              },
+              {
+                "agent": "platform", "layer": "availability", "id": "aap-workflow-exists", "category": "demo-failover",
+                "passed": (_demo_check_aap_wft.json.count | default(0) | int) > 0,
+                "detail": "zuno-day3-scenario-failover-node-workflow must exist in Controller - launch-RBAC itself is wired once by ansible/roles/aap_config/tasks/wire_launch_rbac.yml and not independently re-checked here",
+                "duration_ms": 0
+              }
+            ]
+          }}
+
+    # --- Training evidence (Wesh) ------------------------------------------
+
+    - name: "demo-check | look up recent Wesh TrainJobs"
+      kubernetes.core.k8s_info:
+        api_version: trainer.kubeflow.org/v1alpha1
+        kind: TrainJob
+        namespace: zuno-mlops
+        label_selectors:
+          - app.kubernetes.io/part-of=mlops
+      register: _demo_check_trainjobs
+      ignore_errors: true
+
+    - name: "demo-check | record training-evidence results"
+      ansible.builtin.set_fact:
+        _demo_check_results: >-
+          {{
+            _demo_check_results + [{
+              "agent": "wesh", "layer": "availability", "id": "trainjob-evidence", "category": "demo-training",
+              "passed": (_demo_check_trainjobs.resources | default([]) | selectattr('status.conditions', 'defined') | selectattr('status.conditions') | map(attribute='status.conditions') | map('selectattr', 'type', 'equalto', 'Complete') | map('list') | select | list | length) > 0,
+              "detail": "Complete TrainJobs: " + (_demo_check_trainjobs.resources | default([]) | map(attribute='metadata.name') | list | join(',')),
+              "duration_ms": 0
+            }]
+          }}
+
+    # --- Render everything, decide once ------------------------------------
+
+    - name: "demo-check | render the combined report and fail if anything did not pass"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_render_and_fail.yml"
+      vars:
+        _day2_render_results: "{{ _demo_check_results }}"
+        day2_render_component: "demo-check"

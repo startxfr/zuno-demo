@@ -1,0 +1,246 @@
+---
+# WP-136/ADR-0550: runs evaluations/demo_presenter_probe.py as a one-shot
+# in-cluster Job, then parses its single JSON output line into the
+# `demo_persona_probe_result` fact. Included from ansible/playbooks/
+# demo_check.yml only.
+#
+# Same "no external Route into agent-runtime, must run in-cluster with
+# the acceptance-gate identity" reasoning as
+# ansible/roles/day3/tasks/platform_health_check.yml and
+# ansible/tasks/scenario_failover_probe_job.yml (whose own comment
+# documents the NetworkPolicy allow-list this Job's pod label satisfies).
+# Deliberately smaller than scenario_failover_probe_job.yml: only one
+# frontend client secret (comage, since GET /v1/projects is agent-agnostic
+# - ADR-0527 clause 6) and no Prometheus token, since this probe never
+# reads a metric.
+#
+# Requires cluster_base_domain (ansible/tasks/resolve_cluster_base_domain.yml)
+# and k8s_auth_environment (ansible/tasks/load_k8s_auth_env.yml) already
+# resolved by the calling playbook.
+
+- name: "demo-persona-probe | read the demo-persona password from zuno-auth"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: demo-personas-password
+  register: _dpp_password_secret
+  no_log: true
+
+- name: "demo-persona-probe | read the comage-frontend client secret from zuno-auth"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: comage-frontend-client-secret
+  register: _dpp_client_secret
+  no_log: true
+
+- name: "demo-persona-probe | read the platform's internal root CA from openshift-config"
+  kubernetes.core.k8s_info:
+    kind: ConfigMap
+    namespace: openshift-config
+    name: keycloak-serving-ca
+  register: _dpp_ca_cm
+
+- name: "demo-persona-probe | fail if any required credential is missing"
+  ansible.builtin.fail:
+    msg: >-
+      One of demo-personas-password (zuno-auth), comage-frontend-client-secret
+      (zuno-auth) or openshift-config/keycloak-serving-ca was not found -
+      each is provisioned by an existing component (keycloak,
+      openshift-oauth) this check does not itself install.
+  when: >-
+    (_dpp_password_secret.resources | default([]) | length) == 0 or
+    (_dpp_client_secret.resources | default([]) | length) == 0 or
+    (_dpp_ca_cm.resources | default([]) | length) == 0
+
+- name: "demo-persona-probe | copy the credentials into a zuno-ai-run Secret the Job can mount"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: demo-persona-probe-credentials
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      type: Opaque
+      data:
+        demo-persona-password: "{{ _dpp_password_secret.resources[0].data.password }}"
+        comage-client-secret: "{{ _dpp_client_secret.resources[0].data.client_secret }}"
+  no_log: true
+
+- name: "demo-persona-probe | copy the internal root CA into a zuno-ai-run ConfigMap the Job can mount"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: demo-persona-probe-ca
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        ca.crt: "{{ _dpp_ca_cm.resources[0].data['ca.crt'] }}"
+
+- name: "demo-persona-probe | build the probe scripts ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: demo-persona-probe-scripts
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        demo_presenter_probe.py: "{{ lookup('file', zuno_repo_root + '/evaluations/demo_presenter_probe.py') }}"
+        run_scenarios.py: "{{ lookup('file', zuno_repo_root + '/evaluations/tekos/run_scenarios.py') }}"
+
+- name: "demo-persona-probe | delete any previous probe Job (Jobs are immutable, this task is idempotent-by-recreation)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    name: "zuno-demo-persona-probe"
+    namespace: zuno-ai-run
+    wait: true
+
+- name: "demo-persona-probe | run the probe Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: "zuno-demo-persona-probe"
+        namespace: zuno-ai-run
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        backoffLimit: 0
+        activeDeadlineSeconds: 300
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: acceptance-gate
+          spec:
+            restartPolicy: Never
+            priorityClassName: zuno-platform-weak
+            serviceAccountName: acceptance-gate
+            containers:
+              - name: demo-persona-probe
+                image: "docker.io/library/python:3.12-slim"
+                command:
+                  - sh
+                  - -c
+                  - >-
+                    pip install --quiet --no-cache-dir httpx pyyaml &&
+                    CERTIFI=$(python3 -c 'import certifi; print(certifi.where())') &&
+                    cat /gate-ca/ca.crt >> "$CERTIFI" &&
+                    export SSL_CERT_FILE="$CERTIFI" &&
+                    python3 /gate/demo_presenter_probe.py --persona sale-01
+                workingDir: /gate
+                resources:
+                  requests:
+                    cpu: 100m
+                    memory: 256Mi
+                  limits:
+                    cpu: 500m
+                    memory: 512Mi
+                env:
+                  - name: PYTHONUNBUFFERED
+                    value: "1"
+                  - name: HOME
+                    value: /tmp
+                  - name: PYTHONUSERBASE
+                    value: /tmp/.pyuser
+                  - name: AGENT
+                    value: comage
+                  - name: KEYCLOAK_URL
+                    value: "https://keycloak.{{ cluster_base_domain }}"
+                  - name: RUNTIME_URL
+                    value: "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"
+                  - name: DEMO_PERSONA_PASSWORD
+                    valueFrom:
+                      secretKeyRef:
+                        name: demo-persona-probe-credentials
+                        key: demo-persona-password
+                  - name: COMAGE_FRONTEND_CLIENT_SECRET
+                    valueFrom:
+                      secretKeyRef:
+                        name: demo-persona-probe-credentials
+                        key: comage-client-secret
+                volumeMounts:
+                  - name: gate
+                    mountPath: /gate
+                  - name: gate-ca
+                    mountPath: /gate-ca
+            volumes:
+              # ConfigMap data keys can't contain '/' - run_scenarios.py
+              # must land under a tekos/ subdirectory since
+              # demo_presenter_probe.py does
+              # sys.path.insert(0, .../"tekos"), same remap
+              # scenario_failover_probe_job.yml already uses.
+              - name: gate
+                configMap:
+                  name: demo-persona-probe-scripts
+                  items:
+                    - key: demo_presenter_probe.py
+                      path: demo_presenter_probe.py
+                    - key: run_scenarios.py
+                      path: tekos/run_scenarios.py
+              - name: gate-ca
+                configMap:
+                  name: demo-persona-probe-ca
+
+- name: "demo-persona-probe | wait for the probe Job to reach a terminal state"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai-run
+    name: "zuno-demo-persona-probe"
+  register: _dpp_job
+  until: >-
+    (_dpp_job.resources[0].status.succeeded | default(0)) > 0 or
+    (_dpp_job.resources[0].status.failed | default(0)) > 0
+  retries: 20
+  delay: 10
+
+- name: "demo-persona-probe | find the probe Job's pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai-run
+    label_selectors:
+      - "controller-uid={{ _dpp_job.resources[0].metadata.uid }}"
+  register: _dpp_pod
+
+- name: "demo-persona-probe | fetch the probe Job's output"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai-run
+    name: "{{ _dpp_pod.resources[0].metadata.name }}"
+  register: _dpp_log
+  when: (_dpp_pod.resources | default([]) | length) > 0
+
+- name: "demo-persona-probe | parse the probe verdict"
+  ansible.builtin.set_fact:
+    demo_persona_probe_result: >-
+      {{
+        (_dpp_log.log_lines | default([]))
+        | select('match', '^\{.*\}$')
+        | map('from_json')
+        | list
+        | last
+      }}
+  when: (_dpp_log.log_lines | default([]) | select('match', '^\{.*\}$') | list | length) > 0
+
+- name: "demo-persona-probe | record a failure row if the Job produced no parseable verdict"
+  ansible.builtin.set_fact:
+    demo_persona_probe_result: >-
+      {{
+        {"ok": false, "persona": "sale-01", "projects": [], "missing": ["webinar-public", "webinar-confidential", "webinar-restricted"],
+         "detail": "zuno-demo-persona-probe produced no JSON verdict line - see the raw log: " + (_dpp_log.log_lines | default(['no pod/log found']) | join(' | '))}
+      }}
+  when: demo_persona_probe_result is not defined

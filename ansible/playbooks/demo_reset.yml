@@ -1,0 +1,36 @@
+---
+# `make demo-reset` (WP-136/ADR-0550). Returns the environment to a safe,
+# deterministic initial state before a rehearsal or the real webinar.
+#
+# Reuses day3_scenario_failover_node_restore.yml's own uncordon/reschedule/
+# re-probe logic wholesale (WP-136's explicit instruction: "prefer
+# calling/reusing WP-105 restore logic instead of copying its
+# cordon/uncordon implementation") rather than re-deriving it here. That
+# playbook is already safely re-runnable / idempotent on its own: every
+# cordon-hunting task is gated on the qwen3.5-9b-wesh pod still being
+# Pending at the start of the run (see its own header comment,
+# live-caught 2026-08-30) - if nothing is cordoned and the pod is already
+# Running, it just re-verifies Comage routes to local-wesh and exits
+# clean. Never removes/closes demo conversation state (WP-136 allows this
+# "only if doing so is safe and documented" - no such mechanism exists
+# yet in this repo, so this is a deliberate no-op, not an oversight) and
+# never deletes training/model-registry evidence.
+- import_playbook: day3_scenario_failover_node_restore.yml
+
+- name: "Demo reset: final summary"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    # The imported playbook above already failed (non-zero exit, its own
+    # message) before this play would run if restore didn't succeed - this
+    # print only executes on the READY path, matching the WP's "print a
+    # final READY/NOT READY summary" instruction without needing to
+    # duplicate the imported playbook's own pass/fail logic.
+    - name: "demo-reset | print the READY summary"
+      ansible.builtin.debug:
+        msg: >-
+          DEMO RESET: READY - no node left cordoned, qwen3.5-9b and
+          qwen3.5-9b-wesh are both Running, Comage is back on local-wesh.
+          Run `make demo-check` next to verify the full presenter
+          preflight before rehearsing.
