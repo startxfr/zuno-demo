@@ -1,6 +1,6 @@
 # WP-131: Execute ADR-0546's cross-cluster source bucket and per-cluster S3 convention
 
-- **State:** Operator pending. All eight components now cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion, postgresql, models). postgresql **P0–P13 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), and P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven). **P14 is fully done**: the 5 old buckets that were locked (counter-tested Deny policy, read-only cooling period) were deleted the same day, confirmed gone via `head-bucket` 404s; `zuno-demo-rag-corpus` deliberately never locked/deleted (still live, models moved out of it 2026-09-05 — see "Step 8" below). **Step 8 (`models`) closed 2026-09-05**: all 5 served models cut over live, one at a time, accepted downtime; `models/` (226 objects, 164.6 GB) deleted from `zuno-demo-rag-corpus`. A stale Jinja `default('zuno-corpus')`/`default('zuno-demo-sxa-corpus')` fallback found in 3 roles during the P14 audit was fixed the same day (ADR-0547 clause 3, commit `b8065a4d`) — see "P14" below. **`zuno-demo-rag-corpus` closed 2026-09-05**: all 20 non-`sales` RAG-ingestion domains re-cut-over by forcing a real pipeline run per domain (ADR-0546 clause 1 — re-ingest, don't copy), `corpus.deleteOrphans` flipped `true`, and the bucket itself deleted — see "Closing WP-131" below. All six legacy buckets are now deleted; only **P13** (postgresql repo2 retention, deliberately deferred) remains open on this WP. Owner as of 2026-09-05: `zuno-demo-c0`.
+- **State:** **Done.** All eight components cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion, postgresql, models). postgresql **P0–P14 all done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven), and P14's 5 locked buckets were deleted, confirmed gone via `head-bucket` 404s. **Step 8 (`models`) closed 2026-09-05**: all 5 served models cut over live, one at a time, accepted downtime; `models/` (226 objects, 164.6 GB) deleted from `zuno-demo-rag-corpus`. A stale Jinja `default('zuno-corpus')`/`default('zuno-demo-sxa-corpus')` fallback found in 4 roles across the P14 audit and the later rag-ingestion pass was fixed (ADR-0547 clause 3, commits `b8065a4d`/`e3a3159f`) — see "P14" and "Closing WP-131" below. **`zuno-demo-rag-corpus` closed 2026-09-05**: all 20 non-`sales` RAG-ingestion domains re-cut-over by forcing a real pipeline run per domain (ADR-0546 clause 1 — re-ingest, don't copy), `corpus.deleteOrphans` flipped `true`, and the bucket itself deleted — see "Closing WP-131" below. All six legacy buckets are now deleted and every WP-131 step, including P13, is closed. Owner as of 2026-09-05: `zuno-demo-c0`.
 - **ADRs:** [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (`Accepted` 2026-09-04 — this WP satisfied its acceptance criterion 2),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) (B12),
@@ -416,11 +416,16 @@ P12  DONE 2026-09-04, the acceptance criterion for the cutover. Second
      319,841 = 319,841, rag-tech 69,755 = 69,755, AND an md5 over a 500-row
      ordered id sample identical on both sides
      (2b9c1eece7b83a9272b9dcad7969fcfb). Drill cluster and PVCs deleted after.
-P13  NOT YET DONE - deliberate stop. repo2 retention (repo2-retention-full and
-     the archive retention that follows it). Expiring 102 GB of WAL is safe
-     here because it happens in the NEW bucket while the old one is still
-     intact; set at P7 it would have deleted the history just migrated. Then
-     the chart default flip. Awaiting explicit operator go-ahead.
+P13  DONE 2026-09-05 (commits `bd6413bc`/`52836670`). repo2-retention-full
+     set to 4 (mirrors repo1's count-based retention) now that P12's drill
+     proved the new bucket, so pgBackRest starts expiring repo2 WAL/backups
+     instead of the old bucket staying the only intact history. Then the
+     chart's `path` default flipped from `/pgbackrest/repo2` to
+     `/postgresql` (ADR-0547 clause 4's second step), each proven by an
+     inertia diff before applying. Confirmed live: PostgresCluster carries
+     `repo2-retention-full: "4"`, `repo2-retention-full-type: count`,
+     `repo2-path: /postgresql`, and the chart's own default now reads
+     `/postgresql`.
 P14  DONE - lockdown 2026-09-05 morning, deletion 2026-09-05 midday.
      Five of the seven old buckets carried a WP131-P14-ReadOnlyCoolingPeriod
      Deny policy (blocks Put/Delete/Tag/DeleteBucket, allows read),
