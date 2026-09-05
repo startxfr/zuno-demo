@@ -1,6 +1,6 @@
 # WP-131: Execute ADR-0546's cross-cluster source bucket and per-cluster S3 convention
 
-- **State:** Operator pending. All eight components now cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion, postgresql, models). postgresql **P0–P13 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), and P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven). **P14's lockdown half is done**: 5 of 7 old buckets carry a counter-tested Deny policy (read-only cooling period); `zuno-demo-rag-corpus` deliberately excluded (still live, models moved out of it 2026-09-05 — see "Step 8" below); actual deletion of the locked buckets is the one thing left, after the cooling period. **Step 8 (`models`) closed 2026-09-05**: all 5 served models cut over live, one at a time, accepted downtime; `models/` (226 objects, 164.6 GB) deleted from `zuno-demo-rag-corpus`. Owner as of 2026-09-05: `zuno-demo-c0`.
+- **State:** Operator pending. All eight components now cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion, postgresql, models). postgresql **P0–P13 done and live-verified**: the P7 flip landed (`zuno_postgresql_backup_s3_{bucket,path}` → `zuno-demo222-backups`/`/postgresql`), `stanza-create` adopted the existing history (5 backup sets, no empty stanza), `pgbackrest verify --repo=2` passed clean on all 112 GB (0 errors), a fresh full backup landed on the new path, a second restore drill from the NEW bucket matched the live cluster exactly (rag-sxa-legacy 319,841 rows, rag-tech 69,755 rows, identical content MD5), and P13 enabled `repo2-retention-full=4` (mirrors repo1) plus flipped the chart's `path` default from `/pgbackrest/repo2` to `/postgresql` (ADR-0547 clause 4's second step, inertia-proven). **P14 is fully done**: the 5 old buckets that were locked (counter-tested Deny policy, read-only cooling period) were deleted the same day, confirmed gone via `head-bucket` 404s; `zuno-demo-rag-corpus` deliberately never locked/deleted (still live, models moved out of it 2026-09-05 — see "Step 8" below). **Step 8 (`models`) closed 2026-09-05**: all 5 served models cut over live, one at a time, accepted downtime; `models/` (226 objects, 164.6 GB) deleted from `zuno-demo-rag-corpus`. A stale Jinja `default('zuno-corpus')`/`default('zuno-demo-sxa-corpus')` fallback found in 3 roles during the P14 audit was fixed the same day (ADR-0547 clause 3, commit `b8065a4d`) — see "P14" below. Owner as of 2026-09-05: `zuno-demo-c0`.
 - **ADRs:** [ADR-0546](../../adr/0546-introduce-a-cross-cluster-source-bucket-and-per-cluster-s3-bucket-convention.md)
   (`Accepted` 2026-09-04 — this WP satisfied its acceptance criterion 2),
   [ADR-0517](../../adr/0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md) (B12),
@@ -421,8 +421,8 @@ P13  NOT YET DONE - deliberate stop. repo2 retention (repo2-retention-full and
      here because it happens in the NEW bucket while the old one is still
      intact; set at P7 it would have deleted the history just migrated. Then
      the chart default flip. Awaiting explicit operator go-ahead.
-P14  LOCKDOWN DONE 2026-09-05, deletion still pending the cooling period.
-     Five of the seven old buckets now carry a WP131-P14-ReadOnlyCoolingPeriod
+P14  DONE - lockdown 2026-09-05 morning, deletion 2026-09-05 midday.
+     Five of the seven old buckets carried a WP131-P14-ReadOnlyCoolingPeriod
      Deny policy (blocks Put/Delete/Tag/DeleteBucket, allows read),
      counter-tested with a real PutObject attempt on each (AccessDenied with
      an explicit-deny message, not just a config read-back):
@@ -432,11 +432,24 @@ P14  LOCKDOWN DONE 2026-09-05, deletion still pending the cooling period.
        S3 last-write timestamp check per bucket, independently cross-checked
        by zuno-demo-65; oldest live write 2026-09-04T19:09:02Z, i.e. exactly
        when the P7 postgresql flip stopped writing there)
-     zuno-demo-rag-corpus is DELIBERATELY NOT locked - still serves live
-     model weights and rag-ingestion's re-ingestion into zuno-demo222-data
-     is not complete (corpus.deleteOrphans still pinned false). Deletion of
-     the five locked buckets is a separate, later step after the cooling
-     period - not done yet.
+     zuno-demo-rag-corpus was DELIBERATELY NOT locked/deleted - still serves
+     rag-ingestion, and rag-ingestion's re-ingestion into zuno-demo222-data
+     is not complete (corpus.deleteOrphans still pinned false).
+     Deleted the same day, operator-run (`sx-eu-iam-user-cl` - the Deny
+     policy's `Principal: "*"` blocks even the account owner, so
+     `delete-bucket-policy` had to run before `s3 rb --force`): all 5 confirmed
+     gone via `head-bucket` returning 404 (not 403 - see the 403-vs-404 trap in
+     [[wp131-s3-migration-live-traps]]). Auditing zuno-corpus's own migration
+     status while confirming this (content: training-corpus tarball ->
+     zuno-demo-sources, mlops KFP objects -> zuno-demo222-mlops, MLflow
+     artifacts target never had anything written) surfaced a defect the
+     original WP-131 audit missed: `ansible/roles/{mlflow,mlops,rag_ingestion}`
+     still had `default('zuno-corpus')`/`default('zuno-demo-sxa-corpus')`
+     Jinja fallbacks - dormant (confidential.yml pins the real values) but
+     now doubly wrong per ADR-0547 clause 3 (S3 bucket names are a global
+     namespace; an unset variable would silently resolve to whichever AWS
+     account next registers that exact name). Fixed same day (commit
+     `b8065a4d`): replaced with the invalid placeholder `ZUNO_S3_BUCKET_NOT_SET`.
 ```
 
 ### What is lost if the order is wrong
