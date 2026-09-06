@@ -29,6 +29,19 @@ metadata:
     zuno.io/managed-by: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "-31"
+    # ADR-0517 live finding (demo333, first from-scratch Day 0 run,
+    # 2026-09-06): postgresql is a Day 0 component (ADR-0421), but Istio's
+    # CRDs are only installed by the `service_mesh` role, which is Day 1
+    # (ansible/playbooks/day1_install.yml). On a virgin cluster the
+    # DestinationRule CRD does not exist yet when this Application first
+    # syncs, and ArgoCD's dry-run validation for an unknown kind fails the
+    # ENTIRE sync operation, not just this resource - so zero of this
+    # Application's 30 resources get created, including the PostgresCluster
+    # itself. SkipDryRunOnMissingResource defers just these 4 resources
+    # until the CRD exists; selfHeal then creates them automatically once
+    # Day 1's service_mesh runs. Harmless on demo222 (mesh already
+    # installed there), required for a from-scratch cluster.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   host: {{ $.Values.cluster.name }}-{{ $svc }}.{{ $.Release.Namespace }}.svc.cluster.local
   trafficPolicy:
