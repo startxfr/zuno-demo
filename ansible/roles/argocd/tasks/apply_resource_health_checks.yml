@@ -102,3 +102,38 @@
               hs.status = "Progressing"
               hs.message = "Waiting for InferenceService to report a Ready condition"
               return hs
+          # ADR-0517 live finding (demo333, first from-scratch Day 0 run,
+          # 2026-09-06): PGO's PostgresCluster has no status.conditions
+          # entry that means "the database is actually up" (its conditions
+          # are pgBackRest/proxy-specific: PGBackRestRepoHostReady,
+          # ProxyAvailable, etc. - none is a generic Ready ArgoCD's default
+          # health logic would recognize). Without this, ArgoCD reports
+          # Healthy the instant the CR is merely accepted by the API
+          # server, so sync-wave gating on it is a no-op - every later-wave
+          # resource that assumes "postgres is reachable" (this chart's own
+          # job-schema-grants.yaml/job-monitoring-role.yaml, both explicitly
+          # commented as relying on exactly this gate) races Patroni's
+          # actual bootstrap and fails with connection refused. Confirmed
+          # live: readyReplicas lagged replicas for ~70s after CR creation.
+          # Mirrors this file's InferenceService entry: Progressing until
+          # every instance set's readyReplicas has caught up to replicas.
+          - group: postgres-operator.crunchydata.com
+            kind: PostgresCluster
+            check: |
+              hs = {}
+              if obj.status == nil or obj.status.instances == nil then
+                hs.status = "Progressing"
+                hs.message = "Waiting for the PGO operator to report instance status"
+                return hs
+              end
+              for i, inst in ipairs(obj.status.instances) do
+                if (inst.readyReplicas or 0) < (inst.replicas or 1) then
+                  hs.status = "Progressing"
+                  hs.message = "Waiting for instance set " .. (inst.name or "?") ..
+                    " (" .. tostring(inst.readyReplicas or 0) .. "/" .. tostring(inst.replicas or 0) .. " ready)"
+                  return hs
+                end
+              end
+              hs.status = "Healthy"
+              hs.message = "All instance sets ready"
+              return hs
