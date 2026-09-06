@@ -381,7 +381,7 @@
             "path": "/aap_admin",
             "attributes": {
                 "description": [
-                    "ADR-0418/WP-103 AAP launch-RBAC dimension \u2014 maps (authenticator map_type: is_superuser) to full Controller superuser, replacing the old ocp-paas-ops-triggered map. NOT reconciled by ADR-0530 (clause 4, groups are create-only) \u2014 membership here only seeds a future fresh install; the live realm is updated by hand via kcadm, see wp-103-aap-launch-rbac.md."
+                    "ADR-0418/WP-103 AAP launch-RBAC: maps is_superuser to full Controller superuser (replaces ocp-paas-ops-triggered). NOT reconciled by ADR-0530 (create-only) - live realm updated via kcadm, see wp-103-aap-launch-rbac.md."
                 ]
             }
         },
@@ -390,7 +390,7 @@
             "path": "/aap_ops",
             "attributes": {
                 "description": [
-                    "ADR-0418/WP-103 AAP launch-RBAC dimension \u2014 maps (authenticator map_type: team) to the aap-ops-team Controller Team: view+execute on the gated Phase 3/4 Job/Workflow Templates and view+sync on the zuno-demo Project. NOT reconciled by ADR-0530 (clause 4) \u2014 see wp-103-aap-launch-rbac.md."
+                    "ADR-0418/WP-103 AAP launch-RBAC: maps team to aap-ops-team (view+execute on gated Phase 3/4 Templates, view+sync on zuno-demo Project). NOT reconciled by ADR-0530 - see wp-103-aap-launch-rbac.md."
                 ]
             }
         },
@@ -399,7 +399,7 @@
             "path": "/aap_reader",
             "attributes": {
                 "description": [
-                    "ADR-0418/WP-103 AAP launch-RBAC dimension \u2014 maps (authenticator map_type: team) to the aap-reader-team Controller Team: view-only on the gated Phase 3/4 Job/Workflow Templates and the zuno-demo Project. NOT reconciled by ADR-0530 (clause 4) \u2014 see wp-103-aap-launch-rbac.md."
+                    "ADR-0418/WP-103 AAP launch-RBAC: maps team to aap-reader-team (view-only on gated Phase 3/4 Templates and zuno-demo Project). NOT reconciled by ADR-0530 - see wp-103-aap-launch-rbac.md."
                 ]
             }
         }
