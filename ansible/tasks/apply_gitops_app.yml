@@ -16,6 +16,22 @@
 - name: "gitops | resolve the cluster base domain (for Applications whose Helm values need it)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
+# zuno_gitops_target_revision lives in confidential.yml (an operator-supplied,
+# cluster-specific, non-secret value - ADR-0547 surface 2). Loaded here rather
+# than relying on the calling role's own loader pair: not every caller of this
+# task loads confidential.yml (only 13 of the roles do), and an unloaded
+# variable would silently fall back to the manifest's committed
+# targetRevision - the exact `| default()` silence ADR-0517 B13 documents.
+- name: "gitops | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _gitops_confidential_file
+
+- name: "gitops | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _gitops_confidential_file.stat.exists
+
 # Optionally injects Helm values known only at run time (replaces, not merges,
 # the manifest's own spec.source.helm.values) - combine() with {} is a no-op
 # when gitops_app_extra_helm_values isn't set, so this stays a single step.
@@ -31,6 +47,11 @@
         | combine(
             {'spec': {'source': {'helm': {'values': gitops_app_extra_helm_values | to_nice_yaml}}}}
             if gitops_app_extra_helm_values is defined else {},
+            recursive=True
+          )
+        | combine(
+            {'spec': {'source': {'targetRevision': zuno_gitops_target_revision}}}
+            if zuno_gitops_target_revision is defined else {},
             recursive=True
           )
       }}
