@@ -10,6 +10,7 @@
 kubeconfig
 vault-password*
 ansible/confidential.yml
+ansible/confidential*.back
 
 # Real / unapproved business data
 *.dump
