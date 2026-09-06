@@ -26,6 +26,40 @@
   retries: 30
   delay: 10
 
+# ADR-0517 live finding (demo333, 2026-09-06): sxcm's cluster provisioning
+# drops a LimitRange `openshift-gitops-limits` (generated-by: sxcm, NOT
+# tracked by this repo nor reconciled by the startx-cluster-* Applications -
+# they have no selfHeal and don't list it) that caps Pod/Container memory at
+# 5Gi. The application-controller below is sized at 9Gi (its anti-OOM bump),
+# so on a fresh cluster the StatefulSet pod is FORBIDDEN at creation and no
+# Application ever syncs - worse than the OOM crashloop this bump fixed. On
+# demo222 the LimitRange had been raised by a manual live patch that a
+# reprovision silently resets - exactly the class of undocumented step this
+# role must own. Raise only max.memory (both entries), preserve everything
+# else sxcm set; idempotent no-op once raised.
+- name: "argocd | look up the sxcm LimitRange that caps openshift-gitops pod memory"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: LimitRange
+    name: openshift-gitops-limits
+    namespace: openshift-gitops
+  register: _argocd_limitrange
+
+- name: "argocd | raise the LimitRange memory ceiling above the application-controller's 9Gi limit"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: v1
+    kind: LimitRange
+    name: openshift-gitops-limits
+    namespace: openshift-gitops
+    definition:
+      spec:
+        limits: >-
+          {{ _argocd_limitrange.resources[0].spec.limits
+             | map('combine', {'max': {'memory': '12Gi'}}, recursive=True)
+             | list }}
+  when: _argocd_limitrange.resources | default([]) | length > 0
+
 - name: "argocd | apply the zuno ArgoCD"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
