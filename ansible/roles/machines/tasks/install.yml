@@ -17,12 +17,31 @@
 - name: "machines | resolve this cluster's AWS identity (WP-118 B1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_aws_identity.yml"
 
-- name: "machines | read the MachineSet list the chart declares"
+# ADR-0517 live finding (demo333, 2026-09-06): the chart's own AZ letters
+# ('a'/'c' for the GPU groups) are a verified fact about eu-west-2 for THIS
+# AWS account ("g7e exists ONLY in eu-west-2a and eu-west-2c" per
+# values.yaml's comment) - an AZ *letter* is an account-specific alias for
+# a physical AZ, so which letter carries a given instance type's capacity
+# is not portable across regions, or even guaranteed stable across accounts
+# in the same region. Confirmed live: eu-central-1 offers g7e in 'a' and
+# 'b' for this account, not 'a'/'c'. zuno_machines_az_override
+# (MachineSet-name -> letter) lets a cluster whose GPU-capable letters
+# differ say so without editing the chart, which stays every other
+# cluster's untouched source of truth; an unset/empty map is a no-op.
+- name: "machines | read the MachineSet list the chart declares, with this cluster's AZ-letter overrides applied"
   ansible.builtin.set_fact:
     _machines_chart_list: >-
-      {{ (lookup('ansible.builtin.file',
-                 zuno_repo_root + '/gitops/charts/machines/values.yaml')
-          | from_yaml)['cluster-machine']['machineSet']['list'] }}
+      {{
+        [
+          item | combine({'az': _machines_az_overrides[item.name]}
+                          if item.name in _machines_az_overrides else {})
+          for item in ((lookup('ansible.builtin.file',
+                       zuno_repo_root + '/gitops/charts/machines/values.yaml')
+                       | from_yaml)['cluster-machine']['machineSet']['list'])
+        ]
+      }}
+  vars:
+    _machines_az_overrides: "{{ zuno_machines_az_override | default({}) }}"
 
 # Fail BEFORE building anything if an AZ the chart wants has no installer
 # MachineSet to read a subnet from. This is the case ADR-0517's risk list
