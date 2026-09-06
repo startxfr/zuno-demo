@@ -169,3 +169,12 @@ kuadrant:
 # project.project.name above (must match, since that's what actually
 # creates the namespace).
 operandNamespace: kuadrant-system
+
+# templates/rolebinding-aap-day0-check-secrets.yaml's subject: the AAP
+# day-check cluster-reader ServiceAccount. Mirrors gitops/charts/
+# aap-config/values.yaml's zuno-cluster-reader credential (serviceAccount
+# + that chart's namespace) - kept in sync manually, same convention as
+# operandNamespace above.
+dayCheck:
+  serviceAccount: aap-day0-check
+  namespace: zuno-aap

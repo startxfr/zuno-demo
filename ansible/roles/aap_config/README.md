@@ -135,11 +135,14 @@ fails on permissions, widen with a targeted extra Role/ClusterRole entry,
 never swap in a broader built-in or cluster-admin - three such widenings
 exist so far. Two are routine, both because `cluster-reader` deliberately
 excludes Secrets entirely: `templates/rolebinding-vault-secrets.yaml`
-(`zuno-vault`, vault's own precheck) and
-`templates/rolebinding-connectivity-link-secrets.yaml` (`kuadrant-system`,
+(`zuno-vault`, vault's own precheck) and gitops/charts/connectivity-link/
+`templates/rolebinding-aap-day0-check-secrets.yaml` (`kuadrant-system`,
 confirmed live 2026-08-30 running `zuno-day1-check-workflow` for real -
 connectivity_link's precheck reads `authorino-server-cert`'s
-`tls.crt`/`tls.key` keys, WP-071's regression check). The third,
+`tls.crt`/`tls.key` keys, WP-071's regression check; moved out of this
+chart 2026-09-06, ADR-0517 - a Day 0 sync cannot apply into a namespace
+the Day 1 connectivity-link chart creates, so the pair now lives with
+that namespace's owner). The third,
 `templates/rolebinding-connectivity-link-exec.yaml` (`openshift-ingress`,
 also confirmed live 2026-08-30 in the same run), is **not** routine -
 `pods/exec` grants arbitrary command execution inside any pod the Role's
