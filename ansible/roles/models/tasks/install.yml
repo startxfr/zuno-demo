@@ -45,10 +45,25 @@
       image:
         vllm: "{{ _models_discovered_vllm_image }}"
       # Which bucket/directory contain the model weights
-      # (s3://<bucket>/<prefix>/<servedModelName>/).
+      # (s3://<bucket>/<prefix>/<servedModelName>/). The fallback is the
+      # chart's own invalid placeholder, not a plausible bucket name
+      # (ADR-0547 clause 3) - the real value is pinned in confidential.yml.
       modelsS3:
-        bucket: "{{ zuno_models_s3_bucket | default('zuno-demo-rag-corpus') }}"
+        bucket: "{{ zuno_models_s3_bucket | default('ZUNO_S3_BUCKET_NOT_SET') }}"
         prefix: "{{ zuno_models_s3_prefix | default('models') }}"
+      # ADR-0517 demo333 run: the tekos-lora adapter is this cluster's own
+      # mlops OUTPUT (zuno-<cluster>-mlops), so its download URI is
+      # cluster-specific and comes from confidential.yml. The whole list is
+      # re-stated here because Helm value lists replace wholesale - a partial
+      # override cannot patch one field of one list entry. Every non-URI
+      # field MUST stay byte-identical to the chart's values.yaml entry.
+      loraAdapters:
+        - name: tekos-lora
+          registryModelName: tekos-lora
+          registryModelVersion: wp126-20260904-201830
+          sourceS3Uri: "{{ zuno_models_tekos_lora_source_s3_uri | default('s3://ZUNO_S3_BUCKET_NOT_SET/mlops/models/tekos/wp126-20260904-201830/adapter') }}"
+          path: /mnt/loras/tekos-lora
+          classification: C1
       # ADR-0524 (WP-085), TEMPORAIRE : ouvre le predictor qwen a
       # openshift-lightspeed. Doit etre pose ICI et non dans
       # gitops/apps/models/application-d1.yaml : gitops_app_extra_helm_values

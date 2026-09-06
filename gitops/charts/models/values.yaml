@@ -334,7 +334,16 @@ loraAdapters:
   - name: tekos-lora
     registryModelName: tekos-lora
     registryModelVersion: wp126-20260904-201830
-    sourceS3Uri: s3://zuno-demo222-mlops/mlops/models/tekos/wp126-20260904-201830/adapter
+    # PLACEHOLDER (ADR-0547 clause 3). The adapter is an mlops-pipeline OUTPUT
+    # and lives in this cluster's own zuno-<cluster>-mlops bucket, so the real
+    # URI is cluster-specific: ansible/roles/models/tasks/install.yml injects
+    # zuno_models_tekos_lora_source_s3_uri (confidential.yml) as an
+    # Application-level value, which always overrides this. Left obviously
+    # invalid on purpose: a plausible bucket name here would make a cluster
+    # that lost its Application values silently download another cluster's
+    # (or another AWS account's) artifact instead of failing loudly in the
+    # download initContainer.
+    sourceS3Uri: s3://ZUNO_S3_BUCKET_NOT_SET/mlops/models/tekos/wp126-20260904-201830/adapter
     path: /mnt/loras/tekos-lora
     classification: C1
 
@@ -395,7 +404,13 @@ modelStorage:
 # only), and models/qwen2.5-7b-instruct/ (retired by ADR-0518, kept as
 # instant rollback weights).
 modelsS3:
-  bucket: zuno-demo-rag-corpus
+  # PLACEHOLDER (ADR-0547 clause 3). The real bucket is zuno-demo-sources
+  # (ADR-0546: weights are a cross-cluster INPUT), injected at apply time by
+  # ansible/roles/models/tasks/install.yml from zuno_models_s3_bucket. The
+  # historical zuno-demo-rag-corpus default named a bucket DELETED 2026-09-05
+  # (WP-131) - S3 bucket names are a global namespace, so a plausible-looking
+  # dead name would silently resolve to whoever registers it next.
+  bucket: ZUNO_S3_BUCKET_NOT_SET
   prefix: models
   endpoint: s3.eu-west-2.amazonaws.com
   region: eu-west-2
