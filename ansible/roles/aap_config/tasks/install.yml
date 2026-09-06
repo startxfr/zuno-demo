@@ -14,6 +14,20 @@
 # JobTemplate CRD has no credentials field - confirmed live against the
 # CRD schema, WP-073). All are idempotent GET-then-POST.
 
+# Needed for zuno_gitops_target_revision below (ADR-0517: a cluster
+# tracking a work branch must point the AAP Project at that SAME branch,
+# or every AAP-launched day1/2/3 playbook runs main's code without the
+# branch's fixes). check_confidential_var_loaders enforces the pair.
+- name: "aap-config | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _aap_config_confidential_file
+
+- name: "aap-config | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _aap_config_confidential_file.stat.exists
+
 - name: "aap-config | apply the aap-config GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -278,9 +292,17 @@
     gitops_component_name: "aap-config"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-aap-config-d1"
-    gitops_app_extra_helm_values:
-      aapConfig:
-        enabled: true
+    # ADR-0517 live finding (demo333, 2026-09-06): the chart's
+    # project.branch default is main - correct for every cluster tracking
+    # main, silently WRONG for a cluster deploying from a work branch:
+    # its AAP-launched workflows then execute main's playbooks without
+    # the branch's fixes. Same Application-level injection as
+    # apply_gitops_app.yml's targetRevision override, same variable.
+    gitops_app_extra_helm_values: >-
+      {{ {'aapConfig': {'enabled': true}}
+         | combine({'project': {'branch': zuno_gitops_target_revision}}
+                   if zuno_gitops_target_revision is defined else {},
+                   recursive=True) }}
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 10
 
@@ -448,6 +470,29 @@
 # 2026-08-25). Triggered here via the Controller API directly, bypassing the
 # stuck CR entirely - idempotent, ~15s, and the only way this checkout ever
 # refreshes again.
+# ADR-0517 live finding (demo333, 2026-09-06): a pre-existing Controller
+# project keeps whatever branch it was created with - the AnsibleProject
+# CR reconciles exactly once (see the re-sync comment below), so even the
+# corrected CR spec above never reaches the live project. Converge it
+# directly via the API; the SCM re-sync right below then checks out the
+# right branch. No-op on any cluster already tracking the right branch.
+- name: "aap-config | converge the Project's tracked branch to {{ zuno_gitops_target_revision | default('main') }}"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/projects/{{ _aap_config_project_lookup.json.results[0].id }}/"
+    method: PATCH
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    body_format: json
+    body:
+      scm_branch: "{{ zuno_gitops_target_revision | default('main') }}"
+    status_code: 200
+  when: >-
+    (_aap_config_project_lookup.json.results[0].scm_branch | default(''))
+    != (zuno_gitops_target_revision | default('main'))
+  no_log: true
+
 - name: "aap-config | trigger a Project SCM re-sync (the Project CR itself never re-syncs)"
   ansible.builtin.uri:
     url: "{{ _aap_config_gateway_url }}/api/controller/v2/projects/{{ _aap_config_project_lookup.json.results[0].id }}/update/"
