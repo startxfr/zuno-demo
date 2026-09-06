@@ -17,14 +17,42 @@
 - name: "postgresql | resolve S3 backup credentials"
   ansible.builtin.include_tasks: resolve_backup_s3_creds.yml
 
-- name: "postgresql | default S3 backup check facts when S3 isn't configured"
+# The throwaway Secret/Job below live in zuno-data. On a virgin cluster
+# (ADR-0517: `make d0 check` before anything is installed) that namespace
+# does not exist yet and the k8s module's create hard-fails - which would
+# break this file's own "never fails, sets two facts" contract. The install
+# path is unaffected: day0 installs the namespaces component before
+# postgresql, so the namespace always exists by the time the auto-restore
+# detection runs. Caught live on demo333's first `make d0 check` 2026-09-06.
+- name: "postgresql | probe for the zuno-data namespace"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Namespace
+    name: zuno-data
+  register: _postgresql_ns_probe
+
+- name: "postgresql | default S3 backup check facts when S3 isn't configured or the namespace doesn't exist yet"
   ansible.builtin.set_fact:
     _postgresql_s3_has_backup: false
     _postgresql_s3_check_succeeded: false
-  when: not (_postgresql_backup_s3_enabled | bool)
+  when: >-
+    not (_postgresql_backup_s3_enabled | bool)
+    or (_postgresql_ns_probe.resources | length == 0)
+
+- name: "postgresql | report the S3 cross-check cannot run before the zuno-data namespace exists"
+  ansible.builtin.debug:
+    msg: >-
+      zuno-data namespace not found - fresh cluster, the S3 pgBackRest
+      cross-check is skipped ("couldn't tell" semantics). It runs for real
+      once `make day0 install` has created the namespaces.
+  when:
+    - _postgresql_backup_s3_enabled | bool
+    - _postgresql_ns_probe.resources | length == 0
 
 - name: "postgresql | check the S3 pgBackRest repo for existing data"
-  when: _postgresql_backup_s3_enabled | bool
+  when:
+    - _postgresql_backup_s3_enabled | bool
+    - _postgresql_ns_probe.resources | length > 0
   block:
     - name: "postgresql | delete any previous S3-backup-check Job (idempotent-by-recreation)"
       kubernetes.core.k8s:
