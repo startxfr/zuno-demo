@@ -127,6 +127,23 @@ rules:
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles", "rolebindings"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ADR-0517 live finding (demo333, 2026-09-06): supply_chain_signer_build
+  # (Day 1 build, an AAP Job Template running under this credential)
+  # creates the zuno-signer-image-builder RoleBinding referencing
+  # system:image-builder in zuno-ai-build. Kubernetes' escalation
+  # prevention refuses any binding to permissions the grantor does not
+  # itself hold - on demo222 the binding predated the AAP launch path, so
+  # this never fired. Rather than widening this role with image-builder's
+  # own verbs (builds/details update, imagestreams create, layers
+  # update...), grant the RBAC `bind` verb pinned to that ONE ClusterRole:
+  # the canonical escalation-safe mechanism - it lets this credential
+  # reference system:image-builder in namespace RoleBindings without ever
+  # holding or exercising those permissions, and keeps the "no
+  # cluster-scoped RBAC objects" exclusion above intact.
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    verbs: ["bind"]
+    resourceNames: ["system:image-builder"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies", "ingresses"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
