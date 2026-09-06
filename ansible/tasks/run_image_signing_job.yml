@@ -35,186 +35,228 @@
       {{ 'image-signing-' + sign_image_name if (sign_image_tag | default('latest')) == 'latest'
          else 'image-signing-' + sign_image_name + '-' + (sign_image_tag | default('latest')) }}
 
-- name: "image-signing | resolve {{ sign_image_name }}'s live ImageStreamTag digest"
-  kubernetes.core.k8s_info:
-    api_version: image.openshift.io/v1
-    kind: ImageStreamTag
-    namespace: zuno-ai-build
-    name: "{{ sign_image_name }}:{{ _image_signing_tag }}"
-  register: _image_signing_istag
-
-- name: "image-signing | fail if the ImageStreamTag doesn't exist yet"
-  ansible.builtin.fail:
-    msg: "{{ sign_image_name }}:{{ _image_signing_tag }} not found in zuno-ai-build - the build above should have created it."
-  when: (_image_signing_istag.resources | default([]) | length) == 0
-
-- name: "image-signing | set the image@digest fact"
-  ansible.builtin.set_fact:
-    _image_signing_ref: >-
-      image-registry.openshift-image-registry.svc:5000/zuno-ai-build/{{ sign_image_name }}@{{
-        _image_signing_istag.resources[0].image.metadata.name }}
-
-- name: "image-signing | resolve the cluster base domain (for the Fulcio OIDC issuer)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
-
-# Live lookup, not a fact carried over from another role's run: this task
-# is included from many different Day 1 build roles via
-# apply_openshift_build.yml, potentially in a completely separate
-# ansible-playbook invocation from the one that last ran
-# ansible/roles/rhtas_config (which publishes/removes this ConfigMap).
-# Absent once the Keycloak serving cert is a publicly-trusted CA (Let's
-# Encrypt, ADR-0211) - see ansible/tasks/publish_keycloak_ca_configmap.yml.
-- name: "image-signing | check whether the rhtas-keycloak-ca ConfigMap exists"
+# ADR-0517 live finding (demo333, 2026-09-06): on a from-scratch cluster
+# the Day 1 BUILD phase runs before the Day 1 INSTALL phase, and this
+# secret is delivered by rhtas-config (a Day 1 INSTALL component -
+# gitops/charts/rhtas-config/templates/externalsecret-signer-client.yaml)
+# - so a first-ever build cannot be signed: the signing Job's pod hung in
+# ContainerCreating on the missing Secret mount until the wait below
+# timed out, failing the whole day1 build workflow. Invisible on demo222,
+# where RHTAS predates the signing wiring (WP-070). Callers that
+# legitimately run before RHTAS exists (the routine day1 build path,
+# apply_openshift_build.yml) set sign_skip_when_unavailable: true to turn
+# that dead end into a loud skip - those images are then signed by the
+# day3 signing pass (`make d3 sign`, the exact rebuild-then-resign flow
+# ADR-0544 documents) once RHTAS is up. Callers for whom signing IS the
+# point (day3_release.yml) keep the default false and still fail hard.
+- name: "image-signing | check the RHTAS signer client secret exists"
   kubernetes.core.k8s_info:
     api_version: v1
-    kind: ConfigMap
+    kind: Secret
     namespace: zuno-ai-build
-    name: rhtas-keycloak-ca
-  register: _image_signing_kc_ca
+    name: zuno-signer-client-secret
+  register: _image_signing_client_secret
 
-- name: "image-signing | delete any previous signing Job for {{ sign_image_name }} (idempotent-by-recreation)"
-  kubernetes.core.k8s:
-    state: absent
-    api_version: batch/v1
-    kind: Job
-    name: "{{ _image_signing_job_name }}"
-    namespace: zuno-ai-build
-    wait: true
+- name: "image-signing | decide whether signing must be skipped (RHTAS not installed yet)"
+  ansible.builtin.set_fact:
+    _image_signing_skip: >-
+      {{ (sign_skip_when_unavailable | default(false) | bool) and
+         (_image_signing_client_secret.resources | default([]) | length) == 0 }}
 
-- name: "image-signing | run the image signing Job for {{ sign_image_name }}"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: batch/v1
-      kind: Job
-      metadata:
+- name: "image-signing | WARNING - skipping the signing of {{ sign_image_name }}"
+  ansible.builtin.debug:
+    msg: >-
+      WARNING: zuno-signer-client-secret is absent from zuno-ai-build
+      (rhtas-config is not installed yet - expected on a fresh cluster's
+      first `make day1 build`, which runs before the Day 1 install
+      phase). SKIPPING the signing of
+      {{ sign_image_name }}:{{ _image_signing_tag }} - run `make d3 sign`
+      after Day 1 completes to sign every unsigned image.
+  when: _image_signing_skip | bool
+
+- name: "image-signing | sign {{ sign_image_name }} via RHTAS"
+  when: not (_image_signing_skip | bool)
+  block:
+    - name: "image-signing | resolve {{ sign_image_name }}'s live ImageStreamTag digest"
+      kubernetes.core.k8s_info:
+        api_version: image.openshift.io/v1
+        kind: ImageStreamTag
+        namespace: zuno-ai-build
+        name: "{{ sign_image_name }}:{{ _image_signing_tag }}"
+      register: _image_signing_istag
+
+    - name: "image-signing | fail if the ImageStreamTag doesn't exist yet"
+      ansible.builtin.fail:
+        msg: "{{ sign_image_name }}:{{ _image_signing_tag }} not found in zuno-ai-build - the build above should have created it."
+      when: (_image_signing_istag.resources | default([]) | length) == 0
+
+    - name: "image-signing | set the image@digest fact"
+      ansible.builtin.set_fact:
+        _image_signing_ref: >-
+          image-registry.openshift-image-registry.svc:5000/zuno-ai-build/{{ sign_image_name }}@{{
+            _image_signing_istag.resources[0].image.metadata.name }}
+
+    - name: "image-signing | resolve the cluster base domain (for the Fulcio OIDC issuer)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    # Live lookup, not a fact carried over from another role's run: this task
+    # is included from many different Day 1 build roles via
+    # apply_openshift_build.yml, potentially in a completely separate
+    # ansible-playbook invocation from the one that last ran
+    # ansible/roles/rhtas_config (which publishes/removes this ConfigMap).
+    # Absent once the Keycloak serving cert is a publicly-trusted CA (Let's
+    # Encrypt, ADR-0211) - see ansible/tasks/publish_keycloak_ca_configmap.yml.
+    - name: "image-signing | check whether the rhtas-keycloak-ca ConfigMap exists"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: ConfigMap
+        namespace: zuno-ai-build
+        name: rhtas-keycloak-ca
+      register: _image_signing_kc_ca
+
+    - name: "image-signing | delete any previous signing Job for {{ sign_image_name }} (idempotent-by-recreation)"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: batch/v1
+        kind: Job
         name: "{{ _image_signing_job_name }}"
         namespace: zuno-ai-build
-        labels:
-          zuno.io/managed-by: zuno-ansible
-      spec:
-        backoffLimit: 2
-        template:
+        wait: true
+
+    - name: "image-signing | run the image signing Job for {{ sign_image_name }}"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: batch/v1
+          kind: Job
           metadata:
-            annotations:
-              sidecar.istio.io/inject: "false"
+            name: "{{ _image_signing_job_name }}"
+            namespace: zuno-ai-build
+            labels:
+              zuno.io/managed-by: zuno-ansible
           spec:
-            restartPolicy: Never
-            serviceAccountName: zuno-signer
-            priorityClassName: zuno-platform-weak
-            containers:
-              - name: sign
-                image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer:latest"
-                args:
-                  - sign-image
-                  - "{{ _image_signing_ref }}"
-                # The internal registry serves a cert issued by the
-                # cluster's openshift-service-serving-signer CA - not in
-                # this image's default trust store. Same fix as
-                # gitops/charts/ai-gateway/templates/deployment.yaml's own
-                # LOCAL_GPT_OSS_CA_BUNDLE: point at the namespace's own
-                # openshift-service-ca.crt ConfigMap (standard OpenShift
-                # per-namespace CA bundle, auto-populated, no new resource
-                # needed) instead of disabling verification. SSL_CERT_FILE
-                # (not SSL_CERT_DIR) since this is one PEM bundle file, not
-                # a hashed-symlink directory Go's loader would expect.
-                # Found live 2026-09-05 (ADR-0549's first release run):
-                # `cosign initialize` failed "mkdir /.sigstore: permission
-                # denied" - sign_in_cluster.py's own
-                # `env.setdefault("HOME", ...)` only fills HOME in if it is
-                # truly absent from os.environ; this image (or its base)
-                # apparently presents HOME=/ already set, so the
-                # Python-side fallback never fires. Same fix as
-                # verify_image_signatures.yml's identical, already-working
-                # HOME override - force it at the pod level instead of
-                # relying on the in-process fallback.
-                env: >-
+            backoffLimit: 2
+            template:
+              metadata:
+                annotations:
+                  sidecar.istio.io/inject: "false"
+              spec:
+                restartPolicy: Never
+                serviceAccountName: zuno-signer
+                priorityClassName: zuno-platform-weak
+                containers:
+                  - name: sign
+                    image: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer:latest"
+                    args:
+                      - sign-image
+                      - "{{ _image_signing_ref }}"
+                    # The internal registry serves a cert issued by the
+                    # cluster's openshift-service-serving-signer CA - not in
+                    # this image's default trust store. Same fix as
+                    # gitops/charts/ai-gateway/templates/deployment.yaml's own
+                    # LOCAL_GPT_OSS_CA_BUNDLE: point at the namespace's own
+                    # openshift-service-ca.crt ConfigMap (standard OpenShift
+                    # per-namespace CA bundle, auto-populated, no new resource
+                    # needed) instead of disabling verification. SSL_CERT_FILE
+                    # (not SSL_CERT_DIR) since this is one PEM bundle file, not
+                    # a hashed-symlink directory Go's loader would expect.
+                    # Found live 2026-09-05 (ADR-0549's first release run):
+                    # `cosign initialize` failed "mkdir /.sigstore: permission
+                    # denied" - sign_in_cluster.py's own
+                    # `env.setdefault("HOME", ...)` only fills HOME in if it is
+                    # truly absent from os.environ; this image (or its base)
+                    # apparently presents HOME=/ already set, so the
+                    # Python-side fallback never fires. Same fix as
+                    # verify_image_signatures.yml's identical, already-working
+                    # HOME override - force it at the pod level instead of
+                    # relying on the in-process fallback.
+                    env: >-
+                      {{
+                        [
+                          {'name': 'SSL_CERT_FILE', 'value': '/etc/ssl/openshift-service-ca/service-ca.crt'},
+                          {'name': 'RHTAS_KEYCLOAK_TOKEN_URL', 'value': 'https://keycloak.' + cluster_base_domain + '/realms/zuno/protocol/openid-connect/token'},
+                          {'name': 'RHTAS_CLIENT_SECRET_PATH', 'value': '/etc/rhtas/signer-client-secret/client_secret'},
+                          {'name': 'HOME', 'value': '/tmp'}
+                        ]
+                        +
+                        ([{'name': 'RHTAS_KC_CA_FILE', 'value': '/etc/rhtas/keycloak-ca/ca-bundle.crt'}]
+                         if (_image_signing_kc_ca.resources | default([]) | length) > 0 else [])
+                      }}
+                    volumeMounts: >-
+                      {{
+                        [
+                          {'name': 'openshift-service-ca', 'mountPath': '/etc/ssl/openshift-service-ca', 'readOnly': true},
+                          {'name': 'signer-client-secret', 'mountPath': '/etc/rhtas/signer-client-secret', 'readOnly': true}
+                        ]
+                        +
+                        ([{'name': 'keycloak-ca', 'mountPath': '/etc/rhtas/keycloak-ca', 'readOnly': true}]
+                         if (_image_signing_kc_ca.resources | default([]) | length) > 0 else [])
+                      }}
+                volumes: >-
                   {{
                     [
-                      {'name': 'SSL_CERT_FILE', 'value': '/etc/ssl/openshift-service-ca/service-ca.crt'},
-                      {'name': 'RHTAS_KEYCLOAK_TOKEN_URL', 'value': 'https://keycloak.' + cluster_base_domain + '/realms/zuno/protocol/openid-connect/token'},
-                      {'name': 'RHTAS_CLIENT_SECRET_PATH', 'value': '/etc/rhtas/signer-client-secret/client_secret'},
-                      {'name': 'HOME', 'value': '/tmp'}
+                      {'name': 'signer-client-secret', 'secret': {'secretName': 'zuno-signer-client-secret'}},
+                      {'name': 'openshift-service-ca', 'configMap': {'name': 'openshift-service-ca.crt'}}
                     ]
                     +
-                    ([{'name': 'RHTAS_KC_CA_FILE', 'value': '/etc/rhtas/keycloak-ca/ca-bundle.crt'}]
+                    ([{'name': 'keycloak-ca', 'configMap': {'name': 'rhtas-keycloak-ca'}}]
                      if (_image_signing_kc_ca.resources | default([]) | length) > 0 else [])
                   }}
-                volumeMounts: >-
-                  {{
-                    [
-                      {'name': 'openshift-service-ca', 'mountPath': '/etc/ssl/openshift-service-ca', 'readOnly': true},
-                      {'name': 'signer-client-secret', 'mountPath': '/etc/rhtas/signer-client-secret', 'readOnly': true}
-                    ]
-                    +
-                    ([{'name': 'keycloak-ca', 'mountPath': '/etc/rhtas/keycloak-ca', 'readOnly': true}]
-                     if (_image_signing_kc_ca.resources | default([]) | length) > 0 else [])
-                  }}
-            volumes: >-
-              {{
-                [
-                  {'name': 'signer-client-secret', 'secret': {'secretName': 'zuno-signer-client-secret'}},
-                  {'name': 'openshift-service-ca', 'configMap': {'name': 'openshift-service-ca.crt'}}
-                ]
-                +
-                ([{'name': 'keycloak-ca', 'configMap': {'name': 'rhtas-keycloak-ca'}}]
-                 if (_image_signing_kc_ca.resources | default([]) | length) > 0 else [])
-              }}
 
-- name: "image-signing | wait for the signing Job to reach a terminal state"
-  # Checks status.conditions (type Complete/Failed), not raw succeeded/
-  # failed pod counters - backoffLimit means a single failed pod attempt
-  # doesn't mean the Job is done (it retries), so waiting on
-  # "failed > 0" alone reports a false failure mid-retry, before the Job's
-  # eventual real success.
-  kubernetes.core.k8s_info:
-    api_version: batch/v1
-    kind: Job
-    namespace: zuno-ai-build
-    name: "{{ _image_signing_job_name }}"
-  register: _image_signing_job
-  until: >-
-    (_image_signing_job.resources[0].status.succeeded | default(0)) > 0 or
-    (_image_signing_job.resources[0].status.conditions | default([])
-      | selectattr('type', 'in', ['Complete', 'Failed']) | selectattr('status', 'equalto', 'True') | list | length) > 0
-  retries: 20
-  delay: 10
+    - name: "image-signing | wait for the signing Job to reach a terminal state"
+      # Checks status.conditions (type Complete/Failed), not raw succeeded/
+      # failed pod counters - backoffLimit means a single failed pod attempt
+      # doesn't mean the Job is done (it retries), so waiting on
+      # "failed > 0" alone reports a false failure mid-retry, before the Job's
+      # eventual real success.
+      kubernetes.core.k8s_info:
+        api_version: batch/v1
+        kind: Job
+        namespace: zuno-ai-build
+        name: "{{ _image_signing_job_name }}"
+      register: _image_signing_job
+      until: >-
+        (_image_signing_job.resources[0].status.succeeded | default(0)) > 0 or
+        (_image_signing_job.resources[0].status.conditions | default([])
+          | selectattr('type', 'in', ['Complete', 'Failed']) | selectattr('status', 'equalto', 'True') | list | length) > 0
+      retries: 20
+      delay: 10
 
-- name: "image-signing | fetch the signing Job's pod(s)"
-  kubernetes.core.k8s_info:
-    kind: Pod
-    namespace: zuno-ai-build
-    label_selectors:
-      - "job-name={{ _image_signing_job_name }}"
-  register: _image_signing_pod
+    - name: "image-signing | fetch the signing Job's pod(s)"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: zuno-ai-build
+        label_selectors:
+          - "job-name={{ _image_signing_job_name }}"
+      register: _image_signing_pod
 
-# backoffLimit means multiple pods can share this label across retries -
-# .resources[0] (creation order from the API, not guaranteed) can pick a
-# stale/failed attempt instead of the one that actually determined the
-# Job's final outcome. Sort by creationTimestamp and take the newest.
-- name: "image-signing | select the most recent pod"
-  ansible.builtin.set_fact:
-    _image_signing_pod_name: >-
-      {{ (_image_signing_pod.resources | sort(attribute='metadata.creationTimestamp'))[-1].metadata.name }}
-  when: (_image_signing_pod.resources | default([]) | length) > 0
+    # backoffLimit means multiple pods can share this label across retries -
+    # .resources[0] (creation order from the API, not guaranteed) can pick a
+    # stale/failed attempt instead of the one that actually determined the
+    # Job's final outcome. Sort by creationTimestamp and take the newest.
+    - name: "image-signing | select the most recent pod"
+      ansible.builtin.set_fact:
+        _image_signing_pod_name: >-
+          {{ (_image_signing_pod.resources | sort(attribute='metadata.creationTimestamp'))[-1].metadata.name }}
+      when: (_image_signing_pod.resources | default([]) | length) > 0
 
-- name: "image-signing | print the signing Job's output"
-  kubernetes.core.k8s_log:
-    namespace: zuno-ai-build
-    name: "{{ _image_signing_pod_name }}"
-    container: sign
-  register: _image_signing_log
-  when: (_image_signing_pod.resources | default([]) | length) > 0
+    - name: "image-signing | print the signing Job's output"
+      kubernetes.core.k8s_log:
+        namespace: zuno-ai-build
+        name: "{{ _image_signing_pod_name }}"
+        container: sign
+      register: _image_signing_log
+      when: (_image_signing_pod.resources | default([]) | length) > 0
 
-- name: "image-signing | show the signing Job's output"
-  ansible.builtin.debug:
-    msg: "{{ _image_signing_log.log_lines | default(['no pod/log found']) }}"
+    - name: "image-signing | show the signing Job's output"
+      ansible.builtin.debug:
+        msg: "{{ _image_signing_log.log_lines | default(['no pod/log found']) }}"
 
-- name: "image-signing | fail if the signing Job did not succeed"
-  ansible.builtin.fail:
-    msg: >-
-      {{ _image_signing_job_name }} Job did not succeed (succeeded=
-      {{ _image_signing_job.resources[0].status.succeeded | default(0) }}
-      failed={{ _image_signing_job.resources[0].status.failed | default(0) }}) -
-      see the output above.
-  when: (_image_signing_job.resources[0].status.succeeded | default(0)) == 0
+    - name: "image-signing | fail if the signing Job did not succeed"
+      ansible.builtin.fail:
+        msg: >-
+          {{ _image_signing_job_name }} Job did not succeed (succeeded=
+          {{ _image_signing_job.resources[0].status.succeeded | default(0) }}
+          failed={{ _image_signing_job.resources[0].status.failed | default(0) }}) -
+          see the output above.
+      when: (_image_signing_job.resources[0].status.succeeded | default(0)) == 0
