@@ -189,7 +189,11 @@ backups:
   # runs a backup immediately rather than waiting for the next cron slot.
   s3:
     enabled: false
-    bucket: zuno-demo222-backups
+    # PLACEHOLDER (ADR-0547 clause 3). The real bucket is injected at apply
+    # time from zuno_mariadb_backup_s3_bucket (confidential.yml) - obviously
+    # invalid on purpose so a lost Application value fails loudly instead of
+    # writing backups into another cluster's bucket.
+    bucket: ZUNO_S3_BUCKET_NOT_SET
     prefix: mariadb
     region: eu-west-2
     endpoint: s3.eu-west-2.amazonaws.com

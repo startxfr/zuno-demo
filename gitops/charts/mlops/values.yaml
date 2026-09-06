@@ -55,7 +55,10 @@ s3:
   # fresh-clone defaults. region drives more than it looks: the derived
   # S3_ENDPOINT and the DSPA's externalStorage.host both follow it, so
   # mesh egress moves with the bucket rather than needing its own change.
-  bucket: zuno-demo222-mlops
+  # PLACEHOLDER (ADR-0547 clause 3): obviously invalid on purpose - a
+  # plausible zuno-<cluster>-mlops name here would make a cluster whose
+  # Application lost its values silently write into ANOTHER cluster's bucket.
+  bucket: ZUNO_S3_BUCKET_NOT_SET
   region: eu-west-2
   pathStyle: false
   secretName: mlops-s3-credentials
@@ -82,7 +85,12 @@ modelsS3:
 # pipeline still never writes gitops/charts/models/values.yaml
 # (ADR-0302 point 7).
 mergedModel:
-  s3Uri: s3://zuno-demo-rag-corpus/models/qwen3.5-9b-wesh
+  # ADR-0546/WP-131: zuno-demo-rag-corpus was deleted 2026-09-05; the served
+  # weights (and this publish target) live in the cross-cluster source bucket.
+  # Fleet-shared on purpose (not cluster identity, ADR-0547 clause 5): every
+  # cluster serves wesh from this exact prefix, and overwrite: false below is
+  # what keeps N clusters' pipelines from clobbering it.
+  s3Uri: s3://zuno-demo-sources/models/qwen3.5-9b-wesh
   # Refuse to overwrite a non-empty destination. On the first run the
   # prefix is empty and no LLMInferenceService reads it yet; on any
   # re-run it is the live variant's own weights. Flip only deliberately.
@@ -254,8 +262,9 @@ agents:
     # S3). An s3:// value is downloaded by mlops.py's train stage before
     # from_pretrained; a plain HF repo id still works as before. Must
     # point at the same rag/s3-readable bucket this chart's s3: block
-    # authenticates against.
-    baseModel: s3://zuno-demo-rag-corpus/models/qwen3.5-9b
+    # authenticates against. ADR-0546/WP-131: the weights are a cross-cluster
+    # INPUT in zuno-demo-sources (zuno-demo-rag-corpus was deleted 2026-09-05).
+    baseModel: s3://zuno-demo-sources/models/qwen3.5-9b
     loraR: 8
     loraAlpha: 16
     loraDropout: 0.05
@@ -301,7 +310,9 @@ agents:
     # branch (_fetch_domain_grounding_rows), the actual ADR-0302 point 2
     # mechanism, not ADR-0526's override.
     styleCorpusS3Uri: ""
-    baseModel: s3://zuno-demo-rag-corpus/models/qwen3.5-9b
+    # Same cross-cluster source prefix as comage's baseModel above
+    # (ADR-0546/WP-131 - zuno-demo-rag-corpus is deleted).
+    baseModel: s3://zuno-demo-sources/models/qwen3.5-9b
     # ADR-0301 point 1/WP-133: skips merge-export entirely - this run must
     # register the ADAPTER itself (push-registry's existing
     # merge-manifest-absent fallback), never a merged checkpoint, and must

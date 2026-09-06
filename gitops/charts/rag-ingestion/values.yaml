@@ -1525,7 +1525,10 @@ s3:
   # ADR-0546/WP-131: this cluster's ingestion OUTPUT. ansible overrides it
   # from zuno_rag_corpus_s3_bucket; outputs are never migrated between
   # clusters (ADR-0546 clause 1), each re-ingests through its own pipeline.
-  bucket: "zuno-demo222-data"
+  # PLACEHOLDER (ADR-0547 clause 3): obviously invalid on purpose - a
+  # plausible zuno-<cluster>-data name here would make a cluster whose
+  # Application lost its values silently write into ANOTHER cluster's bucket.
+  bucket: "ZUNO_S3_BUCKET_NOT_SET"
   region: "eu-west-2"         # replace with the actual AWS region
   pathStyle: false
   secretName: rag-s3
