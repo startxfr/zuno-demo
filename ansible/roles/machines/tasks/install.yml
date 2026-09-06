@@ -42,20 +42,30 @@
 # (MachineSet-name -> letter) lets a cluster whose GPU-capable letters
 # differ say so without editing the chart, which stays every other
 # cluster's untouched source of truth; an unset/empty map is a no-op.
-- name: "machines | read the MachineSet list the chart declares, with this cluster's AZ-letter overrides applied"
+- name: "machines | read the MachineSet list the chart declares"
+  ansible.builtin.set_fact:
+    _machines_chart_list_raw: >-
+      {{ (lookup('ansible.builtin.file',
+                 zuno_repo_root + '/gitops/charts/machines/values.yaml')
+          | from_yaml)['cluster-machine']['machineSet']['list'] }}
+    _machines_az_overrides: "{{ zuno_machines_az_override | default({}) }}"
+
+# Ansible's templar rejects Python-style list-comprehension Jinja
+# (`[x for x in y]`) inside set_fact - "expected token ',', got 'for'",
+# caught live on demo333's eu-central-1 install (2026-09-06), the run
+# right after this override was introduced. Rebuilt as an
+# accumulate-via-loop, same idiom the "substitute the cluster identity"
+# task two steps below already uses successfully.
+- name: "machines | apply this cluster's AZ-letter overrides onto the chart list, if any"
   ansible.builtin.set_fact:
     _machines_chart_list: >-
-      {{
-        [
-          item | combine({'az': _machines_az_overrides[item.name]}
-                          if item.name in _machines_az_overrides else {})
-          for item in ((lookup('ansible.builtin.file',
-                       zuno_repo_root + '/gitops/charts/machines/values.yaml')
-                       | from_yaml)['cluster-machine']['machineSet']['list'])
-        ]
-      }}
-  vars:
-    _machines_az_overrides: "{{ zuno_machines_az_override | default({}) }}"
+      {{ (_machines_chart_list | default([])) + [
+           item | combine({'az': _machines_az_overrides[item.name]}
+                           if item.name in _machines_az_overrides else {})
+         ] }}
+  loop: "{{ _machines_chart_list_raw }}"
+  loop_control:
+    label: "{{ item.name }}"
 
 # Fail BEFORE building anything if an AZ the chart wants has no installer
 # MachineSet to read a subnet from. This is the case ADR-0517's risk list
