@@ -218,6 +218,54 @@
       or (_cm_live_consumers['apiServerNamedCert'] | default(false) | bool
           and not (_cert_manager_acme_identity['consumers']['apiServerNamedCert'] | bool))
 
+# ADR-0517 live finding (demo333, first day0 install, 2026-09-06): the two
+# guards above protect a cluster that already HAS a live Application from
+# being walked backwards, and skip entirely when none exists yet ("nothing
+# to protect"). They do not cover the case that actually deadlocked
+# demo333: a FRESH cluster whose confidential.yml was copied wholesale from
+# a finished one (demo222's), carrying both consumer flips already true on
+# the very first sync. acme-cluster-patches.yaml renders at the implicit
+# wave 0 - before namespace-cert-manager (19), the ClusterIssuers (20/22)
+# and the Certificates themselves (23) - so on a virgin cluster it points
+# IngressController/default at a router-wildcard-tls Secret that cannot
+# exist yet, permanently wedging the router (FailedMount, both new
+# replicas stuck ContainerCreating) and every later wave that would have
+# actually issued the certificate. Enforces in code what the chart's own
+# comment already promised: flip ONLY once `oc get certificate -A` shows
+# Ready.
+- name: "cert_manager | check the router/API-server Certificates are Ready before allowing their consumer flip"
+  kubernetes.core.k8s_info:
+    api_version: cert-manager.io/v1
+    kind: Certificate
+    name: "{{ item.name }}"
+    namespace: "{{ item.namespace }}"
+  register: _cert_manager_consumer_cert_check
+  loop:
+    - { name: router-wildcard-tls, namespace: openshift-ingress, flag: routerDefaultCert }
+    - { name: api-server-tls, namespace: openshift-config, flag: apiServerNamedCert }
+  when: _cert_manager_acme_identity['consumers'][item.flag] | bool
+
+- name: "cert_manager | refuse to flip a consumer whose Certificate is not Ready yet"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_certmanager_{{ 'router_default_cert' if item.item.flag == 'routerDefaultCert' else 'api_server_named_cert' }}
+      is true, but Certificate {{ item.item.name }} ({{ item.item.namespace }})
+      {{ 'does not exist yet' if (item.resources | default([]) | length) == 0
+         else 'is not Ready yet' }}. acme-cluster-patches.yaml would point
+      IngressController/default or the APIServer at a Secret that does not
+      exist, which breaks router/Console serving before ACME can issue
+      anything - exactly the trap this variable's own doc comment warns
+      about (a confidential.yml copied from a finished cluster). Complete
+      ADR-0211's staged rollout first: leave this flag false until
+      `oc get certificate -A` shows {{ item.item.name }} Ready, then set it.
+  loop: "{{ _cert_manager_consumer_cert_check.results | default([]) }}"
+  when: >-
+    (item.skipped | default(false)) | bool == false and
+    ((item.resources | default([]) | length) == 0 or
+     not (item.resources[0].status.conditions
+          | default([]) | selectattr('type', 'equalto', 'Ready')
+          | selectattr('status', 'equalto', 'True') | list | length > 0))
+
 - name: "cert_manager | refuse ACME consumers while ACME itself is disabled"
   ansible.builtin.fail:
     msg: >-
