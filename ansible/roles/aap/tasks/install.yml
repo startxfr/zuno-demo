@@ -306,13 +306,26 @@
         _aap_rhn_username in ['', 'xxxxxx'] or
         _aap_rhn_password in ['', 'xxxxxx']
 
-    - name: "aap | look up the Gateway Route"
+    # ADR-0517 live finding (demo333, 2026-09-06): on a fresh cluster the
+    # -d1 apply above returns as soon as ArgoCD reports the
+    # AnsibleAutomationPlatform CR Synced/Healthy - which is the moment
+    # it is CREATED (no custom health check exists for that kind), while
+    # the gateway operator takes 15-20 minutes to actually bring the
+    # stack up and create this Route. A retry-less lookup here failed the
+    # whole role, which then never reached the subscription attach below
+    # - leaving a running AAP with no license, where every Controller
+    # host POST later 403s with "License is missing". Invisible on
+    # demo222, whose AAP predates every rerun of this role.
+    - name: "aap | wait for the Gateway Route (fresh install: the operator takes ~20 min)"
       kubernetes.core.k8s_info:
         api_version: route.openshift.io/v1
         kind: Route
         namespace: zuno-aap
         name: aap
       register: _aap_route
+      until: (_aap_route.resources | default([]) | length) > 0
+      retries: 90
+      delay: 15
 
     - name: "aap | fail if the Gateway Route doesn't exist"
       ansible.builtin.fail:
