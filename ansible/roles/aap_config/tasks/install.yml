@@ -317,48 +317,106 @@
   failed_when: false
   no_log: true
 
-# Two distinct defects to catch, and the second is the one that bit on
-# 2026-08-27: an object can EXIST and still be unusable. `zuno-day0-check`
-# was present with inventory: None while ask_inventory_on_launch is false,
-# i.e. a Job Template that cannot be launched at all - which a plain
-# existence test would have called healthy. So: any missing object among
-# the census above, or ANY Job Template whose inventory never got bound
-# (checked separately below, once each Job Template's id is known).
-- name: "aap-config | decide whether the tower.ansible.com CRs need a nudge"
-  ansible.builtin.set_fact:
-    _aap_config_crs_need_nudge: >-
-      {{ (_aap_config_token_needs_mint | bool)
-         or (_aap_config_census.results
-             | map(attribute='json.count', default=0) | map('int') | select('equalto', 0) | list | length > 0) }}
+# Three distinct defects to catch. The second bit on 2026-08-27: an
+# object can EXIST and still be unusable. `zuno-day0-check` was present
+# with inventory: None while ask_inventory_on_launch is false, i.e. a
+# Job Template that cannot be launched at all - which a plain existence
+# test would have called healthy. The third bit on demo333's from-scratch
+# install (ADR-0517, 2026-09-06): a Workflow Template can exist with ZERO
+# nodes - the operator creates the workflow shell, then every node attach
+# fails ("Unable to Find unified_job_template", ignore_errors'd) because
+# the Job Templates it references don't exist in Controller yet, and the
+# CR still reports Successful. Root cause of that third defect: on a
+# fresh cluster ALL tower.ansible.com CRs land at once and the operator
+# reconciles its queue concurrently (--max-concurrent-reconciles=15) with
+# no cross-CR ordering - the chart's sync-waves only order CR *creation* -
+# so JobTemplate/WorkflowTemplate CRs reconciled before the Project/
+# Inventory reached Controller fail-and-ignore, then sit "Successful"/
+# "Awaiting next reconciliation" forever.
+- name: "aap-config | census each Workflow Template's node count (a zero-node workflow is unlaunchable)"
+  ansible.builtin.uri:
+    url: "{{ _aap_config_gateway_url }}/api/controller/v2/workflow_job_template_nodes/?workflow_job_template__name={{ item }}&page_size=1"
+    method: GET
+    url_username: admin
+    url_password: "{{ _aap_config_admin_password }}"
+    force_basic_auth: true
+    validate_certs: false
+    status_code: [200, 401, 403]
+  register: _aap_config_wf_node_census
+  loop: "{{ aap_config_workflow_templates | map(attribute='name') | list }}"
+  changed_when: false
+  failed_when: false
+  no_log: true
 
-# A re-minted token only reaches the CRs on their NEXT reconcile, and the
-# resource operator reconciles on a long period when nothing about the CR
-# changes - ArgoCD re-applying an identical manifest triggers nothing. So
-# nudge them explicitly, otherwise the waits below can time out against
-# CRs that are still holding the dead credential. Absent CRs are fine: on
-# a first install ArgoCD has only just created them, and their initial
-# reconcile already uses the fresh token.
-- name: "aap-config | force the tower.ansible.com CRs to reconcile"
+# Which CRs to bounce: every census object that is missing (or whose
+# lookup failed outright), plus every workflow whose node count is 0,
+# plus - when the Gateway token was just re-minted - all of them, since
+# a re-minted token only reaches a CR on its next reconcile.
+- name: "aap-config | list the tower.ansible.com CRs whose Controller object is missing or unusable"
+  ansible.builtin.set_fact:
+    _aap_config_crs_to_bounce: >-
+      {%- set kind_by_path = {'projects': 'AnsibleProject',
+                              'inventories': 'AnsibleInventory',
+                              'credentials': 'AnsibleCredential',
+                              'job_templates': 'JobTemplate',
+                              'workflow_job_templates': 'WorkflowTemplate'} -%}
+      {%- set out = [] -%}
+      {%- if _aap_config_token_needs_mint | bool -%}
+        {%- for r in _aap_config_census.results -%}
+          {%- set _ = out.append({'kind': kind_by_path[r.item.path], 'name': r.item.name}) -%}
+        {%- endfor -%}
+      {%- else -%}
+        {%- for r in _aap_config_census.results -%}
+          {%- if (r.json.count | default(0) | int) == 0 -%}
+            {%- set _ = out.append({'kind': kind_by_path[r.item.path], 'name': r.item.name}) -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- for r in _aap_config_wf_node_census.results -%}
+          {%- if (r.json.count | default(0) | int) == 0 -%}
+            {%- set _ = out.append({'kind': 'WorkflowTemplate', 'name': r.item}) -%}
+          {%- endif -%}
+        {%- endfor -%}
+      {%- endif -%}
+      {{ out | unique }}
+
+# The previous mechanism here annotated the CRs to "force a reconcile".
+# Proven DEAD live on demo333 (ADR-0517, 2026-09-06): all 18 JobTemplate
+# CRs were annotated and the operator did nothing for 7+ minutes - the
+# ansible-operator's event filter ignores metadata-only changes, and
+# ArgoCD re-applying an identical manifest triggers nothing either. What
+# does work, proven the same day (16s CR-absent to Controller-object
+# present): DELETE the CR and let this Application's selfHeal recreate
+# it - a recreated CR always gets a fresh initial reconcile, which now
+# succeeds because the Project/Inventory exist. The CRs carry no
+# finalizer, so deletion is immediate, and ArgoCD owns them (prune+
+# selfHeal), so recreation is guaranteed, not hoped for.
+- name: "aap-config | bounce the broken CRs (delete; the Application's selfHeal recreates them)"
   kubernetes.core.k8s:
-    state: patched
+    state: absent
     api_version: tower.ansible.com/v1alpha1
     kind: "{{ item.kind }}"
     namespace: zuno-aap
     name: "{{ item.name }}"
-    definition:
-      metadata:
-        annotations:
-          zuno.io/token-refreshed-at: "{{ lookup('pipe', 'date +%s') }}"
-  loop: >-
-    {{ [{'kind': 'AnsibleProject', 'name': aap_config_project_name},
-        {'kind': 'AnsibleInventory', 'name': aap_config_inventory_name}]
-       + (aap_config_credentials | map(attribute='name') | map('community.general.dict_kv', 'name') | map('combine', {'kind': 'AnsibleCredential'}) | list)
-       + (aap_config_job_templates | map(attribute='name') | map('community.general.dict_kv', 'name') | map('combine', {'kind': 'JobTemplate'}) | list)
-       + (aap_config_workflow_templates | map(attribute='name') | map('community.general.dict_kv', 'name') | map('combine', {'kind': 'WorkflowTemplate'}) | list) }}
+    wait: true
+  loop: "{{ _aap_config_crs_to_bounce }}"
   loop_control:
     label: "{{ item.kind }}/{{ item.name }}"
-  failed_when: false
-  when: _aap_config_crs_need_nudge | bool
+  when: _aap_config_crs_to_bounce | length > 0
+
+- name: "aap-config | wait for ArgoCD to recreate each bounced CR"
+  kubernetes.core.k8s_info:
+    api_version: tower.ansible.com/v1alpha1
+    kind: "{{ item.kind }}"
+    namespace: zuno-aap
+    name: "{{ item.name }}"
+  register: _aap_config_cr_recreated
+  until: (_aap_config_cr_recreated.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10
+  loop: "{{ _aap_config_crs_to_bounce }}"
+  loop_control:
+    label: "{{ item.kind }}/{{ item.name }}"
+  when: _aap_config_crs_to_bounce | length > 0
 
 # ArgoCD reports the CRs Synced/Healthy the moment they're applied (no
 # custom health checks exist for tower.ansible.com kinds) - the resource
