@@ -68,10 +68,10 @@
     msg: >-
       WARNING: zuno-signer-client-secret is absent from zuno-ai-build
       (rhtas-config is not installed yet - expected on a fresh cluster's
-      first `make day1 build`, which runs before the Day 1 install
-      phase). SKIPPING the signing of
-      {{ sign_image_name }}:{{ _image_signing_tag }} - run `make d3 sign`
-      after Day 1 completes to sign every unsigned image.
+      first day1 build, which runs before the Day 1 install phase).
+      SKIPPING the signing of
+      {{ sign_image_name }}:{{ _image_signing_tag }} - after Day 1
+      completes, sign every unsigned image with: make d3 sign all
   when: _image_signing_skip | bool
 
 - name: "image-signing | sign {{ sign_image_name }} via RHTAS"
