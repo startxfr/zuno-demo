@@ -43,7 +43,12 @@
     url_password: "{{ _aap_config_admin_password }}"
     force_basic_auth: true
     validate_certs: false
-    status_code: 204
+    # 204 = deleted synchronously; 202 = deletion accepted and queued as a
+    # background task, which is what the Controller answers for Project
+    # deletes on a fresh AAP install (ADR-0517 live finding, demo333
+    # 2026-09-06 - demo222 always answered 204 because its defaults were
+    # removed long ago on an older build).
+    status_code: [202, 204]
   loop: "{{ _aap_config_defaults_lookup.results }}"
   loop_control:
     label: "{{ item.item.name }}"
