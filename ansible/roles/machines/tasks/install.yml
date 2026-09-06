@@ -17,6 +17,20 @@
 - name: "machines | resolve this cluster's AWS identity (WP-118 B1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_aws_identity.yml"
 
+# Needed starting with zuno_machines_az_override below - every other value
+# this role reads comes from the live AWS API via resolve_cluster_aws_identity
+# above, never from confidential.yml, which is why this role never needed the
+# loader pair until now. check_confidential_var_loaders enforces it.
+- name: "machines | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _machines_confidential_file
+
+- name: "machines | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _machines_confidential_file.stat.exists
+
 # ADR-0517 live finding (demo333, 2026-09-06): the chart's own AZ letters
 # ('a'/'c' for the GPU groups) are a verified fact about eu-west-2 for THIS
 # AWS account ("g7e exists ONLY in eu-west-2a and eu-west-2c" per
