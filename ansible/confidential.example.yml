@@ -335,6 +335,24 @@ zuno_aws_route53_secret_access_key: "xxxxxx"
 # revision (main).
 # zuno_gitops_target_revision: "main"
 
+# --- GPU MachineSet AZ-letter override (ADR-0517 live finding) -------------
+#
+# OPTIONAL and NOT secret. gitops/charts/machines/values.yaml hardcodes 'a'/'c'
+# as the GPU groups' availability zones - a verified fact about eu-west-2 for
+# the account this was authored against ("g7e exists ONLY in eu-west-2a and
+# eu-west-2c"). An AZ LETTER is an account-local alias for a physical AZ, so
+# which letter carries a given instance type's capacity is not portable across
+# regions, or even guaranteed stable across accounts in the same region.
+#
+# Map of MachineSet name -> the letter THIS cluster's account/region actually
+# offers that instance type in (check with `aws ec2
+# describe-instance-type-offerings --location-type availability-zone`).
+# Leave unset on a cluster in eu-west-2 (or any region confirmed to match the
+# chart's own letters) - the chart's values are used unchanged.
+#
+# zuno_machines_az_override:
+#   zuno-gpu-c: "b"
+
 # --- S3 bucket ownership (ADR-0517 B12 / WP-130 probe P6) -------------------
 #
 # OPTIONAL and NOT secret. The short name of the cluster that owns the S3
