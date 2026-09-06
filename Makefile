@@ -16,7 +16,7 @@ EXTRA_VARS ?=
 # out to Day 1 in exchange (see Day 1 comment below) - this is the
 # "always-on infra" split ADR-0418's Context section had deferred to a
 # future ADR.
-DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault cert-manager external-secrets machines postgresql keycloak aap aap-config
+DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault external-secrets cert-manager machines postgresql keycloak aap aap-config
 DAY0_VERBS := check install uninstall reconcile all reinstall
 
 # Day 1 is the remainder of the AI-platform-operator stack (mesh, Kueue,

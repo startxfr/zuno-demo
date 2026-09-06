@@ -34,8 +34,8 @@
       - image_mirrors
       - openshift_rbac_groups
       - vault
-      - cert_manager
       - external_secrets
+      - cert_manager
       - machines
       - postgresql
       - keycloak

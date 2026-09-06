@@ -26,8 +26,8 @@
       - image_mirrors
       - openshift_rbac_groups
       - vault
-      - cert_manager
       - external_secrets
+      - cert_manager
       - machines
       # postgresql/keycloak/aap/aap_config (ADR-0421): their only real
       # prerequisites - vault, external_secrets, machines - are all

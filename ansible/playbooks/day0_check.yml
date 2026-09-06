@@ -1,6 +1,13 @@
 ---
 # Day 0 state check (`make day0 check`). Component order matters: e.g.
-# vault must precede cert_manager/external_secrets, argocd before namespaces.
+# vault must precede cert_manager/external_secrets, argocd before namespaces,
+# and external_secrets before cert_manager - cert-manager's ACME identity is
+# an ExternalSecret (gitops/charts/cert-manager/templates/
+# acme-externalsecret.yaml), and ArgoCD fails a sync outright when it
+# references a kind whose CRD (owned by the external-secrets operator) is
+# not installed yet, not just that one resource. Invisible on a cluster
+# where external-secrets was already installed from a prior run; caught
+# live on demo333's first from-scratch install (ADR-0517, 2026-09-06).
 # openshift_oauth stays in Day 1 (after Day 0's keycloak) - see
 # day1_check.yml. ADR-0421 moved postgresql/keycloak/aap/aap_config here
 # from Day 1 (after machines) and smtp/nfd/nvidia_gpu/
@@ -34,8 +41,8 @@
       - image_mirrors
       - openshift_rbac_groups
       - vault
-      - cert_manager
       - external_secrets
+      - cert_manager
       - machines
       - postgresql
       - keycloak
