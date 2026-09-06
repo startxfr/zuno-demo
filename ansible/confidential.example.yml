@@ -209,12 +209,15 @@ zuno_models_s3_prefix: "models"
 # (registered by the mlops pipeline, WP-126 run wp126-20260904-201830) is
 # downloaded from by the qwen LLMInferenceServices' adapter initContainer.
 # Cluster-specific ON PURPOSE: the adapter is an mlops-pipeline OUTPUT, so it
-# lives in this cluster's own zuno-<cluster>-mlops bucket (copy it there from
-# the training cluster when bootstrapping a new cluster). Same credential as
-# the base model weights (rag/s3 Vault secret, zuno* wildcard). The chart
-# default is an invalid placeholder (ADR-0547 clause 3) - omitting this on a
-# cluster serving loraAdapters breaks the adapter download loudly.
-zuno_models_tekos_lora_source_s3_uri: "s3://zuno-mycluster-mlops/mlops/models/tekos/wp126-20260904-201830/adapter"
+# lives in this cluster's own zuno-<cluster>-mlops bucket. Same credential as
+# the base model weights (rag/s3 Vault secret, zuno* wildcard). OMIT this on
+# a cluster built from scratch: no adapter exists until the cluster's own
+# pipeline registers one, and an unset variable makes the models role inject
+# loraAdapters: [] (qwen serves without adapters) instead of a download
+# initContainer that would crashloop. Set it (then `make d2 install models`)
+# once a pipeline run has produced the artifact at that URI. The chart
+# default stays an invalid placeholder (ADR-0547 clause 3).
+# zuno_models_tekos_lora_source_s3_uri: "s3://zuno-mycluster-mlops/mlops/models/tekos/<run-id>/adapter"
 
 # --- RAG corpus and SXA dump (ADR-0546/WP-131) -----------------------------
 # Two buckets with opposite natures. zuno_rag_corpus_s3_* is this cluster's
