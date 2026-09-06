@@ -28,19 +28,26 @@ metadata:
     app.kubernetes.io/name: postgresql
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-31"
     # ADR-0517 live finding (demo333, first from-scratch Day 0 run,
     # 2026-09-06): postgresql is a Day 0 component (ADR-0421), but Istio's
     # CRDs are only installed by the `service_mesh` role, which is Day 1
     # (ansible/playbooks/day1_install.yml). On a virgin cluster the
     # DestinationRule CRD does not exist yet when this Application first
-    # syncs, and ArgoCD's dry-run validation for an unknown kind fails the
-    # ENTIRE sync operation, not just this resource - so zero of this
-    # Application's 30 resources get created, including the PostgresCluster
-    # itself. SkipDryRunOnMissingResource defers just these 4 resources
-    # until the CRD exists; selfHeal then creates them automatically once
-    # Day 1's service_mesh runs. Harmless on demo222 (mesh already
-    # installed there), required for a from-scratch cluster.
+    # syncs. ArgoCD sync-waves are a hard barrier - a resource whose kind
+    # cannot be resolved at all ("no matches for kind ... ensure CRDs are
+    # installed first") fails its wave and every LATER wave never runs in
+    # that operation. The original "-31" wave sat right before
+    # postgrescluster.yaml's "-30", so this alone blocked the actual
+    # PostgresCluster (and everything below it: monitoring/schema-grants
+    # ConfigMaps, the exporter's PodMonitor/NetworkPolicy) from ever being
+    # created. Moved to "20" - LAST in this chart (podmonitor-postgres.yaml/
+    # networkpolicy-metrics.yaml top out at "15") - so a missing mesh CRD
+    # only blocks these 4 mesh-only resources; selfHeal creates them once
+    # Day 1's service_mesh runs. SkipDryRunOnMissingResource is kept for the
+    # unrelated case where the CRD lands mid-operation (an earlier wave in
+    # THIS sync installs it) - harmless either way, a no-op on demo222
+    # where mesh is already installed.
+    argocd.argoproj.io/sync-wave: "20"
     argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   host: {{ $.Values.cluster.name }}-{{ $svc }}.{{ $.Release.Namespace }}.svc.cluster.local
