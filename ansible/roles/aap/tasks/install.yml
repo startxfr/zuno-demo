@@ -382,42 +382,122 @@
       register: _aap_config_before
       no_log: true
 
-    - name: "aap | attach the configured Red Hat account's subscription"
+# ADR-0517 live finding (demo333, 2026-09-06): the previous single POST
+    # of subscriptions_username/password to /config/ answers 400 "Invalid
+    # subscription" on this fresh AAP 2.7 when the account holds SEVERAL
+    # subscriptions (this one lists 8) - with more than one candidate the
+    # endpoint refuses to pick. It had worked when demo222 was first
+    # subscribed, and never ran again there. The flow the UI actually
+    # uses, reproduced here: list the account's subscriptions, choose one,
+    # save the account credentials in settings (attach validates
+    # server-side against them), then attach BY ID - and the attach field
+    # is `subscription_id`, NOT the `pool_id` the AWX docs suggest
+    # (pool_id answers 400 "No subscription ID provided", live-confirmed).
+    # Everything below is skipped when the license is already
+    # valid+compliant, so re-runs never re-attach.
+    - name: "aap | attach a subscription (only when none is active)"
+      when: >-
+        not (_aap_config_before.json.license_info.valid_key | default(false) | bool) or
+        not (_aap_config_before.json.license_info.compliant | default(false) | bool)
+      block:
+        - name: "aap | list the Red Hat account's available subscriptions"
+          ansible.builtin.uri:
+            url: "{{ _aap_gateway_url }}/api/controller/v2/config/subscriptions/"
+            method: POST
+            url_username: admin
+            url_password: "{{ _aap_admin_password }}"
+            force_basic_auth: true
+            validate_certs: false
+            body_format: json
+            body:
+              subscriptions_username: "{{ _aap_rhn_username }}"
+              subscriptions_password: "{{ _aap_rhn_password }}"
+            status_code: 200
+            timeout: 120
+          register: _aap_sub_list
+          no_log: true
+
+        - name: "aap | fail if the account has no valid subscription"
+          ansible.builtin.fail:
+            msg: >-
+              The Red Hat account authenticated but returned no valid
+              subscription. Check the account's Ansible Automation
+              Platform entitlements on access.redhat.com.
+          when: >-
+            (_aap_sub_list.json | default([]) | selectattr('valid_key') | list | length) == 0
+
+        # Largest instance_count wins: on this operator account that is
+        # the partner subscription (effectively unlimited hosts), and on
+        # a single-subscription account it is simply the only one.
+        - name: "aap | choose the subscription with the largest host count"
+          ansible.builtin.set_fact:
+            _aap_chosen_sub: >-
+              {{ _aap_sub_list.json | selectattr('valid_key')
+                 | sort(attribute='instance_count') | last }}
+          no_log: true
+
+        - name: "aap | save the account credentials in Controller settings (attach validates against them)"
+          ansible.builtin.uri:
+            url: "{{ _aap_gateway_url }}/api/controller/v2/settings/system/"
+            method: PATCH
+            url_username: admin
+            url_password: "{{ _aap_admin_password }}"
+            force_basic_auth: true
+            validate_certs: false
+            body_format: json
+            body:
+              SUBSCRIPTIONS_USERNAME: "{{ _aap_rhn_username }}"
+              SUBSCRIPTIONS_PASSWORD: "{{ _aap_rhn_password }}"
+            status_code: 200
+          no_log: true
+
+        - name: "aap | attach the chosen subscription by id"
+          ansible.builtin.uri:
+            url: "{{ _aap_gateway_url }}/api/controller/v2/config/attach/"
+            method: POST
+            url_username: admin
+            url_password: "{{ _aap_admin_password }}"
+            force_basic_auth: true
+            validate_certs: false
+            body_format: json
+            body:
+              subscription_id: "{{ _aap_chosen_sub.subscription_id }}"
+            status_code: 200
+            timeout: 180
+          register: _aap_attach
+          no_log: true
+          changed_when: true
+
+    - name: "aap | read back the license state"
       ansible.builtin.uri:
         url: "{{ _aap_gateway_url }}/api/controller/v2/config/"
-        method: POST
+        method: GET
         url_username: admin
         url_password: "{{ _aap_admin_password }}"
         force_basic_auth: true
         validate_certs: false
-        body_format: json
-        body:
-          subscriptions_username: "{{ _aap_rhn_username }}"
-          subscriptions_password: "{{ _aap_rhn_password }}"
         status_code: 200
-      register: _aap_subscribe
+      register: _aap_subscribe_verify
       no_log: true
-      changed_when: >-
-        (_aap_config_before.json.license_info.subscription_id | default(''))
-        != (_aap_subscribe.json.subscription_id | default(''))
 
     - name: "aap | fail if the attached subscription is not valid/compliant"
       ansible.builtin.fail:
         msg: >-
           The Red Hat account accepted the credentials but the resulting
           subscription is not valid/compliant (valid_key={{
-          _aap_subscribe.json.valid_key | default('absent') }},
-          compliant={{ _aap_subscribe.json.compliant | default('absent')
+          _aap_subscribe_verify.json.license_info.valid_key | default('absent') }},
+          compliant={{ _aap_subscribe_verify.json.license_info.compliant | default('absent')
           }}). Check the account's Ansible Automation Platform
           entitlements on access.redhat.com.
       when: >-
-        not (_aap_subscribe.json.valid_key | default(false) | bool) or
-        not (_aap_subscribe.json.compliant | default(false) | bool)
+        not (_aap_subscribe_verify.json.license_info.valid_key | default(false) | bool) or
+        not (_aap_subscribe_verify.json.license_info.compliant | default(false) | bool)
 
     - name: "aap | subscription summary"
       ansible.builtin.debug:
         msg: >-
-          Subscription active: '{{ _aap_subscribe.json.subscription_name }}'
-          (account {{ _aap_subscribe.json.account_number }}, sku
-          {{ _aap_subscribe.json.sku }}, {{ _aap_subscribe.json.instance_count
-          }} managed hosts, compliant={{ _aap_subscribe.json.compliant }}).
+          Subscription active:
+          '{{ _aap_subscribe_verify.json.license_info.subscription_name }}'
+          (sku {{ _aap_subscribe_verify.json.license_info.sku | default('n/a') }},
+          {{ _aap_subscribe_verify.json.license_info.instance_count }} managed
+          hosts, compliant={{ _aap_subscribe_verify.json.license_info.compliant }}).
