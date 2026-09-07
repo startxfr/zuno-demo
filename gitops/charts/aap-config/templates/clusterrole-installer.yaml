@@ -57,6 +57,15 @@ rules:
   - apiGroups: [""]
     resources: ["secrets", "configmaps", "serviceaccounts", "pods", "pods/log", "services", "persistentvolumeclaims", "events"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ADR-0517 live finding (demo333, 2026-09-07): the rhtas role loads the
+  # Trillian schema by exec-ing into the mariadb pod (kubernetes.core
+  # k8s_exec/k8s_cp), and exec is its own subresource - the rule above
+  # does not cover it, so the first AAP-driven rhtas install 403'd on
+  # 'pods/exec'. create is the exec POST itself; get covers the client's
+  # websocket handshake probe.
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "get"]
   # WP-102: namespaces, needed by ansible/tasks/apply_openshift_build.yml's
   # "ensure the zuno-ai-build namespace" task (shared by every Day 1/Day 2
   # build role) - a genuine gap, not a deliberate exclusion (this ClusterRole
