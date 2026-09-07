@@ -23,6 +23,15 @@ metadata:
   name: {{ $qr.resourceFlavorName }}
   annotations:
     argocd.argoproj.io/sync-wave: "21"
+    # ADR-0517 live finding (demo333, 2026-09-07): on a fresh cluster the
+    # kueue.x-k8s.io CRDs don't exist until the wave-20 Kueue operand CR
+    # reconciles - and without this option ArgoCD fails the whole sync at
+    # VALIDATION ("Make sure the CRD is installed"), before wave 20 ever
+    # applies: a deadlock no amount of sync retries can clear, invisible
+    # on demo222 where the CRDs predate this chart. With it, validation
+    # passes, wave 20 applies, and the syncPolicy.retry rides through the
+    # ~2 min the operand takes to register the CRDs.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 # Empty spec = matches every node. Deliberately left alone by WP-117: the
 # GPU flavor below is purely additive, whereas narrowing this one would
 # re-quota every existing and future cpu/memory consumer.
@@ -38,6 +47,15 @@ metadata:
   name: {{ $qr.gpuFlavor.name }}
   annotations:
     argocd.argoproj.io/sync-wave: "21"
+    # ADR-0517 live finding (demo333, 2026-09-07): on a fresh cluster the
+    # kueue.x-k8s.io CRDs don't exist until the wave-20 Kueue operand CR
+    # reconciles - and without this option ArgoCD fails the whole sync at
+    # VALIDATION ("Make sure the CRD is installed"), before wave 20 ever
+    # applies: a deadlock no amount of sync retries can clear, invisible
+    # on demo222 where the CRDs predate this chart. With it, validation
+    # passes, wave 20 applies, and the syncPolicy.retry rides through the
+    # ~2 min the operand takes to register the CRDs.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   nodeLabels:
     {{- toYaml $qr.gpuFlavor.nodeLabels | nindent 4 }}
@@ -53,6 +71,15 @@ metadata:
   name: {{ $qr.clusterQueueName }}
   annotations:
     argocd.argoproj.io/sync-wave: "21"
+    # ADR-0517 live finding (demo333, 2026-09-07): on a fresh cluster the
+    # kueue.x-k8s.io CRDs don't exist until the wave-20 Kueue operand CR
+    # reconciles - and without this option ArgoCD fails the whole sync at
+    # VALIDATION ("Make sure the CRD is installed"), before wave 20 ever
+    # applies: a deadlock no amount of sync retries can clear, invisible
+    # on demo222 where the CRDs predate this chart. With it, validation
+    # passes, wave 20 applies, and the syncPolicy.retry rides through the
+    # ~2 min the operand takes to register the CRDs.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   namespaceSelector: {}
   # TWO resource groups, not one group with two flavors: a resource may
@@ -95,6 +122,15 @@ metadata:
   namespace: {{ $ns }}
   annotations:
     argocd.argoproj.io/sync-wave: "21"
+    # ADR-0517 live finding (demo333, 2026-09-07): on a fresh cluster the
+    # kueue.x-k8s.io CRDs don't exist until the wave-20 Kueue operand CR
+    # reconciles - and without this option ArgoCD fails the whole sync at
+    # VALIDATION ("Make sure the CRD is installed"), before wave 20 ever
+    # applies: a deadlock no amount of sync retries can clear, invisible
+    # on demo222 where the CRDs predate this chart. With it, validation
+    # passes, wave 20 applies, and the syncPolicy.retry rides through the
+    # ~2 min the operand takes to register the CRDs.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   clusterQueue: {{ $qr.clusterQueueName }}
 {{- end }}
