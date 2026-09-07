@@ -1127,6 +1127,65 @@ def check_day0_day1_roles() -> List[Finding]:
     return findings
 
 
+def check_aap_workflow_dags() -> List[Finding]:
+    """Every Makefile day1/day2 run component appears in aap-config's
+    workflow DAGs (and vice versa).
+
+    ADR-0517 live finding (demo333, 2026-09-07): rhtas was in
+    DAY1_RUN_COMPONENTS and in day1_install.yml's serial order but missing
+    from gitops/charts/aap-config/values.yaml's &day1ComponentDag - so
+    every AAP-driven day1 install silently skipped it AND every day1 check
+    (same graph) silently never verified it. The cluster reached a green
+    d1 with no RHTAS at all; only day2's supply-chain image verification
+    (dialing a TUF service that did not exist) surfaced it. A component
+    list and a hand-maintained DAG will drift again without this check.
+    """
+    findings: List[Finding] = []
+    lists = _parse_makefile_lists()
+    values_path = REPO_ROOT / "gitops" / "charts" / "aap-config" / "values.yaml"
+    try:
+        values = yaml.safe_load(values_path.read_text())
+    except Exception as exc:  # noqa: BLE001 - report, never crash the linter
+        return [Finding("aap_workflow_dags", f"cannot parse {values_path}: {exc}")]
+
+    dags = {}
+    for wf in (values or {}).get("workflowTemplates", []):
+        nodes = wf.get("nodes")
+        if isinstance(nodes, list):
+            dags[wf.get("name", "?")] = {n.get("id") for n in nodes if isinstance(n, dict)}
+
+    # supply-chain is deliberately check-only (ADR-0420/WP-070: no install
+    # verb of its own) - the check DAG carries it, the install DAG must not.
+    expected = {
+        "zuno-day1-install-workflow": ("DAY1_RUN_COMPONENTS", set(lists["DAY1_RUN_COMPONENTS"])),
+        "zuno-day1-check-workflow": ("DAY1_RUN_COMPONENTS", set(lists["DAY1_RUN_COMPONENTS"])),
+        "zuno-day2-install-workflow": ("DAY2_RUN_COMPONENTS", set(lists["DAY2_RUN_COMPONENTS"]) - {"supply-chain"}),
+        "zuno-day2-check-workflow": ("DAY2_RUN_COMPONENTS", set(lists["DAY2_RUN_COMPONENTS"])),
+    }
+    for wf_name, (list_name, make_set) in expected.items():
+        if wf_name not in dags:
+            findings.append(Finding(
+                "aap_workflow_dags",
+                f"aap-config values.yaml has no workflowTemplate named {wf_name}"))
+            continue
+        dag_set = dags[wf_name]
+        # `namespaces` is Day 2's Makefile-only pre-step (applied by every
+        # component role's own prerequisites); tolerate it absent from the
+        # DAG rather than hardcoding false positives.
+        for missing in sorted(make_set - dag_set - {"namespaces"}):
+            findings.append(Finding(
+                "aap_workflow_dags",
+                f"Makefile {list_name} lists '{missing}' but {wf_name}'s DAG "
+                f"has no node for it - AAP installs AND checks will silently "
+                f"skip that component (this is how rhtas was lost)"))
+        for extra in sorted(dag_set - make_set):
+            findings.append(Finding(
+                "aap_workflow_dags",
+                f"{wf_name}'s DAG has node '{extra}' that Makefile "
+                f"{list_name} does not list"))
+    return findings
+
+
 def check_gitops_values_clobber() -> List[Finding]:
     """Catch roles whose gitops_app_extra_helm_values silently drops manifest keys.
 
@@ -1306,6 +1365,7 @@ def main() -> int:
         + check_wp_version_view()
         + check_agent_status_vs_adr()
         + check_day0_day1_roles()
+        + check_aap_workflow_dags()
         + check_debug_make_commands()
         + check_gitops_values_clobber()
         + check_confidential_var_loaders()
@@ -1320,7 +1380,8 @@ def main() -> int:
           "declared ADR supersessions, work-package state vs the roadmap tracker, "
           "the roadmap's by-version table against the ADR bodies, "
           "agent zuno.status vs its governing ADR(s), Makefile/ansible role "
-          "consistency, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
+          "consistency, Makefile component lists against aap-config's AAP "
+          "workflow DAGs, make commands printed by debug tasks, GitOps Application values against the roles that replace them, "
           "roles reading ansible/confidential.yml variables without loading the file, "
           f"platform version prose against {PROFILE_PATH.relative_to(REPO_ROOT)}, "
           "model architectural roles against provider-routing.yaml/"

@@ -262,6 +262,13 @@ workflowTemplates:
         successNodes: [mariadb]
       - id: grafana
         successNodes: [mariadb]
+      # ADR-0517 live finding (demo333, 2026-09-07): perses was in
+      # DAY1_RUN_COMPONENTS and day1_install.yml's serial order (after
+      # grafana) but missing from this DAG - same silent-skip class as the
+      # rhtas node below; check_docs.py's aap_workflow_dags check now
+      # pins every component list to these graphs.
+      - id: perses
+        successNodes: [mariadb]
       - id: mariadb
         successNodes: [tempo]
         allParentsMustConverge: true
@@ -282,6 +289,16 @@ workflowTemplates:
         successNodes: [lightspeed]
         allParentsMustConverge: true
       - id: lightspeed
+        successNodes: [rhtas]
+      # ADR-0517 live finding (demo333, 2026-09-07): rhtas was in the
+      # Makefile's DAY1_RUN_COMPONENTS and in day1_install.yml's serial
+      # order (lightspeed -> rhtas -> aiagent-operator) but MISSING from
+      # this DAG - so every AAP-driven day1 install silently skipped it
+      # and every day1 check (same graph) silently never verified it: the
+      # cluster reached a green d1 with no RHTAS at all, discovered only
+      # when d2's supply-chain verification dialed a TUF service that did
+      # not exist. Same position as the playbook's serial order.
+      - id: rhtas
         successNodes: [aiagent-operator]
       - id: aiagent-operator
         successNodes: []
@@ -330,6 +347,16 @@ workflowTemplates:
         successNodes: [mlops]
         allParentsMustConverge: true
       - id: mlops
+        successNodes: [trustyai-config]
+      # ADR-0517 live finding (demo333, 2026-09-07): trustyai-config and
+      # mlflow were in DAY2_RUN_COMPONENTS and day2_install.yml's serial
+      # order (mlops -> trustyai_config -> mlflow -> lightspeed_config)
+      # but missing from this DAG - same silent-skip class as day1's
+      # rhtas/perses nodes; the aap_workflow_dags docs check now guards
+      # this. supply-chain stays check-only by design (no install verb).
+      - id: trustyai-config
+        successNodes: [mlflow]
+      - id: mlflow
         successNodes: [lightspeed-config]
       - id: lightspeed-config
         successNodes: []
@@ -352,6 +379,12 @@ workflowTemplates:
         successNodes: [mlops]
         allParentsMustConverge: true
       - id: mlops
+        successNodes: [trustyai-config]
+      # ADR-0517: same trustyai-config/mlflow insertion as the install
+      # DAG above - the check graph skipped them identically.
+      - id: trustyai-config
+        successNodes: [mlflow]
+      - id: mlflow
         successNodes: [lightspeed-config]
       # check-only tail (ADR-0420/WP-070) - no install/build of its own.
       - id: lightspeed-config
