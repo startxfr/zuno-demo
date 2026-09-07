@@ -14,6 +14,39 @@
     name: agent_build
     tasks_from: build
 
+# ADR-0517 live finding (demo333, 2026-09-07): on a from-scratch cluster
+# NOTHING has run `make d3 sign` yet, so Vault KV zuno/okf-signatures is
+# empty and the agent-runtime chart's externalsecret-okf-signatures.yaml
+# (wave 0, ESO health check registered) goes Degraded on "could not get
+# secret data from provider" - ArgoCD's wave gating then never applies
+# the Deployment behind it and this Day 2 install times out waiting on
+# Synced/Healthy. Day 3's signing verb cannot be the first producer: it
+# runs two tiers later. The signing Job itself only needs what Day 1
+# already delivered (agent-runtime:latest + supply-chain-signer:latest in
+# zuno-ai-build, the zuno-signer SA and the Vault Transit key from d0),
+# so this role produces the signatures itself when they are missing -
+# same self-sufficiency pattern as the two image builds above.
+#
+# Probed via the materialized target Secret, not Vault: absent means no
+# consumer ever got signatures (fresh cluster), present means the
+# pipeline delivered them - re-signing then stays where it belongs, in
+# `make d3 sign agents` (ADR-0544's rebuild lever), so steady-state
+# installs never pay a signing-Job run.
+- name: "llm | probe the materialized OKF signatures Secret"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    name: agent-runtime-okf-signatures
+    namespace: zuno-ai-run
+  register: _llm_okf_signatures_secret
+  failed_when: false
+
+- name: "llm | first-run OKF bundle signing (fresh cluster: Day 3 has never signed)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_okf_signing_job.yml"
+  when:
+    - "'resources' in _llm_okf_signatures_secret"
+    - (_llm_okf_signatures_secret.resources | default([]) | length) == 0
+
 # No OLM operator involved in any of these three - all content is -d1
 # (the -d0 Applications are no-ops).
 - name: "llm | apply the provider-routing/AI Inference Gateway/Agent Runtime GitOps Applications (d0, no-op)"
