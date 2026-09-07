@@ -172,6 +172,14 @@
     name: "{{ item.name }}"
     namespace: "{{ item.namespace }}"
   register: _oai_diag_prereqs
+  # ADR-0517 live finding (demo333, 2026-09-07): under the AAP check
+  # ServiceAccounts a forbidden lookup RAISES instead of returning empty
+  # (the Secret get 403'd for aap-day0-check before the targeted Role in
+  # gitops/charts/aap-config/templates/rolebinding-openshift-ai-secrets.yaml
+  # landed), and one raised item aborts this whole read-only diagnosis.
+  # Never fatal here; the record task below distinguishes a confirmed
+  # NotFound ('resources' present and empty) from an indeterminate lookup.
+  failed_when: false
   loop:
     - { kind: Secret, name: maas-db-config, namespace: redhat-ods-applications }
     - { kind: ConfigMap, name: cluster-monitoring-config, namespace: openshift-monitoring }
@@ -196,7 +204,11 @@
   loop: "{{ _oai_diag_prereqs.results | default([]) }}"
   loop_control:
     label: "{{ item.item.kind }}/{{ item.item.name }}"
-  when: (item.resources | default([]) | length) == 0
+  # 'resources' in item: only a lookup that actually ANSWERED (vs a 403/
+  # exception under a restricted ServiceAccount) may assert NotFound.
+  when:
+    - "'resources' in item"
+    - (item.resources | default([]) | length) == 0
 
 # --- MaaS payload-processing mTLS sidecar (ADR-0201) ------------------------
 - name: "openshift_ai | diagnose: look up payload-processing/payload-pre-processing Deployments"
