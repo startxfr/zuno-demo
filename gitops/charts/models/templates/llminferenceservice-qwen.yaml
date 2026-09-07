@@ -147,6 +147,17 @@ spec:
     {{- end }}
     containers:
       - name: main
+        # ADR-0517 live finding (demo333, 2026-09-07): vLLM 0.24.0+rhaiv.9
+        # auto-disables its DeepGemm FP8 kernels for model_type qwen3_5
+        # ("DeepGemm E8M0 scale format causes accuracy degradation") but
+        # NOT for this qwen3_6 model - and on a MIG slice the kernel dies
+        # at engine init with "Assertion error ... deepgemm ...
+        # layout.hpp:76: Unknown recipe", crashlooping the pod before it
+        # ever serves. Same kill-switch vLLM's own warning names; remove
+        # once the image's auto-disable list covers qwen3_6.
+        env:
+          - name: VLLM_USE_DEEP_GEMM
+            value: "0"
         args:
           # Ported unchanged from the retired vllm-runtime ServingRuntime -
           # --enforce-eager works around a MIG/NVML CUDA-graph crash on this
