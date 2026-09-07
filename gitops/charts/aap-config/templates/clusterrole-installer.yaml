@@ -144,6 +144,18 @@ rules:
     resources: ["clusterroles"]
     verbs: ["bind"]
     resourceNames: ["system:image-builder"]
+  # ADR-0517 live finding (demo333, 2026-09-07): Tempo's validating
+  # webhook (vtempostack.tempo.grafana.com) refuses any create/patch of
+  # a TempoStack with spec.tenants.mode=openshift unless the REQUESTER
+  # itself can create tokenreviews - openshift_ai's right-size patch of
+  # RHOAI's data-science-tempostack (a Day 1 install step under this
+  # credential) 422'd on exactly that. Invisible on demo222, where the
+  # patch last ran under the bootstrap kubeconfig. TokenReview creation
+  # only validates presented tokens - it mints nothing and reads no
+  # secrets - so this stays within the file's posture.
+  - apiGroups: ["authentication.k8s.io"]
+    resources: ["tokenreviews"]
+    verbs: ["create"]
   - apiGroups: ["networking.k8s.io"]
     resources: ["networkpolicies", "ingresses"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
