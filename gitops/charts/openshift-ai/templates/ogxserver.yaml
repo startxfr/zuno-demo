@@ -80,6 +80,16 @@ metadata:
     # After the operator/webhook (wave -5 above and DataScienceCluster's
     # own default wave 0) - the pgvector password Secret must exist first.
     argocd.argoproj.io/sync-wave: "5"
+    # ADR-0517 live finding (demo333, 2026-09-07): on a fresh cluster the
+    # ogx.io CRD only exists once the DataScienceCluster (same sync,
+    # earlier wave) reconciles its ogx component - and without this
+    # option ArgoCD fails the whole sync at VALIDATION ("Make sure the
+    # CRD is installed") before ANY wave applies, wedging every resource
+    # in the app including the wave -20 ExternalSecrets. Same deadlock
+    # and same fix as gitops/charts/kueue's wave-21 queue resources; the
+    # Application's syncPolicy.retry rides through the CRD-registration
+    # window once validation passes.
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
 spec:
   distribution:
     {{- with .Values.ogxServer.distribution.name }}
