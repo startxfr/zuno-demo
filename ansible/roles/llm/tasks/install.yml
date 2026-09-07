@@ -42,10 +42,28 @@
   failed_when: false
 
 - name: "llm | first-run OKF bundle signing (fresh cluster: Day 3 has never signed)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_okf_signing_job.yml"
   when:
     - "'resources' in _llm_okf_signatures_secret"
     - (_llm_okf_signatures_secret.resources | default([]) | length) == 0
+  block:
+    - name: "llm | sign the OKF bundles"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_okf_signing_job.yml"
+
+    # ADR-0517 live finding continued: signing alone lost the race once.
+    # On a retry of a failed first install the ExternalSecret already
+    # exists and sits in ESO's failure backoff - it re-read Vault 90s
+    # AFTER this role's Synced/Healthy wait expired (signed 14:51:44,
+    # wait gave up ~14:57:05, ES Ready 14:58:39, live-measured). Same
+    # force-then-wait lever day3_sign.yml uses; the shared task is a
+    # documented no-op when the ES does not exist yet (virgin cluster:
+    # the Application below creates it and its INITIAL read succeeds
+    # immediately against the now-populated Vault path).
+    - name: "llm | force the signatures ExternalSecret to re-read Vault (retry path only)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/force_externalsecret_refresh.yml"
+      vars:
+        es_name: agent-runtime-okf-signatures
+        es_namespace: zuno-ai-run
+        es_wait_for_refresh: true
 
 # No OLM operator involved in any of these three - all content is -d1
 # (the -d0 Applications are no-ops).
