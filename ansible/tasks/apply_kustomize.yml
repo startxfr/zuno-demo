@@ -1,5 +1,5 @@
 ---
-# Applies every resource in a role's kustomize/ directory via `kustomize build`.
+# Applies every resource in a role's kustomize/ directory via `oc kustomize`.
 # Requires kustomize_dir; optional kustomize_replacements (literal-string
 # substitutions applied to the rendered YAML before parsing).
 - name: "kustomize | validate kustomize_dir is set"
@@ -11,12 +11,19 @@
 
 # LoadRestrictionsNone: some roles' configMapGenerator files: reach outside
 # their own kustomize/ directory, which kustomize's default restriction rejects.
+#
+# `oc kustomize`, not the standalone `kustomize` binary (ADR-0517 live
+# finding, demo333 2026-09-07): AAP's execution environment ships oc but
+# NOT kustomize, so the first day2 check that reached this task under AAP
+# died with exit 127. oc embeds kustomize and accepts the same
+# --load-restrictor flag; oc is already a hard dependency of half this
+# repo's roles, on workstations and in the EE alike.
 - name: "kustomize | build manifests from {{ kustomize_dir }}"
   ansible.builtin.set_fact:
     _kustomize_raw: >-
       {{
         lookup('ansible.builtin.pipe',
-               'kustomize build --load-restrictor LoadRestrictionsNone ' + kustomize_dir)
+               'oc kustomize --load-restrictor LoadRestrictionsNone ' + kustomize_dir)
       }}
 
 - name: "kustomize | substitute runtime replacements, if any"
