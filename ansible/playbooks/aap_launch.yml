@@ -112,6 +112,15 @@
     # Day 1/Day 2 sequence) can run much longer - the same generous
     # retry/delay budget every other long-running wait in this repo uses
     # (e.g. aap role's own operator-install waits).
+    # ADR-0517 live finding (demo333, 2026-09-07): a single transient
+    # gateway error mid-poll (a 503 while the platform Postgres - AAP's
+    # own database - rolled its instances) made this task FATAL with the
+    # workflow still running fine: a non-200 answer fails the uri module
+    # outright (status_code: 200 with no tolerance), and a non-JSON body
+    # makes the bare `.json.status` until-expression raise instead of
+    # evaluate false. failed_when: false + `| default('')` turn any such
+    # blip into one more retry out of 360, and the explicit fail below
+    # keeps a real never-finished run a real failure.
     - name: Poll until the run reaches a terminal status
       ansible.builtin.uri:
         url: "{{ _aap_launch_gateway_url }}/api/controller/v2/{{ 'workflow_jobs' if aap_launch_type == 'workflow' else 'jobs' }}/{{ _aap_launch_result.json.id }}/"
@@ -122,10 +131,21 @@
         validate_certs: false
         status_code: 200
       register: _aap_launch_status
-      until: _aap_launch_status.json.status in ['successful', 'failed', 'error', 'canceled']
+      until: (_aap_launch_status.json.status | default('')) in ['successful', 'failed', 'error', 'canceled']
       retries: 360
       delay: 10
+      failed_when: false
       no_log: true
+
+    - name: Fail if polling never reached a terminal status
+      ansible.builtin.fail:
+        msg: >-
+          {{ aap_launch_type }} '{{ aap_launch_template }}' (id
+          {{ _aap_launch_result.json.id }}) never reached a terminal
+          status within 360x10s of polling - last observed:
+          '{{ _aap_launch_status.json.status | default('no JSON answer') }}'.
+          Check the Controller UI/API and re-run once it settles.
+      when: (_aap_launch_status.json.status | default('')) not in ['successful', 'failed', 'error', 'canceled']
 
     - name: "Fetch the job's stdout (Job Template launches only - a Workflow
         run's own stdout is empty; inspect its nodes individually via the
