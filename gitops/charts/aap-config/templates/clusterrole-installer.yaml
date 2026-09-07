@@ -205,8 +205,40 @@ rules:
       - config.opendatahub.io
       - nim.opendatahub.io
       - features.opendatahub.io
+      # ADR-0517 live finding (demo333, 2026-09-07): the first-ever full
+      # `make day1 install` under this credential on a fresh cluster
+      # 403'd in service_mesh ("cannot get clusterissuers ... at the
+      # cluster scope") - and a systematic diff of every api_version the
+      # day1/2/3 roles use against this block found eight more groups
+      # that would have failed the same way, one 403 per re-run
+      # (whack-a-mole demo222 never exposed: its day1+ components
+      # predate the AAP launch path). All are operator CRDs the day1/2
+      # install roles apply or wait on, same trust tier as the groups
+      # above. machine.openshift.io and the AAP operator's own groups
+      # stay deliberately excluded per the header comment.
+      - cert-manager.io
+      - rhtas.redhat.com
+      - policy.sigstore.dev
+      - opentelemetry.io
+      - tempo.grafana.com
+      - gateway.networking.k8s.io
+      - mlflow.kubeflow.org
+      - ols.openshift.io
+      - template.openshift.io
     resources: ["*"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Same finding, read-only tier: CRD-existence guards
+  # (lightspeed_config, day3) and the default-StorageClass resolution
+  # (ansible/tasks/resolve_cluster_default_storage_class.yml) every
+  # PVC-creating day1/2 role runs. Reads only - granting write on CRDs
+  # or StorageClasses would be a real escalation, unlike the operand
+  # groups above.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
   # Day 2: content-ingestion agent CRDs.
   - apiGroups: ["zuno.zuno.ai"]
     resources: ["*"]
