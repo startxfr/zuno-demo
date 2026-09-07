@@ -45,6 +45,11 @@ spec:
         # not in values.yaml because both Applications render this chart.
         kserveModuleNetworkPolicyRbac:
           enabled: true
+        # ADR-0517 live finding: the dashboard UI modules' vendor egress
+        # policies drop their injected sidecar's dial to istiod - see the
+        # chart's templates/networkpolicy-dashboard-modules-istiod.yaml.
+        dashboardModulesMeshEgress:
+          enabled: true
         prometheusK8s: null
         userWorkloadMonitoring:
             enabled: false

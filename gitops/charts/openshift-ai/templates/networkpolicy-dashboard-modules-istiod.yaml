@@ -1,0 +1,47 @@
+{{- if .Values.dashboardModulesMeshEgress.enabled }}
+# ADR-0517 live finding (demo333, 2026-09-07): RHOAI 3.5's dashboard
+# UI-module Deployments (automl-ui, agent-ops-ui, autorag-ui, maas-ui,
+# mlflow-ui, model-registry-ui...) each ship their OWN vendor-owned
+# egress NetworkPolicy (<module>-allow-ports, ownerReference
+# default-dashboard) that allowlists DNS and a few app ports - and
+# nothing else, because upstream RHOAI does not expect its pods to carry
+# an Istio sidecar. On this platform redhat-ods-applications is
+# namespace-injected, so every one of those pods gets a proxy whose xDS
+# dial to istiod (zuno-mesh:15012) the vendor policy then silently
+# drops: the istio-proxy native-sidecar init container never passes its
+# startup probe, the pod loops Init:1/2 forever, the dashboard module
+# reports Degraded and the DataScienceCluster never reaches Ready. Six
+# modules looped for ~2h on the from-scratch install; two others
+# (gen-ai, eval-hub) happen to work only because their own vendor
+# policies carry broader egress. Invisible on demo222: same
+# vendor-policy contents, but its module pods predate the policies'
+# arrival with RHOAI 3.5 and were never recreated since.
+#
+# NetworkPolicies are additive, so instead of fighting the vendor-owned
+# objects (ArgoCD does not manage them, the dashboard operator would
+# revert any edit) this SUPPLEMENTARY policy grants the one missing
+# flow, for every current and future dashboard module at once via their
+# shared part-of label: egress to istiod's xDS port. Everything else
+# (DNS, app ports) stays exactly as the vendor policies define it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zuno-dashboard-modules-istiod-egress
+  namespace: redhat-ods-applications
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/part-of: odh-dashboard
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.dashboardModulesMeshEgress.istiodNamespace }}
+      ports:
+        - protocol: TCP
+          port: 15012
+{{- end }}

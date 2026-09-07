@@ -510,6 +510,15 @@ kserveModuleNetworkPolicyRbac:
   namespace: redhat-ods-applications
   serviceAccount: kserve-module-controller-manager
 
+# templates/networkpolicy-dashboard-modules-istiod.yaml (ADR-0517):
+# supplementary egress so the vendor-policied dashboard UI-module pods'
+# Istio sidecars can reach istiod's xDS port. Default false, flipped by
+# application-d1.yaml (same both-Applications-render-this-chart reason
+# as kserveModuleNetworkPolicyRbac above).
+dashboardModulesMeshEgress:
+  enabled: false
+  istiodNamespace: zuno-mesh
+
 ogxServer:
   # Enabled (WP-06 operator follow-up): stands up the OGX data-plane API
   # for the corpus proof + provider-parity run.
