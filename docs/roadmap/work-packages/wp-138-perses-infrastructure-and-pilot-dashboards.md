@@ -91,8 +91,11 @@ instance - which structurally cannot reproduce that failure mode.
   or depended upon beyond reading `data-science-perses`'s label and
   `prometheus-web-tls-ca`'s contents - see ADR-0552's Operational
   considerations for the exact boundary.
-- No Route or authentication decision for direct Perses access - the
-  `UIPlugin` console path is the only access surface this WP builds.
+- No new Route created or authentication added for direct Perses access -
+  access, once the `UIPlugin`'s console path proved to have no consumer on
+  this cluster (see Status updates), reuses WP-080's existing
+  `data-science-perses-route` unmodified. This WP builds no new access
+  surface of its own.
 
 ## Tests / verification checklist
 
@@ -111,13 +114,22 @@ instance - which structurally cannot reproduce that failure mode.
 
 ## Live verification
 
-Use this repo's established frontend/console verification method (real
-browser session, not a synthetic check): confirm the OpenShift console shows
-a Perses navigation entry from the `UIPlugin`, that both `mesh-gateway` and
-`trustyai` dashboards render with live data, that the `prometheus`
-datasource's Bearer auth against thanos-querier actually works (the one
-genuinely unverified piece of this design), and that RHOAI's own dashboards
-in the same console view are unaffected.
+Confirmed via the Perses REST API through RHOAI's existing
+`data-science-perses-route` (`redhat-ods-monitoring`, WP-080's own Route -
+no new Route needed): `GET /api/v1/projects` lists both `zuno-mesh` and
+`zuno-ai-run` projects, and `GET /api/v1/projects/<ns>/dashboards` returns
+each dashboard's full panel content. The `prometheus` datasource's Bearer
+auth against thanos-querier works (`PersesGlobalDatasource/prometheus` is
+`Available: true`, live-confirmed, not assumed). Browser confirmation of
+actual rendered panel data (not just the REST payload) still pending -
+visit:
+
+- `https://data-science-perses-route-redhat-ods-monitoring.<appsDomain>/projects/zuno-mesh/dashboards/mesh-gateway`
+- `https://data-science-perses-route-redhat-ods-monitoring.<appsDomain>/projects/zuno-ai-run/dashboards/trustyai`
+
+No console-nav access: see the dated finding below - the `UIPlugin` this WP
+deploys has no OpenShift-console consumer on this cluster's exact version
+combination, discovered live, not assumed.
 
 ## Status updates (then re-run check_docs.py)
 
@@ -135,8 +147,33 @@ in the same console view are unaffected.
   has an unrelated pre-existing `$ref` bug predating this change). Zero
   Grafana impact throughout. ADR-0552 authored same day, superseding
   ADR-0551's server-topology decision.
-- After live verification of attempt 2 (this brief's design): this WP's
-  `State` -> `Done`.
+- **2026-09-07, attempt 2, applied successfully**: `zuno-perses-d1` v2
+  (ADR-0552's design) applied. Live-caught one contained schema error - the
+  Perses server rejected `plugin.spec.format` on `TimeSeriesChart`/`Table`
+  panels ("field not allowed"; `StatChart` panels accept it, confirmed
+  live) - fixed and reapplied via ArgoCD selfHeal, zero impact on anyone
+  else. Final state: all 3 `PersesGlobalDatasource` and both
+  `PersesDashboard`s `Available: true`, RHOAI's 7/8 relevant dashboards
+  unchanged throughout, `zuno-perses-d1` `Synced`/`Healthy`.
+- **2026-09-07, dated finding - the `UIPlugin` has no console consumer
+  here**: the `console-dashboards-plugin` `ConsolePlugin` loads correctly
+  (HTTP 200 from the console pod, `ClusterOperator/console` reports "All is
+  well", enabled in `console.operator.openshift.io/cluster`'s
+  `spec.plugins`) and publishes a `console.dashboards/datasource` extension
+  - but the actual `/monitoring/dashboards` page on this cluster
+  (`monitoring-plugin` 1.0.0, OCP 4.22.8) is rendered by a component
+  literally named `LegacyDashboardsPage`, whose own manifest declares no
+  extension that consumes `console.dashboards/datasource` - confirmed by
+  inspecting `monitoring-plugin`'s live `plugin-manifest.json` from inside
+  the console pod. This is a genuine version-compatibility gap between COO
+  1.5.2's `Dashboards` `UIPlugin` type and this OCP release's console, not a
+  misconfiguration - there is no fix available in this repo for it today.
+  Access is via RHOAI's existing `data-science-perses-route` instead (see
+  Live verification above) - ADR-0551's decision 4 (UIPlugin) still stands
+  as *deployed* (harmless, and forward-compatible if a future OCP/COO
+  pairing wires the consumer), just not as the working access path today.
+- After browser confirmation of the two pilot dashboards' rendered panel
+  data via the Route above: this WP's `State` -> `Done`.
 - `docs/roadmap/implementation-roadmap.md`'s Phase 41 tracker row for
   WP-138 updated to match.
 
@@ -144,13 +181,16 @@ in the same console view are unaffected.
 
 - The remaining eight Grafana dashboards - WP-139, once this WP's pattern is
   live-verified.
-- Any Grafana deprecation or Route/auth changes for Perses - not decided by
-  ADR-0551/ADR-0552.
+- Any Grafana deprecation - not decided by ADR-0551/ADR-0552.
+- Making the `UIPlugin` actually surface in the console nav - blocked on an
+  OCP/COO version pairing this repo does not control (see the dated finding
+  above), not a repo-side task.
 
 ## Completion criteria
 
 WP-138 is done when both pilot `PersesDashboard`s render correct, live data
-through the OpenShift console's `UIPlugin` via `data-science-perses`, each
+- confirmed via RHOAI's existing `data-science-perses-route`, since the
+`UIPlugin` console path has no consumer on this cluster today - each
 scoped to its own application namespace, both referencing the shared
 `PersesGlobalDatasource`s, with zero changes to any existing Grafana or
 RHOAI-owned resource.

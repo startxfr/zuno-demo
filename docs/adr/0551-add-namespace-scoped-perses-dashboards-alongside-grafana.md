@@ -139,6 +139,26 @@ cluster is not a supported or even discussed configuration - see
 [ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md),
 which replaces decisions 2 and 3 with reusing `data-science-perses`.
 
+## Second dated correction note (2026-09-07)
+
+Decision 4 (the `UIPlugin` console integration) was deployed successfully -
+the `console-dashboards-plugin` `ConsolePlugin` loads (`HTTP 200` from the
+console pod, `ClusterOperator/console` "All is well", enabled in
+`console.operator.openshift.io/cluster`) and publishes a
+`console.dashboards/datasource` extension - but live inspection of this
+cluster's `monitoring-plugin` (1.0.0, OCP 4.22.8) found that the actual
+`/monitoring/dashboards` page is rendered by a component named
+`LegacyDashboardsPage`, which declares no extension consuming
+`console.dashboards/datasource`. There is no OpenShift-console UI on this
+exact version pairing that reads Perses dashboards at all - a genuine
+version-compatibility gap between COO 1.5.2's `Dashboards` `UIPlugin` type
+and this OCP release, discovered live, not something this repo can fix.
+WP-138 accesses the dashboards via RHOAI's existing
+`data-science-perses-route` (WP-080) instead - see WP-138's own dated
+finding for the full detail. The `UIPlugin` remains deployed (harmless,
+forward-compatible if a future OCP/COO pairing wires the consumer) but is
+not, today, a working access path.
+
 ## Related ADRs
 
 - [ADR-0522](0522-enable-openshift-ai-monitoring-stack-side-by-side.md) - the
