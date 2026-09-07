@@ -187,7 +187,21 @@
 # as soon as synced, not once status.phase is actually Ready.
 - name: "openshift_ai | wait for the DataScienceCluster to report Ready, diagnosing blocked resources on timeout"
   block:
-    - name: "openshift_ai | wait for the DataScienceCluster to report Ready"
+    # ADR-0517 live finding (demo333, 2026-09-07): phase == Ready alone is
+    # unreachable on this platform. RHOAI 3.5's modules controller marks a
+    # module Degraded on ANY False condition of its operand (the same
+    # any-False trap as ArgoCD's generic health check), and our OGXServer
+    # deliberately runs with spec.overrideConfig (see the chart's
+    # ogx-override-config comment - the typed-provider pipeline upstream
+    # cannot express the pgvector persistence block), which permanently
+    # pins its benign ConfigGenerated=False/ConfigGenerationInactive
+    # condition - so module `ogx` reports Degraded forever, ModulesReady
+    # stays False, and phase never leaves "Not Ready" even with every
+    # workload healthy (all 3 ogx Deployments available, OGX component
+    # Ready, live-verified). Accept: phase Ready, OR the real signals all
+    # True (ComponentsReady, DashboardReady, OGXReady) while the ONLY
+    # degraded modules are in the documented-benign allowlist below.
+    - name: "openshift_ai | wait for the DataScienceCluster to report Ready (modulo the benign ogx module state)"
       kubernetes.core.k8s_info:
         # v2, not v1: v2 is the CRD's storage version - same reasoning as
         # precheck.yml's DataScienceCluster lookup and this chart's own
@@ -197,9 +211,27 @@
         kind: DataScienceCluster
         name: zuno-dsc
       register: _openshift_ai_dsc
+      vars:
+        _dsc_conds: "{{ (_openshift_ai_dsc.resources | default([{}]))[0].status.conditions | default([]) }}"
+        _dsc_cond_true: >-
+          {{ _dsc_conds | selectattr('status', 'equalto', 'True')
+             | map(attribute='type') | list }}
+        _dsc_degraded_modules: >-
+          {{ ((_dsc_conds | selectattr('type', 'equalto', 'ModulesReady')
+               | map(attribute='message') | first | default(''))
+              | regex_replace('^Some modules are degraded: ', '')).split(', ')
+             | reject('equalto', '') | list }}
       until: >-
         (_openshift_ai_dsc.resources | default([]) | length) > 0 and
-        (_openshift_ai_dsc.resources[0].status.phase | default('')) == 'Ready'
+        (
+          (_openshift_ai_dsc.resources[0].status.phase | default('')) == 'Ready'
+          or (
+            'ComponentsReady' in _dsc_cond_true and
+            'DashboardReady' in _dsc_cond_true and
+            'OGXReady' in _dsc_cond_true and
+            (_dsc_degraded_modules | difference(['ogx']) | length) == 0
+          )
+        )
       retries: 60
       delay: 20
   rescue:
