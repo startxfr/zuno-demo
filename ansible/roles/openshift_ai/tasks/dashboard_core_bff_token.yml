@@ -107,9 +107,16 @@
 - name: "openshift_ai | dashboard: mount the dashboard SA token into core-bff (RHOAI 3.5.0 packaging defect)"
   kubernetes.core.k8s:
     state: patched
-    # merge_type deliberately unset - see TRAP 2 above. Deployment is a
-    # built-in, so the module's strategic-merge default is what makes this an
-    # additive patch keyed on container name and mountPath.
+    # ADR-0517 live finding (demo333, 2026-09-07): the previous "merge_type
+    # deliberately unset - the module defaults to strategic-merge for a
+    # built-in" held on the workstation but NOT in AAP's execution
+    # environment, whose kubernetes.core build fell back to an RFC 7386
+    # merge: the API then treated the container entry below as a NEW
+    # container ("containers[0].image: Required value") and rejected the
+    # mount against a volume list it was about to replace. Pinning
+    # strategic-merge makes the additive keyed-on-name/mountPath behavior
+    # explicit everywhere. TRAP 2 below still stands: never `merge`.
+    merge_type: strategic-merge
     api_version: apps/v1
     kind: Deployment
     name: rhods-dashboard
