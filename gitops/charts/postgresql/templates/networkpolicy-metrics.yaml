@@ -87,6 +87,22 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: zuno-aap
+        # ADR-0517 live finding (demo333, 2026-09-07): RHOAI's ogx
+        # (pgvector provider) and maas-db both connect direct-to-primary
+        # from redhat-ods-applications - deliberately, for the same
+        # transaction-mode-pooling reason as Keycloak/AAP above
+        # (gitops/charts/openshift-ai/values.yaml's host comments). On a
+        # fresh cluster zuno-ogx crash-looped for 80+ minutes on
+        # "Connection reset by peer"/recv timeout: its SYN reached the
+        # instance pods directly (5432 is sidecar-excluded) and this
+        # policy dropped it - the client-side TCP connect still
+        # "succeeds" against the local Envoy, which is what made the
+        # probe lie (netpol-egress-mesh-pod-verification). demo222 never
+        # showed it for the usual reason: its ogx predates the
+        # port-exclusion flip that made 5432 direct.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ods-applications
       ports:
         - protocol: TCP
           port: 5432
