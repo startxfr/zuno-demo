@@ -32,6 +32,27 @@
     file: "{{ zuno_repo_root }}/ansible/confidential.yml"
   when: _gitops_confidential_file.stat.exists
 
+# ADR-0517 live finding (demo333, 2026-09-07): confidential.yml is
+# gitignored, so it does NOT exist in the AAP Project checkout - every
+# AAP-launched day1/2 job was silently applying Applications with the
+# manifest's committed targetRevision (main) while the cluster deploys
+# from a work branch, undoing the override above for exactly the runs
+# that matter. ansible/branch-pin.yml is the committed-on-the-branch
+# counterpart: present in every checkout of the branch (local AND AAP),
+# absent on main. Loaded AFTER confidential.yml so the pin wins where
+# both exist (they agree by construction). Removed at the final
+# merge-to-main step, together with the confidential.yml variable
+# (ADR-0517 Jalon 8).
+- name: "gitops | check for ansible/branch-pin.yml (work-branch deployments only)"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/branch-pin.yml"
+  register: _gitops_branch_pin_file
+
+- name: "gitops | load ansible/branch-pin.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/branch-pin.yml"
+  when: _gitops_branch_pin_file.stat.exists
+
 # Optionally injects Helm values known only at run time (replaces, not merges,
 # the manifest's own spec.source.helm.values) - combine() with {} is a no-op
 # when gitops_app_extra_helm_values isn't set, so this stays a single step.
@@ -54,7 +75,25 @@
             if zuno_gitops_target_revision is defined else {},
             recursive=True
           )
+        | combine(
+            {'spec': {'syncPolicy': {'retry': {'limit': 5, 'backoff': {
+               'duration': '30s', 'factor': 2, 'maxDuration': '5m'}}}},
+            recursive=True
+          )
       }}
+# The syncPolicy.retry above is an ADR-0517 live finding (demo333,
+# 2026-09-07): on a fresh cluster, a chart that installs an operator and
+# its operand in consecutive sync-waves (mariadb: MariadbOperator wave
+# -32, MariaDB wave -30) races the operator's validating webhook -
+# ArgoCD considers the operator CR Synced the moment it is created (no
+# health check), applies the operand, and the webhook Service has no
+# endpoints yet ("failed calling webhook ... no endpoints available",
+# live-hit at 07:54, endpoints up at 07:56). Without retry the sync op
+# terminates Failed and automated sync never re-attempts the same
+# revision - the app sat Failed for 15 min until a human intervened.
+# Five backoff retries (30s..5m) ride through every such
+# operator-startup window. Applications are Ansible-applied, never
+# git-synced (ADR-0311), so this adds no drift.
 
 - name: "gitops | apply ArgoCD Application: zuno-{{ gitops_app_name }}"
   kubernetes.core.k8s:

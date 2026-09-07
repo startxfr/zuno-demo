@@ -1,0 +1,12 @@
+---
+# ADR-0517 (demo333 run): committed-on-the-branch counterpart of
+# confidential.yml's zuno_gitops_target_revision - confidential.yml is
+# gitignored and therefore ABSENT from the AAP Project checkout, so
+# AAP-launched runs silently fell back to the manifests' committed
+# targetRevision (main). This file exists ONLY on a work branch whose
+# cluster must track that branch; it is loaded by
+# ansible/tasks/apply_gitops_app.yml after confidential.yml (the two
+# agree by construction), and MUST BE DELETED in the final
+# merge-to-main step (ADR-0517 Jalon 8), together with the
+# confidential.yml variable. Nothing secret belongs here.
+zuno_gitops_target_revision: "demo333"
