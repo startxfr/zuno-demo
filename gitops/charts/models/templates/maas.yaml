@@ -67,8 +67,22 @@ spec:
   gatewayRef:
     name: maas-default-gateway
     namespace: openshift-ingress
-{{- if .Values.maas.externalOIDC.enabled }}
+{{- if and .Values.maas.externalOIDC.enabled (.Capabilities.APIVersions.Has "components.platform.opendatahub.io/v1alpha1/ModelsAsService") }}
 ---
+# ADR-0517 live finding (demo333, 2026-09-07): a FRESH RHOAI 3.5.0 GA
+# install ships no modelsasservices.components.platform.opendatahub.io
+# CRD at all - the MaaS CRDs live under maas.opendatahub.io there, and
+# the DSC has no modelsAsService component key. This CR only exists on
+# clusters upgraded through ea.2 (demo222), where the old CRD survived
+# the upgrade; on a from-scratch GA cluster rendering it fails the whole
+# sync ('ModelsAsService "" not found', retried to exhaustion) and blocks
+# every model behind it. Gated on the CRD's presence via Capabilities:
+# ArgoCD passes the destination cluster's real API versions to Helm, so
+# demo222 keeps rendering it byte-identically and a fresh GA cluster
+# skips it. When demo222 is reinstalled from scratch (or the ea.2 CRD is
+# retired), this whole block can be deleted - the externalOIDC feature it
+# carries is still broken live anyway, see the 2026-09-02 note below.
+#
 # Live-verified 2026-09-01: unlike the Tenant CR above, ModelsAsService
 # reconciles for real (owned by DataScienceCluster zuno-dsc -> Config
 # default -> this object, all Ready=True) - it is auto-created once when
