@@ -27,7 +27,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
 | v0.4 | 35 | 9 | 30 | WP-55, WP-093, WP-101 |
-| v0.5 | 8 | — | 14 | WP-55, WP-101, WP-122 |
+| v0.5 | 9 | 1 | 16 | WP-55, WP-101, WP-122, WP-138, WP-139 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | 1 | 5 | — |
@@ -809,6 +809,24 @@ reuses WP-105's failover drill and WP-526's Wesh lifecycle unchanged.
 | WP-137 | [wp-137](work-packages/wp-137-arkos-dat-classification-routing.md) | 0550 | ADR-0527, ADR-0034, ADR-0416 | Done (2026-09-05 — live C1/C2 comparison verified) | none |
 | WP-135 | [wp-135](work-packages/wp-135-routing-decision-explainability.md) | 0550 | WP-137 | Done (2026-09-05 — all six live demo cases verified through the real frontend) | none |
 | WP-136 | [wp-136](work-packages/wp-136-webinar-demo-orchestration.md) | 0550 | WP-137, WP-135 | Done (2026-09-05 — both live rehearsals complete, ~21-min run 2 signed off against the 20-min target) | none |
+
+### Phase 41 — namespace-scoped Perses dashboards alongside Grafana (added 2026-09-07)
+
+ADR-0551 answers the call ADR-0522 left open - whether to migrate
+`zuno-monitoring`'s Grafana dashboards onto Perses - by choosing a
+COO-provisioned Perses distinct from RHOAI's own (WP-080's
+`data-science-perses`), additive to Grafana rather than replacing it, and
+physically split by application namespace instead of Grafana's
+template-filtered consolidation. WP-138 stands up the Perses server, the
+three shared `PersesGlobalDatasource`s, the console `UIPlugin`, and
+translates two pilot dashboards (`mesh-gateway`, `trustyai`) to prove the
+chain end to end; WP-139 translates the remaining eight once that pattern is
+live-verified.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-138 | [wp-138](work-packages/wp-138-perses-infrastructure-and-pilot-dashboards.md) | 0551 | none | Not started | Live-verify console UIPlugin rendering; confirm/patch NetworkPolicy for the COO operator callback |
+| WP-139 | [wp-139](work-packages/wp-139-perses-parity-remaining-dashboards.md) | 0551 | WP-138 | Not started | Live-verify remaining eight dashboards |
 
 ### OKF stream phases
 
