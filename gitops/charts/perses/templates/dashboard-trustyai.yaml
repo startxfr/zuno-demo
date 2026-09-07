@@ -234,9 +234,7 @@ spec:
             description: "faithfulness = answer grounded in retrieved contexts; llm_context_precision = retrieved contexts relevant to the question. Judged by the local qwen3.6 model against live pgvector retrievals. last_over_time keeps the latest run visible."
           plugin:
             kind: Table
-            spec:
-              format:
-                unit: percent
+            spec: {}
           queries:
             - kind: TimeSeriesQuery
               spec:
@@ -256,9 +254,7 @@ spec:
             description: "1 - passed/total per probe/detector from the last garak security scan. Higher is WORSE: 1.0 on mitigation.MitigationBypass means the model never voiced an explicit refusal."
           plugin:
             kind: Table
-            spec:
-              format:
-                unit: percent
+            spec: {}
           queries:
             - kind: TimeSeriesQuery
               spec:

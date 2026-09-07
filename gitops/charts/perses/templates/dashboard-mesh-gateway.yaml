@@ -124,9 +124,7 @@ spec:
             name: "Mesh request latency p50/p95 (by destination service)"
           plugin:
             kind: TimeSeriesChart
-            spec:
-              format:
-                unit: milliseconds
+            spec: {}
           queries:
             - kind: TimeSeriesQuery
               spec:
@@ -182,9 +180,7 @@ spec:
             name: "Mesh-attributed bandwidth (TCP bytes/s, by source->destination workload)"
           plugin:
             kind: TimeSeriesChart
-            spec:
-              format:
-                unit: bytesPerSecond
+            spec: {}
           queries:
             - kind: TimeSeriesQuery
               spec:
