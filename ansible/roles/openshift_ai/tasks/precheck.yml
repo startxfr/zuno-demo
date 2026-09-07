@@ -443,6 +443,18 @@
       {{ (_oai_dashboard_deploy.resources | default([]) | first | default({}))
          .get('spec', {}).get('template', {}).get('spec', {}).get('containers', [])
          | selectattr('name', 'equalto', 'core-bff') | list }}
+    # ADR-0517 live finding (demo333, 2026-09-07), mirroring
+    # dashboard_core_bff_token.yml: a fresh 3.5.0 install ships the
+    # Deployment WITHOUT the dashboard-sa-token volume and WITHOUT
+    # automountServiceAccountToken: false - the token is automounted and
+    # core-bff runs healthy with no explicit mount (both pods 4/4,
+    # live-verified). The defect's real signature is the explicit volume
+    # being present while core-bff lacks the mount; without the volume
+    # test this tripwire false-positives on fixed packaging.
+    _oai_dashboard_volumes: >-
+      {{ (_oai_dashboard_deploy.resources | default([]) | first | default({}))
+         .get('spec', {}).get('template', {}).get('spec', {}).get('volumes', [])
+         | map(attribute='name') | list }}
   failed_when: false
 
 - name: "openshift_ai | precheck: core-bff token-mount summary"
@@ -451,10 +463,12 @@
       rhods-dashboard core-bff:
       {{ 'container not present (pre-3.5.0 dashboard) - nothing to check'
          if (_oai_core_bff | default([]) | length) == 0
-         else ('token mounted - OK'
-               if ((_oai_core_bff | first).get('volumeMounts', [])
-                   | selectattr('name', 'equalto', 'dashboard-sa-token') | list | length) > 0
-               else 'NO ServiceAccount token mounted - core-bff cannot start') }}
+         else ('no dashboard-sa-token volume - token automounted, fixed packaging, nothing to check'
+               if 'dashboard-sa-token' not in (_oai_dashboard_volumes | default([]))
+               else ('token mounted - OK'
+                     if ((_oai_core_bff | first).get('volumeMounts', [])
+                         | selectattr('name', 'equalto', 'dashboard-sa-token') | list | length) > 0
+                     else 'NO ServiceAccount token mounted - core-bff cannot start')) }}
 
 - name: "openshift_ai | precheck: record the missing core-bff token mount"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
@@ -468,20 +482,50 @@
       auto_fix: "make d1 reconcile openshift-ai"
   when:
     - (_oai_core_bff | default([]) | length) > 0
+    - "'dashboard-sa-token' in (_oai_dashboard_volumes | default([]))"
     - ((_oai_core_bff | first).get('volumeMounts', [])
        | selectattr('name', 'equalto', 'dashboard-sa-token') | list | length) == 0
     - blocked_findings is defined
 
 - name: "openshift_ai | compute install state"
   ansible.builtin.set_fact:
+    # ADR-0517 live finding (demo333, 2026-09-07), mirroring install.yml's
+    # DSC wait: phase == Ready alone is unreachable on this platform.
+    # RHOAI 3.5's modules controller marks a module Degraded on ANY False
+    # condition of its operand, and our OGXServer deliberately runs with
+    # spec.overrideConfig, permanently pinning its benign
+    # ConfigGenerated=False - so module `ogx` reports Degraded forever and
+    # phase never leaves "Not Ready" even with every workload healthy.
+    # Accept: phase Ready, OR the real signals all True (ComponentsReady,
+    # DashboardReady, OGXReady) while the ONLY degraded modules are in the
+    # documented-benign allowlist (['ogx']).
     _state_is_installed: >-
       {{
         _openshift_ai_d0_installed
         and _state_check_result
         and (_openshift_ai_dsc_lookup.resources | default([]) | length) > 0
-        and (_openshift_ai_dsc_lookup.resources[0].status.phase | default('')) == 'Ready'
+        and (
+          (_openshift_ai_dsc_lookup.resources[0].status.phase | default('')) == 'Ready'
+          or (
+            'ComponentsReady' in _oai_state_cond_true and
+            'DashboardReady' in _oai_state_cond_true and
+            'OGXReady' in _oai_state_cond_true and
+            (_oai_state_degraded_modules | difference(['ogx']) | length) == 0
+          )
+        )
         and (_openshift_ai_ogx_ready | bool)
       }}
+  vars:
+    _oai_state_conds: >-
+      {{ (_openshift_ai_dsc_lookup.resources | default([{}]))[0].status.conditions | default([]) }}
+    _oai_state_cond_true: >-
+      {{ _oai_state_conds | selectattr('status', 'equalto', 'True')
+         | map(attribute='type') | list }}
+    _oai_state_degraded_modules: >-
+      {{ ((_oai_state_conds | selectattr('type', 'equalto', 'ModulesReady')
+           | map(attribute='message') | first | default(''))
+          | regex_replace('^Some modules are degraded: ', '')).split(', ')
+         | reject('equalto', '') | list }}
 
 # Deep diagnosis so `make d0 check` explains WHY openshift-ai is not
 # installed (DSC conditions, InstallPlan approval, ADR-0343 prereqs) - the
