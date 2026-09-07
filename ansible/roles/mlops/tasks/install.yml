@@ -77,21 +77,26 @@
         # A latent defect nobody can see is still a defect: this one sat here
         # from the moment rag_ingestion's twin was fixed until the next command
         # that happened to touch it. Keep this a double-quoted scalar.
-        ca-bundle.crt: "{{ (_mlops_vault_ca.resources[0].data['ca-bundle.crt'] | default('')) ~ '\n' ~ (_mlops_service_ca.resources[0].data['service-ca.crt'] | default('')) }}"
+        # ADR-0517 live finding (demo333, 2026-09-07), same as
+        # rag_ingestion's twin: user-ca-bundle is OPTIONAL (it only exists
+        # on clusters with a private PKI root, per openshift_oauth's own
+        # contract); only service-ca stays required.
+        ca-bundle.crt: "{{ ((_mlops_vault_ca.resources | default([{}]) | first | default({})).get('data', {}).get('ca-bundle.crt', '')) ~ '\n' ~ (_mlops_service_ca.resources[0].data['service-ca.crt'] | default('')) }}"
   register: _mlops_ca_bundle_apply
   when: >-
-    (_mlops_vault_ca.resources | default([]) | length) > 0 and
     (_mlops_service_ca.resources | default([]) | length) > 0
 
-- name: "mlops | fail loudly if either source CA ConfigMap is missing"
+- name: "mlops | fail loudly if the service-ca ConfigMap is missing"
   ansible.builtin.fail:
     msg: >-
-      user-ca-bundle (openshift-config) or openshift-service-ca.crt
-      (zuno-mlops) not found - the DSP api-server's MLflow-trust ConfigMap
-      cannot be built. Both are cluster-standard ConfigMaps that should
-      always exist; investigate before re-running.
+      openshift-service-ca.crt (zuno-mlops) not found - the DSP
+      api-server's MLflow-trust ConfigMap cannot be built. That ConfigMap
+      is injected by OpenShift's service-ca operator in every namespace
+      and should always exist; investigate before re-running.
+      (openshift-config/user-ca-bundle is deliberately NOT required: it
+      only exists on clusters with a private PKI root - see
+      openshift_oauth's install.)
   when: >-
-    (_mlops_vault_ca.resources | default([]) | length) == 0 or
     (_mlops_service_ca.resources | default([]) | length) == 0
 
 # ADR-0546/WP-131: the pipeline-artifact bucket and the style-corpus URI are

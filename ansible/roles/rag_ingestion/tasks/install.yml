@@ -73,21 +73,32 @@
         # identical `>-` scalar and is presumably subject to the same bug;
         # out of scope to fix here since that ConfigMap only gets rewritten
         # if mlops's install task actually re-runs the merge.
-        ca-bundle.crt: "{{ (_rag_ingestion_vault_ca.resources[0].data['ca-bundle.crt'] | default('')) ~ '\n' ~ (_rag_ingestion_service_ca.resources[0].data['service-ca.crt'] | default('')) }}"
+        # ADR-0517 live finding (demo333, 2026-09-07): the user-ca-bundle
+        # half is OPTIONAL, not "cluster-standard". openshift_oauth only
+        # creates it when the Keycloak TLS Secret carries a private PKI
+        # root (ca.crt) - its own contract says "absence is a steady
+        # state, not a failure: a cluster with no private root simply gets
+        # spec.trustedCA.name ''". A from-scratch cluster with an
+        # ACME/public-only cert chain (demo333) has NO such root, and this
+        # task treated that legitimate state as a hard error. The bundle
+        # is now built from whatever exists; only service-ca - which
+        # OpenShift itself guarantees in every namespace - stays required.
+        ca-bundle.crt: "{{ ((_rag_ingestion_vault_ca.resources | default([{}]) | first | default({})).get('data', {}).get('ca-bundle.crt', '')) ~ '\n' ~ (_rag_ingestion_service_ca.resources[0].data['service-ca.crt'] | default('')) }}"
   register: _rag_ingestion_ca_bundle_apply
   when: >-
-    (_rag_ingestion_vault_ca.resources | default([]) | length) > 0 and
     (_rag_ingestion_service_ca.resources | default([]) | length) > 0
 
-- name: "rag_ingestion | fail loudly if either source CA ConfigMap is missing"
+- name: "rag_ingestion | fail loudly if the service-ca ConfigMap is missing"
   ansible.builtin.fail:
     msg: >-
-      user-ca-bundle (openshift-config) or openshift-service-ca.crt
-      (zuno-ai-build) not found - the DSP api-server's MLflow-trust
-      ConfigMap cannot be built. Both are cluster-standard ConfigMaps that
-      should always exist; investigate before re-running.
+      openshift-service-ca.crt (zuno-ai-build) not found - the DSP
+      api-server's MLflow-trust ConfigMap cannot be built. That ConfigMap
+      is injected by OpenShift's service-ca operator in every namespace
+      and should always exist; investigate before re-running.
+      (openshift-config/user-ca-bundle is deliberately NOT required: it
+      only exists on clusters with a private PKI root - see
+      openshift_oauth's install.)
   when: >-
-    (_rag_ingestion_vault_ca.resources | default([]) | length) == 0 or
     (_rag_ingestion_service_ca.resources | default([]) | length) == 0
 
 # ADR-0546/WP-131: two buckets with opposite natures, and keeping them apart is
