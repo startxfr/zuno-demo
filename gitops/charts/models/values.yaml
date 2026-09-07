@@ -210,7 +210,17 @@ llmInferenceService:
   # llminferenceserviceconfig -n redhat-ods-applications`) - confirmed live
   # to resolve to the exact same image digest the retired vllm-runtime
   # ServingRuntime pinned, so this migration is not an image change.
-  baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
+  # ADR-0517 live finding (demo333, 2026-09-07): the ea.2 preset name
+  # this used to reference (v3-5-0-ea-2-kserve-config-llm-template-
+  # nvidia-cuda) does not EXIST on a from-scratch RHOAI 3.5.0 GA - the
+  # GA renamed its presets, and every LLMInferenceService sat at
+  # Ready=Unknown/NewObservedGenFailure with 'ConfigNotFound' until the
+  # baseRef was moved to the GA single-node NVIDIA/CUDA successor
+  # below. demo222 (upgraded through ea.2) carries BOTH names; at the
+  # merge-to-main this flip re-renders its LLM workloads - treat it as
+  # an ADR-0547 clause-4 live change (expect a rolling restart of every
+  # LLM predictor there, verify the GA preset exists first).
+  baseRef: v3-5-0-kserve-config-llm-single-node-template-nvidia-cuda
   # Same gpt-oss-20b routing constraint (see gptOssModel.llmInferenceService
   # below for the full "why not a dedicated gateway" history) - MaaS
   # mandates route adoption on maas-default-gateway itself.
@@ -633,7 +643,9 @@ gptOssModel:
     # Same RHOAI 3.5 EA2 vLLM/CUDA preset the qwen MaaS backend used
     # (`oc get llminferenceserviceconfig -n redhat-ods-applications`) -
     # generic serving image, not qwen-specific.
-    baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
+    # ADR-0517: GA preset name - see the first baseRef above for the full
+    # ea.2-rename story and the demo222 merge caveat.
+    baseRef: v3-5-0-kserve-config-llm-single-node-template-nvidia-cuda
     # templates/s3-serving-credentials-gptoss.yaml's existing SA/Secret
     # pair (unchanged by this ADR - already the right serving.kserve.io/
     # s3-* annotated shape LLMInferenceService's storage-initializer
@@ -803,7 +815,9 @@ weshModel:
       name: maas-default-gateway
       namespace: openshift-ingress
       manage: false
-    baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
+    # ADR-0517: GA preset name - see the first baseRef above for the full
+    # ea.2-rename story and the demo222 merge caveat.
+    baseRef: v3-5-0-kserve-config-llm-single-node-template-nvidia-cuda
     serviceAccountName: qwen35-9b-wesh-s3
     # Same EPP-port sidecar exclusion every LLMInferenceService here needs
     # (ADR-0201/WP-27) - see gptOssModel's schedulerAnnotations comment.
@@ -873,7 +887,9 @@ qwen35Model:
       name: maas-default-gateway
       namespace: openshift-ingress
       manage: false
-    baseRef: v3-5-0-ea-2-kserve-config-llm-template-nvidia-cuda
+    # ADR-0517: GA preset name - see the first baseRef above for the full
+    # ea.2-rename story and the demo222 merge caveat.
+    baseRef: v3-5-0-kserve-config-llm-single-node-template-nvidia-cuda
     serviceAccountName: qwen35-9b-s3
     schedulerAnnotations:
       traffic.sidecar.istio.io/excludeInboundPorts: "9002"
