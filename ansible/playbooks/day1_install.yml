@@ -41,6 +41,7 @@
       - mesh_monitoring
       - kiali
       - grafana
+      - perses
       - mariadb
       - tempo
       - openshift_oauth
