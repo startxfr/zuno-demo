@@ -41,3 +41,5 @@ sequenceDiagram
   D-->>S: Result
   S-->>R: Auditable result
 ```
+
+For a fuller, scenario-based walkthrough of the same pipeline (AI Gateway, OKF, RAG, MCP, model routing and tracing) with per-agent diagrams, see [Agent Request Workflow](../agents/request-workflow.md).

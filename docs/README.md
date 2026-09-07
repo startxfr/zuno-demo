@@ -12,9 +12,10 @@ This directory is the canonical documentation set for the Zuno Demo platform.
 6. [Security architecture](architecture/security-architecture.md)
 7. [Architecture Decision Records](adr/README.md)
 8. [Agent catalog](agents/README.md)
-9. [Platform prerequisites](platform/prerequisites.md)
-10. [Installation](platform/installation.md)
-11. [Roadmap](roadmap/README.md)
+9. [Agent request workflow](agents/request-workflow.md)
+10. [Platform prerequisites](platform/prerequisites.md)
+11. [Installation](platform/installation.md)
+12. [Roadmap](roadmap/README.md)
 
 ## Documentation policy
 
