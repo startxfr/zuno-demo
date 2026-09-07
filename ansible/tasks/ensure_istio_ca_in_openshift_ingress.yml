@@ -1,0 +1,68 @@
+---
+# Copies istio-ca-root-cert into openshift-ingress for a Gateway-API
+# gateway's auto-deployed Istio proxy pod. Shared by connectivity_link
+# (zuno-agent-gateway, Day 1) and openshift_ai (maas-default-gateway,
+# Day 2) - factored out of openshift_ai (ADR-0517 live finding, demo333
+# 2026-09-07): on a fresh cluster the Day 1 connectivity-link gateway
+# hit the exact FailedMount openshift_ai's 2026-08-13 copy had fixed for
+# Day 2, invisible on demo222 where that Day 2 run had already left the
+# ConfigMap in place for everyone.
+#
+# Why a copy and not a label (original 2026-08-13 analysis, still
+# holds): Istio's gateway-controller auto-deploys the proxy pod into
+# openshift-ingress, and that pod mounts the istio-ca-root-cert
+# ConfigMap. cert-manager-istio-csr (this platform's Istio CA,
+# service_mesh component) only distributes it into namespaces matching
+# --configmap-namespace-selector=istio-injection=enabled (VERIFIED
+# live) - and labeling openshift-ingress that way would also enroll it
+# in the sidecar-injection webhook, silently auto-injecting Istio
+# sidecars into every future pod there, including the cluster's default
+# HAProxy routers - too broad a blast radius. The copy is safe to redo
+# unconditionally on every run: the CA root (Vault-generated once,
+# idempotent) is valid 10 years with no rotation anywhere, so the copy
+# cannot go stale.
+#
+# Caller contract: set istio_ca_caller_component (finding attribution,
+# e.g. "connectivity-link"); optional istio_ca_source_namespace
+# (default zuno-ai-run, any already-meshed namespace works).
+- name: "istio-ca | look up istio-ca-root-cert from an already-meshed namespace"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: istio-ca-root-cert
+    namespace: "{{ istio_ca_source_namespace | default('zuno-ai-run') }}"
+  register: _istio_ca_root_cert
+
+- name: "istio-ca | record the missing istio-ca-root-cert finding before failing"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: "{{ istio_ca_caller_component }}"
+      resource: "ConfigMap/istio-ca-root-cert ({{ istio_ca_source_namespace | default('zuno-ai-run') }})"
+      state: "NotFound"
+      cause: "cert-manager-istio-csr has not distributed the CA root ConfigMap into the source namespace yet - service_mesh is not installed or not reconciled"
+      solution: "Install/reconcile the service-mesh component first, then re-run {{ istio_ca_caller_component }}"
+      auto_fix: "make d1 reconcile service-mesh"
+  when: (_istio_ca_root_cert.resources | default([]) | length) == 0
+
+- name: "istio-ca | fail loudly if istio-ca-root-cert isn't available to copy yet"
+  ansible.builtin.fail:
+    msg: >-
+      ConfigMap istio-ca-root-cert not found in namespace
+      {{ istio_ca_source_namespace | default('zuno-ai-run') }} -
+      the service_mesh component (and cert-manager-istio-csr within it)
+      must be installed and have reconciled that namespace before a
+      Gateway's Istio proxy pod can start in openshift-ingress. Run
+      `make d1 check service-mesh` first.
+  when: (_istio_ca_root_cert.resources | default([]) | length) == 0
+
+- name: "istio-ca | copy istio-ca-root-cert into openshift-ingress for the Gateway Istio proxy pods"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: istio-ca-root-cert
+        namespace: openshift-ingress
+      data: "{{ _istio_ca_root_cert.resources[0].data }}"

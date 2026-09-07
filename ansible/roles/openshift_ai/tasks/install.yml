@@ -159,47 +159,16 @@
 # unconditionally on every run: the CA root (Vault-generated, idempotent) is
 # valid 10 years with no automated rotation anywhere in this repo, so the copy
 # can't go stale.
-- name: "openshift_ai | look up istio-ca-root-cert from an already-meshed namespace"
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: ConfigMap
-    name: istio-ca-root-cert
-    namespace: "{{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }}"
-  register: _openshift_ai_istio_ca_root_cert
-
-- name: "openshift_ai | record the missing istio-ca-root-cert finding before failing"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+# Factored into the shared ensure_istio_ca_in_openshift_ingress.yml
+# (ADR-0517, demo333 2026-09-07): connectivity_link's zuno-agent-gateway
+# (Day 1) needs the identical copy, and on a fresh cluster it needs it
+# BEFORE this Day 2 role ever runs. The full why-a-copy-not-a-label
+# analysis (2026-08-13) lives in the shared task's header.
+- name: "openshift_ai | ensure istio-ca-root-cert exists in openshift-ingress (maas-default-gateway proxy)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/ensure_istio_ca_in_openshift_ingress.yml"
   vars:
-    blocked_finding:
-      component: openshift-ai
-      resource: "ConfigMap/istio-ca-root-cert ({{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }})"
-      state: "NotFound"
-      cause: "cert-manager-istio-csr has not distributed the CA root ConfigMap into the source namespace yet - service_mesh is not installed or not reconciled"
-      solution: "Install/reconcile the service-mesh component first, then re-run openshift-ai"
-      auto_fix: "make d1 reconcile service-mesh"
-  when: (_openshift_ai_istio_ca_root_cert.resources | default([]) | length) == 0
-
-- name: "openshift_ai | fail loudly if istio-ca-root-cert isn't available to copy yet"
-  ansible.builtin.fail:
-    msg: >-
-      ConfigMap istio-ca-root-cert not found in namespace
-      {{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }} -
-      the service_mesh Day 0 component (and cert-manager-istio-csr within
-      it) must be installed and have reconciled that namespace before
-      openshift_ai's maas-default-gateway Istio proxy pod can start. Run
-      `make d1 check service-mesh` first.
-  when: (_openshift_ai_istio_ca_root_cert.resources | default([]) | length) == 0
-
-- name: "openshift_ai | copy istio-ca-root-cert into openshift-ingress for the maas-default-gateway Istio proxy pod"
-  kubernetes.core.k8s:
-    state: present
-    definition:
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: istio-ca-root-cert
-        namespace: openshift-ingress
-      data: "{{ _openshift_ai_istio_ca_root_cert.resources[0].data }}"
+    istio_ca_caller_component: "openshift-ai"
+    istio_ca_source_namespace: "{{ openshift_ai_maas_gateway_ca_source_namespace | default('zuno-ai-run') }}"
 
 
 - name: "openshift_ai | apply the openshift-ai GitOps Application (d1: DataScienceCluster)"

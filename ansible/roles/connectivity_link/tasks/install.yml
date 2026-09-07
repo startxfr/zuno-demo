@@ -69,6 +69,18 @@
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 
+# ADR-0517 live finding (demo333, 2026-09-07): the d1 chart's
+# zuno-agent-gateway makes Istio auto-deploy a proxy pod into
+# openshift-ingress, which mounts istio-ca-root-cert - absent there on a
+# fresh cluster (istio-csr only distributes it to istio-injection
+# namespaces), so the pod hung in ContainerCreating/FailedMount and the
+# whole d1 sync timed out. See the shared task's header for why a copy,
+# not a label. openshift_ai (Day 2, maas-default-gateway) does the same.
+- name: "connectivity_link | ensure istio-ca-root-cert exists in openshift-ingress (zuno-agent-gateway proxy)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/ensure_istio_ca_in_openshift_ingress.yml"
+  vars:
+    istio_ca_caller_component: "connectivity-link"
+
 - name: "connectivity_link | apply the connectivity-link GitOps Application (d1: Kuadrant instance)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
