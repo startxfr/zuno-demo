@@ -3,6 +3,11 @@
 # gitops/charts/grafana/templates/datasource-mesh-prometheus.yaml -
 # mesh-monitoring's own MonitoringStack (Istio/Envoy telemetry, zuno-mesh),
 # no auth, same in-cluster URL. Cluster-scoped per ADR-0551 decision 3.
+#
+# ADR-0552: targets RHOAI's existing `data-science-perses` instance (see
+# globaldatasource-prometheus.yaml's header for why). `plugin.spec.proxy`
+# shape (not `directUrl`) matches RHOAI's own no-auth
+# `data-science-prometheus-datasource` example exactly - no `secret` needed.
 apiVersion: perses.dev/v1alpha2
 kind: PersesGlobalDatasource
 metadata:
@@ -14,7 +19,7 @@ metadata:
 spec:
   instanceSelector:
     matchLabels:
-      dashboards: "perses"
+      platform.opendatahub.io/part-of: monitoring
   config:
     default: false
     display:
@@ -22,5 +27,8 @@ spec:
     plugin:
       kind: PrometheusDatasource
       spec:
-        directUrl: {{ .Values.datasources.meshPrometheus.url | quote }}
+        proxy:
+          kind: HTTPProxy
+          spec:
+            url: {{ .Values.datasources.meshPrometheus.url | quote }}
 {{- end }}

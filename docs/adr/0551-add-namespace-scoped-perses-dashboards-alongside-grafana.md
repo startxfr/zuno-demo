@@ -1,6 +1,9 @@
 # ADR-0551: Add namespace-scoped Perses dashboards alongside the existing Grafana stack
 
-- **Status:** Accepted
+- **Status:** Superseded in part by ADR-0552 (decisions 2 and 3 - server
+  topology and datasource strategy - replaced; decisions 1, 4, 5 and 6 -
+  physical namespace split, UIPlugin console integration, phased rollout,
+  namespace mapping - remain this record's own decisions, unchanged)
 - **Target:** v0.5
 - **Date:** 2026-09-07
 - **Decision owners:** Zuno Demo architecture team
@@ -119,12 +122,30 @@ retiring it - the two stacks are additive, exactly as ADR-0522 kept
 `zuno-monitoring` and RHOAI's monitoring independently owned. A future ADR
 would be needed to change that.
 
+## Dated correction note (2026-09-07)
+
+Decision 2 ("one Perses server instance") was applied live via WP-138 and
+immediately rolled back: `PersesDashboard`/`PersesDatasource`/
+`PersesGlobalDatasource` resources with no `instanceSelector` set - which is
+exactly how every one of RHOAI's own resources is configured - resolve
+against **any** Perses instance on the cluster (a standard Kubernetes
+`LabelSelector` with no fields matches everything), not just the intended
+one. The moment this ADR's second, independent Perses instance appeared,
+several of RHOAI's own dashboards (`redhat-ods-monitoring`) started
+resolving against it instead of `data-science-perses`, breaking them for
+~14 minutes until the instance was deleted. Confirmed against upstream
+Perses/Red Hat documentation: running more than one Perses instance per
+cluster is not a supported or even discussed configuration - see
+[ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md),
+which replaces decisions 2 and 3 with reusing `data-science-perses`.
+
 ## Related ADRs
 
 - [ADR-0522](0522-enable-openshift-ai-monitoring-stack-side-by-side.md) - the
-  ADR that named this option and deferred it; this decision fulfills it by
-  choosing a COO-based Perses distinct from RHOAI's own, which stays
-  untouched.
+  ADR that named this option and deferred it; this decision fulfills it,
+  though [ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md)
+  changed HOW - reusing RHOAI's Perses instance rather than running a second
+  one.
 - [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) -
   the Grafana dashboard set this ADR duplicates, unmodified.
 - [ADR-0329](0329-consolidate-agent-workloads-into-the-shared-zuno-ai-run-namespace.md) -

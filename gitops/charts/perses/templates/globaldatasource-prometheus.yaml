@@ -4,10 +4,18 @@
 # (PersesGlobalDatasource) per ADR-0551 decision 3 so every PersesDashboard
 # references it by name regardless of its own namespace.
 #
-# Auth: client.kubernetesAuth.enable uses the Perses pod's own projected
-# ServiceAccount token (perses-prometheus-reader, bound to
-# cluster-monitoring-view - see perses.yaml's header comment) instead of
-# Grafana's static-secret Bearer header. UNVERIFIED live - see perses.yaml.
+# ADR-0552: targets RHOAI's existing `data-science-perses` instance (its own
+# live label, `platform.opendatahub.io/part-of: monitoring` - verify this
+# hasn't changed before applying) instead of running an independent second
+# instance - the original design broke RHOAI's dashboards live, see
+# ADR-0551's dated correction note.
+#
+# plugin.spec.proxy shape and client.tls.caCert copy RHOAI's own working
+# `cluster-prometheus-datasource` (redhat-ods-monitoring) exactly, reusing
+# its `prometheus-web-tls-ca` ConfigMap - same endpoint, same CA, no need to
+# duplicate it. `proxy.spec.secret` is this chart's own
+# zuno-perses-prometheus-reader-token (serviceaccount-prometheus-reader.yaml),
+# never RHOAI's own `cluster-prometheus-datasource-secret`.
 apiVersion: perses.dev/v1alpha2
 kind: PersesGlobalDatasource
 metadata:
@@ -19,19 +27,25 @@ metadata:
 spec:
   instanceSelector:
     matchLabels:
-      dashboards: "perses"
+      platform.opendatahub.io/part-of: monitoring
   client:
-    kubernetesAuth:
-      enable: true
     tls:
       enable: true
-      insecureSkipVerify: true
+      caCert:
+        type: configmap
+        name: prometheus-web-tls-ca
+        namespace: redhat-ods-monitoring
+        certPath: service-ca.crt
   config:
-    default: true
+    default: false
     display:
       name: Prometheus
     plugin:
       kind: PrometheusDatasource
       spec:
-        directUrl: {{ .Values.datasources.prometheus.url | quote }}
+        proxy:
+          kind: HTTPProxy
+          spec:
+            url: {{ .Values.datasources.prometheus.url | quote }}
+            secret: zuno-perses-prometheus-reader-token
 {{- end }}

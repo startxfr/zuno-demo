@@ -1,10 +1,11 @@
 apiVersion: v2
 name: perses
 description: >-
-  ADR-0551/WP-138: namespace-scoped Perses dashboards duplicating
-  zuno-monitoring's Grafana dashboard set, on top of the Cluster
-  Observability Operator's Perses CRDs (already installed cluster-wide by
-  gitops/charts/mesh-monitoring's application-d0.yaml - no operator
-  Subscription of its own here).
+  ADR-0551/ADR-0552/WP-138: namespace-scoped Perses dashboards duplicating
+  zuno-monitoring's Grafana dashboard set, targeting RHOAI's existing
+  data-science-perses instance (ADR-0552) rather than running an
+  independent one - an earlier attempt at the latter broke RHOAI's own
+  dashboards live, see ADR-0551's dated correction note. No operator
+  Subscription or server CR of its own here.
 type: application
 version: 0.1.0

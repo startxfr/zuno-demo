@@ -11,10 +11,11 @@
 # (ADR-0329), validating a PersesDashboard placed in a busier namespace with
 # only a single datasource (prometheus).
 #
-# UNVERIFIED AGAINST A LIVE PERSES INSTANCE - see
-# dashboard-mesh-gateway.yaml's header for the full caveat (plugin kinds,
-# Grid layout shape). Grafana's table `transformations` (merge/organize/
-# renameByName - dashboard-trustyai.yaml's Garak/RAGAS job outcomes, LM-Eval
+# Targets RHOAI's existing `data-science-perses` instance (ADR-0552) - see
+# dashboard-mesh-gateway.yaml's header for the full caveat (plugin kinds
+# confirmed against RHOAI's own live resources; only the ListVariable
+# variable plugin remains best-effort). Grafana's table `transformations`
+# (merge/organize/renameByName - dashboard-trustyai.yaml's Garak/RAGAS job outcomes, LM-Eval
 # activity, and both score tables) have no confirmed 1:1 Perses equivalent
 # used here: these four Table panels keep the same PromQL and render Prometheus's
 # own label/value column names rather than Grafana's renamed columns - a
@@ -31,19 +32,13 @@ metadata:
 spec:
   instanceSelector:
     matchLabels:
-      dashboards: "perses"
+      platform.opendatahub.io/part-of: monitoring
   config:
     display:
       name: "TrustyAI evaluation & guardrails"
       description: "ADR-0534/WP-113/ADR-0551: observe-only guardrails detections on real agent traffic, evaluation job outcomes, and the latest RAGAS/Garak scores. Detections never block a response - that asymmetry is the observe-only contract. Perses duplicate of zuno-monitoring's Grafana dashboard, scoped to zuno-ai-run."
     duration: 6h
     refreshInterval: 30s
-    datasources:
-      prometheus:
-        default: true
-        plugin:
-          kind: PrometheusDatasource
-          spec: {}
     panels:
       evaluationsByOutcome:
         kind: Panel

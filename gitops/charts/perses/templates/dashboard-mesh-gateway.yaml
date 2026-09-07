@@ -11,21 +11,21 @@
 # because it already has its own dedicated datasource, no shared-namespace
 # convergence with any other dashboard.
 #
-# UNVERIFIED AGAINST A LIVE PERSES INSTANCE (none exists on this cluster yet
-# - see ADR-0551's Context): panel plugin kinds (TimeSeriesChart/StatChart/
-# Table/Markdown), query plugin kind (PrometheusTimeSeriesQuery/
-# TempoTraceQuery), the Grid layout shape, and the ListVariable/
-# PrometheusLabelValuesVariable variable plugin are all best-effort against
-# upstream Perses's documented schema (perses.dev), not confirmed against
-# this cluster's specific COO 1.5.2-bundled Perses version. WP-138's live
-# verification step is the actual confirmation gate - if any plugin/query
-# kind name is wrong, only that field needs correcting, not the panel
-# content, PromQL, or the datasource/namespace-scoping architecture this
-# file exists to prove. Grafana's "row" grouping/collapse and the
-# cross-dashboard "Zuno dashboards" link dropdown have no confirmed 1:1
-# Perses equivalent used here - rows become Grid layout sections
-# (display.collapse.open mirrors collapsed: true/false); the link dropdown
-# is dropped rather than guessed.
+# Targets RHOAI's existing `data-science-perses` instance (ADR-0552, not a
+# second independent one - see ADR-0551's dated correction note for why
+# that first attempt broke RHOAI's own dashboards live).
+#
+# Panel plugin kinds (TimeSeriesChart/StatChart/Table/Markdown), query
+# plugin kind (PrometheusTimeSeriesQuery/TempoTraceQuery) and the Grid
+# layout shape are confirmed against RHOAI's own live, Available:true
+# PersesDashboard/PersesDatasource resources on this same cluster - not
+# guessed. The ListVariable/PrometheusLabelValuesVariable variable plugin
+# has no live RHOAI example to confirm against, so it remains best-effort;
+# WP-138's live verification step is the confirmation gate for that one
+# piece. Grafana's "row" grouping/collapse and the cross-dashboard "Zuno
+# dashboards" link dropdown have no confirmed 1:1 Perses equivalent used
+# here - rows become Grid layout sections (display.collapse.open mirrors
+# collapsed: true/false); the link dropdown is dropped rather than guessed.
 apiVersion: perses.dev/v1alpha2
 kind: PersesDashboard
 metadata:
@@ -38,7 +38,7 @@ metadata:
 spec:
   instanceSelector:
     matchLabels:
-      dashboards: "perses"
+      platform.opendatahub.io/part-of: monitoring
   config:
     display:
       name: "Mesh & gateway"
@@ -94,22 +94,6 @@ spec:
               datasource:
                 kind: PrometheusDatasource
                 name: mesh-prometheus
-    datasources:
-      mesh-prometheus:
-        default: false
-        plugin:
-          kind: PrometheusDatasource
-          spec: {}
-      prometheus:
-        default: true
-        plugin:
-          kind: PrometheusDatasource
-          spec: {}
-      tempo:
-        default: false
-        plugin:
-          kind: TempoDatasource
-          spec: {}
     panels:
       meshRequestsRate:
         kind: Panel

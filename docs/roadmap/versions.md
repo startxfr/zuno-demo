@@ -69,15 +69,18 @@ Make the OpenShift AI MaaS governance plane live and route agent model calls
 through it end-to-end. Also carries the RHOAI monitoring stack enabled
 side-by-side with the existing observability stack (ADR-0522, ADR-0523),
 per-run trace correlation (ADR-0543), and a namespace-scoped Perses
-duplication of the `zuno-monitoring` Grafana dashboards, additive and not a
-migration of RHOAI's own Perses (ADR-0551, WP-138/WP-139). ADR-0537 (RHOAI
-`HardwareProfile` CRs for local models) closed `Implemented` 2026-09-03; its
-`ExternalModel`/MaaS
+duplication of the `zuno-monitoring` Grafana dashboards (ADR-0551,
+WP-138/WP-139) - reusing RHOAI's own `data-science-perses` instance rather
+than running an independent second one, after a live incident showed a
+second instance breaks any Perses resource with no `instanceSelector`
+(exactly how RHOAI's own are configured) (ADR-0552, superseding ADR-0551 in
+part). ADR-0537 (RHOAI `HardwareProfile` CRs for local models) closed
+`Implemented` 2026-09-03; its `ExternalModel`/MaaS
 half, permanently blocked upstream, split out the same day to
 [ADR-0541](../adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md)
 in the v0.7 band below.
 
-**9 ADRs.** Open: ADR-0551 (`Accepted`); WP-55, WP-101, WP-122, WP-138,
+**10 ADRs.** Open: ADR-0552 (`Accepted`); WP-55, WP-101, WP-122, WP-138,
 WP-139.
 
 ## v0.6

@@ -1,10 +1,17 @@
 {{- if .Values.perses.enabled }}
 # Same backend as gitops/charts/grafana/templates/datasource-tempo.yaml -
-# ADR-0029's distributed traces. Cluster-scoped per ADR-0551 decision 3.
-# Plugin kind name (TempoDatasource) is best-effort against upstream
-# Perses's plugin registry, not yet confirmed against this cluster's
-# COO-bundled Perses version - WP-138's live verification step is the
-# confirmation gate; only this plugin.kind would need correcting if wrong.
+# ADR-0029's distributed traces (gitops/charts/tempo's TempoMonolithic in
+# zuno-monitoring, no gateway/multi-tenancy, no auth) - NOT RHOAI's own
+# separate Tempo (data-science-tempostack), which does need auth/tenant
+# headers; do not copy that pattern here, it targets a different backend.
+# Cluster-scoped per ADR-0551 decision 3.
+#
+# ADR-0552: targets RHOAI's existing `data-science-perses` instance (see
+# globaldatasource-prometheus.yaml's header for why). `plugin.spec.proxy`
+# shape matches RHOAI's own datasource examples; `TempoDatasource` plugin
+# kind confirmed via `oc explain`-adjacent inspection of RHOAI's own
+# `tempo-datasource` resource, which uses the same plugin kind for its own
+# (differently-configured) Tempo.
 apiVersion: perses.dev/v1alpha2
 kind: PersesGlobalDatasource
 metadata:
@@ -16,7 +23,7 @@ metadata:
 spec:
   instanceSelector:
     matchLabels:
-      dashboards: "perses"
+      platform.opendatahub.io/part-of: monitoring
   config:
     default: false
     display:
@@ -24,5 +31,8 @@ spec:
     plugin:
       kind: TempoDatasource
       spec:
-        directUrl: {{ .Values.datasources.tempo.url | quote }}
+        proxy:
+          kind: HTTPProxy
+          spec:
+            url: {{ .Values.datasources.tempo.url | quote }}
 {{- end }}

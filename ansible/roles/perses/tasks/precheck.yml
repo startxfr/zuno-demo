@@ -5,12 +5,14 @@
   vars:
     gitops_app_name: "zuno-perses-d1"
 
-- name: "perses | look up the Perses instance"
+# No Perses server CR to look up here (ADR-0552 reuses RHOAI's existing
+# data-science-perses instance) - check one of this chart's own resources
+# instead.
+- name: "perses | look up the prometheus PersesGlobalDatasource"
   kubernetes.core.k8s_info:
     api_version: perses.dev/v1alpha2
-    kind: Perses
-    namespace: zuno-monitoring
-    name: perses
+    kind: PersesGlobalDatasource
+    name: prometheus
   register: _perses_lookup
 
 - name: "perses | compute install state"

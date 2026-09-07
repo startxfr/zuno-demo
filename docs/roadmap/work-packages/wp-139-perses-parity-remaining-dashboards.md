@@ -1,7 +1,7 @@
 # WP-139: Perses parity for the remaining eight dashboards
 
 - **State:** Not started
-- **ADRs:** ADR-0551
+- **ADRs:** ADR-0551, ADR-0552
 - **Depends on:** WP-138
 - **Related:** none
 - **Target:** v0.5
@@ -15,11 +15,11 @@
 ## Goal
 
 Translate the remaining eight `GrafanaDashboard`s into namespace-scoped
-`PersesDashboard`s, per ADR-0551's mapping table, reusing WP-138's `Perses`
-server instance, the three `PersesGlobalDatasource`s and the `UIPlugin`
-without modification. After this WP, all ten Grafana dashboards have a
-live-verified Perses equivalent; Grafana itself remains untouched and
-authoritative.
+`PersesDashboard`s, per ADR-0551's mapping table, targeting
+`data-science-perses` (ADR-0552) via WP-138's three `PersesGlobalDatasource`s
+and the `UIPlugin`, without modification to any of them. After this WP, all
+ten Grafana dashboards have a live-verified Perses equivalent; Grafana
+itself remains untouched and authoritative.
 
 ## Why this wasn't done in WP-138
 

@@ -1,16 +1,16 @@
-# perses.enabled renders everything in this chart (server, datasources,
-# UIPlugin, dashboards). Default false so `helm template`/`helm lint` render
-# nothing, same convention as gitops/charts/grafana/values.yaml. There is no
-# operator.enabled/project.enabled here: the Cluster Observability Operator
-# is already installed cluster-wide by gitops/charts/mesh-monitoring's
+# perses.enabled renders everything in this chart (datasources, UIPlugin,
+# dashboards - no server, ADR-0552 reuses RHOAI's existing
+# `data-science-perses` instance). Default false so `helm template`/`helm
+# lint` render nothing, same convention as
+# gitops/charts/grafana/values.yaml. There is no operator.enabled/
+# project.enabled here: the Cluster Observability Operator is already
+# installed cluster-wide by gitops/charts/mesh-monitoring's
 # application-d0.yaml (confirmed live: `oc get csv -n
 # openshift-cluster-observability-operator` -> cluster-observability-operator.v1.5.2)
 # - a second Subscription for the same operator would fight that Application
 # for ownership.
 perses:
   enabled: false
-
-monitoringNamespace: zuno-monitoring
 
 # ADR-0551 decision 3: one PersesGlobalDatasource per Grafana datasource
 # (gitops/charts/grafana/templates/datasource-*.yaml), same URLs/UIDs,

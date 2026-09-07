@@ -1,35 +1,48 @@
 # perses
 
-ADR-0551/WP-138: a second, independent dashboard layer duplicating
+ADR-0551/ADR-0552/WP-138: a second dashboard layer duplicating
 `zuno-monitoring`'s Grafana dashboard set onto Perses (`perses.dev/v1alpha2`,
 Cluster Observability Operator), physically split by application namespace
 instead of Grafana's own template-filtered consolidation (ADR-0413). Grafana
 is not modified, reduced, or replaced - see `gitops/charts/grafana/README.md`
 for the dashboard set this duplicates.
 
-Referenced by a single `gitops/apps/perses/application-d1.yaml` - no `-d0`:
-the Cluster Observability Operator is already subscribed cluster-wide by
-`gitops/apps/mesh-monitoring/application-d0.yaml`; a second Subscription
-here would fight that Application for ownership of the same operator.
+**Reuses RHOAI's existing `data-science-perses` instance** (ADR-0552) rather
+than running an independent one. An earlier attempt (ADR-0551's original
+decision 2) ran a second, independent `Perses` server instance and broke
+RHOAI's own dashboards live for ~14 minutes: `PersesDashboard`/
+`PersesDatasource`/`PersesGlobalDatasource` resources with no
+`instanceSelector` set - exactly how every one of RHOAI's own resources is
+configured - resolve against **any** Perses instance on the cluster
+(standard Kubernetes `LabelSelector` semantics, not a bug). See ADR-0551's
+dated correction note and ADR-0552 for the full incident and redesign.
+
+Referenced by a single `gitops/apps/perses/application-d1.yaml` - no `-d0`
+and no server CR of any kind.
 
 ## What this chart renders
 
-- One `Perses` server instance (`perses`, `zuno-monitoring`, label
-  `dashboards: perses`) - a single instance for the whole cluster, mirroring
-  Grafana's own single-instance model. Namespace scoping is achieved by
-  where each `PersesDashboard`/`PersesGlobalDatasource` lives plus
-  `instanceSelector`, not by running one Perses per namespace.
-- Three cluster-scoped `PersesGlobalDatasource`s, the same three backends
+- Three cluster-scoped `PersesGlobalDatasource`s targeting
+  `data-science-perses` (`instanceSelector.matchLabels:
+  {platform.opendatahub.io/part-of: monitoring}`), the same three backends
   `gitops/charts/grafana/templates/datasource-*.yaml` already uses:
-  `prometheus` (thanos-querier, authenticated via the Perses pod's own
-  `client.kubernetesAuth` rather than Grafana's static-secret Bearer
-  header), `mesh-prometheus` (mesh-monitoring's own MonitoringStack, no
-  auth), `tempo` (distributed traces, no auth).
+  `prometheus` (thanos-querier, Bearer-authenticated via a **new**
+  ServiceAccount/Secret this chart creates in `redhat-ods-monitoring` -
+  `templates/serviceaccount-prometheus-reader.yaml` - reusing RHOAI's own
+  `prometheus-web-tls-ca` ConfigMap for TLS rather than duplicating it),
+  `mesh-prometheus` (mesh-monitoring's own MonitoringStack, no auth),
+  `tempo` (ADR-0029's TempoMonolithic, no auth - not RHOAI's own, separately
+  auth'd Tempo). All three use the `plugin.spec.proxy: {kind: HTTPProxy,
+  spec: {url, secret?}}` shape, copied from RHOAI's own live, working
+  `PersesDatasource` examples - not the unverified `directUrl` shape the
+  first attempt guessed.
 - One `UIPlugin` (`dashboards`, `type: Dashboards`) giving Perses a real
-  navigation entry inside the OpenShift console - unlike Grafana, which has
-  no console presence at all today (only its own oauth-proxied Route).
+  navigation entry inside the OpenShift console - unaffected by the
+  ADR-0552 pivot; it also now surfaces RHOAI's own pre-existing dashboards,
+  accepted as a harmless side effect.
 - Two pilot `PersesDashboard`s (WP-138), each in the application namespace
-  it actually observes:
+  it actually observes, targeting `data-science-perses` via the same
+  `instanceSelector`:
 
   | File | Namespace | Duplicates (Grafana uid) |
   |---|---|---|
@@ -41,19 +54,25 @@ here would fight that Application for ownership of the same operator.
   namespace, including the five that stay `platform`-scoped in
   `zuno-monitoring` (no single owning application namespace).
 
+## What this chart does NOT touch
+
+No RHOAI-owned object in `redhat-ods-monitoring` is modified, deleted, or
+depended upon beyond reading `data-science-perses`'s label and the
+`prometheus-web-tls-ca` ConfigMap's contents. The only new footprint inside
+that namespace is this chart's own, distinctly-named
+`zuno-perses-prometheus-reader` ServiceAccount/Secret/ClusterRoleBinding -
+never RHOAI's own identities or secrets.
+
 ## Known unknowns (WP-138's live verification is the confirmation gate)
 
-Perses's dashboard model is typed CUE/JSON (`panels`/`layouts`/`queries` as
-structured objects), unlike Grafana's opaque JSON blob - the two pilot
-dashboards above are a real per-panel translation, not a copy-paste, and
-several pieces are best-effort against upstream Perses's documented schema
-rather than confirmed against this cluster's specific COO 1.5.2-bundled
-Perses version (no Perses instance exists anywhere on this cluster as of
-this chart's authoring): panel/query/datasource plugin kind names, the
-`client.kubernetesAuth` in-cluster-token mechanism for the `prometheus`
-datasource, how the `UIPlugin` discovers which `Perses` instance(s) to
-render, and the `ListVariable`/`PrometheusLabelValuesVariable` template
-variables. See each template's own header comment for the specific caveat.
-Grafana's table `transformations` (column merge/rename) and its
-cross-dashboard link dropdown have no confirmed Perses equivalent used here
-- both are documented, deliberate simplifications, not silent gaps.
+Panel/query/datasource plugin kind names and the `plugin.spec.proxy` shape
+are confirmed against RHOAI's own live, `Available: true` Perses resources
+on this same cluster - not guessed, unlike the first attempt. What remains
+genuinely unverified: whether `proxy.spec.secret` truly resolves relative to
+the Perses server's own namespace (`redhat-ods-monitoring`) as inferred from
+RHOAI's own examples, and the `ListVariable`/
+`PrometheusLabelValuesVariable` template-variable plugin (no RHOAI example
+to confirm against). See each template's own header comment. Grafana's
+table `transformations` (column merge/rename) and its cross-dashboard link
+dropdown have no confirmed Perses equivalent used here - both are
+documented, deliberate simplifications, not silent gaps.
