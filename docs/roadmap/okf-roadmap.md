@@ -6,6 +6,10 @@ self-contained brief under [work-packages/](work-packages/) written so a
 lower-capability model can execute it as a standalone task. The stream is
 established by [ADR-0501](../adr/0501-establish-the-okf-stream-with-its-own-milestones-and-roadmap.md).
 
+See [OKF Workflow](../agents/okf-workflow.md) for the full change → sign →
+deploy → consume diagram, with a section-by-section split of what's live
+today versus what OKF v0.2/v0.3 (ADR-0506–0510, this roadmap) still targets.
+
 [docs/adr/README.md](../adr/README.md) is the **sole authority for ADR
 status**. This roadmap tracks WP state only — never copy ADR status strings
 here (`platform/docs/check_docs.py` validates the index/body pair; a third

@@ -13,9 +13,10 @@ This directory is the canonical documentation set for the Zuno Demo platform.
 7. [Architecture Decision Records](adr/README.md)
 8. [Agent catalog](agents/README.md)
 9. [Agent request workflow](agents/request-workflow.md)
-10. [Platform prerequisites](platform/prerequisites.md)
-11. [Installation](platform/installation.md)
-12. [Roadmap](roadmap/README.md)
+10. [OKF workflow: change, sign, deploy, consume](agents/okf-workflow.md)
+11. [Platform prerequisites](platform/prerequisites.md)
+12. [Installation](platform/installation.md)
+13. [Roadmap](roadmap/README.md)
 
 ## Documentation policy
 

@@ -46,3 +46,5 @@ cert-manager issues and rotates TLS certificates for routes and mesh workloads f
 ![Red Hat Trusted Artifact Signer Low Level Design](../assets/img/zuno-lld-rhtas.png)
 
 Red Hat Trusted Artifact Signer (RHTAS, ADR-0535) provides keyless cosign/Sigstore signing (Fulcio, Rekor, Trillian, TUF) for first-party container images and OKF agent bundles built in `zuno-ai-build`, replacing the earlier Vault Transit signer (ADR-0420). An `ImageContentPolicy` enforces signature verification at admission, and `make d2 check supply-chain` verifies the chain end to end.
+
+See [OKF Workflow](../agents/okf-workflow.md) for the full change → sign → deploy → consume diagram this signing step belongs to.
