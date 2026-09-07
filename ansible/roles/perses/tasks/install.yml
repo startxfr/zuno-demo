@@ -1,0 +1,18 @@
+---
+# ADR-0551/WP-138: the Perses server, its three PersesGlobalDatasources, the
+# console UIPlugin, and the two pilot PersesDashboards - all one Application
+# (no -d0: the Cluster Observability Operator is already subscribed
+# cluster-wide by ansible/roles/mesh_monitoring's own -d0 apply). Unlike
+# ansible/roles/grafana's two-phase apply, no runtime-discovered secret
+# needs injecting here - the "prometheus" PersesGlobalDatasource
+# authenticates via client.kubernetesAuth (the Perses pod's own projected
+# ServiceAccount token), not a static Bearer value - so a single apply
+# suffices.
+- name: "perses | apply the perses GitOps Application (d1: server, datasources, UIPlugin, pilot dashboards)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "perses"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-perses-d1"
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 10

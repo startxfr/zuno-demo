@@ -1,0 +1,28 @@
+{{- if .Values.perses.enabled }}
+# Same backend as gitops/charts/grafana/templates/datasource-tempo.yaml -
+# ADR-0029's distributed traces. Cluster-scoped per ADR-0551 decision 3.
+# Plugin kind name (TempoDatasource) is best-effort against upstream
+# Perses's plugin registry, not yet confirmed against this cluster's
+# COO-bundled Perses version - WP-138's live verification step is the
+# confirmation gate; only this plugin.kind would need correcting if wrong.
+apiVersion: perses.dev/v1alpha2
+kind: PersesGlobalDatasource
+metadata:
+  name: tempo
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "perses"
+  config:
+    default: false
+    display:
+      name: Tempo
+    plugin:
+      kind: TempoDatasource
+      spec:
+        directUrl: {{ .Values.datasources.tempo.url | quote }}
+{{- end }}

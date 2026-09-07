@@ -1,0 +1,528 @@
+{{- if .Values.perses.enabled }}
+# WP-138 pilot #1: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-mesh-gateway.yaml (ADR-0413/
+# ADR-0551). Same panels, same PromQL, same two datasources
+# (mesh-prometheus for Istio/Envoy, prometheus for Kuadrant), same
+# Kuadrant-empty-by-design caveat - see that file's own header for the full
+# rationale, not repeated here.
+#
+# Namespace: zuno-mesh (ADR-0551 mapping table) - service-mesh/kiali's own
+# namespace, unambiguous split, chosen as the WP-138 pilot specifically
+# because it already has its own dedicated datasource, no shared-namespace
+# convergence with any other dashboard.
+#
+# UNVERIFIED AGAINST A LIVE PERSES INSTANCE (none exists on this cluster yet
+# - see ADR-0551's Context): panel plugin kinds (TimeSeriesChart/StatChart/
+# Table/Markdown), query plugin kind (PrometheusTimeSeriesQuery/
+# TempoTraceQuery), the Grid layout shape, and the ListVariable/
+# PrometheusLabelValuesVariable variable plugin are all best-effort against
+# upstream Perses's documented schema (perses.dev), not confirmed against
+# this cluster's specific COO 1.5.2-bundled Perses version. WP-138's live
+# verification step is the actual confirmation gate - if any plugin/query
+# kind name is wrong, only that field needs correcting, not the panel
+# content, PromQL, or the datasource/namespace-scoping architecture this
+# file exists to prove. Grafana's "row" grouping/collapse and the
+# cross-dashboard "Zuno dashboards" link dropdown have no confirmed 1:1
+# Perses equivalent used here - rows become Grid layout sections
+# (display.collapse.open mirrors collapsed: true/false); the link dropdown
+# is dropped rather than guessed.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: mesh-gateway
+  namespace: zuno-mesh
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "perses"
+  config:
+    display:
+      name: "Mesh & gateway"
+      description: "ADR-0413/ADR-0551: Istio/Envoy mesh traffic (mesh-prometheus datasource) and Kuadrant Authorino/Limitador (prometheus datasource) - empty-by-design until ADR-0201's MaaS AuthPolicy gap closes. Perses duplicate of zuno-monitoring's Grafana dashboard, scoped to zuno-mesh."
+    duration: 6h
+    refreshInterval: 30s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: dest_service
+          display:
+            name: dest_service
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: destination_service_name
+              matchers:
+                - "istio_requests_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: mesh-prometheus
+      - kind: ListVariable
+        spec:
+          name: source_workload
+          display:
+            name: source_workload
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: source_workload
+              matchers:
+                - "istio_requests_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: mesh-prometheus
+      - kind: ListVariable
+        spec:
+          name: mesh_namespace
+          display:
+            name: mesh_namespace
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: destination_service_namespace
+              matchers:
+                - "istio_requests_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: mesh-prometheus
+    datasources:
+      mesh-prometheus:
+        default: false
+        plugin:
+          kind: PrometheusDatasource
+          spec: {}
+      prometheus:
+        default: true
+        plugin:
+          kind: PrometheusDatasource
+          spec: {}
+      tempo:
+        default: false
+        plugin:
+          kind: TempoDatasource
+          spec: {}
+    panels:
+      meshRequestsRate:
+        kind: Panel
+        spec:
+          display:
+            name: "Mesh requests (rate, by destination service/response code)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: mesh-prometheus
+                    query: >-
+                      sum by (destination_service_name, response_code)
+                      (rate(istio_requests_total{destination_service_name=~"$dest_service",
+                      destination_service_namespace=~"$mesh_namespace"}[5m]))
+                    seriesNameFormat: "{{`{{destination_service_name}}`}} ({{`{{response_code}}`}})"
+      meshLatency:
+        kind: Panel
+        spec:
+          display:
+            name: "Mesh request latency p50/p95 (by destination service)"
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              format:
+                unit: milliseconds
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: mesh-prometheus
+                    query: >-
+                      histogram_quantile(0.50, sum by (le, destination_service_name)
+                      (rate(istio_request_duration_milliseconds_bucket{destination_service_name=~"$dest_service",
+                      destination_service_namespace=~"$mesh_namespace"}[5m])))
+                    seriesNameFormat: "p50 {{`{{destination_service_name}}`}}"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: mesh-prometheus
+                    query: >-
+                      histogram_quantile(0.95, sum by (le, destination_service_name)
+                      (rate(istio_request_duration_milliseconds_bucket{destination_service_name=~"$dest_service",
+                      destination_service_namespace=~"$mesh_namespace"}[5m])))
+                    seriesNameFormat: "p95 {{`{{destination_service_name}}`}}"
+      mtlsCoverage:
+        kind: Panel
+        spec:
+          display:
+            name: "mTLS coverage (rate, by connection security policy)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: mesh-prometheus
+                    query: >-
+                      sum by (connection_security_policy)
+                      (rate(istio_requests_total{destination_service_namespace=~"$mesh_namespace"}[5m]))
+                    seriesNameFormat: "{{`{{connection_security_policy}}`}}"
+      meshBandwidth:
+        kind: Panel
+        spec:
+          display:
+            name: "Mesh-attributed bandwidth (TCP bytes/s, by source->destination workload)"
+          plugin:
+            kind: TimeSeriesChart
+            spec:
+              format:
+                unit: bytesPerSecond
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: mesh-prometheus
+                    query: >-
+                      sum by (source_workload, destination_workload)
+                      (rate(istio_tcp_sent_bytes_total{source_workload=~"$source_workload"}[5m]))
+                    seriesNameFormat: "{{`{{source_workload}}`}} -> {{`{{destination_workload}}`}} (sent)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: mesh-prometheus
+                    query: >-
+                      sum by (source_workload, destination_workload)
+                      (rate(istio_tcp_received_bytes_total{source_workload=~"$source_workload"}[5m]))
+                    seriesNameFormat: "{{`{{source_workload}}`}} -> {{`{{destination_workload}}`}} (received)"
+      controlPlaneHealth:
+        kind: Panel
+        spec:
+          display:
+            name: "Mesh control plane health (istiod)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: mesh-prometheus
+                    query: "sum(rate(pilot_xds_pushes[5m]))"
+                    seriesNameFormat: "xds pushes/s"
+      mesh5xxRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "Mesh 5xx ratio"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 2
+                    color: orange
+                  - value: 10
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: mesh-prometheus
+                    query: >-
+                      sum(rate(istio_requests_total{response_code=~"5.."}[5m]))
+                      / sum(rate(istio_requests_total[5m]))
+      totalMeshRps:
+        kind: Panel
+        spec:
+          display:
+            name: "Total mesh RPS"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: mesh-prometheus
+                    query: "sum(rate(istio_requests_total[5m]))"
+      authorinoDecisions:
+        kind: Panel
+        spec:
+          display:
+            name: "Authorino: auth decisions (rate, by authconfig/status)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (authconfig, status) (rate(auth_server_response_status[5m]))
+                    seriesNameFormat: "{{`{{authconfig}}`}} ({{`{{status}}`}})"
+      authorinoHealth:
+        kind: Panel
+        spec:
+          display:
+            name: "Authorino: controller health (reconcile errors, rate)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (controller)
+                      (rate(controller_runtime_reconcile_errors_total{namespace="kuadrant-system"}[5m]))
+                    seriesNameFormat: "{{`{{controller}}`}}"
+      limitadorCalls:
+        kind: Panel
+        spec:
+          display:
+            name: "Limitador: authorized vs limited calls (rate, by namespace)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum by (limitador_namespace) (rate(authorized_calls[5m]))"
+                    seriesNameFormat: "authorized: {{`{{limitador_namespace}}`}}"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum by (limitador_namespace) (rate(limited_calls[5m]))"
+                    seriesNameFormat: "limited: {{`{{limitador_namespace}}`}}"
+      limitadorUp:
+        kind: Panel
+        spec:
+          display:
+            name: "Limitador: up / datastore partitioned"
+          plugin:
+            kind: StatChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "limitador_up"
+                    seriesNameFormat: "up"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "datastore_partitioned"
+                    seriesNameFormat: "datastore_partitioned"
+      kuadrantEmptyNote:
+        kind: Panel
+        spec:
+          display:
+            name: "Why is this empty?"
+          plugin:
+            kind: Markdown
+            spec:
+              text: >-
+                Panels above are empty by design: Authorino needs real
+                traffic past the `maas-gateway-auth` AuthPolicy, blocked by
+                ADR-0201's mTLS gap; Limitador needs a RateLimitPolicy (none
+                attached). Both populate automatically once those close.
+      meshErrorTraces:
+        kind: Panel
+        spec:
+          display:
+            name: "Traces: mesh errors"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{status=error}"
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Mesh traffic & control plane"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/meshRequestsRate"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/meshLatency"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/mtlsCoverage"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/meshBandwidth"
+            - x: 0
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/controlPlaneHealth"
+            - x: 12
+              y: 16
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/mesh5xxRatio"
+            - x: 18
+              y: 16
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/totalMeshRps"
+      - kind: Grid
+        spec:
+          display:
+            title: "Kuadrant (Authorino/Limitador)"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/authorinoDecisions"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/authorinoHealth"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/limitadorCalls"
+            - x: 12
+              y: 8
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/limitadorUp"
+            - x: 18
+              y: 8
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/kuadrantEmptyNote"
+      - kind: Grid
+        spec:
+          display:
+            title: "Traces"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/meshErrorTraces"
+{{- end }}

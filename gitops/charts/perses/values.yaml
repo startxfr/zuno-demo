@@ -1,0 +1,25 @@
+# perses.enabled renders everything in this chart (server, datasources,
+# UIPlugin, dashboards). Default false so `helm template`/`helm lint` render
+# nothing, same convention as gitops/charts/grafana/values.yaml. There is no
+# operator.enabled/project.enabled here: the Cluster Observability Operator
+# is already installed cluster-wide by gitops/charts/mesh-monitoring's
+# application-d0.yaml (confirmed live: `oc get csv -n
+# openshift-cluster-observability-operator` -> cluster-observability-operator.v1.5.2)
+# - a second Subscription for the same operator would fight that Application
+# for ownership.
+perses:
+  enabled: false
+
+monitoringNamespace: zuno-monitoring
+
+# ADR-0551 decision 3: one PersesGlobalDatasource per Grafana datasource
+# (gitops/charts/grafana/templates/datasource-*.yaml), same URLs/UIDs,
+# cluster-scoped so every PersesDashboard can reference them regardless of
+# which application namespace it lives in.
+datasources:
+  prometheus:
+    url: "https://thanos-querier.openshift-monitoring.svc.cluster.local:9091"
+  meshPrometheus:
+    url: "http://mesh-monitoring-prometheus.zuno-mesh.svc.cluster.local:9090"
+  tempo:
+    url: "http://tempo-tempo.zuno-monitoring.svc.cluster.local:3200"

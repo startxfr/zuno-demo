@@ -1,0 +1,37 @@
+{{- if .Values.perses.enabled }}
+# Same backend as gitops/charts/grafana/templates/datasource-prometheus.yaml
+# (thanos-querier, ADR-0029's zuno_*/zuno_bff_* series), cluster-scoped
+# (PersesGlobalDatasource) per ADR-0551 decision 3 so every PersesDashboard
+# references it by name regardless of its own namespace.
+#
+# Auth: client.kubernetesAuth.enable uses the Perses pod's own projected
+# ServiceAccount token (perses-prometheus-reader, bound to
+# cluster-monitoring-view - see perses.yaml's header comment) instead of
+# Grafana's static-secret Bearer header. UNVERIFIED live - see perses.yaml.
+apiVersion: perses.dev/v1alpha2
+kind: PersesGlobalDatasource
+metadata:
+  name: prometheus
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "perses"
+  client:
+    kubernetesAuth:
+      enable: true
+    tls:
+      enable: true
+      insecureSkipVerify: true
+  config:
+    default: true
+    display:
+      name: Prometheus
+    plugin:
+      kind: PrometheusDatasource
+      spec:
+        directUrl: {{ .Values.datasources.prometheus.url | quote }}
+{{- end }}

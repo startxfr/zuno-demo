@@ -1,0 +1,34 @@
+{{- if .Values.perses.enabled }}
+# ADR-0551 decision 4: a real OpenShift console navigation entry for
+# Perses, via the Cluster Observability Operator's UIPlugin CRD
+# (observability.openshift.io/v1alpha1) - not a bare Route, which is how
+# Grafana is reached today (no console presence at all, confirmed live: `oc
+# get consolelink/consoleplugin -A` shows nothing for Grafana).
+#
+# `type: Dashboards` confirmed live against this cluster's COO 1.5.2 CRD
+# (`oc explain uiplugin.spec.type`) as a distinct enum value from
+# `Monitoring` (which instead adds a `spec.monitoring.perses.enabled` toggle
+# to the existing built-in "Monitoring" console plugin) - `Dashboards` is
+# the literal, dedicated match for "give Perses its own nav entry", so this
+# uses it rather than piggybacking on Monitoring. It takes no further
+# sub-config in this CRD version (no `dashboards:` key exists under
+# `uiplugin.spec` at all).
+#
+# Cluster-scoped (UIPlugin has no metadata.namespace) - how it discovers
+# WHICH Perses instance(s) to render is unconfirmed as of this change (no
+# UIPlugin exists anywhere on this cluster yet: `oc get uiplugin -A` is
+# empty). Likely auto-discovers Perses/PersesDashboard resources cluster-wide
+# via the Kubernetes API, respecting the viewer's own RBAC - not via a
+# hardcoded URL, since no such field exists in the schema. WP-138's live
+# verification step is the confirmation gate for this whole mechanism.
+apiVersion: observability.openshift.io/v1alpha1
+kind: UIPlugin
+metadata:
+  name: dashboards
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  type: Dashboards
+{{- end }}

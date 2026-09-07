@@ -1,0 +1,354 @@
+{{- if .Values.perses.enabled }}
+# WP-138 pilot #2: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-trustyai.yaml (ADR-0534/WP-113/
+# ADR-0551). Same panels, same PromQL, same "observe-only" contract - see
+# that file's own header for the full series-origin/caveat rationale, not
+# repeated here.
+#
+# Namespace: zuno-ai-run (ADR-0551 mapping table) - chosen as WP-138's
+# second pilot specifically because, unlike mesh-gateway, it lands in the
+# same shared application namespace as most of the platform's workloads
+# (ADR-0329), validating a PersesDashboard placed in a busier namespace with
+# only a single datasource (prometheus).
+#
+# UNVERIFIED AGAINST A LIVE PERSES INSTANCE - see
+# dashboard-mesh-gateway.yaml's header for the full caveat (plugin kinds,
+# Grid layout shape). Grafana's table `transformations` (merge/organize/
+# renameByName - dashboard-trustyai.yaml's Garak/RAGAS job outcomes, LM-Eval
+# activity, and both score tables) have no confirmed 1:1 Perses equivalent
+# used here: these four Table panels keep the same PromQL and render Prometheus's
+# own label/value column names rather than Grafana's renamed columns - a
+# deliberate, documented simplification, not a silent gap.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: trustyai
+  namespace: zuno-ai-run
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "perses"
+  config:
+    display:
+      name: "TrustyAI evaluation & guardrails"
+      description: "ADR-0534/WP-113/ADR-0551: observe-only guardrails detections on real agent traffic, evaluation job outcomes, and the latest RAGAS/Garak scores. Detections never block a response - that asymmetry is the observe-only contract. Perses duplicate of zuno-monitoring's Grafana dashboard, scoped to zuno-ai-run."
+    duration: 6h
+    refreshInterval: 30s
+    datasources:
+      prometheus:
+        default: true
+        plugin:
+          kind: PrometheusDatasource
+          spec: {}
+    panels:
+      evaluationsByOutcome:
+        kind: Panel
+        spec:
+          display:
+            name: "Exchanges evaluated, by outcome"
+            description: "Every completed agent exchange is observed by the guardrails hook (agent-runtime). outcome=detected means something was flagged AND the response was still delivered unmodified."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum by (outcome) (increase(zuno_guardrails_evaluations_total[$__rate_interval]))"
+                    seriesNameFormat: "{{`{{outcome}}`}}"
+      detectionsByName:
+        kind: Panel
+        spec:
+          display:
+            name: "Detections, by detection name"
+            description: "One series per detection class per agent (NeMo rails policy names since the ADR-0540 backend flip 2026-09-03)."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum by (detection, agent) (increase(zuno_guardrails_detections_total[$__rate_interval]))"
+                    seriesNameFormat: "{{`{{detection}}`}} ({{`{{agent}}`}})"
+      detectionRate:
+        kind: Panel
+        spec:
+          display:
+            name: "Detection rate (window)"
+            description: "Share of evaluated exchanges that raised at least one detection over the dashboard window. Observe-only: this measures the detectors, it gates nothing."
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 20
+                    color: orange
+                  - value: 50
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(increase(zuno_guardrails_evaluations_total{outcome="detected"}[$__range]))
+                      / clamp_min(sum(increase(zuno_guardrails_evaluations_total[$__range])), 1)
+      observerUnavailable:
+        kind: Panel
+        spec:
+          display:
+            name: "Observer unavailable (share)"
+            description: "Share of exchanges where the observer could not be reached at all (transport failure only). Read together with the coverage panel below."
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 1
+                    color: orange
+                  - value: 10
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      (sum(increase(zuno_guardrails_evaluations_total{outcome="unavailable"}[$__range])) or vector(0))
+                      / clamp_min(sum(increase(zuno_guardrails_evaluations_total[$__range])), 1)
+      coverage:
+        kind: Panel
+        spec:
+          display:
+            name: "Coverage: exchanges observed vs agent traffic"
+            description: "The observer disables itself silently when misconfigured - the two lines diverging is the signal, not their absolute equality. Traffic read from the BFF request-duration histogram count, not zuno_bff_requests_total (which double-counts per Keycloak group)."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum(rate(zuno_guardrails_evaluations_total[$__rate_interval]))"
+                    seriesNameFormat: "exchanges observed"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(zuno_bff_request_duration_ms_milliseconds_count{code!~"5.."}[$__rate_interval]))
+                    seriesNameFormat: "agent traffic (non-5xx BFF)"
+      garakRagasJobOutcomes:
+        kind: Panel
+        spec:
+          display:
+            name: "Garak / RAGAS job outcomes"
+            description: "kube-state-metrics view of the trustyai-config evaluation Jobs. Simplified from Grafana's merged/renamed table: raw succeeded/failed series per job_name, not a single merged row per job - see this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (job_name) (kube_job_status_succeeded{namespace="zuno-ai-run", job_name=~"garak.*|ragas.*"})
+                    seriesNameFormat: "succeeded: {{`{{job_name}}`}}"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (job_name) (kube_job_status_failed{namespace="zuno-ai-run", job_name=~"garak.*|ragas.*"})
+                    seriesNameFormat: "failed: {{`{{job_name}}`}}"
+      lmEvalPodActivity:
+        kind: Panel
+        spec:
+          display:
+            name: "LM-Eval pod activity (mmlu benchmarks)"
+            description: "LMEvalJob CR results have no Prometheus path on this platform - pod phase is the dashboard-visible signal; scores stay in `oc get lmevaljob -o yaml` / make d3 check trustyai-config."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (pod, phase) (kube_pod_status_phase{namespace="zuno-ai-run", pod=~".*mmlu.*"} > 0)
+                    seriesNameFormat: "{{`{{pod}}`}} ({{`{{phase}}`}})"
+      ragasScores:
+        kind: Panel
+        spec:
+          display:
+            name: "RAGAS scores (real rag-service retrievals)"
+            description: "faithfulness = answer grounded in retrieved contexts; llm_context_precision = retrieved contexts relevant to the question. Judged by the local qwen3.6 model against live pgvector retrievals. last_over_time keeps the latest run visible."
+          plugin:
+            kind: Table
+            spec:
+              format:
+                unit: percent
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "max by (metric, question) (last_over_time(zuno_ragas_score[30d]))"
+                    seriesNameFormat: "{{`{{metric}}`}}: {{`{{question}}`}}"
+      garakAttackSuccessRate:
+        kind: Panel
+        spec:
+          display:
+            name: "Garak attack success rate (jailbreak probes)"
+            description: "1 - passed/total per probe/detector from the last garak security scan. Higher is WORSE: 1.0 on mitigation.MitigationBypass means the model never voiced an explicit refusal."
+          plugin:
+            kind: Table
+            spec:
+              format:
+                unit: percent
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "max by (probe, detector, model) (last_over_time(zuno_garak_attack_success_rate[30d]))"
+                    seriesNameFormat: "{{`{{probe}}`}}/{{`{{detector}}`}} ({{`{{model}}`}})"
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Guardrails (observe-only)"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 9
+              height: 8
+              content:
+                $ref: "#/spec/panels/evaluationsByOutcome"
+            - x: 9
+              y: 0
+              width: 9
+              height: 8
+              content:
+                $ref: "#/spec/panels/detectionsByName"
+            - x: 18
+              y: 0
+              width: 6
+              height: 8
+              content:
+                $ref: "#/spec/panels/detectionRate"
+            - x: 0
+              y: 8
+              width: 8
+              height: 8
+              content:
+                $ref: "#/spec/panels/observerUnavailable"
+            - x: 8
+              y: 8
+              width: 16
+              height: 8
+              content:
+                $ref: "#/spec/panels/coverage"
+      - kind: Grid
+        spec:
+          display:
+            title: "Evaluation jobs"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/garakRagasJobOutcomes"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/lmEvalPodActivity"
+      - kind: Grid
+        spec:
+          display:
+            title: "Scores (latest run)"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 9
+              content:
+                $ref: "#/spec/panels/ragasScores"
+            - x: 12
+              y: 0
+              width: 12
+              height: 9
+              content:
+                $ref: "#/spec/panels/garakAttackSuccessRate"
+{{- end }}

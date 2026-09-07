@@ -1,0 +1,26 @@
+{{- if .Values.perses.enabled }}
+# Same backend as
+# gitops/charts/grafana/templates/datasource-mesh-prometheus.yaml -
+# mesh-monitoring's own MonitoringStack (Istio/Envoy telemetry, zuno-mesh),
+# no auth, same in-cluster URL. Cluster-scoped per ADR-0551 decision 3.
+apiVersion: perses.dev/v1alpha2
+kind: PersesGlobalDatasource
+metadata:
+  name: mesh-prometheus
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "perses"
+  config:
+    default: false
+    display:
+      name: Mesh Prometheus
+    plugin:
+      kind: PrometheusDatasource
+      spec:
+        directUrl: {{ .Values.datasources.meshPrometheus.url | quote }}
+{{- end }}

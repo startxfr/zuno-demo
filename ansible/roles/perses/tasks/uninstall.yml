@@ -1,0 +1,8 @@
+---
+# Single Application to delete - no operator to remove (the Cluster
+# Observability Operator is owned by ansible/roles/mesh_monitoring, not this
+# role) and no -d0 counterpart.
+- name: "perses | delete the perses GitOps Application (d1: server, datasources, UIPlugin, dashboards)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-perses-d1"

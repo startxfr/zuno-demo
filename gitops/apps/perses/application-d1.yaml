@@ -1,0 +1,37 @@
+---
+# WP-138/ADR-0551: the Perses server, its three PersesGlobalDatasources, the
+# console UIPlugin, and the two pilot PersesDashboards (mesh-gateway,
+# trustyai). No -d0 counterpart - the Cluster Observability Operator is
+# already subscribed cluster-wide by
+# gitops/apps/mesh-monitoring/application-d0.yaml; a second Subscription
+# here would fight that Application for ownership. `destination.namespace`
+# below only backstops resources that omit their own metadata.namespace
+# (Perses, the GlobalDatasources, the UIPlugin all render into
+# zuno-monitoring); the two PersesDashboards carry their own namespace
+# (zuno-mesh, zuno-ai-run) per ADR-0551's physical-split decision - the
+# `zuno` AppProject's `destinations: [{namespace: "*"}]` allows this.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-perses-d1
+  namespace: openshift-gitops
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/perses
+    helm:
+      releaseName: zuno-perses-d1
+      values: |
+        perses:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
