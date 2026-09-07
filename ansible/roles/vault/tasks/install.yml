@@ -346,6 +346,50 @@
     - _vault_pubkey_file.changed
     - (_vault_pubkey_git_diff.rc | default(0)) != 0
 
+# ADR-0517 live finding (demo333, 2026-09-07): publish the Vault PKI ROOT
+# certificate to a well-known in-cluster ConfigMap. The root
+# (CN=zuno-demo.internal, created by unseal-configure's
+# pki/root/generate/internal) signs live server certs (mariadb-server-cert,
+# istiod) on EVERY cluster - but the only path that distributed it
+# cluster-wide (openshift_oauth -> openshift-config/user-ca-bundle) sourced
+# it from the KEYCLOAK TLS Secret's ca.crt, which only exists while
+# Keycloak itself serves a Vault-issued cert. On an ACME/public-Keycloak
+# cluster that source is empty, the root never reached
+# Proxy.spec.trustedCA, and the DSP api-server hung unable to verify
+# MariaDB's chain (rag-dspa CrashLoop, Day 2 blocked). "What signs
+# Keycloak's cert" and "does this cluster have a private PKI root" are
+# different questions - this ConfigMap answers the second one directly
+# from the PKI engine, and openshift_oauth now prefers it (its keycloak
+# fallback kept for compatibility). A root certificate is public material:
+# a ConfigMap, not a Secret, is the right home.
+- name: "vault | read the PKI root certificate from the pki engine"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault read -field=certificate pki/cert/ca"
+  register: _vault_pki_root_raw
+  changed_when: false
+  # Same rule as every VAULT_TOKEN task in this role: the exec command line
+  # (token included) lands in the result on failure.
+  no_log: true
+
+- name: "vault | publish the PKI root to the well-known vault-pki-root-ca ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: vault-pki-root-ca
+        namespace: zuno-vault
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        ca.crt: "{{ _vault_pki_root_raw.stdout }}"
+  when: (_vault_pki_root_raw.stdout | default('')) is search('BEGIN CERTIFICATE')
+
 - name: "vault | generate and seed self-generatable application secrets (idempotent - first run only, see vault_seed_if_missing.yml)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   loop: "{{ _vault_generated_secrets | dict2items }}"

@@ -174,6 +174,21 @@
     namespace: zuno-auth
   register: _openshift_oauth_vault_root
 
+# ADR-0517 live finding (demo333, 2026-09-07): the Keycloak Secret is the
+# WRONG primary source for this decision - it only carries ca.crt while
+# Keycloak serves a Vault-issued cert, but the Vault PKI root exists (and
+# signs mariadb-server-cert/istiod) on every cluster, ACME-Keycloak ones
+# included. The vault role now publishes the root directly
+# (zuno-vault/vault-pki-root-ca); prefer it, keep the Keycloak ca.crt as
+# a fallback for a cluster whose vault role predates that ConfigMap.
+- name: "openshift_oauth | look up the vault-published PKI root ConfigMap"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    name: vault-pki-root-ca
+    namespace: zuno-vault
+  register: _openshift_oauth_vault_pki_cm
+
 # ONE fact, three consumers (create, delete, and the Proxy reference passed
 # to Helm below). Until now the first two were computed live while the third
 # was hardcoded in gitops/apps/openshift-oauth/application-d1.yaml, and they
@@ -181,8 +196,13 @@
 # private root simply gets spec.trustedCA.name: "".
 - name: "openshift_oauth | decide whether this cluster has a private PKI root to trust cluster-wide"
   ansible.builtin.set_fact:
+    _openshift_oauth_pki_root_pem: >-
+      {{ (_openshift_oauth_vault_pki_cm.resources | default([{}]) | first | default({})).get('data', {}).get('ca.crt', '')
+         or ((((_openshift_oauth_vault_root.resources | default([{}]))[0].data | default({})).get('ca.crt', '')) | b64decode) }}
+- name: "openshift_oauth | reduce that to the boolean the three consumers key on"
+  ansible.builtin.set_fact:
     _openshift_oauth_private_ca: >-
-      {{ 'ca.crt' in ((_openshift_oauth_vault_root.resources | default([{}]))[0].data | default({})) }}
+      {{ (_openshift_oauth_pki_root_pem | length) > 0 }}
 
 - name: "openshift_oauth | copy the Vault PKI root into openshift-config as user-ca-bundle (key ca-bundle.crt) for cluster-wide trust"
   kubernetes.core.k8s:
@@ -201,7 +221,7 @@
         labels:
           zuno.io/managed-by: zuno-ansible
       data:
-        ca-bundle.crt: "{{ _openshift_oauth_vault_root.resources[0].data['ca.crt'] | b64decode }}"
+        ca-bundle.crt: "{{ _openshift_oauth_pki_root_pem }}"
   when: _openshift_oauth_private_ca | bool
 
 - name: "openshift_oauth | look up user-ca-bundle before considering removing it"
