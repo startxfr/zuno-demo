@@ -6,10 +6,12 @@
 # Kuadrant-empty-by-design caveat - see that file's own header for the full
 # rationale, not repeated here.
 #
-# Namespace: zuno-mesh (ADR-0551 mapping table) - service-mesh/kiali's own
-# namespace, unambiguous split, chosen as the WP-138 pilot specifically
-# because it already has its own dedicated datasource, no shared-namespace
-# convergence with any other dashboard.
+# Namespace: redhat-ods-monitoring, named zuno-mesh-gateway (ADR-0553) -
+# NOT zuno-mesh (ADR-0551's original mapping): live investigation found
+# redhat-ods-monitoring is the only project rhods-dashboard's "Monitor &
+# observe" tab actually renders on this cluster (see ADR-0551's third dated
+# correction note). The zuno- prefix avoids any collision with RHOAI's own
+# eight dashboards sharing this namespace - verified live, none exists.
 #
 # Targets RHOAI's existing `data-science-perses` instance (ADR-0552, not a
 # second independent one - see ADR-0551's dated correction note for why
@@ -29,8 +31,8 @@
 apiVersion: perses.dev/v1alpha2
 kind: PersesDashboard
 metadata:
-  name: mesh-gateway
-  namespace: zuno-mesh
+  name: zuno-mesh-gateway
+  namespace: redhat-ods-monitoring
   labels:
     zuno.io/managed-by: argocd
   annotations:

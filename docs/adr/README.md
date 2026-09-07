@@ -272,8 +272,9 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0523](0523-dual-export-traces-into-the-rhoai-monitoring-stack.md) | Implemented | Dual-export traces into the RHOAI monitoring stack |
 | [ADR-0537](0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md) | Implemented | Integrate RHOAI HardwareProfiles for local models |
 | [ADR-0543](0543-propagate-a-per-run-id-across-every-service-span.md) | Implemented | Propagate a per-run id across every service span (documents work implemented 2026-08-23 whose ADR was never written) |
-| [ADR-0551](0551-add-namespace-scoped-perses-dashboards-alongside-grafana.md) | Superseded in part by ADR-0552 | Add namespace-scoped Perses dashboards alongside the existing Grafana stack |
+| [ADR-0551](0551-add-namespace-scoped-perses-dashboards-alongside-grafana.md) | Superseded in part by ADR-0552, ADR-0553 | Add namespace-scoped Perses dashboards alongside the existing Grafana stack |
 | [ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md) | Accepted | Reuse RHOAI's Perses instance instead of running an independent one |
+| [ADR-0553](0553-collocate-perses-dashboards-in-redhat-ods-monitoring-for-visibility.md) | Accepted | Collocate Perses dashboards in redhat-ods-monitoring for real visibility |
 
 ## v0.6
 

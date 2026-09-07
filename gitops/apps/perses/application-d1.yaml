@@ -1,15 +1,20 @@
 ---
-# WP-138/ADR-0551: the Perses server, its three PersesGlobalDatasources, the
-# console UIPlugin, and the two pilot PersesDashboards (mesh-gateway,
-# trustyai). No -d0 counterpart - the Cluster Observability Operator is
-# already subscribed cluster-wide by
-# gitops/apps/mesh-monitoring/application-d0.yaml; a second Subscription
-# here would fight that Application for ownership. `destination.namespace`
-# below only backstops resources that omit their own metadata.namespace
-# (Perses, the GlobalDatasources, the UIPlugin all render into
-# zuno-monitoring); the two PersesDashboards carry their own namespace
-# (zuno-mesh, zuno-ai-run) per ADR-0551's physical-split decision - the
-# `zuno` AppProject's `destinations: [{namespace: "*"}]` allows this.
+# WP-138/ADR-0551/ADR-0552/ADR-0553: three PersesGlobalDatasources, a
+# console UIPlugin, a ServiceAccount/Secret for Bearer auth, and the two
+# pilot PersesDashboards (zuno-mesh-gateway, zuno-trustyai) - all targeting
+# RHOAI's existing `data-science-perses` instance rather than running one
+# of our own (ADR-0552), collocated in `redhat-ods-monitoring` rather than
+# split per application namespace (ADR-0553, superseding ADR-0551's
+# original mapping - see its dated correction notes for why). No -d0
+# counterpart - the Cluster Observability Operator is already subscribed
+# cluster-wide by gitops/apps/mesh-monitoring/application-d0.yaml; a second
+# Subscription here would fight that Application for ownership.
+# `destination.namespace` below only backstops resources that omit their
+# own metadata.namespace (none currently do - the GlobalDatasources and
+# UIPlugin are cluster-scoped, everything else sets `redhat-ods-monitoring`
+# explicitly) - the `zuno` AppProject's `destinations: [{namespace: "*"}]`
+# allows a chart writing into a namespace other than this Application's own
+# destination.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

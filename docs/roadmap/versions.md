@@ -68,20 +68,25 @@ WP-55, WP-093, WP-101, WP-112, WP-135, WP-136, WP-137.
 Make the OpenShift AI MaaS governance plane live and route agent model calls
 through it end-to-end. Also carries the RHOAI monitoring stack enabled
 side-by-side with the existing observability stack (ADR-0522, ADR-0523),
-per-run trace correlation (ADR-0543), and a namespace-scoped Perses
-duplication of the `zuno-monitoring` Grafana dashboards (ADR-0551,
-WP-138/WP-139) - reusing RHOAI's own `data-science-perses` instance rather
-than running an independent second one, after a live incident showed a
-second instance breaks any Perses resource with no `instanceSelector`
-(exactly how RHOAI's own are configured) (ADR-0552, superseding ADR-0551 in
-part). ADR-0537 (RHOAI `HardwareProfile` CRs for local models) closed
-`Implemented` 2026-09-03; its `ExternalModel`/MaaS
+per-run trace correlation (ADR-0543), and a Perses duplication of the
+`zuno-monitoring` Grafana dashboards (ADR-0551, WP-138/WP-139), twice
+revised by live findings: reusing RHOAI's own `data-science-perses`
+instance rather than running an independent second one, after a live
+incident showed a second instance breaks any Perses resource with no
+`instanceSelector` (ADR-0552, superseding ADR-0551 in part); then
+collocating every dashboard into `redhat-ods-monitoring` rather than
+splitting them per application namespace, after discovering that's the
+only project RHOAI's own "Monitor & observe" tab renders on this cluster -
+neither the OpenShift console nor a standalone Perses UI work here today
+(ADR-0553, also superseding ADR-0551 in part). ADR-0537 (RHOAI
+`HardwareProfile` CRs for local models) closed `Implemented` 2026-09-03;
+its `ExternalModel`/MaaS
 half, permanently blocked upstream, split out the same day to
 [ADR-0541](../adr/0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md)
 in the v0.7 band below.
 
-**10 ADRs.** Open: ADR-0552 (`Accepted`); WP-55, WP-101, WP-122, WP-138,
-WP-139.
+**11 ADRs.** Open: ADR-0552, ADR-0553 (both `Accepted`); WP-55, WP-101,
+WP-122, WP-138, WP-139.
 
 ## v0.6
 

@@ -1,9 +1,11 @@
 # ADR-0551: Add namespace-scoped Perses dashboards alongside the existing Grafana stack
 
 - **Status:** Superseded in part by ADR-0552 (decisions 2 and 3 - server
-  topology and datasource strategy - replaced; decisions 1, 4, 5 and 6 -
-  physical namespace split, UIPlugin console integration, phased rollout,
-  namespace mapping - remain this record's own decisions, unchanged)
+  topology and datasource strategy) and by ADR-0553 (decisions 1 and 6 -
+  physical namespace split and namespace mapping). Decisions 4 (`UIPlugin`
+  console integration - deployed, confirmed non-functional on this cluster,
+  see the second dated correction note) and 5 (phased WP-138/WP-139
+  rollout) remain this record's own decisions, unchanged.
 - **Target:** v0.5
 - **Date:** 2026-09-07
 - **Decision owners:** Zuno Demo architecture team
@@ -158,6 +160,25 @@ WP-138 accesses the dashboards via RHOAI's existing
 finding for the full detail. The `UIPlugin` remains deployed (harmless,
 forward-compatible if a future OCP/COO pairing wires the consumer) but is
 not, today, a working access path.
+
+## Third dated correction note (2026-09-07)
+
+Following the second note above, `data-science-perses-route` itself turned
+out to be a dead end too - Red Hat's `perses-rhel9` image ships without its
+bundled React frontend at all (confirmed live: no frontend asset directory
+on the pod's filesystem; the Route serves Perses's own hardcoded "forgot to
+generate the react app" placeholder). The dashboards render nowhere as a
+standalone Perses UI on this cluster. The one working path found:
+`rhods-dashboard`'s "Monitor & observe" tab (a RHOAI product surface, not
+the OpenShift console) - but it only shows dashboards from the
+`redhat-ods-monitoring` project, hardcoded, confirmed by inspecting
+`rhods-dashboard`'s own RBAC (no `perses.dev` access at all - it calls
+Perses's REST API directly against that fixed project name). Decisions 1
+and 6 (the physical namespace split and its mapping table) are superseded
+by [ADR-0553](0553-collocate-perses-dashboards-in-redhat-ods-monitoring-for-visibility.md),
+which moves every dashboard into `redhat-ods-monitoring` to make this the
+working access path, trading away per-application-namespace placement for
+actual human-visible rendering.
 
 ## Related ADRs
 

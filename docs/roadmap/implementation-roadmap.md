@@ -27,7 +27,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
 | v0.4 | 35 | 9 | 30 | WP-55, WP-093, WP-101 |
-| v0.5 | 10 | 1 | 16 | WP-55, WP-101, WP-122, WP-138, WP-139 |
+| v0.5 | 11 | 2 | 16 | WP-55, WP-101, WP-122, WP-138, WP-139 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | 1 | 5 | — |
@@ -810,25 +810,32 @@ reuses WP-105's failover drill and WP-526's Wesh lifecycle unchanged.
 | WP-135 | [wp-135](work-packages/wp-135-routing-decision-explainability.md) | 0550 | WP-137 | Done (2026-09-05 — all six live demo cases verified through the real frontend) | none |
 | WP-136 | [wp-136](work-packages/wp-136-webinar-demo-orchestration.md) | 0550 | WP-137, WP-135 | Done (2026-09-05 — both live rehearsals complete, ~21-min run 2 signed off against the 20-min target) | none |
 
-### Phase 41 — namespace-scoped Perses dashboards alongside Grafana (added 2026-09-07)
+### Phase 41 — Perses dashboards duplicating Grafana, made visible via RHOAI (added 2026-09-07)
 
 ADR-0551 answers the call ADR-0522 left open - whether to migrate
 `zuno-monitoring`'s Grafana dashboards onto Perses - additive to Grafana
-rather than replacing it, physically split by application namespace instead
-of Grafana's template-filtered consolidation. Its original choice of a
-second, independent Perses server broke RHOAI's own dashboards live
-(instanceSelector-less resources match any instance) and was rolled back
-within the hour; ADR-0552 supersedes that half of the decision, reusing
-RHOAI's existing `data-science-perses` instance (WP-080) instead. WP-138
-stands up the three shared `PersesGlobalDatasource`s (targeting
-`data-science-perses`), the console `UIPlugin`, and translates two pilot
-dashboards (`mesh-gateway`, `trustyai`) to prove the chain end to end;
-WP-139 translates the remaining eight once that pattern is live-verified.
+rather than replacing it. Two live findings revised it the same day. First:
+its original choice of a second, independent Perses server broke RHOAI's
+own dashboards live (instanceSelector-less resources match any instance)
+and was rolled back within the hour; ADR-0552 supersedes that half,
+reusing RHOAI's existing `data-science-perses` instance (WP-080) instead.
+Second: neither the OpenShift console (no consumer wired for the
+`UIPlugin`'s extension on this OCP release) nor a standalone Perses UI
+(Red Hat's image ships without its frontend) render anything on this
+cluster - the only working visual path is RHOAI's own `rhods-dashboard`
+"Monitor & observe" tab, hardcoded to the `redhat-ods-monitoring` project;
+ADR-0553 supersedes ADR-0551's namespace-split decision, collocating every
+dashboard there instead. WP-138 stands up the three shared
+`PersesGlobalDatasource`s (targeting `data-science-perses`), the console
+`UIPlugin` (deployed, confirmed non-functional here), and translates two
+pilot dashboards (`zuno-mesh-gateway`, `zuno-trustyai`, both in
+`redhat-ods-monitoring`) to prove the chain end to end; WP-139 translates
+the remaining eight once that pattern is live-verified.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-138 | [wp-138](work-packages/wp-138-perses-infrastructure-and-pilot-dashboards.md) | 0551, 0552 | none | Not started | Live-verify console UIPlugin rendering; confirm the new ServiceAccount/Secret in `redhat-ods-monitoring` authenticates the `prometheus` datasource |
-| WP-139 | [wp-139](work-packages/wp-139-perses-parity-remaining-dashboards.md) | 0551, 0552 | WP-138 | Not started | Live-verify remaining eight dashboards |
+| WP-138 | [wp-138](work-packages/wp-138-perses-infrastructure-and-pilot-dashboards.md) | 0551, 0552, 0553 | none | Not started | Confirm both pilot dashboards render in `rhods-dashboard`'s "Monitor & observe" tab after moving to `redhat-ods-monitoring` |
+| WP-139 | [wp-139](work-packages/wp-139-perses-parity-remaining-dashboards.md) | 0551, 0552, 0553 | WP-138 | Not started | Live-verify remaining eight dashboards render the same way |
 
 ### OKF stream phases
 

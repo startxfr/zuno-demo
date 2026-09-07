@@ -5,11 +5,11 @@
 # that file's own header for the full series-origin/caveat rationale, not
 # repeated here.
 #
-# Namespace: zuno-ai-run (ADR-0551 mapping table) - chosen as WP-138's
-# second pilot specifically because, unlike mesh-gateway, it lands in the
-# same shared application namespace as most of the platform's workloads
-# (ADR-0329), validating a PersesDashboard placed in a busier namespace with
-# only a single datasource (prometheus).
+# Namespace: redhat-ods-monitoring, named zuno-trustyai (ADR-0553) - NOT
+# zuno-ai-run (ADR-0551's original mapping): live investigation found
+# redhat-ods-monitoring is the only project rhods-dashboard's "Monitor &
+# observe" tab actually renders on this cluster (see ADR-0551's third dated
+# correction note).
 #
 # Targets RHOAI's existing `data-science-perses` instance (ADR-0552) - see
 # dashboard-mesh-gateway.yaml's header for the full caveat (plugin kinds
@@ -23,8 +23,8 @@
 apiVersion: perses.dev/v1alpha2
 kind: PersesDashboard
 metadata:
-  name: trustyai
-  namespace: zuno-ai-run
+  name: zuno-trustyai
+  namespace: redhat-ods-monitoring
   labels:
     zuno.io/managed-by: argocd
   annotations:
