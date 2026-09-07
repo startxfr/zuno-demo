@@ -103,6 +103,30 @@ See [Standard clauses](README.md#standard-clauses) for Alternatives
 considered, Consequences, Security considerations, Acceptance criteria and
 Review evidence.
 
+## Dated correction note (2026-09-07)
+
+This ADR's stated benefit did not materialize: live-verified in the
+browser, `rhods-dashboard`'s "Observability dashboard" ("Monitor &
+observe" > Dashboard) renders a **fixed, hardcoded set of six tabs**
+(Cluster, Models, LLM Traffic, LLM Utilization, Usage, LLM Performance),
+matching RHOAI's own `dashboard-N-*`-named resources one by one - not a
+dynamic listing of every `PersesDashboard` in the `redhat-ods-monitoring`
+project. `zuno-mesh-gateway`/`zuno-trustyai` do not appear as tabs despite
+sharing the project; RHOAI's own dashboards additionally carry
+product-specific labels (`platform.opendatahub.io/part-of: dashboard` /
+`kserve`) this repo's do not and cannot match. Collocating in
+`redhat-ods-monitoring` therefore bought no visibility benefit over the
+original per-application-namespace split.
+
+**Decision, confirmed with the user 2026-09-07**: keep the collocated
+placement anyway, to avoid a third relocation churn cycle in one day. This
+ADR's placement decision (dashboards in `redhat-ods-monitoring`) stands as
+the final architecture, on record as **not delivering its original
+justification** - a deliberate, accepted trade documented here rather than
+silently left inconsistent with its own Context section. No further
+dashboard-visibility work is planned; see WP-138's Status updates for the
+closing state.
+
 ## Migration / evolution
 
 If a future OCP/COO version wires `LegacyDashboardsPage` (or a successor) to

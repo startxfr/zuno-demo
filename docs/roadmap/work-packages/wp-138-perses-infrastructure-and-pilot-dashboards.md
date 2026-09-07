@@ -1,7 +1,8 @@
 # WP-138: Perses datasources and pilot dashboards (zuno-mesh-gateway, zuno-trustyai)
 
-- **State:** Not started (two prior repo-side attempts applied and
-  superseded 2026-09-07 - see Status updates)
+- **State:** Done (2026-09-07 - data layer live-verified correct; no
+  visual rendering exists for these dashboards anywhere on this cluster,
+  confirmed and accepted - see Status updates)
 - **ADRs:** ADR-0551, ADR-0552, ADR-0553
 - **Depends on:** none
 - **Related:** WP-139 (translates the remaining eight dashboards once this
@@ -125,13 +126,17 @@ findings the same day revised how:
 
 ## Live verification
 
-Log into `rhods-dashboard` (`https://rhods-dashboard-redhat-ods-applications.<appsDomain>`),
-open the "Monitor & observe" tab, and confirm `zuno-mesh-gateway` and
-`zuno-trustyai` appear alongside RHOAI's own dashboards, rendering real
-panel data (spot-check against the Grafana equivalents' values for the same
-time range). This is the pilot's real completion gate - the earlier
-REST-API-only and Route-only checks (see Status updates) proved the data
-layer but not actual human-visible rendering.
+Live-confirmed via the Perses REST API through RHOAI's
+`data-science-perses-route` (`GET /api/v1/projects/redhat-ods-monitoring/dashboards`
+returns both dashboards' full panel/query content) and via each
+`PersesGlobalDatasource`'s own `Available: true` status (the `prometheus`
+datasource's Bearer auth against thanos-querier genuinely works, not
+assumed). Browser confirmation was also done, but disproved rather than
+confirmed the intended visual path: `rhods-dashboard`'s "Observability
+dashboard" only renders a fixed set of six RHOAI-specific tabs, not these
+two - see Status updates and ADR-0553's dated correction note. No visual
+rendering path exists for these dashboards on this cluster; the data layer
+is this WP's actual, accepted completion gate.
 
 ## Status updates (then re-run check_docs.py)
 
@@ -165,13 +170,31 @@ layer but not actual human-visible rendering.
   `perses.dev` RBAC at all - it calls Perses's REST API directly against
   that fixed project). ADR-0553 authored same day: collocate instead of
   split.
-- **2026-09-07, attempt 3, in progress - collocating in
-  `redhat-ods-monitoring`**: this brief's current design (dashboards
-  renamed `zuno-mesh-gateway`/`zuno-trustyai`, moved into
-  `redhat-ods-monitoring`). Repo-side pushed; live apply and "Monitor &
-  observe" browser confirmation pending.
-- After browser confirmation in `rhods-dashboard`'s "Monitor & observe"
-  tab: this WP's `State` -> `Done`.
+- **2026-09-07, attempt 3, applied - collocating in
+  `redhat-ods-monitoring`**: `zuno-mesh-gateway`/`zuno-trustyai` created in
+  `redhat-ods-monitoring`, both `Available: true`; old
+  `zuno-mesh`/`zuno-ai-run` resources correctly pruned by ArgoCD; RHOAI's
+  eight dashboards unaffected, no name collision.
+- **2026-09-07, ADR-0553's hypothesis refuted, browser-confirmed**: logged
+  into `rhods-dashboard`, opened "Observe & monitor" > "Observability
+  dashboard" - it renders a **fixed set of six tabs** (Cluster, Models, LLM
+  Traffic, LLM Utilization, Usage, LLM Performance), one per RHOAI's own
+  `dashboard-N-*` resource, each also carrying a product-specific label
+  (`platform.opendatahub.io/part-of: dashboard`/`kserve`) this repo's
+  dashboards do not have. `zuno-mesh-gateway`/`zuno-trustyai` do not appear
+  as tabs despite sharing the project - collocation bought no visibility.
+  Confirmed with the user: keep the collocated placement anyway (avoid a
+  fourth relocation); see ADR-0553's own dated correction note.
+- **Closing state, confirmed with the user**: no visual rendering path
+  exists for this repo's Perses dashboards anywhere on this cluster today
+  (OpenShift console: no extension consumer; direct Route: no bundled
+  frontend in Red Hat's image; `rhods-dashboard`: fixed tab list that
+  doesn't include ours). Completion rests on the data layer, fully
+  live-verified: both dashboards `Available: true`, correct panel/query
+  content (confirmed via the Perses REST API), `prometheus` datasource
+  Bearer auth against thanos-querier working, zero impact on Grafana or any
+  RHOAI-owned resource throughout three redesign attempts in one day.
+  `State` -> `Done` on that basis.
 - `docs/roadmap/implementation-roadmap.md`'s Phase 41 tracker row for
   WP-138 updated to match.
 
@@ -186,7 +209,9 @@ layer but not actual human-visible rendering.
 
 ## Completion criteria
 
-WP-138 is done when both pilot dashboards render correct, live data in
-`rhods-dashboard`'s "Monitor & observe" tab, both referencing the shared
-`PersesGlobalDatasource`s, with zero changes to any existing Grafana or
-RHOAI-owned resource.
+WP-138 is done when both pilot dashboards are `Available: true` with
+correct, live-verified panel/query content (confirmed via the Perses REST
+API, since no visual rendering path exists for them on this cluster - see
+Status updates), both referencing the shared `PersesGlobalDatasource`s,
+with zero changes to any existing Grafana or RHOAI-owned resource. Met
+2026-09-07.

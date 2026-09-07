@@ -27,7 +27,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
 | v0.4 | 35 | 9 | 30 | WP-55, WP-093, WP-101 |
-| v0.5 | 11 | 2 | 16 | WP-55, WP-101, WP-122, WP-138, WP-139 |
+| v0.5 | 11 | 2 | 16 | WP-55, WP-101, WP-122, WP-139 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | 1 | 5 | — |
@@ -834,7 +834,7 @@ the remaining eight once that pattern is live-verified.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-138 | [wp-138](work-packages/wp-138-perses-infrastructure-and-pilot-dashboards.md) | 0551, 0552, 0553 | none | Not started | Confirm both pilot dashboards render in `rhods-dashboard`'s "Monitor & observe" tab after moving to `redhat-ods-monitoring` |
+| WP-138 | [wp-138](work-packages/wp-138-perses-infrastructure-and-pilot-dashboards.md) | 0551, 0552, 0553 | none | Done (2026-09-07 - data layer live-verified; no visual UI exists on this cluster for these dashboards, confirmed and accepted) | none |
 | WP-139 | [wp-139](work-packages/wp-139-perses-parity-remaining-dashboards.md) | 0551, 0552, 0553 | WP-138 | Not started | Live-verify remaining eight dashboards render the same way |
 
 ### OKF stream phases

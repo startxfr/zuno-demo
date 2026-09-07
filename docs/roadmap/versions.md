@@ -86,7 +86,7 @@ half, permanently blocked upstream, split out the same day to
 in the v0.7 band below.
 
 **11 ADRs.** Open: ADR-0552, ADR-0553 (both `Accepted`); WP-55, WP-101,
-WP-122, WP-138, WP-139.
+WP-122, WP-139.
 
 ## v0.6
 
