@@ -102,6 +102,21 @@
       {{ (_openshift_ai_dashboard_deploy.resources | default([]) | first | default({}))
          .get('spec', {}).get('template', {}).get('spec', {}).get('containers', [])
          | selectattr('name', 'equalto', 'core-bff') | list }}
+    # ADR-0517 live finding (demo333, 2026-09-07): the EXIT case in the
+    # header arrived, but not the way it anticipated - a fresh 3.5.0
+    # install ships the Deployment WITHOUT automountServiceAccountToken:
+    # false and WITHOUT the dashboard-sa-token volume at all: the token is
+    # simply automounted, core-bff runs healthy unpatched (both pods 3/3,
+    # live-verified). The old guard ("core-bff exists and lacks the
+    # mount") then patched a mount against a volume that does not exist,
+    # 422-failing the whole install. The defect's REAL signature is the
+    # explicit dashboard-sa-token volume being present - so its presence
+    # joins the guard, and on fixed packaging this whole task is the
+    # silent no-op the header always promised.
+    _openshift_ai_dashboard_volumes: >-
+      {{ (_openshift_ai_dashboard_deploy.resources | default([]) | first | default({}))
+         .get('spec', {}).get('template', {}).get('spec', {}).get('volumes', [])
+         | map(attribute='name') | list }}
   when: (_openshift_ai_dashboard_deploy.resources | default([]) | length) > 0
 
 - name: "openshift_ai | dashboard: mount the dashboard SA token into core-bff (RHOAI 3.5.0 packaging defect)"
@@ -133,5 +148,6 @@
                     readOnly: true
   when:
     - (_openshift_ai_core_bff | default([]) | length) > 0
+    - "'dashboard-sa-token' in (_openshift_ai_dashboard_volumes | default([]))"
     - (_openshift_ai_core_bff | default([]) | first).get('volumeMounts', [])
       | selectattr('name', 'equalto', 'dashboard-sa-token') | list | length == 0
