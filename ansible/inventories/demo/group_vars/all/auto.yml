@@ -46,7 +46,7 @@ zuno_admin_rag_postgresql_root_password: "{{ zuno_admin_password }}"
 # init default). Seeding is idempotent (ADR-0345): an existing install
 # keeps its old seeded value until the operator deletes
 # zuno/keycloak/demo-personas and re-runs the seed.
-zuno_admin_demo_personas_root_password: "secretdemerde"
+zuno_admin_demo_personas_root_password: "{{ zuno_personas_mainpwd | default 'secretdemerde' }}"
 zuno_admin_tekos_frontend_token: "{{ zuno_admin_token }}"
 zuno_admin_mcp_gateway_token: "{{ zuno_admin_token }}"
 zuno_admin_tekos_session_token: "{{ zuno_admin_token }}"
