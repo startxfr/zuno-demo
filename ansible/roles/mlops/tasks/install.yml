@@ -100,6 +100,14 @@
 # confidential.yml variable without loading the file gets an undefined variable
 # and its `| default(chart)` fallback wins in silence, which is why this pair is
 # not optional. check_confidential_var_loaders() enforces it.
+# ADR-0517 (demo333, 2026-09-07): committed per-cluster non-secret values
+# first - AAP checkouts have no confidential.yml, and without this the
+# Helm values below fell back to their placeholders there (see
+# ansible/clusters/demo333.yml). confidential.yml, loaded after, still
+# overrides locally.
+- name: "mlops | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "mlops | check for ansible/confidential.yml"
   ansible.builtin.stat:
     path: "{{ zuno_repo_root }}/ansible/confidential.yml"

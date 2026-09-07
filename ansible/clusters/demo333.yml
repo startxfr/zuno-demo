@@ -1,0 +1,42 @@
+---
+# ADR-0517 live finding (demo333, 2026-09-07): committed per-cluster
+# NON-SECRET configuration, loaded by ansible/tasks/load_cluster_vars.yml
+# from the cluster short name resolve_cluster_name.yml derives.
+#
+# Why this file exists: since ADR-0354/WP-094 the day1/2/3 make verbs run
+# inside AAP from the Project's SCM checkout, where ansible/confidential.yml
+# does not exist (gitignored). Every role that injected a confidential
+# per-cluster value into an Application's Helm values therefore fell back
+# to its ADR-0547 noisy placeholder under AAP (models' modelsS3.bucket
+# reached the live Application as ZUNO_S3_BUCKET_NOT_SET) - or, worse,
+# silently disabled a feature (mariadb S3 backups). Bucket names, regions
+# and prefixes are not secrets: committing them per cluster gives every
+# checkout - workstation and AAP - the same truth.
+#
+# Precedence: this file is loaded BEFORE ansible/confidential.yml, so a
+# value set in confidential.yml still overrides it locally. Real secrets
+# (access keys, passwords) NEVER belong here - they stay in
+# confidential.yml and reach the cluster through Vault seeding + ESO.
+zuno_models_s3_bucket: "zuno-demo-sources"
+zuno_models_s3_prefix: "models"
+# zuno_models_tekos_lora_source_s3_uri deliberately unset: a from-scratch
+# cluster has no adapter until its own mlops pipeline produces one
+# (ansible/roles/models/tasks/install.yml renders loraAdapters: [] then).
+zuno_mlflow_artifacts_s3_bucket: "zuno-demo333-mlops"
+zuno_mlflow_artifacts_s3_endpoint: "https://s3.eu-central-1.amazonaws.com"
+zuno_mlflow_artifacts_s3_region: "eu-central-1"
+zuno_mlflow_artifacts_s3_prefix: "mlflow-artifacts"
+zuno_mlops_s3_bucket: "zuno-demo333-mlops"
+zuno_mlops_s3_region: "eu-central-1"
+zuno_mlops_style_corpus_s3_uri: "s3://zuno-demo-sources/training-corpus/qwen-wesh-training-corpus.tgz"
+zuno_rag_corpus_s3_bucket: "zuno-demo333-data"
+zuno_rag_corpus_s3_region: "eu-central-1"
+zuno_sxa_dump_s3_bucket: "zuno-demo-sources"
+zuno_sxa_dump_s3_region: "eu-west-2"
+zuno_sxa_dump_schema_s3_key: "sxa-dump/sxa.schema.sql"
+zuno_sxa_dump_data_s3_key: "sxa-dump/sxa.data.sql"
+zuno_rag_corpus_delete_orphans: true
+zuno_mariadb_backup_s3_bucket: "zuno-demo333-backups"
+zuno_mariadb_backup_s3_prefix: "mariadb"
+zuno_mariadb_backup_s3_endpoint: "s3.eu-central-1.amazonaws.com"
+zuno_mariadb_backup_s3_region: "eu-central-1"

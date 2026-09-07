@@ -1,0 +1,29 @@
+---
+# Committed per-cluster NON-SECRET configuration for demo222 - see
+# ansible/clusters/demo333.yml's header for the full rationale (ADR-0517
+# live finding: AAP checkouts have no ansible/confidential.yml, so
+# per-cluster Application Helm values fell back to placeholders there).
+# Values transcribed 2026-09-07 from the operator-held demo222
+# confidential set; ansible/confidential.yml still overrides locally.
+# Real secrets NEVER belong here.
+zuno_models_s3_bucket: "zuno-demo-sources"
+zuno_models_s3_prefix: "models"
+zuno_models_tekos_lora_source_s3_uri: "s3://zuno-demo222-mlops/mlops/models/tekos/wp126-20260904-201830/adapter"
+zuno_mlflow_artifacts_s3_bucket: "zuno-demo222-mlops"
+zuno_mlflow_artifacts_s3_endpoint: "https://s3.eu-west-2.amazonaws.com"
+zuno_mlflow_artifacts_s3_region: "eu-west-2"
+zuno_mlflow_artifacts_s3_prefix: "mlflow-artifacts"
+zuno_mlops_s3_bucket: "zuno-demo222-mlops"
+zuno_mlops_s3_region: "eu-west-2"
+zuno_mlops_style_corpus_s3_uri: "s3://zuno-demo-sources/training-corpus/qwen-wesh-training-corpus.tgz"
+zuno_rag_corpus_s3_bucket: "zuno-demo222-data"
+zuno_rag_corpus_s3_region: "eu-west-2"
+zuno_sxa_dump_s3_bucket: "zuno-demo-sources"
+zuno_sxa_dump_s3_region: "eu-west-2"
+zuno_sxa_dump_schema_s3_key: "sxa-dump/sxa.schema.sql"
+zuno_sxa_dump_data_s3_key: "sxa-dump/sxa.data.sql"
+zuno_rag_corpus_delete_orphans: true
+zuno_mariadb_backup_s3_bucket: "zuno-demo222-backups"
+zuno_mariadb_backup_s3_prefix: "mariadb"
+zuno_mariadb_backup_s3_endpoint: "s3.eu-west-2.amazonaws.com"
+zuno_mariadb_backup_s3_region: "eu-west-2"

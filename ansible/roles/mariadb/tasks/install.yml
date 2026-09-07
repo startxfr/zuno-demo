@@ -81,6 +81,14 @@
 # Soft-read of ansible/confidential.yml (not a hard fail like vault's) for
 # optional S3 backup creds - same shape as
 # ansible/roles/postgresql/tasks/install.yml.
+# ADR-0517 (demo333, 2026-09-07): committed per-cluster non-secret values
+# first - AAP checkouts have no confidential.yml, and without this the
+# Helm values below fell back to their placeholders there (see
+# ansible/clusters/demo333.yml). confidential.yml, loaded after, still
+# overrides locally.
+- name: "mariadb | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "mariadb | check for ansible/confidential.yml"
   ansible.builtin.stat:
     path: "{{ zuno_repo_root }}/ansible/confidential.yml"
@@ -93,6 +101,20 @@
 
 # Only add the PhysicalBackup S3 schedule when real credentials exist -
 # never rendered half-configured (same rule postgresql's repo2 follows).
+#
+# ADR-0517 live finding (demo333, 2026-09-07): under AAP there is no
+# confidential.yml, so the two credential fields are ALWAYS absent there
+# and this guard silently disabled backups on a cluster whose Vault was
+# correctly seeded (day1 install ran green, no schedule rendered, nothing
+# reported). The credentials themselves never flow through this role -
+# the chart's externalsecret-backup-s3.yaml reads Vault zuno/mariadb/s3 -
+# so requiring their literals only makes sense where confidential.yml
+# can exist at all. New contract: the non-secret trio (bucket/endpoint/
+# region, now from ansible/clusters/<cluster>.yml) declares the intent;
+# the credential check still applies on a workstation (confidential.yml
+# present), and without confidential.yml the Vault seed is trusted - if
+# it is missing the ExternalSecret goes Degraded and the sync fails
+# NOISILY instead of backups vanishing in silence.
 - name: "mariadb | determine whether S3 backup credentials are configured"
   ansible.builtin.set_fact:
     _mariadb_backup_s3_enabled: >-
@@ -100,8 +122,13 @@
         (zuno_mariadb_backup_s3_bucket | default('xxxxxx') != 'xxxxxx')
         and (zuno_mariadb_backup_s3_endpoint | default('xxxxxx') != 'xxxxxx')
         and (zuno_mariadb_backup_s3_region | default('xxxxxx') != 'xxxxxx')
-        and (zuno_mariadb_backup_s3_access_key_id | default('xxxxxx') != 'xxxxxx')
-        and (zuno_mariadb_backup_s3_secret_access_key | default('xxxxxx') != 'xxxxxx')
+        and (
+          (not _mariadb_confidential_file.stat.exists)
+          or (
+            (zuno_mariadb_backup_s3_access_key_id | default('xxxxxx') != 'xxxxxx')
+            and (zuno_mariadb_backup_s3_secret_access_key | default('xxxxxx') != 'xxxxxx')
+          )
+        )
       }}
 
 - name: "mariadb | note that the S3 backup schedule is not configured"
