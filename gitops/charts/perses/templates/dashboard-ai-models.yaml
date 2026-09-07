@@ -1,0 +1,844 @@
+{{- if .Values.perses.enabled }}
+# WP-139: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-ai-models.yaml (ADR-0029/
+# ADR-0413/ADR-0551), continuing the WP-138 pilot pattern established by
+# dashboard-mesh-gateway.yaml and dashboard-trustyai.yaml. Same panels, same
+# PromQL, same single "prometheus" datasource for every gateway/vLLM/GPU
+# panel plus "tempo" for the two trace tables - see the Grafana file's own
+# header for the double-unit-suffix latency-metric history and the "row"
+# schema history, not repeated here.
+#
+# Namespace: redhat-ods-monitoring, named zuno-ai-models (ADR-0553) - NOT
+# split per application namespace as ADR-0551 originally planned: live
+# investigation found redhat-ods-monitoring is the only project
+# rhods-dashboard's "Monitor & observe" tab actually renders on this
+# cluster (see ADR-0551's third dated correction note). This is a Perses
+# duplicate of zuno-monitoring's Grafana dashboard, kept here for
+# data-layer parity only - no confirmed visual rendering path shows custom
+# dashboards on this cluster yet (see ADR-0553's dated correction note).
+#
+# Targets RHOAI's existing `data-science-perses` instance (ADR-0552, not a
+# second independent one - see ADR-0551's dated correction note for why
+# that first attempt broke RHOAI's own dashboards live).
+#
+# Panel plugin kinds (TimeSeriesChart/StatChart/Table/Markdown), query
+# plugin kind (PrometheusTimeSeriesQuery/TempoTraceQuery) and the Grid
+# layout shape are confirmed against RHOAI's own live, Available:true
+# PersesDashboard/PersesDatasource resources on this same cluster - not
+# guessed. The ListVariable/PrometheusLabelValuesVariable plugin has no
+# live RHOAI example to confirm against, so it remains best-effort per the
+# two pilots. One variable here is chain-dependent rather than a flat
+# label-values query: `model`'s matcher interpolates `$provider`
+# (`zuno_model_calls_total{provider=~"$provider"}`), mirroring the
+# Grafana definition's own `label_values(zuno_model_calls_total{provider=~"$provider"},
+# model)` exactly - flagged here as best-effort because it additionally
+# assumes Perses resolves dashboard variables in declaration order the
+# same way Grafana does, which has no live confirmation yet.
+#
+# Simplifications/drops, all deliberate:
+#   - Grafana's top-level "Zuno dashboards" links dropdown is dropped, same
+#     as both pilots - no confirmed Perses equivalent used here.
+#   - The "Latency p50/p95" panel's fieldConfig data link ("View slow
+#     model_call traces in Tempo", a per-panel Explore deep link) is
+#     dropped too - a different Grafana feature from the dashboard-level
+#     links dropdown above, but likewise has no attempted Perses
+#     translation here.
+#   - The two Tempo table targets' "limit": 20 has no field in the
+#     TempoTraceQuery plugin shape used by dashboard-mesh-gateway.yaml's
+#     meshErrorTraces precedent, so it is not carried over.
+#   - format/thresholds are only ever set on StatChart panels
+#     (errorRatio/totalCallVolume/semanticCacheHitRatio); every
+#     TimeSeriesChart and Table panel keeps `plugin.spec: {}` - Perses
+#     rejects a `format:` block on those two kinds, confirmed live during
+#     WP-138. This means the many timeseries panels' Grafana units
+#     (currencyUSD, ms, s, percentunit, decmbytes, celsius, watt, reqps)
+#     are not carried over - same precedent as both pilot files.
+#   - Unit mapping on the StatChart panels follows the pilots' own
+#     precedent: Grafana's percentunit -> Perses percent (threshold values
+#     scaled x100, exactly like mesh5xxRatio's 0.02/0.1 -> 2/10), and
+#     Grafana's reqps -> Perses decimal (no native rps unit, exactly like
+#     totalMeshRps).
+#   - Grafana's classic "row" grouping/collapse has no confirmed 1:1 Perses
+#     equivalent used here either - rows become Grid layout sections
+#     (display.collapse.open mirrors collapsed: false/true as true/false).
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: zuno-ai-models
+  namespace: redhat-ods-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      platform.opendatahub.io/part-of: monitoring
+  config:
+    display:
+      name: "AI models & serving"
+      description: "ADR-0029/ADR-0413/ADR-0551: gateway model traffic, semantic cache, vLLM serving internals and GPU (DCGM) health, filterable by provider/model/outcome. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring (ADR-0552/ADR-0553) for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0553's dated correction note)."
+    duration: 6h
+    refreshInterval: 30s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: provider
+          display:
+            name: provider
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: provider
+              matchers:
+                - "zuno_model_calls_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: model
+          display:
+            name: model
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: model
+              matchers:
+                - 'zuno_model_calls_total{provider=~"$provider"}'
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: outcome
+          display:
+            name: outcome
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: outcome
+              matchers:
+                - "zuno_model_calls_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: served_model
+          display:
+            name: served_model
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: model_name
+              matchers:
+                - "vllm:num_requests_running"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+    panels:
+      modelCallsRate:
+        kind: Panel
+        spec:
+          display:
+            name: "Model calls (rate, by provider/model/outcome)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (provider, model, outcome)
+                      (rate(zuno_model_calls_total{provider=~"$provider",
+                      model=~"$model", outcome=~"$outcome"}[5m]))
+                    seriesNameFormat: "{{`{{provider}}`}}/{{`{{model}}`}} ({{`{{outcome}}`}})"
+      tokensConsumed:
+        kind: Panel
+        spec:
+          display:
+            name: "Tokens consumed (rate, by kind)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (provider, model, kind)
+                      (rate(zuno_model_tokens_total{provider=~"$provider",
+                      model=~"$model"}[5m]))
+                    seriesNameFormat: "{{`{{provider}}`}}/{{`{{model}}`}} ({{`{{kind}}`}})"
+      estimatedCost:
+        kind: Panel
+        spec:
+          display:
+            name: "Estimated cost (USD/s, by provider and model)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (provider, model)
+                      (rate(zuno_model_cost_usd_total{provider=~"$provider",
+                      model=~"$model"}[5m]))
+                    seriesNameFormat: "{{`{{provider}}`}}/{{`{{model}}`}}"
+      latencyP50P95:
+        kind: Panel
+        spec:
+          display:
+            name: "Latency p50/p95 (by provider/model)"
+            description: "The histogram is live (ai-gateway/app/telemetry.py's create_histogram(\"zuno.model_call_duration_ms\", unit=\"ms\", ...)), but the OTel-to-Prometheus translator appends a unit suffix on top of the already-unit-suffixed name, so the real series is zuno_model_call_duration_ms_milliseconds_bucket, not the _ms_bucket name you'd expect - verified live against Thanos 2026-08-22."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      histogram_quantile(0.50, sum by (le, provider, model)
+                      (rate(zuno_model_call_duration_ms_milliseconds_bucket{provider=~"$provider",
+                      model=~"$model"}[5m])))
+                    seriesNameFormat: "p50 {{`{{provider}}`}}/{{`{{model}}`}}"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      histogram_quantile(0.95, sum by (le, provider, model)
+                      (rate(zuno_model_call_duration_ms_milliseconds_bucket{provider=~"$provider",
+                      model=~"$model"}[5m])))
+                    seriesNameFormat: "p95 {{`{{provider}}`}}/{{`{{model}}`}}"
+      errorRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "Error ratio"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 2
+                    color: orange
+                  - value: 10
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(zuno_model_calls_total{outcome="error",
+                      provider=~"$provider", model=~"$model"}[5m]))
+                      / sum(rate(zuno_model_calls_total{provider=~"$provider",
+                      model=~"$model"}[5m]))
+      totalCallVolume:
+        kind: Panel
+        spec:
+          display:
+            name: "Total model call volume"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(zuno_model_calls_total{provider=~"$provider",
+                      model=~"$model", outcome=~"$outcome"}[5m]))
+      semanticCacheLookups:
+        kind: Panel
+        spec:
+          display:
+            name: "Semantic cache lookups (rate, by outcome)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (outcome)
+                      (rate(zuno_semantic_cache_lookups_total{model=~"$model"}[5m]))
+                    seriesNameFormat: "{{`{{outcome}}`}}"
+      semanticCacheSavings:
+        kind: Panel
+        spec:
+          display:
+            name: "Estimated $ saved by semantic cache"
+            description: "Cache hit rate x average cost per call - known-empty by design until SEMANTIC_CACHE_ENABLED=true is set on the ai-gateway Deployment (confirmed live 2026-08-22: currently false, zero zuno_semantic_cache_lookups_total series). Flipping that flag is a real behavior change (response freshness/cost trade-off) outside this dashboard's scope."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(zuno_semantic_cache_lookups_total{outcome="hit"}[5m]))
+                      * (sum(rate(zuno_model_cost_usd_total[5m]))
+                      / sum(rate(zuno_model_calls_total[5m])))
+      semanticCacheHitRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "Semantic cache hit ratio"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(zuno_semantic_cache_lookups_total{outcome="hit",
+                      model=~"$model"}[5m]))
+                      / sum(rate(zuno_semantic_cache_lookups_total{model=~"$model"}[5m]))
+      vllmRequestsRunningWaiting:
+        kind: Panel
+        spec:
+          display:
+            name: "vLLM: requests running / waiting"
+            description: "gitops/charts/models/templates/servicemonitor-vllm.yaml - the three classic InferenceServices' own /metrics."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (model_name)
+                      (vllm:num_requests_running{model_name=~"$served_model"})
+                    seriesNameFormat: "{{`{{model_name}}`}} (running)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (model_name)
+                      (vllm:num_requests_waiting{model_name=~"$served_model"})
+                    seriesNameFormat: "{{`{{model_name}}`}} (waiting)"
+      vllmTimeToFirstToken:
+        kind: Panel
+        spec:
+          display:
+            name: "vLLM: time to first token (p50/p95)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      histogram_quantile(0.50, sum by (le, model_name)
+                      (rate(vllm:time_to_first_token_seconds_bucket{model_name=~"$served_model"}[5m])))
+                    seriesNameFormat: "p50 {{`{{model_name}}`}}"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      histogram_quantile(0.95, sum by (le, model_name)
+                      (rate(vllm:time_to_first_token_seconds_bucket{model_name=~"$served_model"}[5m])))
+                    seriesNameFormat: "p95 {{`{{model_name}}`}}"
+      vllmTimePerOutputToken:
+        kind: Panel
+        spec:
+          display:
+            name: "vLLM: time per output token (p95)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      histogram_quantile(0.95, sum by (le, model_name)
+                      (rate(vllm:time_per_output_token_seconds_bucket{model_name=~"$served_model"}[5m])))
+                    seriesNameFormat: "{{`{{model_name}}`}}"
+      vllmE2eLatency:
+        kind: Panel
+        spec:
+          display:
+            name: "vLLM: end-to-end request latency (p95)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      histogram_quantile(0.95, sum by (le, model_name)
+                      (rate(vllm:e2e_request_latency_seconds_bucket{model_name=~"$served_model"}[5m])))
+                    seriesNameFormat: "{{`{{model_name}}`}}"
+      vllmTokenThroughput:
+        kind: Panel
+        spec:
+          display:
+            name: "vLLM: token throughput (prompt + generation)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (model_name)
+                      (rate(vllm:prompt_tokens_total{model_name=~"$served_model"}[5m]))
+                    seriesNameFormat: "{{`{{model_name}}`}} (prompt)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (model_name)
+                      (rate(vllm:generation_tokens_total{model_name=~"$served_model"}[5m]))
+                    seriesNameFormat: "{{`{{model_name}}`}} (generation)"
+      vllmKvCacheUsage:
+        kind: Panel
+        spec:
+          display:
+            name: "vLLM: KV-cache usage"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: 'vllm:gpu_cache_usage_perc{model_name=~"$served_model"}'
+                    seriesNameFormat: "{{`{{model_name}}`}}"
+      vllmCompletedByFinishReason:
+        kind: Panel
+        spec:
+          display:
+            name: "vLLM: completed requests by finish reason"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (model_name, finished_reason)
+                      (rate(vllm:request_success_total{model_name=~"$served_model"}[5m]))
+                    seriesNameFormat: "{{`{{model_name}}`}} ({{`{{finished_reason}}`}})"
+      gpuUtilization:
+        kind: Panel
+        spec:
+          display:
+            name: "GPU utilization"
+            description: "gpu-operator's own nvidia-dcgm-exporter ServiceMonitor - single full GPU (no MIG slicing active on this cluster today)."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_UTIL)"
+                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+      gpuFramebuffer:
+        kind: Panel
+        spec:
+          display:
+            name: "GPU framebuffer used / free"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_USED)"
+                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (used)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE)"
+                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}} (free)"
+      gpuTemperature:
+        kind: Panel
+        spec:
+          display:
+            name: "GPU temperature"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP)"
+                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+      gpuPowerDraw:
+        kind: Panel
+        spec:
+          display:
+            name: "GPU power draw"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "avg by (Hostname, gpu) (DCGM_FI_DEV_POWER_USAGE)"
+                    seriesNameFormat: "{{`{{Hostname}}`}} gpu{{`{{gpu}}`}}"
+      tracesSlowModelCall:
+        kind: Panel
+        spec:
+          display:
+            name: "Traces: slow model_call (>2s)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: '{name="model_call" && duration > 2s}'
+      tracesModelCallErrors:
+        kind: Panel
+        spec:
+          display:
+            name: "Traces: model_call errors"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: '{name="model_call" && status=error}'
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Overview"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/modelCallsRate"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/tokensConsumed"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/estimatedCost"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/latencyP50P95"
+            - x: 0
+              y: 16
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/errorRatio"
+            - x: 6
+              y: 16
+              width: 12
+              height: 4
+              content:
+                $ref: "#/spec/panels/totalCallVolume"
+      - kind: Grid
+        spec:
+          display:
+            title: "Semantic cache"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/semanticCacheLookups"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/semanticCacheSavings"
+            - x: 0
+              y: 8
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/semanticCacheHitRatio"
+      - kind: Grid
+        spec:
+          display:
+            title: "vLLM serving"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/vllmRequestsRunningWaiting"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/vllmTimeToFirstToken"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/vllmTimePerOutputToken"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/vllmE2eLatency"
+            - x: 0
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/vllmTokenThroughput"
+            - x: 12
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/vllmKvCacheUsage"
+            - x: 0
+              y: 24
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/vllmCompletedByFinishReason"
+      - kind: Grid
+        spec:
+          display:
+            title: "GPU (DCGM)"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/gpuUtilization"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/gpuFramebuffer"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/gpuTemperature"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/gpuPowerDraw"
+      - kind: Grid
+        spec:
+          display:
+            title: "Traces"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/tracesSlowModelCall"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/tracesModelCallErrors"
+{{- end }}

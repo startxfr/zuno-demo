@@ -1,0 +1,523 @@
+{{- if .Values.perses.enabled }}
+# WP-139: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-data.yaml (ADR-0413, split
+# 2026-09-01 out of dashboard-infra-data.yaml/ADR-0551/ADR-0552/ADR-0553).
+# Same panels, same PromQL, same PostgreSQL/MariaDB/Redis exporter series -
+# see that Grafana file's own header for the pg18 ccp_monitoring-role
+# rationale (job-monitoring-role.yaml) and the row-layout history, not
+# repeated here.
+#
+# Namespace: redhat-ods-monitoring, named zuno-data (ADR-0553) - NOT split
+# per application namespace (ADR-0551's original mapping). Targets RHOAI's
+# existing `data-science-perses` instance (ADR-0552) - see
+# dashboard-mesh-gateway.yaml's header for the live confirmation trail on
+# panel/query plugin kinds. No template variables: matches the Grafana
+# original, which deliberately has none either (each exporter is
+# one-per-service, not multi-tenant, so there is no $namespace/$node/$pod
+# to filter by here).
+#
+# DOCUMENTED EXCEPTION (per WP-139's own dashboard table): all four Redis
+# panels (redisConnectedClients, redisHitRatio, redisMemoryUsedVsMax,
+# redisCommandsRate) actually observe the Redis workload deployed in
+# `zuno-auth` (gitops/apps/redis/application-d0.yaml and application-d1.yaml
+# both set spec.destination.namespace: zuno-auth), not `zuno-data`. This is
+# carried over unchanged from the Grafana original - not silently dropped,
+# relocated, or renamed - and is called out again on each Redis panel's own
+# display.description below.
+#
+# Simplifications/judgment calls made translating this dashboard:
+# - Grafana's "Zuno dashboards" links dropdown is dropped outright (same
+#   rule WP-138 already applied to cross-dashboard link dropdowns).
+# - All nine TimeSeriesChart panels drop their Grafana fieldConfig.unit
+#   (bytes, s, percentunit, ops) entirely: Perses's schema rejects
+#   plugin.spec.format on TimeSeriesChart, confirmed live during WP-138 -
+#   the PromQL and seriesNameFormat still carry the same information.
+# - "Database exporters: up" (Grafana unit "short") has no Perses unit kind
+#   found to match; best-effort mapped to "decimal" - flagged explicitly,
+#   same call WP-139's dashboard-overview.yaml made for its own "short"
+#   panels. Its null/red threshold step maps to value: 0 (0-floored gauge,
+#   the up/down convention already used by mesh5xxRatio's own base step).
+# - "Redis: hit ratio" keeps Grafana's percentunit -> percent unit
+#   conversion (WP-138's own established precedent); it carries no
+#   thresholds in the Grafana source, so none are added here either.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: zuno-data
+  namespace: redhat-ods-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      platform.opendatahub.io/part-of: monitoring
+  config:
+    display:
+      name: "Data"
+      description: "ADR-0413, split 2026-09-01 from dashboard-infra-data.yaml: PostgreSQL/MariaDB/Redis database exporter health, throughput and cache efficiency. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only (ADR-0551/ADR-0552/ADR-0553) - no confirmed visual rendering path shows custom dashboards on this cluster, see ADR-0553's dated correction note. EXCEPTION: the four Redis panels observe a workload that actually lives in zuno-auth, not this dashboard's nominal zuno-data area - see this file's header."
+    duration: 6h
+    refreshInterval: 30s
+    panels:
+      exportersUp:
+        kind: Panel
+        spec:
+          display:
+            name: "Database exporters: up"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+              thresholds:
+                steps:
+                  - value: 0
+                    color: red
+                  - value: 1
+                    color: green
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "min(pg_up)"
+                    seriesNameFormat: "postgresql"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "min(mysql_up)"
+                    seriesNameFormat: "mariadb"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "min(redis_up)"
+                    seriesNameFormat: "redis"
+      pgDatabaseSize:
+        kind: Panel
+        spec:
+          display:
+            name: "PostgreSQL: database size"
+            description: "postgres_exporter's built-in pg_database_size_bytes collector - verified live 2026-08-22."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "pg_database_size_bytes"
+                    seriesNameFormat: "{{`{{datname}}`}}"
+      pgActiveConnections:
+        kind: Panel
+        spec:
+          display:
+            name: "PostgreSQL: active connections"
+            description: "postgres_exporter's built-in pg_stat_activity collector - verified live 2026-08-22 after fixing the ccp_monitoring role (PGO doesn't create it for pg18; see this dashboard's Grafana header comment)."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum by (pod) (pg_stat_activity_count)"
+                    seriesNameFormat: "{{`{{pod}}`}}"
+      pgTransactionsRate:
+        kind: Panel
+        spec:
+          display:
+            name: "PostgreSQL: transactions/s"
+            description: "postgres_exporter's built-in pg_stat_database collector - verified live 2026-08-22."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(pg_stat_database_xact_commit[5m])) +
+                      sum(rate(pg_stat_database_xact_rollback[5m]))
+      pgReplicationLag:
+        kind: Panel
+        spec:
+          display:
+            name: "PostgreSQL: replication lag"
+            description: "3-instance Patroni cluster (docs/platform/slo.md's failover drill: new primary Ready in 4.8s). postgres_exporter's built-in pg_replication_lag_seconds collector - verified live 2026-08-22."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "pg_replication_lag_seconds"
+                    seriesNameFormat: "{{`{{pod}}`}}"
+      pgCacheHitRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "PostgreSQL: cache hit ratio"
+            description: "Verified live 2026-08-22 once the ccp_monitoring role fix (job-monitoring-role.yaml) landed."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(pg_stat_database_blks_hit[5m])) /
+                      (sum(rate(pg_stat_database_blks_hit[5m])) + sum(rate(pg_stat_database_blks_read[5m])))
+      mariadbConnections:
+        kind: Panel
+        spec:
+          display:
+            name: "MariaDB: connections"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "mysql_global_status_threads_connected"
+                    seriesNameFormat: "connected"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "mysql_global_variables_max_connections"
+                    seriesNameFormat: "max"
+      mariadbQueriesRate:
+        kind: Panel
+        spec:
+          display:
+            name: "MariaDB: queries/s and slow queries/s"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "rate(mysql_global_status_questions[5m])"
+                    seriesNameFormat: "queries/s"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "rate(mysql_global_status_slow_queries[5m])"
+                    seriesNameFormat: "slow queries/s"
+      mariadbBufferPoolHitRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "MariaDB: InnoDB buffer pool hit ratio"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      1 - (rate(mysql_global_status_innodb_buffer_pool_reads[5m]) /
+                      rate(mysql_global_status_innodb_buffer_pool_read_requests[5m]))
+      mariadbTableLockWaits:
+        kind: Panel
+        spec:
+          display:
+            name: "MariaDB: table lock waits"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "rate(mysql_global_status_table_locks_waited[5m])"
+                    seriesNameFormat: "waited"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "rate(mysql_global_status_table_locks_immediate[5m])"
+                    seriesNameFormat: "immediate"
+      redisConnectedClients:
+        kind: Panel
+        spec:
+          display:
+            name: "Redis: connected clients"
+            description: "EXCEPTION: this Redis workload actually runs in zuno-auth, not zuno-data (gitops/apps/redis/application-d0.yaml, application-d1.yaml) - kept here unchanged from the Grafana original, see this file's header."
+          plugin:
+            kind: StatChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "redis_connected_clients"
+      redisHitRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "Redis: hit ratio"
+            description: "EXCEPTION: this Redis workload actually runs in zuno-auth, not zuno-data - see this file's header."
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      rate(redis_keyspace_hits_total[5m]) /
+                      (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m]))
+      redisMemoryUsedVsMax:
+        kind: Panel
+        spec:
+          display:
+            name: "Redis: memory used vs max"
+            description: "EXCEPTION: this Redis workload actually runs in zuno-auth, not zuno-data - see this file's header."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "redis_memory_used_bytes"
+                    seriesNameFormat: "used"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "redis_memory_max_bytes"
+                    seriesNameFormat: "max"
+      redisCommandsRate:
+        kind: Panel
+        spec:
+          display:
+            name: "Redis: commands/s"
+            description: "EXCEPTION: this Redis workload actually runs in zuno-auth, not zuno-data - see this file's header."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "rate(redis_commands_processed_total[5m])"
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Overview"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 24
+              height: 4
+              content:
+                $ref: "#/spec/panels/exportersUp"
+      - kind: Grid
+        spec:
+          display:
+            title: "Postgres"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/pgDatabaseSize"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/pgActiveConnections"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/pgTransactionsRate"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/pgReplicationLag"
+            - x: 0
+              y: 16
+              width: 8
+              height: 8
+              content:
+                $ref: "#/spec/panels/pgCacheHitRatio"
+      - kind: Grid
+        spec:
+          display:
+            title: "MariaDB"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/mariadbConnections"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/mariadbQueriesRate"
+            - x: 0
+              y: 8
+              width: 8
+              height: 8
+              content:
+                $ref: "#/spec/panels/mariadbBufferPoolHitRatio"
+            - x: 8
+              y: 8
+              width: 8
+              height: 8
+              content:
+                $ref: "#/spec/panels/mariadbTableLockWaits"
+      - kind: Grid
+        spec:
+          display:
+            title: "Redis"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/redisConnectedClients"
+            - x: 6
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/redisHitRatio"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/redisMemoryUsedVsMax"
+            - x: 0
+              y: 16
+              width: 18
+              height: 4
+              content:
+                $ref: "#/spec/panels/redisCommandsRate"
+{{- end }}

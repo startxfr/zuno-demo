@@ -1,0 +1,683 @@
+{{- if .Values.perses.enabled }}
+# WP-139: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-infra-data.yaml (ADR-0413/
+# ADR-0551). Same panels, same PromQL, same $namespace/$node/$pod
+# filtering, same node-exporter "instance" vs kube_node_info "node" label
+# split (node-level CPU/mem/disk/net panels stay unfiltered by $node,
+# only the node-readiness table honors it) - see that file's own header
+# for the full rationale, not repeated here.
+#
+# Namespace: redhat-ods-monitoring, named zuno-infra-data (ADR-0553) - NOT
+# split per application namespace (ADR-0551's original plan): live
+# investigation found redhat-ods-monitoring is the only project
+# rhods-dashboard's "Monitor & observe" tab actually renders on this
+# cluster (see ADR-0551's third dated correction note, and
+# dashboard-mesh-gateway.yaml/dashboard-trustyai.yaml's own headers for the
+# same finding applied to WP-138's two pilots).
+#
+# Targets RHOAI's existing `data-science-perses` instance (ADR-0552), same
+# as both WP-138 pilots - see dashboard-mesh-gateway.yaml's header for the
+# confirmed-vs-best-effort breakdown of plugin kinds. The
+# ListVariable/PrometheusLabelValuesVariable variable plugin (used here for
+# $namespace/$node/$pod) remains best-effort for the same reason as the
+# pilots: no live RHOAI example to confirm the label-values-with-embedded-
+# selector shape (e.g. $pod's matcher depends on $namespace) against.
+#
+# Simplifications/best-effort calls made in this file:
+#   - Every timeseries panel's Grafana fieldConfig.defaults.unit
+#     (percentunit, Bps, bytes, percent) is DROPPED: Perses rejects
+#     `plugin.spec.format` on TimeSeriesChart panels (confirmed live during
+#     WP-138) with no other place to carry a unit hint, so these panels
+#     render unitless. This affects: Deployment availability, Node CPU/
+#     memory utilization, Node disk/network IO, GPU utilization by node,
+#     Memory working set by namespace/pod, Pod network IO, Container disk
+#     IO, PVC usage.
+#   - The Node readiness/schedulability table panel keeps its two raw
+#     instant-query PromQL expressions verbatim (no format:table/instant
+#     equivalent exists as a query option in Perses's Table plugin - not
+#     needed since there's no Grafana `transformations` block to replicate
+#     here, unlike dashboard-trustyai.yaml's four table panels).
+#   - Grafana's "row" grouping/collapse (type: row, collapsed: true/false)
+#     becomes Grid layout sections (display.collapse.open mirrors
+#     collapsed: true/false), same as both pilots; the cross-dashboard
+#     "Zuno dashboards" link dropdown is dropped rather than guessed.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: zuno-infra-data
+  namespace: redhat-ods-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      platform.opendatahub.io/part-of: monitoring
+  config:
+    display:
+      name: "Infrastructure"
+      description: "ADR-0413/ADR-0551/ADR-0552/ADR-0553: node/pod/deployment health, node and pod resource consumption (CPU/RAM/GPU/disk/network/errors). Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0553's dated correction note)."
+    duration: 6h
+    refreshInterval: 30s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: namespace
+          display:
+            name: namespace
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: namespace
+              matchers:
+                - 'kube_pod_status_phase{namespace=~"zuno-.*"}'
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: node
+          display:
+            name: node
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: node
+              matchers:
+                - "kube_node_info"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: pod
+          display:
+            name: pod
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: pod
+              matchers:
+                - 'container_cpu_usage_seconds_total{namespace=~"$namespace"}'
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+    panels:
+      podStatusByNamespace:
+        kind: Panel
+        spec:
+          display:
+            name: "Pod status by namespace"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: 'sum by (namespace, phase) (kube_pod_status_phase{namespace=~"$namespace"})'
+                    seriesNameFormat: "{{`{{namespace}}`}} ({{`{{phase}}`}})"
+      podRestarts:
+        kind: Panel
+        spec:
+          display:
+            name: "Pod restarts (last hour)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace, pod)
+                      (increase(kube_pod_container_status_restarts_total{namespace=~"$namespace"}[1h])) > 0
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{pod}}`}}"
+      deploymentAvailability:
+        kind: Panel
+        spec:
+          display:
+            name: "Deployment availability"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      kube_deployment_status_replicas_available{namespace=~"$namespace"}
+                      / kube_deployment_spec_replicas{namespace=~"$namespace"}
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{deployment}}`}}"
+      componentStatus:
+        kind: Panel
+        spec:
+          display:
+            name: "Component status (pod-health + BFF error-rate approximation)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: 'sum by (agent) (rate(zuno_bff_requests_total{code=~"5.."}[5m]))'
+                    seriesNameFormat: "bff errors: {{`{{agent}}`}}"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: 'sum by (namespace) (kube_pod_status_phase{namespace=~"$namespace", phase="Failed"})'
+                    seriesNameFormat: "failed pods: {{`{{namespace}}`}}"
+      nodeReadiness:
+        kind: Panel
+        spec:
+          display:
+            name: "Node readiness / schedulability"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: 'kube_node_status_condition{condition="Ready", node=~"$node"} == 1'
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: 'kube_node_spec_unschedulable{node=~"$node"}'
+      nodeCpuUtilization:
+        kind: Panel
+        spec:
+          display:
+            name: "Node CPU utilization"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: '1 - avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m]))'
+                    seriesNameFormat: "{{`{{instance}}`}}"
+      nodeMemoryUtilization:
+        kind: Panel
+        spec:
+          display:
+            name: "Node memory utilization"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)"
+                    seriesNameFormat: "{{`{{instance}}`}}"
+      nodeDiskIo:
+        kind: Panel
+        spec:
+          display:
+            name: "Node disk IO"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum by (instance) (rate(node_disk_read_bytes_total[5m]))"
+                    seriesNameFormat: "{{`{{instance}}`}} (read)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum by (instance) (rate(node_disk_written_bytes_total[5m]))"
+                    seriesNameFormat: "{{`{{instance}}`}} (write)"
+      nodeNetworkIo:
+        kind: Panel
+        spec:
+          display:
+            name: "Node network IO"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (instance)
+                      (rate(node_network_receive_bytes_total{device!~"lo|veth.*"}[5m]))
+                    seriesNameFormat: "{{`{{instance}}`}} (rx)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (instance)
+                      (rate(node_network_transmit_bytes_total{device!~"lo|veth.*"}[5m]))
+                    seriesNameFormat: "{{`{{instance}}`}} (tx)"
+      gpuUtilizationByNode:
+        kind: Panel
+        spec:
+          display:
+            name: "GPU utilization by node"
+            description: "Summary view - see dashboard-ai-models.yaml for full GPU/DCGM detail."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "avg by (Hostname) (DCGM_FI_DEV_GPU_UTIL)"
+                    seriesNameFormat: "{{`{{Hostname}}`}}"
+      cpuUsageByNamespace:
+        kind: Panel
+        spec:
+          display:
+            name: "CPU usage by namespace"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace)
+                      (rate(container_cpu_usage_seconds_total{namespace=~"$namespace"}[5m]))
+                    seriesNameFormat: "{{`{{namespace}}`}}"
+      memoryWorkingSetByNamespace:
+        kind: Panel
+        spec:
+          display:
+            name: "Memory working set by namespace"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace)
+                      (container_memory_working_set_bytes{namespace=~"$namespace", container!=""})
+                    seriesNameFormat: "{{`{{namespace}}`}}"
+      cpuUsageByPod:
+        kind: Panel
+        spec:
+          display:
+            name: "CPU usage by pod"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace, pod)
+                      (rate(container_cpu_usage_seconds_total{namespace=~"$namespace", pod=~"$pod", container!=""}[5m]))
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{pod}}`}}"
+      memoryWorkingSetByPod:
+        kind: Panel
+        spec:
+          display:
+            name: "Memory working set by pod"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace, pod)
+                      (container_memory_working_set_bytes{namespace=~"$namespace", pod=~"$pod", container!=""})
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{pod}}`}}"
+      podNetworkIo:
+        kind: Panel
+        spec:
+          display:
+            name: "Pod network IO"
+            description: "Raw pod/NIC counters (cAdvisor) - moved from the retired dashboard-network-mesh.yaml, which kept this separate from mesh-attributed Istio bandwidth (different Prometheus stack, dashboard-mesh-gateway.yaml)."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace, pod)
+                      (rate(container_network_receive_bytes_total{namespace=~"$namespace", pod=~"$pod"}[5m]))
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{pod}}`}} (rx)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace, pod)
+                      (rate(container_network_transmit_bytes_total{namespace=~"$namespace", pod=~"$pod"}[5m]))
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{pod}}`}} (tx)"
+      podNetworkErrors:
+        kind: Panel
+        spec:
+          display:
+            name: "Pod network errors / drops"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace, pod)
+                      (rate(container_network_receive_errors_total{namespace=~"$namespace"}[5m])
+                      + rate(container_network_transmit_errors_total{namespace=~"$namespace"}[5m]))
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{pod}}`}} (errors)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace, pod)
+                      (rate(container_network_receive_packets_dropped_total{namespace=~"$namespace"}[5m])
+                      + rate(container_network_transmit_packets_dropped_total{namespace=~"$namespace"}[5m]))
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{pod}}`}} (drops)"
+      containerDiskIo:
+        kind: Panel
+        spec:
+          display:
+            name: "Container disk IO"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace, pod)
+                      (rate(container_fs_reads_bytes_total{namespace=~"$namespace", pod=~"$pod"}[5m])
+                      + rate(container_fs_writes_bytes_total{namespace=~"$namespace", pod=~"$pod"}[5m]))
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{pod}}`}}"
+      pvcUsage:
+        kind: Panel
+        spec:
+          display:
+            name: "PVC usage"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      kubelet_volume_stats_used_bytes{namespace=~"$namespace"}
+                      / kubelet_volume_stats_capacity_bytes{namespace=~"$namespace"}
+                    seriesNameFormat: "{{`{{namespace}}`}}/{{`{{persistentvolumeclaim}}`}}"
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Cluster health"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/podStatusByNamespace"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/podRestarts"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/deploymentAvailability"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/componentStatus"
+            - x: 0
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/nodeReadiness"
+      - kind: Grid
+        spec:
+          display:
+            title: "Node resources"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/nodeCpuUtilization"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/nodeMemoryUtilization"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/nodeDiskIo"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/nodeNetworkIo"
+            - x: 0
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/gpuUtilizationByNode"
+      - kind: Grid
+        spec:
+          display:
+            title: "Namespace resources"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/cpuUsageByNamespace"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/memoryWorkingSetByNamespace"
+      - kind: Grid
+        spec:
+          display:
+            title: "Pod & container resources"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/cpuUsageByPod"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/memoryWorkingSetByPod"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/podNetworkIo"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/podNetworkErrors"
+            - x: 0
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/containerDiskIo"
+            - x: 12
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/pvcUsage"
+{{- end }}

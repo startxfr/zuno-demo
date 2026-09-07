@@ -1,0 +1,708 @@
+{{- if .Values.perses.enabled }}
+# WP-139: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-run-trace.yaml (ADR-0543/
+# ADR-0413/ADR-0551), continuing the WP-138 pilot pattern established by
+# dashboard-mesh-gateway.yaml and dashboard-trustyai.yaml. Same panels, same
+# TraceQL/PromQL - see that file's own header for the `select()` field-name
+# scope-prefix behavior, the Jaeger-vs-Grafana-Explore trace-link decision
+# and the classic "row" schema history, not repeated here.
+#
+# Namespace: redhat-ods-monitoring, named zuno-run-trace (ADR-0553) - NOT
+# split per source namespace as ADR-0551 originally planned: live
+# investigation found redhat-ods-monitoring is the only project
+# rhods-dashboard's "Monitor & observe" tab actually renders on this cluster
+# (see ADR-0551's third dated correction note). This is a Perses duplicate
+# of zuno-monitoring's Grafana dashboard, kept here for data-layer parity
+# only - no confirmed visual rendering path shows custom dashboards on this
+# cluster yet (see ADR-0553's dated correction note).
+#
+# Targets RHOAI's existing `data-science-perses` instance (ADR-0552) - see
+# dashboard-mesh-gateway.yaml's header for the full caveat (panel/query
+# plugin kinds confirmed against RHOAI's own live resources; the
+# ListVariable/PrometheusLabelValuesVariable variable plugin remains
+# best-effort, no live RHOAI example uses it).
+#
+# This dashboard is almost entirely Tempo-backed (20 of its 21 panels query
+# `tempo`, only the traffic-sanity stat queries `prometheus`), so it needed
+# far more simplification/best-effort calls than either pilot. All
+# deliberate, all flagged, none silent:
+#   - Grafana's top-level "Zuno dashboards" links dropdown is dropped, same
+#     as both pilots - no confirmed Perses equivalent used anywhere in this
+#     chart.
+#   - Every trace table's per-column "Open trace in Jaeger" fieldConfig
+#     override (a hyperlink on the traceID column, pointed at this
+#     platform's Jaeger UI per the Grafana file's own header) is dropped -
+#     Perses panels here carry no per-field link config in the schema used
+#     in this chart. traceID stays a plain text column; open the Jaeger UI
+#     directly and paste the ID.
+#   - "Span timeline" was a Grafana `timeseries` panel in points/scatter mode
+#     (partitionByValues transformation turning each span into a point,
+#     colored per originating service, X=start time/Y=duration) fed by a
+#     Tempo trace-search query - not a real Prometheus time series. Perses
+#     has no confirmed TraceQuery-fed TimeSeriesChart on this cluster (the
+#     only confirmed Tempo panel shape is Table+TraceQuery, per
+#     dashboard-mesh-gateway.yaml's meshErrorTraces), so this becomes a
+#     Table like every other trace panel here: the same TraceQL span
+#     selection, rendered as a raw span list instead of a scatter plot. The
+#     chronological/per-service visual grouping is lost.
+#   - The two "Model calls"/"Cost per call" `bargauge` panels are the same
+#     situation as the piechart-over-Tempo case dashboard-agents-tools-rag.yaml
+#     already documents for its own dashboard: Perses has no confirmed
+#     bargauge+TraceQuery combination, so both become Table/TraceQuery -
+#     Grafana's reduceOptions bar-per-call rendering is dropped in favor of
+#     the raw `select()` rows.
+#   - The three `piechart` panels ("Time spent by hop", "Cost by provider",
+#     "Call outcomes this run") are the same case again: each had a Grafana
+#     `groupBy` transformation aggregating spans into donut slices. All
+#     three become Table/TraceQuery with the identical TraceQL selection but
+#     no aggregation - raw per-span rows, not a pie. ("Call outcomes this
+#     run" additionally does not carry over Grafana's `groupBy` field choice
+#     of `traceID`/count, since the resulting Perses table has no groupBy at
+#     all.)
+#   - The five `stat` panels under Tempo ("Total cost - local/distant",
+#     "Total run cost", "Total tokens", "Total MCP tool calls", "Total RAG
+#     searches") each had a Grafana transformation chain
+#     (filterFieldsByName+reduce(sum/count), or calculateField+reduce(sum)
+#     for token addition) collapsing a trace-search result into one number.
+#     Perses's StatChart has no confirmed TraceQuery binding either, so all
+#     five become Table/TraceQuery too: the reader sees the raw per-call
+#     attribute rows (cost/tokens/etc.) and sums or counts them visually
+#     instead of a single pre-aggregated stat. This is a materially bigger
+#     loss of fidelity than dashboard-trustyai.yaml's or
+#     dashboard-agents-tools-rag.yaml's table simplifications (which kept
+#     Prometheus-side aggregation and only lost column renaming/grouping) -
+#     called out here explicitly because five of this dashboard's headline
+#     numbers no longer render as numbers.
+#   - The "Traffic sanity for $agent" stat is the one panel that keeps its
+#     original shape: real Prometheus query, translated straight onto
+#     StatChart (no fieldConfig/thresholds were set on it in Grafana, so
+#     `plugin.spec: {}`, same as both pilots' unthresholded stats).
+#   - The `run_id` templating variable is a Grafana `textbox` (free-text
+#     paste field, no query), not a label-values query - translated
+#     best-effort onto Perses's `TextVariable` kind. Unlike
+#     ListVariable/PrometheusLabelValuesVariable (used for `agent` below,
+#     and confirmed-if-unverified against the two pilots' own precedent),
+#     there is no PersesDashboard anywhere on this cluster using TextVariable
+#     to confirm the shape against - this is this file's own, additional,
+#     best-effort call, flagged separately from the ListVariable caveat above.
+#   - Grafana's classic "row" grouping/collapse becomes Grid layout sections
+#     (display.collapse.open mirrors collapsed: false/true as true/false);
+#     "Overview" stays open, the other five stay closed, matching the source
+#     file exactly. The "Overview" row's two children (Traffic sanity, Span
+#     timeline) are serialized as flat siblings with gridPos y=1/y=5 rather
+#     than nested under the row (a `collapsed: false` classic-schema quirk),
+#     so their y was rebased by -1 to zero-base this Grid section, same
+#     rebasing dashboard-mesh-gateway.yaml/dashboard-trustyai.yaml perform.
+#   - Grafana's `refresh` field is `""` (disabled) on this dashboard, not a
+#     usable duration - defaulted to `30s` like both pilots rather than left
+#     unset.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: zuno-run-trace
+  namespace: redhat-ods-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      platform.opendatahub.io/part-of: monitoring
+  config:
+    display:
+      name: "Run Trace (per-run drill-down)"
+      description: "ADR-0543: select an agent, paste a run_id, see every MCP/RAG/model/BFF/API hop that run consumed - cost, tokens, latency, outcomes. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0551/ADR-0553's dated correction notes)."
+    duration: 6h
+    refreshInterval: 30s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: agent
+          display:
+            name: agent
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: agent
+              matchers:
+                - "zuno_bff_requests_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: TextVariable
+        spec:
+          name: run_id
+          value: ""
+          display:
+            name: run_id
+            description: "Paste a run_id (from the chat UI or database) - not a lookup, this dashboard does not list run_ids for you."
+    panels:
+      trafficSanity:
+        kind: Panel
+        spec:
+          display:
+            name: "Traffic sanity for $agent (is this dashboard/pipeline alive?)"
+            description: "If every panel below is empty, check here first: no traffic at all for $agent means Tempo/the collector may be down or retention expired, not necessarily a wrong run_id."
+          plugin:
+            kind: StatChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))"
+                    seriesNameFormat: "requests/s"
+      spanTimeline:
+        kind: Panel
+        spec:
+          display:
+            name: "Span timeline"
+            description: "Every span this run made, grouped/colored by originating service, plotted by actual start time (points mode) - shows chronological ordering across hops. Simplified from Grafana's scatter/points timeseries (partitionByValues by traceService): raw per-span rows from the same TraceQL selection, not a chronological scatter plot - see this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{span.zuno.run_id=\"$run_id\"}"
+      bffTraces:
+        kind: Panel
+        spec:
+          display:
+            name: "BFF Traces (agent-bff)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"bff_request\" && span.zuno.run_id=\"$run_id\"}"
+      agentTraces:
+        kind: Panel
+        spec:
+          display:
+            name: "Agent Traces (agent-runtime)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"api_request\" && span.zuno.run_id=\"$run_id\"}"
+      mcpTrace:
+        kind: Panel
+        spec:
+          display:
+            name: "MCP trace (mcp-gateway)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"tool_invoke\" && span.zuno.run_id=\"$run_id\"}"
+      ragTrace:
+        kind: Panel
+        spec:
+          display:
+            name: "RAG trace (rag-service)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"rag_search\" && span.zuno.run_id=\"$run_id\"}"
+      modelCallsAll:
+        kind: Panel
+        spec:
+          display:
+            name: "Model calls (all - provider/model/duration)"
+            description: "Simplified from Grafana's bargauge (one bar per model call): raw per-call rows from the same TraceQL selection, not a bar chart - see this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"model_call\" && span.zuno.run_id=\"$run_id\"} | select(span.zuno.provider, span.zuno.model)"
+      costPerCallLocal:
+        kind: Panel
+        spec:
+          display:
+            name: "Cost per call - local (self-hosted)"
+            description: "Simplified from Grafana's bargauge: raw per-call estimated_cost_usd rows, not a bar chart - see this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"local\"} | select(span.zuno.estimated_cost_usd, span.zuno.model)"
+      totalCostLocal:
+        kind: Panel
+        spec:
+          display:
+            name: "Total cost - local"
+            description: "Simplified from Grafana's filterFieldsByName+reduce(sum): raw per-call estimated_cost_usd rows, not a single summed stat - sum the column visually. See this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"local\"} | select(span.zuno.estimated_cost_usd)"
+      costPerCallDistant:
+        kind: Panel
+        spec:
+          display:
+            name: "Cost per call - distant (SaaS)"
+            description: "Simplified from Grafana's bargauge: raw per-call estimated_cost_usd rows, not a bar chart - see this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"saas\"} | select(span.zuno.estimated_cost_usd, span.zuno.model)"
+      totalCostDistant:
+        kind: Panel
+        spec:
+          display:
+            name: "Total cost - distant"
+            description: "Simplified from Grafana's filterFieldsByName+reduce(sum): raw per-call estimated_cost_usd rows, not a single summed stat - sum the column visually. See this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"model_call\" && span.zuno.run_id=\"$run_id\" && span.zuno.model_kind=\"saas\"} | select(span.zuno.estimated_cost_usd)"
+      errorsThisRun:
+        kind: Panel
+        spec:
+          display:
+            name: "Errors this run (span status=error)"
+            description: "Kept as a table (unlike several panels above) since matches can come from any service - the Service column stays so you can tell which one."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{span.zuno.run_id=\"$run_id\" && status=error}"
+      mcpPolicyDenials:
+        kind: Panel
+        spec:
+          display:
+            name: "MCP policy denials this run"
+            description: "A denied tool call is expected control flow (ADR-0011), not an OTel span error - it only shows up here, via zuno.outcome, not in the status=error panel above."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{span.zuno.run_id=\"$run_id\" && span.zuno.outcome=\"denied\"}"
+      guardrailsObservation:
+        kind: Panel
+        spec:
+          display:
+            name: "Guardrails observation this run"
+            description: "Was this exchange observed at all, and what did the guardrails find? ADR-0540/WP-120. zuno.outcome is clean, detected or unavailable; zuno.detections carries the class NAMES only - never the matched text, which is the user's own prompt. NO ROW HERE IS ITSELF A FINDING: it means the observer never ran for this run - an unset backend URL makes observe_exchange return before calling anything, silently, so an absent row is the only trace that failure leaves. A row with outcome=detected means something was flagged AND the response still reached the user unmodified: observe-only, and that asymmetry is the contract, not a bug."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"guardrails_observe\" && span.zuno.run_id=\"$run_id\"} | select(span.zuno.outcome, span.zuno.detection_count, span.zuno.detections, span.zuno.backend, span.zuno.latency_ms)"
+      timeSpentByHop:
+        kind: Panel
+        spec:
+          display:
+            name: "Time spent by hop"
+            description: "Share of total latency across bff_request/api_request/agent_graph_run/tool_invoke/rag_search/model_call spans - where did the time go? Simplified from Grafana's donut+groupBy(sum) transformation: raw per-span latency_ms rows, not an aggregated pie - see this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{span.zuno.run_id=\"$run_id\"} | select(span.zuno.latency_ms)"
+      costByProvider:
+        kind: Panel
+        spec:
+          display:
+            name: "Cost by provider"
+            description: "Simplified from Grafana's donut+groupBy(sum) transformation: raw per-call provider/estimated_cost_usd rows, not an aggregated pie - see this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"model_call\" && span.zuno.run_id=\"$run_id\"} | select(span.zuno.provider, span.zuno.estimated_cost_usd)"
+      callOutcomes:
+        kind: Panel
+        spec:
+          display:
+            name: "Call outcomes this run"
+            description: "OTel span status (ok/error/unset) across every span this run made - a universal field, unlike zuno.outcome which not every span type sets. Simplified from Grafana's donut+groupBy(count) transformation: raw per-span rows, not an aggregated pie - see this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{span.zuno.run_id=\"$run_id\"}"
+      totalRunCost:
+        kind: Panel
+        spec:
+          display:
+            name: "Total run cost"
+            description: "Simplified from Grafana's filterFieldsByName+reduce(sum): raw per-call estimated_cost_usd rows, not a single summed stat - sum the column visually. See this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"model_call\" && span.zuno.run_id=\"$run_id\"} | select(span.zuno.estimated_cost_usd)"
+      totalTokens:
+        kind: Panel
+        spec:
+          display:
+            name: "Total tokens"
+            description: "Simplified from Grafana's calculateField(prompt_tokens+completion_tokens)+reduce(sum): raw per-call prompt_tokens/completion_tokens rows, not a single summed stat - add and sum the columns visually. See this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"model_call\" && span.zuno.run_id=\"$run_id\"} | select(span.zuno.prompt_tokens, span.zuno.completion_tokens)"
+      totalMcpToolCalls:
+        kind: Panel
+        spec:
+          display:
+            name: "Total MCP tool calls"
+            description: "Simplified from Grafana's filterFieldsByName+reduce(count): raw per-call trace rows, not a single count stat - count the rows visually. See this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"tool_invoke\" && span.zuno.run_id=\"$run_id\"}"
+      totalRagSearches:
+        kind: Panel
+        spec:
+          display:
+            name: "Total RAG searches"
+            description: "Simplified from Grafana's filterFieldsByName+reduce(count): raw per-call trace rows, not a single count stat - count the rows visually. See this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"rag_search\" && span.zuno.run_id=\"$run_id\"}"
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Overview"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 24
+              height: 4
+              content:
+                $ref: "#/spec/panels/trafficSanity"
+            - x: 0
+              y: 4
+              width: 24
+              height: 10
+              content:
+                $ref: "#/spec/panels/spanTimeline"
+      - kind: Grid
+        spec:
+          display:
+            title: "Traces by service"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/bffTraces"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/agentTraces"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/mcpTrace"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/ragTrace"
+      - kind: Grid
+        spec:
+          display:
+            title: "Model calls & cost"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/modelCallsAll"
+            - x: 0
+              y: 8
+              width: 9
+              height: 8
+              content:
+                $ref: "#/spec/panels/costPerCallLocal"
+            - x: 9
+              y: 8
+              width: 3
+              height: 8
+              content:
+                $ref: "#/spec/panels/totalCostLocal"
+            - x: 12
+              y: 8
+              width: 9
+              height: 8
+              content:
+                $ref: "#/spec/panels/costPerCallDistant"
+            - x: 21
+              y: 8
+              width: 3
+              height: 8
+              content:
+                $ref: "#/spec/panels/totalCostDistant"
+      - kind: Grid
+        spec:
+          display:
+            title: "Issues this run"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/errorsThisRun"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/mcpPolicyDenials"
+            - x: 0
+              y: 8
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/guardrailsObservation"
+      - kind: Grid
+        spec:
+          display:
+            title: "Breakdowns"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 8
+              height: 8
+              content:
+                $ref: "#/spec/panels/timeSpentByHop"
+            - x: 8
+              y: 0
+              width: 8
+              height: 8
+              content:
+                $ref: "#/spec/panels/costByProvider"
+            - x: 16
+              y: 0
+              width: 8
+              height: 8
+              content:
+                $ref: "#/spec/panels/callOutcomes"
+      - kind: Grid
+        spec:
+          display:
+            title: "Run totals"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/totalRunCost"
+            - x: 6
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/totalTokens"
+            - x: 12
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/totalMcpToolCalls"
+            - x: 18
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/totalRagSearches"
+{{- end }}

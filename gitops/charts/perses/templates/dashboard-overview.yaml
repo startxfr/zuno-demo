@@ -1,0 +1,531 @@
+{{- if .Values.perses.enabled }}
+# WP-139: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-overview.yaml (ADR-0413/
+# ADR-0551/ADR-0552/ADR-0553). Same panels, same PromQL, same SLO/
+# error-budget/burn-rate math docs/platform/slo.md and
+# gitops/charts/observability/templates/prometheusrule-slo.yaml already
+# evaluate on - see that Grafana file's own header for the full rationale
+# (row-layout history, burn-rate shape), not repeated here.
+#
+# Namespace: redhat-ods-monitoring, named zuno-overview (ADR-0553) - this
+# dashboard has no single owning application namespace (it's the platform
+# landing page, per WP-139's own dashboard table), so ADR-0551's original
+# per-namespace mapping never applied to it cleanly even before ADR-0553
+# superseded that mapping table outright in favor of collocating every
+# dashboard here. Targets RHOAI's existing `data-science-perses` instance
+# (ADR-0552) - see dashboard-mesh-gateway.yaml's header for the live
+# confirmation trail on panel/query plugin kinds. No template variables:
+# this dashboard has none in Grafana either (deliberately - it's meant to
+# be read at a glance, drill-down happens on the linked dashboards).
+#
+# Simplifications/judgment calls made translating this dashboard:
+# - Grafana's "Zuno dashboards" links dropdown AND the "Navigation" row's
+#   `dashlist` panel are both dropped outright (same rule WP-138 already
+#   applied to cross-dashboard link dropdowns) - there is nothing left to
+#   render in their place, so that Grid section is omitted entirely rather
+#   than shipped empty.
+# - The "gauge"-type panel (Error budget remaining) is mapped to StatChart,
+#   same as "stat" panels - Perses has no separate Gauge kind targeted
+#   here; its Grafana min:-1/max:1 bounds are dropped, not part of
+#   StatChart's format spec.
+# - percentunit -> percent unit conversion with thresholds re-scaled x100,
+#   following the exact precedent WP-138 already set live
+#   (mesh5xxRatio/detectionRate/observerUnavailable) - not a new convention
+#   invented here. A Grafana `{color, value: null}` step (the "default/
+#   base" color) maps to value: 0 in every panel except one: Error budget
+#   remaining's range is -100..100 after scaling (not 0-floored - 0 marks
+#   its own green threshold), so its null/red step is placed at -100
+#   instead - a best-effort judgment call, flagged here rather than
+#   silently reusing the 0 rule.
+# - "reqps" -> "decimal" follows WP-138's own totalMeshRps precedent
+#   exactly (Model calls/s, Tool denials/s, RAG search errors/s). "short"
+#   (Firing zuno alerts, Failed/pending pods, Telemetry pipeline up) and
+#   "currencyUSD" (Model cost) have no Perses unit kind found to match;
+#   both are best-effort mapped to "decimal" - for currencyUSD this loses
+#   the $ formatting, flagged explicitly rather than silently dropped.
+# - The "Deployment availability" table panel drops its Grafana
+#   `format: "table"`/`instant: true` query flags and its percentunit
+#   fieldConfig: Table panels take spec: {} with no format block (schema
+#   rejects it, WP-138's live-caught trap) - same precedent
+#   dashboard-trustyai.yaml's Table panels already set.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: zuno-overview
+  namespace: redhat-ods-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      platform.opendatahub.io/part-of: monitoring
+  config:
+    display:
+      name: "Zuno overview"
+      description: "ADR-0413: platform landing page - SLO/error budget, component health, headline usage KPIs. No single owning application namespace. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only (ADR-0551/ADR-0552/ADR-0553) - no confirmed visual rendering path shows custom dashboards on this cluster, see ADR-0553's dated correction note."
+    duration: 6h
+    refreshInterval: 30s
+    panels:
+      agentPathAvailability5m:
+        kind: Panel
+        spec:
+          display:
+            name: "Agent-path availability (5m)"
+            description: "docs/platform/slo.md measurement query - successful (non-5xx) ratio at the BFF boundary."
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+              thresholds:
+                steps:
+                  - value: 0
+                    color: red
+                  - value: 99.9
+                    color: green
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(zuno_bff_requests_total{code!~"5.."}[5m])) /
+                      sum(rate(zuno_bff_requests_total[5m]))
+      agentPathAvailability30d:
+        kind: Panel
+        spec:
+          display:
+            name: "Agent-path availability (30d)"
+            description: "ADR-0102 objective: 99.9% over a rolling 30-day window."
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+              thresholds:
+                steps:
+                  - value: 0
+                    color: red
+                  - value: 99.9
+                    color: green
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(increase(zuno_bff_requests_total{code!~"5.."}[30d])) /
+                      sum(increase(zuno_bff_requests_total[30d]))
+      errorBudgetRemaining30d:
+        kind: Panel
+        spec:
+          display:
+            name: "Error budget remaining (30d)"
+            description: "1 - (budget consumed / 0.1% budget). Negative means the 30-day error budget is exhausted. Grafana's gauge min:-1/max:1 bounds are dropped - not part of Perses StatChart's format spec."
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+              thresholds:
+                steps:
+                  - value: -100
+                    color: red
+                  - value: 0
+                    color: green
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      1 - ((1 - (sum(increase(zuno_bff_requests_total{code!~"5.."}[30d]))
+                      / sum(increase(zuno_bff_requests_total[30d])))) / 0.001)
+      firingZunoAlerts:
+        kind: Panel
+        spec:
+          display:
+            name: "Firing zuno alerts"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 1
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(ALERTS{alertname=~"AgentPathErrorBudgetBurn.*|RagFreshnessLagExceeded.*",
+                      alertstate="firing"}) or vector(0)
+      errorBudgetBurnRate:
+        kind: Panel
+        spec:
+          display:
+            name: "Error budget burn rate (1h vs 6h windows)"
+            description: "Same multi-window shape as AgentPathErrorBudgetBurnFast (1h, pages at 14.4x) / AgentPathErrorBudgetBurnSlow (6h, tickets at 6x) - prometheusrule-slo.yaml."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      (1 - (sum(rate(zuno_bff_requests_total{code!~"5.."}[1h]))
+                      / sum(rate(zuno_bff_requests_total[1h])))) / 0.001
+                    seriesNameFormat: "burn rate (1h, fast)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      (1 - (sum(rate(zuno_bff_requests_total{code!~"5.."}[6h]))
+                      / sum(rate(zuno_bff_requests_total[6h])))) / 0.001
+                    seriesNameFormat: "burn rate (6h, slow)"
+      deploymentAvailability:
+        kind: Panel
+        spec:
+          display:
+            name: "Deployment availability (zuno-*)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      min by (namespace, deployment)
+                      (kube_deployment_status_replicas_available{namespace=~"zuno-.*"}
+                      / kube_deployment_spec_replicas{namespace=~"zuno-.*"})
+      failedPendingPods:
+        kind: Panel
+        spec:
+          display:
+            name: "Failed / pending pods (zuno-*)"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 1
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum(kube_pod_status_phase{namespace=~\"zuno-.*\", phase=~\"Failed|Pending\"})"
+      telemetryPipelineUp:
+        kind: Panel
+        spec:
+          display:
+            name: "Telemetry pipeline up (OTel collector)"
+            description: "up{job=\"zuno-otel-collector-collector\"} - the series docs/platform/slo.md confirmed live as the collector's own scrape health."
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+              thresholds:
+                steps:
+                  - value: 0
+                    color: red
+                  - value: 1
+                    color: green
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "up{job=\"zuno-otel-collector-collector\"}"
+      modelCallsRate:
+        kind: Panel
+        spec:
+          display:
+            name: "Model calls/s"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum(rate(zuno_model_calls_total[5m]))"
+      modelErrorRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "Model error ratio"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percent
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 2
+                    color: orange
+                  - value: 10
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(zuno_model_calls_total{outcome="error"}[5m])) /
+                      sum(rate(zuno_model_calls_total[5m]))
+      modelCost24h:
+        kind: Panel
+        spec:
+          display:
+            name: "Model cost (24h)"
+            description: "Grafana's currencyUSD unit has no Perses format equivalent found - best-effort mapped to decimal, which loses the $ formatting."
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum(increase(zuno_model_cost_usd_total[24h]))"
+      toolDenialsRate:
+        kind: Panel
+        spec:
+          display:
+            name: "Tool denials/s"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum(rate(zuno_tool_invocations_total{outcome=\"denied\"}[5m])) or vector(0)"
+      bffRequestsByAgent:
+        kind: Panel
+        spec:
+          display:
+            name: "BFF requests by agent (rate)"
+            description: "EXPECT A STEP DOWN ON 2026-09-03, with no drop in real traffic behind it. Until then zuno_bff_requests_total recorded one point per Keycloak GROUP, so a caller in twelve groups counted as twelve requests. It now counts exactly one point per response. The group breakdown moved to zuno_bff_requests_by_identity_total, which must never be used for volume or SLO."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum by (agent) (rate(zuno_bff_requests_total[5m]))"
+                    seriesNameFormat: "{{`{{agent}}`}}"
+      ragSearchErrorsRate:
+        kind: Panel
+        spec:
+          display:
+            name: "RAG search errors/s"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum(rate(zuno_rag_searches_total{outcome=\"error\"}[5m])) or vector(0)"
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "SLO & error budget"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/agentPathAvailability5m"
+            - x: 6
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/agentPathAvailability30d"
+            - x: 12
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/errorBudgetRemaining30d"
+            - x: 18
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/firingZunoAlerts"
+            - x: 0
+              y: 4
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/errorBudgetBurnRate"
+      - kind: Grid
+        spec:
+          display:
+            title: "Platform health"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/deploymentAvailability"
+            - x: 12
+              y: 0
+              width: 12
+              height: 4
+              content:
+                $ref: "#/spec/panels/failedPendingPods"
+            - x: 0
+              y: 8
+              width: 12
+              height: 4
+              content:
+                $ref: "#/spec/panels/telemetryPipelineUp"
+      - kind: Grid
+        spec:
+          display:
+            title: "Usage KPIs"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/modelCallsRate"
+            - x: 6
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/modelErrorRatio"
+            - x: 12
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/modelCost24h"
+            - x: 18
+              y: 0
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/toolDenialsRate"
+            - x: 0
+              y: 4
+              width: 16
+              height: 8
+              content:
+                $ref: "#/spec/panels/bffRequestsByAgent"
+            - x: 16
+              y: 4
+              width: 8
+              height: 4
+              content:
+                $ref: "#/spec/panels/ragSearchErrorsRate"
+{{- end }}

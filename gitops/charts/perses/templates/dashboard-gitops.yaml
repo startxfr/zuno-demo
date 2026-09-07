@@ -1,0 +1,199 @@
+{{- if .Values.perses.enabled }}
+# WP-139: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-gitops.yaml (ADR-0413,
+# originally split 2026-09-01 out of dashboard-infra-data.yaml). Same
+# panels, same PromQL, hardcoded to namespace="openshift-gitops" - see
+# that file's own header for the full rationale. As that file's own header
+# explains, this dashboard carries NO $namespace (or any other) filter
+# variable by design (single-namespace), so unlike
+# dashboard-infra-data.yaml and dashboard-usage-cost.yaml this translation
+# has no `spec.config.variables` section - not an omission.
+#
+# Namespace: redhat-ods-monitoring, named zuno-gitops (ADR-0553) - NOT
+# split per application namespace (ADR-0551's original plan): live
+# investigation found redhat-ods-monitoring is the only project
+# rhods-dashboard's "Monitor & observe" tab actually renders on this
+# cluster (see ADR-0551's third dated correction note, and
+# dashboard-mesh-gateway.yaml/dashboard-trustyai.yaml's own headers for the
+# same finding applied to WP-138's two pilots).
+#
+# Targets RHOAI's existing `data-science-perses` instance (ADR-0552), same
+# as both WP-138 pilots and dashboard-infra-data.yaml/
+# dashboard-usage-cost.yaml - see dashboard-mesh-gateway.yaml's header for
+# the confirmed-vs-best-effort breakdown of plugin kinds. This dashboard
+# has no ListVariable/PrometheusLabelValuesVariable at all, so it carries
+# none of that best-effort caveat.
+#
+# Simplifications/best-effort calls made in this file:
+#   - "ArgoCD Deployment availability"'s Grafana fieldConfig.defaults.unit
+#     (percentunit) is DROPPED: Perses rejects `plugin.spec.format` on
+#     TimeSeriesChart panels (confirmed live during WP-138), so it renders
+#     unitless.
+#   - "ArgoCD apps out of sync" is a Grafana `stat` panel whose single
+#     threshold step has `value: null` (Grafana's base/default color,
+#     applying below the first explicit step). StatChart IS allowed a
+#     format/thresholds block (per WP-138), but its schema has no null-value
+#     step; translated best-effort to an explicit `value: 0` base step,
+#     same as this dashboard's own "green at zero" intent. Grafana's `short`
+#     unit has no direct Perses equivalent confirmed live; mapped
+#     best-effort to `decimal`.
+#   - The "ArgoCD application sync/health status" table panel keeps its
+#     PromQL verbatim (no `transformations` block existed to replicate
+#     either way, and Table panels never carry a format: block per the
+#     same WP-138 schema rejection noted above).
+#   - Grafana's "row" grouping/collapse (type: row, collapsed: true/false)
+#     becomes Grid layout sections (display.collapse.open mirrors
+#     collapsed: true/false), same as both pilots; the cross-dashboard
+#     "Zuno dashboards" link dropdown is dropped rather than guessed.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: zuno-gitops
+  namespace: redhat-ods-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      platform.opendatahub.io/part-of: monitoring
+  config:
+    display:
+      name: "GitOps"
+      description: "ADR-0413/ADR-0551/ADR-0552/ADR-0553: ArgoCD application sync/health status and the openshift-gitops control-plane's own resource footprint. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0553's dated correction note)."
+    duration: 6h
+    refreshInterval: 30s
+    panels:
+      appSyncHealthStatus:
+        kind: Panel
+        spec:
+          display:
+            name: "ArgoCD application sync/health status"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (name, sync_status, health_status)
+                      (argocd_app_info{namespace="openshift-gitops"})
+      appsOutOfSync:
+        kind: Panel
+        spec:
+          display:
+            name: "ArgoCD apps out of sync"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: decimal
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 1
+                    color: orange
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      count(argocd_app_info{namespace="openshift-gitops", sync_status!="Synced"})
+                      or vector(0)
+      argocdDeploymentAvailability:
+        kind: Panel
+        spec:
+          display:
+            name: "ArgoCD Deployment availability"
+            description: "dashboard-infra-data.yaml's \"Deployment availability\" panel, scoped to namespace=openshift-gitops."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      kube_deployment_status_replicas_available{namespace="openshift-gitops"}
+                      / kube_deployment_spec_replicas{namespace="openshift-gitops"}
+                    seriesNameFormat: "{{`{{deployment}}`}}"
+      argocdCpuUsage:
+        kind: Panel
+        spec:
+          display:
+            name: "ArgoCD CPU usage"
+            description: "dashboard-infra-data.yaml's \"CPU usage by namespace\" panel, scoped to namespace=openshift-gitops."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (namespace)
+                      (rate(container_cpu_usage_seconds_total{namespace="openshift-gitops"}[5m]))
+                    seriesNameFormat: "{{`{{namespace}}`}}"
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Sync health"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 16
+              height: 8
+              content:
+                $ref: "#/spec/panels/appSyncHealthStatus"
+            - x: 16
+              y: 0
+              width: 8
+              height: 8
+              content:
+                $ref: "#/spec/panels/appsOutOfSync"
+      - kind: Grid
+        spec:
+          display:
+            title: "Control plane"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/argocdDeploymentAvailability"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/argocdCpuUsage"
+{{- end }}

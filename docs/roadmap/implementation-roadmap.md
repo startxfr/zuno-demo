@@ -830,12 +830,17 @@ dashboard there instead. WP-138 stands up the three shared
 `UIPlugin` (deployed, confirmed non-functional here), and translates two
 pilot dashboards (`zuno-mesh-gateway`, `zuno-trustyai`, both in
 `redhat-ods-monitoring`) to prove the chain end to end; WP-139 translates
-the remaining eight once that pattern is live-verified.
+the remaining eight once that pattern is live-verified. WP-139's eight
+files are now written (121 panels, 10 dashboards/143 panels total with
+WP-138's two) and pass `helm lint`/`helm template`/`check_workload_
+hardening.py`/`check_docs.py`, but applying them to the cluster and the
+data-layer verification WP-138 used to close itself are deferred to a
+later session.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-138 | [wp-138](work-packages/wp-138-perses-infrastructure-and-pilot-dashboards.md) | 0551, 0552, 0553 | none | Done (2026-09-07 - data layer live-verified; no visual UI exists on this cluster for these dashboards, confirmed and accepted) | none |
-| WP-139 | [wp-139](work-packages/wp-139-perses-parity-remaining-dashboards.md) | 0551, 0552, 0553 | WP-138 | Not started | Live-verify remaining eight dashboards render the same way |
+| WP-139 | [wp-139](work-packages/wp-139-perses-parity-remaining-dashboards.md) | 0551, 0552, 0553 | WP-138 | Repo work merged (2026-09-07 - all 8 dashboards translated and passing chart/docs checks; cluster apply and live verification deferred) | Apply `zuno-perses-d1`, confirm `Available: true` on all 8, then live-verify per WP-138's method |
 
 ### OKF stream phases
 

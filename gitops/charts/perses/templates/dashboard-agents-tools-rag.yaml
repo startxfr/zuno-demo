@@ -1,0 +1,680 @@
+{{- if .Values.perses.enabled }}
+# WP-139: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-agents-tools-rag.yaml (ADR-0102/
+# ADR-0011/ADR-0036/ADR-0050/ADR-0109/ADR-0413/ADR-0551). Same panels, same
+# PromQL/TraceQL, same variables - see that file's own header for the
+# row-vs-schema-version rationale (classic "row" panel type, not v2 Dashboard
+# schema), not repeated here.
+#
+# Namespace: redhat-ods-monitoring, named zuno-agents-tools-rag (ADR-0553) -
+# NOT split per source namespace (ADR-0551's original mapping): live
+# investigation found redhat-ods-monitoring is the only project
+# rhods-dashboard's "Monitor & observe" tab actually renders on this cluster
+# (see ADR-0551's third dated correction note, and ADR-0553's own dated
+# correction note - this Perses duplicate is data-layer parity only, no
+# confirmed visual rendering path for custom dashboards has been shown live
+# on this cluster). The zuno- prefix avoids any collision with RHOAI's own
+# eight dashboards sharing this namespace, same as the two WP-138 pilots.
+#
+# Targets RHOAI's existing `data-science-perses` instance (ADR-0552) - see
+# dashboard-mesh-gateway.yaml's header for the full caveat (panel/query
+# plugin kinds confirmed against RHOAI's own live resources; the
+# ListVariable/PrometheusLabelValuesVariable variable plugin remains
+# best-effort, no live RHOAI example uses it).
+#
+# Simplifications/best-effort calls made translating THIS dashboard (WP-138's
+# two pilots did not need most of these - flagged explicitly per that
+# session's own rule, not silently dropped):
+#   - Grafana's "row" panels become Grid layout sections; collapsed:
+#     true/false -> display.collapse.open: false/true (Agents open, MCP
+#     tools/RAG/Traces closed, matching the source file exactly).
+#   - The cross-dashboard "Zuno dashboards" link dropdown (spec.links) is
+#     dropped - no Perses equivalent used anywhere in this chart.
+#   - Per-panel Grafana Explore deep links into Tempo (fieldConfig.defaults.
+#     links on "Per-agent success ratio", "MCP tool invocations" and
+#     "RAG searches") are dropped for the same reason - Perses panels carry
+#     no per-panel link field in the schema used here.
+#   - fieldConfig unit/thresholds/min/max on every timeseries-typed panel
+#     (percentunit, short, s, reqps, etc.) are dropped: TimeSeriesChart's
+#     plugin.spec must stay {} - format/thresholds there is a confirmed
+#     live schema rejection (WP-138). Only the four `stat`-typed panels
+#     (Non-allowed ratio, Freshness alerts firing, RAG search error ratio)
+#     keep format+thresholds, translated onto StatChart, where both fields
+#     are allowed; a Grafana `value: null` first threshold step is mapped to
+#     `value: 0`, matching both pilot files' own first-step convention.
+#   - "Answer grounding (zuno.source_mode)" was a Grafana `piechart` over a
+#     Tempo TraceQL query with a groupBy transformation aggregating span
+#     counts into a donut. Perses has no confirmed piechart+TraceQuery
+#     combination on this cluster, so it is simplified to the same
+#     Table/TraceQuery shape used for this dashboard's other three trace
+#     panels: the identical TraceQL span selection, but rendered as a raw
+#     span table rather than an aggregated donut - the groupBy aggregation
+#     itself is dropped. Same kind of simplification dashboard-trustyai.yaml
+#     already documents for its own table transformations.
+#   - The four templating variables (agent/tool/mcp_server/domain) are all
+#     clean label_values() queries against the `prometheus` datasource and
+#     translate 1:1 onto ListVariable/PrometheusLabelValuesVariable, same
+#     shape as dashboard-mesh-gateway.yaml's three variables - still
+#     best-effort per that file's own caveat, since no live RHOAI dashboard
+#     uses this variable plugin to confirm against.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: zuno-agents-tools-rag
+  namespace: redhat-ods-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      platform.opendatahub.io/part-of: monitoring
+  config:
+    display:
+      name: "Agents, tools & RAG"
+      description: "ADR-0102/ADR-0011/ADR-0036/ADR-0050/ADR-0109/ADR-0413/ADR-0551/ADR-0552/ADR-0553: per-agent SLO/error budget, MCP tool authorization outcomes, RAG search and freshness health. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0553's dated correction note)."
+    duration: 6h
+    refreshInterval: 30s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: agent
+          display:
+            name: agent
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: agent
+              matchers:
+                - "zuno_bff_requests_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: tool
+          display:
+            name: tool
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: tool
+              matchers:
+                - "zuno_tool_invocations_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: mcp_server
+          display:
+            name: mcp_server
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: mcp_server
+              matchers:
+                - "zuno_tool_invocations_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: domain
+          display:
+            name: domain
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: domain
+              matchers:
+                - "zuno_rag_freshness_lag_seconds_count"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+    panels:
+      bffRequestsByAgentCode:
+        kind: Panel
+        spec:
+          display:
+            name: "BFF requests by agent/code (rate)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (agent, code)
+                      (rate(zuno_bff_requests_total{agent=~"$agent"}[5m]))
+                    seriesNameFormat: "{{`{{agent}}`}} ({{`{{code}}`}})"
+      perAgentSuccessRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "Per-agent success ratio (ADR-0102 shape)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (agent) (rate(zuno_bff_requests_total{agent=~"$agent",
+                      code!~"5.."}[5m])) / sum by (agent)
+                      (rate(zuno_bff_requests_total{agent=~"$agent"}[5m]))
+                    seriesNameFormat: "{{`{{agent}}`}}"
+      errorBudgetBurnRate:
+        kind: Panel
+        spec:
+          display:
+            name: "Error budget burn rate (1h vs 6h windows, filtered by agent)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      (1 - (sum(rate(zuno_bff_requests_total{agent=~"$agent",
+                      code!~"5.."}[1h])) /
+                      sum(rate(zuno_bff_requests_total{agent=~"$agent"}[1h])))) / 0.001
+                    seriesNameFormat: "burn rate (1h, fast)"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      (1 - (sum(rate(zuno_bff_requests_total{agent=~"$agent",
+                      code!~"5.."}[6h])) /
+                      sum(rate(zuno_bff_requests_total{agent=~"$agent"}[6h])))) / 0.001
+                    seriesNameFormat: "burn rate (6h, slow)"
+      mcpToolInvocations:
+        kind: Panel
+        spec:
+          display:
+            name: "MCP tool invocations (rate, by tool/outcome)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (tool, outcome)
+                      (rate(zuno_tool_invocations_total{tool=~"$tool",
+                      mcp_server=~"$mcp_server"}[5m]))
+                    seriesNameFormat: "{{`{{tool}}`}} ({{`{{outcome}}`}})"
+      deniedInvocations:
+        kind: Panel
+        spec:
+          display:
+            name: "Denied invocations (rate, by tool/capability)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (tool, capability)
+                      (rate(zuno_tool_invocations_total{outcome="denied",
+                      tool=~"$tool", mcp_server=~"$mcp_server"}[5m]))
+                    seriesNameFormat: "{{`{{tool}}`}} / {{`{{capability}}`}}"
+      nonAllowedRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "Non-allowed ratio"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percentunit
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 0.02
+                    color: orange
+                  - value: 0.1
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(zuno_tool_invocations_total{outcome=~"denied|error|unknown_tool",
+                      tool=~"$tool", mcp_server=~"$mcp_server"}[5m])) /
+                      sum(rate(zuno_tool_invocations_total{tool=~"$tool",
+                      mcp_server=~"$mcp_server"}[5m]))
+      trafficByMcpServer:
+        kind: Panel
+        spec:
+          display:
+            name: "Traffic by MCP server (rate)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (mcp_server)
+                      (rate(zuno_tool_invocations_total{mcp_server=~"$mcp_server"}[5m]))
+                    seriesNameFormat: "{{`{{mcp_server}}`}}"
+      ragSearchesByOutcomeProvider:
+        kind: Panel
+        spec:
+          display:
+            name: "RAG searches (rate, by outcome/provider)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: "sum by (outcome, provider) (rate(zuno_rag_searches_total[5m]))"
+                    seriesNameFormat: "{{`{{outcome}}`}} ({{`{{provider}}`}})"
+      ragResultCount:
+        kind: Panel
+        spec:
+          display:
+            name: "RAG result count (p50/p95)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      histogram_quantile(0.50, sum by (le)
+                      (rate(zuno_rag_result_count_bucket[5m])))
+                    seriesNameFormat: "p50"
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      histogram_quantile(0.95, sum by (le)
+                      (rate(zuno_rag_result_count_bucket[5m])))
+                    seriesNameFormat: "p95"
+      ragFreshnessLagByDomain:
+        kind: Panel
+        spec:
+          display:
+            name: "RAG freshness lag by domain"
+            description: "Same shape as prometheusrule-freshness-lag.yaml's RagFreshnessLagExceeded<Domain> alerts. Per-domain objectives: tech 604800s (7d), sales 14400s (4h), adv 86400s (1d) - sxa-legacy is deliberately exempt."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (domain) (rate(zuno_rag_freshness_lag_seconds_sum{domain=~"$domain"}[30m]))
+                      / sum by (domain)
+                      (rate(zuno_rag_freshness_lag_seconds_count{domain=~"$domain"}[30m]))
+                    seriesNameFormat: "{{`{{domain}}`}}"
+      freshnessAlertsFiring:
+        kind: Panel
+        spec:
+          display:
+            name: "Freshness alerts firing"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: short
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 1
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(ALERTS{alertname=~"RagFreshnessLagExceeded.*",
+                      alertstate="firing"}) or vector(0)
+      ragSearchErrorRatio:
+        kind: Panel
+        spec:
+          display:
+            name: "RAG search error ratio"
+          plugin:
+            kind: StatChart
+            spec:
+              format:
+                unit: percentunit
+              thresholds:
+                steps:
+                  - value: 0
+                    color: green
+                  - value: 0.02
+                    color: orange
+                  - value: 0.1
+                    color: red
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum(rate(zuno_rag_searches_total{outcome="error"}[5m])) /
+                      sum(rate(zuno_rag_searches_total[5m]))
+      ragEmptySearchesByDomainSet:
+        kind: Panel
+        spec:
+          display:
+            name: "Searches returning NOTHING (share, by domain set)"
+            description: "Share of RAG searches that came back with zero rows, BY THE DOMAIN SET SEARCHED. A search that finds nothing is outcome=ok, not an error - so the error-ratio stat beside this one stays green while retrieval is silently dead, and the p50/p95 panel above shows a low number rather than an alarming one. One series pegged at 1.0 is not automatically wrong: knowledge.sales is deliberately empty until Salesforce ingestion lands (ADR-0218). What matters is a series MOVING UP: a domain that was serving content stopped. `domains` is the requested set joined by commas, one label rather than one point per domain."
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      (sum by (domains) (rate(zuno_rag_result_count_bucket{le="0.0"}[$__rate_interval]))
+                      or vector(0)) / clamp_min(sum by (domains)
+                      (rate(zuno_rag_result_count_count[$__rate_interval])), 0.0001)
+                    seriesNameFormat: "{{`{{domains}}`}}"
+      answerGroundingSourceMode:
+        kind: Panel
+        spec:
+          display:
+            name: "Answer grounding (zuno.source_mode)"
+            description: "ADR-0205's acceptance signal - how every agent answer was grounded (indexed/live/both/none), from agent_graph_run spans. Simplified from Grafana's donut+groupBy transformation: raw per-span rows from the same TraceQL selection, not an aggregated pie - see this file's header."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"agent_graph_run\" && span.zuno.agent=~\"$agent\"} | select(span.zuno.source_mode, span.zuno.latency_ms)"
+      tracesSlowAgentGraphRun:
+        kind: Panel
+        spec:
+          display:
+            name: "Traces: slow agent_graph_run (>10s)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"agent_graph_run\" && duration > 10s}"
+      tracesToolInvokeErrors:
+        kind: Panel
+        spec:
+          display:
+            name: "Traces: tool_invoke errors"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"tool_invoke\" && status=error}"
+      tracesSlowRagSearch:
+        kind: Panel
+        spec:
+          display:
+            name: "Traces: slow rag_search (>2s)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TraceQuery
+              spec:
+                plugin:
+                  kind: TempoTraceQuery
+                  spec:
+                    datasource:
+                      kind: TempoDatasource
+                      name: tempo
+                    query: "{name=\"rag_search\" && duration > 2s}"
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Agents"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/bffRequestsByAgentCode"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/perAgentSuccessRatio"
+            - x: 0
+              y: 8
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/errorBudgetBurnRate"
+      - kind: Grid
+        spec:
+          display:
+            title: "MCP tools"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/mcpToolInvocations"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/deniedInvocations"
+            - x: 0
+              y: 8
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/nonAllowedRatio"
+            - x: 6
+              y: 8
+              width: 18
+              height: 8
+              content:
+                $ref: "#/spec/panels/trafficByMcpServer"
+      - kind: Grid
+        spec:
+          display:
+            title: "RAG"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/ragSearchesByOutcomeProvider"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/ragResultCount"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/ragFreshnessLagByDomain"
+            - x: 12
+              y: 8
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/freshnessAlertsFiring"
+            - x: 18
+              y: 8
+              width: 6
+              height: 4
+              content:
+                $ref: "#/spec/panels/ragSearchErrorRatio"
+            - x: 0
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/ragEmptySearchesByDomainSet"
+            - x: 12
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/answerGroundingSourceMode"
+      - kind: Grid
+        spec:
+          display:
+            title: "Traces"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/tracesSlowAgentGraphRun"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/tracesToolInvokeErrors"
+            - x: 0
+              y: 8
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/tracesSlowRagSearch"
+{{- end }}

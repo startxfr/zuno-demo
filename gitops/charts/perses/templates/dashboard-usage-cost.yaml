@@ -1,0 +1,468 @@
+{{- if .Values.perses.enabled }}
+# WP-139: typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-usage-cost.yaml (ADR-0029/
+# ADR-0413/ADR-0551). Same panels, same PromQL, same increase(...[$__range])
+# window semantics and topk(20, ...) cardinality bound, same
+# user/group/agent/model/provider filter variables - see that file's own
+# header for the full rationale (including the 2026-08-22 agent-dimension
+# addition and the live-verified user/group label caveat), not repeated
+# here.
+#
+# Namespace: redhat-ods-monitoring, named zuno-usage-cost (ADR-0553) - NOT
+# split per application namespace (ADR-0551's original plan): live
+# investigation found redhat-ods-monitoring is the only project
+# rhods-dashboard's "Monitor & observe" tab actually renders on this
+# cluster (see ADR-0551's third dated correction note, and
+# dashboard-mesh-gateway.yaml/dashboard-trustyai.yaml's own headers for the
+# same finding applied to WP-138's two pilots).
+#
+# Targets RHOAI's existing `data-science-perses` instance (ADR-0552), same
+# as both WP-138 pilots and dashboard-infra-data.yaml - see
+# dashboard-mesh-gateway.yaml's header for the confirmed-vs-best-effort
+# breakdown of plugin kinds. The ListVariable/PrometheusLabelValuesVariable
+# variable plugin (used here for $user/$group/$agent/$model/$provider)
+# remains best-effort for the same reason as the pilots: no live RHOAI
+# example to confirm against.
+#
+# Simplifications/best-effort calls made in this file:
+#   - Every timeseries panel's Grafana fieldConfig.defaults.unit
+#     (currencyUSD) is DROPPED: Perses rejects `plugin.spec.format` on
+#     TimeSeriesChart panels (confirmed live during WP-138), so "Estimated
+#     cost" and "Hourly spend (by provider)" render unitless. Same rule
+#     applies to Table panels, so "Model cost by user & agent" also loses
+#     its currencyUSD hint - raw PromQL/labels are kept verbatim per that
+#     rule, same precedent as dashboard-trustyai.yaml's table panels
+#     (no Grafana `transformations` block existed here to replicate
+#     either way).
+#   - "Cost by provider/model" is Grafana's `piechart` panel type, which
+#     isn't one of WP-138's confirmed panel-kind mappings
+#     (TimeSeriesChart/StatChart/Table/Markdown/TempoTraceQuery all have a
+#     live RHOAI resource to confirm the schema against - see
+#     dashboard-mesh-gateway.yaml's header). Translated best-effort to
+#     `plugin.kind: PieChart` with the same query shape as a TimeSeriesChart
+#     panel; this is unconfirmed against any live example on this cluster
+#     and needs the same live-verification gate WP-138 used for the
+#     ListVariable plugin. Its currencyUSD format is dropped for the same
+#     reason as above, out of caution rather than a confirmed rejection.
+#   - Grafana's "row" grouping/collapse (type: row, collapsed: true/false)
+#     becomes Grid layout sections (display.collapse.open mirrors
+#     collapsed: true/false), same as both pilots; the cross-dashboard
+#     "Zuno dashboards" link dropdown is dropped rather than guessed.
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: zuno-usage-cost
+  namespace: redhat-ods-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      platform.opendatahub.io/part-of: monitoring
+  config:
+    display:
+      name: "Usage & cost"
+      description: "ADR-0029/ADR-0413/ADR-0551/ADR-0552/ADR-0553: model calls/tokens/cost and API requests by user and Keycloak group, filterable by user/group/agent/model/provider. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0553's dated correction note)."
+    duration: 24h
+    refreshInterval: 30s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: user
+          display:
+            name: user
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: user
+              matchers:
+                - "zuno_model_calls_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: group
+          display:
+            name: group
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: group
+              matchers:
+                - "zuno_model_calls_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: agent
+          display:
+            name: agent
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: agent
+              matchers:
+                - "zuno_bff_requests_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: model
+          display:
+            name: model
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: model
+              matchers:
+                - "zuno_model_calls_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: provider
+          display:
+            name: provider
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: provider
+              matchers:
+                - "zuno_model_calls_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+    panels:
+      modelCallsByUser:
+        kind: Panel
+        spec:
+          display:
+            name: "Model calls (top 20 users, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      topk(20, sum by (user)
+                      (increase(zuno_model_calls_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range])))
+                    seriesNameFormat: "{{`{{user}}`}}"
+      estimatedCostByUser:
+        kind: Panel
+        spec:
+          display:
+            name: "Estimated cost (top 20 users, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      topk(20, sum by (user)
+                      (increase(zuno_model_cost_usd_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range])))
+                    seriesNameFormat: "{{`{{user}}`}}"
+      apiRequestsByUser:
+        kind: Panel
+        spec:
+          display:
+            name: "API requests (top 20 users, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      topk(20, sum by (user)
+                      (increase(zuno_bff_requests_total{user=~"$user", agent=~"$agent"}[$__range])))
+                    seriesNameFormat: "{{`{{user}}`}}"
+      topTokenConsumers:
+        kind: Panel
+        spec:
+          display:
+            name: "Top token consumers (over range)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      topk(20, sum by (user)
+                      (increase(zuno_model_tokens_total{user=~"$user"}[$__range])))
+      modelCallsByGroup:
+        kind: Panel
+        spec:
+          display:
+            name: "Model calls (by group, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (group)
+                      (increase(zuno_model_calls_total{group=~"$group", model=~"$model", provider=~"$provider"}[$__range]))
+                    seriesNameFormat: "{{`{{group}}`}}"
+      tokensConsumedByGroup:
+        kind: Panel
+        spec:
+          display:
+            name: "Tokens consumed (by group/kind, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (group, kind)
+                      (increase(zuno_model_tokens_total{group=~"$group", model=~"$model", provider=~"$provider"}[$__range]))
+                    seriesNameFormat: "{{`{{group}}`}} ({{`{{kind}}`}})"
+      apiRequestsByGroupAgent:
+        kind: Panel
+        spec:
+          display:
+            name: "API requests (by group/agent, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (group, agent)
+                      (increase(zuno_bff_requests_total{group=~"$group", agent=~"$agent"}[$__range]))
+                    seriesNameFormat: "{{`{{group}}`}} / {{`{{agent}}`}}"
+      modelCostByUserAgent:
+        kind: Panel
+        spec:
+          display:
+            name: "Model cost by user & agent (top 20, over range)"
+            description: "zuno_model_cost_usd_total's agent label (ADR-0029) - populated once ai-gateway forwards X-Zuno-Agent into model_call_span, same redeploy this dashboard's other panels needed."
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      topk(20, sum by (user, agent)
+                      (increase(zuno_model_cost_usd_total{user=~"$user", agent=~"$agent"}[$__range])))
+      tokensByAgent:
+        kind: Panel
+        spec:
+          display:
+            name: "Tokens by agent (over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (agent, kind)
+                      (increase(zuno_model_tokens_total{agent=~"$agent", model=~"$model", provider=~"$provider"}[$__range]))
+                    seriesNameFormat: "{{`{{agent}}`}} ({{`{{kind}}`}})"
+      costByProviderModel:
+        kind: Panel
+        spec:
+          display:
+            name: "Cost by provider/model (over range)"
+          plugin:
+            kind: PieChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (provider, model)
+                      (increase(zuno_model_cost_usd_total{provider=~"$provider", model=~"$model"}[$__range]))
+                    seriesNameFormat: "{{`{{provider}}`}}/{{`{{model}}`}}"
+      hourlySpendByProvider:
+        kind: Panel
+        spec:
+          display:
+            name: "Hourly spend (by provider)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: 'sum by (provider) (increase(zuno_model_cost_usd_total{provider=~"$provider"}[1h]))'
+                    seriesNameFormat: "{{`{{provider}}`}}"
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "By user"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/modelCallsByUser"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/estimatedCostByUser"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/apiRequestsByUser"
+            - x: 0
+              y: 16
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/topTokenConsumers"
+      - kind: Grid
+        spec:
+          display:
+            title: "By group & agent"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/modelCallsByGroup"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/tokensConsumedByGroup"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/apiRequestsByGroupAgent"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/modelCostByUserAgent"
+            - x: 0
+              y: 16
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/tokensByAgent"
+      - kind: Grid
+        spec:
+          display:
+            title: "By provider & model"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/costByProviderModel"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/hourlySpendByProvider"
+{{- end }}
