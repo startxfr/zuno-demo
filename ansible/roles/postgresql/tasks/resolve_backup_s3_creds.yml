@@ -41,10 +41,12 @@
 # case for why confidential.yml stays primary), everything needed is
 # already public/in-cluster: bucket/endpoint/region sit in the CR's own
 # spec.backups.pgbackrest.repos[name=repo2].s3 (non-secret, this repo
-# generated them), and the access/secret keys live in the
-# zuno-postgresql-backup-s3 Secret's repo2-s3-key/repo2-s3-key-secret -
-# the exact same Secret PGO itself already consumes for repo2, not a
-# credential this re-derives or duplicates.
+# generated them), and the access/secret keys are inside the
+# zuno-postgresql-backup-s3 Secret's single s3.conf key - a pgBackRest
+# ini blob (`[global]` / `repo2-s3-key=...` / `repo2-s3-key-secret=...`),
+# not separate Secret data keys (checked live: `.data` has exactly one
+# key, `s3.conf`) - the exact same Secret PGO itself already consumes for
+# repo2, not a credential this re-derives or duplicates.
 - name: "postgresql | look up the PostgresCluster for the in-cluster S3 fallback"
   kubernetes.core.k8s_info:
     api_version: postgres-operator.crunchydata.com/v1beta1
@@ -74,17 +76,35 @@
       }}
   when: not (_postgresql_backup_s3_enabled | bool)
 
+- name: "postgresql | decode s3.conf from the fallback Secret, if present"
+  ansible.builtin.set_fact:
+    _postgresql_backup_s3_fallback_conf: >-
+      {{
+        (_postgresql_backup_s3_fallback_secret.resources[0].data['s3.conf'] | b64decode)
+        if ((_postgresql_backup_s3_fallback_secret.resources | default([]) | length) > 0
+            and ('s3.conf' in (_postgresql_backup_s3_fallback_secret.resources[0].data | default({}))))
+        else ''
+      }}
+  when: not (_postgresql_backup_s3_enabled | bool)
+
+- name: "postgresql | extract the repo2 access/secret key from s3.conf, if present"
+  ansible.builtin.set_fact:
+    _postgresql_backup_s3_fallback_access_key: "{{ _postgresql_backup_s3_fallback_conf | regex_search('(?m)^repo2-s3-key=(.+)$', '\\1') | default([''], true) | first }}"
+    _postgresql_backup_s3_fallback_secret_key: "{{ _postgresql_backup_s3_fallback_conf | regex_search('(?m)^repo2-s3-key-secret=(.+)$', '\\1') | default([''], true) | first }}"
+  when:
+    - not (_postgresql_backup_s3_enabled | bool)
+    - _postgresql_backup_s3_fallback_conf | length > 0
+
 - name: "postgresql | apply the in-cluster S3 fallback, if fully resolved"
   ansible.builtin.set_fact:
     zuno_postgresql_backup_s3_bucket: "{{ _postgresql_backup_s3_fallback_repo2.s3.bucket }}"
     zuno_postgresql_backup_s3_endpoint: "{{ _postgresql_backup_s3_fallback_repo2.s3.endpoint }}"
     zuno_postgresql_backup_s3_region: "{{ _postgresql_backup_s3_fallback_repo2.s3.region }}"
-    zuno_postgresql_backup_s3_access_key: "{{ _postgresql_backup_s3_fallback_secret.resources[0].data['repo2-s3-key'] | b64decode }}"
-    zuno_postgresql_backup_s3_secret_key: "{{ _postgresql_backup_s3_fallback_secret.resources[0].data['repo2-s3-key-secret'] | b64decode }}"
+    zuno_postgresql_backup_s3_access_key: "{{ _postgresql_backup_s3_fallback_access_key }}"
+    zuno_postgresql_backup_s3_secret_key: "{{ _postgresql_backup_s3_fallback_secret_key }}"
     _postgresql_backup_s3_enabled: true
   when:
     - not (_postgresql_backup_s3_enabled | bool)
     - (_postgresql_backup_s3_fallback_repo2.s3.bucket | default('')) | length > 0
-    - (_postgresql_backup_s3_fallback_secret.resources | default([]) | length) > 0
-    - "'repo2-s3-key' in (_postgresql_backup_s3_fallback_secret.resources[0].data | default({}))"
-    - "'repo2-s3-key-secret' in (_postgresql_backup_s3_fallback_secret.resources[0].data | default({}))"
+    - (_postgresql_backup_s3_fallback_access_key | default('')) | length > 0
+    - (_postgresql_backup_s3_fallback_secret_key | default('')) | length > 0
