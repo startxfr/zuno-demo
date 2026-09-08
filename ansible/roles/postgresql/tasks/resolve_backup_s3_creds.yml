@@ -17,7 +17,7 @@
     - _postgresql_backup_s3_enabled is not defined
     - _postgresql_confidential_file.stat.exists
 
-- name: "postgresql | determine whether S3 backup credentials are configured"
+- name: "postgresql | determine whether S3 backup credentials are configured (from confidential.yml)"
   ansible.builtin.set_fact:
     _postgresql_backup_s3_enabled: >-
       {{
@@ -28,3 +28,63 @@
         and (zuno_postgresql_backup_s3_secret_key | default('xxxxxx') != 'xxxxxx')
       }}
   when: _postgresql_backup_s3_enabled is not defined
+
+# In-cluster fallback, live finding (demo333, 2026-09-08): ansible/
+# confidential.yml is local-only and gitignored - it never exists inside
+# AAP's execution environment (a fresh git checkout), so every
+# AAP-launched `make d3 restore postgresql` fell back to "S3 not
+# configured" and failed, even though S3 backups work fine (PGO itself
+# uses its own credentials, never this file). Once the PostgresCluster
+# actually exists (never true on the very first bootstrap before `make d0
+# install postgresql` - hence this being a fallback, not the primary
+# path; see [[day3-operational-tier-backup-restore]]'s chicken-and-egg
+# case for why confidential.yml stays primary), everything needed is
+# already public/in-cluster: bucket/endpoint/region sit in the CR's own
+# spec.backups.pgbackrest.repos[name=repo2].s3 (non-secret, this repo
+# generated them), and the access/secret keys live in the
+# zuno-postgresql-backup-s3 Secret's repo2-s3-key/repo2-s3-key-secret -
+# the exact same Secret PGO itself already consumes for repo2, not a
+# credential this re-derives or duplicates.
+- name: "postgresql | look up the PostgresCluster for the in-cluster S3 fallback"
+  kubernetes.core.k8s_info:
+    api_version: postgres-operator.crunchydata.com/v1beta1
+    kind: PostgresCluster
+    namespace: zuno-data
+    name: zuno-postgresql
+  register: _postgresql_backup_s3_fallback_cluster
+  when: not (_postgresql_backup_s3_enabled | bool)
+
+- name: "postgresql | look up the zuno-postgresql-backup-s3 Secret for the in-cluster S3 fallback"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-data
+    name: zuno-postgresql-backup-s3
+  register: _postgresql_backup_s3_fallback_secret
+  when: not (_postgresql_backup_s3_enabled | bool)
+
+- name: "postgresql | resolve the repo2 S3 spec from the PostgresCluster, if present"
+  ansible.builtin.set_fact:
+    _postgresql_backup_s3_fallback_repo2: >-
+      {{
+        (_postgresql_backup_s3_fallback_cluster.resources[0].spec.backups.pgbackrest.repos
+         | default([]) | selectattr('name', 'equalto', 'repo2') | list | first | default({}))
+        if (_postgresql_backup_s3_fallback_cluster.resources | default([]) | length) > 0
+        else {}
+      }}
+  when: not (_postgresql_backup_s3_enabled | bool)
+
+- name: "postgresql | apply the in-cluster S3 fallback, if fully resolved"
+  ansible.builtin.set_fact:
+    zuno_postgresql_backup_s3_bucket: "{{ _postgresql_backup_s3_fallback_repo2.s3.bucket }}"
+    zuno_postgresql_backup_s3_endpoint: "{{ _postgresql_backup_s3_fallback_repo2.s3.endpoint }}"
+    zuno_postgresql_backup_s3_region: "{{ _postgresql_backup_s3_fallback_repo2.s3.region }}"
+    zuno_postgresql_backup_s3_access_key: "{{ _postgresql_backup_s3_fallback_secret.resources[0].data['repo2-s3-key'] | b64decode }}"
+    zuno_postgresql_backup_s3_secret_key: "{{ _postgresql_backup_s3_fallback_secret.resources[0].data['repo2-s3-key-secret'] | b64decode }}"
+    _postgresql_backup_s3_enabled: true
+  when:
+    - not (_postgresql_backup_s3_enabled | bool)
+    - (_postgresql_backup_s3_fallback_repo2.s3.bucket | default('')) | length > 0
+    - (_postgresql_backup_s3_fallback_secret.resources | default([]) | length) > 0
+    - "'repo2-s3-key' in (_postgresql_backup_s3_fallback_secret.resources[0].data | default({}))"
+    - "'repo2-s3-key-secret' in (_postgresql_backup_s3_fallback_secret.resources[0].data | default({}))"
