@@ -1,0 +1,38 @@
+---
+# Reverse of install.yml. Same ordering rationale as ansible/roles/rhtas/
+# tasks/uninstall.yml: delete -d1 (the ClusterImagePolicy/TrustRoot/
+# signerClientMirror operand) first so ArgoCD isn't fighting a CR deletion,
+# then remove_operator.yml (needs the Subscription to still exist) before
+# -d0's own delete. remove_operator.yml deletes every CRD owned by the
+# CSV, which cascades to delete any surviving ClusterImagePolicy/TrustRoot
+# CRs and their broken-webhook conversion-strategy patch along with the
+# CRD itself - nothing extra to revert there, a reinstall re-patches a
+# fresh CRD the same way it did the first time.
+- name: "rhtas_config | delete the rhtas-config ArgoCD Application (d1: Policy Controller operand)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-rhtas-config-d1"
+
+- name: "rhtas_config | delete the ansible-managed rhtas-keycloak-ca ConfigMap (zuno-ai-build copy)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    name: rhtas-keycloak-ca
+    namespace: zuno-ai-build
+
+# OLM OwnNamespace install mode: Subscription/CSV live in
+# policy-controller-operator, not openshift-operators (live finding,
+# demo333 2026-09-08, same as precheck.yml/install.yml's own lookups) - no
+# discovery loop needed, the package name is a fixed default install.yml
+# itself resolves the same way.
+- name: "rhtas_config | remove the policy-controller-operator operator (owned CRDs, then CSV, then Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+  vars:
+    operator_subscription_name: "{{ policy_controller_package_name | default('policy-controller-operator') }}"
+    operator_namespace: policy-controller-operator
+
+- name: "rhtas_config | delete the rhtas-config ArgoCD Application (d0: cascades the remaining OperatorGroup)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-rhtas-config-d0"

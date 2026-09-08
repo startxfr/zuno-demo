@@ -1,0 +1,71 @@
+---
+# State detection (never fails). Mirrors ansible/roles/rhtas/tasks/
+# precheck.yml's shape - install.yml's own two GitOps Applications plus the
+# live objects its waits treat as "done": the policy-controller-manager
+# Deployment (Available), the ClusterImagePolicy (Ready - the same
+# condition install.yml itself waits on, TrustRoot's readiness is implied
+# by it per install.yml's own KeysInlined dependency), and the
+# zuno-signer-client-secret Secret the image-signing Jobs actually consume.
+- name: "rhtas_config | check the rhtas-config Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-rhtas-config-d0"
+
+- name: "rhtas_config | save the d0 check result"
+  ansible.builtin.set_fact:
+    _rhtas_config_d0_installed: "{{ _state_check_result }}"
+
+- name: "rhtas_config | check the rhtas-config Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-rhtas-config-d1"
+
+- name: "rhtas_config | save the d1 check result"
+  ansible.builtin.set_fact:
+    _rhtas_config_d1_installed: "{{ _state_check_result }}"
+
+# OLM OwnNamespace install mode - the Subscription/CSV/Deployment all land
+# in policy-controller-operator, not zuno-rhtas (live finding, demo333
+# 2026-09-08, see install.yml's own comment on this same lookup).
+- name: "rhtas_config | look up the policy-controller-manager Deployment"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: policy-controller-operator
+    name: policy-controller-manager
+  register: _rhtas_config_operator_deployment_lookup
+
+- name: "rhtas_config | look up the zuno-first-party-images ClusterImagePolicy"
+  kubernetes.core.k8s_info:
+    api_version: policy.sigstore.dev/v1alpha1
+    kind: ClusterImagePolicy
+    name: zuno-first-party-images
+  register: _rhtas_config_cip_lookup
+
+- name: "rhtas_config | look up the zuno-signer-client-secret Secret"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-ai-build
+    name: zuno-signer-client-secret
+  register: _rhtas_config_signer_secret_lookup
+
+- name: "rhtas_config | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _rhtas_config_d0_installed
+        and _rhtas_config_d1_installed
+        and (_rhtas_config_operator_deployment_lookup.resources | default([]) | length) > 0
+        and (_rhtas_config_operator_deployment_lookup.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'Available') | map(attribute='status') | list
+             | first | default('False')) == 'True'
+        and (_rhtas_config_cip_lookup.resources | default([]) | length) > 0
+        and (_rhtas_config_cip_lookup.resources[0].status.conditions | default([])
+             | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
+             | first | default('False')) == 'True'
+        and (_rhtas_config_signer_secret_lookup.resources | default([]) | length) > 0
+      }}
+
+- name: "rhtas_config | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
