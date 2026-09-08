@@ -15,6 +15,14 @@
 # `day2_render_component` (default 'agents'),
 # `day2_render_fail_inline` (default true - set false for a caller that
 # only ever wants to report, never fail).
+# `day2_render_fail_hint` (default '' - set by a caller that can tell,
+# from its own results which specific next-step command would address
+# the failure(s), e.g. demo_check.yml pointing at `make demo reset` for
+# a missing demo project or `make d3 run mlops` for missing training
+# evidence). Appended to the fail message when non-empty; this task stays
+# generic and never guesses a remediation itself - running that command
+# is still the operator's call, this only surfaces what the report above
+# already implies.
 - name: "day2-report | render the combined report (platform/testing/day2_report.py)"
   ansible.builtin.command:
     cmd: "python3 {{ zuno_repo_root }}/platform/testing/day2_report.py --format {{ report_format | default('text') }} --component {{ day2_render_component | default('agents') }}"
@@ -31,7 +39,7 @@
   ansible.builtin.fail:
     msg: >-
       One or more checks did not pass - see the report above for which
-      one(s).
+      one(s).{{ ' ' + day2_render_fail_hint if (day2_render_fail_hint | default('')) | length > 0 else '' }}
   when:
     - day2_render_fail_inline | default(true)
     - (_day2_render_report.rc | default(0)) != 0
