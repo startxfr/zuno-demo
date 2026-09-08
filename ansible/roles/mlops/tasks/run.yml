@@ -56,6 +56,33 @@
   register: _mlops_run_result
   changed_when: true
 
+- name: "mlops | look up the RHOAI dashboard Route"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: redhat-ods-applications
+    name: rhods-dashboard
+  register: _mlops_run_dashboard_route
+  ignore_errors: true
+
 - name: "mlops | report the triggered run"
   ansible.builtin.debug:
     var: _mlops_run_result.stdout_lines
+
+# The trigger_run.py-printed "Run details" link points at the raw DSPA
+# route (ds-pipeline-mlops-dspa-...), which needs its own separate
+# OAuth-proxy login and returns a bare "Unauthorized" on a plain browser
+# hit - live-caught 2026-09-08. The RHOAI dashboard route is already
+# behind the cluster's normal SSO and has no equivalent direct-link-to-
+# a-run URL scheme, so this points at the dashboard plus the manual
+# navigation instead of a link.
+- name: "mlops | print the RHOAI dashboard navigation to view this run"
+  ansible.builtin.debug:
+    msg: >-
+      To watch this run, use the RHOAI dashboard instead of the link
+      above (the raw DSPA route needs its own login and shows
+      "Unauthorized" in a plain browser tab):
+      https://{{ (_mlops_run_dashboard_route.resources | default([]) | first | default({})).spec.host | default('<rhods-dashboard Route not found>') }}
+      -> Data Science Projects -> "Zuno MLOps" ({{ mlops_namespace | default('zuno-mlops') }})
+      -> Pipelines tab -> Runs, then find the run named
+      "{{ (_mlops_run_result.stdout | regex_search('run_id=(\S+)', '\1')) | default([]) | first | default('(see run_id above)') }}".
