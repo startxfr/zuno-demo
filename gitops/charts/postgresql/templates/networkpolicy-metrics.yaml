@@ -103,6 +103,23 @@ spec:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: redhat-ods-applications
+        # ADR-0517 live finding (demo333, 2026-09-08, post-restart): the
+        # redhat-ods-applications rule above covers where our own chart
+        # renders the maas-db-config Secret, but RHOAI's ModelsAsService
+        # operator (maas.opendatahub.io/v1alpha1 Config/default) actually
+        # runs the maas-api gateway Deployment itself in its own
+        # operator-generated namespace, redhat-ai-gateway-infra - a
+        # different namespace than the Secret's targetNamespace. Same
+        # direct-to-primary reasoning (values.yaml's maasDb.host comment).
+        # First seen live once maas-api actually ran long enough to attempt
+        # a real connection: TCP connect "succeeded" (local Envoy), the
+        # Postgres protocol exchange hung ~57s until the liveness probe
+        # killed the pod, CrashLoopBackOff with no app-level error logged -
+        # same lying-probe shape as the redhat-ods-applications/zuno-ogx
+        # case above.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ai-gateway-infra
       ports:
         - protocol: TCP
           port: 5432
