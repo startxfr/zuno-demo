@@ -395,10 +395,19 @@ platformNamespaces:
     # succeeded instantly while ArgoCD's own cross-namespace calls
     # intermittently hit the webhook's tight 5s timeout - NetworkPolicy,
     # not the webhook server, was the real bottleneck.
+    # policy-controller-operator: ADR-0517 live finding (demo333,
+    # 2026-09-08) - its webhook's TrustRoot reconciler GETs the TUF
+    # service (tuf.zuno-rhtas.svc.cluster.local) to build its Sigstore
+    # keys client; without this entry that call times out
+    # ("context deadline exceeded") and TrustRoot's Ready condition never
+    # goes True. Same failure class as the openshift-operators/rekor
+    # entry above - first real run of this namespace ever exercised the
+    # call.
     allowedFromNamespaces:
       - zuno-ai-build
       - openshift-operators
       - openshift-gitops
+      - policy-controller-operator
     # Deliberately NOT istio-injection: enabled - operator-owned workloads,
     # same posture as zuno-aap/openshift-lightspeed (a sidecar would have
     # to be re-patched on every Securesign reconcile).
