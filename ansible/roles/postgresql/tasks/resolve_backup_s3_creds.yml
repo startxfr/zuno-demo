@@ -95,6 +95,28 @@
     - not (_postgresql_backup_s3_enabled | bool)
     - _postgresql_backup_s3_fallback_conf | length > 0
 
+    # check_s3_backup.yml's throwaway Job defaults this to /pgbackrest/
+    # repo2 when unset - WRONG for this cluster and silently so (no
+    # error, just an empty-looking prefix): confirmed live by execing
+    # `pgbackrest info --repo=2` inside the primary pod and diffing its
+    # /etc/pgbackrest/conf.d/pgbackrest_instance.conf against what the
+    # first version of this fallback (464f8348) produced - PGO's real
+    # repo2-path is spec.backups.pgbackrest.global['repo2-path'], not a
+    # fixed convention. First attempt at this fallback used the wrong
+    # default and made the check Job "successfully" query the wrong S3
+    # prefix, reporting "no backup" for a bucket that demonstrably has one
+    # (job 1079).
+- name: "postgresql | resolve the repo2 S3 path from the PostgresCluster's pgbackrest global options"
+  ansible.builtin.set_fact:
+    _postgresql_backup_s3_fallback_path: >-
+      {{
+        (_postgresql_backup_s3_fallback_cluster.resources[0].spec.backups.pgbackrest.global
+         | default({})).get('repo2-path', '')
+        if (_postgresql_backup_s3_fallback_cluster.resources | default([]) | length) > 0
+        else ''
+      }}
+  when: not (_postgresql_backup_s3_enabled | bool)
+
 - name: "postgresql | apply the in-cluster S3 fallback, if fully resolved"
   ansible.builtin.set_fact:
     zuno_postgresql_backup_s3_bucket: "{{ _postgresql_backup_s3_fallback_repo2.s3.bucket }}"
@@ -102,9 +124,11 @@
     zuno_postgresql_backup_s3_region: "{{ _postgresql_backup_s3_fallback_repo2.s3.region }}"
     zuno_postgresql_backup_s3_access_key: "{{ _postgresql_backup_s3_fallback_access_key }}"
     zuno_postgresql_backup_s3_secret_key: "{{ _postgresql_backup_s3_fallback_secret_key }}"
+    zuno_postgresql_backup_s3_path: "{{ _postgresql_backup_s3_fallback_path }}"
     _postgresql_backup_s3_enabled: true
   when:
     - not (_postgresql_backup_s3_enabled | bool)
     - (_postgresql_backup_s3_fallback_repo2.s3.bucket | default('')) | length > 0
     - (_postgresql_backup_s3_fallback_access_key | default('')) | length > 0
     - (_postgresql_backup_s3_fallback_secret_key | default('')) | length > 0
+    - (_postgresql_backup_s3_fallback_path | default('')) | length > 0
