@@ -257,6 +257,20 @@ rules:
   - apiGroups: ["apiextensions.k8s.io"]
     resources: ["customresourcedefinitions"]
     verbs: ["get", "list", "watch"]
+  # ADR-0517 live finding (demo333, 2026-09-08): rhtas_config's install.yml
+  # patches the ClusterImagePolicy CRD's spec.conversion (strategy: None -
+  # sidesteps policy-controller-operator's mispackaged conversion webhook,
+  # a "user-approved cluster mutation" per that task's own comment,
+  # previously only ever applied by hand with the bootstrap kubeconfig).
+  # First real run under this credential 403'd - the read-only rule above
+  # is a deliberate boundary (see its comment), so this widens write
+  # access to exactly one named CRD via resourceNames, same
+  # escalation-safe narrowing pattern as the clusterroles/bind grant
+  # above (system:image-builder), not a blanket CRD-write grant.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["patch"]
+    resourceNames: ["clusterimagepolicies.policy.sigstore.dev"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["storageclasses"]
     verbs: ["get", "list", "watch"]
