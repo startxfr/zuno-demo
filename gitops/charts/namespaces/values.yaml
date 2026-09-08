@@ -204,6 +204,14 @@ platformNamespaces:
       backing ADR-0535's audit-only ClusterImagePolicy (WP-111).
     extraLabels:
       zuno.io/managed: "true"
+    # ADR-0517 live finding (demo333, 2026-09-08): the API server calls
+    # this operator's own webhooks (defaulting.clusterimagepolicy.rhtas.com,
+    # policy.rhtas.com) synchronously on every TrustRoot/ClusterImagePolicy
+    # write - same failure class as ESO's secretstore-validate webhook and
+    # istiod's above ("context deadline exceeded", status never populated).
+    # First real run of this namespace ever exercised these webhooks; the
+    # entry predates that and was never given this flag.
+    allowApiServerWebhooks: true
 
   - name: zuno-mlops
     displayName: Zuno MLOps
