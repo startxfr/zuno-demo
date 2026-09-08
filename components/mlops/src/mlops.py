@@ -676,9 +676,15 @@ def _download_style_corpus(config: MlopsConfig, store: ArtifactStore, workdir: P
 
     bucket, key = _split_s3_uri(config.style_corpus_s3uri)
     # The corpus bucket is named by the URI, not assumed to be S3_BUCKET -
-    # ArtifactStore._resolve picks the default client when they match and
-    # a region-correct one when they do not.
-    raw = store.get_bytes(key, bucket=bucket)
+    # and today it IS the same cross-cluster source bucket the base model
+    # is staged in (zuno-demo-sources), so it needs the same region/
+    # endpoint override _resolve_base_model passes below, not this
+    # pipeline's own artifact-bucket region - omitting it here raised a
+    # live PermanentRedirect (2026-09-08, demo333, agent comage).
+    raw = store.get_bytes(
+        key, bucket=bucket,
+        region=config.models_s3_region, endpoint=config.models_s3_endpoint,
+    )
     if raw is None:
         raise SystemExit(f"style corpus not found at {config.style_corpus_s3uri}")
 
