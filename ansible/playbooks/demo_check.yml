@@ -337,26 +337,45 @@
 
     # --- Render everything, decide once ------------------------------------
 
-    # Next-step hints for the specific failures that mean "demo environment
-    # not seeded yet" rather than a real defect - `make demo reset` creates
-    # the webinar projects (and uncordons any node) and `make d3 run mlops`
-    # produces a Complete TrainJob (WP-126/ADR-0539). Computed here, not in
-    # day2_render_and_fail.yml, because only this playbook knows which
-    # command actually fixes which one of its own checks.
-    - name: "demo-check | build a next-step hint for any known, fixable failure"
+    # Some failures mean "demo environment not seeded yet" rather than a
+    # real platform defect - `make demo reset` creates the webinar projects
+    # (and uncordons any node) and `make d3 run mlops` produces a Complete
+    # TrainJob (WP-126/ADR-0539). `make demo check` is a human operator's
+    # preflight tool (WP-136/ADR-0550), not a CI gate, so when EVERY failure
+    # is one of these known/expected gaps this playbook does not raise an
+    # Ansible failure at all - it prints the report plus the exact next
+    # command, and stops there. A failure outside this known set still
+    # fails the play as before (see day2_render_and_fail.yml).
+    - name: "demo-check | separate known/seedable failures from any other failure"
+      ansible.builtin.set_fact:
+        _demo_check_seedable_failures: "{{ _demo_check_results | rejectattr('passed') | selectattr('id', 'in', ['demo-projects', 'no-node-cordoned', 'trainjob-evidence']) | list }}"
+        _demo_check_other_failures: "{{ _demo_check_results | rejectattr('passed') | rejectattr('id', 'in', ['demo-projects', 'no-node-cordoned', 'trainjob-evidence']) | list }}"
+
+    - name: "demo-check | build the next-step hint for any known, seedable failure"
       ansible.builtin.set_fact:
         _demo_check_fail_hint: >-
           {{
             (
               (['`make demo reset` to create the missing webinar demo project(s) and/or uncordon any node']
-                if (_demo_check_results | selectattr('id', 'in', ['demo-projects', 'no-node-cordoned']) | rejectattr('passed') | list | length) > 0
+                if (_demo_check_seedable_failures | selectattr('id', 'in', ['demo-projects', 'no-node-cordoned']) | list | length) > 0
                 else [])
               +
               (['`make d3 run mlops` (agent comage) to produce a Complete TrainJob']
-                if (_demo_check_results | selectattr('id', 'equalto', 'trainjob-evidence') | rejectattr('passed') | list | length) > 0
+                if (_demo_check_seedable_failures | selectattr('id', 'equalto', 'trainjob-evidence') | list | length) > 0
                 else [])
             ) | join(' and ')
           }}
+
+    - name: "demo-check | not a defect, just not seeded yet - print the next step and stop"
+      ansible.builtin.debug:
+        msg: >-
+          Demo environment not fully seeded yet (see report above) - run
+          {{ _demo_check_fail_hint }}, then re-run `make demo check`. Not
+          treated as a failure: every failing check here has a known,
+          expected cause on a freshly (re)deployed cluster.
+      when:
+        - (_demo_check_seedable_failures | length) > 0
+        - (_demo_check_other_failures | length) == 0
 
     - name: "demo-check | render the combined report and fail if anything did not pass"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_render_and_fail.yml"
@@ -365,3 +384,4 @@
         day2_render_component: "demo-check"
         day2_render_fail_hint: >-
           {{ 'Run ' + _demo_check_fail_hint + ', then re-run this check.' if (_demo_check_fail_hint | length) > 0 else '' }}
+        day2_render_fail_inline: "{{ (_demo_check_other_failures | length) > 0 }}"
