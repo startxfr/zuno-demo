@@ -274,6 +274,18 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["storageclasses"]
     verbs: ["get", "list", "watch"]
+  # ADR-0517 live finding (demo333, 2026-09-08): `make d3 backup postgresql`
+  # (Day 3, aap-installer) 403'd reading the PostgresCluster - this
+  # apiGroup was simply never granted, postgresql having only ever run
+  # Day 0 install through the bootstrap kubeconfig or a chart-rendered
+  # path before now. Not part of the big multi-group operand block above:
+  # the CR itself is ArgoCD-rendered (create/update/delete belong to the
+  # application-controller, never this credential) - aap-installer only
+  # ever reads it (every install/check/restore path) and patches the
+  # on-demand pgbackrest-backup annotation (backup.yml). No create/delete.
+  - apiGroups: ["postgres-operator.crunchydata.com"]
+    resources: ["postgresclusters"]
+    verbs: ["get", "list", "watch", "patch"]
   # Day 2: content-ingestion agent CRDs.
   - apiGroups: ["zuno.zuno.ai"]
     resources: ["*"]
