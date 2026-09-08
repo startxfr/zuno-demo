@@ -30,7 +30,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.5 | 11 | 2 | 16 | WP-55, WP-101, WP-122, WP-139 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
-| v0.8 | 5 | 1 | 5 | — |
+| v0.8 | 5 | — | 6 | — |
 | v0.9 | 5 | 3 | 5 | — |
 | v0.10 | 5 | 5 | 6 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -742,10 +742,9 @@ dependency on the already-merged WP-119.
 | WP-128 | [wp-128](work-packages/wp-128-inferencegraph-rag-research.md) | 0545 | none | Done (2026-09-03) | recommendation: no reranker for now. Confirmed via full code read that neither rag-service provider (pgvector RRF+metadata, OGX client-side filtering) calls a second model anywhere; no documented quality gap (the one live RAGAS sample is excellent but too small to trust); the GPU quota that would host a reranker is already saturated (ADR-0542). InferenceGraph-vs-direct-call is therefore moot until a reranker is actually wanted - revisit on degraded RAGAS at scale or a documented relevance complaint |
 
 
-### Phase 37 — demo333 portability: parameterize, gate, and split the buckets (added 2026-09-03)
+### Phase 37 — demo333 portability: parameterize, gate, and split the buckets (added 2026-09-03; run executed and ADR-0517 Implemented 2026-09-08)
 
-ADR-0517's own run stays blocked on an operator provisioning `demo333`, but the
-audit that was meant to bound it has been overtaken. WP-118 closed nine blockers
+WP-118 closed nine blockers
 by removing `demo222` literals; audit pass 2 found no further literals and three
 further blockers anyway — a cluster-only mutation with nothing in the repo to
 grep for (B10, already closed by WP-123), `demo222`'s ACME end state committed to
@@ -761,6 +760,7 @@ finding, WP-131 executes ADR-0546's bucket split.
 | WP-130 | [wp-130](work-packages/wp-130-fresh-cluster-readiness-gate.md) | 0517, 0547 | WP-118, WP-132 | Done (2026-09-04) | seven read-only probes wired into `make d0 check` and gating `make d0 install` (default StorageClass, AWS installer identity and per-AZ subnets, base domain and Route53 identity, the ACME consumer flips, confidential.yml completeness, bucket ownership, leftover `mycluster-*` placeholders) plus a blocking gate on `make d0 install`; zero findings on `demo222`, and each condition proven able to fire rather than trusted - P6 driven live, the rest unit-tested, which found a real bug in resolve_cluster_default_storage_class.yml's bool handling |
 | WP-131 | [wp-131](work-packages/wp-131-per-cluster-s3-bucket-convention.md) | 0546, 0517, 0547 | manual AWS provisioning; P0-a and P0-b in the brief | Done (2026-09-05 — all eight components cut over and live-verified) | All eight components are cut over and live-verified on demo222 (mlflow, mariadb, aap hub, mlops, openshift-ai traces, rag-ingestion, postgresql, models). postgresql P0-P14 all done and live-verified: the P7 flip landed, `stanza-create` adopted the existing history, `pgbackrest verify --repo=2` passed clean on all 112 GB, a restore drill from the new bucket matched the live cluster exactly, and P14's 5 locked buckets were deleted, confirmed gone via `head-bucket` 404s. Step 8 (`models`) closed 2026-09-05: all 5 served models cut over live, one at a time; `models/` (226 objects, 164.6 GB) deleted from `zuno-demo-rag-corpus`. `zuno-demo-rag-corpus` itself closed 2026-09-05: all 20 non-`sales` RAG-ingestion domains re-cut-over via a real pipeline run per domain, `corpus.deleteOrphans` flipped `true`, and the bucket deleted. All six legacy buckets are now deleted and every WP-131 step, including P13, is closed. Gated the ADR-0517 run |
 | WP-132 | [wp-132](work-packages/wp-132-cluster-parameterization.md) | 0547, 0517 | WP-118 | Done (2026-09-04) | steps 0-3 landed and live-verified (B13 — cert_manager never loaded confidential.yml, so WP-118 B6's ACME identity resolved to placeholders and the next install would have broken DNS-01 live on demo222; loader added plus a check_docs guard; `make d0 install cert-manager` then confirmed `changed=0` with the Applications byte-identical and the ACME track Ready — and that changed=0 proves something, because the chart defaults are placeholders now). the RHOAI version pin is now `zuno_openshift_ai_version` and `make d1 install openshift-ai` added exactly one line to the Application with everything downstream of startingCSV untouched. B11 closed - the ACME rollout state left application-d1.yaml for four operator variables defaulting to the chart's safe start, guarded against pruning a live track. steps 4 and 5 deliberately scoped out - the machines chart's AZ and instance types are fleet design rather than cluster identity and no discovery task can populate them, and no conversion produced a secret needing Vault; ADR-0547's acceptance criterion 1 is knowingly unmet and recorded in its implementation notes. Each landed step used the two-step order with an inertia proof that answers what a dead mechanism would have looked like |
+| WP-140 | [wp-140](work-packages/wp-140-demo333-redeploy-execution.md) | 0517 | WP-130, WP-131, WP-132 | Done (2026-09-08) | the proof run itself: `demo333` provisioned (region pivot eu-west-1 → eu-central-1, `g7e` unavailable in eu-west-1), full redeploy executed, `make d0/d1/d2/d3 check` and `make d3 test all` (15/15) all green, `make d3 sign/backup/restore postgresql` all green. 40 manual interventions logged and closed - full findings log in ADR-0517's own Implementation notes - split roughly into literals the WP-118 audit anticipated but couldn't exhaustively enumerate, first-real-run-under-AAP RBAC/NetworkPolicy/wiring gaps (the largest class, `demo222` never having exercised these paths under the current AAP-launch automation), and a handful of genuine code bugs. `demo222` untouched throughout, S3 isolation re-verified clean at closure |
 
 ### Phase 38 — prove the original LoRA-adapter mechanism and close ADR-0301/ADR-0302 (added 2026-09-04)
 

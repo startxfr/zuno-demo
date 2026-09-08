@@ -1014,6 +1014,48 @@ target; revert to `latest` immediately after proving it.
     require real delimiters. Zero false positives across all 908
     reference responses.
 
+### Dated entries (roadmap work packages, v0.8) — current status per ADR
+
+- **ADR-0517 (WP-140, plus prep WP-130/131/132)**: Redeploy the full
+  platform from scratch on a new `demo333` cluster —
+  **Implemented 2026-09-08.** `demo333` provisioned (region pivot
+  `eu-west-1` → `eu-central-1`, `g7e` GPU instance type unavailable in
+  `eu-west-1`), full redeploy via `make day0/day1/day2 install` +
+  `make d3 sign/backup/restore`, `make d0/d1/d2/d3 check` and
+  `make d3 test all` (15/15) all green — matching `demo222`'s acceptance
+  bar. **40 manual interventions** logged and closed during the run
+  (full log in the ADR's own Implementation notes), split roughly into:
+  literals the WP-118 static audit had anticipated but couldn't
+  exhaustively enumerate; first-real-run-under-AAP RBAC/NetworkPolicy/
+  wiring gaps (the largest class — paths `demo222` had never exercised
+  under this repo's current AAP-launch automation, e.g. `rhtas_config`
+  being written but never wired into any playbook since it was authored);
+  and a handful of genuine code bugs (`resolve_backup_s3_creds.yml`'s
+  fallback path needed three separate fixes). `demo222` left untouched
+  throughout — S3 isolation (region, tags, no cross-bucket policy, no
+  replication) re-verified clean at closure. **Standing lesson, same
+  shape as ADR-0547's own thesis: an RBAC/NetworkPolicy grant nobody ever
+  requested is invisible to a static `grep` audit — only a genuine
+  from-scratch run under the real launch path (AAP, not the bootstrap
+  kubeconfig) proves those paths work.**
+- **ADR-0533**, **Implemented**: Advantage's and Finage's non-promotion
+  consolidated into a dedicated decision record.
+- **ADR-0546 (WP-131)**: Cross-cluster source bucket (`zuno-demo-sources`)
+  plus per-cluster S3 bucket convention (`zuno-<cluster>-xxx`) —
+  **Implemented 2026-09-05.** All eight components cut over and
+  live-verified on `demo222`, all six legacy shared buckets deleted. This
+  is what let `demo333` get its own isolated `zuno-demo333-*` buckets
+  rather than writing into `demo222`'s.
+- **ADR-0547 (WP-130/132)**: Parameterize every cluster-specific value in
+  Ansible, seeded through Vault when secret — **Implemented 2026-09-04.**
+  One known, recorded exception (the `machines` chart's AZ/instance types
+  stay fleet design, covered by WP-130's readiness probe P2). ADR-0517's
+  own run is the first full proof this parameterization holds under an
+  actual from-scratch AAP-driven deploy, not just a design read.
+- **ADR-0548**: Remove the unused `zuno-ai-platform` reserved namespace —
+  **Implemented** (pruned by an ArgoCD hard-refresh; no CR had ever
+  anchored there).
+
 ### Dated entries (OKF stream) — current status per ADR
 
 - **ADR-0501**, 2026-08-29, **Accepted**: the OKF stream/roadmap mechanic

@@ -9,6 +9,27 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Implementation note (2026-09-08) - ADR-0517 Proposed -> Implemented
+
+`demo333` was provisioned (after a region pivot, `eu-west-1` -> `eu-central-1`:
+the `g7e` GPU instance type this platform depends on does not exist in
+`eu-west-1`) and the full platform redeployed via `make day0/day1/day2
+install` plus `make d3 sign/backup/restore`, passing `make d0/d1/d2/d3 check`
+and `make d3 test all` (15/15) - matching `demo222`'s acceptance bar, per
+this ADR's own criteria. WP-140 tracks the run itself; WP-130/131/132 (all
+closed earlier) made the automation cluster-agnostic enough for it to
+succeed. 40 manual interventions were logged and closed during the run -
+full findings log in the ADR's own Implementation notes - split roughly
+between literals the WP-118 audit had anticipated but couldn't exhaustively
+enumerate, first-real-run-under-AAP RBAC/NetworkPolicy/wiring gaps (the
+largest class - paths `demo222` had never exercised under this repo's
+current AAP-launch automation), and a handful of genuine code bugs.
+`demo222` was left untouched throughout (Decision clause 4 / Acceptance
+criterion 4), re-verified at closure: separate S3 regions and tags, no
+cross-bucket policy, no replication. Jalon 8 (this closure, plus merging
+`demo333` -> `main`) is the only step left in this ADR's own execution
+plan.
+
 ## Retargeting note (2026-09-05)
 
 ADR-0506, ADR-0507, ADR-0508, ADR-0509, ADR-0510 (all v0.7 -> v0.10) - the

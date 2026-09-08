@@ -153,8 +153,21 @@ ADR-0517's thirteen blockers. ADR-0547's flip is recorded with its one known
 exception (the `machines` chart's AZ/instance types stay fleet design, covered
 by WP-130's probe P2) and a fresh zero-finding `make d0 check` run post-WP-131.
 
-**4 ADRs.** Open: ADR-0517 only, blocked on an operator provisioning `demo333`.
-All work packages done: WP-130 and WP-132 (2026-09-04), WP-131 (2026-09-05).
+**Update (2026-09-08).** `demo333` was provisioned (after a region pivot,
+`eu-west-1` → `eu-central-1`: the `g7e` GPU instance type this platform
+needs does not exist in `eu-west-1`) and the full redeploy ran to
+completion: `make day0/day1/day2 install` plus `make d3 sign/backup/restore`,
+passing `make d0/d1/d2/d3 check` and `make d3 test all` (15/15) — matching
+`demo222`'s acceptance bar. 40 manual interventions were logged and closed
+during the run (RBAC/NetworkPolicy gaps and code bugs a from-scratch cluster
+was uniquely positioned to surface — every one of them a first real
+execution of a path `demo222` never exercised under this repo's current
+automation). ADR-0517 moved to `Implemented`; see its own Implementation
+notes for the full findings log. `demo222` was left untouched throughout
+(re-verified: separate S3 regions/tags, no cross-bucket policy).
+
+**4 ADRs, all closed.** All work packages done: WP-130 and WP-132
+(2026-09-04), WP-131 (2026-09-05), ADR-0517's own run (2026-09-08).
 
 ## v0.9
 
