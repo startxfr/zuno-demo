@@ -342,6 +342,18 @@ platformNamespaces:
       # invisible to NetworkPolicy checks scoped to that namespace alone)
       # and crash-loops on its startup probe.
       - rhoai-model-registries
+      # Same class of bug again, found live 2026-09-09: RHOAI's own
+      # maas-controller enabled sidecar.istio.io/inject on
+      # payload-processing/payload-pre-processing (openshift-ingress) -
+      # without this entry their istio-proxy got a workload cert fine
+      # (cert-manager-istio-csr apparently reachable some other way) but
+      # timed out forever on istiod's XDS ("dial tcp <istiod ClusterIP>
+      # :15012: i/o timeout"), stuck Init:1/2. The pre-existing
+      # *-gateway-istio pods in this same namespace are provisioned via
+      # the Gateway API controller's own injection path, not this
+      # namespace-wide sidecar-injector webhook, so their being healthy
+      # did not reveal this gap.
+      - openshift-ingress
     # zuno.io/managed: ADR-0320 - see templates/namespace.yaml's comment.
     extraLabels:
       zuno.io/managed: "true"
