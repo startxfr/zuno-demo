@@ -160,11 +160,33 @@ async def _invoke_streamable_http(
             binding.backend, binding.provider_tool, exc,
         )
         raise DownstreamError(502, f"{binding.backend} MCP server returned an error: {exc}") from exc
-    except (httpx.HTTPError, OSError) as exc:
+    except (httpx.HTTPError, httpx2.HTTPError, OSError) as exc:
         logger.error(
             "%s MCP server call failed for tool '%s': %s", binding.backend, binding.provider_tool, exc
         )
         raise DownstreamError(502, f"{binding.backend} MCP server unreachable or errored: {exc}") from exc
+    except ExceptionGroup as excgroup:
+        # streamable_http_client opens its own anyio TaskGroup for the
+        # duration of the `async with` block (read/write tasks) - a real
+        # connection failure (e.g. the backend not being deployed, as with
+        # salesforce-mcp/WP-101) surfaces as an httpx2.ConnectError raised
+        # from INSIDE that TaskGroup, which anyio re-wraps in an
+        # ExceptionGroup rather than letting it propagate directly, so it
+        # never reached the except clause above (live-caught 2026-09-09:
+        # this bug returns an unhandled 500 instead of the clean 502 every
+        # other failure path here uses). split() only reclassifies it as
+        # that same clean 502 if EVERY leaf is itself one of this
+        # function's own connectivity-error types, so an unrelated bug
+        # inside the SDK's own tasks is never silently masked as "backend
+        # unreachable".
+        connectivity, other = excgroup.split((httpx.HTTPError, httpx2.HTTPError, OSError))
+        if other is not None:
+            raise
+        exc = connectivity.exceptions[0]
+        logger.error(
+            "%s MCP server call failed for tool '%s': %s", binding.backend, binding.provider_tool, exc
+        )
+        raise DownstreamError(502, f"{binding.backend} MCP server unreachable or errored: {exc}") from excgroup
 
     if result.is_error:
         detail = "; ".join(block.text for block in result.content if hasattr(block, "text"))

@@ -18,7 +18,11 @@ Proves `_invoke_streamable_http` correctly:
     `DownstreamError(502, ...)`, preserving the exact contract
     app/main.py already depends on;
   - maps an unknown-tool call to the same `DownstreamError(502, ...)`
-    contract.
+    contract;
+  - maps a genuinely unreachable backend (real `httpx2.ConnectError`, not
+    an MCP-protocol-level error) to the same `DownstreamError(502, ...)`
+    contract - regression test for the `except (httpx.HTTPError, OSError)`
+    clause not covering `httpx2`'s own exception hierarchy (ADR-0555 fix).
 
 Run from this directory:
 
@@ -28,6 +32,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import socket
 import sys
 
 os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
@@ -157,10 +162,42 @@ async def test_unknown_tool_becomes_downstream_error_502(transport) -> None:
         httpx2.AsyncClient = orig_client_cls
 
 
+def _closed_local_port() -> int:
+    """Binds and immediately releases a local TCP port so a connection
+    attempt to it gets a genuine, fast "connection refused" - a real
+    httpx2.ConnectError, not an MCP-protocol-level error the fake ASGI app
+    would produce."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+async def test_unreachable_backend_becomes_downstream_error_502(transport) -> None:
+    # Deliberately does NOT patch httpx2.AsyncClient to the fake ASGI
+    # transport (unlike every other test above) - the whole point is to
+    # exercise the real network path and get a real httpx2.ConnectError.
+    downstream.MCP_GATEWAY_WORKLOAD_TOKEN = "test-workload-token"
+    port = _closed_local_port()
+    binding = Binding(
+        capability="sales.test.unreachable",
+        backend="the downstream MCP server",
+        transport="streamable-http",
+        provider_tool="get_customer",
+        auth_mode="service-identity",
+        endpoint={"env": "TEST_UNREACHABLE_MCP_URL", "default": f"http://127.0.0.1:{port}", "path": "/mcp"},
+    )
+    try:
+        await downstream._invoke_streamable_http(binding, {"customer_id": 1}, "fake-bearer")
+        raise AssertionError("expected DownstreamError")
+    except downstream.DownstreamError as exc:
+        assert exc.status_code == 502, exc.status_code
+
+
 TESTS = [
     test_successful_call_unwraps_structured_content_envelope,
     test_tool_error_becomes_downstream_error_502,
     test_unknown_tool_becomes_downstream_error_502,
+    test_unreachable_backend_becomes_downstream_error_502,
 ]
 
 
