@@ -1,0 +1,91 @@
+---
+# Widens RHOAI's generated MonitoringStack (data-science-monitoringstack,
+# redhat-ods-monitoring) to discover ServiceMonitors/PodMonitors in
+# zuno-ai-run too, so the built-in "Observe & Monitor > Models" dashboard
+# tab - which reads exclusively from this stack's own Thanos querier
+# (gitops/charts/openshift-ai/values.yaml's persesRoute comment) - shows
+# real data for the 5 models there instead of one model with all-zero
+# stats. ADR-0554.
+#
+# Root cause, live-confirmed (demo333, 2026-09-09): spec.resourceSelector
+# is already {} (matches any ServiceMonitor/PodMonitor cluster-wide, RHOAI-
+# owned), but spec.namespaceSelector is entirely absent - a null selector
+# matches the CR's own namespace only (`oc explain
+# prometheus.spec.serviceMonitorNamespaceSelector --api-version=
+# monitoring.rhobs/v1`), so the generated Prometheus structurally cannot
+# see zuno-ai-run regardless of RBAC. The RBAC half of this fix lives in
+# gitops/charts/models/templates/rolebinding-rhoai-monitoringstack-
+# prometheus.yaml (GitOps - a resource this repo fully owns, unlike this
+# CR); the NetworkPolicy half lives in that same chart's
+# networkpolicy-{qwen,qwen35,gptoss,wesh}.yaml.
+#
+# Scoped to exactly zuno-ai-run (matchLabels on the automatic
+# kubernetes.io/metadata.name label - no new label needed anywhere), never
+# {} - deliberately minimal and additive, matching the literal ask. Known,
+# accepted side-effect: resourceSelector being {} means this also surfaces
+# every OTHER ServiceMonitor/PodMonitor already in zuno-ai-run
+# (vllm-predictors, zuno-evalhub-metrics,
+# zuno-guardrails-smoke-service-monitor, kserve-llm-isvc-scheduler(-default)),
+# not only the 4 KServe model-serving ones - all already independently
+# scraped by the platform's own prometheus-k8s under its own job/instance
+# labels, so this is a second Prometheus scraping the same targets, not a
+# single-Prometheus double-match (see ADR-0554's consequences).
+#
+# WHY A PARTIAL ANSIBLE PATCH, NOT GITOPS (same reasoning as
+# right_size_monitoring_stack.yml/dashboard_feature_flags.yml next door):
+# this CR has ownerReferences to Monitoring/default-monitoring ->
+# DSCInitialization/default-dsci and IS actively reconciled by RHOAI's
+# Monitoring controller (managedFields read live 2026-09-09: the
+# `monitoring` field-manager's most recent Apply touched status/metadata
+# that same day). Confirmed live that the `monitoring` manager's Apply
+# operation claims ownership of ['alertmanagerConfig','logLevel',
+# 'prometheusConfig','resourceSelector','resources','retention'] and NEVER
+# 'namespaceSelector' - under standard Server-Side Apply semantics a field
+# no manager asserts ownership over is never reverted by that manager's
+# later applies, so this patch survives reconciliation even though the CR
+# demonstrably keeps getting reconciled. If that ever stops holding (the
+# field reverts within seconds of a green reconcile), the operator has
+# started owning it: drop this file and record it as an upstream
+# constraint instead of adding retries - same instruction as the two files
+# this one mirrors.
+#
+# Contract: patch-only, never fails on its own, records nothing and
+# decides nothing - install.yml keeps its record-then-fail shape while
+# reconcile.yml records and continues. Idempotent, self-healing if the CR
+# is ever recreated (uninstall/reinstall, fresh redeploy).
+- name: "openshift_ai | monitoring: wait for the RHOAI-generated MonitoringStack to exist"
+  kubernetes.core.k8s_info:
+    api_version: monitoring.rhobs/v1alpha1
+    kind: MonitoringStack
+    name: data-science-monitoringstack
+    namespace: redhat-ods-monitoring
+  register: _openshift_ai_monitoringstack
+  # RHOAI's monitoring service creates this asynchronously after the DSCI is
+  # accepted, so at install time a bare lookup returns nothing and the patch
+  # below would silently no-op - the whole reason this file is shared with
+  # install.yml. Bounded and never fatal: on timeout the patch simply skips
+  # and `make d1 reconcile openshift-ai` re-applies it later.
+  until: (_openshift_ai_monitoringstack.resources | default([]) | length) > 0
+  retries: "{{ openshift_ai_monitoringstack_wait_retries | default(30) }}"
+  delay: "{{ openshift_ai_monitoringstack_wait_delay | default(10) }}"
+  failed_when: false
+
+- name: "openshift_ai | monitoring: widen the MonitoringStack's ServiceMonitor/PodMonitor discovery to zuno-ai-run"
+  kubernetes.core.k8s:
+    state: patched
+    # Explicit, like dashboard_feature_flags.yml: left unset the module
+    # tries strategic-merge first, which a CRD has no metadata for - the API
+    # server rejects it and the module silently falls back to merge. Naming
+    # it makes this one deterministic RFC 7386 request with no failed
+    # round-trip.
+    merge_type: merge
+    api_version: monitoring.rhobs/v1alpha1
+    kind: MonitoringStack
+    name: data-science-monitoringstack
+    namespace: redhat-ods-monitoring
+    definition:
+      spec:
+        namespaceSelector:
+          matchLabels:
+            kubernetes.io/metadata.name: "{{ openshift_ai_monitoring_extra_namespace | default('zuno-ai-run') }}"
+  when: (_openshift_ai_monitoringstack.resources | default([]) | length) > 0

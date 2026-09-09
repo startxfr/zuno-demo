@@ -14,8 +14,13 @@
 # not catch it either - platform/security/check_workload_hardening.py
 # only asserts that this chart renders at least one NetworkPolicy, never
 # that each model has its own.
-# Metrics scraping needs no allowance here; RHOAI's own controller
-# scrapes independently (see templates/servicemonitor-vllm.yaml).
+# ADR-0554 (live-confirmed 2026-09-09): metrics scraping DOES need an
+# allowance here - RHOAI's own controller auto-creating the PodMonitor
+# (templates/servicemonitor-vllm.yaml's comment) only means the scrape
+# TARGET is discovered, not that the scrape request reaches the pod.
+# RHOAI's own separate MonitoringStack (data-science-monitoringstack,
+# redhat-ods-monitoring) was found dropped at L4 with no admission rule at
+# all - see the metrics.enabled block below.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -52,6 +57,21 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
+{{- if .Values.metrics.enabled }}
+    # ADR-0554 (live-confirmed 2026-09-09): admits RHOAI's own separate
+    # MonitoringStack (data-science-monitoringstack, redhat-ods-monitoring)
+    # scraping the PodMonitor directly (kserve-llm-isvc-vllm-engine,
+    # targetPort 8000) - without this rule its requests were dropped at L4,
+    # keeping the Observe & Monitor > Models dashboard tab's data empty for
+    # this model.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ods-monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+{{- end }}
 {{- if .Values.lmEval.enabled }}
     # ADR-0534/WP-109: admits eval-class pods (LMEvalJob + the Garak/eval
     # Jobs in gitops/charts/trustyai-config, all labeled lm-eval) so the

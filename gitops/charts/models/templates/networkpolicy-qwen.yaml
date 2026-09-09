@@ -85,6 +85,19 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
+    # ADR-0554 (live-confirmed 2026-09-09): unlike the two entries above,
+    # this one IS load-bearing - RHOAI's own separate MonitoringStack
+    # (data-science-monitoringstack, redhat-ods-monitoring) scrapes the
+    # PodMonitor directly (kserve-llm-isvc-vllm-engine, targetPort 8000),
+    # and without this rule its requests were dropped at L4, keeping the
+    # Observe & Monitor > Models dashboard tab's data empty for this model.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: redhat-ods-monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
 {{- end }}
 {{- if .Values.lmEval.enabled }}
     # ADR-0108/WP-10: admits the LMEvalJob pod's (lmevaljob.yaml) calls to

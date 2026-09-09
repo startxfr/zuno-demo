@@ -285,6 +285,13 @@
 - name: "openshift_ai | reconcile: right-size the RHOAI-generated TempoStack"
   ansible.builtin.include_tasks: right_size_monitoring_stack.yml
 
+# --- MonitoringStack namespace scope: shared with install.yml, same
+# "generated after DSCI acceptance" precondition as the TempoStack above.
+# ADR-0554 - all the rationale (why a partial patch, why this survives
+# RHOAI's own reconciler) lives in the shared file.
+- name: "openshift_ai | reconcile: widen the RHOAI MonitoringStack to observe zuno-ai-run"
+  ansible.builtin.include_tasks: widen_monitoringstack_namespace_selector.yml
+
 # --- Dashboard feature flags: shared with install.yml for the same reason as
 # the TempoStack above. These four flags had no applier at all until
 # 2026-09-03 - they were posted by hand with `oc patch` and recorded only in

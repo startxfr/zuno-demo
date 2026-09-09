@@ -27,7 +27,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
 | v0.4 | 35 | 9 | 30 | WP-55, WP-093, WP-101 |
-| v0.5 | 11 | 2 | 16 | WP-55, WP-101, WP-122, WP-139 |
+| v0.5 | 12 | 3 | 17 | WP-55, WP-101, WP-122, WP-139, WP-141 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
@@ -835,12 +835,19 @@ files are now written (121 panels, 10 dashboards/143 panels total with
 WP-138's two) and pass `helm lint`/`helm template`/`check_workload_
 hardening.py`/`check_docs.py`, but applying them to the cluster and the
 data-layer verification WP-138 used to close itself are deferred to a
-later session.
+later session. ADR-0554/WP-141 continues this same thread from a different
+angle: `rhods-dashboard`'s "Observe & Monitor" tab's Models page - a fixed,
+RHOAI-authored dashboard, not one of this repo's own Perses translations -
+was found to render only 1 of 5 deployed models with all-zero stats, because
+RHOAI's own `data-science-monitoringstack` Prometheus was structurally blind
+to `zuno-ai-run` (namespace scope, RBAC and NetworkPolicy all closed).
+Widened additively, without touching Grafana/Kiali/`zuno-monitoring`.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-138 | [wp-138](work-packages/wp-138-perses-infrastructure-and-pilot-dashboards.md) | 0551, 0552, 0553 | none | Done (2026-09-07 - data layer live-verified; no visual UI exists on this cluster for these dashboards, confirmed and accepted) | none |
 | WP-139 | [wp-139](work-packages/wp-139-perses-parity-remaining-dashboards.md) | 0551, 0552, 0553 | WP-138 | Repo work merged (2026-09-07 - all 8 dashboards translated and passing chart/docs checks; cluster apply and live verification deferred) | Apply `zuno-perses-d1`, confirm `Available: true` on all 8, then live-verify per WP-138's method |
+| WP-141 | [wp-141](work-packages/wp-141-widen-rhoai-monitoringstack-scope.md) | 0554 | none | Repo work merged (2026-09-09 - Ansible patch + RoleBinding + NetworkPolicy all written, passing chart/docs checks; live verification deferred) | `make d1 reconcile openshift-ai` + `make d2 install models`, then live-verify per WP-141's acceptance criteria |
 
 ### OKF stream phases
 

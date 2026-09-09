@@ -1,0 +1,61 @@
+{{- if .Values.metrics.enabled }}
+# Grants RHOAI's own MonitoringStack Prometheus
+# (data-science-monitoringstack-prometheus, redhat-ods-monitoring) read
+# access to this namespace's Services/Endpoints/Pods/EndpointSlices/
+# Ingresses - one of three separately-necessary conditions RHOAI's Observe
+# & Monitor > Models dashboard tab needs (ADR-0554). The other two -
+# spec.namespaceSelector on MonitoringStack/data-science-monitoringstack
+# (an Ansible partial patch,
+# ansible/roles/openshift_ai/tasks/widen_monitoringstack_namespace_selector.yml,
+# because that CR is RHOAI-operator-owned) and the NetworkPolicy admission
+# in networkpolicy-{qwen,qwen35,gptoss,wesh}.yaml - live elsewhere. This
+# Role/RoleBinding is a brand-new resource this repo fully owns, so unlike
+# the CR patch it's GitOps-managed like everything else in this chart.
+#
+# A dedicated Role rather than a roleRef to RHOAI's own ClusterRole
+# (data-science-monitoringstack-prometheus) - same "widen with a targeted
+# extra Role, never a broader built-in" idiom as
+# aap-config/templates/rolebinding-openshift-ai-secrets.yaml and
+# rolebinding-rhtas-signer-secret.yaml. Decouples this grant from RHOAI
+# renaming or narrowing that ClusterRole on a future upgrade. Rules mirror
+# exactly what that ClusterRole already grants its Prometheus
+# ServiceAccount in redhat-ods-monitoring (live-verified 2026-09-09) minus
+# the SCC `use` verbs, which are cluster-scoped and already covered there.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: zuno-rhoai-monitoringstack-prometheus-reader
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+rules:
+  - apiGroups: [""]
+    resources: ["services", "endpoints", "pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["discovery.k8s.io"]
+    resources: ["endpointslices"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions", "networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-rhoai-monitoringstack-prometheus-reader
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: zuno-rhoai-monitoringstack-prometheus-reader
+subjects:
+  - kind: ServiceAccount
+    name: data-science-monitoringstack-prometheus
+    namespace: redhat-ods-monitoring
+{{- end }}

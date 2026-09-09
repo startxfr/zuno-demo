@@ -275,6 +275,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0551](0551-add-namespace-scoped-perses-dashboards-alongside-grafana.md) | Superseded in part by ADR-0552, ADR-0553 | Add namespace-scoped Perses dashboards alongside the existing Grafana stack |
 | [ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md) | Accepted | Reuse RHOAI's Perses instance instead of running an independent one |
 | [ADR-0553](0553-collocate-perses-dashboards-in-redhat-ods-monitoring-for-visibility.md) | Accepted | Collocate Perses dashboards in redhat-ods-monitoring for real visibility |
+| [ADR-0554](0554-widen-rhoais-monitoringstack-to-observe-zuno-ai-run.md) | Proposed | Widen RHOAI's built-in MonitoringStack to observe zuno-ai-run's models |
 
 ## v0.6
 

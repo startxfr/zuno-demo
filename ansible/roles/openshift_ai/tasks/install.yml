@@ -255,6 +255,13 @@
 - name: "openshift_ai | right-size the RHOAI-generated TempoStack"
   ansible.builtin.include_tasks: right_size_monitoring_stack.yml
 
+# Same "generated after DSCI acceptance" precondition as the TempoStack
+# right-sizing above, and the same "shared with reconcile.yml" reason - see
+# the included file for the full ADR-0554 rationale (RHOAI's own Observe &
+# Monitor dashboard tab was structurally blind to zuno-ai-run).
+- name: "openshift_ai | widen the RHOAI MonitoringStack to observe zuno-ai-run"
+  ansible.builtin.include_tasks: widen_monitoringstack_namespace_selector.yml
+
 # After the TempoStack, and last overall, because the dashboard component only
 # creates its OdhDashboardConfig once the DSC above is accepted. Shared with
 # reconcile.yml for the same reason the TempoStack remediation is: until
