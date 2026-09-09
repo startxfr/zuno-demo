@@ -31,6 +31,26 @@
 # both stacks see identically-labeled series; portNumber (not the
 # deprecated targetPort KServe's own object still uses) to avoid this
 # Prometheus version's warning.
+#
+# ADR-0554 Part E (2026-09-09, live-confirmed): the `exported_namespace`/
+# `k8s_pod_name` copies below are NOT cosmetic. Every PromQL query on the
+# Perses dashboards this PodMonitor feeds (dashboard-2/3/4, "LLM Traffic"/
+# "LLM Utilization"/"LLM Performance", data-science-prometheus-datasource)
+# filters on `exported_namespace=~"$namespace"` and groups per-pod panels
+# by `k8s_pod_name` - labels this repo's own SD-based relabeling never
+# produces (Prometheus's k8s SD sets plain `namespace`/`pod`). Those two
+# label names are what you get for free when a target is scraped via an
+# OTel Collector k8s-semconv pipeline (RHOAI's `data-science-collector-*`
+# pods) instead of a raw PodMonitor - this file intentionally does the
+# latter (Part D's whole point), so without an explicit copy the filter
+# matches zero series even though the underlying metric is present and
+# moving. Confirmed live: `kserve_vllm:num_requests_running{exported_
+# namespace=~"zuno-ai-run"}` returned zero results against this exact
+# datasource/proxy path while the bare metric (no exported_namespace
+# filter) showed real, changing values for all 4 models at the same
+# moment - copying the two labels here, not touching the dashboards
+# (operator-owned, would be reverted) or standing up a parallel OTel
+# Collector pipeline (far larger scope for the same outcome).
 apiVersion: monitoring.rhobs/v1
 kind: PodMonitor
 metadata:
@@ -64,6 +84,14 @@ spec:
           sourceLabels:
             - __meta_kubernetes_pod_label_app_kubernetes_io_component
           targetLabel: llm_isvc_component
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_namespace
+          targetLabel: exported_namespace
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_name
+          targetLabel: k8s_pod_name
       scheme: https
       portNumber: 8000
       tlsConfig:
