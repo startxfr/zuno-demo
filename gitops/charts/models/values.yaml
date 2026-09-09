@@ -1443,10 +1443,13 @@ lmEval:
       datasetHfConfig: abstract_algebra
 
 # ADR-0524 (WP-085), TEMPORAIRE: autorise OpenShift Lightspeed a appeler le
-# predictor qwen directement, pendant que le plan de controle MaaS ne sait plus
-# rapprocher une identite d'une MaaSSubscription (403, WP-076). Regression
-# assumee et tracee d'ADR-0521, a retirer des que MaaS refonctionne - voir le
-# commentaire dans templates/networkpolicy-qwen.yaml.
+# predictor gpt-oss-20b (et qwen, meme regle) directement, pendant que
+# l'AuthPolicy generee par maas-controller ne sait plus rapprocher une
+# identite d'une MaaSSubscription pour AUCUN modele (403/401, confirme aussi
+# sur ai-gateway le 2026-09-09 - defaut cote controleur MaaS, pas specifique
+# a un modele). Regression assumee et tracee d'ADR-0521, a retirer des que
+# MaaS refonctionne - voir le commentaire dans templates/networkpolicy-
+# gptoss.yaml (et networkpolicy-qwen.yaml, meme bloc).
 lightspeed:
-  enabled: false
+  enabled: true
   namespace: openshift-lightspeed
