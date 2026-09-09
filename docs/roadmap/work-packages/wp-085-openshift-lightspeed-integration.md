@@ -464,5 +464,35 @@ now documents each in place, no new ADR):
    allowlist, gated by the real OpenShift group `ocp-ai-ops` (not `lightspeed_readonly` - seeded
    deliberately, see ADR-0524's Operational considerations) rather than a new Keycloak group.
 
-Live verification for all three items still to be run (see this file's own checklist above,
-extended to cover the new tools/model) before considering this session's changes closed.
+**Resolved 2026-09-09, same day**: switched `endpointMode: direct` for gpt-oss-20b (bypassing the
+broken MaaS AuthPolicy entirely) plus a matching NetworkPolicy admission
+(`networkpolicy-gptoss.yaml`'s `lightspeed.enabled` block, mirroring qwen's). Live-verified:
+`lightspeed-app-server` pod is `2/2 Ready`, LLM health check gets a real `200 OK` from
+`gpt-oss-20b-kserve-workload-svc:8000`, no more 403. This is the same documented ADR-0521
+regression pattern already used for qwen - remove it and flip back to `maas` once the
+maas-controller AuthPolicy's model-identity matching is fixed upstream (see item 2 above for the
+exact defect).
+
+**RAG tool and AAP audit access, live-verified 2026-09-09** against `zuno-mcp`'s real `/mcp`
+front-door using real Keycloak-issued tokens for three fixture personas (`consultant-01`,
+`ai-ops-01`, `sale-01`): `knowledge.tech.search` (canonical capability name - the alias
+`search_technical_docs` is rejected by the front-door's own capability-ceiling check, by design,
+since `tools/list` only ever advertises the canonical name) returns real corpus results for
+`consultant-01`, and is correctly denied for `ai-ops-01`/`sale-01`. `aap.platform.audit` returns
+real AAP controller data for both `ai-ops-01` (the new grant) and `consultant-01` (pre-existing),
+and is correctly denied for `sale-01` with the exact `allowed_groups` list in the denial message.
+6/6 authorization outcomes matched expectations.
+
+**Second, separate live defect found and fixed the same day**: a real Lightspeed console query
+that triggered a tool call (`pods_list` via `openshift-mcp-server`) followed by a synthesis turn
+crashed with `openai.APIError: unexpected tokens remaining in message header`. Root cause: gpt-oss-
+20b's Harmony response format wraps its internal chain-of-thought in `<|channel|>analysis`/
+`commentary ... <|end|>` tags; `llminferenceservice-gptoss.yaml`'s vLLM args set
+`--tool-call-parser=openai` (verified correct - registered to `GptOssToolParser`) but never set a
+matching `--reasoning-parser`, so those tags were never stripped and leaked into the streamed
+content, breaking every OpenAI-compatible streaming client the moment a tool round preceded a
+synthesis turn. Fixed by adding `--reasoning-parser=openai_gptoss` (verified present and correctly
+registered to `GptOssReasoningParser` in the live vLLM 0.24.0+rhaiv.9 image before applying). This
+is a real, repo-owned config gap (not MaaS/vendor-owned) that would have hit every consumer of
+gpt-oss-20b's tool-calling path (Lightspeed, ai-gateway, Tekos), not just Lightspeed - the model
+serving pod was restarted to pick it up.
