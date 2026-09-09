@@ -1,6 +1,7 @@
 # WP-141: Widen RHOAI's MonitoringStack to observe zuno-ai-run
 
-- **State:** Done (2026-09-09 - live-verified end to end, 4 parts)
+- **State:** Done (2026-09-09 - live-verified end to end, 6 parts; 3
+  known, separately-scoped gaps remain - see Status updates)
 - **ADRs:** ADR-0554
 - **Related:** ADR-0522, ADR-0552, ADR-0553
 - **Target:** v0.5
@@ -44,7 +45,7 @@ zero series - see the ADR's Dated correction note):
    of namespace/RBAC/NetworkPolicy scope. Covers the 4 LLMInferenceService
    models only - `embeddings` (a classic `InferenceService`, different
    serving runtime/metrics path entirely) is out of scope for this WP.
-5. **The actual fix for the dashboard the user was looking at** (ADR-0554's
+5. **The fix for the "Cluster"/"Models" tabs specifically** (ADR-0554's
    second dated correction note): `rhods-dashboard`'s "Observe & Monitor"
    tabs read exclusively from `PersesDatasource/cluster-prometheus-
    datasource`, which points at `thanos-querier.openshift-monitoring.svc`
@@ -58,6 +59,15 @@ zero series - see the ADR's Dated correction note):
    to all three. This single asymmetry is why exactly one model
    (`qwen36-27b-instruct`) ever showed real data through this entire
    investigation, independent of parts 1-4.
+6. **The fix for "LLM Traffic"/"LLM Utilization"/"LLM Performance"**
+   (ADR-0554's third dated correction note): these three tabs DO read
+   `data-science-monitoringstack` (parts 1-4's target), but every one of
+   their PromQL queries filters on `exported_namespace=~"$namespace"`
+   and/or groups by `k8s_pod_name` - labels part 4's PodMonitor never
+   produced (plain `namespace`/`pod` from standard k8s SD). Fixed by
+   adding two `relabelings` entries to that same PodMonitor, copying
+   `__meta_kubernetes_namespace`/`__meta_kubernetes_pod_name` into those
+   exact names at scrape time.
 
 ## Acceptance criteria
 
@@ -87,15 +97,23 @@ zero series - see the ADR's Dated correction note):
   Literal browser screenshot pending the user's own reload.
 - [x] `git status` on every `zuno-monitoring`/Grafana/Kiali-owning chart
   shows no changes from this work.
+- [x] "LLM Traffic"/"LLM Utilization"/"LLM Performance" tabs
+  (`data-science-prometheus-datasource`) return real series, not empty
+  results, for the exact panel queries: `kserve_vllm:num_requests_running
+  {exported_namespace=~"zuno-ai-run"}` returns all 4 models (0 before part
+  6); the "Throughput (req/s)" panel query showed 14 nonzero points across
+  the 30 minutes spanning a `make d3 stresstest` run, queried directly
+  through the same browser proxy path
+  (`/perses/api/proxy/.../data-science-prometheus-datasource/...`).
 
 ## Status updates
 
-- **2026-09-09 — Done.** All 5 parts written and live-verified on
+- **2026-09-09 — Done.** All 6 parts written and live-verified on
   `demo333`. Parts 1-4 (below) target `data-science-monitoringstack` and
   are real, correct fixes for that stack - but the user, after a hard
   browser refresh and a private window, still saw only 1 of 5 models.
   Root cause (found from the browser's own Network tab, not guessed):
-  `rhods-dashboard`'s "Observe & Monitor" tabs read exclusively from
+  `rhods-dashboard`'s "Cluster"/"Models" tabs read exclusively from
   `PersesDatasource/cluster-prometheus-datasource`
   (`config.default: true`), which points at
   `thanos-querier.openshift-monitoring.svc` - the **platform's own**
@@ -107,6 +125,27 @@ zero series - see the ADR's Dated correction note):
   the needed admission from a pre-existing ADR-0413 rule (whose own
   comment incorrectly called it unnecessary), the other three never did.
   Part 5 (same commit family) added the missing admission and is what
-  actually resolved what the user was looking at. `helm lint`/`helm
+  actually resolved the "Cluster"/"Models" tabs. `helm lint`/`helm
   template`/`ansible-playbook --syntax-check`/`check_workload_hardening.py`/
   `check_docs.py` all pass throughout.
+- **2026-09-09, later the same day — Part 6 added.** After part 5, the
+  user confirmed "Cluster"/"Models" showed all 4 models but reported the
+  remaining three tabs ("LLM Traffic"/"LLM Utilization"/"LLM Performance")
+  still showed "No data" even after a fresh stresstest produced real,
+  moving traffic. These three DO read `data-science-monitoringstack`
+  (parts 1-4's actual target) - so parts 1-4 should have sufficed, and
+  didn't. Root cause: every PromQL query on those three dashboards filters
+  on `exported_namespace=~"$namespace"` and/or groups by `k8s_pod_name`,
+  labels part 4's PodMonitor never produced (plain `namespace`/`pod` from
+  standard k8s SD - `exported_namespace`/`k8s_pod_name` is what an OTel
+  Collector k8s-semconv pipeline produces instead, which this PodMonitor
+  deliberately bypasses). Fixed by adding two relabeling rules to copy
+  those labels at scrape time. Also found, live-confirmed, and
+  deliberately left unfixed as separate/out-of-scope: the "Usage" tab
+  needs Limitador metrics (`authorized_hits_total` etc.) that Limitador
+  doesn't emit at all on this cluster (a Limitador config gap, not a
+  discovery/RBAC/NetworkPolicy problem); "GPU utilization" and "Error
+  rate" panels need `accelerator_gpu_utilization`/
+  `inference_model_request_error_total`, which exist in no Prometheus on
+  this cluster at all (no DCGM exporter, no EPP metrics emitter deployed).
+  See ADR-0554's "Known out-of-scope gaps" section.

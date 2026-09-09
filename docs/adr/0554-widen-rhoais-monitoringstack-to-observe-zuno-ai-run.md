@@ -1,8 +1,12 @@
 # ADR-0554: Widen RHOAI's built-in MonitoringStack to observe `zuno-ai-run`'s models
 
 - **Status:** Implemented (live-verified 2026-09-09 - all 4 model targets
-  `health: up` in RHOAI's own Prometheus, see the Dated correction note for
-  the fourth piece the original Decision missed)
+  `health: up` in RHOAI's own Prometheus, and the "LLM Traffic"/"LLM
+  Utilization"/"LLM Performance" dashboard tabs confirmed rendering real
+  data; see the Dated correction notes for the pieces the original
+  Decision missed. Two known, separately-scoped gaps remain - the "Usage"
+  tab and the "GPU utilization"/"Error rate" panels - see Known
+  out-of-scope gaps below)
 - **Target:** v0.5
 - **Date:** 2026-09-09
 - **Decision owners:** Zuno Demo architecture team
@@ -108,6 +112,12 @@ confirmed unaffected by anything below.
    `kserve-llm-isvc-vllm-engine` selector/relabelings. Found live-necessary
    after decisions 1-3 alone still left zero series flowing (see the Dated
    correction note below) - not part of the original decision.
+5. **`exported_namespace`/`k8s_pod_name` label copies on decision 4's own
+   PodMonitor** (same file, two extra `relabelings` entries copying
+   `__meta_kubernetes_namespace`/`__meta_kubernetes_pod_name`). Found
+   live-necessary after decisions 1-4 made `data-science-monitoringstack`
+   see the model pods correctly but three of its six dashboard tabs still
+   showed no data - see the Third dated correction note below.
 
 ## Operational considerations
 
@@ -247,6 +257,71 @@ Live-verified: `up{namespace="zuno-ai-run",job=~".*kserve.*"}` against
 and `count(group(kserve_vllm:num_requests_running) by (model_name,
 namespace))` - the exact query the dashboard's "Deployed models" panel
 runs - now returns `4`.
+
+## Third dated correction note (2026-09-09, same day)
+
+After the second correction fixed the "Cluster"/"Models" tabs
+(`cluster-prometheus-datasource`), the user reported the remaining three
+tabs - "LLM Traffic", "LLM Utilization", "LLM Performance" - still showed
+"No data" even after a fresh `make d3 stresstest` produced real, moving
+traffic. These three tabs use the *other* datasource,
+`data-science-prometheus-datasource` (`data-science-monitoringstack`
+itself, decisions 1-4's target) - so decisions 1-4 should have been
+sufficient. Live-verified they were not: every single PromQL query across
+these three `PersesDashboard` objects filters on
+`exported_namespace=~"$namespace"` and/or groups per-pod panels by
+`sum by (k8s_pod_name) (...)` - label names decision 4's PodMonitor never
+produces (standard Prometheus-operator k8s SD sets plain `namespace`/
+`pod`). Those specific label names are what a target scraped through an
+OTel Collector k8s-semconv pipeline produces for free (RHOAI's
+`data-science-collector-*` pods, present in `redhat-ods-monitoring` but
+never wired to receive vLLM's metrics) - not what a raw PodMonitor
+produces. Confirmed directly against the exact browser proxy path
+(`/perses/api/proxy/projects/redhat-ods-monitoring/datasources/
+data-science-prometheus-datasource/...`): the panel's own query with
+`exported_namespace=~"zuno-ai-run"` returned zero series, while the bare
+metric (no `exported_namespace` filter) showed real, changing values for
+all 4 models at the same instant.
+
+Fixed by adding decision 5: two extra `relabelings` entries on decision
+4's PodMonitor, copying `__meta_kubernetes_namespace` ->
+`exported_namespace` and `__meta_kubernetes_pod_name` -> `k8s_pod_name`
+at scrape time. Deliberately done here rather than by standing up a
+parallel OTel Collector pipeline (the "correct"/intended RHOAI
+architecture, but far larger scope for the same outcome) or editing the
+operator-owned `PersesDashboard` objects (would be reverted on the next
+reconcile). Live-verified: `kserve_vllm:num_requests_running{exported_
+namespace=~"zuno-ai-run"}` now returns all 4 models, and the exact
+"Throughput (req/s)" panel query showed 14 nonzero points across the 30
+minutes spanning the stresstest run.
+
+## Known out-of-scope gaps (2026-09-09)
+
+Two further empty panels were found while verifying decision 5, root
+causes confirmed live, deliberately left unfixed here - each is a
+separate, real gap unrelated to the widening this ADR performs, not a
+NetworkPolicy/RBAC/CRD-group problem this ADR's pattern can address:
+
+- **"Usage" tab** (`dashboard-3-maas-usage-admin`): every panel queries
+  Limitador's `authorized_hits_total`/`authorized_calls_total`/
+  `limited_calls_total`. Confirmed live (`oc exec` into the Limitador pod,
+  `curl localhost:8080/metrics`): that endpoint exposes only
+  `limitador_up`/`datastore_partitioned` - the per-limit counters are not
+  emitted at all, on any Limitador instance on this cluster, regardless of
+  who scrapes it. This is a Limitador configuration gap (its own metrics
+  granularity setting), not a discovery/RBAC/NetworkPolicy problem -
+  `kuadrant-system`'s own `limitador-metrics` ServiceMonitor (this repo's,
+  `zuno-connectivity-link-d1`) already scrapes the pod successfully
+  (`up{job="limitador-limitador"}` = 1 in the platform's own Prometheus);
+  there is simply nothing behind `authorized_hits_total` to scrape yet.
+- **"GPU utilization" panel** (dashboard-3) and **"Error rate" panel**
+  (dashboard-2): `accelerator_gpu_utilization` and
+  `inference_model_request_error_total` return zero series in *every*
+  Prometheus/Thanos on this cluster, not just `data-science-
+  monitoringstack` - confirmed against the platform's own
+  `thanos-querier.openshift-monitoring.svc` too. No DCGM GPU exporter and
+  no Gateway API Inference Extension (EPP) metrics emitter are deployed on
+  `demo333` today; these panels are permanently empty until one is.
 
 ## Migration / evolution
 
