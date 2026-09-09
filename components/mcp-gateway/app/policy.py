@@ -68,6 +68,12 @@ class ToolPolicyEntry:
     # distinction (group membership alone is the gate, as for every
     # capability before this WP).
     subject_field: Optional[str] = None
+    # ADR-0524 clause 3 extension (2026-09-09): LLM-facing summary of what
+    # the tool does and when to use it, consumed only by the /mcp
+    # front-door's tools/list (app/mcp_frontdoor.py's list_tools()). None
+    # for entries that don't set it - the front-door falls back to a
+    # generic sentence in that case, see this file's own module docstring.
+    description: Optional[str] = None
 
 
 class PolicyStore:
@@ -112,6 +118,7 @@ class PolicyStore:
                         ),
                         capability=item.get("capability"),
                         subject_field=item.get("subject_field"),
+                        description=item.get("description"),
                     )
                     # ADR-0116: one entry, two names during migration - the
                     # legacy tool name and the canonical capability ID both

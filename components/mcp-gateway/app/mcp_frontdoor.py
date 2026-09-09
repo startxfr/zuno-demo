@@ -42,6 +42,15 @@ logger = logging.getLogger("mcp_gateway.frontdoor")
 # cannot read it here.
 DEFAULT_FRONTDOOR_CAPABILITIES = ("confluence.page.search", "confluence.page.read")
 
+# ADR-0524 clause 4 says every capability reachable through this front-door
+# is a read - true for every capability except this one. aap.cluster.audit
+# (components/mcp-servers/aap/server.py's cluster_audit) launches a real AAP
+# Job Template; it doesn't write platform data, but it isn't a pure read
+# either, so it must not carry list_tools()'s otherwise-blanket
+# readOnlyHint: true - Lightspeed's toolsApprovalConfig (tool_annotations)
+# uses this hint to decide whether to prompt before calling.
+_NON_READONLY_CAPABILITIES = {"aap.cluster.audit"}
+
 
 def frontdoor_capabilities() -> List[str]:
     """The allowlist, overridable per deployment via a comma-separated env var.
@@ -179,16 +188,19 @@ def list_tools(
             f"Zuno platform capability '{capability}', served by the "
             f"'{binding.backend}' backend through the Zuno MCP Gateway."
         )
+        is_read_only = capability not in _NON_READONLY_CAPABILITIES
         tools.append(
             {
                 "name": capability,
                 "description": description,
                 "inputSchema": _input_schema(binding),
-                # ADR-0524 clause 4: every capability reachable here is a read.
-                # Lightspeed's toolsApprovalConfig defaults to
-                # `tool_annotations`, so this is what decides whether the
-                # console prompts the user before a call.
-                "annotations": {"readOnlyHint": True, "destructiveHint": False},
+                # ADR-0524 clause 4: every capability reachable here is a
+                # read, except the deliberate exceptions in
+                # _NON_READONLY_CAPABILITIES above. Lightspeed's
+                # toolsApprovalConfig defaults to `tool_annotations`, so this
+                # is what decides whether the console prompts the user
+                # before a call.
+                "annotations": {"readOnlyHint": is_read_only, "destructiveHint": False},
             }
         )
     return tools

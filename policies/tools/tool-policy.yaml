@@ -59,6 +59,21 @@
 #   allowed_groups:    list of Keycloak `zuno` realm group names (see
 #                       platform/identity/README.md) permitted to invoke this tool,
 #                       subject to the other four factors above still applying.
+#   description (optional): free-text, LLM-facing summary of what the tool
+#                       does and when to use it. Consumed ONLY by the /mcp
+#                       front-door's tools/list (ADR-0524 clause 3,
+#                       components/mcp-gateway/app/mcp_frontdoor.py's
+#                       list_tools()) - when absent, the front-door falls back
+#                       to a generic "Zuno platform capability '<name>',
+#                       served by the '<backend>' backend" sentence that
+#                       carries no information about the tool's purpose. Any
+#                       capability reachable through that front-door (i.e.
+#                       listed in a chart's lightspeed.frontdoorCapabilities)
+#                       needs a real one, or the calling model has nothing to
+#                       decide tool selection on beyond the bare name - live-
+#                       caught 2026-09-09: Lightspeed answered an AAP audit
+#                       request with a manually-typed command list instead of
+#                       calling aap.cluster.audit, traced to exactly this gap.
 #   external_model_policy.allow_context (optional, default true): ADR-0035 -
 #                       a source-level restriction independent of
 #                       min_classification. When false, this tool's result
@@ -75,6 +90,9 @@ tools:
   - tool: search_confluence
     capability: confluence.page.search
     mcp_server: confluence
+    description: >-
+      Search Confluence pages by text. Read-only; results come from real
+      Confluence Cloud content.
     # C2 per ADR-0035 (was incorrectly C1) - internal Confluence content is
     # business-sensitive, matching the `confluence` domain in
     # policies/data-classification/classification.yaml.
@@ -104,6 +122,10 @@ tools:
   - tool: search_technical_docs
     capability: knowledge.tech.search
     mcp_server: rag-service
+    description: >-
+      Search the internal technical-docs knowledge base (OpenShift, Ansible,
+      ArgoCD, and other platform technologies) and return relevant passages.
+      Read-only.
     # C1 per `technical-docs` in policies/data-classification/
     # classification.yaml - lower than Confluence's C2 (this is public/
     # semi-public technology documentation, not internal business content).
@@ -128,6 +150,9 @@ tools:
   - tool: confluence.page.read
     capability: confluence.page.read
     mcp_server: confluence
+    description: >-
+      Read a Confluence page's current content and metadata by page id.
+      Read-only.
     min_classification: C2
     allowed_groups:
       - consultant
@@ -455,6 +480,11 @@ tools:
   - tool: aap.platform.audit
     capability: aap.platform.audit
     mcp_server: aap
+    description: >-
+      Summarize the Ansible Automation Platform's own state: component and
+      instance health, the zuno-demo Project's last Git sync, and recent runs
+      of the cluster health-check Job Template. Read-only - changes nothing.
+      Use this for a quick status summary.
     min_classification: C2
     allowed_groups:
       - consultant
@@ -465,6 +495,12 @@ tools:
   - tool: aap.cluster.audit
     capability: aap.cluster.audit
     mcp_server: aap
+    description: >-
+      Run this cluster's Day 0 health check through Ansible Automation
+      Platform and report the result. Takes no arguments and always runs the
+      same read-mostly check playbook. This launches real automation and
+      typically takes a few minutes - use it when the user explicitly asks
+      for a fresh cluster audit or check, rather than a status summary.
     min_classification: C2
     allowed_groups:
       - consultant
