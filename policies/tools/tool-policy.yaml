@@ -109,6 +109,11 @@ tools:
       # clause 4: two of its three enforcement layers are this list and the
       # /mcp front-door's tools/list, which derives from this list.
       - lightspeed_readonly
+      # 2026-09-10, user request: reuse ocp-ai-ops (already granted on
+      # aap.platform.audit/aap.cluster.audit) rather than stand up a
+      # separate lightspeed_readonly Group - same real console users, same
+      # read-only posture, one fewer OpenShift Group to maintain.
+      - ocp-ai-ops
     external_model_policy:
       allow_context: false
 
@@ -137,6 +142,8 @@ tools:
       # Same posture as search_confluence/confluence.page.read: exposed to
       # Lightspeed's per-user callers, read-only, no equivalent write tool.
       - lightspeed_readonly
+      # 2026-09-10, user request - see search_confluence's own comment above.
+      - ocp-ai-ops
     external_model_policy:
       allow_context: false
 
@@ -161,6 +168,8 @@ tools:
       # ADR-0524 clause 4 - see the search_confluence entry above. Deliberately
       # NOT present on confluence.page.create / confluence.page.update below.
       - lightspeed_readonly
+      # 2026-09-10, user request - see search_confluence's own comment above.
+      - ocp-ai-ops
     external_model_policy:
       allow_context: false
 
