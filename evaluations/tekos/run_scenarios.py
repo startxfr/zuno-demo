@@ -87,6 +87,19 @@ DEMO_PASSWORD = os.getenv("DEMO_PERSONA_PASSWORD")
 # module's original single env var exactly).
 FRONTEND_CLIENT_SECRET = os.getenv(f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET")
 
+
+def agent_zuno_status(agent: str = AGENT) -> str:
+    """Reads zuno.status straight from agents/<agent>/agent.okf.md's own
+    frontmatter (mirrors ansible/roles/day3/tasks/stresstest_job_create_one.yml's
+    resolution of the same field) - lets a security check recognize a
+    placeholder-status agent (advantage/finage/naveo today) and skip an
+    assertion that can never pass against one, rather than hardcoding an
+    agent-name list that would go stale the moment an agent goes active.
+    """
+    okf_path = pathlib.Path(__file__).resolve().parents[2] / "agents" / agent / "agent.okf.md"
+    frontmatter = okf_path.read_text(encoding="utf-8").split("---", 2)[1]
+    return (yaml.safe_load(frontmatter).get("zuno") or {}).get("status", "unknown")
+
 SERVICE_HEALTH_URLS = {
     "frontend": f"{FRONTEND_URL}/healthz",
     "bff": f"{BFF_URL}/healthz",
