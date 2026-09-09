@@ -370,3 +370,15 @@ aapMetricsDatabase:
 aapMetricsReadOnly:
   owner: msawxreadonly
   vaultPath: aap-metrics/postgresql-awx-readonly
+
+# templates/rolebinding-aap-day0-check-secrets.yaml's subject - the
+# zuno-cluster-reader credential tier's ServiceAccount (ADR-0354 targeted
+# widening, live finding 2026-09-09/10: resolve_backup_s3_creds.yml's
+# Secret lookup 403'd under it, cluster-reader excludes Secrets everywhere).
+# Kept in sync manually with gitops/charts/aap-config/values.yaml's
+# zuno-cluster-reader credential - same convention as
+# gitops/charts/connectivity-link/templates/rolebinding-aap-day0-check-secrets.yaml,
+# which this file mirrors.
+dayCheck:
+  serviceAccount: aap-day0-check
+  namespace: zuno-aap

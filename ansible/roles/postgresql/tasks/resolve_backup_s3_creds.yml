@@ -54,6 +54,17 @@
     namespace: zuno-data
     name: zuno-postgresql
   register: _postgresql_backup_s3_fallback_cluster
+  # Never fatal (ADR-0524, live finding 2026-09-09/10): this whole file is
+  # reached unconditionally from every *-check Job Template via
+  # check_s3_backup.yml, whose own header already documents "deliberately
+  # never fails on its own... sets facts instead so callers can tell
+  # 'genuinely no backup' apart from 'couldn't tell'". A raw k8s_info error
+  # here (RBAC denial, or anything else) broke that contract for this one
+  # task - restore.yml already has its own clear, actionable `fail` for
+  # exactly the "couldn't tell" case (see its own task list), so tolerating
+  # this one is safe: it degrades to that existing, correct behavior rather
+  # than a bare Ansible module traceback.
+  failed_when: false
   when: not (_postgresql_backup_s3_enabled | bool)
 
 - name: "postgresql | look up the zuno-postgresql-backup-s3 Secret for the in-cluster S3 fallback"
@@ -63,7 +74,28 @@
     namespace: zuno-data
     name: zuno-postgresql-backup-s3
   register: _postgresql_backup_s3_fallback_secret
+  # See the PostgresCluster lookup's own comment just above - same reasoning.
+  # Live-caught here specifically: aap-day0-check/cluster-reader has no
+  # secrets grant, so this 403'd on every *-check run until
+  # gitops/charts/postgresql/templates/rolebinding-aap-day0-check-secrets.yaml
+  # was added.
+  failed_when: false
   when: not (_postgresql_backup_s3_enabled | bool)
+
+- name: "postgresql | warn if the in-cluster S3 fallback lookup was denied"
+  ansible.builtin.debug:
+    msg: >-
+      Could not read the PostgresCluster and/or the zuno-postgresql-backup-s3
+      Secret in zuno-data for the in-cluster S3 fallback (see the two lookup
+      tasks above for the actual error) - treating S3 backup as unconfigured
+      for this run. If this is a permissions error, the fix is a scoped
+      Role/RoleBinding for the calling credential's ServiceAccount, same
+      shape as gitops/charts/postgresql/templates/
+      rolebinding-aap-day0-check-secrets.yaml.
+  when:
+    - not (_postgresql_backup_s3_enabled | bool)
+    - (_postgresql_backup_s3_fallback_cluster.failed | default(false))
+      or (_postgresql_backup_s3_fallback_secret.failed | default(false))
 
 - name: "postgresql | resolve the repo2 S3 spec from the PostgresCluster, if present"
   ansible.builtin.set_fact:
