@@ -484,7 +484,10 @@ tools:
       Summarize the Ansible Automation Platform's own state: component and
       instance health, the zuno-demo Project's last Git sync, and recent runs
       of the cluster health-check Job Template. Read-only - changes nothing.
-      Use this for a quick status summary.
+      Use this for a quick status summary. Every run in the response
+      includes a link to it in the AAP Controller UI, and the most recent
+      one also includes its last few output lines - always share the link,
+      and the output lines when the run failed.
     min_classification: C2
     allowed_groups:
       - consultant
@@ -502,7 +505,9 @@ tools:
       no arguments and always launches the same read-mostly check playbook.
       Use it when the user explicitly asks for a fresh cluster audit or
       check, rather than a status summary; call aap.platform.audit
-      afterwards to see whether the run passed.
+      afterwards to see whether the run passed. The response includes a
+      link to the run in the AAP Controller UI - always share it when
+      telling the user the job was launched.
     min_classification: C2
     allowed_groups:
       - consultant

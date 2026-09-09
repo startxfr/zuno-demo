@@ -57,6 +57,11 @@ spec:
                 secretKeyRef:
                   name: mcp-gateway-workload-token
                   key: token
+            # The AAP Gateway's public Route, for building human-facing job
+            # links (server.py's _job_url) - never used for this pod's own
+            # API calls, which go through AAP_BASE_URL's in-cluster Service.
+            - name: AAP_CONTROLLER_UI_URL
+              value: "https://aap.{{ .Values.clusterBaseDomain }}"
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

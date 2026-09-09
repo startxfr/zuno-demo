@@ -32,6 +32,7 @@ import sys
 os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("AAP_API_TOKEN", "test-token")
 os.environ.setdefault("AAP_BASE_URL", "http://aap.zuno-aap.svc")
+os.environ.setdefault("AAP_CONTROLLER_UI_URL", "https://aap.apps.demo333.startx.fr")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -88,6 +89,23 @@ def _json(payload, status: int = 200) -> httpx.Response:
     return httpx.Response(status, json=payload)
 
 
+def _job_events_page():
+    """A page of job_events as the real API would order it (order_by=
+    -counter: most recent first). Alternates blank-stdout events (play/task
+    start markers) with real output, so tests can prove _job_log_tail keeps
+    only the non-empty ones and restores chronological order."""
+    return _json({"count": 8, "results": [
+        {"counter": 10, "stdout": "PLAY RECAP *********************"},
+        {"counter": 9, "stdout": ""},
+        {"counter": 8, "stdout": "ok: [localhost]"},
+        {"counter": 7, "stdout": ""},
+        {"counter": 6, "stdout": "TASK [gather facts] ***"},
+        {"counter": 5, "stdout": ""},
+        {"counter": 4, "stdout": "PLAY [zuno-day0-check] ***"},
+        {"counter": 3, "stdout": ""},
+    ]})
+
+
 def _healthy_handler(job_status: str = "running"):
     """A Controller that answers every path platform_audit/cluster_audit use.
 
@@ -136,6 +154,8 @@ def _healthy_handler(job_status: str = "running"):
                 "finished": "2026-08-27T09:02:00Z" if job_status == "successful" else None,
                 "elapsed": 120.0,
             })
+        if path in ("/api/controller/v2/jobs/41/job_events/", "/api/controller/v2/jobs/42/job_events/"):
+            return _job_events_page()
         return _json({"detail": f"unexpected path {path}"}, status=418)
 
     return handler
@@ -246,6 +266,54 @@ async def test_cluster_audit_returns_immediately_without_waiting_for_completion(
     assert len(polls) == 1, f"expected exactly one status read, no poll loop, got {len(polls)}"
 
 
+async def test_cluster_audit_includes_a_job_url_and_log_tail(transport) -> None:
+    recorder = _Recorder()
+    server._client = _install_mock(_healthy_handler(), recorder)
+    result = await server.cluster_audit()
+
+    assert result["job"]["url"] == "https://aap.apps.demo333.startx.fr/#/jobs/playbook/42/output"
+    # _job_events_page has 4 non-empty entries among 8, most-recent-first;
+    # log_tail must keep only those, restored to chronological order.
+    assert result["job"]["log_tail"] == [
+        "PLAY [zuno-day0-check] ***",
+        "TASK [gather facts] ***",
+        "ok: [localhost]",
+        "PLAY RECAP *********************",
+    ]
+    events_calls = [p for p in recorder.paths() if p == "/api/controller/v2/jobs/42/job_events/"]
+    assert len(events_calls) == 1, f"expected exactly one job_events call, got {len(events_calls)}"
+
+
+async def test_platform_audit_attaches_log_tail_only_to_the_latest_run(transport) -> None:
+    recorder = _Recorder()
+    server._client = _install_mock(_healthy_handler(), recorder)
+    result = await server.platform_audit()
+
+    latest = result["recent_runs"][0]
+    assert latest["id"] == 41
+    assert latest["url"] == "https://aap.apps.demo333.startx.fr/#/jobs/playbook/41/output"
+    assert latest["log_tail"] == [
+        "PLAY [zuno-day0-check] ***",
+        "TASK [gather facts] ***",
+        "ok: [localhost]",
+        "PLAY RECAP *********************",
+    ]
+    events_calls = [p for p in recorder.paths() if p == "/api/controller/v2/jobs/41/job_events/"]
+    assert len(events_calls) == 1, (
+        f"only the most recent run should trigger a job_events call, got {len(events_calls)}"
+    )
+
+
+async def test_job_url_is_none_without_a_configured_ui_url(transport) -> None:
+    original = server.AAP_CONTROLLER_UI_URL
+    server.AAP_CONTROLLER_UI_URL = ""
+    try:
+        assert server._job_url(42) is None
+        assert server._summarize_job({"id": 42, "status": "running"})["url"] is None
+    finally:
+        server.AAP_CONTROLLER_UI_URL = original
+
+
 async def test_expired_token_surfaces_as_a_clear_error(transport) -> None:
     """ADR-0355 Operational considerations: a 401 must not reach the agent as
     an opaque failure."""
@@ -336,6 +404,9 @@ TESTS = [
     test_platform_audit_rejects_an_out_of_range_recent_jobs,
     test_cluster_audit_launches_only_the_authorized_template,
     test_cluster_audit_returns_immediately_without_waiting_for_completion,
+    test_cluster_audit_includes_a_job_url_and_log_tail,
+    test_platform_audit_attaches_log_tail_only_to_the_latest_run,
+    test_job_url_is_none_without_a_configured_ui_url,
     test_expired_token_surfaces_as_a_clear_error,
     test_unreachable_controller_surfaces_as_a_clear_error,
     test_missing_job_template_names_the_likely_cause,

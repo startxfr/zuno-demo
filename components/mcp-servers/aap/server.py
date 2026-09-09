@@ -59,6 +59,13 @@ AAP_API_TOKEN = os.getenv("AAP_API_TOKEN", "")
 # /api/controller/v2/... must be reached *through* the gateway.
 AAP_BASE_URL = os.getenv("AAP_BASE_URL", "http://aap.zuno-aap.svc")
 
+# The Gateway's public Route (e.g. https://aap.apps.demo333.startx.fr) -
+# deliberately a SEPARATE value from AAP_BASE_URL above, never the same
+# one: AAP_BASE_URL is the in-cluster Service this pod's own API calls use
+# and is meaningless in a browser. Empty by default (no link surfaced)
+# rather than guessing a hostname - a wrong link is worse than no link.
+AAP_CONTROLLER_UI_URL = os.getenv("AAP_CONTROLLER_UI_URL", "")
+
 HTTP_TIMEOUT_SECONDS = float(os.getenv("AAP_HTTP_TIMEOUT_SECONDS", "20"))
 
 # ADR-0355 clause 2 authorizes launching this template and no other. Not a
@@ -165,6 +172,19 @@ async def _lookup_by_name(client: httpx.AsyncClient, collection: str, name: str)
     return results[0]
 
 
+def _job_url(job_id: Any) -> Optional[str]:
+    """Human-facing link to this job's output page in the AAP Controller
+    UI - None when AAP_CONTROLLER_UI_URL isn't configured, so callers must
+    treat it as optional. The `#/jobs/playbook/<id>/output` shape mirrors
+    the `#/jobs/project/<id>` link ansible/roles/aap_config/tasks/
+    install.yml already uses for a project update; `playbook` is the UI's
+    sibling route for a Job Template run (job type `job`, not
+    `project_update`)."""
+    if not AAP_CONTROLLER_UI_URL:
+        return None
+    return f"{AAP_CONTROLLER_UI_URL.rstrip('/')}/#/jobs/playbook/{job_id}/output"
+
+
 def _summarize_job(job: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "id": job.get("id"),
@@ -173,7 +193,31 @@ def _summarize_job(job: Dict[str, Any]) -> Dict[str, Any]:
         "started": job.get("started"),
         "finished": job.get("finished"),
         "elapsed_seconds": job.get("elapsed"),
+        "url": _job_url(job.get("id")),
     }
+
+
+async def _job_log_tail(client: httpx.AsyncClient, job_id: Any, lines: int = 5) -> List[str]:
+    """The last few lines of this job's output, via job_events (paginated,
+    ordered by -counter) rather than the full stdout blob (`/jobs/<id>/
+    stdout/?format=txt`, used elsewhere in this repo e.g. ansible/
+    playbooks/aap_launch.yml) - cheap even for a long or noisy playbook.
+    Not every event carries stdout (play/task start markers are often
+    blank), so this over-fetches one page and keeps only the most recent
+    `lines` non-empty ones, restored to chronological order for display.
+    """
+    events = await _request(
+        client,
+        "GET",
+        f"/api/controller/v2/jobs/{job_id}/job_events/",
+        params={"order_by": "-counter", "page_size": max(lines * 5, 25)},
+    )
+    non_empty = [
+        row["stdout"].rstrip("\n")
+        for row in (events.get("results") or [])
+        if row.get("stdout")
+    ]
+    return list(reversed(non_empty[:lines]))
 
 
 mcp_server = MCPServer(
@@ -190,7 +234,10 @@ mcp_server = MCPServer(
         "the run itself takes a few minutes. Call it only when the user asks for "
         "a fresh cluster check rather than a status summary, and call "
         "platform_audit afterwards (on the user's next relevant question) to "
-        "report whether it passed."
+        "report whether it passed. Both tools return a `url` link to the run "
+        "in the AAP Controller UI and (for the most recent run) a `log_tail` "
+        "of its last output lines - always surface the url, and the log_tail "
+        "when the run failed."
     ),
 )
 
@@ -219,6 +266,11 @@ async def platform_audit(recent_jobs: int = 5) -> Dict[str, Any]:
     """Summarize the Ansible Automation Platform's own state: component/instance
     health, the zuno-demo Project's last Git sync, and recent runs of the
     cluster health-check Job Template. Read-only - changes nothing.
+
+    Every job in the response includes a `url` field - a link to that run
+    in the AAP Controller UI - and the most recent run also carries a
+    `log_tail` field with its last few output lines. Include both when
+    reporting a run's outcome to the user, not just its pass/fail status.
 
     Args:
         recent_jobs: how many recent Job Template runs to include (1-25).
@@ -249,6 +301,13 @@ async def platform_audit(recent_jobs: int = 5) -> Dict[str, Any]:
             params={"order_by": "-id", "page_size": recent_jobs},
         )
 
+        recent_runs = [_summarize_job(job) for job in history.get("results") or []]
+        # Only the most recent run gets its log fetched - one extra call,
+        # not `recent_jobs` of them. This is what answers "how did my last
+        # cluster_audit go", the common follow-up after launching one.
+        if recent_runs:
+            recent_runs[0]["log_tail"] = await _job_log_tail(client, recent_runs[0]["id"])
+
     return {
         "controller": {
             "version": ping.get("version"),
@@ -270,7 +329,7 @@ async def platform_audit(recent_jobs: int = 5) -> Dict[str, Any]:
             "status": template.get("status"),
             "last_job_run": template.get("last_job_run"),
         },
-        "recent_runs": [_summarize_job(job) for job in history.get("results") or []],
+        "recent_runs": recent_runs,
     }
 
 
@@ -281,6 +340,11 @@ async def cluster_audit() -> Dict[str, Any]:
     the run to finish (the underlying playbook takes a few minutes). Takes
     no arguments and always launches the same read-mostly check playbook.
     Call platform_audit afterwards to see whether the run passed.
+
+    The response's `job` includes a `url` field - a link to this run in the
+    AAP Controller UI - and a `log_tail` field with its output so far (likely
+    empty this soon after launch). Include the url when telling the user
+    the job was launched.
     """
     async with _client() as client:
         template = await _lookup_by_name(client, "job_templates", JOB_TEMPLATE_NAME)
@@ -307,16 +371,18 @@ async def cluster_audit() -> Dict[str, Any]:
         # error" first. One immediate status read (never a wait loop) keeps
         # this call fast for every caller, not just Lightspeed.
         job = await _request(client, "GET", f"/api/controller/v2/jobs/{job_id}/")
+        summary = _summarize_job(job)
+        summary["log_tail"] = await _job_log_tail(client, job_id)
 
     return {
         "job_template": JOB_TEMPLATE_NAME,
         "launched": True,
-        "job": _summarize_job(job),
+        "job": summary,
         "message": (
             f"Launched '{JOB_TEMPLATE_NAME}' as AAP job {job_id} (status: "
             f"{job.get('status')}). It typically takes a few minutes to finish - "
-            "ask for a platform audit afterwards to see whether it passed, or "
-            f"check job {job_id} directly in the AAP Controller UI."
+            "ask for a platform audit afterwards to see whether it passed. "
+            + (f"Job link: {summary['url']}" if summary["url"] else f"Job id: {job_id}.")
         ),
     }
 

@@ -15,6 +15,11 @@ spec:
     path: gitops/charts/mcp-aap
     helm:
       releaseName: zuno-mcp-aap-d1
+      values: |
+        # Substituted by ansible/tasks/apply_gitops_app.yml (same pattern
+        # as gitops/apps/mcp/application-d1.yaml) - feeds the chart's
+        # AAP_CONTROLLER_UI_URL (server.py's _job_url).
+        clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

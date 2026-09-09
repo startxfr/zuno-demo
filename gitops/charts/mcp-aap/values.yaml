@@ -3,6 +3,14 @@
 # platform/bindings/tools/tool-bindings.yaml.
 namespace: zuno-ai-run
 
+# Substituted by ansible/tasks/apply_gitops_app.yml (same generic mechanism
+# every other chart's clusterBaseDomain uses - see e.g. ai-gateway/values.yaml)
+# - real per-cluster value comes from gitops/apps/mcp-aap/application-d1.yaml.
+# Used to build AAP_CONTROLLER_UI_URL (https://aap.<clusterBaseDomain>), the
+# AAP Gateway's public Route - distinct from credentials.secretName's `url`
+# key below, which is the in-cluster Service this pod's own API calls use.
+clusterBaseDomain: apps.mycluster.example.com
+
 # Built by the "mcp" build component into zuno-ai-build's ImageStream, pulled
 # cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
 image:
