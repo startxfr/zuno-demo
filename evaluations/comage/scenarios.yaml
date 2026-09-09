@@ -96,7 +96,15 @@ scenarios:
   - id: 12
     title: MCP Gateway denies a Salesforce tool call outside the caller's allowed groups
     type: mcp_gateway_denied
-    persona: board-01
+    # was board-01 - policies/tools/tool-policy.yaml's allowed_groups for
+    # salesforce.opportunity.read is [sales, board], and board-01 carries
+    # /board, so that persona was actually ALLOWED and never exercised a
+    # real denial: it fell through to the (WP-101, undeployed)
+    # salesforce-mcp backend instead. consultant-01 has neither /sales
+    # nor /board (live-confirmed 2026-09-09), so this now denies at the
+    # gateway's own ADR-0011 policy check regardless of whether
+    # salesforce-mcp is ever deployed (ADR-0555 fix).
+    persona: consultant-01
     tool: salesforce.opportunity.read
     arguments: { query: "Acme Renewal" }
     expect_status: 403
