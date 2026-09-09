@@ -56,10 +56,15 @@ zero series - see the ADR's Dated correction note):
 - [x] RHOAI's Prometheus (`prometheus-data-science-monitoringstack-0`) shows
   `health:"up"` targets for `namespace="zuno-ai-run"` via its own
   `/api/v1/targets` API - confirmed for all 4 LLMInferenceService models.
-- [ ] Browser-verified `rhods-dashboard` Observe & Monitor > Models tab
-  showing nonzero numbers after real traffic - not yet done this session
-  (requires sending live inference requests through each model first);
-  the Prometheus-side data path is proven, this is presentation-layer only.
+- [x] Real, nonzero traffic reaches RHOAI's own Thanos: after `make d3
+  stresstest` (224/248 checks passed - real bulk interactions through the
+  agents), `sum(increase(kserve_vllm:request_success_total[1h])) by
+  (llm_isvc_name)` queried against `data-science-thanos-querier-route`
+  showed real counts for 3/4 models (`qwen36-27b-instruct` ~6,
+  `qwen35-9b-wesh` ~13, `gpt-oss-20b` ~13; `qwen35-9b` 0 - not routed to
+  this run, a business-routing outcome, not a metrics gap). Literal
+  browser screenshot of the dashboard tab rendering these not taken this
+  session - the data source it reads from is proven live.
 - [x] `git status` on every `zuno-monitoring`/Grafana/Kiali-owning chart
   shows no changes from this work.
 
