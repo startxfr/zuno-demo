@@ -94,6 +94,30 @@ tools:
     external_model_policy:
       allow_context: false
 
+  # ADR-0524 clause 3 extension (2026-09-09): technical-docs/knowledge.tech
+  # search, exposed as a Lightspeed-reachable tool the same way
+  # search_confluence is - a new capability accepted through the SAME
+  # front-door capability allowlist mechanism the clause already defines,
+  # not a new exception. Backed by the existing rag-tech pgvector corpus
+  # (already used internally by Tekos's retrieve_node) via a thin proxy to
+  # components/rag-service - no new backend deployed.
+  - tool: search_technical_docs
+    capability: knowledge.tech.search
+    mcp_server: rag-service
+    # C1 per `technical-docs` in policies/data-classification/
+    # classification.yaml - lower than Confluence's C2 (this is public/
+    # semi-public technology documentation, not internal business content).
+    min_classification: C1
+    allowed_groups:
+      - consultant
+      - board
+      - cdp
+      # Same posture as search_confluence/confluence.page.read: exposed to
+      # Lightspeed's per-user callers, read-only, no equivalent write tool.
+      - lightspeed_readonly
+    external_model_policy:
+      allow_context: false
+
   # ADR-0117: real Confluence Cloud access (components/mcp-servers/confluence),
   # replacing the search_confluence demo handler above's mapping. read/create/
   # update never had a pre-ADR-0116 legacy name, so `tool` equals `capability`
@@ -416,6 +440,18 @@ tools:
   #      and its token holds awx.execute_jobtemplate on the zuno-day0-check
   #      object alone, so neither a broader group nor a prompt injection can
   #      reach a second Job Template.
+  #
+  # 2026-09-09 (ADR-0524 clause 3/4 extension, Lightspeed): `ocp-ai-ops`
+  # added deliberately - the one intentional exception to the "no OpenShift
+  # RBAC group here" rule stated above. Lightspeed's per-user callers carry
+  # real OpenShift groups (TokenReview), never the OKF business groups
+  # above, and `lightspeed_readonly` is NOT added here (unlike
+  # search_confluence/confluence.page.read) precisely because that group
+  # would hand AAP audit access to every Lightspeed user without
+  # distinction. `ocp-ai-ops` (admin RoleBinding on zuno-* namespaces,
+  # gitops/charts/openshift-rbac-groups) is reused instead of inventing a
+  # new Keycloak group: real humans already trusted with cluster-admin-tier
+  # access to the AI platform, not a broader "any console user" grant.
   - tool: aap.platform.audit
     capability: aap.platform.audit
     mcp_server: aap
@@ -424,6 +460,7 @@ tools:
       - consultant
       - board
       - cdp
+      - ocp-ai-ops
 
   - tool: aap.cluster.audit
     capability: aap.cluster.audit
@@ -433,6 +470,7 @@ tools:
       - consultant
       - board
       - cdp
+      - ocp-ai-ops
 
   # ADR-0415: stable-diffusion-xl image generation via OVHcloud AI
   # Endpoints, for advantage/cognos/comage's preferred image model. Policy

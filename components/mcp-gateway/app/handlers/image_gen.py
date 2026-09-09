@@ -27,7 +27,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 
@@ -42,6 +42,7 @@ async def handle(
     caller_sub: str,
     delegated_token: Optional[str] = None,
     bearer_token: str = "",
+    caller_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     prompt = str(arguments.get("prompt", "")).strip()
     if not prompt:

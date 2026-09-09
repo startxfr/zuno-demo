@@ -24,7 +24,7 @@ and returns synthetic data.
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 async def handle(
@@ -32,6 +32,7 @@ async def handle(
     caller_sub: str,
     delegated_token: Optional[str] = None,
     bearer_token: str = "",
+    caller_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     folder = str(arguments.get("folder", "")).strip() or "My Drive"
     return {
@@ -62,6 +63,7 @@ async def handle_create(
     caller_sub: str,
     delegated_token: Optional[str] = None,
     bearer_token: str = "",
+    caller_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     title = str(arguments.get("title", "")).strip() or "Untitled document"
     content = str(arguments.get("content", ""))
@@ -82,6 +84,7 @@ async def handle_update(
     caller_sub: str,
     delegated_token: Optional[str] = None,
     bearer_token: str = "",
+    caller_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     document_id = str(arguments.get("document_id", "")).strip()
     if not document_id:

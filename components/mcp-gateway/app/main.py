@@ -277,7 +277,13 @@ async def _authorize_and_invoke(
 
         try:
             result = await invoke_downstream(
-                binding, tool_name, arguments, identity.sub, identity.token, delegated_token=delegated_token
+                binding,
+                tool_name,
+                arguments,
+                identity.sub,
+                identity.token,
+                delegated_token=delegated_token,
+                caller_groups=identity.groups,
             )
         except DownstreamError as exc:
             call.outcome = "downstream_error"

@@ -1046,6 +1046,18 @@ maas:
             - limit: 1000000
               window: 1h
           priority: 100
+        # ADR-0524 clause 1 (WP-085), extended 2026-09-09 when Lightspeed's
+        # default model moved from qwen36-27b-instruct to gpt-oss-20b: same
+        # dedicated ServiceAccount identity and scoping rationale as
+        # qwen36-27b-instruct-lightspeed below - without this entry MaaS
+        # 403s with "no matching subscription found for user" for this
+        # model+identity pair specifically, independent of the qwen grant.
+        - name: gpt-oss-20b-lightspeed
+          user: "system:serviceaccount:openshift-lightspeed:lightspeed-maas-client"
+          tokenRateLimits:
+            - limit: 200000
+              window: 1h
+          priority: 50
 
       # Proves a group/model combination WITHOUT entitlement is denied
       # (ADR-0201 acceptance bullet 3): only the groups above are subjects

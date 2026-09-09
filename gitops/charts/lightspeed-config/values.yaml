@@ -22,20 +22,10 @@ olsConfig:
   provider:
     name: zuno-maas
     type: rhoai_vllm
-    # CORRECTION 2026-08-27: these two were swapped, and the comment that
-    # used to sit here said the model identity is "derived from the request
-    # path". It is not. Proven by A/B on the live gateway with one identical
-    # ai-gateway token, changing only the request BODY's `model` field:
-    #   body model = zuno-ai-run/qwen36-27b-instruct-maas  -> HTTP 200
-    #   body model = qwen3.6-27b-instruct                   -> HTTP 403
-    #     "no matching subscription found for user"
-    # and, separately, changing only the PATH segment:
-    #   path /zuno-ai-run/qwen36-27b-instruct/v1      -> HTTP 200
-    #   path /zuno-ai-run/qwen36-27b-instruct-maas/v1 -> HTTP 404
-    #
-    # So there are two distinct names with two distinct jobs, exactly as
-    # ai-gateway already models them (`model` vs `maas_model_ref` in
-    # platform/ai-gateway/provider-routing.yaml):
+    # Two distinct names with two distinct jobs, exactly as ai-gateway
+    # already models them (`model` vs `maas_model_ref` in
+    # platform/ai-gateway/provider-routing.yaml) - proven by A/B on the live
+    # gateway 2026-08-27 (see git history for the full trace):
     #
     #   llmISvcName  - the LLMInferenceService, and the ONLY thing the
     #                  HTTPRoute matches. Goes in the URL path.
@@ -47,43 +37,28 @@ olsConfig:
     #                  request body's `model`.
     #   modelName    - what the KServe predictor itself answers to, used
     #                  only when endpointMode=direct bypasses MaaS.
-    llmISvcName: qwen36-27b-instruct
-    maasModelRef: zuno-ai-run/qwen36-27b-instruct-maas
-    modelName: qwen3.6-27b-instruct
-    # TEMPORAIRE (2026-08-27) - voir ADR-0524 / WP-085.
     #
-    #   maas   : chemin nominal d'ADR-0521, via la passerelle MaaS.
-    #   direct : appel direct du Service KServe, en contournant MaaS.
-    #
-    # `direct` est actif parce que le plan de controle MaaS ne sait plus
-    # rapprocher une identite d'une MaaSSubscription : 403 "no matching
-    # subscription found for user", reproduit le 2026-08-27 pour l'identite
-    # CONNUE BONNE `ai-gateway` et sur `gpt-oss-20b`, un modele que WP-085 n'a
-    # jamais touche. Cache informer, PostgreSQL, MaaSModelRef et
-    # MaaSSubscription ont tous ete elimines par test - le defaut est en amont,
-    # perimetre WP-076/ADR-0521.
-    #
-    # Repasser a `maas` est une edition d'UNE valeur ici, plus le retrait du
-    # bloc lightspeed dans gitops/charts/models/templates/networkpolicy-qwen.yaml.
-    # L'entitlement MaaS (MaaSSubscription + sujet OPA) reste en place et intact
-    # exactement pour rendre ce retour possible sans autre travail.
-    # BASCULE TENTEE ET ANNULEE le 2026-08-27. Les deux noms sont corriges et
-    # le rendu `maas` est bon (chemin + corps verifies par A/B live), mais la
-    # bascule bute sur un TROISIEME defaut, cote operateur celui-la et deja
-    # documente plus bas pour `staticToken` : OLS v1.1.2 IGNORE `credentialKey`
-    # et exige en dur la cle `apitoken`. Or `credential.mode: saTokenSecret`
-    # produit un Secret de type kubernetes.io/service-account-token, dont la
-    # cle est `token`. L'app-server crashe alors au demarrage :
-    #   FileNotFoundError: '/etc/apikeys/lightspeed-maas-credentials/apitoken'
-    # Un simple changement de template ne suffit pas : le type
-    # service-account-token est peuple par le controleur sous `token`, et on ne
-    # peut pas le renommer. Il faudrait une tache ansible qui lise le token du
-    # SA et ecrive un Secret Opaque sous la cle `apitoken`.
-    #
-    # Piege de deploiement au passage : le type d'un Secret est IMMUABLE, donc
-    # changer credential.mode fait echouer la synchro ArgoCD
-    # (`Secret ... is invalid: type: Invalid`) tant que l'ancien Secret n'est
-    # pas supprime a la main.
+    # gpt-oss-20b (unlike qwen) publishes the SAME string for all three -
+    # see gitops/charts/models/values.yaml's gptOssModel block.
+    llmISvcName: gpt-oss-20b
+    maasModelRef: zuno-ai-run/gpt-oss-20b-maas
+    modelName: gpt-oss-20b
+    # 2026-09-09: switched from qwen36-27b-instruct to gpt-oss-20b as
+    # Lightspeed's default model. `endpointMode: maas` chosen deliberately:
+    # gpt-oss-20b was the exact model on which the original MaaS 403 ("no
+    # matching subscription found for user") was first reproduced
+    # (2026-08-27, WP-085 step 2) - but that defect was upstream in the MaaS
+    # control plane (payload-processing's mesh sidecar losing its istiod XDS
+    # egress, ansible/roles/openshift_ai/tasks/reconcile.yml), not specific
+    # to this model, and was confirmed fixed live before this switch. A new
+    # `gpt-oss-20b-lightspeed` MaaSSubscription was added alongside the
+    # existing `qwen36-27b-instruct-lightspeed` one (gpt-oss-20b's own
+    # `subscriptions` list in gitops/charts/models/values.yaml) - each
+    # published model needs its own subscription entry for this identity,
+    # switching the model here does not carry the qwen entitlement over.
+    # If a 403 reappears specifically on this model after a green
+    # payload-processing NetworkPolicy, treat that as a new, separate
+    # defect rather than assuming it's the same one.
     endpointMode: maas  # direct | maas
 
     # In-cluster MaaS gateway root. Same endpoint ai-gateway's maasAdapter
@@ -93,10 +68,18 @@ olsConfig:
     servingNamespace: zuno-ai-run
     # endpointMode=direct : le Service KServe du workload, en OpenAI-compatible
     # sur 8000. Meme endpoint que le fallback documente d'ai-gateway
-    # (LOCAL_MODEL_ENDPOINT). Verifie live le 2026-08-27 : HTTP 200 avec la CA
-    # service-ca et un token factice.
-    directEndpoint: https://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
-    contextWindowSize: 128000
+    # (LOCAL_MODEL_ENDPOINT).
+    # NOTE: unlike qwen, gpt-oss-20b has no `lightspeed.enabled` admission
+    # block in gitops/charts/models/templates/ - only networkpolicy-qwen.yaml
+    # carries one. If endpointMode is ever flipped to `direct` for this
+    # model, that NetworkPolicy gap must be closed first (add an equivalent
+    # admission for gpt-oss-20b's own predictor NetworkPolicy) or the
+    # direct path will be silently blocked.
+    directEndpoint: https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
+    # gpt-oss-20b is served with maxModelLen: 32768 (gitops/charts/models/
+    # values.yaml gptOssModel block), well below its 131k native window -
+    # matched here rather than reusing qwen's 128000.
+    contextWindowSize: 32768
     maxTokensForResponse: 2048
 
   # ADR-0524 clause 2: native OpenShift knowledge, untouched. `rag` stays

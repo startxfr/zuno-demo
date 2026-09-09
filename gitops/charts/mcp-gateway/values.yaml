@@ -96,6 +96,16 @@ lightspeed:
   # list, NOT on the caller's groups - a consultant is entitled to
   # confluence.page.create elsewhere in the platform and would reach it here the
   # moment it were added.
+  #
+  # 2026-09-09 extension: knowledge.tech.search (technical-docs RAG,
+  # policies/tools/tool-policy.yaml) and aap.platform.audit/aap.cluster.audit
+  # (AAP audit, scoped further by allowed_groups to ocp-ai-ops) added. Both
+  # are read-only, same as the two Confluence entries above - the ceiling
+  # stays a read-only allowlist, it just now covers three capability
+  # families instead of one.
   frontdoorCapabilities:
     - confluence.page.search
     - confluence.page.read
+    - knowledge.tech.search
+    - aap.platform.audit
+    - aap.cluster.audit

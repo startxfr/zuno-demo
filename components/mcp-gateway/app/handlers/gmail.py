@@ -15,7 +15,7 @@ returns synthetic data.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 async def handle(
@@ -23,6 +23,7 @@ async def handle(
     caller_sub: str,
     delegated_token: Optional[str] = None,
     bearer_token: str = "",
+    caller_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     query = str(arguments.get("query", "")).strip() or "in:inbox"
     return {

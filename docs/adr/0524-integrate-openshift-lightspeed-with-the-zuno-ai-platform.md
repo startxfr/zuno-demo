@@ -81,6 +81,11 @@ mirroring the existing `*-ai-gateway` entries, so its consumption is entitled, r
 attributable rather than anonymous. The MaaS gateway's serving CA is trusted through
 `spec.ols.additionalCAConfigMapRef`.
 
+*Changed 2026-09-09*: default model switched from `qwen36-27b-instruct` to `gpt-oss-20b`. Each
+published model needs its own `-lightspeed` `MaaSSubscription` entry for this identity - switching
+the model does not carry an existing entitlement over - so a new `gpt-oss-20b-lightspeed`
+subscription was added alongside the pre-existing `qwen36-27b-instruct-lightspeed` one.
+
 **2. Native OpenShift knowledge, untouched.** `spec.ols.rag[]` stays empty and
 `spec.ols.byokRAGOnly` stays unset, so the operator's RHOKP sidecar keeps serving official,
 version-matched OpenShift documentation. Zuno builds no OpenShift-documentation ingestion
@@ -107,13 +112,30 @@ the caller's own groups - are untouched and still evaluated per call, by the sam
 path runs (`_evaluate_tool_policy`). The exception lives in one named function,
 `evaluate_without_declaration()`, whose only sanctioned caller is this endpoint.
 
-**4. Read-only Confluence, enforced in three independent places.** The `/mcp` front-door's
-capability allowlist contains only `confluence.page.search` and `confluence.page.read`, and is
-checked on both `tools/list` and `tools/call` - so a write is refused before any policy lookup,
-for every caller, however entitled. The service-identity fallback additionally carries a group
-(`lightspeed_readonly`) that appears on only those two entries in `policies/tools/tool-policy.yaml`.
-And `spec.ols.toolsApprovalConfig` keeps its `tool_annotations` default. A write attempt fails
-closed even if any one layer were misconfigured.
+*Extended 2026-09-09*: `lightspeed.frontdoorCapabilities` (`gitops/charts/mcp-gateway/values.yaml`)
+now lists five capabilities, not two - `knowledge.tech.search` (a new tool, `search_technical_docs`,
+proxying the existing `rag-tech` pgvector corpus already used internally by Tekos, via an
+in-process handler exactly like `generate_image`/`generate_diagram`) and `aap.platform.audit` /
+`aap.cluster.audit` (AAP's existing audit-only capabilities, already bound for Tekos/Arkos). Both
+additions are accepted through this same mechanism - no new exception, no new ADR - and both stay
+read-only, per clause 4 below. Adding `knowledge.tech.search` does not reopen clause 2: that clause
+concerns the official-OpenShift-documentation corpus RHOKP serves, and Zuno still builds no
+competing corpus for that; `technical-docs`/`knowledge.tech` is a separate, pre-existing corpus
+covering the technologies Zuno agents support.
+
+**4. Read-only, enforced in three independent places.** The `/mcp` front-door's capability
+allowlist is a read-only allowlist by construction - originally `confluence.page.search` and
+`confluence.page.read`, since 2026-09-09 also `knowledge.tech.search`, `aap.platform.audit` and
+`aap.cluster.audit` - checked on both `tools/list` and `tools/call`, so a write is refused before
+any policy lookup, for every caller, however entitled. No write-capable tool has ever been added to
+this list, and none of the three added capabilities has a write counterpart. The service-identity
+fallback additionally carries a group (`lightspeed_readonly`) that appears on only the two
+Confluence entries and, since 2026-09-09, `knowledge.tech.search` in
+`policies/tools/tool-policy.yaml` - deliberately NOT on the two AAP entries, which are gated
+instead by the real OpenShift group `ocp-ai-ops` (see Operational considerations below), so the
+service-identity fallback never inherits AAP audit access. And `spec.ols.toolsApprovalConfig` keeps
+its `tool_annotations` default. A write attempt fails closed even if any one layer were
+misconfigured.
 
 **5. Per-user identity, with a service identity only as a compatibility fallback.** Lightspeed's
 MCP calls are authorized as the **real console user**, not as a shared robot account:
@@ -163,9 +185,12 @@ Tracked by WP-085.
 
 This decision does **not** introduce: a Zuno-built MCP server or deployment dedicated to
 Lightspeed (clause 3 adds an endpoint to an existing component; clause 6's introspection server
-is the operator's own, not Zuno's); an OpenShift-documentation ingestion pipeline; a pgvector
-corpus for official OpenShift documentation; any Confluence write capability; or a replacement
-for the Lightspeed console plugin or conversational backend.
+is the operator's own, not Zuno's); an OpenShift-documentation ingestion pipeline or a pgvector
+corpus for **official OpenShift documentation** specifically (RHOKP keeps serving that, clause 2 -
+this is unaffected by the 2026-09-09 `knowledge.tech.search` addition, which reuses the
+pre-existing, separately-scoped `technical-docs` corpus, not a new one); any write capability on
+any of the three tool families reachable through the front-door (Confluence, technical-docs
+search, AAP audit); or a replacement for the Lightspeed console plugin or conversational backend.
 
 ## Target architecture
 
@@ -179,10 +204,13 @@ OpenShift Console  --(console plugin)-->  Lightspeed (openshift-lightspeed)
  (rhoai_vllm)          openshift-mcp-server                (zuno-ai-run, existing)
       |                (operator-managed)                        |
       v                                                   ADR-0011 intersection
- qwen3.6-27b-instruct                                             |
- (zuno-ai-run, KServe)                                            v
-                                                            confluence-mcp
-                                                          search / read ONLY
+ gpt-oss-20b                                                      |
+ (zuno-ai-run, KServe)                              +-------------+-------------+
+                                                      |             |             |
+                                                      v             v             v
+                                                confluence-mcp  rag-service   aap-mcp
+                                                search/read     technical-docs audit
+                                                    ONLY          search ONLY   ONLY
 ```
 
 ## Operational considerations
@@ -218,6 +246,20 @@ The namespace is **not** mesh-injected: Lightspeed's Deployments are operator-ow
 would put the platform in the business of patching a Red Hat operand. Reachability into
 `zuno-ai-run` is therefore a NetworkPolicy question only - `mcp-gateway`'s policy today admits
 only `agent-runtime` and `acceptance-gate` pods and must gain a namespace-scoped allow.
+
+*Added 2026-09-09*: `aap.platform.audit`/`aap.cluster.audit` reaching Lightspeed's `/mcp` front-door
+(clause 3 extension) reuses `ocp-ai-ops` - an existing OpenShift/Keycloak group already bound to an
+`admin` RoleBinding on every `zuno.io/managed=true` namespace (`gitops/charts/openshift-rbac-groups`)
+- as the `allowed_groups` entry in `policies/tools/tool-policy.yaml`, rather than creating a new
+Keycloak group or reusing `lightspeed_readonly`. This is a deliberate, one-off departure from
+`tool-policy.yaml`'s stated convention of only referencing the seven OKF business groups (see that
+file's own comment on the AAP entries): `ocp-ai-ops` members are real humans already trusted with
+admin-tier access to the AI platform for unrelated reasons, so granting them AAP audit visibility
+through Lightspeed does not meaningfully widen what they can already do, whereas `lightspeed_readonly`
+would have handed it to every console user who can open the assistant, with no way to narrow further
+(no admin-tier OKF business group exists to narrow to - the same gap ADR-0355 clause 4 already
+recorded). If a future capability needs a narrower or purpose-built grant than `ocp-ai-ops` provides,
+create a dedicated Keycloak group rather than reusing this one further.
 
 Day 3 gains Lightspeed coverage on both existing verbs, in two layers. `make d3 check
 lightspeed[-config]` delegates to each component's own `precheck.yml`, the operand's reading

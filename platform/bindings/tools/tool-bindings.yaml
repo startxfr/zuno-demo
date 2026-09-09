@@ -124,6 +124,19 @@ bindings:
     provider_tool: update_page
     auth_mode: service-identity
 
+  # --- rag-service: existing in-cluster REST service (components/rag-
+  #     service), NOT an MCP server - proxied via an in-process handler
+  #     the same way image_gen/diagram_gen reach their own real in-cluster
+  #     services. ADR-0524 clause 3 extension (2026-09-09): exposes the
+  #     existing knowledge.tech/rag-tech corpus to Lightspeed's front-door.
+  - capability: knowledge.tech.search
+    aliases: [search_technical_docs]
+    backend: rag-service
+    transport: in-process
+    handler: rag_query
+    provider_tool: search_technical_docs
+    auth_mode: service-identity
+
   # --- salesforce: real MCP server (ADR-0326/WP-33), streamable-HTTP
   #     transport - same shape as confluence above, templated from it.
   - capability: salesforce.opportunity.read

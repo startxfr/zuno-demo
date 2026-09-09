@@ -39,6 +39,7 @@ async def handle(
     caller_sub: str,
     delegated_token: Optional[str] = None,
     bearer_token: str = "",
+    caller_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     # auth_mode=service-identity (ADR-0208): the technical SMTP identity
     # is a shared credential, never a per-user one - delegated_token is

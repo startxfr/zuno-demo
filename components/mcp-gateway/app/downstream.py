@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 import httpx
 import httpx2  # the mcp SDK's own httpx fork/client type, required by streamable_http_client
@@ -23,7 +23,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 
 from app.bindings import Binding
-from app.handlers import diagram_gen, drive, email_report, gmail, image_gen, web_search
+from app.handlers import diagram_gen, drive, email_report, gmail, image_gen, rag_query, web_search
 
 logger = logging.getLogger("mcp_gateway.downstream")
 
@@ -70,6 +70,10 @@ IN_PROCESS_HANDLERS = {
     # ADR-0516: same posture - calls the real, in-cluster diagram-render
     # service (never an external SaaS call, unlike image_gen above).
     "diagram_gen": diagram_gen.handle,
+    # ADR-0524 clause 3 extension (2026-09-09): calls the real, in-cluster
+    # rag-service over the existing knowledge.tech/rag-tech corpus - see
+    # app/handlers/rag_query.py's own docstring.
+    "rag_query": rag_query.handle,
 }
 
 
@@ -87,6 +91,7 @@ async def invoke(
     caller_sub: str,
     bearer_token: str,
     delegated_token: Optional[str] = None,
+    caller_groups: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     if binding is None:
         # Fail closed (ADR-0116): deterministic error, no backend contacted.
@@ -109,8 +114,17 @@ async def invoke(
         # ADR-0415: bearer_token is forwarded the same way, for the one
         # handler (image_gen) that makes a real in-cluster call and needs
         # the caller's own identity to reach it - every other handler
-        # ignores it, same as delegated_token above.
-        return await handler(arguments, caller_sub, delegated_token=delegated_token, bearer_token=bearer_token)
+        # ignores it, same as delegated_token above. caller_groups follows
+        # the identical pattern, added for rag_query (ADR-0524 clause 3
+        # extension): rag-service enforces its ACL on caller_groups, not on
+        # a bearer token, so this is the one handler that actually reads it.
+        return await handler(
+            arguments,
+            caller_sub,
+            delegated_token=delegated_token,
+            bearer_token=bearer_token,
+            caller_groups=caller_groups,
+        )
 
     raise DownstreamError(
         502, f"binding '{binding.capability}' has unsupported transport '{binding.transport}'"

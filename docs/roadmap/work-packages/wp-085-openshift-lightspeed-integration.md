@@ -408,3 +408,61 @@ each sufficient on its own.
 - ADR-0524 moves to `Implemented` only when steps 1-6 are all live-verified. If step 4's per-user
   half is blocked by the console plugin, ADR-0524 stays `Partially implemented` with the blocking
   evidence recorded here.
+
+## Extensions post-live, 2026-09-09
+
+Live incident: the console assistant returned "Bad Gateway" for a simple pod-count question.
+Investigation surfaced TWO distinct, real defects - one understood and reproducible, one found but
+**NOT root-caused or fixed** as of this writing:
+
+1. **Understood, partially mitigated**: `payload-processing`'s NetworkPolicy (`openshift-ingress`,
+   owned entirely by MaaS's `Config/default`/`maastenantconfig` controller) loses its egress rule to
+   `istiod:15012/15010` - confirmed live that this controller reconciles on a fixed **5-minute**
+   timer (`maas-controller` logs, `redhat-ods-applications`) and overwrites the whole `spec.egress`
+   field every cycle, since the field has no per-item ownership. Re-running
+   `ansible/roles/openshift_ai/tasks/reconcile.yml`'s existing patch (`make d1 reconcile
+   openshift-ai`) restores it, but it reverts again within ~10-15 minutes - **periodic manual
+   reconcile is not durable enough** to keep this rule in place continuously. No vendor-supported
+   declarative alternative exists on the `Config`/`v1alpha1` CRD today (`spec` only exposes
+   `limitadorScrapeInterval`/`usageLogging`). Left open; a genuine fix needs either an upstream
+   change or an automated re-assertion running faster than the controller's 5-minute cycle.
+
+2. **Found, NOT resolved**: independently of (1), the MaaS gateway's auth/entitlement path is
+   currently denying every caller platform-wide, not just Lightspeed - confirmed live via
+   `ai-gateway`'s own already-proven `gpt-oss-20b` MaaS calls also failing (401, not 403, but the
+   same broken layer). `maas-api`'s access log
+   (`redhat-ai-gateway-infra`/`maas-api`, path `/internal/v1/subscriptions/select`) shows every
+   single request arriving with `Authorization=absent X-Api-Key=absent X-MaaS-Username=absent
+   X-MaaS-Group=absent` - no identity ever reaches the subscription-matching call, which explains
+   the universal "no matching subscription found for user". Two remediation attempts, both
+   verified to have NO effect: (a) restarting `kuadrant-operator-controller-manager`
+   (`openshift-operators`) - was crash-looping on liveness-probe timeouts (19 restarts/19h, node
+   `ip-10-18-28-96` at ~76% CPU with 248 pods scheduled on it - a plausible but unconfirmed CPU-
+   contention trigger); (b) deleting/recreating the `maas-default-gateway-istio` pod
+   (`openshift-ingress`) to force a fresh Wasm-filter reload - the freshly-created pod exhibited the
+   identical empty-headers behavior immediately, disproving the "stale Wasm config" hypothesis.
+   **Root cause still unknown.** `lightspeed-config`'s own OLSConfig/values are confirmed correct
+   throughout - this is entirely upstream of anything this WP or ADR-0524 controls.
+
+Given (2) is unresolved, live end-to-end verification of the model switch and the two new tools
+below is currently blocked. The repo-side changes are complete and independently correct (validated
+via `helm template`, YAML parsing, and the mcp-gateway test suite); they should live-verify cleanly
+once the MaaS incident above is independently resolved.
+
+Same session, three deliberate extensions beyond the original 7-clause decision (ADR-0524 itself
+now documents each in place, no new ADR):
+
+1. **Default model**: `qwen36-27b-instruct` -> `gpt-oss-20b`, still `endpointMode: maas`. Required
+   its own `gpt-oss-20b-lightspeed` `MaaSSubscription` entry (`gitops/charts/models/values.yaml`) -
+   the qwen entitlement does not carry over to a different published model.
+2. **`search_technical_docs`** (`knowledge.tech.search`): a new front-door tool exposing the
+   existing `technical-docs`/`rag-tech` corpus (previously Tekos-internal only) via a thin
+   in-process proxy to `components/rag-service`'s `/v1/search` - no new backend. Same
+   `allowed_groups` as `search_confluence` (`consultant`/`board`/`cdp`/`lightspeed_readonly`),
+   `min_classification: C1`.
+3. **AAP audit tools** (`aap.platform.audit`/`aap.cluster.audit`): added to the front-door
+   allowlist, gated by the real OpenShift group `ocp-ai-ops` (not `lightspeed_readonly` - seeded
+   deliberately, see ADR-0524's Operational considerations) rather than a new Keycloak group.
+
+Live verification for all three items still to be run (see this file's own checklist above,
+extended to cover the new tools/model) before considering this session's changes closed.
