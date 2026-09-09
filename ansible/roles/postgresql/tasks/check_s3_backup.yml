@@ -255,3 +255,28 @@
         name: zuno-postgresql-check-s3-backup-creds
         namespace: zuno-data
         wait: false
+
+  # ADR-0524, live finding 2026-09-09/10: this block's own header comment
+  # already promises "deliberately never fails on its own... sets facts
+  # instead" - a raw RBAC 403 creating the throwaway Secret/Job broke that
+  # promise for the *-check credential tier before the Role above existed.
+  # Kept even now that the Role covers the known-good path: any OTHER
+  # unexpected failure in here (image pull, quota, a future secret this
+  # Role doesn't yet cover) should still degrade to "couldn't tell" rather
+  # than failing this entire day-check run - restore.yml already has its
+  # own clear, actionable `fail` for exactly that case.
+  rescue:
+    - name: "postgresql | warn that the S3 pgBackRest cross-check failed unexpectedly"
+      ansible.builtin.debug:
+        msg: >-
+          The S3 pgBackRest cross-check block failed unexpectedly (see the
+          task output above) - treating as "couldn't tell" rather than
+          failing this entire run. If this is a permissions error, the fix
+          is a scoped Role/RoleBinding for the calling credential, same
+          shape as gitops/charts/postgresql/templates/
+          rolebinding-aap-day0-check-secrets.yaml.
+
+    - name: "postgresql | record that the S3 cross-check could not complete"
+      ansible.builtin.set_fact:
+        _postgresql_s3_has_backup: false
+        _postgresql_s3_check_succeeded: false
