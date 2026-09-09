@@ -496,11 +496,13 @@ tools:
     capability: aap.cluster.audit
     mcp_server: aap
     description: >-
-      Run this cluster's Day 0 health check through Ansible Automation
-      Platform and report the result. Takes no arguments and always runs the
-      same read-mostly check playbook. This launches real automation and
-      typically takes a few minutes - use it when the user explicitly asks
-      for a fresh cluster audit or check, rather than a status summary.
+      Launch this cluster's Day 0 health check through Ansible Automation
+      Platform and return immediately with the job id - it does not wait for
+      the run to finish (the underlying playbook takes a few minutes). Takes
+      no arguments and always launches the same read-mostly check playbook.
+      Use it when the user explicitly asks for a fresh cluster audit or
+      check, rather than a status summary; call aap.platform.audit
+      afterwards to see whether the run passed.
     min_classification: C2
     allowed_groups:
       - consultant

@@ -121,19 +121,17 @@ mcp:
     # would time out on Confluence searches the gateway itself considers
     # healthy.
     #
-    # 2026-09-09, live-caught: aap.cluster.audit (components/mcp-servers/aap/
-    # server.py's cluster_audit) blocks synchronously on a real AAP Job
-    # Template - observed taking ~2m30s end to end, and its own poll loop
-    # allows up to AAP_JOB_TIMEOUT_SECONDS (600s, default) before giving up
-    # with an explicit, job-id-carrying error. A 60s budget here cut the
-    # console off mid-run with a bare "network error" while the job kept
-    # running (and completing) both in mcp-gateway and in AAP - this is a
-    # single timeout for the whole zuno-mcp server (the CRD has no per-tool
-    # override), so it must cover this capability's worst case, not just the
-    # fast ones. 630s (600s + margin) so a real AAP-side timeout's own clean
-    # error message has a chance to reach the console instead of Lightspeed
-    # cutting the call first.
-    timeoutSeconds: 630
+    # 2026-09-09, live-caught: aap.cluster.audit used to block synchronously
+    # on a real AAP Job Template (~2m30s observed) - raised to 630s here as a
+    # first fix, then reverted back to 60s once cluster_audit itself was
+    # changed to launch-and-return (components/mcp-servers/aap/server.py) -
+    # OpenShift Lightspeed's console plugin has its own client-side request
+    # timeout well under a few minutes, and no field on this CRD can raise
+    # THAT one, so the fix had to happen in the tool, not this timeout. Keep
+    # this at a value that only needs to cover this repo's own fast tools
+    # (Confluence/RAG search, launching a job, reading AAP's own state) -
+    # nothing behind zuno-mcp should ever block for minutes again.
+    timeoutSeconds: 60
 
   # ADR-0524 clause 5. Two identity modes, both delivered by WP-085.
   #

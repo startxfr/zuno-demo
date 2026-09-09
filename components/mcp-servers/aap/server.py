@@ -36,10 +36,8 @@ unscoped `zuno/aap/controller-token`.
 """
 from __future__ import annotations
 
-import asyncio
 import hmac
 import os
-import time
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
 
@@ -63,12 +61,6 @@ AAP_BASE_URL = os.getenv("AAP_BASE_URL", "http://aap.zuno-aap.svc")
 
 HTTP_TIMEOUT_SECONDS = float(os.getenv("AAP_HTTP_TIMEOUT_SECONDS", "20"))
 
-# Upper bound on cluster_audit's poll loop. day0_check.yml takes a few
-# minutes; the bound exists so a wedged job surfaces as an explicit,
-# job-id-carrying error rather than hanging the calling agent's turn.
-JOB_TIMEOUT_SECONDS = float(os.getenv("AAP_JOB_TIMEOUT_SECONDS", "600"))
-JOB_POLL_SECONDS = float(os.getenv("AAP_JOB_POLL_SECONDS", "5"))
-
 # ADR-0355 clause 2 authorizes launching this template and no other. Not a
 # tool argument - see the module docstring.
 JOB_TEMPLATE_NAME = os.getenv("AAP_JOB_TEMPLATE_NAME", "zuno-day0-check")
@@ -77,8 +69,6 @@ PROJECT_NAME = os.getenv("AAP_PROJECT_NAME", "zuno-demo")
 # ADR-0037: required, not optional - this server has no purpose other than
 # serving the gateway (same reasoning as confluence/server.py).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
-
-_TERMINAL_JOB_STATUSES = frozenset({"successful", "failed", "error", "canceled"})
 
 
 class AapConfigError(RuntimeError):
@@ -193,11 +183,14 @@ mcp_server = MCPServer(
         "Ansible Automation Platform (AAP) audits for this OpenShift cluster. "
         "Use platform_audit to report how the automation platform itself is "
         "doing - component health, whether its Git project is in sync, and how "
-        "recent runs went. Use cluster_audit to actually run the cluster's "
-        f"'{JOB_TEMPLATE_NAME}' health check and report the outcome; it takes "
-        "no arguments, runs real automation, and can take several minutes, so "
-        "call it only when the user asks for a fresh cluster check rather than "
-        "a status summary."
+        "recent runs went (this also shows the outcome of any cluster_audit run, "
+        "once it has finished). Use cluster_audit to launch the cluster's "
+        f"'{JOB_TEMPLATE_NAME}' health check; it takes no arguments, runs real "
+        "automation, and returns immediately with a job id rather than waiting - "
+        "the run itself takes a few minutes. Call it only when the user asks for "
+        "a fresh cluster check rather than a status summary, and call "
+        "platform_audit afterwards (on the user's next relevant question) to "
+        "report whether it passed."
     ),
 )
 
@@ -283,13 +276,12 @@ async def platform_audit(recent_jobs: int = 5) -> Dict[str, Any]:
 
 @mcp_server.tool()
 async def cluster_audit() -> Dict[str, Any]:
-    """Run this cluster's Day 0 health check through Ansible Automation
-    Platform and report the result. Takes no arguments and always runs the
-    same read-mostly check playbook. This launches real automation and
-    typically takes a few minutes.
+    """Launch this cluster's Day 0 health check through Ansible Automation
+    Platform and return immediately with the job id - it does NOT wait for
+    the run to finish (the underlying playbook takes a few minutes). Takes
+    no arguments and always launches the same read-mostly check playbook.
+    Call platform_audit afterwards to see whether the run passed.
     """
-    started_at = time.monotonic()
-
     async with _client() as client:
         template = await _lookup_by_name(client, "job_templates", JOB_TEMPLATE_NAME)
 
@@ -307,48 +299,25 @@ async def cluster_audit() -> Dict[str, Any]:
                 f"no job id: {launched}"
             )
 
-        job: Dict[str, Any] = {}
-        while True:
-            job = await _request(client, "GET", f"/api/controller/v2/jobs/{job_id}/")
-            if job.get("status") in _TERMINAL_JOB_STATUSES:
-                break
-            if time.monotonic() - started_at > JOB_TIMEOUT_SECONDS:
-                # Explicit, job-id-carrying error - never a silent timeout
-                # (ADR-0355 Operational considerations).
-                raise ValueError(
-                    f"AAP job {job_id} ('{JOB_TEMPLATE_NAME}') was still "
-                    f"'{job.get('status')}' after {JOB_TIMEOUT_SECONDS:.0f}s and "
-                    f"was left running - inspect it in the Controller UI "
-                    f"(job {job_id}) rather than relaunching."
-                )
-            await asyncio.sleep(JOB_POLL_SECONDS)
+        # ADR-0524 (2026-09-09, live-caught): this used to poll here until the
+        # job reached a terminal status (up to 10 minutes) before returning.
+        # OpenShift Lightspeed's console plugin has its own client-side
+        # request timeout well under that - the job kept running and
+        # completing correctly, but the console always showed "network
+        # error" first. One immediate status read (never a wait loop) keeps
+        # this call fast for every caller, not just Lightspeed.
+        job = await _request(client, "GET", f"/api/controller/v2/jobs/{job_id}/")
 
-        summaries = await _request(
-            client,
-            "GET",
-            f"/api/controller/v2/jobs/{job_id}/job_host_summaries/",
-            params={"page_size": 25},
-        )
-
-    hosts = [
-        {
-            "host": row.get("host_name"),
-            "ok": row.get("ok"),
-            "changed": row.get("changed"),
-            "failures": row.get("failures"),
-            "skipped": row.get("skipped"),
-            "unreachable": row.get("dark"),
-        }
-        for row in summaries.get("results") or []
-    ]
-
-    status = job.get("status")
     return {
         "job_template": JOB_TEMPLATE_NAME,
-        "passed": status == "successful",
+        "launched": True,
         "job": _summarize_job(job),
-        "hosts": hosts,
-        "failure_reason": job.get("job_explanation") or job.get("result_traceback") or None,
+        "message": (
+            f"Launched '{JOB_TEMPLATE_NAME}' as AAP job {job_id} (status: "
+            f"{job.get('status')}). It typically takes a few minutes to finish - "
+            "ask for a platform audit afterwards to see whether it passed, or "
+            f"check job {job_id} directly in the AAP Controller UI."
+        ),
     }
 
 

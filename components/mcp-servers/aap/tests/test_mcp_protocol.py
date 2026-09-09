@@ -32,8 +32,6 @@ import sys
 os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("AAP_API_TOKEN", "test-token")
 os.environ.setdefault("AAP_BASE_URL", "http://aap.zuno-aap.svc")
-# Keep the poll loop instant - the tests drive terminal states explicitly.
-os.environ.setdefault("AAP_JOB_POLL_SECONDS", "0")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -90,13 +88,14 @@ def _json(payload, status: int = 200) -> httpx.Response:
     return httpx.Response(status, json=payload)
 
 
-def _healthy_handler(job_statuses=None):
+def _healthy_handler(job_status: str = "running"):
     """A Controller that answers every path platform_audit/cluster_audit use.
 
-    job_statuses: successive statuses returned by GET /jobs/<id>/, so a test
-    can make a job stay 'running' for a few polls before finishing.
+    job_status: what GET /jobs/<id>/ reports. cluster_audit only reads this
+    once, immediately after launch (ADR-0524, 2026-09-09: it no longer polls
+    to a terminal status - see server.cluster_audit's own docstring), so the
+    realistic default is a non-terminal status like 'running'.
     """
-    remaining = list(job_statuses or ["successful"])
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path
@@ -131,18 +130,12 @@ def _healthy_handler(job_statuses=None):
         if path == f"/api/controller/v2/job_templates/{JOB_TEMPLATE_ID}/launch/":
             return _json({"id": 42, "job": 42}, status=201)
         if path == "/api/controller/v2/jobs/42/":
-            status = remaining.pop(0) if len(remaining) > 1 else remaining[0]
             return _json({
-                "id": 42, "status": status, "failed": status != "successful",
+                "id": 42, "status": job_status, "failed": job_status == "failed",
                 "started": "2026-08-27T09:00:00Z",
-                "finished": "2026-08-27T09:02:00Z" if status in server._TERMINAL_JOB_STATUSES else None,
+                "finished": "2026-08-27T09:02:00Z" if job_status == "successful" else None,
                 "elapsed": 120.0,
             })
-        if path == "/api/controller/v2/jobs/42/job_host_summaries/":
-            return _json({"count": 1, "results": [
-                {"host_name": "localhost", "ok": 30, "changed": 0, "failures": 0,
-                 "skipped": 2, "dark": 0},
-            ]})
         return _json({"detail": f"unexpected path {path}"}, status=418)
 
     return handler
@@ -224,9 +217,9 @@ async def test_cluster_audit_launches_only_the_authorized_template(transport) ->
     server._client = _install_mock(_healthy_handler(), recorder)
     result = await server.cluster_audit()
 
-    assert result["passed"] is True
+    assert result["launched"] is True
     assert result["job"]["id"] == 42
-    assert result["hosts"][0]["host"] == "localhost"
+    assert "42" in result["message"], "the message must name the job id"
 
     posts = [(path, body) for method, path, body in recorder.calls if method == "POST"]
     assert len(posts) == 1, f"exactly one POST expected, got {posts}"
@@ -238,32 +231,19 @@ async def test_cluster_audit_launches_only_the_authorized_template(transport) ->
     assert body in (b"", b"null"), f"launch body must be empty, got {body!r}"
 
 
-async def test_cluster_audit_polls_until_the_job_is_terminal(transport) -> None:
+async def test_cluster_audit_returns_immediately_without_waiting_for_completion(transport) -> None:
+    """ADR-0524 (2026-09-09): a real AAP job takes a few minutes, but
+    OpenShift Lightspeed's console plugin times out well before that -
+    cluster_audit must launch and return right away, reporting whatever
+    status the job has THAT INSTANT (here: still 'running'), never wait for
+    a terminal one."""
     recorder = _Recorder()
-    server._client = _install_mock(_healthy_handler(["running", "running", "failed"]), recorder)
+    server._client = _install_mock(_healthy_handler(job_status="running"), recorder)
     result = await server.cluster_audit()
 
-    assert result["passed"] is False, "a failed job must not report passed"
-    assert result["job"]["status"] == "failed"
+    assert result["job"]["status"] == "running", "must report the immediate status, not wait for one"
     polls = [p for p in recorder.paths() if p == "/api/controller/v2/jobs/42/"]
-    assert len(polls) == 3, f"expected 3 polls, got {len(polls)}"
-
-
-async def test_cluster_audit_raises_a_job_carrying_error_on_timeout(transport) -> None:
-    recorder = _Recorder()
-    server._client = _install_mock(_healthy_handler(["running"] * 50), recorder)
-    original = server.JOB_TIMEOUT_SECONDS
-    server.JOB_TIMEOUT_SECONDS = -1  # every poll is already past the deadline
-    try:
-        await server.cluster_audit()
-    except ValueError as exc:
-        message = str(exc)
-        assert "42" in message, f"the error must name the job id: {message}"
-        assert "left running" in message, message
-    else:
-        raise AssertionError("a job that never finishes must raise, not return")
-    finally:
-        server.JOB_TIMEOUT_SECONDS = original
+    assert len(polls) == 1, f"expected exactly one status read, no poll loop, got {len(polls)}"
 
 
 async def test_expired_token_surfaces_as_a_clear_error(transport) -> None:
@@ -355,8 +335,7 @@ TESTS = [
     test_platform_audit_summarizes_a_healthy_platform,
     test_platform_audit_rejects_an_out_of_range_recent_jobs,
     test_cluster_audit_launches_only_the_authorized_template,
-    test_cluster_audit_polls_until_the_job_is_terminal,
-    test_cluster_audit_raises_a_job_carrying_error_on_timeout,
+    test_cluster_audit_returns_immediately_without_waiting_for_completion,
     test_expired_token_surfaces_as_a_clear_error,
     test_unreachable_controller_surfaces_as_a_clear_error,
     test_missing_job_template_names_the_likely_cause,

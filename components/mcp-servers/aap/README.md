@@ -10,7 +10,7 @@ middleware (ADR-0037), `/healthz` that never touches the backend.
 | Capability | Tool | What it does |
 |---|---|---|
 | `aap.platform.audit` | `platform_audit` | Read-only. Controller/instance health, the `zuno-demo` Project's last Git sync, recent `zuno-day0-check` runs. Issues GET requests only. |
-| `aap.cluster.audit` | `cluster_audit` | Launches the `zuno-day0-check` Job Template, polls to a terminal state, returns a pass/fail summary with per-host counters. |
+| `aap.cluster.audit` | `cluster_audit` | Launches the `zuno-day0-check` Job Template and returns immediately with the job id - does not wait for it to finish (2026-09-09: OpenShift Lightspeed's console plugin times out well before a real run completes). Call `platform_audit` afterwards to see whether it passed. |
 
 `cluster_audit` is this repository's first agent-reachable capability that
 runs automation rather than reading state. **It takes no arguments.** The
@@ -28,9 +28,7 @@ are the AAP-side token and the agent OKF declarations.
 | `AAP_API_TOKEN` | ExternalSecret from Vault `zuno/aap/mcp-token` | The least-privilege `zuno-mcp` user's token. Never `zuno/aap/admin`, never WP-073's `zuno/aap/controller-token` (that one is admin). |
 | `AAP_BASE_URL` | same secret, key `url` | The AAP **Gateway** Service, `http://aap.zuno-aap.svc`. Never `aap-controller-service`: on AAP 2.5+ it answers 401 to a gateway-minted token. |
 | `MCP_GATEWAY_WORKLOAD_TOKEN` | `mcp-gateway-workload-token` Secret | ADR-0037. |
-| `AAP_JOB_TIMEOUT_SECONDS` | default `600` | Upper bound on `cluster_audit`'s poll loop. Exceeding it raises an error naming the job id - never a silent timeout. |
 | `AAP_HTTP_TIMEOUT_SECONDS` | default `20` | Per-request timeout. |
-| `AAP_JOB_POLL_SECONDS` | default `5` | Poll interval. |
 
 The credential is minted by the Day 1 `aap_config` role, not the `vault`
 role: an AAP token cannot be self-generated, it has to come back from a
