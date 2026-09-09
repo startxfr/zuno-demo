@@ -204,6 +204,50 @@ targets (`qwen36-27b-instruct`, `qwen35-9b`, `qwen35-9b-wesh`,
 `gpt-oss-20b`) `health: up` in RHOAI's own Prometheus within seconds of
 applying it.
 
+## Second dated correction note (2026-09-09, same day)
+
+All four parts above were real and correctly fixed `data-science-
+monitoringstack`'s own visibility into `zuno-ai-run` - but the user,
+looking at the actual browser page, still saw only 1 of 5 models after a
+hard refresh and a private window (ruling out browser caching). Root
+cause, found from the browser's own Network tab: `rhods-dashboard`'s
+"Observe & Monitor" tabs (both "Cluster" and "Models") query through
+`/perses/api/proxy/projects/redhat-ods-monitoring/datasources/
+cluster-prometheus-datasource/...` - and `PersesDatasource/
+cluster-prometheus-datasource` (`config.default: true`, the one every
+panel in both dashboards actually references) points at
+`https://thanos-querier.openshift-monitoring.svc:9091` - **the
+platform's own Thanos (`prometheus-k8s` + user-workload-monitoring), not
+`data-science-monitoringstack` at all.** Every part of this ADR up to
+here fixed the wrong Prometheus for this specific dashboard tab (still
+real, still useful for `data-science-monitoringstack`'s own consumers,
+just not this one).
+
+`prometheus-k8s`/UWM already had full RBAC and CRD-group compatibility
+for KServe's `monitoring.coreos.com/v1` PodMonitors (confirmed live
+2026-09-08 per an earlier investigation: it was already scraping the
+target list) - no namespaceSelector/RBAC/new-PodMonitor work was ever
+needed on that side. `up{namespace="zuno-ai-run",job=~".*kserve.*"}`
+queried directly against `thanos-querier.openshift-monitoring.svc`
+showed exactly the same asymmetry as the dashboard: `qwen36-27b-instruct`
+at `up=1`, the other three at `up=0`. Cause: `networkpolicy-qwen.yaml`
+was the only one of the four LLMInferenceService NetworkPolicies that
+admitted `openshift-monitoring`/`openshift-user-workload-monitoring` on
+port 8000 - a pre-existing ADR-0413 rule whose own comment called it "NOT
+actually needed" (now corrected in that file). `qwen35`/`gptoss`/`wesh`
+never had it. That single asymmetry is the entire explanation for why
+exactly one model ever showed real data throughout this whole
+investigation, independent of every fix made above it.
+
+Fixed by adding the same `openshift-monitoring`/
+`openshift-user-workload-monitoring` admission (mirroring the pre-existing
+`qwen36-27b-instruct` rule) to `networkpolicy-{qwen35,gptoss,wesh}.yaml`.
+Live-verified: `up{namespace="zuno-ai-run",job=~".*kserve.*"}` against
+`thanos-querier.openshift-monitoring.svc` now shows all 4 pods at `up=1`,
+and `count(group(kserve_vllm:num_requests_running) by (model_name,
+namespace))` - the exact query the dashboard's "Deployed models" panel
+runs - now returns `4`.
+
 ## Migration / evolution
 
 If a future RHOAI/COO version exposes `spec.namespaceSelector` (or an

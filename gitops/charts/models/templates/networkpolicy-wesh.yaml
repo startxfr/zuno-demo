@@ -61,13 +61,34 @@ spec:
     # ADR-0554 (live-confirmed 2026-09-09): admits RHOAI's own separate
     # MonitoringStack (data-science-monitoringstack, redhat-ods-monitoring)
     # scraping the PodMonitor directly (kserve-llm-isvc-vllm-engine,
-    # targetPort 8000) - without this rule its requests were dropped at L4,
-    # keeping the Observe & Monitor > Models dashboard tab's data empty for
-    # this model.
+    # targetPort 8000) - without this rule its requests were dropped at L4.
+    # NOT what feeds the Observe & Monitor > Models dashboard tab, though -
+    # see the next block for that (dated correction note, ADR-0554).
     - from:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: redhat-ods-monitoring
+      ports:
+        - protocol: TCP
+          port: 8000
+    # ADR-0554 dated correction (2026-09-09): the actual data source behind
+    # RHOAI's "Observe & Monitor > Models" tab is `cluster-prometheus-
+    # datasource`, which is the PLATFORM's own thanos-querier
+    # (openshift-monitoring, prometheus-k8s+UWM) - a completely different
+    # Prometheus from data-science-monitoringstack above. `up{namespace=
+    # "zuno-ai-run"}` queried directly against it showed only
+    # qwen36-27b-instruct at up=1; this model (and qwen35/gptoss) were 0 -
+    # networkpolicy-qwen.yaml's own ADR-0413 admission of these two
+    # namespaces (kept there, at the time, as "not actually needed") was in
+    # fact the ONLY thing keeping qwen36-27b-instruct's dashboard row alive
+    # this whole investigation. Mirrored here for real this time.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-monitoring
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-user-workload-monitoring
       ports:
         - protocol: TCP
           port: 8000

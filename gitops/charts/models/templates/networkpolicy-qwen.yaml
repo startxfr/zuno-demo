@@ -70,11 +70,18 @@ spec:
           port: 8000
 {{- end }}
 {{- if .Values.metrics.enabled }}
-    # ADR-0413: admits prometheus-k8s's scrape of vLLM's own /metrics
-    # endpoint. NOT actually needed once this became an LLMInferenceService
-    # (RHOAI's own controller scrapes it independently - see
-    # templates/servicemonitor-vllm.yaml's comment) but kept harmless/
-    # symmetric with the port-8000 shape rather than special-cased away.
+    # ADR-0413, corrected by ADR-0554's dated correction note
+    # (2026-09-09): this IS load-bearing, contrary to what this comment
+    # used to say ("NOT actually needed... RHOAI's own controller scrapes
+    # it independently"). RHOAI's Observe & Monitor > Models dashboard tab
+    # reads from `cluster-prometheus-datasource` -
+    # thanos-querier.openshift-monitoring.svc (prometheus-k8s+UWM), NOT
+    # data-science-monitoringstack. `up{namespace="zuno-ai-run"}` queried
+    # directly against it showed qwen36-27b-instruct (this file) at up=1
+    # while qwen35-9b/gpt-oss-20b/qwen35-9b-wesh - which never had this
+    # admission block until this same date - were up=0. This rule is the
+    # entire reason this model's dashboard row ever worked while
+    # investigating why the other three didn't.
     - from:
         - namespaceSelector:
             matchLabels:
@@ -85,12 +92,12 @@ spec:
       ports:
         - protocol: TCP
           port: 8000
-    # ADR-0554 (live-confirmed 2026-09-09): unlike the two entries above,
-    # this one IS load-bearing - RHOAI's own separate MonitoringStack
-    # (data-science-monitoringstack, redhat-ods-monitoring) scrapes the
-    # PodMonitor directly (kserve-llm-isvc-vllm-engine, targetPort 8000),
-    # and without this rule its requests were dropped at L4, keeping the
-    # Observe & Monitor > Models dashboard tab's data empty for this model.
+    # ADR-0554: RHOAI's own separate MonitoringStack (data-science-
+    # monitoringstack, redhat-ods-monitoring) ALSO scrapes the PodMonitor
+    # directly (kserve-llm-isvc-vllm-engine, targetPort 8000) - a third,
+    # independent consumer, not the dashboard's data source (see above)
+    # but real nonetheless (e.g. any future RHOAI-native surface built on
+    # that stack instead of the platform's Thanos).
     - from:
         - namespaceSelector:
             matchLabels:

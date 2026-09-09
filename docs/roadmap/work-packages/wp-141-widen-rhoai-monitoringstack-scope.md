@@ -44,6 +44,20 @@ zero series - see the ADR's Dated correction note):
    of namespace/RBAC/NetworkPolicy scope. Covers the 4 LLMInferenceService
    models only - `embeddings` (a classic `InferenceService`, different
    serving runtime/metrics path entirely) is out of scope for this WP.
+5. **The actual fix for the dashboard the user was looking at** (ADR-0554's
+   second dated correction note): `rhods-dashboard`'s "Observe & Monitor"
+   tabs read exclusively from `PersesDatasource/cluster-prometheus-
+   datasource`, which points at `thanos-querier.openshift-monitoring.svc`
+   (`prometheus-k8s`+UWM) - a **third** Prometheus, not
+   `data-science-monitoringstack` that parts 1-4 targeted. That stack
+   already had full RBAC/CRD-group compatibility for KServe's PodMonitors;
+   the only gap was NetworkPolicy - `networkpolicy-qwen.yaml` already
+   admitted `openshift-monitoring`/`openshift-user-workload-monitoring`
+   (ADR-0413, its comment wrongly called it "not actually needed", now
+   corrected), `qwen35`/`gptoss`/`wesh` never did. Added the same admission
+   to all three. This single asymmetry is why exactly one model
+   (`qwen36-27b-instruct`) ever showed real data through this entire
+   investigation, independent of parts 1-4.
 
 ## Acceptance criteria
 
@@ -62,23 +76,37 @@ zero series - see the ADR's Dated correction note):
   (llm_isvc_name)` queried against `data-science-thanos-querier-route`
   showed real counts for 3/4 models (`qwen36-27b-instruct` ~6,
   `qwen35-9b-wesh` ~13, `gpt-oss-20b` ~13; `qwen35-9b` 0 - not routed to
-  this run, a business-routing outcome, not a metrics gap). Literal
-  browser screenshot of the dashboard tab rendering these not taken this
-  session - the data source it reads from is proven live.
+  this run, a business-routing outcome, not a metrics gap).
+- [x] The dashboard's OWN data source (`cluster-prometheus-datasource` ->
+  `thanos-querier.openshift-monitoring.svc`, found via the browser's
+  Network tab - not `data-science-monitoringstack`) now returns all 4
+  models: `up{namespace="zuno-ai-run",job=~".*kserve.*"}` shows all 4 pods
+  at `up=1`, and `count(group(kserve_vllm:num_requests_running) by
+  (model_name, namespace))` - the exact "Deployed models" panel query -
+  returns `4`, queried directly against that same datasource's upstream.
+  Literal browser screenshot pending the user's own reload.
 - [x] `git status` on every `zuno-monitoring`/Grafana/Kiali-owning chart
   shows no changes from this work.
 
 ## Status updates
 
-- **2026-09-09 — Done.** All 4 parts written and live-verified on
-  `demo333`. Parts 1-3 alone were insufficient (confirmed live: zero
-  `zuno-ai-run` series reached RHOAI's Prometheus even with a correctly
-  widened `namespaceSelector`, correct RBAC, and correct NetworkPolicy) -
-  root-caused to KServe's PodMonitor using `monitoring.coreos.com/v1`
-  while RHOAI's Cluster-Observability-Operator-based Prometheus only has
-  RBAC for `monitoring.rhobs` (two separate CRDs, confirmed via `oc get
-  crd`). Part 4 added and live-verified: all 4 model targets `health: up`
-  within seconds. `helm lint`/`helm template`/`ansible-playbook
-  --syntax-check`/`check_workload_hardening.py`/`check_docs.py` all pass.
-  Remaining: a browser screenshot of the actual dashboard tab with live
-  traffic, deferred to whenever the models next see real usage.
+- **2026-09-09 — Done.** All 5 parts written and live-verified on
+  `demo333`. Parts 1-4 (below) target `data-science-monitoringstack` and
+  are real, correct fixes for that stack - but the user, after a hard
+  browser refresh and a private window, still saw only 1 of 5 models.
+  Root cause (found from the browser's own Network tab, not guessed):
+  `rhods-dashboard`'s "Observe & Monitor" tabs read exclusively from
+  `PersesDatasource/cluster-prometheus-datasource`
+  (`config.default: true`), which points at
+  `thanos-querier.openshift-monitoring.svc` - the **platform's own**
+  Thanos (`prometheus-k8s`+UWM), a third Prometheus instance parts 1-4
+  never touched. That stack already had full RBAC/CRD-group
+  compatibility for KServe's PodMonitors (no `data-science-
+  monitoringstack`-style landmine there); the only gap was NetworkPolicy,
+  and only for 3 of the 4 models - `networkpolicy-qwen.yaml` already had
+  the needed admission from a pre-existing ADR-0413 rule (whose own
+  comment incorrectly called it unnecessary), the other three never did.
+  Part 5 (same commit family) added the missing admission and is what
+  actually resolved what the user was looking at. `helm lint`/`helm
+  template`/`ansible-playbook --syntax-check`/`check_workload_hardening.py`/
+  `check_docs.py` all pass throughout.
