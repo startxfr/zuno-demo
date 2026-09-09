@@ -110,6 +110,32 @@ classes:
       group:   { budget: 5000000,  window: 24h }
       project: { budget: 2500000,  window: 24h }
 
+  stresstest:
+    description: >-
+      Dedicated, deliberately tiny class used only by the Day 3 stresstest's
+      own token-budget exhaustion proof
+      (platform/testing/token_quota_429.py, ADR-0555/WP-142) - never applied
+      to a real demo persona's normal chat task (zuno.quota_class is set per
+      task frontmatter, this class has no task opted into it), so ordinary
+      usage never draws from this budget. Sized so ~10-20 short real chat
+      calls exhaust the user-level token budget, keeping the real-inference/
+      GPU cost of proving enforcement marginal even on a GPU-quota-
+      constrained cluster (see gpu-quota-saturated incident, 2026-09-04).
+      standard/intensive above are deliberately NOT touched by this class -
+      they were raised 2026-09-02 after a real stresstest run legitimately
+      consumed ~1.2M tokens against the old, too-low ceiling; this repo
+      keeps its own quota-exhaustion proof on a dedicated class rather than
+      risk re-tightening those.
+    fail_mode: closed
+    requests:
+      user:    { limit: 5,    window: 5m }
+      group:   { limit: 20,   window: 5m }
+      project: { limit: 10,   window: 5m }
+    tokens:
+      user:    { budget: 2000,  window: 5m }
+      group:   { budget: 8000,  window: 5m }
+      project: { budget: 4000,  window: 5m }
+
 precedence:
   in_project_context: [project, user, group]
   default: [user, group]

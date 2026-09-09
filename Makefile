@@ -640,12 +640,14 @@ if [[ -z "$$verb" ]]; then \
     'Report format: text (default) | json | csv - REPORT_FORMAT=<fmt> or EXTRA_VARS="-e report_format=<fmt>"' \
     'Bulk interaction count (stresstest only): BULK=<n> (skips the interactive prompt; BULK=0 disables it)' \
     'Remove test-generated conversations after the run (stresstest only): CLEANUP=<0|1> (default: remove; skips the interactive prompt)' \
+    'Run agents one at a time instead of in parallel (stresstest only, default: parallel): SEQUENTIAL=1' \
     'Agent to train (run only): AGENT=<agent> (default: comage - the only agent with a compiled pipeline version today)' \
     'Release tag (release only, REQUIRED, no default): TAG=<tag> - must already be a real, pushed git tag' \
     '' \
     'Example: make d3 test agents' \
     'Example: make d3 stresstest BULK=25' \
     'Example: make d3 stresstest CLEANUP=0   # keep test conversations for inspection' \
+    'Example: make d3 stresstest SEQUENTIAL=1   # one agent at a time, like every run before ADR-0561' \
     'Example: make d3 backup postgresql' \
     'Example: make d3 restore postgresql' \
     'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything' \
@@ -683,8 +685,10 @@ case "$$verb" in \
         cleanup=1; \
       fi; \
     fi; \
-    aap_route job zuno-day3-stresstest "{\"target_component\": \"$$component\", \"report_format\": \"$$report_format\", \"bulk_interactions\": $$bulk, \"cleanup_test_data\": $$cleanup}"; rc=$$?; \
-    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" -e "cleanup_test_data=$$cleanup" $(EXTRA_VARS); else exit $$rc; fi ;; \
+    sequential="$${SEQUENTIAL:-0}"; \
+    parallel="true"; case "$$sequential" in 1|true|yes) parallel="false" ;; esac; \
+    aap_route job zuno-day3-stresstest "{\"target_component\": \"$$component\", \"report_format\": \"$$report_format\", \"bulk_interactions\": $$bulk, \"cleanup_test_data\": $$cleanup, \"day2_stresstest_parallel\": $$parallel}"; rc=$$?; \
+    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_stresstest.yml -e "target_component=$$component" -e "report_format=$$report_format" -e "bulk_interactions=$$bulk" -e "cleanup_test_data=$$cleanup" -e "day2_stresstest_parallel=$$parallel" $(EXTRA_VARS); else exit $$rc; fi ;; \
   backup) \
     case " $(DAY3_BACKUP_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 backup component: '$$component' (expected one of: $(DAY3_BACKUP_COMPONENTS) or all)" >&2; exit 2;; esac; \
     aap_route job zuno-day3-backup "{\"target_component\": \"$$component\"}"; rc=$$?; \

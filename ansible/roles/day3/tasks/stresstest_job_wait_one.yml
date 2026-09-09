@@ -1,0 +1,73 @@
+---
+# Wait half of stresstest_job_run_one.yml's per-agent work (loop_var:
+# day2_stress_agent) - the counterpart to stresstest_job_create_one.yml. Only
+# needs the loop var; no dependency on any fact set during the create phase.
+# stresstest_job.yml runs the create loop for every agent to completion
+# first, THEN this wait loop for every agent - since all Jobs are already
+# running concurrently on the cluster by the time this loop starts, its
+# total wall-clock is bounded by the slowest single agent, not the sum of
+# all of them, even though this loop itself executes sequentially in
+# Ansible. See stresstest_job.yml's own header comment.
+
+# retries/delay give a 2400s/40min budget, not 900s/15min like
+# run_acceptance_gate.yml's identical-looking wait - that Job never runs
+# day2_bulk.py, this one does when BULK_INTERACTIONS>0. Arkos's own
+# DAT-drafting bulk_load calls legitimately take ~21-22 minutes end to end
+# (live-confirmed 2026-09-02, twice: `make d3 stresstest agents` died here
+# both times, exit code 2, while the Job itself kept running and completed
+# normally minutes later - recovered manually via oc logs/oc apply both
+# times since this task gave up too early, not because anything was
+# actually stuck).
+- name: "day2-stresstest | wait for the {{ day2_stress_agent }} Job to reach a terminal state"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-ai-run
+    name: "zuno-day2-stresstest-{{ day2_stress_agent }}"
+  register: _day2_stress_job
+  until: >-
+    (_day2_stress_job.resources[0].status.succeeded | default(0)) > 0 or
+    (_day2_stress_job.resources[0].status.failed | default(0)) > 0
+  retries: 160
+  delay: 15
+
+# Selects on controller-uid (unique per Job instance), not job-name
+# (stable across delete-then-recreate) - live-cluster-confirmed
+# 2026-08-21: Job deletion does not reliably garbage-collect its pods
+# within this task's own runtime, so a previous run's pod can still carry
+# the same job-name label when the next run's "find the Job's pod" task
+# runs, and label_selectors + resources[0] has no guarantee of picking
+# the newest one. controller-uid is set by the Job controller itself and
+# is different for every Job object, even ones sharing a name across
+# recreations, so this can never match a stale pod.
+- name: "day2-stresstest | find the {{ day2_stress_agent }} Job's pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-ai-run
+    label_selectors:
+      - "controller-uid={{ _day2_stress_job.resources[0].metadata.uid }}"
+  register: _day2_stress_pod
+
+- name: "day2-stresstest | fetch the {{ day2_stress_agent }} Job's output"
+  kubernetes.core.k8s_log:
+    namespace: zuno-ai-run
+    name: "{{ _day2_stress_pod.resources[0].metadata.name }}"
+  register: _day2_stress_log
+  when: (_day2_stress_pod.resources | default([]) | length) > 0
+
+# day2_stresstest.py prints one JSON-array line; day2_bulk.py prints a
+# second one when it ran - both matched and flattened into one result
+# list, accumulated across every agent in the outer loop.
+- name: "day2-stresstest | parse and accumulate {{ day2_stress_agent }}'s results"
+  ansible.builtin.set_fact:
+    _day2_stress_results: >-
+      {{
+        (_day2_stress_results | default([])) +
+        (
+          (_day2_stress_log.log_lines | default([]))
+          | select('match', '^\[.*\]$')
+          | map('from_json')
+          | list
+          | flatten
+        )
+      }}

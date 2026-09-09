@@ -276,6 +276,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md) | Accepted | Reuse RHOAI's Perses instance instead of running an independent one |
 | [ADR-0553](0553-collocate-perses-dashboards-in-redhat-ods-monitoring-for-visibility.md) | Accepted | Collocate Perses dashboards in redhat-ods-monitoring for real visibility |
 | [ADR-0554](0554-widen-rhoais-monitoringstack-to-observe-zuno-ai-run.md) | Implemented | Widen RHOAI's built-in MonitoringStack to observe zuno-ai-run's models |
+| [ADR-0555](0555-parallel-and-quota-exhaustive-day3-stresstest.md) | Implemented | Parallel-by-default Day 3 stresstest, generalized quota/limit exhaustion proofs |
 
 ## v0.6
 

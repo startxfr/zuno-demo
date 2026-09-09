@@ -15,12 +15,17 @@ configMapGenerator:
       - day2_report.py=../../../../../platform/testing/day2_report.py
       - day2_stresstest.py=../../../../../platform/testing/day2_stresstest.py
       - day2_bulk.py=../../../../../platform/testing/day2_bulk.py
-      # ADR-0511/WP-54's live 429 proof, imported by day2_stresstest.py's
-      # _quota_results() layer. Shared like the files above rather than
-      # per-agent-prefixed: the module gates itself to Tekos internally
-      # (the quota-demo Route is Tekos-only today) and returns a coverage
-      # row for every other agent, so one unprefixed key is correct.
+      # ADR-0511/WP-54's live request-rate 429 proof, imported by
+      # day2_stresstest.py's _quota_results() layer. Shared like the files
+      # above rather than per-agent-prefixed: the module gates itself
+      # internally (tekos/arkos/comage only, ADR-0555/WP-142 generalized it
+      # from Tekos-only) and returns a coverage row for every other agent,
+      # so one unprefixed key is correct.
       - quota_429.py=../../../../../platform/testing/quota_429.py
+      # ADR-0555/WP-142's live token-BUDGET 429 proof, imported by
+      # day2_stresstest.py's _token_quota_results() layer. Same
+      # unprefixed/self-gating posture as quota_429.py above.
+      - token_quota_429.py=../../../../../platform/testing/token_quota_429.py
       # run_scenarios.py's chat_register_conformance handler (used by
       # Comage's French-register-conformance scenarios) imports this at
       # call time. Previously bundled only for the ADR-0053 acceptance-gate

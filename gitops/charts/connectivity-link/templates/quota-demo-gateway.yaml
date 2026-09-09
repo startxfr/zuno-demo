@@ -1,12 +1,17 @@
-# ADR-0511/WP-54: the demo-scoped ingress path Kuadrant's RateLimitPolicy
+# ADR-0511/WP-54, generalized to every stresstest-covered agent by
+# ADR-0555/WP-142: the demo-scoped ingress path Kuadrant's RateLimitPolicy
 # (templates/quota-ratelimitpolicies.yaml) and AuthPolicy require - Kuadrant's
 # own CRDs hard-reject any targetRef that isn't Gateway API (confirmed against
 # the live CRD's x-kubernetes-validations: only Gateway/HTTPRoute/GRPCRoute),
 # and agent traffic today reaches pods via plain OpenShift Routes, which
 # Kuadrant cannot target at all. Rather than migrate agent ingress wholesale
 # (a real architecture decision with no ADR behind it yet), this renders a
-# SEPARATE, additional path for Tekos only, on its own hostname - the
-# existing tekos-frontend Route is completely untouched throughout.
+# SEPARATE, additional path per agent in quotaEnforcement.routes, each on its
+# own hostname - the existing <agent>-frontend Route is completely untouched
+# throughout. The Gateway/Service/ConfigMap below are SHARED across every
+# agent (Gateway API dispatches by Host header at the HTTPRoute layer, not
+# per-Gateway-listener), only the OpenShift Route fronting it is per-agent
+# (one hostname per OpenShift Route object, unlike Gateway API's HTTPRoute).
 #
 # Ingress shape copied exactly from the two other live Gateway API
 # gateways on this cluster (data-science-gateway, maas-default-gateway):
@@ -109,16 +114,17 @@ spec:
                 operator: In
                 values:
                   - {{ .Values.quotaEnforcement.routeNamespace }}
+{{- range .Values.quotaEnforcement.routes }}
 ---
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: zuno-agent-gateway
+  name: zuno-agent-gateway-{{ .name }}
   namespace: openshift-ingress
   labels:
     app.kubernetes.io/part-of: zuno-quota-enforcement
 spec:
-  host: {{ .Values.quotaEnforcement.demoHostname }}
+  host: {{ .hostname }}
   port:
     targetPort: 443
   tls:
@@ -129,4 +135,5 @@ spec:
     name: zuno-agent-gateway-istio
     weight: 100
   wildcardPolicy: None
+{{- end }}
 {{- end }}

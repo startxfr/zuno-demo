@@ -26,19 +26,39 @@ spec:
           enabled: true
           authorinoTls:
             enabled: true
-        # ADR-0517 B4 (WP-118 step 1): token, substituted by
-        # ansible/tasks/apply_gitops_app.yml. quotaEnforcement.gateway.enabled
-        # defaults to true in the chart's own values.yaml, so this
-        # Application renders templates/quota-demo-gateway.yaml (the
-        # tekos-quota-demo Route/Gateway) without an explicit gate override
-        # here - but that means it also needs its own demoHostname override
-        # to get the substitution, mirroring
+        # ADR-0517 B4 (WP-118 step 1) / ADR-0555 B (WP-142): tokens,
+        # substituted by ansible/tasks/apply_gitops_app.yml.
+        # quotaEnforcement.gateway.enabled defaults to true in the chart's
+        # own values.yaml, so this Application renders
+        # templates/quota-demo-gateway.yaml (one Route per agent, sharing
+        # one Gateway) without an explicit gate override here - but that
+        # means it also needs its own `routes` override to get the
+        # substitution, mirroring
         # gitops/apps/connectivity-link-quota/application-d1.yaml's own
-        # (Day2) copy. Missing this left the live Route on the chart's raw
-        # placeholder default, live-confirmed 2026-09-03 as a 503 on the
-        # ADR-0511/WP-54 quota-demo route.
+        # (Day2) copy - both MUST list the exact same route names/hostnames,
+        # only `backendService`/`backendPort` differ in meaning here (this
+        # Application's copy of `routes` is only ever read for `.name`/
+        # `.hostname` by quota-demo-gateway.yaml, never `.backendService`/
+        # `.backendPort` - kept anyway so both Applications' values blocks
+        # stay copy-paste identical rather than diverging on which fields
+        # each happens to need). Missing this left the live Route on the
+        # chart's raw placeholder default, live-confirmed 2026-09-03 as a
+        # 503 on the ADR-0511/WP-54 quota-demo route (Tekos-only at the
+        # time).
         quotaEnforcement:
-          demoHostname: tekos-quota-demo.apps.mycluster.example.com
+          routes:
+            - name: tekos-quota-demo
+              hostname: tekos-quota-demo.apps.mycluster.example.com
+              backendService: tekos-frontend
+              backendPort: 8080
+            - name: arkos-quota-demo
+              hostname: arkos-quota-demo.apps.mycluster.example.com
+              backendService: arkos-frontend
+              backendPort: 8080
+            - name: comage-quota-demo
+              hostname: comage-quota-demo.apps.mycluster.example.com
+              backendService: comage-frontend
+              backendPort: 8080
   destination:
     server: https://kubernetes.default.svc
     namespace: kuadrant-system

@@ -21,46 +21,70 @@
 # discovered by ansible and set via gitops_app_extra_helm_values on the -d0
 # apply (ADR-0048). templates/checks.yaml fails the render if either is
 # still empty once operator.enabled is true.
-# quotaEnforcement (ADR-0511/WP-54): renders the GENERATED per-class
+# quotaEnforcement (ADR-0511/WP-54, generalized to every stresstest-covered
+# agent by ADR-0555/WP-142): renders the GENERATED per-class per-route
 # RateLimitPolicies in templates/quota-ratelimitpolicies.yaml (source:
 # policies/quotas/quota-policy.yaml via
 # platform/okf/generate_quota_enforcement.py - never edit that file by
-# hand) PLUS the demo Gateway/HTTPRoute/AuthPolicy in
-# templates/quota-demo-gateway.yaml + templates/quota-demo-route.yaml that
-# give them something to target (Kuadrant's CRDs hard-reject any targetRef
-# that isn't Gateway API - plain OpenShift Routes, which is how every
-# agent's real traffic is served today, cannot be targeted at all). Scoped
-# to Tekos on a dedicated demo hostname; the real tekos-frontend Route is
-# untouched. See this chart's README, WP-54 section, for the live demo
-# evidence and rollback (enabled: false removes all of it via ArgoCD
+# hand) PLUS one demo Gateway-fronted HTTPRoute/AuthPolicy per entry in
+# `routes` below (templates/quota-demo-gateway.yaml + quota-demo-route.yaml)
+# that give them something to target (Kuadrant's CRDs hard-reject any
+# targetRef that isn't Gateway API - plain OpenShift Routes, which is how
+# every agent's real traffic is served today, cannot be targeted at all).
+# One dedicated demo hostname per agent; the real <agent>-frontend Route is
+# untouched throughout. See this chart's README, WP-54 section, for the live
+# demo evidence and rollback (enabled: false removes all of it via ArgoCD
 # selfHeal). Token budgets are NOT here: they are enforced by AI Gateway
 # (components/ai-gateway/app/quota_budgets.yaml, generated from the same
-# policy file).
+# policy file) and, for the dedicated stresstest-only proof, by RHOAI's MaaS
+# TokenRateLimitPolicy (platform/testing/token_quota_429.py).
 #
 # Split into gateway/route sub-switches so the two halves can be applied
 # by different ArgoCD Applications on different Days: gateway (ConfigMap +
-# Gateway + Route) has no dependency on any Day2 workload and stays on
-# zuno-connectivity-link-d1 (Day1); route (HTTPRoute + AuthPolicy) plus the
-# sibling RateLimitPolicy target/reference the tekos-frontend backend
-# Service, which is only created by Day2's `agents` role - rendering them
-# from Day1 made the HTTPRoute permanently BackendNotFound/Degraded until
-# Day2 ran, which in turn made zuno-connectivity-link-d1's Synced+Healthy
-# wait in ansible/roles/connectivity_link/tasks/install.yml liable to time
-# out and hard-fail `make day1 install` on every fresh cluster. route
-# defaults false so only the Day2 zuno-connectivity-link-quota-d1
-# Application (ansible/roles/agents/tasks/install.yml, applied after
-# zuno-api-d1/tekos-frontend exists) renders it.
+# Gateway + one Route per entry in `routes`) has no dependency on any Day2
+# workload and stays on zuno-connectivity-link-d1 (Day1); route (HTTPRoute +
+# AuthPolicy) plus the sibling RateLimitPolicies target/reference each
+# agent's own <agent>-frontend backend Service, which is only created by
+# Day2's `agents` role - rendering them from Day1 made every HTTPRoute
+# permanently BackendNotFound/Degraded until Day2 ran, which in turn made
+# zuno-connectivity-link-d1's Synced+Healthy wait in
+# ansible/roles/connectivity_link/tasks/install.yml liable to time out and
+# hard-fail `make day1 install` on every fresh cluster. route defaults false
+# so only the Day2 zuno-connectivity-link-quota-d1 Application
+# (ansible/roles/agents/tasks/install.yml, applied after every agent's own
+# `-frontend` Service exists) renders it.
+#
+# `routes` is a list, not the single-route scalar set this used to be
+# (ADR-0511/WP-54 was Tekos-only) - every entry needs a unique `name`
+# (used as the HTTPRoute/AuthPolicy/RateLimitPolicy/gateway-Route resource
+# name and as the RateLimitPolicy's targetRef) and a unique `hostname`
+# (OpenShift Routes are one-hostname-per-object, so quota-demo-gateway.yaml
+# renders one per entry even though they all share the same underlying
+# Gateway/Service). `apps.mycluster.example.com` in each hostname is
+# substituted for the real cluster domain by
+# ansible/tasks/apply_gitops_app.yml's blanket string replace - safe with
+# any number of occurrences, confirmed against that task's own
+# implementation before adding more than the original one.
 quotaEnforcement:
   enabled: true
   gateway:
     enabled: true
   route:
     enabled: false
-  routeName: tekos-quota-demo
   routeNamespace: zuno-ai-run
-  demoHostname: tekos-quota-demo.apps.mycluster.example.com
-  demoBackendService: tekos-frontend
-  demoBackendPort: 8080
+  routes:
+    - name: tekos-quota-demo
+      hostname: tekos-quota-demo.apps.mycluster.example.com
+      backendService: tekos-frontend
+      backendPort: 8080
+    - name: arkos-quota-demo
+      hostname: arkos-quota-demo.apps.mycluster.example.com
+      backendService: arkos-frontend
+      backendPort: 8080
+    - name: comage-quota-demo
+      hostname: comage-quota-demo.apps.mycluster.example.com
+      backendService: comage-frontend
+      backendPort: 8080
   # jwksUrl, not issuerUrl (OIDC discovery) - Authorino runs in-cluster and
   # doesn't trust the CA signing the external Keycloak route's cert; the
   # internal Service endpoint is plain HTTP, sidestepping TLS trust

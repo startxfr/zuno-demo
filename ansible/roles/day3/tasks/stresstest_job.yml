@@ -185,8 +185,40 @@
   ansible.builtin.set_fact:
     _day2_stress_results: "{{ (_day2_stress_contract.stdout | from_json) if _day2_stress_contract.stdout else [] }}"
 
-- name: "day2-stresstest | run one Job per ready agent"
+# ADR-0555/WP-142: parallel by default (day2_stresstest_parallel, set from
+# Makefile's SEQUENTIAL=<0|1> via -e day2_stresstest_parallel=...). Sequential
+# mode calls the original, combined stresstest_job_run_one.yml unchanged -
+# one agent's Job is created, fully waited-on, logged and parsed before the
+# next agent's Job is even created, exactly like every run before this ADR.
+# Parallel mode splits that same per-agent work into stresstest_job_create_
+# one.yml/stresstest_job_wait_one.yml and runs each as its OWN loop over
+# every agent: Job creation is near-instant, so by the time the create loop
+# finishes, all agents' Jobs are already running concurrently on the
+# cluster - the wait loop is still sequential in Ansible's own execution
+# order, but each iteration only "catches up" to whichever Job already
+# finished while an earlier iteration was waiting, so total wall-clock is
+# bounded by the slowest single agent, not the sum of all of them. No
+# async/poll or JobSet involved - async cannot wrap a whole include_tasks
+# file, and every agent's Job spec was already fully independent (own name,
+# env vars, ConfigMap volume items), so nothing about the Jobs themselves
+# needed to change, only how this loop sequences create vs wait.
+- name: "day2-stresstest | run one Job per ready agent (sequential)"
+  when: not (day2_stresstest_parallel | default(true) | bool)
   ansible.builtin.include_tasks: stresstest_job_run_one.yml
+  loop: "{{ _day2_stress_ready_agents | default([]) }}"
+  loop_control:
+    loop_var: day2_stress_agent
+
+- name: "day2-stresstest | create all stresstest Jobs (parallel)"
+  when: day2_stresstest_parallel | default(true) | bool
+  ansible.builtin.include_tasks: stresstest_job_create_one.yml
+  loop: "{{ _day2_stress_ready_agents | default([]) }}"
+  loop_control:
+    loop_var: day2_stress_agent
+
+- name: "day2-stresstest | wait for all stresstest Jobs (parallel)"
+  when: day2_stresstest_parallel | default(true) | bool
+  ansible.builtin.include_tasks: stresstest_job_wait_one.yml
   loop: "{{ _day2_stress_ready_agents | default([]) }}"
   loop_control:
     loop_var: day2_stress_agent

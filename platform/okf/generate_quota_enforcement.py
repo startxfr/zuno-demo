@@ -136,10 +136,13 @@ def _render_rlp(classes: Dict[str, Dict]) -> str:
     # RateLimitPolicy CRs both targeting the same HTTPRoute do not merge,
     # the second "overrides" the first (status Enforced=False,
     # reason=Overridden - confirmed live on this cluster, 2026-08-18).
-    # So this renders ONE RateLimitPolicy whose `limits` map holds every
-    # class's per-dimension entries together; each entry already carries
-    # its own `when` class-selector predicate, which is what actually
-    # differentiates standard vs intensive at request time.
+    # So this renders ONE RateLimitPolicy PER quotaEnforcement.routes entry
+    # (ADR-0555/WP-142 generalized this from Tekos-only to every
+    # stresstest-covered agent - each agent needs its own targetRef, so it
+    # needs its own CR), whose `limits` map holds every class's
+    # per-dimension entries together; each entry already carries its own
+    # `when` class-selector predicate, which is what actually differentiates
+    # standard vs intensive (vs the new stresstest class) at request time.
     lines: List[str] = [
         # quotaEnforcement.route.enabled ALONE, not also kuadrant.enabled:
         # this file is rendered by its own dedicated Day2 Application
@@ -155,30 +158,34 @@ def _render_rlp(classes: Dict[str, Dict]) -> str:
         # 2026-08-18 that the -d0/-d1 kuadrant.enabled guard elsewhere in
         # this chart already exists to prevent).
         "{{- if .Values.quotaEnforcement.route.enabled }}",
-        f"# GENERATED FILE (ADR-0511/WP-54) - do not edit. Source:",
-        f"# policies/quotas/quota-policy.yaml. Regenerate with:",
+        f"# GENERATED FILE (ADR-0511/WP-54, ADR-0555/WP-142) - do not edit.",
+        f"# Source: policies/quotas/quota-policy.yaml. Regenerate with:",
         f"#   {REGEN_CMD}",
-        f"# ONE RateLimitPolicy for every quota class; request-rate dimension",
+        f"# ONE RateLimitPolicy per quotaEnforcement.routes entry, each holding",
+        f"# every quota class's per-dimension entries; request-rate dimension",
         f"# only (token budgets are enforced by AI Gateway - see",
-        f"# components/ai-gateway/app/quota_budgets.yaml). Kuadrant allows only",
-        f"# one policy per targetRef at this level, so per-class limits share",
-        f"# one CR - each limit entry's own `when` predicate selects the class.",
+        f"# components/ai-gateway/app/quota_budgets.yaml - and, for the",
+        f"# dedicated stresstest class, RHOAI's own MaaS TokenRateLimitPolicy).",
+        f"# Kuadrant allows only one policy per targetRef at this level, so",
+        f"# per-class limits share one CR per route - each limit entry's own",
+        f"# `when` predicate selects the class.",
         f"# Rendered only when .Values.quotaEnforcement.route.enabled is true",
-        f"# AND the operator has supplied the agent chat HTTPRoute this policy",
+        f"# AND the operator has supplied the agent chat HTTPRoutes this policy",
         f"# targets (see this chart's README, WP-54 section).",
+        "{{- range .Values.quotaEnforcement.routes }}",
         "---",
         "apiVersion: kuadrant.io/v1",
         "kind: RateLimitPolicy",
         "metadata:",
-        "  name: zuno-quota",
-        "  namespace: {{ .Values.quotaEnforcement.routeNamespace }}",
+        "  name: zuno-quota-{{ .name }}",
+        "  namespace: {{ $.Values.quotaEnforcement.routeNamespace }}",
         "  labels:",
         "    app.kubernetes.io/part-of: zuno-quota-enforcement",
         "spec:",
         "  targetRef:",
         "    group: gateway.networking.k8s.io",
         "    kind: HTTPRoute",
-        "    name: {{ .Values.quotaEnforcement.routeName }}",
+        "    name: {{ .name }}",
         "  limits:",
     ]
     for cls_name, cls in sorted(classes.items()):
@@ -197,6 +204,7 @@ def _render_rlp(classes: Dict[str, Dict]) -> str:
                 "      when:",
             ]
             lines += [f"        - predicate: {p!r}" for p in predicates]
+    lines.append("{{- end }}")
     lines.append("{{- end }}")
     lines.append("")
     return "\n".join(lines)

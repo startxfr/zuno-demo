@@ -28,6 +28,18 @@ classes:
       project:
         budget: 2500000
         window: 24h
+  stresstest:
+    fail_mode: closed
+    tokens:
+      user:
+        budget: 2000
+        window: 5m
+      group:
+        budget: 8000
+        window: 5m
+      project:
+        budget: 4000
+        window: 5m
 precedence:
   in_project_context:
   - project

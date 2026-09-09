@@ -172,6 +172,22 @@ def _quota_results() -> List[Day2Result]:
     return quota_429.run()
 
 
+def _token_quota_results() -> List[Day2Result]:
+    """ADR-0555/WP-142: the token-BUDGET counterpart to _quota_results()'s
+    request-RATE proof - drives real short chat calls, tagged
+    X-Zuno-Quota-Class: stresstest, past the dedicated `stresstest` class's
+    deliberately tiny per-user token budget (policies/quotas/quota-
+    policy.yaml) and asserts the resulting AI Gateway 429 as the expected,
+    positive result. See platform/testing/token_quota_429.py's own header
+    comment for why this targets AI Gateway's own ledger rather than RHOAI
+    MaaS's Kuadrant TokenRateLimitPolicy (currently unreachable by persona
+    traffic on this cluster - a separate, documented gap).
+    """
+    import token_quota_429
+
+    return token_quota_429.run()
+
+
 def _rag_ingestion_results() -> List[Day2Result]:
     """WP-25/ADR-0110: a fast, bounded, read-only proof that
     reconcile-acls's live Confluence listing path is reachable and
@@ -232,6 +248,7 @@ def main() -> int:
     results += _safe_run("stress_test", _stress_test_results)
     results += _safe_run("rag_ingestion", _rag_ingestion_results)
     results += _safe_run("quota", _quota_results)
+    results += _safe_run("token_quota", _token_quota_results)
 
     print(json.dumps([asdict(r) for r in results]))
 
