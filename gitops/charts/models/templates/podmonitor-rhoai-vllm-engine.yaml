@@ -1,0 +1,84 @@
+{{- if .Values.metrics.enabled }}
+# ADR-0554 Part D - the piece the original ADR text didn't anticipate.
+# RHOAI's own MonitoringStack (data-science-monitoringstack,
+# redhat-ods-monitoring) can NEVER discover the PodMonitor KServe's own
+# LLMInferenceService controller auto-creates
+# (kserve-llm-isvc-vllm-engine(-default), monitoring.coreos.com/v1): its
+# underlying Prometheus operand is Red Hat's Cluster Observability
+# Operator build, whose ClusterRole (live-verified 2026-09-09) only grants
+# get/list/watch on the monitoring.rhobs API group - monitoring.coreos.com
+# is a structurally different, unrelated CRD group that happens to share
+# the same Kind names. No namespaceSelector, RBAC or NetworkPolicy fix can
+# bridge that; the two widen_monitoringstack_namespace_selector.yml/
+# rolebinding-rhoai-monitoringstack-prometheus.yaml/networkpolicy-*.yaml
+# changes ADR-0554 already made are necessary but were not sufficient
+# until this file existed too - confirmed live by creating an ad hoc
+# monitoring.rhobs/v1 PodMonitor with this exact selector: RHOAI's
+# Prometheus picked it up and scraped all 4 model pods `health: up` within
+# seconds, while the community-group one it already had RBAC/network
+# access to remained invisible throughout.
+#
+# apiVersion is deliberately monitoring.rhobs/v1, the OPPOSITE choice from
+# this chart's own servicemonitor-vllm.yaml (monitoring.coreos.com/v1,
+# for prometheus-k8s) and exactly the choice
+# gitops/charts/mesh-monitoring/templates/podmonitor-istio-proxy.yaml
+# already established for the same reason: one cluster, two independent
+# Prometheus-operator flavours, each bound to its own CRD group - name a
+# resource under the wrong one and it renders successfully but is scraped
+# by nobody.
+#
+# Selector/relabelings copied from kserve-llm-isvc-vllm-engine verbatim so
+# both stacks see identically-labeled series; portNumber (not the
+# deprecated targetPort KServe's own object still uses) to avoid this
+# Prometheus version's warning.
+apiVersion: monitoring.rhobs/v1
+kind: PodMonitor
+metadata:
+  name: zuno-rhoai-vllm-engine
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  namespaceSelector: {}
+  podMetricsEndpoints:
+    - metricRelabelings:
+        - action: replace
+          replacement: kserve_$1
+          sourceLabels:
+            - __name__
+          targetLabel: __name__
+      relabelings:
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_label_app_kubernetes_io_name
+          targetLabel: llm_isvc_name
+        - action: replace
+          sourceLabels:
+            - __meta_kubernetes_pod_label_llm_d_ai_role
+          targetLabel: llm_isvc_role
+        - action: replace
+          regex: llminferenceservice-(.*)
+          replacement: $1
+          sourceLabels:
+            - __meta_kubernetes_pod_label_app_kubernetes_io_component
+          targetLabel: llm_isvc_component
+      scheme: https
+      portNumber: 8000
+      tlsConfig:
+        insecureSkipVerify: true
+  selector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values:
+          - llminferenceservice-workload
+          - llminferenceservice-workload-prefill
+          - llminferenceservice-workload-worker
+          - llminferenceservice-workload-leader
+          - llminferenceservice-workload-leader-prefill
+          - llminferenceservice-workload-worker-prefill
+    matchLabels:
+      app.kubernetes.io/part-of: llminferenceservice
+{{- end }}

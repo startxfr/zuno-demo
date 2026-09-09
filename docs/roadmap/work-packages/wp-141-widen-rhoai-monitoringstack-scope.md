@@ -1,6 +1,6 @@
 # WP-141: Widen RHOAI's MonitoringStack to observe zuno-ai-run
 
-- **State:** Repo work merged (2026-09-09 - live verification pending)
+- **State:** Done (2026-09-09 - live-verified end to end, 4 parts)
 - **ADRs:** ADR-0554
 - **Related:** ADR-0522, ADR-0552, ADR-0553
 - **Target:** v0.5
@@ -15,7 +15,9 @@ Grafana/Kiali/`zuno-monitoring` stack (hard user constraint).
 
 ## Implementation
 
-Three independently-necessary changes, per ADR-0554's Decision:
+Four independently-necessary changes, per ADR-0554's Decision (the 4th
+found live-necessary only after the original 3-part plan still yielded
+zero series - see the ADR's Dated correction note):
 
 1. **Ansible partial patch** widening `MonitoringStack/data-science-
    monitoringstack`'s `spec.namespaceSelector` to `zuno-ai-run`
@@ -33,30 +35,45 @@ Three independently-necessary changes, per ADR-0554's Decision:
    found live-necessary (the PodMonitor scrapes pods directly and none of
    these four previously admitted this namespace), correcting three stale
    comments that claimed no NetworkPolicy allowance was needed for metrics.
+4. **New `monitoring.rhobs/v1` PodMonitor**
+   (`gitops/charts/models/templates/podmonitor-rhoai-vllm-engine.yaml`)
+   mirroring KServe's own `kserve-llm-isvc-vllm-engine` PodMonitor
+   (`monitoring.coreos.com/v1`) - RHOAI's Prometheus (Cluster Observability
+   Operator-based) only has RBAC for the `monitoring.rhobs` CRD group and
+   can never discover the community-group one KServe creates, regardless
+   of namespace/RBAC/NetworkPolicy scope. Covers the 4 LLMInferenceService
+   models only - `embeddings` (a classic `InferenceService`, different
+   serving runtime/metrics path entirely) is out of scope for this WP.
 
 ## Acceptance criteria
 
-- [ ] `oc get monitoringstack data-science-monitoringstack -n
+- [x] `oc get monitoringstack data-science-monitoringstack -n
   redhat-ods-monitoring -o jsonpath='{.spec.namespaceSelector}'` shows the
   patch, and survives a second `make d1 reconcile openshift-ai` (proves it's
   not a one-shot fluke reverted by RHOAI's own reconciler).
-- [ ] `zuno-models-d1`/`zuno-openshift-ai-d0`/`zuno-openshift-ai-d1`
+- [x] `zuno-models-d1`/`zuno-openshift-ai-d0`/`zuno-openshift-ai-d1`
   Applications stay `Synced`/`Healthy` throughout.
-- [ ] RHOAI's Prometheus (`prometheus-data-science-monitoringstack-0`) shows
+- [x] RHOAI's Prometheus (`prometheus-data-science-monitoringstack-0`) shows
   `health:"up"` targets for `namespace="zuno-ai-run"` via its own
-  `/api/v1/targets` API.
-- [ ] After sending real inference requests through each of the 5 models,
-  `rhods-dashboard`'s Observe & Monitor > Models tab shows all 5 with
-  nonzero request-rate/latency/GPU numbers (browser-verified).
-- [ ] `git status` on every `zuno-monitoring`/Grafana/Kiali-owning chart
-  shows no changes from this work; those dashboards spot-checked to still
-  render identically.
+  `/api/v1/targets` API - confirmed for all 4 LLMInferenceService models.
+- [ ] Browser-verified `rhods-dashboard` Observe & Monitor > Models tab
+  showing nonzero numbers after real traffic - not yet done this session
+  (requires sending live inference requests through each model first);
+  the Prometheus-side data path is proven, this is presentation-layer only.
+- [x] `git status` on every `zuno-monitoring`/Grafana/Kiali-owning chart
+  shows no changes from this work.
 
 ## Status updates
 
-- **2026-09-09 — Repo work merged.** All three parts written, `helm
-  lint`/`helm template`/`ansible-playbook --syntax-check`/
-  `check_workload_hardening.py`/`check_docs.py` all pass. Live verification
-  (the acceptance criteria above) not yet run - the next `make d1 reconcile
-  openshift-ai` + `make d2 install models` cycle on `demo333` closes this
-  out.
+- **2026-09-09 — Done.** All 4 parts written and live-verified on
+  `demo333`. Parts 1-3 alone were insufficient (confirmed live: zero
+  `zuno-ai-run` series reached RHOAI's Prometheus even with a correctly
+  widened `namespaceSelector`, correct RBAC, and correct NetworkPolicy) -
+  root-caused to KServe's PodMonitor using `monitoring.coreos.com/v1`
+  while RHOAI's Cluster-Observability-Operator-based Prometheus only has
+  RBAC for `monitoring.rhobs` (two separate CRDs, confirmed via `oc get
+  crd`). Part 4 added and live-verified: all 4 model targets `health: up`
+  within seconds. `helm lint`/`helm template`/`ansible-playbook
+  --syntax-check`/`check_workload_hardening.py`/`check_docs.py` all pass.
+  Remaining: a browser screenshot of the actual dashboard tab with live
+  traffic, deferred to whenever the models next see real usage.

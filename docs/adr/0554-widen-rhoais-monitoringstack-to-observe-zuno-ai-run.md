@@ -1,6 +1,8 @@
 # ADR-0554: Widen RHOAI's built-in MonitoringStack to observe `zuno-ai-run`'s models
 
-- **Status:** Proposed
+- **Status:** Implemented (live-verified 2026-09-09 - all 4 model targets
+  `health: up` in RHOAI's own Prometheus, see the Dated correction note for
+  the fourth piece the original Decision missed)
 - **Target:** v0.5
 - **Date:** 2026-09-09
 - **Decision owners:** Zuno Demo architecture team
@@ -100,18 +102,27 @@ confirmed unaffected by anything below.
    stale comments claiming "metrics scraping needs no allowance here" - true
    only in the sense that the PodMonitor object exists (KServe's controller
    auto-creates it), not that the scrape request actually reaches the pod.
+4. **New `PodMonitor` (`monitoring.rhobs/v1`)**
+   (`gitops/charts/models/templates/podmonitor-rhoai-vllm-engine.yaml`,
+   GitOps-managed) mirroring KServe's own auto-created
+   `kserve-llm-isvc-vllm-engine` selector/relabelings. Found live-necessary
+   after decisions 1-3 alone still left zero series flowing (see the Dated
+   correction note below) - not part of the original decision.
 
 ## Operational considerations
 
-**Known, accepted side-effect of (1):** `resourceSelector` is already `{}`
-(RHOAI-owned via SSA, cannot be safely narrowed without fighting that
-ownership), so widening `namespaceSelector` also surfaces every *other*
-ServiceMonitor/PodMonitor already in `zuno-ai-run` -
-`vllm-predictors`/`zuno-evalhub-metrics`/`zuno-guardrails-smoke-service-monitor`/
-`kserve-llm-isvc-scheduler(-default)` - not only the 4 model-serving ones.
-All of these are already independently scraped by the platform's own
-`prometheus-k8s` under separate `job`/`instance` labels; this is a second,
-independent Prometheus observing the same targets, not one Prometheus
+**Corrected (see Dated correction note): `resourceSelector: {}` does NOT
+surface other pre-existing `zuno-ai-run` ServiceMonitors/PodMonitors**
+(`vllm-predictors`/`zuno-evalhub-metrics`/`zuno-guardrails-smoke-service-monitor`)
+the way this section originally claimed - all three are
+`monitoring.coreos.com/v1` (live-verified), the wrong CRD group for RHOAI's
+Prometheus to ever see, same as the KServe PodMonitors decision 4 exists to
+route around. The only object this widening actually admits is decision
+4's own `monitoring.rhobs/v1` PodMonitor. Its series are ALSO scraped by
+the platform's own `prometheus-k8s`, via the separate, pre-existing
+`monitoring.coreos.com/v1` KServe PodMonitors, under different `job`/
+`instance` labels - two independent Prometheus instances each
+independently scraping the same target pods, not one Prometheus
 double-matching a single Service via an ambiguous selector (a previously
 seen, different bug class) - no double-counting risk for any existing panel
 in either stack.
@@ -144,6 +155,54 @@ RBAC is touched anywhere in this change.
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives
 considered, Consequences, Acceptance criteria and Review evidence.
+
+## Dated correction note (2026-09-09)
+
+Decisions 1-3 as originally written were necessary but not sufficient.
+Live-verified after applying all three: `MonitoringStack`'s `namespaceSelector`
+correctly widened (confirmed via the underlying `Prometheus` CR's own
+`serviceMonitorNamespaceSelector`/`podMonitorNamespaceSelector`), the
+RoleBinding correctly granted, the NetworkPolicy correctly admitting - yet
+`/api/v1/status/config` on the live Prometheus pod still showed zero
+`zuno-ai-run` mentions and zero scrape targets, repeatedly, across a
+restart of the operator controller pod (`obo-prometheus-operator`) and
+several of its own "sync prometheus" reconcile passes with no error logged.
+
+Root cause: KServe's LLMInferenceService controller creates its
+`kserve-llm-isvc-vllm-engine(-default)` PodMonitor under
+`monitoring.coreos.com/v1` (confirmed: `oc get podmonitor ... -o
+jsonpath='{.apiVersion}'`). RHOAI's MonitoringStack is built on Red Hat's
+Cluster Observability Operator, whose own `obo-prometheus-operator`
+ServiceAccount's ClusterRole (read live from the cluster) grants
+`get`/`list`/`watch` **only** on the `monitoring.rhobs` API group -
+`podmonitors.monitoring.coreos.com` and `podmonitors.monitoring.rhobs` are
+two entirely separate CRDs (different `spec.group`, confirmed via `oc get
+crd`) that merely share the Kind name `PodMonitor`. No namespaceSelector,
+RBAC or NetworkPolicy change can bridge that gap - the operator's
+informers are wired to one specific CRD group and structurally cannot
+discover objects registered under the other, no matter how permissive
+`resourceSelector`/`namespaceSelector` are set.
+
+This exact landmine was already documented in this repo, just not read
+before starting this ADR: `gitops/charts/models/templates/
+servicemonitor-vllm.yaml`'s own header comment and
+`gitops/charts/observability/templates/servicemonitor-otel-collector.yaml`
+both warn that `monitoring.rhobs/v1` here would "render successfully and
+never be scraped by prometheus-k8s" - the same trap in the opposite
+direction. `gitops/charts/mesh-monitoring/templates/
+podmonitor-istio-proxy.yaml`/`servicemonitor-istiod.yaml` already carry
+the correct `monitoring.rhobs/v1` choice for feeding a COO-based
+MonitoringStack (`mesh-monitoring`), which is why Kiali's own Prometheus
+data source has always worked without hitting this - it was the template
+to copy, not read until after re-deriving the same conclusion the hard
+way.
+
+Fixed by adding Decision 4 (`podmonitor-rhoai-vllm-engine.yaml`, a new
+`monitoring.rhobs/v1` PodMonitor mirroring KServe's own selector/
+relabelings). Live-verified end to end after all four parts: all 4 model
+targets (`qwen36-27b-instruct`, `qwen35-9b`, `qwen35-9b-wesh`,
+`gpt-oss-20b`) `health: up` in RHOAI's own Prometheus within seconds of
+applying it.
 
 ## Migration / evolution
 
