@@ -193,6 +193,71 @@
 # this only patches the one annotation+label pair it doesn't manage - safe
 # to re-apply if a future
 # reconcile of theirs drops it.
+# Live-caught 2026-09-09: this role's OWN mesh opt-in above (annotation
+# patch) works, but the MaaS Config controller's own generated NetworkPolicy
+# (payload-processing, openshift-ingress) egress-restricts these pods to
+# DNS + 443/6443 only - no allowance for istiod's XDS port. Once the sidecar
+# is actually injected, its DeltaAggregatedResources gRPC stream to
+# istiod:15012 times out forever ("dial tcp <istiod ClusterIP>:15012: i/o
+# timeout"), and the pod never leaves Init:1/2 - the same symptom class as
+# a mesh-allowlist gap, but this time it's an egress restriction on the
+# workload's own NetworkPolicy, not zuno-mesh's ingress side.
+#
+# Unlike MonitoringStack/data-science-monitoringstack (ADR-0554's
+# widen_monitoringstack_namespace_selector.yml), this field is NOT provably
+# safe to patch once and forget: live managedFields showed maas-controller
+# owns the ENTIRE spec.egress list as one field (no per-item ownership -
+# NetworkPolicy's egress array has no associative merge key), so a future
+# maas-controller re-apply of Config/default could overwrite this back to
+# its original two entries. Re-applied every reconcile for that reason,
+# same as dashboard_feature_flags.yml's flags - if this ever reverts within
+# seconds of a green reconcile, maas-controller has started re-asserting
+# spec.egress: drop this task and record it as an upstream constraint
+# rather than adding retries to fight the controller.
+- name: "openshift_ai | reconcile: look up the payload-processing NetworkPolicy"
+  kubernetes.core.k8s_info:
+    api_version: networking.k8s.io/v1
+    kind: NetworkPolicy
+    name: payload-processing
+    namespace: openshift-ingress
+  register: _openshift_ai_ipp_netpol
+
+- name: "openshift_ai | reconcile: admit payload-processing/payload-pre-processing egress to istiod's XDS port"
+  kubernetes.core.k8s:
+    state: patched
+    merge_type: merge
+    api_version: networking.k8s.io/v1
+    kind: NetworkPolicy
+    name: payload-processing
+    namespace: openshift-ingress
+    definition:
+      spec:
+        egress:
+          - ports:
+              - port: 53
+                protocol: UDP
+              - port: 53
+                protocol: TCP
+              - port: 5353
+                protocol: UDP
+              - port: 5353
+                protocol: TCP
+          - ports:
+              - port: 443
+                protocol: TCP
+              - port: 6443
+                protocol: TCP
+          - to:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: zuno-mesh
+            ports:
+              - port: 15012
+                protocol: TCP
+              - port: 15010
+                protocol: TCP
+  when: (_openshift_ai_ipp_netpol.resources | default([]) | length) > 0
+
 - name: "openshift_ai | reconcile: look up payload-processing/payload-pre-processing Deployments"
   kubernetes.core.k8s_info:
     api_version: apps/v1
