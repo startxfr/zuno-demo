@@ -27,7 +27,7 @@ import yaml
 os.environ.setdefault("AGENT", "naveo")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, agent_zuno_status, auth_headers  # noqa: E402
+from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, auth_headers, is_placeholder_agent_404  # noqa: E402
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -50,19 +50,19 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
     """ADR-0032: the BFF must forward the validated end-user bearer token
     to the Agent Runtime, which requires one and rejects calls without it.
     """
-    if agent_zuno_status() == "placeholder":
-        return CheckResult(
-            "bff_forwards_identity_to_runtime", True,
-            f"skipped (coverage): {AGENT} is zuno.status=placeholder - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design; flip this back to a "
-            "real assertion once the agent goes active",
-        )
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
         headers=auth_headers("consultant-01"),
         json={"session_id": "sec-check-1", "message": "Where do I find the onboarding checklist?"},
         timeout=30,
     )
+    if is_placeholder_agent_404(resp):
+        return CheckResult(
+            "bff_forwards_identity_to_runtime", True,
+            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
+            "_active_agent_or_404 404s every chat call by design; flip this back to a "
+            "real assertion once the agent goes active",
+        )
     ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
     return CheckResult("bff_forwards_identity_to_runtime", ok, f"status={resp.status_code} body={resp.text[:200]}")
 
@@ -72,13 +72,6 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
     Runtime must derive the authoritative subject from the validated
     token, never this field.
     """
-    if agent_zuno_status() == "placeholder":
-        return CheckResult(
-            "runtime_ignores_mismatched_user_sub", True,
-            f"skipped (coverage): {AGENT} is zuno.status=placeholder - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design; flip this back to a "
-            "real assertion once the agent goes active",
-        )
     import uuid
 
     forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
@@ -88,6 +81,13 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
         json={"session_id": "sec-check-2", "user_sub": forged_sub, "message": "Where do I find the onboarding checklist?"},
         timeout=30,
     )
+    if is_placeholder_agent_404(resp):
+        return CheckResult(
+            "runtime_ignores_mismatched_user_sub", True,
+            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
+            "_active_agent_or_404 404s every chat call by design; flip this back to a "
+            "real assertion once the agent goes active",
+        )
     ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
     return CheckResult("runtime_ignores_mismatched_user_sub", ok, f"status={resp.status_code} forged_sub={forged_sub} body={resp.text[:200]}")
 
@@ -98,20 +98,20 @@ def entitlement_without_business_role_denied() -> CheckResult:
     (the agent entitlement alone never substitutes for the business-role
     check the MCP Gateway/policy layer performs).
     """
-    if agent_zuno_status() == "placeholder":
-        return CheckResult(
-            "entitlement_without_business_role_denied", True,
-            f"skipped (coverage): {AGENT} is zuno.status=placeholder - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design (outside the (200,403) "
-            "this check otherwise accepts); flip this back to a real assertion once the "
-            "agent goes active",
-        )
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
         headers=auth_headers("naveo-entitlement-only-user-01"),
         json={"session_id": "sec-check-3", "message": "Where do I find the onboarding checklist?"},
         timeout=30,
     )
+    if is_placeholder_agent_404(resp):
+        return CheckResult(
+            "entitlement_without_business_role_denied", True,
+            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
+            "_active_agent_or_404 404s every chat call by design (outside the (200,403) "
+            "this check otherwise accepts); flip this back to a real assertion once the "
+            "agent goes active",
+        )
     # A business-role-less caller can still authenticate and chat (the
     # entitlement/role separation this scaffold's tools rely on is
     # enforced per-tool-call by the MCP Gateway, not by the chat route

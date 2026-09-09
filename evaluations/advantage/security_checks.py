@@ -46,7 +46,7 @@ os.environ.setdefault("AGENT", "advantage")
 # directory, not only when run_acceptance_gate.py's dynamic loader has
 # already put evaluations/tekos/ on sys.path for us.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, _invoke_tool, agent_zuno_status, auth_headers  # noqa: E402
+from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers, is_placeholder_agent_404  # noqa: E402
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -85,19 +85,19 @@ def bff_forwards_identity_to_runtime() -> CheckResult:
     401, surfaced to the client as a 502 from the BFF - so a 200 here with a
     real reply is direct evidence the token now reaches the Runtime.
     """
-    if agent_zuno_status() == "placeholder":
-        return CheckResult(
-            "bff_forwards_identity_to_runtime", True,
-            f"skipped (coverage): {AGENT} is zuno.status=placeholder - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design; flip this back to a "
-            "real assertion once the agent goes active",
-        )
     resp = httpx.post(
         f"{BFF_URL}/api/chat",
         headers=auth_headers("adv-01"),
         json={"session_id": "sec-check-1", "message": "What's the status of the Acme delivery project?"},
         timeout=30,
     )
+    if is_placeholder_agent_404(resp):
+        return CheckResult(
+            "bff_forwards_identity_to_runtime", True,
+            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
+            "_active_agent_or_404 404s every chat call by design; flip this back to a "
+            "real assertion once the agent goes active",
+        )
     ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
     return CheckResult(
         "bff_forwards_identity_to_runtime",
@@ -114,13 +114,6 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
     must not be rejected or otherwise change the outcome (impersonation via
     the body field is impossible because the field is never trusted).
     """
-    if agent_zuno_status() == "placeholder":
-        return CheckResult(
-            "runtime_ignores_mismatched_user_sub", True,
-            f"skipped (coverage): {AGENT} is zuno.status=placeholder - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design; flip this back to a "
-            "real assertion once the agent goes active",
-        )
     import uuid
 
     forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
@@ -134,6 +127,13 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
         },
         timeout=30,
     )
+    if is_placeholder_agent_404(resp):
+        return CheckResult(
+            "runtime_ignores_mismatched_user_sub", True,
+            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
+            "_active_agent_or_404 404s every chat call by design; flip this back to a "
+            "real assertion once the agent goes active",
+        )
     ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
     return CheckResult(
         "runtime_ignores_mismatched_user_sub",

@@ -88,17 +88,31 @@ DEMO_PASSWORD = os.getenv("DEMO_PERSONA_PASSWORD")
 FRONTEND_CLIENT_SECRET = os.getenv(f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET")
 
 
-def agent_zuno_status(agent: str = AGENT) -> str:
-    """Reads zuno.status straight from agents/<agent>/agent.okf.md's own
-    frontmatter (mirrors ansible/roles/day3/tasks/stresstest_job_create_one.yml's
-    resolution of the same field) - lets a security check recognize a
-    placeholder-status agent (advantage/finage/naveo today) and skip an
-    assertion that can never pass against one, rather than hardcoding an
-    agent-name list that would go stale the moment an agent goes active.
+def is_placeholder_agent_404(resp: httpx.Response) -> bool:
+    """True if `resp` is agent-runtime's `_active_agent_or_404` (app/main.py)
+    denying a chat call because the agent is not yet zuno.status=active.
+
+    A bare status-code check, deliberately not matched against agent-
+    runtime's exact 404 body (`{"detail": "unknown agent '<agent>'"}`):
+    a call routed through the BFF instead of straight to RUNTIME_URL sees
+    that rejection re-wrapped into the BFF's own generic error shape
+    (`{"error": "agent runtime rejected the request"}`,
+    components/agent-bff/main.go's writeError) with the status code
+    preserved but the original body text gone. Safe to key on status
+    alone: every call site this helper is used from has no other reason
+    to see a 404 on this endpoint for a validly-shaped request.
+
+    Deliberately response-shape-based, not a pre-flight read of
+    agents/<agent>/agent.okf.md's own frontmatter (an earlier version of
+    this check did that) - live-caught 2026-09-09 (ADR-0555): the Day 3
+    stresstest Job these scripts actually run in
+    (ansible/roles/day3/kustomize/stresstest-scripts) mounts a flat
+    ConfigMap that never projects agents/<agent>/agent.okf.md for
+    advantage/finage/naveo at all (only tekos/arkos, for gate_checks.py's
+    own unrelated needs), so a filesystem read always raised
+    FileNotFoundError in the one context this actually needs to work in.
     """
-    okf_path = pathlib.Path(__file__).resolve().parents[2] / "agents" / agent / "agent.okf.md"
-    frontmatter = okf_path.read_text(encoding="utf-8").split("---", 2)[1]
-    return (yaml.safe_load(frontmatter).get("zuno") or {}).get("status", "unknown")
+    return resp.status_code == 404
 
 SERVICE_HEALTH_URLS = {
     "frontend": f"{FRONTEND_URL}/healthz",
