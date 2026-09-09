@@ -157,25 +157,25 @@ CONFLUENCE_TRIGGER_PROMPTS = [
     # 2026-09-05) added a >=50%-of-significant-words-in-the-title post
     # filter: the previous 3 generic prompts (written 2026-08-21, before
     # that filter existed) no longer reliably title-matched any real
-    # indexed page and started failing live. This cluster's real indexed
-    # Confluence space (startxfr.atlassian.net) is known - live-observed
-    # in this same stresstest run's own citations - to contain a real page
-    # titled "Procedure UPGRADE 4.13 vers 4.14 cluster
-    # data-preprod/MGMT/data.gouv AWS", so these 3 prompts are built
-    # around its own words (procedure/upgrade/cluster/4.13/4.14) - offline-
-    # confirmed via server.py's own `_is_relevant_result`/
-    # `_significant_words` against that exact title (comfortably clears
-    # the 50% bar, 3-5 of 7-9 significant words hit) before being locked
-    # in here, same discipline as the prompts they replace. A plausible-
-    # sounding but unverified query (e.g. mandatory scenario 10's own
-    # "RHOAI 3.5 EA2 rollout") can still return zero results against THIS
-    # specific live corpus even though the trigger/routing/MCP-call path
-    # all work correctly - that's a content-coverage fact about the demo
-    # Confluence space, not a code bug (see run_scenarios.py's
-    # chat_triggers_tool for the same lesson applied to scenario 10).
-    ("latest", "What does the latest internal documentation say about the OpenShift cluster upgrade from 4.13 to 4.14?"),
-    ("current", "What is the current procedure to upgrade our OpenShift cluster from 4.13 to 4.14?"),
-    ("recent", "Can you summarize the most recent OpenShift cluster upgrade procedure to 4.14?"),
+    # indexed page and started failing live.
+    #
+    # A first re-tune attempt (this same day) added extra descriptive
+    # words ("cluster", "our", "most") that are NOT in _QUERY_STOPWORDS -
+    # each one inflates the significant-word denominator without adding a
+    # title hit, and live-caught the ratio dropping back under 50% for
+    # "current"/"recent" (still `source_mode=indexed`). Replaced with
+    # near-verbatim copies of evaluations/tekos/scenarios.yaml's own
+    # scenario 10 message - already live-confirmed `source_mode="both"`
+    # for the "latest" trigger word against this cluster's real
+    # "Procedure UPGRADE 4.13 vers 4.14 cluster data-preprod/MGMT/
+    # data.gouv AWS" page - changing ONLY the one required trigger word
+    # (_TOOL_TRIGGER_PATTERN needs "latest"/"current"/"recent" literally)
+    # and nothing else, so the significant-word set stays minimal.
+    # Offline-confirmed via server.py's own `_is_relevant_result`/
+    # `_significant_words` against that exact title before locking in.
+    ("latest", "What does the latest internal Confluence doc say about the OpenShift upgrade procedure to version 4.14?"),
+    ("current", "What does the current internal Confluence doc say about the OpenShift upgrade procedure to version 4.14?"),
+    ("recent", "What does the recent internal Confluence doc say about the OpenShift upgrade procedure to version 4.14?"),
 ]
 
 
