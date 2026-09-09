@@ -152,20 +152,30 @@ def check_technical_qa_domain(domain: str, message: str) -> StressResult:
 # --------------------------------------------------------------------------
 
 CONFLUENCE_TRIGGER_PROMPTS = [
-    # Verified live against this cluster's real search_confluence tool
-    # (a genuine company Confluence, not synthetic fixture content -
-    # startxfr.atlassian.net, French-language operational pages) before
-    # being locked in here, rather than guessed: each of these three
-    # returned non-empty results at the time of writing. A plausible-
+    # Re-verified 2026-09-09 (ADR-0555) after commit d541c91f
+    # (components/mcp-servers/confluence/server.py's `_is_relevant_result`,
+    # 2026-09-05) added a >=50%-of-significant-words-in-the-title post
+    # filter: the previous 3 generic prompts (written 2026-08-21, before
+    # that filter existed) no longer reliably title-matched any real
+    # indexed page and started failing live. This cluster's real indexed
+    # Confluence space (startxfr.atlassian.net) is known - live-observed
+    # in this same stresstest run's own citations - to contain a real page
+    # titled "Procedure UPGRADE 4.13 vers 4.14 cluster
+    # data-preprod/MGMT/data.gouv AWS", so these 3 prompts are built
+    # around its own words (procedure/upgrade/cluster/4.13/4.14) - offline-
+    # confirmed via server.py's own `_is_relevant_result`/
+    # `_significant_words` against that exact title (comfortably clears
+    # the 50% bar, 3-5 of 7-9 significant words hit) before being locked
+    # in here, same discipline as the prompts they replace. A plausible-
     # sounding but unverified query (e.g. mandatory scenario 10's own
-    # "RHOAI 3.5 EA2 rollout") can return zero results against THIS
+    # "RHOAI 3.5 EA2 rollout") can still return zero results against THIS
     # specific live corpus even though the trigger/routing/MCP-call path
     # all work correctly - that's a content-coverage fact about the demo
     # Confluence space, not a code bug (see run_scenarios.py's
     # chat_triggers_tool for the same lesson applied to scenario 10).
-    ("latest", "What does the latest internal documentation say about OpenShift?"),
-    ("current", "Can you check our internal documents for the current OpenShift ETCD backup procedure?"),
-    ("recent", "Please share the most recent OpenShift status."),
+    ("latest", "What does the latest internal documentation say about the OpenShift cluster upgrade from 4.13 to 4.14?"),
+    ("current", "What is the current procedure to upgrade our OpenShift cluster from 4.13 to 4.14?"),
+    ("recent", "Can you summarize the most recent OpenShift cluster upgrade procedure to 4.14?"),
 ]
 
 
