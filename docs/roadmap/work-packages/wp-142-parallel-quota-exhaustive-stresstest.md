@@ -1,9 +1,8 @@
 # WP-142: Parallel, quota-exhaustive Day 3 stresstest
 
-- **State:** Done (2026-09-09 - parallel execution + request-rate proof
-  live-verified; token-budget proof code-complete, needs an ai-gateway
-  rebuild before its live behavior is genuine exhaustion, not a fail-closed
-  unknown-class 429 - see ADR-0555's Known out-of-scope gaps)
+- **State:** Done (2026-09-09 - parallel execution, request-rate proof, and
+  token-budget exhaustion proof all live-verified after an `ai-gateway`
+  rebuild; see Status updates)
 - **ADRs:** ADR-0555
 - **Related:** ADR-0058, ADR-0511
 - **Target:** v0.5
@@ -76,33 +75,43 @@ counted as an expected, positive PASS - without lowering the `standard`/
   `ai-gateway`, a real Keycloak token for `consultant-01`, `AI_GATEWAY_URL`/
   `TOKEN_QUOTA_TOKEN` overrides): gets a real 429 from AI Gateway's ledger,
   confirming the request/response/classification plumbing is correct end
-  to end - not yet genuine budget-exhaustion behavior until ai-gateway is
-  rebuilt with the regenerated `quota_budgets.yaml` (see ADR-0555's Known
-  out-of-scope gaps).
-- [ ] Live: `make d3 stresstest` (parallel, default) - confirm via `oc get
-  jobs -n zuno-ai-run` that all 3 agent Jobs run concurrently and total
-  wall-clock is close to the slowest single agent. Not yet re-run after
-  this WP's own changes landed - the in-progress run this session started
-  from predates them.
-- [ ] Live, after `make d2 build ai-gateway` + redeploy: `token_quota`
-  layer shows a genuine post-exhaustion 429 (not an immediate one) for
-  tekos/arkos/comage.
+  to end.
+- [x] Live: `make d3 stresstest agents` (parallel, default) - confirmed via
+  `oc get jobs -n zuno-ai-run` that `zuno-day2-stresstest-{tekos,arkos,
+  comage,...}` were all created within ~50s of each other with several
+  `active:1` concurrently (some briefly Kueue-suspended on GPU quota, not a
+  regression - see the 2026-09-04 GPU-quota-saturated note), instead of the
+  old one-Job-fully-waited-before-the-next-is-even-created behavior.
+- [x] Live, after `make d1 build ai-gateway` + redeploy (ImageChangeTrigger
+  auto-rolled the Deployment): `token_quota` layer shows a genuine
+  post-exhaustion 429 (not an immediate fail-closed-unknown-class one) for
+  tekos (429 at call 4/24) and comage (429 at call 7/24) - multiple real
+  chat calls actually ran (some timing out under GPU load rather than
+  returning instantly, consistent with real inference consuming the
+  budget) before the ledger's `stresstest` class 2,000-token/5m ceiling
+  was crossed. arkos passed the same `stresstest-429` assertion in the
+  same run.
 - [x] `git status` on every `zuno-monitoring`/Grafana/Kiali-owning chart
   shows no changes from this work.
 
 ## Status updates
 
-- **2026-09-09 — Done, one follow-up rebuild pending.** Parts 1-3
-  (parallel execution, Makefile `SEQUENTIAL=`, request-rate 429
-  generalization) are fully live-capable with this session's changes alone
-  - no rebuild needed, GitOps/Ansible only. Part 4 (token-budget proof) is
-  code-complete and unit-verified live (real 429 from AI Gateway's ledger,
-  correct plumbing) but needs `make d2 build ai-gateway` before its
-  behavior matches the intended "genuine exhaustion after ~15 calls"
-  rather than "immediate fail-closed 429 for an unknown class" - the image
-  bakes `quota_budgets.yaml` in at build time, it is not a live-synced
-  ConfigMap. Also discovered and documented, not fixed: RHOAI MaaS's own
-  Kuadrant TokenRateLimitPolicy (`/sales` tier) is unreachable by any
-  persona today because `ModelsAsService.spec.externalOIDC` is unset -
-  a separate, larger, cluster-wide MaaS-authentication decision, correctly
-  out of scope for this WP.
+- **2026-09-09 — Done, fully live-verified.** Parts 1-3 (parallel
+  execution, Makefile `SEQUENTIAL=`, request-rate 429 generalization) were
+  live-capable with this session's changes alone - no rebuild needed,
+  GitOps/Ansible only. Part 4 (token-budget proof) needed
+  `make d1 build ai-gateway` (built+signed successfully, commit `05333171`
+  on `origin/main`, confirmed live in the redeployed pod's
+  `/app/app/quota_budgets.yaml`) before its behavior matched the intended
+  "genuine exhaustion after several real calls" rather than "immediate
+  fail-closed 429 for an unknown class" - the image bakes
+  `quota_budgets.yaml` in at build time, it is not a live-synced
+  ConfigMap. A full `make d3 stresstest agents` (parallel, default) run
+  afterward confirmed all three: Jobs created concurrently (~50s spread,
+  several `active:1` at once), and `token_quota` PASSed with genuine
+  post-exhaustion 429s for tekos/arkos/comage. Also discovered and
+  documented, not fixed: RHOAI MaaS's own Kuadrant TokenRateLimitPolicy
+  (`/sales` tier) is unreachable by any persona today because
+  `ModelsAsService.spec.externalOIDC` is unset - a separate, larger,
+  cluster-wide MaaS-authentication decision, correctly out of scope for
+  this WP.
