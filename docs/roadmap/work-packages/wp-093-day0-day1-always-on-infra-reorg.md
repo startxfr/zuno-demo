@@ -1,6 +1,7 @@
 # WP-093: Move postgresql/keycloak/aap/aap-config to Day 0, nvidia-gpu/custom-metrics-autoscaler/nfd/smtp to Day 1
 
-- **State:** Repo work merged - live verification pending.
+- **State:** Done (2026-09-10 - live verification satisfied retroactively
+  by WP-140's full `demo333` redeploy, 2026-09-06→09-08).
 - **ADRs:** ADR-0421 (new), amends ADR-0056/ADR-0060 placement; amends
   ADR-0418's header (dependency note only, its Decision content is
   unchanged by this WP).
@@ -135,22 +136,25 @@ Ansible roles or Helm charts.
 
 ## Operator / human follow-up
 
-- A full live `make d0 install all` → `make d1 install all` run (or
-  `reconcile`/`check` equivalents) against a real cluster, to confirm the
-  new sequencing actually reconciles cleanly end to end - not yet done by
-  this WP (see "What NOT to touch": live execution was deliberately kept
-  out of this session's scope after the accidental live-but-no-op runs
-  above). Needs explicit operator go-ahead per this repository's shared-
-  cluster convention before running for real.
-- Once live-verified, flip ADR-0421's own "Implementation state" section
-  from "not yet live-verified end to end" to a dated live-verification
-  note, and update `MEMORY.md`.
+- ~~A full live `make d0 install all` → `make d1 install all` run...~~
+  Satisfied retroactively: WP-140's from-scratch `demo333` redeploy
+  (2026-09-06→09-08) ran `make day0/day1/day2 install` end to end using
+  this ADR's reordered component lists as its actual sequencing, with
+  `make d0/d1/d2/d3 check` all green at closure. No dedicated live run
+  was needed beyond that.
+- ADR-0421's own "Implementation state" section updated (2026-09-10) with
+  a dated live-verification note citing WP-140.
 
 ## Status updates
 
 - 2026-08-30: Repo changes merged, `check_docs.py` green, Makefile
   validation paths exercised without a cluster. State: `Repo work merged,
   live verification pending`.
+- 2026-09-10: State moved to `Done` - WP-140's `demo333` redeploy
+  (2026-09-06→09-08) is recognized as having already live-verified this
+  ADR's sequencing (full `make day0/day1/day2 install`, all
+  `make d0/d1/d2/d3 check` green), closing the deferred follow-up without
+  a dedicated run.
 
 ## Rollback
 

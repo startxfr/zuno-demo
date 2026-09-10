@@ -147,11 +147,19 @@ day0/day1 playbooks, affected role READMEs, `ansible/README.md`,
 paths exercised without a cluster (`make d0 install bogus-component`,
 `make d1 install bogus-component`, and the moved components validating
 against their new tier and being rejected by their old one all behave as
-expected). Not yet live-verified end to end against a real cluster (a
-full `make d0 install all` → `make d1 install all` run) - deferred to
-whichever follow-up work package first needs a live Day 0/Day 1 run after
-this change (this repository's shared cluster was not mutated for this
-ADR beyond two no-op idempotent installs confirming `changed=0`).
+expected).
+
+**Live-verified end to end (2026-09-10, retroactive confirmation).** WP-140
+executed a full `make day0/day1/day2 install` (and the corresponding
+`d3 sign/backup/restore`) from scratch on the new `demo333` cluster,
+2026-09-06 through 2026-09-08, exercising this ADR's reordered component
+lists as its actual sequencing - `postgresql`/`keycloak`/`aap`/
+`aap-config` installed as Day 0 members and `smtp`/`nfd`/`nvidia-gpu`/
+`custom-metrics-autoscaler` as Day 1 members, right after `machines` and
+at the head of Day 1 respectively. `make d0/d1/d2/d3 check` all passed at
+closure. See [WP-140](../roadmap/work-packages/wp-140-demo333-redeploy-execution.md)
+for the full run record; this satisfies WP-093's deferred "live
+verification pending" follow-up.
 
 ## Related ADRs
 

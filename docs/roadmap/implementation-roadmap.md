@@ -26,7 +26,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.1 | 29 | — | 18 | — |
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
-| v0.4 | 35 | 9 | 30 | WP-55, WP-093, WP-101 |
+| v0.4 | 35 | 9 | 30 | WP-55, WP-101 |
 | v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122, WP-139 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
@@ -475,7 +475,7 @@ separately and added to this phase's table as they land.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-093 | [wp-093](work-packages/wp-093-day0-day1-always-on-infra-reorg.md) | 0421 | — | Repo work merged (2026-08-30) - live verification pending | a full live `make d0 install all` → `make d1 install all` run against a real cluster, deferred pending explicit operator go-ahead (this repo's shared-cluster convention) |
+| WP-093 | [wp-093](work-packages/wp-093-day0-day1-always-on-infra-reorg.md) | 0421 | — | Done (2026-09-10) - live verification satisfied retroactively by WP-140's full `demo333` redeploy (2026-09-06→09-08), `make d0/d1/d2/d3 check` all green | none |
 | WP-094 | [wp-094](work-packages/wp-094-generalize-aap-job-templates.md) | 0418 | WP-093 | Done (2026-08-30) - live launch/Survey/credential round-trip confirmed (jobs 180/240/244) | install-type ClusterRole check deliberately deferred (low risk, not required to close Phase 1) |
 | WP-095 | [wp-095](work-packages/wp-095-workflow-templates.md) | 0418 | WP-094 | Done (2026-08-30) - Day 1 `zuno-day1-check-workflow` full green run (job 243); Day 2 `zuno-day2-check-workflow` also full green (job 514, after WP-102) | none |
 | WP-097 | [wp-097](work-packages/wp-097-make-aap-routing.md) | 0418 | WP-095 | Done (2026-08-30) - live-verified `zuno_make_aap_mode=auto` routing both Job and Workflow Template launches, exit-code propagation confirmed | `remote` unreachable-failure and `auto` fallback branches still only offline-tested (isolated shell-logic), not re-exercised live this pass |
