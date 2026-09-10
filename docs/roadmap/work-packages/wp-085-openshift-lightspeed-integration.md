@@ -496,3 +496,58 @@ registered to `GptOssReasoningParser` in the live vLLM 0.24.0+rhaiv.9 image befo
 is a real, repo-owned config gap (not MaaS/vendor-owned) that would have hit every consumer of
 gpt-oss-20b's tool-calling path (Lightspeed, ai-gateway, Tekos), not just Lightspeed - the model
 serving pod was restarted to pick it up.
+
+## Extensions post-live, 2026-09-10
+
+Continued live console testing (user driving the console directly) surfaced five more defects, all
+found, fixed and live-verified the same session - none required a new ADR.
+
+1. **Front-door tools carried no real description**: `mcp_frontdoor.py`'s `tools/list` always fell
+   back to a generic `"Zuno platform capability '<name>'..."` sentence, because `ToolPolicyEntry`
+   (`components/mcp-gateway/app/policy.py`) had no `description` field to read from `tool-policy.yaml`
+   in the first place. Symptom: asked to "faire un audit du cluster avec aap", the model answered with
+   a manually-typed command list instead of calling `aap.cluster.audit` - it had no information in
+   `tools/list` to tell the two tools apart, or to know either existed for that purpose. Fixed by
+   adding the field end to end (dataclass, loader, all 5 front-door capabilities' YAML entries) and a
+   per-capability `readOnlyHint` override (`aap.cluster.audit` isn't a pure read, unlike the other 4 -
+   was previously mislabeled `true` like everything else).
+2. **The `ocp-ai-ops` OpenShift Group never existed** on this cluster, despite
+   `gitops/charts/openshift-rbac-groups`' `zuno-ocp-ai-ops-admin` RoleBinding referencing it since
+   ADR-0349, and this WP's own item 3 above gating AAP audit access on it. `oc get group ocp-ai-ops`
+   -> NotFound. Root cause: this cluster has no Keycloak OAuth identity provider registered at all
+   (`oc get oauth cluster` shows only `startx-htpasswd_auth`) - the "ocp-\*" groups described
+   throughout this repo as "Keycloak groups" were pure design intent, never wired to any real login
+   path. The real console user (`admin`, htpasswd) could never have picked up that group through
+   normal login. Fixed live: `oc adm groups new ocp-ai-ops admin` (group membership is resolved
+   per-request via TokenReview, no relogin needed) - this also retroactively activated the
+   previously-dormant `zuno-ocp-ai-ops-admin` RoleBinding across every `zunoManagedNamespaces` entry.
+3. **`aap.cluster.audit` blocked ~2-3 minutes waiting for the AAP Job Template to finish**, and
+   OpenShift Lightspeed's console-plugin proxy has its own unconfigurable client-side request timeout
+   well under that (confirmed via OTel traces: the backend chain always finished correctly,
+   `success: true`, ~150s end to end; raising `OLSConfig.spec.mcpServers[].timeout` to 630s changed
+   nothing - `ConsolePlugin`'s CRD has no timeout field at all for its proxy). Fixed at the only layer
+   this repo controls: `cluster_audit` (`components/mcp-servers/aap/server.py`) now launches the Job
+   Template and returns immediately with the job id, never polling to a terminal status;
+   `platform_audit`'s existing `recent_runs` doubles as the "did it pass" follow-up. `OLSConfig`
+   timeout reverted to 60s afterward. Live-requested follow-on: every job summary now also carries a
+   `url` (link to the run in the AAP Controller UI - new `AAP_CONTROLLER_UI_URL` env var, the
+   Gateway's public Route, wired through `gitops/charts/mcp-aap` the same `clusterBaseDomain` way
+   every other chart does) and the most-recent run's `log_tail` (last ~5 non-blank output lines via
+   `job_events`, not the full `stdout` blob).
+4. **`zuno-day0-check` itself failed**, surfaced incidentally by the new `log_tail` field: two
+   separate RBAC gaps on the same *-check credential tier (`aap-day0-check`/`cluster-reader`, which
+   excludes Secrets and all write verbs everywhere by design) - a missing `get` on the real
+   `zuno-postgresql-backup-s3` Secret, then (once fixed) a missing `create`/`update`/`delete` for a
+   throwaway Secret+Job `ansible/roles/postgresql/tasks/check_s3_backup.yml`'s own S3 cross-check
+   (WP-131 P0) creates and deletes on every run. Both fixed with scoped `Role`/`RoleBinding`s in
+   `gitops/charts/postgresql/templates/rolebinding-aap-day0-check-secrets.yaml`, same "targeted
+   widening, never a broader built-in" pattern already used 4 times elsewhere in this repo (ADR-0354).
+   Also added a `rescue:` to `check_s3_backup.yml`'s probe block, restoring a contract the file's own
+   header already promised ("never fails on its own") that a one-day-old task had broken. Live-
+   verified: a real `zuno-day0-check` run (AAP job 1153) completed `successful`, `ok=216 failed=0`.
+5. **Confluence/RAG tools extended to `ocp-ai-ops`**: user asked whether Lightspeed could reach the
+   Confluence MCP tools too - mechanically yes since the original integration (front-door ceiling and
+   policy entries were already in place), but blocked by the same group gap as item 2. Rather than
+   seed a separate `lightspeed_readonly` Group, added `ocp-ai-ops` to `confluence.page.search`,
+   `confluence.page.read` and `knowledge.tech.search`'s `allowed_groups` in `tool-policy.yaml`. Live-
+   verified via `tools/list`: the real console identity now sees all 5 front-door tools.
