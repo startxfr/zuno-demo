@@ -103,6 +103,35 @@ zuno_mariadb_backup_s3_secret_access_key: "xxxxxx"
 # zuno-<cluster>-backups, beside the pgBackRest repo under postgresql/.
 zuno_mariadb_backup_s3_prefix: "mariadb"
 
+# --- MariaDB mode (ADR-0352 / WP-143) --------------------------------------
+# internal (default when absent - this repo deploys gitops/charts/mariadb as
+# today) | external (a pre-existing MariaDB/MySQL endpoint is used; the
+# built-in is NOT deployed, `make d1 uninstall mariadb` never touches the
+# external instance, and `make d1 check mariadb` asserts reachability and
+# per-database AUTH instead of Application health).
+# Consequence when external and any required key below is left at the
+# sentinel: the install fails fast, before any apply, naming the key.
+# The external DBA must pre-create the three databases and their users
+# (defaults: mlpipeline/mlpipeline, mlops/mlops, trillian/trillian - a
+# different username is supported via the _username keys, which flow to the
+# consumer charts as non-secret Helm values). Passwords are seeded by the
+# mariadb role into the same Vault paths the consumer ExternalSecrets
+# already read (rag/pipeline-db, mlops/dspa-mysql, rhtas/trillian-mysql),
+# overwriting the internally-generated ones. The five backup fields above
+# and the mysqld-exporter metrics are internal-only and do not apply.
+# zuno_mariadb_external_ca_bundle is accepted and reserved for the future
+# TLS seam (not yet wired into the DSPA/ODH trust bundles - see WP-143).
+zuno_mariadb_mode: internal
+zuno_mariadb_external_host: "xxxxxx"
+zuno_mariadb_external_port: "3306"
+zuno_mariadb_external_ca_bundle: ""
+zuno_mariadb_external_db_mlpipeline_username: "mlpipeline"
+zuno_mariadb_external_db_mlpipeline_password: "xxxxxx"
+zuno_mariadb_external_db_mlops_username: "mlops"
+zuno_mariadb_external_db_mlops_password: "xxxxxx"
+zuno_mariadb_external_db_trillian_username: "trillian"
+zuno_mariadb_external_db_trillian_password: "xxxxxx"
+
 # --- Quay.io registry (stored in Vault for future cluster-side use, e.g. an
 # image pull secret; NOT the same credential ADR-0115's build-publish.yml CI
 # workflow uses - that one is QUAY_USERNAME/QUAY_PASSWORD as a GitHub Actions

@@ -1,0 +1,161 @@
+---
+# Shared by install_external.yml (mariadb_assert_hard_fail: true) and
+# precheck.yml's external personality (false - prechecks record state,
+# never fail, ADR-0352 clause 4). Asserts what clause 7 requires of an
+# external MariaDB: the endpoint is reachable and each of the three
+# per-database credential pairs authenticates - via a short-lived
+# in-cluster client Job in zuno-data, because the external endpoint is
+# not necessarily reachable from the Ansible controller (workstation or
+# AAP execution environment), and an in-cluster probe exercises the same
+# network path the consumers will use. The supply_chain role's
+# verify_image_signatures.yml set the run-a-Job-per-check precedent.
+#
+# The credentials reach the Job through a short-lived Secret (deleted in
+# the always-cleanup below), never through the pod spec. The pod opts out
+# of istio injection: a sidecar would keep a completed Job's pod Running
+# forever, and MySQL's server-first protocol is exactly what the mesh
+# trips over (see install_internal.yml's appProtocol patch).
+- name: "mariadb | create the short-lived external-assert credentials Secret"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: mariadb-external-assert
+        namespace: zuno-data
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      stringData:
+        MARIADB_HOST: "{{ zuno_mariadb_external_host }}"
+        MARIADB_PORT: "{{ zuno_mariadb_external_port | default('3306') }}"
+        DB_MLPIPELINE_USER: "{{ zuno_mariadb_external_db_mlpipeline_username | default('mlpipeline') }}"
+        DB_MLPIPELINE_PASS: "{{ zuno_mariadb_external_db_mlpipeline_password }}"
+        DB_MLOPS_USER: "{{ zuno_mariadb_external_db_mlops_username | default('mlops') }}"
+        DB_MLOPS_PASS: "{{ zuno_mariadb_external_db_mlops_password }}"
+        DB_TRILLIAN_USER: "{{ zuno_mariadb_external_db_trillian_username | default('trillian') }}"
+        DB_TRILLIAN_PASS: "{{ zuno_mariadb_external_db_trillian_password }}"
+  no_log: true
+
+- name: "mariadb | delete any previous external-assert Job"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-data
+    name: mariadb-external-assert
+    wait: true
+    wait_timeout: 60
+
+- name: "mariadb | run the external-assert client Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: mariadb-external-assert
+        namespace: zuno-data
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        backoffLimit: 0
+        ttlSecondsAfterFinished: 3600
+        template:
+          metadata:
+            annotations:
+              sidecar.istio.io/inject: "false"
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: assert
+                # rhel9/mariadb-1011 ships the mariadb/mysql client and is
+                # pulled with the cluster's registry.redhat.io entitlement
+                # (same registry AAP/RHTAS images come from); override with
+                # -e zuno_mariadb_client_image=... where a mirror is needed.
+                image: "{{ zuno_mariadb_client_image | default('registry.redhat.io/rhel9/mariadb-1011:latest') }}"
+                envFrom:
+                  - secretRef:
+                      name: mariadb-external-assert
+                command:
+                  - /bin/sh
+                  - -c
+                  - |
+                    set -e
+                    rc=0
+                    for db in mlpipeline mlops trillian; do
+                      case "$db" in
+                        mlpipeline) u="$DB_MLPIPELINE_USER"; p="$DB_MLPIPELINE_PASS" ;;
+                        mlops)      u="$DB_MLOPS_USER";      p="$DB_MLOPS_PASS" ;;
+                        trillian)   u="$DB_TRILLIAN_USER";   p="$DB_TRILLIAN_PASS" ;;
+                      esac
+                      if MYSQL_PWD="$p" mysql -h "$MARIADB_HOST" -P "$MARIADB_PORT" \
+                          -u "$u" --connect-timeout=10 -e 'SELECT 1' "$db" >/dev/null; then
+                        echo "OK: $db as $u"
+                      else
+                        echo "FAIL: $db as $u" >&2
+                        rc=1
+                      fi
+                    done
+                    exit $rc
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  runAsNonRoot: true
+                  capabilities:
+                    drop: ["ALL"]
+                  seccompProfile:
+                    type: RuntimeDefault
+
+- name: "mariadb | wait for the external-assert Job to finish"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-data
+    name: mariadb-external-assert
+  register: _mariadb_assert_job
+  until: >-
+    (_mariadb_assert_job.resources | default([]) | length) > 0 and
+    ((_mariadb_assert_job.resources[0].status.succeeded | default(0) | int) > 0
+     or (_mariadb_assert_job.resources[0].status.failed | default(0) | int) > 0)
+  retries: 30
+  delay: 10
+  failed_when: false
+
+- name: "mariadb | record the external-assert outcome"
+  ansible.builtin.set_fact:
+    _mariadb_external_ok: >-
+      {{ (_mariadb_assert_job.resources | default([]) | length) > 0
+         and (_mariadb_assert_job.resources[0].status.succeeded | default(0) | int) > 0 }}
+
+# The credentials Secret never outlives the assert; a FAILED Job is kept
+# (ttl-reaped after an hour) so its pod log names the database that
+# refused AUTH, a successful one is removed right away.
+- name: "mariadb | delete the short-lived external-assert credentials Secret"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Secret
+    namespace: zuno-data
+    name: mariadb-external-assert
+
+- name: "mariadb | delete the external-assert Job (success only)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-data
+    name: mariadb-external-assert
+    wait: true
+    wait_timeout: 60
+  when: _mariadb_external_ok | bool
+
+- name: "mariadb | fail on an unreachable or unauthenticated external endpoint"
+  ansible.builtin.fail:
+    msg: >-
+      The external MariaDB at
+      {{ zuno_mariadb_external_host }}:{{ zuno_mariadb_external_port | default('3306') }}
+      failed the reachability/AUTH assertion - inspect the
+      mariadb-external-assert Job's pod log in zuno-data for the
+      database(s) that refused. The DBA prerequisites are listed in
+      ADR-0352 clause 7 and ansible/confidential.example.yml.
+  when: (mariadb_assert_hard_fail | default(false) | bool) and not (_mariadb_external_ok | bool)

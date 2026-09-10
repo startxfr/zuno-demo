@@ -126,6 +126,12 @@
     file: "{{ zuno_repo_root }}/ansible/confidential.yml"
   when: _rag_ingestion_confidential_file.stat.exists
 
+# ADR-0352/WP-143 clause 11: the KFP metadata-DB endpoint arrives as a
+# resolved fact, never as a mode - internal defaults reproduce the old
+# chart literals exactly (inertia: byte-identical render).
+- name: "rag_ingestion | resolve the MariaDB endpoint (ADR-0352/WP-143)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_mariadb_endpoint.yml"
+
 - name: "rag_ingestion | apply the rag-ingestion GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -165,6 +171,16 @@
       # in the index for one cycle is the far milder error.
       corpus:
         deleteOrphans: "{{ zuno_rag_corpus_delete_orphans | default(true) | bool }}"
+      # ADR-0352/WP-143: endpoint facts from resolve_mariadb_endpoint.yml.
+      # database/secretName/externalSecret stay chart defaults - only the
+      # endpoint identity moves (host/port/username), and helm deep-merges
+      # this map over the chart's own externalMySQL block.
+      pipelineServer:
+        metadataDatabase:
+          externalMySQL:
+            host: "{{ mariadb_endpoint_host }}"
+            port: "{{ mariadb_endpoint_port }}"
+            username: "{{ mariadb_db_mlpipeline_username }}"
       s3:
         # ADR-0547 clause 3: an invalid placeholder, not zuno-demo-rag-corpus
         # (deleted WP-131 2026-09-05) - a plausible-looking default risks

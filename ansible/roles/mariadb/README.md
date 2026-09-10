@@ -145,3 +145,42 @@ property names, matching `gitops/charts/mariadb/templates/externalsecret-backup-
 `remoteRef.property`, unlike `postgresql`'s snake_case `access_key`/
 `secret_key`). No registry/image-pull credentials are needed - unlike the
 Enterprise operator, `mariadb-operator`'s image is public.
+
+## Internal or external mode (ADR-0352 / WP-143)
+
+`zuno_mariadb_mode` in `ansible/confidential.yml` selects who runs the
+MariaDB. `internal` (the default, key absent) is everything above,
+unchanged. `external` means a pre-existing MariaDB/MySQL endpoint is
+used: neither `zuno-mariadb` Application is applied, `install` instead
+validates the `zuno_mariadb_external_*` payload (fail-fast on any
+`"xxxxxx"` sentinel), seeds the three per-database passwords into the
+same Vault paths the consumer ExternalSecrets already read
+(`rag/pipeline-db`, `mlops/dspa-mysql`, `rhtas/trillian-mysql` -
+overwriting the internally generated ones), and asserts reachability plus
+per-database AUTH through a short-lived client Job in `zuno-data`
+(image: `zuno_mariadb_client_image`, default
+`registry.redhat.io/rhel9/mariadb-1011:latest`). `check` runs the same
+assertion record-state-only; `uninstall` is a strict no-op against the
+external instance. A mode flip in either direction is a migration event
+(ADR-0352 clause 4): uninstall the built-in first, move the data
+yourself, then re-run the install - and delete the three consumer target
+Secrets so their ExternalSecrets re-materialize the new passwords ahead
+of the 1h refreshInterval.
+
+External prerequisites (the DBA's side, asserted by `check`): the three
+databases and users exist (`mlpipeline`, `mlops`, `trillian` by default -
+different usernames flow through the `_username` keys as non-secret Helm
+values to the consumer charts). Consumers never read the mode key: they
+include `ansible/tasks/resolve_mariadb_endpoint.yml` and consume
+`mariadb_endpoint_host`/`_port` + per-database username facts (ADR-0352
+clause 11).
+
+Feature parity in external mode, stated honestly: no mysqld-exporter
+metrics/ServiceMonitor (the `mysql_*` dashboard series lose their
+source), no `vault-issuer-mariadb` ClusterIssuer/TLS, no S3
+PhysicalBackup schedule (backups become the external DBA's concern), and
+`zuno_mariadb_external_ca_bundle` is reserved - the TLS trust seam into
+the DSPA/ODH bundles is not wired yet. Known limit: the mode lives in
+`confidential.yml`, which AAP checkouts don't have, so an AAP-driven
+check of an external-mode cluster falls back to the internal personality
+and reports NOT installed.

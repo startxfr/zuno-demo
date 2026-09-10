@@ -3,31 +3,57 @@
 # not a fixed constant. Order: delete -d1 (MariaDB/PhysicalBackup operand) first
 # so ArgoCD isn't fighting a CR deletion, then remove_operator.yml (needs the
 # Subscription to still exist) before -d0's own delete.
-- name: "mariadb | delete the mariadb ArgoCD Application (d1: MariaDB/PhysicalBackup)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
-  vars:
-    gitops_app_name: "zuno-mariadb-d1"
+#
+# ADR-0352/WP-143 clause 4: in external mode this whole file is a strict
+# no-op - the platform never deletes, mutates or de-provisions a MariaDB
+# it does not own, and there are no zuno-mariadb Applications to remove.
+- name: "mariadb | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _mariadb_confidential_file
 
-- name: "mariadb | find the mariadb-operator Subscription"
-  kubernetes.core.k8s_info:
-    api_version: operators.coreos.com/v1alpha1
-    kind: Subscription
-    namespace: openshift-operators
-  register: _mariadb_subscriptions
+- name: "mariadb | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _mariadb_confidential_file.stat.exists
 
-- name: "mariadb | remove the discovered operator(s) (owned CRDs - cascading the MariadbOperator/MariaDB CRs - then CSV, then Subscription)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
-  vars:
-    operator_subscription_name: "{{ _mariadb_subscription.metadata.name }}"
-    operator_namespace: openshift-operators
-  loop: >-
-    {{ _mariadb_subscriptions.resources | default([])
-       | selectattr('metadata.name', 'search', 'mariadb') | list }}
-  loop_control:
-    loop_var: _mariadb_subscription
-    label: "{{ _mariadb_subscription.metadata.name }}"
+- name: "mariadb | skip uninstall entirely in external mode (ADR-0352 clause 4)"
+  ansible.builtin.debug:
+    msg: >-
+      zuno_mariadb_mode is 'external' - nothing to uninstall. The external
+      MariaDB is not owned by this platform and is left untouched; only
+      flip the mode back to internal (a migration event, ADR-0352
+      clause 4) to redeploy the built-in instance.
+  when: (zuno_mariadb_mode | default('internal')) == 'external'
 
-- name: "mariadb | delete the mariadb ArgoCD Application (d0: cascades the remaining operator install)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
-  vars:
-    gitops_app_name: "zuno-mariadb-d0"
+- name: "mariadb | uninstall the built-in MariaDB (internal mode only)"
+  when: (zuno_mariadb_mode | default('internal')) != 'external'
+  block:
+    - name: "mariadb | delete the mariadb ArgoCD Application (d1: MariaDB/PhysicalBackup)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+      vars:
+        gitops_app_name: "zuno-mariadb-d1"
+
+    - name: "mariadb | find the mariadb-operator Subscription"
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: Subscription
+        namespace: openshift-operators
+      register: _mariadb_subscriptions
+
+    - name: "mariadb | remove the discovered operator(s) (owned CRDs - cascading the MariadbOperator/MariaDB CRs - then CSV, then Subscription)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/remove_operator.yml"
+      vars:
+        operator_subscription_name: "{{ _mariadb_subscription.metadata.name }}"
+        operator_namespace: openshift-operators
+      loop: >-
+        {{ _mariadb_subscriptions.resources | default([])
+           | selectattr('metadata.name', 'search', 'mariadb') | list }}
+      loop_control:
+        loop_var: _mariadb_subscription
+        label: "{{ _mariadb_subscription.metadata.name }}"
+
+    - name: "mariadb | delete the mariadb ArgoCD Application (d0: cascades the remaining operator install)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+      vars:
+        gitops_app_name: "zuno-mariadb-d0"

@@ -1,0 +1,105 @@
+---
+# External mode (ADR-0352 clause 4): a pre-existing MariaDB/MySQL endpoint
+# is used. Nothing is deployed - neither zuno-mariadb Application is
+# applied. Instead: (1) validate the confidential.yml payload fail-fast,
+# (2) seed the three per-database passwords into the SAME Vault paths the
+# consumer ExternalSecrets already read (overwriting the internally
+# generated ones - the `vault kv put` precedent from zuno/mariadb/s3:
+# real external credentials re-apply idempotently, they are not
+# create-if-missing), (3) assert reachability and per-database AUTH with
+# an in-cluster client Job (external_assert.yml, shared with precheck).
+#
+# The external DBA pre-creates the three databases and users (ADR-0352
+# clause 7 - PGO-style declarative Database/User/Grant CRs have no
+# external equivalent). Usernames reach the consumer charts as non-secret
+# Helm values via ansible/tasks/resolve_mariadb_endpoint.yml; only the
+# passwords transit Vault.
+- name: "mariadb | validate the external-mode payload (fail-fast on sentinels)"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_mariadb_mode is 'external' but {{ item.name }} is missing or
+      still the 'xxxxxx' sentinel in ansible/confidential.yml. External
+      mode requires the endpoint and all three per-database credential
+      pairs (ADR-0352 clause 2) - see ansible/confidential.example.yml.
+  when: (item.value | default('xxxxxx')) in ['xxxxxx', '']
+  loop:
+    - { name: "zuno_mariadb_external_host", value: "{{ zuno_mariadb_external_host | default('xxxxxx') }}" }
+    - { name: "zuno_mariadb_external_db_mlpipeline_username", value: "{{ zuno_mariadb_external_db_mlpipeline_username | default('xxxxxx') }}" }
+    - { name: "zuno_mariadb_external_db_mlpipeline_password", value: "{{ zuno_mariadb_external_db_mlpipeline_password | default('xxxxxx') }}" }
+    - { name: "zuno_mariadb_external_db_mlops_username", value: "{{ zuno_mariadb_external_db_mlops_username | default('xxxxxx') }}" }
+    - { name: "zuno_mariadb_external_db_mlops_password", value: "{{ zuno_mariadb_external_db_mlops_password | default('xxxxxx') }}" }
+    - { name: "zuno_mariadb_external_db_trillian_username", value: "{{ zuno_mariadb_external_db_trillian_username | default('xxxxxx') }}" }
+    - { name: "zuno_mariadb_external_db_trillian_password", value: "{{ zuno_mariadb_external_db_trillian_password | default('xxxxxx') }}" }
+  loop_control:
+    label: "{{ item.name }}"
+  no_log: true
+
+# Vault access: the same bootstrap-credentials pattern
+# ansible/roles/aap_config/tasks/install.yml uses to persist the Gateway
+# token - the root token never leaves the cluster, every put runs inside
+# the vault pod.
+- name: "mariadb | find the Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _mariadb_vault_pod
+
+- name: "mariadb | read the Vault bootstrap credentials"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-vault
+    name: vault-bootstrap-credentials
+  register: _mariadb_vault_creds
+  no_log: true
+
+- name: "mariadb | fail if Vault isn't bootstrapped"
+  ansible.builtin.fail:
+    msg: >-
+      vault-bootstrap-credentials not found in zuno-vault - run
+      `make d0 install vault` first. External mariadb mode seeds the
+      external passwords into Vault, so Vault must exist before this role.
+  when: >-
+    (_mariadb_vault_pod.resources | default([]) | length) == 0 or
+    (_mariadb_vault_creds.resources | default([]) | length) == 0
+
+- name: "mariadb | set the Vault connection fact"
+  ansible.builtin.set_fact:
+    _mariadb_vault_root_token: "{{ _mariadb_vault_creds.resources[0].data.root_token | b64decode }}"
+  no_log: true
+
+# Overwrites the internally-generated password at each path; the consumer
+# ExternalSecrets (rag-pipeline-db in zuno-ai-build,
+# mlops-dspa-mysql-credentials in zuno-mlops, rhtas-trillian-db in
+# zuno-rhtas) re-materialize it on their next refresh (refreshInterval 1h;
+# delete the target Secret to force it during a mode flip).
+- name: "mariadb | seed the external per-database passwords into Vault"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _mariadb_vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _mariadb_vault_root_token }} vault kv put
+      zuno/{{ item.path }} password={{ item.password | quote }}"
+  loop:
+    - { path: "rag/pipeline-db", password: "{{ zuno_mariadb_external_db_mlpipeline_password }}" }
+    - { path: "mlops/dspa-mysql", password: "{{ zuno_mariadb_external_db_mlops_password }}" }
+    - { path: "rhtas/trillian-mysql", password: "{{ zuno_mariadb_external_db_trillian_password }}" }
+  loop_control:
+    label: "zuno/{{ item.path }}"
+  no_log: true
+
+- name: "mariadb | assert endpoint reachability and per-database AUTH"
+  ansible.builtin.include_tasks: external_assert.yml
+  vars:
+    mariadb_assert_hard_fail: true
+
+- name: "mariadb | external-mode summary"
+  ansible.builtin.debug:
+    msg: >-
+      External MariaDB at
+      {{ zuno_mariadb_external_host }}:{{ zuno_mariadb_external_port | default('3306') }}
+      verified - all three databases authenticated. Nothing was deployed;
+      the three Vault paths now carry the external passwords.

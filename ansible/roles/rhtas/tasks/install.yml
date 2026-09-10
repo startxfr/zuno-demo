@@ -115,41 +115,178 @@
 # CSV's own trillian-db relatedImage - re-extract it on operator upgrades.
 # Idempotent (CREATE TABLE IF NOT EXISTS throughout), applied as the
 # trillian user so no extra grants are involved.
-- name: "rhtas | read the Trillian DB password from its ExternalSecret target"
+#
+# ADR-0352/WP-143: applied by a short-lived CLIENT Job against the
+# resolved endpoint, not by exec-ing into the mariadb-0 pod - that pod
+# only exists in internal mode, and clause 11 forbids this role from
+# branching on mariadb's mode. The password comes from Vault
+# (rhtas/trillian-mysql - correct in both modes, external seeding
+# included) through a short-lived ExternalSecret, because the chart's own
+# rhtas-trillian-db Secret is only rendered by the -d1 apply BELOW this
+# point, and the schema must exist before Securesign's createtree jobs
+# run (the terminal-state trap above). The earlier k8s_cp+k8s_exec shape
+# existed because a 6.5KB schema can't ride a single exec argument - a
+# Job mounting the schema as a ConfigMap has no such transport limit.
+- name: "rhtas | resolve the MariaDB endpoint (ADR-0352/WP-143)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_mariadb_endpoint.yml"
+
+- name: "rhtas | materialize the Trillian DB password for the schema Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: external-secrets.io/v1beta1
+      kind: ExternalSecret
+      metadata:
+        name: rhtas-trillian-schema-db
+        namespace: zuno-rhtas
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        refreshInterval: 1h
+        secretStoreRef:
+          name: vault-backend
+          kind: ClusterSecretStore
+        target:
+          name: rhtas-trillian-schema-db
+        data:
+          - secretKey: password
+            remoteRef:
+              key: rhtas/trillian-mysql
+              property: password
+
+- name: "rhtas | wait for the schema-Job password Secret to materialize"
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret
-    namespace: zuno-data
-    name: mariadb-rhtas-trillian-db-password
-  register: _rhtas_trillian_db_pw
-  no_log: true
+    namespace: zuno-rhtas
+    name: rhtas-trillian-schema-db
+  register: _rhtas_schema_db_secret
+  until: (_rhtas_schema_db_secret.resources | default([]) | length) > 0
+  retries: 30
+  delay: 5
 
-# Recurring "Unknown error" from k8s_exec (no_log-masked, several live
-# runs 2026-09-02) traced to shipping the whole 6.5KB schema inline as a
-# single quoted -e argument over the exec websocket. postgresql's role
-# hits the same "can't mix multi-statement SQL into one CLI arg" problem
-# and never flakes because it ships the script into the pod first
-# (k8s_cp) and runs a short, fixed-length command against it - same fix
-# applied here instead of guessing at the transport-level root cause.
-- name: "rhtas | copy the Trillian schema into the mariadb pod"
-  kubernetes.core.k8s_cp:
-    namespace: zuno-data
-    pod: mariadb-0
-    container: mariadb
-    remote_path: /tmp/trillian-storage.sql
-    content: "{{ lookup('ansible.builtin.file', role_path + '/files/trillian-storage.sql') }}"
+- name: "rhtas | publish the Trillian schema as a ConfigMap"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: rhtas-trillian-schema
+        namespace: zuno-rhtas
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      data:
+        storage.sql: "{{ lookup('ansible.builtin.file', role_path + '/files/trillian-storage.sql') }}"
 
-- name: "rhtas | apply the Trillian schema to the trillian database (idempotent)"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-data
-    pod: mariadb-0
-    container: mariadb
-    command: >-
-      sh -c "MYSQL_PWD='{{ _rhtas_trillian_db_pw.resources[0].data.password | b64decode }}'
-      mariadb -u trillian trillian < /tmp/trillian-storage.sql"
-  no_log: true
-  register: _rhtas_schema_apply
-  changed_when: false
+- name: "rhtas | delete any previous Trillian schema-apply Job"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-rhtas
+    name: rhtas-trillian-schema-apply
+    wait: true
+    wait_timeout: 60
+
+- name: "rhtas | apply the Trillian schema through a client Job (idempotent)"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: rhtas-trillian-schema-apply
+        namespace: zuno-rhtas
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      spec:
+        backoffLimit: 2
+        ttlSecondsAfterFinished: 3600
+        template:
+          metadata:
+            annotations:
+              sidecar.istio.io/inject: "false"
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: schema-apply
+                image: "{{ zuno_mariadb_client_image | default('registry.redhat.io/rhel9/mariadb-1011:latest') }}"
+                env:
+                  - name: MARIADB_HOST
+                    value: "{{ mariadb_endpoint_host }}"
+                  - name: MARIADB_PORT
+                    value: "{{ mariadb_endpoint_port }}"
+                  - name: MARIADB_USER
+                    value: "{{ mariadb_db_trillian_username }}"
+                  - name: MYSQL_PWD
+                    valueFrom:
+                      secretKeyRef:
+                        name: rhtas-trillian-schema-db
+                        key: password
+                command:
+                  - /bin/sh
+                  - -c
+                  - >-
+                    mysql -h "$MARIADB_HOST" -P "$MARIADB_PORT"
+                    -u "$MARIADB_USER" --connect-timeout=10
+                    trillian < /schema/storage.sql
+                volumeMounts:
+                  - name: schema
+                    mountPath: /schema
+                    readOnly: true
+                securityContext:
+                  allowPrivilegeEscalation: false
+                  runAsNonRoot: true
+                  capabilities:
+                    drop: ["ALL"]
+                  seccompProfile:
+                    type: RuntimeDefault
+            volumes:
+              - name: schema
+                configMap:
+                  name: rhtas-trillian-schema
+
+- name: "rhtas | wait for the Trillian schema-apply Job to succeed"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-rhtas
+    name: rhtas-trillian-schema-apply
+  register: _rhtas_schema_job
+  until: >-
+    (_rhtas_schema_job.resources | default([]) | length) > 0 and
+    ((_rhtas_schema_job.resources[0].status.succeeded | default(0) | int) > 0
+     or (_rhtas_schema_job.resources[0].status.failed | default(0) | int) > 0)
+  retries: 30
+  delay: 10
+
+- name: "rhtas | fail if the Trillian schema apply failed"
+  ansible.builtin.fail:
+    msg: >-
+      The rhtas-trillian-schema-apply Job in zuno-rhtas failed - inspect
+      its pod log. Without the schema, Securesign's createtree jobs die
+      with "Table trillian.Trees doesn't exist" and Rekor/CTlog go
+      terminal (WP-110).
+  when: (_rhtas_schema_job.resources[0].status.succeeded | default(0) | int) == 0
+
+# The schema-only ExternalSecret and ConfigMap never outlive the apply -
+# the chart's own rhtas-trillian-db Secret (rendered by -d1 below) is the
+# runtime credential source. Deleting the ExternalSecret cascades its
+# owned target Secret.
+- name: "rhtas | clean up the schema-apply support objects"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: "{{ item.api_version }}"
+    kind: "{{ item.kind }}"
+    namespace: zuno-rhtas
+    name: "{{ item.name }}"
+  loop:
+    - { api_version: batch/v1, kind: Job, name: rhtas-trillian-schema-apply }
+    - { api_version: external-secrets.io/v1beta1, kind: ExternalSecret, name: rhtas-trillian-schema-db }
+    - { api_version: v1, kind: ConfigMap, name: rhtas-trillian-schema }
+  loop_control:
+    label: "{{ item.kind }}/{{ item.name }}"
 
 # securesignOperand.enabled lives in the same chart, applied via the
 # separate zuno-rhtas-d1 Application after -d0 is Synced+Healthy. The
@@ -180,6 +317,12 @@
           | from_yaml).spec.source.helm['values'] | from_yaml)
         | combine(
             {'fulcio': {'trustedCAConfigMapName': 'rhtas-keycloak-ca' if (keycloak_ca_configmap_published | bool) else ''}},
+            recursive=True
+          )
+        | combine(
+            {'trillianDatabase': {'host': mariadb_endpoint_host,
+                                  'port': mariadb_endpoint_port,
+                                  'user': mariadb_db_trillian_username}},
             recursive=True
           )
       }}

@@ -1,38 +1,75 @@
 ---
-# State detection (never fails).
-- name: "mariadb | check the mariadb Application (d0)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
-  vars:
-    gitops_app_name: "zuno-mariadb-d0"
+# State detection (never fails). ADR-0352/WP-143: mode-gated - the
+# external personality asserts endpoint reachability + per-database AUTH
+# and never inspects the zuno-mariadb Applications (which don't exist in
+# external mode). This load pair is the clause-4 symmetric-gating fix:
+# install gating without precheck gating is the smtp asymmetry ADR-0352
+# names. Known limit: the mode lives in confidential.yml, which AAP
+# checkouts don't have - an AAP-driven check of an external-mode cluster
+# falls back to the internal personality and reports NOT installed (see
+# the role README).
+- name: "mariadb | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _mariadb_confidential_file
 
-- name: "mariadb | save the d0 check result"
+- name: "mariadb | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _mariadb_confidential_file.stat.exists
+
+- name: "mariadb | resolve the component mode (ADR-0352)"
   ansible.builtin.set_fact:
-    _mariadb_d0_installed: "{{ _state_check_result }}"
+    _mariadb_mode: "{{ zuno_mariadb_mode | default('internal') }}"
 
-- name: "mariadb | check the mariadb Application (d1)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
-  vars:
-    gitops_app_name: "zuno-mariadb-d1"
+- name: "mariadb | internal-mode state detection"
+  when: _mariadb_mode != 'external'
+  block:
+    - name: "mariadb | check the mariadb Application (d0)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+      vars:
+        gitops_app_name: "zuno-mariadb-d0"
 
-- name: "mariadb | look up the mariadb MariaDB CR"
-  kubernetes.core.k8s_info:
-    api_version: k8s.mariadb.com/v1alpha1
-    kind: MariaDB
-    namespace: zuno-data
-    name: mariadb
-  register: _mariadb_cluster_lookup
+    - name: "mariadb | save the d0 check result"
+      ansible.builtin.set_fact:
+        _mariadb_d0_installed: "{{ _state_check_result }}"
 
-- name: "mariadb | compute install state"
-  ansible.builtin.set_fact:
-    _state_is_installed: >-
-      {{
-        _mariadb_d0_installed
-        and _state_check_result
-        and (_mariadb_cluster_lookup.resources | default([]) | length) > 0
-        and (_mariadb_cluster_lookup.resources[0].status.conditions | default([])
-             | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
-             | first | default('False')) == 'True'
-      }}
+    - name: "mariadb | check the mariadb Application (d1)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+      vars:
+        gitops_app_name: "zuno-mariadb-d1"
+
+    - name: "mariadb | look up the mariadb MariaDB CR"
+      kubernetes.core.k8s_info:
+        api_version: k8s.mariadb.com/v1alpha1
+        kind: MariaDB
+        namespace: zuno-data
+        name: mariadb
+      register: _mariadb_cluster_lookup
+
+    - name: "mariadb | compute install state"
+      ansible.builtin.set_fact:
+        _state_is_installed: >-
+          {{
+            _mariadb_d0_installed
+            and _state_check_result
+            and (_mariadb_cluster_lookup.resources | default([]) | length) > 0
+            and (_mariadb_cluster_lookup.resources[0].status.conditions | default([])
+                 | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
+                 | first | default('False')) == 'True'
+          }}
+
+- name: "mariadb | external-mode state detection"
+  when: _mariadb_mode == 'external'
+  block:
+    - name: "mariadb | assert the external endpoint (record-state, never fail)"
+      ansible.builtin.include_tasks: external_assert.yml
+      vars:
+        mariadb_assert_hard_fail: false
+
+    - name: "mariadb | compute install state (external)"
+      ansible.builtin.set_fact:
+        _state_is_installed: "{{ _mariadb_external_ok | bool }}"
 
 - name: "mariadb | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

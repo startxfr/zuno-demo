@@ -1,0 +1,60 @@
+---
+# ADR-0352 clause 11 (WP-143): the mode-agnostic MariaDB endpoint
+# abstraction. Consumer roles (rag_ingestion, mlops, rhtas) include this
+# and consume the facts below - they must NEVER read zuno_mariadb_mode
+# themselves: the information a consumer needs arrives as an endpoint
+# value, not as a mode. Internal defaults reproduce the pre-WP-143 chart
+# literals exactly, so an internal-mode render stays byte-identical.
+#
+# Idempotent behind the same `is not defined` guard the
+# resolve_cluster_*.yml discovery tasks use (ADR-0547 clause 2).
+# Self-contained: soft-loads confidential.yml itself (the defensive-load
+# pattern apply_gitops_app.yml uses), so a caller that never loads it
+# (rhtas) still resolves correctly and
+# check_confidential_var_loaders() stays satisfied.
+- name: "mariadb-endpoint | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _mariadb_endpoint_confidential_file
+  when: mariadb_endpoint_host is not defined
+
+- name: "mariadb-endpoint | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when:
+    - mariadb_endpoint_host is not defined
+    - _mariadb_endpoint_confidential_file.stat.exists
+
+- name: "mariadb-endpoint | resolve the MariaDB endpoint facts"
+  ansible.builtin.set_fact:
+    mariadb_endpoint_host: >-
+      {{
+        zuno_mariadb_external_host | default('mariadb.zuno-data.svc.cluster.local')
+        if (zuno_mariadb_mode | default('internal')) == 'external'
+        else 'mariadb.zuno-data.svc.cluster.local'
+      }}
+    mariadb_endpoint_port: >-
+      {{
+        zuno_mariadb_external_port | default('3306')
+        if (zuno_mariadb_mode | default('internal')) == 'external'
+        else '3306'
+      }}
+    mariadb_db_mlpipeline_username: >-
+      {{
+        zuno_mariadb_external_db_mlpipeline_username | default('mlpipeline')
+        if (zuno_mariadb_mode | default('internal')) == 'external'
+        else 'mlpipeline'
+      }}
+    mariadb_db_mlops_username: >-
+      {{
+        zuno_mariadb_external_db_mlops_username | default('mlops')
+        if (zuno_mariadb_mode | default('internal')) == 'external'
+        else 'mlops'
+      }}
+    mariadb_db_trillian_username: >-
+      {{
+        zuno_mariadb_external_db_trillian_username | default('trillian')
+        if (zuno_mariadb_mode | default('internal')) == 'external'
+        else 'trillian'
+      }}
+  when: mariadb_endpoint_host is not defined

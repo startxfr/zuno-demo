@@ -123,6 +123,12 @@
     file: "{{ zuno_repo_root }}/ansible/confidential.yml"
   when: _mlops_confidential_file.stat.exists
 
+# ADR-0352/WP-143 clause 11: the DSPA metadata-DB endpoint arrives as a
+# resolved fact, never as a mode - internal defaults reproduce the old
+# chart literals exactly (inertia: byte-identical render).
+- name: "mlops | resolve the MariaDB endpoint (ADR-0352/WP-143)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_mariadb_endpoint.yml"
+
 - name: "mlops | apply the mlops GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -164,6 +170,10 @@
         | combine({'agents': {'comage': {'styleCorpusS3Uri':
                      zuno_mlops_style_corpus_s3_uri
                      | default('s3://ZUNO_S3_BUCKET_NOT_SET/qwen-wesh-training-corpus.tgz')}}}, recursive=True)
+        | combine({'pipelineServer': {'metadataDatabase': {'externalMySQL': {
+                     'host': mariadb_endpoint_host,
+                     'port': mariadb_endpoint_port,
+                     'username': mariadb_db_mlops_username}}}}, recursive=True)
       }}
     # Values-changing apply - see ansible/roles/mlflow/tasks/install.yml.
     gitops_app_refresh: true
