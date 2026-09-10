@@ -9,6 +9,26 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Amendment note (2026-09-10) - ADR-0352 corrected in place; ADR-0556/0557 added
+
+ADR-0352 (day-0 internal/external mode, still `Proposed`, never implemented -
+the same in-place-correction ground ADR-0354's 2026-08-24 amendment stood on)
+is re-derived against the platform as it exists after ADR-0421: the component
+classification now covers all 36 components (13 Day 0 + 23 Day 1), AAP enters
+as a vital Tier-A component with mandatory external admin credentials (as does
+Keycloak, whose verify-only external mode is withdrawn), external Vault widens
+from KV-only to full idempotent setup (KV, PKI, transit, k8s-auth, policies -
+ADR-0345 semantics), Day-1 externalization narrows to redis and mariadb
+(tempo/mesh_monitoring and the old Tier B are withdrawn), external_secrets and
+cert-manager become the "unmanaged operator, config always ours" Tier
+A-operator pair, and two clauses are added: a hard Day-1 gate on the seven
+vital Day-0 components, and a no-component-reads-another's-mode abstraction
+rule. The off-cluster-ArgoCD exclusion is lifted; the remote mechanism (native
+vs RHACM) is studied in the new ADR-0557. The new ADR-0556 records the
+long-term contract for a `zuno` operator (ZunoFoundation/ZunoInfra/ZunoStack
+CRDs, one per cluster, mirroring the Day 0/1/2 playbooks). Both new ADRs are
+`Proposed` in v0.9. Filename and title of ADR-0352 are unchanged.
+
 ## Implementation note (2026-09-08) - ADR-0517 Proposed -> Implemented
 
 `demo333` was provisioned (after a region pivot, `eu-west-1` -> `eu-central-1`:

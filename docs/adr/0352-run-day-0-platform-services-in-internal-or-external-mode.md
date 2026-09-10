@@ -3,6 +3,13 @@
 - **Status:** Proposed
 - **Target:** v0.9
 - **Date:** 2026-08-17
+- **Amended:** 2026-09-10 (re-derived against the post-ADR-0421 component
+  lists; AAP added as a vital Tier-A component; Day-1 externalization
+  narrowed to redis and mariadb; external Vault widened to full setup;
+  Keycloak/AAP external admin credentials made mandatory; remote-ArgoCD
+  mechanism delegated to ADR-0557; vital-gate and dependency-abstraction
+  clauses added. Never implemented, so corrected in place — see
+  `CHANGELOG.md`.)
 - **Decision owners:** Zuno Demo architecture team
 
 ## Context
@@ -18,8 +25,10 @@ assumption structural, not incidental:
   `gitops/charts/<c>` whose values all default to `false`. Applications
   are Ansible-applied, never git-synced (ADR-0311); ordering is the
   `day0_components` list order in `ansible/playbooks/day0_install.yml`
-  (28 entries, snake_case) — which has drifted from the Makefile's
-  `DAY0_COMPONENTS` (27 entries; `image_mirrors` is missing there).
+  (13 entries since ADR-0421 moved `postgresql`, `keycloak`, `aap` and
+  `aap_config` into Day 0; `day1_components` carries 23 more) — the
+  Day-0 list has drifted from the Makefile's `DAY0_COMPONENTS`
+  (12 entries; `image_mirrors` is missing there).
 - **`ansible/confidential.yml` is the sole per-environment entry point**:
   gitignored, flat `zuno_<vendor>_<field>` namespace, sentinel `"xxxxxx"`
   = not configured, template `ansible/confidential.example.yml`. Only
@@ -106,7 +115,10 @@ assumption structural, not incidental:
    or `_external_host`/`_external_port` for TCP services, matching the
    `zuno_smtp_host`/`zuno_smtp_port` precedent — and
    `zuno_<c>_external_ca_bundle` (PEM string; `""` = the endpoint is
-   trusted by the system/cluster CA set). There is deliberately **no**
+   trusted by the system/cluster CA set). Tier A-operator components
+   (`external_secrets`, `cert_manager` — clause 3) carry only the mode
+   key: their external mode supplies no endpoint, and clause 7 defines
+   what it asserts instead. There is deliberately **no**
    `insecure`/skip-verify key anywhere in the schema. Validation:
    `mode: external` with any required key left at the `"xxxxxx"`
    sentinel fails fast in the role, before any apply; `mode: internal`
@@ -116,30 +128,57 @@ assumption structural, not incidental:
    destined for `confidential.example.yml` at implementation time:
 
    ```yaml
-   # --- Day-0 component modes (ADR-0352) ------------------------------
+   # --- Component modes (ADR-0352) ------------------------------------
    # Each Tier-A component: internal (default, this repo deploys it) |
    # external (a pre-existing instance is used; the built-in is not
    # deployed). Absent keys mean internal.
 
-   # Keycloak (identity provider)
-   zuno_keycloak_mode: internal
-   zuno_keycloak_external_url: "xxxxxx"        # e.g. https://sso.corp.example.com
-   zuno_keycloak_external_realm: "zuno"        # realm expected on the external instance
-   zuno_keycloak_external_ca_bundle: ""        # PEM; "" = publicly/cluster trusted
-   zuno_keycloak_external_admin_username: "xxxxxx"  # optional; sentinel = verify-only,
-   zuno_keycloak_external_admin_password: "xxxxxx"  # set = platform may provision realm/clients
+   # ArgoCD - the number-one infrastructure piece: every other component
+   # is delivered through it. external = an instance this repo does not
+   # deploy carries the zuno AppProject and our Applications, either a
+   # pre-existing in-cluster instance or a REMOTE one that declares this
+   # cluster (mechanism study: ADR-0557).
+   zuno_argocd_mode: internal
+   zuno_argocd_external_url: "xxxxxx"          # API URL of the external instance
+   zuno_argocd_external_namespace: "xxxxxx"    # namespace, when the instance is in-cluster
+   zuno_argocd_external_token: "xxxxxx"        # account allowed to manage the zuno AppProject
+   zuno_argocd_external_ca_bundle: ""
 
-   # Vault (secrets; PKI stays unsupported externally - see clause 7)
+   # Vault - secrets plus every engine the internal install provisions.
+   # The token must carry enough policy for the platform to perform the
+   # FULL setup itself - KV v2, PKI, transit, kubernetes auth, policies
+   # and roles - idempotently (ADR-0345 semantics; see clause 7).
    zuno_vault_mode: internal
    zuno_vault_external_url: "xxxxxx"           # e.g. https://vault.corp.example.com:8200
    zuno_vault_external_ca_bundle: ""
    zuno_vault_external_kv_mount: "zuno"        # KV v2 mount granted to the platform
-   zuno_vault_external_auth_mount: "kubernetes" # k8s auth mount configured for THIS cluster
-   zuno_vault_external_token: "xxxxxx"         # short-lived; seeding + verification only
+   zuno_vault_external_auth_mount: "kubernetes" # k8s auth mount for THIS cluster
+   zuno_vault_external_token: "xxxxxx"         # setup token: mount/policy/role provisioning
+
+   # External Secrets Operator (Tier A-operator: external = the operator
+   # is installed outside this installer; the ClusterSecretStore and all
+   # operand config stay ours in BOTH modes - see clause 7)
+   zuno_external_secrets_mode: internal
+
+   # cert-manager (Tier A-operator: same contract - the operator may be
+   # unmanaged, ClusterIssuers/Certificates stay ours in both modes)
+   zuno_cert_manager_mode: internal
+
+   # Keycloak - identity provider. Admin credentials are REQUIRED in
+   # external mode: the platform creates and reconciles the realm and
+   # its full configuration (clause 7).
+   zuno_keycloak_mode: internal
+   zuno_keycloak_external_url: "xxxxxx"        # e.g. https://sso.corp.example.com
+   zuno_keycloak_external_realm: "zuno"        # realm the platform creates/reconciles
+   zuno_keycloak_external_ca_bundle: ""        # PEM; "" = publicly/cluster trusted
+   zuno_keycloak_external_admin_username: "xxxxxx"  # REQUIRED in external mode
+   zuno_keycloak_external_admin_password: "xxxxxx"
 
    # PostgreSQL - one pre-created role per platform database. Databases:
-   # zuno, keycloak, rag-tech, maas, agent-checkpoints, ogx, rag-sales,
-   # rag-sxa-legacy, rag-adv, rag-project (from the PGO spec.users list).
+   # the PGO spec.users list (zuno, keycloak, rag-tech, maas,
+   # agent-checkpoints, ogx, rag-sales, rag-sxa-legacy, rag-adv,
+   # rag-project) plus the five AAP databases (gateway, controller, hub,
+   # eda, metrics) that internal AAP provisions on this instance.
    zuno_postgresql_mode: internal
    zuno_postgresql_external_host: "xxxxxx"
    zuno_postgresql_external_port: "5432"
@@ -151,37 +190,39 @@ assumption structural, not incidental:
    zuno_postgresql_external_db_keycloak_password: "xxxxxx"
    # ... one _username/_password pair per remaining database ...
 
-   # MariaDB - databases: mlpipeline (rag-ingestion + mlops pipeline store)
-   zuno_mariadb_mode: internal
-   zuno_mariadb_external_host: "xxxxxx"
-   zuno_mariadb_external_port: "3306"
-   zuno_mariadb_external_ca_bundle: ""
-   zuno_mariadb_external_db_mlpipeline_username: "xxxxxx"
-   zuno_mariadb_external_db_mlpipeline_password: "xxxxxx"
+   # AAP - Ansible Automation Platform. Admin credentials are REQUIRED
+   # in external mode: the platform provisions org, project, inventory,
+   # credentials, job and workflow templates over REST (clause 7).
+   # aap_config follows this mode key and has none of its own.
+   zuno_aap_mode: internal
+   zuno_aap_external_url: "xxxxxx"             # Gateway URL, e.g. https://aap.corp.example.com
+   zuno_aap_external_ca_bundle: ""
+   zuno_aap_external_admin_username: "xxxxxx"  # REQUIRED in external mode
+   zuno_aap_external_admin_password: "xxxxxx"
 
-   # Redis
+   # --- Day-1 components: internal-only, except the two below ---------
+
+   # Redis - external = an endpoint to consume; how it is deployed is
+   # the provider's concern. Consumer inventory drives sizing: clause 7.
    zuno_redis_mode: internal
    zuno_redis_external_host: "xxxxxx"
    zuno_redis_external_port: "6379"
    zuno_redis_external_password: "xxxxxx"      # sentinel = no AUTH
    zuno_redis_external_ca_bundle: ""           # "" + port 6379 = plaintext
 
-   # Tempo (trace backend; the endpoint is the OTLP receiver)
-   zuno_tempo_mode: internal
-   zuno_tempo_external_otlp_endpoint: "xxxxxx" # e.g. https://tempo.corp.example.com:4317
-   zuno_tempo_external_ca_bundle: ""
-
-   # Metrics backend. The mode key rides on mesh_monitoring - the
-   # component that deploys the only Prometheus this platform owns;
-   # kiali is re-pointed to the external query API.
-   zuno_mesh_monitoring_mode: internal
-   zuno_mesh_monitoring_external_prometheus_url: "xxxxxx"
-   zuno_mesh_monitoring_external_ca_bundle: ""
-
-   # ArgoCD (external = a pre-existing IN-CLUSTER ArgoCD carries our
-   # Applications; an off-cluster ArgoCD is out of scope - clause 7)
-   zuno_argocd_mode: internal
-   zuno_argocd_external_namespace: "xxxxxx"    # namespace of the existing instance
+   # MariaDB - one credential pair per database. Databases today:
+   # mlpipeline (rag-ingestion), mlops (mlops DSPA), trillian (RHTAS).
+   # The database inventory drives consumer configuration: clause 7.
+   zuno_mariadb_mode: internal
+   zuno_mariadb_external_host: "xxxxxx"
+   zuno_mariadb_external_port: "3306"
+   zuno_mariadb_external_ca_bundle: ""
+   zuno_mariadb_external_db_mlpipeline_username: "xxxxxx"
+   zuno_mariadb_external_db_mlpipeline_password: "xxxxxx"
+   zuno_mariadb_external_db_mlops_username: "xxxxxx"
+   zuno_mariadb_external_db_mlops_password: "xxxxxx"
+   zuno_mariadb_external_db_trillian_username: "xxxxxx"
+   zuno_mariadb_external_db_trillian_password: "xxxxxx"
    ```
 
    `zuno_keycloak_external_realm: "zuno"` is a real default, a stated
@@ -196,25 +237,29 @@ assumption structural, not incidental:
    (d) the keycloak issuer-vs-JWKS split-brain default; (e) the
    Makefile/playbook component-list drift.
 
-3. **All 28 playbook components are classified into three tiers.** Mode
-   keys attach to the component that deploys the service in internal
-   mode — which is why the metrics key rides on `mesh_monitoring`
-   rather than a nonexistent "prometheus" component, an accepted naming
-   awkwardness.
+3. **All 36 playbook components (13 Day 0 + 23 Day 1, post-ADR-0421)
+   are classified into three tiers.** Mode keys attach to the component
+   that deploys the service in internal mode. Day 1 is internal-only
+   with exactly two exceptions, redis and mariadb (plus smtp, which has
+   no built-in): the platform's own workload plane stays ours to run,
+   only shared middleware may be handed over.
 
    | Tier | Meaning | Components |
    |---|---|---|
-   | A — external-endpoint capable | A running instance can be supplied; full clause-2 schema, clause-4 lifecycle, clause-7 prerequisites | keycloak, vault, postgresql, mariadb, redis, tempo, mesh_monitoring, argocd, smtp (grandfathered, always-external) |
-   | B — pre-installed-operator capable | "External" means the operator Subscription/CSV already exists (installed by the cluster team); our `-d0` Application is skipped, the `-d1` operand config still applies where it is ours to own | cert_manager, external_secrets, observability, service_mesh, nfd, nvidia_gpu, connectivity_link, lws, custom_metrics_autoscaler, jobset, kueue, openshift_ai |
-   | C — always internal | Cluster-topology glue where "external" is meaningless | admin_context, namespaces, image_mirrors, openshift_rbac_groups, openshift_oauth, machines, kiali |
+   | A-endpoint, Day 0 — **vital** | A running instance can be supplied; full clause-2 schema, clause-4 lifecycle, clause-7 prerequisites; gates Day 1 per clause 10 | argocd, vault, postgresql, keycloak, aap (`aap_config` follows `aap`'s mode key) |
+   | A-operator, Day 0 — **vital** | "External" means the operator is installed outside this installer (unmanaged); our `-d0` Application is skipped, our `-d1` operand config (ClusterSecretStore, ClusterIssuers) is applied by us via ArgoCD in **both** modes | external_secrets, cert_manager |
+   | A-endpoint, Day 1 | Same endpoint contract as Day-0 A-endpoint; the only Day-1 components that may be external | redis, mariadb, smtp (grandfathered, always-external) |
+   | C — always internal | Cluster-topology glue, the observability/mesh/GPU stack and the workload plane | Day 0: admin_context, namespaces, image_mirrors, openshift_rbac_groups, machines. Day 1: nfd, nvidia_gpu, custom_metrics_autoscaler, observability, service_mesh, mesh_monitoring, kiali, grafana, perses, tempo, openshift_oauth, connectivity_link, lws, jobset, kueue, openshift_ai, lightspeed, rhtas, rhtas_config, aiagent_operator |
 
-   Tier B gets the same `zuno_<c>_mode` key but a slimmer contract: no
-   URL/CA; the external check asserts CSV/CRD presence instead of
-   endpoint reachability; its detailed schema is deferred to the
-   per-component work — this ADR fixes only the vocabulary and check
-   semantics. Kiali is Tier C but is a first-class *consumer*
-   re-pointed by clause 5. (Tempo also has a Tier-B reading — the
-   operator pre-installed — noted, not elaborated.)
+   Dated narrowing (2026-09-10): the 2026-08-17 draft classified tempo
+   and mesh_monitoring as external-endpoint capable and carried a
+   "Tier B" of twelve pre-installed-operator candidates. Both are
+   withdrawn — Day-1 externalization is redis and mariadb only, and the
+   operator-externalization contract survives solely as the Tier
+   A-operator row (external_secrets, cert_manager), where it is vital
+   rather than optional. A future ADR may re-open Tier B for the Day-1
+   operator stack; this one no longer claims it. Kiali remains a
+   first-class *consumer* re-pointed by clause 5.
 
 4. **In external mode a role stops deploying and starts asserting, and
    the gating is symmetric across all four verbs.**
@@ -295,44 +340,93 @@ assumption structural, not incidental:
 7. **Everything the built-in self-provisions becomes, for external
    mode, a documented prerequisite that `check` asserts — verify, don't
    assume.** Per service:
-   - **Keycloak**: the realm `zuno_keycloak_external_realm` exists and
-     carries the expected clients, scopes and mappers (enumerated at
-     implementation from the inline `KeycloakRealmImport`). The
-     file-vault SPI (projected client-secret Secrets) requires owning
-     the pod and is internal-only. Default provisioning path: a runbook
-     (realm export) handed to the external Keycloak admin; opt-in: an
-     Admin-REST provisioning job when the
-     `zuno_keycloak_external_admin_*` credentials are set. The keycloak
-     chart's embedded PostgreSQL block becomes dead config.
-   - **Vault**: init/unseal is skipped. Assert instead: the KV v2
-     mount is writable with the supplied token, the kubernetes auth
-     mount is configured for *this* cluster, and the named
+   - **ArgoCD**: the external instance — in-cluster in another team's
+     namespace, or **remote** — carries the `zuno` AppProject, the
+     Subscription-health Lua customization, and RBAC allowing our
+     Applications; a remote instance must additionally have this
+     cluster declared as a destination. All of it is asserted before
+     any Application is applied. This widens the 2026-08-17 draft,
+     which ruled the off-cluster case out of scope: the *mechanism* for
+     the remote case (native ArgoCD cluster registration vs RHACM) is
+     studied and decided in ADR-0557; this clause only fixes what
+     external mode must assert, whichever mechanism wins. ADR-0311's
+     "Applications are Ansible-applied to the local cluster" is read
+     accordingly: they are Ansible-applied to wherever the governing
+     ArgoCD lives.
+   - **Vault**: init/unseal is skipped, and that is the *only* part of
+     the internal setup that is. With the supplied setup token the
+     platform **provisions everything else itself, idempotently**:
+     the KV v2 mount, the PKI mounts and issuers behind
+     `vault-issuer`/`vault-issuer-istio`, the transit engine
+     (ADR-0420; release signing has since moved to RHTAS per
+     ADR-0535 — the engine list is derived from what the internal
+     install actually provisions at implementation time), the
+     kubernetes auth mount for *this* cluster, and the named
      policies/roles bound to our ServiceAccounts (`eso-reader`,
-     `cert-manager-issuer`, `istio-issuer`) exist. **External Vault
-     PKI is unsupported initially**: certificate consumers cut over
-     via the existing `acme.consumers.*` staged flip instead, keeping
-     the external-Vault prerequisite list to KV + k8s-auth. Seeding of
-     confidential values into KV still happens (via the short-lived
-     supplied token), keeping `confidential.yml` the single entry
-     point.
-   - **Prometheus** (`mesh_monitoring` external): the external
-     instance scrapes the mesh targets (equivalents of our
-     ServiceMonitors/MonitoringStack), hosts equivalents of our
-     PrometheusRules, and answers a probe query at the supplied URL —
-     the same query Kiali depends on.
+     `cert-manager-issuer`, `istio-issuer`). Every operation is
+     create-if-missing, never rewrite — the `vault_seed_if_missing`
+     semantics of ADR-0345, extended from KV values to mounts,
+     policies and roles, so external setup carries the same
+     idempotence guarantee as internal. `check` asserts each mount,
+     policy and role instead of assuming them. Seeding of confidential
+     values into KV still happens through the supplied token, keeping
+     `confidential.yml` the single entry point.
+   - **External Secrets Operator** (Tier A-operator): external mode
+     means the operator is deployed and lifecycle-managed outside this
+     installer — assert the CSV/CRDs are present and the controller
+     Deployment is Ready, and ship an unmanaged-install document in
+     the role/chart README. The `-d1` operand config — the
+     `vault-backend` ClusterSecretStore above all — is **ours in both
+     modes** and is always applied via ArgoCD: the ESO↔Vault wiring
+     exists whatever the mode of either side.
+   - **cert-manager** (Tier A-operator): identical contract — external
+     mode asserts the unmanaged operator is present and Ready (plus an
+     unmanaged-install document); the ClusterIssuers, ACME
+     configuration and Certificates stay ours and are always applied
+     via ArgoCD.
+   - **Keycloak**: admin credentials are **required** in external mode.
+     The platform creates the realm `zuno_keycloak_external_realm` if
+     missing and reconciles its full configuration — clients, scopes,
+     mappers, enumerated at implementation from the inline
+     `KeycloakRealmImport` — idempotently over the Admin REST API,
+     reusing the reconcile-not-import mechanics of ADR-0530. `check`
+     asserts the realm and each expected client. The realm-export
+     runbook of the 2026-08-17 draft is demoted from contract to
+     documentation annex, and the verify-only mode is withdrawn. The
+     file-vault SPI (projected client-secret Secrets) requires owning
+     the pod and stays internal-only. The keycloak chart's embedded
+     PostgreSQL block becomes dead config.
+   - **AAP**: admin credentials are **required** in external mode. The
+     platform provisions the org, project, inventory, the two
+     credentials, and every job and workflow template — the full
+     `aap-config` surface — idempotently. Implementation constraint:
+     the `aap-config` chart's `tower.ansible.com/v1alpha1` CRs assume
+     the resource-operator runs in-cluster with the AAP operator; in
+     external mode there is none, so provisioning generalizes the
+     GET-then-POST REST path the `aap_config` role already uses for
+     the org, the inventory host and credential attachment — REST for
+     everything, zero in-cluster dependency — rather than installing a
+     lone resource-operator. `check` asserts org, project and each
+     template exist.
    - **PostgreSQL / MariaDB**: databases and roles are pre-created by
-     the DBA (PGO's `spec.users[]` has no external equivalent);
-     credentials from `confidential.yml` are seeded into Vault and
-     delivered by ExternalSecret templates that reproduce the exact
-     Secret shapes consumers already mount (the pguser shape for
-     postgres, the `rag-pipeline-db` shape for mariadb).
-   - **Redis**: reachable; AUTH succeeds when a password is supplied.
-   - **ArgoCD**: the existing in-cluster instance carries the `zuno`
-     AppProject, the Subscription-health Lua customization, and RBAC
-     allowing our Applications — asserted before any Application is
-     applied into `zuno_argocd_external_namespace`. An off-cluster
-     ArgoCD is explicitly out of scope (Applications are
-     Ansible-applied to the local cluster, ADR-0311).
+     the DBA (PGO's `spec.users[]` has no external equivalent) — for
+     PostgreSQL that list includes the five AAP databases when AAP is
+     internal; for MariaDB it is the clause-2 inventory (`mlpipeline`,
+     `mlops`, `trillian`), one credential pair per database, and any
+     database added later adds its pair to the schema and its consumer
+     to the inventory. Credentials from `confidential.yml` are seeded
+     into Vault and delivered by ExternalSecret templates that
+     reproduce the exact Secret shapes consumers already mount (the
+     pguser shape for postgres; the `rag-pipeline-db`/`mlops-db`/
+     Trillian shapes for mariadb).
+   - **Redis**: reachable; AUTH succeeds when a password is supplied;
+     and the endpoint is provisioned for the platform's consumer
+     inventory — seven today (ai-gateway, aiagent-operator, and the
+     comage/finage/advantage/tekos session stores, plus the
+     agent-frontend code default), so `check` asserts the server's
+     connection budget (`maxclients` or managed-tier equivalent)
+     accommodates them. A new consumer updates the inventory and the
+     assertion.
 
 8. **External mode changes who runs a service, not how config flows.**
    Charts remain the only source of rendered config; Applications
@@ -349,12 +443,45 @@ assumption structural, not incidental:
    pilot exercises the whole contract — mode key, symmetric gating,
    external check assertions, Vault seeding, ExternalSecret shape —
    with zero consumer-seam surgery and the smallest possible blast
-   radius. Then keycloak (highest value; exercises CA supply, realm
-   prerequisites, the oauth integration and the widest seam set), then
-   vault, then mesh_monitoring, redis, postgresql, tempo, argocd; Tier
-   B components follow per environment need. Implementation lands one
-   component per work package mapped to this clause; roadmap briefs
-   live under `docs/roadmap/`, not in this ADR.
+   radius. Then keycloak (highest value; exercises CA supply, mandatory
+   admin-credential provisioning, the oauth integration and the widest
+   seam set), then vault (the full-setup contract), then postgresql,
+   redis, aap, and the two Tier A-operator components
+   (external_secrets, cert_manager — mostly documentation plus check
+   surgery); argocd lands last, once ADR-0557 has picked its
+   mechanism. Implementation lands one component per work package
+   mapped to this clause; roadmap briefs live under `docs/roadmap/`,
+   not in this ADR.
+
+10. **The seven Day-0 Tier-A components are vital: Day 1 does not
+    start until each is functional, whatever its mode.** argocd,
+    vault, external_secrets, cert_manager, postgresql, keycloak and
+    aap (with aap_config) must pass their functional assertion —
+    internal: Applications Synced/Healthy plus CR readiness, as today;
+    external: the clause-7 assertions — before `make d1 install`
+    proceeds. This is a **hard gate on the Day-1 entry point**,
+    distinct from the record-state, never-fail precheck contract:
+    prechecks keep recording, the gate blocks. It rides the
+    `check_cluster_readiness` probe mechanism (WP-130/ADR-0547), which
+    already blocks `make d0 install` on would-fail findings; this
+    clause extends the same pattern to the d1 boundary.
+
+11. **Perfect dependency abstraction: no component ever reads another
+    component's mode key.** Every cross-component dependency is
+    consumed through the clause-5/clause-8 seam — Vault KV +
+    ExternalSecrets for secrets, Helm values for non-secrets — and
+    that seam must render all four internal/external combinations of
+    any dependent pair indistinguishable to the consumer. Normative
+    examples: external Keycloak stops using our PostgreSQL entirely
+    (its chart's DB block is dead config, whatever postgresql's mode);
+    internal AAP against external PostgreSQL means the five AAP
+    databases are pre-created by the DBA and delivered in the exact
+    Secret shapes the aap chart's ExternalSecrets already mount; ESO
+    bridges Vault to consumers identically whether Vault, ESO, or both
+    are external. A role or chart that branches on another component's
+    `zuno_<c>_mode` key is a contract violation — the information a
+    consumer needs must arrive as an endpoint value or a Secret, never
+    as a mode.
 
 ## Consequences
 
@@ -368,9 +495,9 @@ assumption structural, not incidental:
   roughly doubling their task surface.
 - Mode flips are migrations, not toggles; no data-movement automation
   is promised.
-- External mode narrows the demo surface: the file-vault SPI, PGO
-  backups/pgBackRest and MonitoringStack ownership don't apply — each
-  component's runbook must carry an honest feature-parity note.
+- External mode narrows the demo surface: the file-vault SPI and PGO
+  backups/pgBackRest don't apply — each component's runbook must carry
+  an honest feature-parity note.
 - Known dead-config surfaces (the keycloak chart's PostgreSQL block,
   `allowedFromNamespaces` entries for externalized services) are
   accepted as inert rather than templated away.
@@ -378,17 +505,22 @@ assumption structural, not incidental:
 ## Security considerations
 
 External credentials enter through the same gitignored file as every
-other secret and land only in Vault KV; the external-Vault bootstrap
-token is short-lived and used only for seeding and verification. CA
-bundles are explicit inputs; there is deliberately no skip-verify knob
-anywhere in the schema, and postgres defaults to `verify-full`. The
-trust boundary widens: platform JWTs and tokens transit to endpoints
-outside the cluster over currently-unrestricted egress — recorded and
-accepted for the demo, flagged as first-class input for any future
-egress-policy work. Keycloak admin credentials are optional and
-verify-only by default; provisioning against the external instance is
-opt-in. A compromised external service becomes shared fate with the
-platform; internal mode remains the isolation-maximizing default.
+other secret and land only in Vault KV. The external-Vault setup token
+is the widest credential in the schema — it provisions mounts, policies
+and roles — so it should be scoped to exactly that by the Vault admin
+and rotated after Day 0; it is never persisted outside Vault KV itself.
+CA bundles are explicit inputs; there is deliberately no skip-verify
+knob anywhere in the schema, and postgres defaults to `verify-full`.
+The trust boundary widens: platform JWTs and tokens transit to
+endpoints outside the cluster over currently-unrestricted egress —
+recorded and accepted for the demo, flagged as first-class input for
+any future egress-policy work. Keycloak and AAP admin credentials are
+mandatory in external mode and are used by an idempotent
+reconciliation, never by hand; they grant realm/organization
+administration on services the platform does not own, which their
+owners must accept knowingly. A compromised external service becomes
+shared fate with the platform; internal mode remains the
+isolation-maximizing default.
 
 ## Operational considerations
 
@@ -415,14 +547,15 @@ lives with the clause-9 work packages.)
 
 - `docs/adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md`
   exists, containing the clause-2 schema block and the clause-3 table
-  classifying all 28 playbook components.
-- The `## version 0.3` index table in `docs/adr/README.md` has the
-  ADR-0352 row and its status string matches the body's `Proposed`.
+  classifying all 36 playbook components (13 Day 0 + 23 Day 1).
+- The v0.9 index table in `docs/adr/README.md` has the ADR-0352 row
+  and its status string matches the body's `Proposed`.
 - No implementation surface has changed: `zuno_*_mode` keys appear
   nowhere under `ansible/` or `gitops/`.
 - The external-mode lifecycle contract covers all four verbs
   (install/check/reconcile/uninstall), including symmetric precheck
-  gating.
+  gating, plus the Day-1 vital gate (clause 10) and the
+  dependency-abstraction rule (clause 11).
 - `make check` passes (`platform/docs/check_docs.py` ADR index
   included).
 
@@ -443,3 +576,11 @@ Migration/evolution and Review evidence.
 - [ADR-0346](0346-trust-the-ingress-router-ca-and-absorb-the-startx-cluster-auth-oauth-settings.md)
 - [ADR-0347](0347-trust-the-vault-pki-root-for-the-oauth-openid-idp.md)
 - [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md)
+- [ADR-0354](0354-add-ansible-automation-platform-as-a-day-1-component.md)
+- [ADR-0418](0418-execute-day-0-and-day-1-operations-as-aap-job-templates.md)
+- [ADR-0421](0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md)
+- [ADR-0530](0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md)
+- [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md)
+- [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md)
+- [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md)
+- [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md)

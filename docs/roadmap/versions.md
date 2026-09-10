@@ -181,10 +181,17 @@ close ADR-0111's last SecNumCloud gap with an in-cluster named-release
 ledger — the Sigstore Policy Controller admission gate ADR-0535 left dormant
 stays a later ADR's concern. The band also carries the two agent-onboarding
 decisions parked behind it (ADR-0307, ADR-0410 — WP-41 was cancelled
-2026-08-23) and the day-0 internal/external tiering effort (ADR-0352), which
-has no work package yet.
+2026-08-23) and the internal/external mode effort: ADR-0352 (amended in place
+2026-09-10 — AAP added as a vital component, mandatory Keycloak/AAP external
+admin credentials, full external-Vault setup, Day-1 externalization narrowed
+to redis/mariadb, Day-1 vital gate and dependency-abstraction clauses), still
+without a work package, plus its two 2026-09-10 companions: ADR-0557 studies
+managing the cluster from a remote ArgoCD (native vs RHACM), and ADR-0556
+records the long-term `zuno` operator contract
+(ZunoFoundation/ZunoInfra/ZunoStack CRDs mirroring the Day 0/1/2 playbooks).
 
-**5 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410. No open work packages.
+**7 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410, ADR-0556, ADR-0557. No open
+work packages.
 
 ## v0.10
 
