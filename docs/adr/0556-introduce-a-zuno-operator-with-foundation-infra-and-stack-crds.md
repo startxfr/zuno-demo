@@ -9,15 +9,14 @@
 
 The platform's lifecycle is driven by three Ansible playbook families —
 Day 0 (13 components, `ansible/playbooks/day0_*.yml`), Day 1 (23
-components) and Day 2 (11 components, plus `supply_chain` which the
-Makefile knows and `day2_install.yml` does not) — sequenced by ADR-0056
-/ ADR-0060 / ADR-0421, dispatched through `make` (ADR-0030), and
-re-runnable as AAP job templates (ADR-0418). What a cluster *should*
-run is therefore encoded in playbook variable lists and Makefile
-variables, not in any object the cluster itself holds; drift between
-the two has already happened (`image_mirrors`, `supply_chain`), and
-reconciliation is something an operator runs, not something that runs
-continuously.
+components) and Day 2 (11 components, plus the check-only
+`supply_chain` gate) — sequenced by ADR-0056 / ADR-0060 / ADR-0421,
+dispatched through `make` (ADR-0030), and re-runnable as AAP job
+templates (ADR-0418). What a cluster *should* run is therefore encoded
+in playbook variable lists and Makefile variables, not in any object
+the cluster itself holds; drift between the two has already happened
+(`image_mirrors`), and reconciliation is something an operator runs,
+not something that runs continuously.
 
 The repo already owns one operator: the AIAgent operator
 (`operator/aiagent-operator/`, group `zuno.zuno.ai`, `v1alpha1`),
@@ -78,10 +77,12 @@ cannot describe two different platforms:
 - **`ZunoStack`** — Day 2. One spec entry per component:
   `namespaces, llm, models, rag, rag_ingestion, mcp, agents, mlops,
   trustyai_config, mlflow, lightspeed_config` — plus `supply_chain`,
-  whose Makefile-vs-playbook discrepancy must be resolved (added to
-  `day2_install.yml`, or dropped from `DAY2_RUN_COMPONENTS`) no later
-  than this CRD's implementation, since the CRD forces one list to be
-  the truth. No mode key: Day 2 is the platform's own workload plane.
+  which is **check-only by design** (ADR-0420/WP-070: a pure
+  signature-verification gate, no install/build of its own — since
+  2026-09-10 the Makefile expresses this as
+  `DAY2_CHECK_ONLY_COMPONENTS`); its spec entry is likewise a
+  verification-only entry the operator asserts but never installs. No
+  mode key: Day 2 is the platform's own workload plane.
 
 Secrets never appear in a CR: external credentials keep flowing
 `confidential.yml` → Vault KV → ExternalSecrets (ADR-0352 clause 8);

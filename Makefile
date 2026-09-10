@@ -65,10 +65,15 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (the /mcp front-door plus the NetworkPolicy admitting
 # openshift-lightspeed) and "agents" all already live, plus the Day 1
 # "lightspeed" operator installed before any of it.
-# "install" operate on the 11 deployable components, plus "supply-chain"
-# (ADR-0420/WP-070) for "check" only - it has no install/build of its own,
-# only a signature-verification gate (ansible/roles/supply_chain).
-DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops trustyai-config mlflow lightspeed-config supply-chain
+# "install" operate on the 11 deployable components. "supply-chain"
+# (ADR-0420/WP-070) is check-only - it has no install/build of its own,
+# only a signature-verification gate (ansible/roles/supply_chain) - so it
+# lives in its own list, same split Day 3 already uses
+# (DAY3_CHECK_ONLY_COMPONENTS): "check" accepts it, every mutating verb
+# rejects it cleanly instead of dying inside Ansible on a missing
+# tasks/install.yml.
+DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops trustyai-config mlflow lightspeed-config
+DAY2_CHECK_ONLY_COMPONENTS := supply-chain
 DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops trustyai-eval
 DAY2_VERBS := check install build uninstall all reinstall
 
@@ -192,7 +197,7 @@ endef
 DAY_VERB := $(word 2,$(MAKECMDGOALS))
 DAY_COMPONENT := $(word 3,$(MAKECMDGOALS))
 
-.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo new-mcp-server completion _complete-top _complete-verbs _complete-components $(DEMO_VERBS) $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
+.PHONY: help credentials-check day0 d0 day1 d1 day2 d2 day3 d3 demo new-mcp-server completion _complete-top _complete-verbs _complete-components $(DEMO_VERBS) $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS)
 
 help:
 	@printf '%s\n' \
@@ -246,6 +251,7 @@ help:
 	  'Day 1 components (check/install): $(DAY1_RUN_COMPONENTS)' \
 	  'Day 1 components (build):         $(DAY1_BUILD_COMPONENTS)' \
 	  'Day 2 components (check/install): $(DAY2_RUN_COMPONENTS)' \
+	  'Day 2 components (check only):    $(DAY2_CHECK_ONLY_COMPONENTS)' \
 	  'Day 2 components (build):         $(DAY2_BUILD_COMPONENTS)' \
 	  'Day 3 components (test/stresstest/check): $(DAY3_TEST_COMPONENTS)' \
 	  'Day 3 components (backup/restore):        $(DAY3_BACKUP_COMPONENTS)' \
@@ -329,6 +335,7 @@ _complete-components:
 	     esac ;; \
 	  2) case "$(VERB)" in \
 	       build) echo "$(DAY2_BUILD_COMPONENTS) all" ;; \
+	       check) echo "$(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) all" ;; \
 	       *) echo "$(DAY2_RUN_COMPONENTS) all" ;; \
 	     esac ;; \
 	  3) case "$(VERB)" in \
@@ -523,6 +530,9 @@ if [[ -z "$$verb" ]]; then \
     'Components (check/install/uninstall/all; optional, default: all):' \
     '  $(DAY2_RUN_COMPONENTS)' \
     '' \
+    'Components (check only):' \
+    '  $(DAY2_CHECK_ONLY_COMPONENTS)' \
+    '' \
     'Components (build; optional, default: all):' \
     '  $(DAY2_BUILD_COMPONENTS)' \
     '' \
@@ -546,7 +556,7 @@ run_install() { route_or_local install zuno-day2-install-workflow; }; \
 run_uninstall() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_uninstall.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 case "$$verb" in \
   check) \
-    case " $(DAY2_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 check component: '$$component' (expected one of: $(DAY2_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    case " $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 check component: '$$component' (expected one of: $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) or all)" >&2; exit 2;; esac; \
     run_check ;; \
   build) \
     case " $(DAY2_BUILD_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 build component: '$$component' (expected one of: $(DAY2_BUILD_COMPONENTS) or all)" >&2; exit 2;; esac; \
@@ -743,5 +753,5 @@ d3: $(if $(DAY_VERB),credentials-check)
 # directly, so e.g. `make d0 check postgresql` or `make demo step-1`
 # needs "check"/"postgresql"/"step-1" to resolve to *something* as Make
 # goals without erroring as unknown targets.
-$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DEMO_VERBS)):
+$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DEMO_VERBS)):
 	@:

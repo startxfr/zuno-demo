@@ -170,7 +170,8 @@ def _parse_makefile_lists() -> dict:
     lists = {}
     for name in ("DAY0_VERBS", "DAY0_COMPONENTS",
                  "DAY1_VERBS", "DAY1_RUN_COMPONENTS", "DAY1_BUILD_COMPONENTS",
-                 "DAY2_VERBS", "DAY2_RUN_COMPONENTS", "DAY2_BUILD_COMPONENTS",
+                 "DAY2_VERBS", "DAY2_RUN_COMPONENTS", "DAY2_CHECK_ONLY_COMPONENTS",
+                 "DAY2_BUILD_COMPONENTS",
                  "DAY3_VERBS", "DAY3_TEST_COMPONENTS", "DAY3_BACKUP_COMPONENTS"):
         match = re.search(rf"^{name}\s*:=\s*(.*)$", text, re.MULTILINE)
         lists[name] = match.group(1).split() if match else []
@@ -198,7 +199,11 @@ def _components_for(day: str, verb: str, lists: dict) -> List[str]:
         return lists["DAY0_COMPONENTS"]
     if day in ("d1", "d2"):
         key = "BUILD" if verb == "build" else "RUN"
-        return lists[f"DAY{day[1]}_{key}_COMPONENTS"]
+        components = lists[f"DAY{day[1]}_{key}_COMPONENTS"]
+        if verb == "check":
+            components = components + lists.get(
+                f"DAY{day[1]}_CHECK_ONLY_COMPONENTS", [])
+        return components
     return lists["DAY3_TEST_COMPONENTS"] + lists["DAY3_BACKUP_COMPONENTS"]
 
 
@@ -1154,13 +1159,15 @@ def check_aap_workflow_dags() -> List[Finding]:
         if isinstance(nodes, list):
             dags[wf.get("name", "?")] = {n.get("id") for n in nodes if isinstance(n, dict)}
 
-    # supply-chain is deliberately check-only (ADR-0420/WP-070: no install
-    # verb of its own) - the check DAG carries it, the install DAG must not.
+    # Check-only components (DAY2_CHECK_ONLY_COMPONENTS, e.g. supply-chain
+    # per ADR-0420/WP-070: no install verb of its own) belong in the check
+    # DAG but must not appear in the install DAG.
     expected = {
         "zuno-day1-install-workflow": ("DAY1_RUN_COMPONENTS", set(lists["DAY1_RUN_COMPONENTS"])),
         "zuno-day1-check-workflow": ("DAY1_RUN_COMPONENTS", set(lists["DAY1_RUN_COMPONENTS"])),
-        "zuno-day2-install-workflow": ("DAY2_RUN_COMPONENTS", set(lists["DAY2_RUN_COMPONENTS"]) - {"supply-chain"}),
-        "zuno-day2-check-workflow": ("DAY2_RUN_COMPONENTS", set(lists["DAY2_RUN_COMPONENTS"])),
+        "zuno-day2-install-workflow": ("DAY2_RUN_COMPONENTS", set(lists["DAY2_RUN_COMPONENTS"])),
+        "zuno-day2-check-workflow": ("DAY2_RUN_COMPONENTS + DAY2_CHECK_ONLY_COMPONENTS",
+                                     set(lists["DAY2_RUN_COMPONENTS"]) | set(lists["DAY2_CHECK_ONLY_COMPONENTS"])),
     }
     for wf_name, (list_name, make_set) in expected.items():
         if wf_name not in dags:
