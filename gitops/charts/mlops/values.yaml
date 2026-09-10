@@ -200,6 +200,10 @@ pipelineServer:
       port: "3306"
       username: mlops
       database: mlops
+      # ADR-0352/WP-143: same TLS-ness contract as rag-ingestion's
+      # externalMySQL.tls - "true" (default, internal TLS-serving
+      # MariaDB), "false" = plaintext external endpoint.
+      tls: "true"
       secretName: mlops-dspa-mysql-credentials
       externalSecret:
         remoteKey: mlops/dspa-mysql

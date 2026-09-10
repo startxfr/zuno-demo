@@ -119,8 +119,11 @@ zuno_mariadb_backup_s3_prefix: "mariadb"
 # already read (rag/pipeline-db, mlops/dspa-mysql, rhtas/trillian-mysql),
 # overwriting the internally-generated ones. The five backup fields above
 # and the mysqld-exporter metrics are internal-only and do not apply.
-# zuno_mariadb_external_ca_bundle is accepted and reserved for the future
-# TLS seam (not yet wired into the DSPA/ODH trust bundles - see WP-143).
+# zuno_mariadb_external_ca_bundle: "" means a PLAINTEXT endpoint - the DSPA
+# consumers' DSN then gets tls=false (WP-143 live finding: their driver
+# aborts the handshake against a non-TLS server otherwise). A non-empty PEM
+# declares a TLS endpoint (DSN keeps tls=true); wiring that CA into the
+# DSPA/ODH trust bundles is still the deferred seam - see WP-143.
 zuno_mariadb_mode: internal
 zuno_mariadb_external_host: "xxxxxx"
 zuno_mariadb_external_port: "3306"

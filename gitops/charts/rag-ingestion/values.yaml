@@ -45,6 +45,11 @@ pipelineServer:
       port: 3306
       database: mlpipeline
       username: mlpipeline
+      # ADR-0352/WP-143: "true" (default) = the endpoint serves TLS (the
+      # internal MariaDB does, via vault-issuer-mariadb) and the DSN keeps
+      # DSPO's tls=true; "false" = plaintext endpoint, dspa.yaml emits a
+      # customExtraParams override (see the live-finding comment there).
+      tls: "true"
       secretName: rag-pipeline-db
       externalSecret:
         remoteKey: "rag/pipeline-db"

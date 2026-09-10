@@ -57,4 +57,17 @@
         if (zuno_mariadb_mode | default('internal')) == 'external'
         else 'trillian'
       }}
+    # WP-143 live finding: the endpoint's TLS-ness is part of the
+    # endpoint contract - the DSPA consumers' DSN defaults to tls=true
+    # and the go driver aborts the handshake against a plaintext server.
+    # Internal MariaDB serves TLS (vault-issuer-mariadb) -> "true";
+    # external -> "true" only when a CA bundle is supplied (the trust
+    # wiring into the DSPA bundles is still the deferred seam), else
+    # "false" (plaintext endpoint).
+    mariadb_endpoint_tls: >-
+      {{
+        ('true' if (zuno_mariadb_external_ca_bundle | default('') | length > 0) else 'false')
+        if (zuno_mariadb_mode | default('internal')) == 'external'
+        else 'true'
+      }}
   when: mariadb_endpoint_host is not defined

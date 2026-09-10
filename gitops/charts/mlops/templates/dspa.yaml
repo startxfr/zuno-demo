@@ -60,6 +60,13 @@ spec:
     # use - the probe is the only non-mesh client, so it is disabled
     # rather than un-meshing port 3306 for everyone.
     disableHealthCheck: true
+{{- if eq (.Values.pipelineServer.metadataDatabase.externalMySQL.tls | default "true" | toString) "false" }}
+    # ADR-0352/WP-143 live finding - same DSN tls=true default as
+    # rag-ingestion's dspa.yaml (see the comment there): an external
+    # plaintext endpoint needs this override, the internal TLS-serving
+    # MariaDB emits nothing and renders byte-identical.
+    customExtraParams: '{"tls":"false"}'
+{{- end }}
     externalDB:
       host: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.host | quote }}
       port: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.port | quote }}

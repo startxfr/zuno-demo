@@ -70,6 +70,17 @@ spec:
     # for everyone. A genuinely broken credential now surfaces as the
     # apiserver pod's own crashloop/logs instead of the CR condition.
     disableHealthCheck: true
+{{- if eq (.Values.pipelineServer.metadataDatabase.externalMySQL.tls | default "true" | toString) "false" }}
+    # ADR-0352/WP-143 live finding: DSPO's server config defaults the DSN
+    # to tls=true, and the go-sql-driver then aborts the handshake against
+    # any MariaDB whose greeting lacks the SSL capability - a silent
+    # crashloop at "Initializing DB client...". The endpoint's TLS-ness is
+    # part of the endpoint contract (clause 11): an external plaintext
+    # endpoint sets tls "false" and this override is emitted; the internal
+    # MariaDB serves TLS (vault-issuer-mariadb) so the default emits
+    # nothing and the render stays byte-identical.
+    customExtraParams: '{"tls":"false"}'
+{{- end }}
     externalDB:
       host: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.host | quote }}
       port: {{ .Values.pipelineServer.metadataDatabase.externalMySQL.port | quote }}

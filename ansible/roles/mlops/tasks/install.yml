@@ -173,7 +173,8 @@
         | combine({'pipelineServer': {'metadataDatabase': {'externalMySQL': {
                      'host': mariadb_endpoint_host,
                      'port': mariadb_endpoint_port,
-                     'username': mariadb_db_mlops_username}}}}, recursive=True)
+                     'username': mariadb_db_mlops_username,
+                     'tls': mariadb_endpoint_tls}}}}, recursive=True)
       }}
     # Values-changing apply - see ansible/roles/mlflow/tasks/install.yml.
     gitops_app_refresh: true

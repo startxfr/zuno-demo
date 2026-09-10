@@ -181,6 +181,7 @@
             host: "{{ mariadb_endpoint_host }}"
             port: "{{ mariadb_endpoint_port }}"
             username: "{{ mariadb_db_mlpipeline_username }}"
+            tls: "{{ mariadb_endpoint_tls }}"
       s3:
         # ADR-0547 clause 3: an invalid placeholder, not zuno-demo-rag-corpus
         # (deleted WP-131 2026-09-05) - a plausible-looking default risks
