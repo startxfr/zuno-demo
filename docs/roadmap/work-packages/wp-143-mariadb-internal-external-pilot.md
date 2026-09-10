@@ -1,6 +1,6 @@
 # WP-143: MariaDB internal/external mode pilot
 
-- **State:** Not started
+- **State:** Repo work merged (2026-09-10 - commit 19dca0e6; live rehearsal pending)
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md)
 - **Depends on:** none
 - **Related:** [ADR-0345](../../adr/0345-make-self-generated-vault-credentials-idempotent.md), [ADR-0547](../../adr/0547-parameterize-every-cluster-specific-value-in-ansible.md)
@@ -161,6 +161,13 @@ with operator confirmation before each destructive step:
 ## Status updates (then re-run check_docs.py)
 
 - **2026-09-10 — Not started.** Brief authored (ADR-0352 clause 9).
+- **2026-09-10 — Repo work merged.** All eight repo changes landed
+  (commit 19dca0e6): mode dispatch + external branch in the mariadb role,
+  gated precheck/uninstall, `resolve_mariadb_endpoint.yml`, the three
+  consumer host/username injections (inertia proven byte-identical with
+  templates rendering, mechanism proven alive with a changed host), the
+  rhtas schema client Job, confidential.example.yml block, role README.
+  Live rehearsal on demo333 is next.
 
 ## Out of scope / deferred
 

@@ -871,7 +871,7 @@ a mode-agnostic client Job - proven by a live external-flip rehearsal on
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-143 | [wp-143](work-packages/wp-143-mariadb-internal-external-pilot.md) | 0352 | none | Not started | none yet |
+| WP-143 | [wp-143](work-packages/wp-143-mariadb-internal-external-pilot.md) | 0352 | none | Repo work merged (2026-09-10 - commit 19dca0e6; live rehearsal pending) | run the WP's live-verification protocol on demo333 (simulated external endpoint, full data migration there and back) |
 
 ### OKF stream phases
 
