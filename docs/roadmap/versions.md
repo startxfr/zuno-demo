@@ -187,7 +187,9 @@ admin credentials, full external-Vault setup, Day-1 externalization narrowed
 to redis/mariadb, Day-1 vital gate and dependency-abstraction clauses), whose
 clause-9 MariaDB pilot is now carried by WP-143, plus its two 2026-09-10
 companions: ADR-0557 studies
-managing the cluster from a remote ArgoCD (native vs RHACM), and ADR-0556
+managing the cluster from a remote ArgoCD (native vs RHACM — study concluded
+2026-09-10, `Accepted`: both push flavors behind a sub-mode key, RHACM's pull
+model ruled out of external mode), and ADR-0556
 records the long-term `zuno` operator contract
 (ZunoFoundation/ZunoInfra/ZunoStack CRDs mirroring the Day 0/1/2 playbooks).
 

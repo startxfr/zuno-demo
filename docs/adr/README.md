@@ -319,7 +319,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | Implemented | Adopt RHTAS as the artifact trust and supply-chain service |
 | [ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md) | Implemented | Close ADR-0111's last SecNumCloud gap with an in-cluster release ledger |
 | [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | Proposed | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
-| [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Proposed | Manage the cluster from a remote ArgoCD, natively or via RHACM |
+| [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 
 ## v0.10
 
