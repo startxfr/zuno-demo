@@ -344,7 +344,9 @@ spec:
             name: "Cost by provider/model (over range)"
           plugin:
             kind: PieChart
-            spec: {}
+            spec:
+              calculation: last
+              radius: 50
           queries:
             - kind: TimeSeriesQuery
               spec:

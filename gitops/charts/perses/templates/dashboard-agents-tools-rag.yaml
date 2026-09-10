@@ -273,14 +273,14 @@ spec:
             kind: StatChart
             spec:
               format:
-                unit: percentunit
+                unit: percent
               thresholds:
                 steps:
                   - value: 0
                     color: green
-                  - value: 0.02
+                  - value: 2
                     color: orange
-                  - value: 0.1
+                  - value: 10
                     color: red
           queries:
             - kind: TimeSeriesQuery
@@ -429,14 +429,14 @@ spec:
             kind: StatChart
             spec:
               format:
-                unit: percentunit
+                unit: percent
               thresholds:
                 steps:
                   - value: 0
                     color: green
-                  - value: 0.02
+                  - value: 2
                     color: orange
-                  - value: 0.1
+                  - value: 10
                     color: red
           queries:
             - kind: TimeSeriesQuery
