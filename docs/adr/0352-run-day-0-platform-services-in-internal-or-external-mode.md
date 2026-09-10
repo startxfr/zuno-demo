@@ -438,12 +438,16 @@ assumption structural, not incidental:
    seed, never manage. No new config file or entry point is introduced.
 
 9. **MariaDB pilots the contract; Keycloak is the first hard one.**
-   MariaDB's only two consumers (rag-ingestion, mlops) already
-   implement `metadataDatabase.mode: externalMySQL` end-to-end, so the
-   pilot exercises the whole contract — mode key, symmetric gating,
-   external check assertions, Vault seeding, ExternalSecret shape —
-   with zero consumer-seam surgery and the smallest possible blast
-   radius. Then keycloak (highest value; exercises CA supply, mandatory
+   MariaDB's three consumers (rag-ingestion and mlops already implement
+   `metadataDatabase.mode: externalMySQL` end-to-end; rhtas/Trillian is
+   the third — correction 2026-09-10, the original draft counted two)
+   all resolve their credentials from Vault independently of the
+   mariadb chart, so the pilot exercises the whole contract — mode key,
+   symmetric gating, external check assertions, Vault seeding,
+   ExternalSecret shape — with minimal consumer-seam surgery (the
+   endpoint hosts are chart literals to parameterize, and the rhtas
+   Trillian schema load must stop exec-ing into the built-in pod) and
+   the smallest possible blast radius. WP-143 carries this pilot. Then keycloak (highest value; exercises CA supply, mandatory
    admin-credential provisioning, the oauth integration and the widest
    seam set), then vault (the full-setup contract), then postgresql,
    redis, aap, and the two Tier A-operator components

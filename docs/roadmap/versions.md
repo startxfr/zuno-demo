@@ -184,14 +184,14 @@ decisions parked behind it (ADR-0307, ADR-0410 — WP-41 was cancelled
 2026-08-23) and the internal/external mode effort: ADR-0352 (amended in place
 2026-09-10 — AAP added as a vital component, mandatory Keycloak/AAP external
 admin credentials, full external-Vault setup, Day-1 externalization narrowed
-to redis/mariadb, Day-1 vital gate and dependency-abstraction clauses), still
-without a work package, plus its two 2026-09-10 companions: ADR-0557 studies
+to redis/mariadb, Day-1 vital gate and dependency-abstraction clauses), whose
+clause-9 MariaDB pilot is now carried by WP-143, plus its two 2026-09-10
+companions: ADR-0557 studies
 managing the cluster from a remote ArgoCD (native vs RHACM), and ADR-0556
 records the long-term `zuno` operator contract
 (ZunoFoundation/ZunoInfra/ZunoStack CRDs mirroring the Day 0/1/2 playbooks).
 
-**7 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410, ADR-0556, ADR-0557. No open
-work packages.
+**7 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410, ADR-0556, ADR-0557; WP-143.
 
 ## v0.10
 
