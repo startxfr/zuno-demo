@@ -131,7 +131,9 @@ spec:
                 "fillOpacity": 20,
                 "stacking": {
                   "mode": "normal"
-                }
+                },
+                "showPoints": "always",
+                "pointSize": 6
               }
             }
           },
@@ -156,7 +158,7 @@ spec:
           },
           "description": "Share of evaluated exchanges that raised at least one detection over the dashboard window. Observe-only: this measures the detectors, it gates nothing.",
           "gridPos": {
-            "h": 8,
+            "h": 4,
             "w": 6,
             "x": 18,
             "y": 1
@@ -164,6 +166,7 @@ spec:
           "fieldConfig": {
             "defaults": {
               "unit": "percentunit",
+              "decimals": 1,
               "min": 0,
               "max": 1,
               "thresholds": {
@@ -195,6 +198,36 @@ spec:
           ]
         },
         {
+          "id": 10,
+          "title": "Detections (count, window)",
+          "type": "stat",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "description": "Raw count of detections over the dashboard window - immune to percentage rounding. A rare-event detection rate (a handful of hits against a much larger clean baseline) can round the percentage stat above to 0%; this never does.",
+          "gridPos": {
+            "h": 4,
+            "w": 6,
+            "x": 18,
+            "y": 5
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            }
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum(increase(zuno_guardrails_detections_total[$__range]))"
+            }
+          ]
+        },
+        {
           "id": 8,
           "title": "Observer unavailable (share)",
           "type": "stat",
@@ -212,6 +245,7 @@ spec:
           "fieldConfig": {
             "defaults": {
               "unit": "percentunit",
+              "decimals": 1,
               "min": 0,
               "max": 1,
               "thresholds": {
