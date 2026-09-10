@@ -233,4 +233,38 @@ spec:
       ports:
         - port: 9004
           protocol: TCP
+---
+{{- /*
+VERIFIED live, 2026-09-10: the operator-generated "payload-processing"
+NetworkPolicy above (tenant-instance selector, egress limited to DNS +
+443/6443) has no rule for istiod's XDS port (15012), so the istio-proxy
+sidecar's DeltaAggregatedResources gRPC stream to
+istiod.zuno-mesh.svc:15012 times out and the startup probe on 15021 never
+passes - the pod wedges in Init:1/2 forever. payload-pre-processing doesn't
+hit this because its own "app"-selector policy above grants it `egress: [{}]`
+(full allow), which unions with the narrow operator policy; payload-processing
+has no such second policy, only the Ingress-only
+payload-processing-maas-gateway-allow above. Confirmed live with a
+label-matched debug pod: TCP to istiod:15012 timed out, TCP to
+cert-manager-istio-csr:443 (already allowed) succeeded. Same
+independently-owned-policy technique as the two blocks above - nothing for
+the ModelsAsService controller to revert.
+*/ -}}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: payload-processing-istiod-egress-allow
+  namespace: openshift-ingress
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  podSelector:
+    matchLabels:
+      app: payload-processing
+  policyTypes:
+    - Egress
+  egress:
+    - ports:
+        - port: 15012
+          protocol: TCP
 {{- end }}
