@@ -71,6 +71,54 @@ RAG_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc.cluster
 # scenario 20 includes it in `services:`; harmless to resolve unconditionally
 # for every agent).
 SALESFORCE_MCP_URL = os.getenv("SALESFORCE_MCP_URL", "http://salesforce-mcp.zuno-ai-run.svc.cluster.local:8000")
+# ADR-0540/WP-120: the NeMo Guardrails server agent-runtime's own
+# guardrails_client._evaluate_nemo talks to. Shared across every agent
+# (same service, same config_id) - not agent-specific like FRONTEND_URL.
+GUARDRAILS_URL = os.getenv("GUARDRAILS_URL", "http://zuno-guardrails.zuno-ai-run.svc:80")
+GUARDRAILS_CONFIG_ID = os.getenv("GUARDRAILS_CONFIG_ID", "zuno-observe")
+
+
+def query_guardrails_detections(message: str) -> List[str]:
+    """Hits the NeMo Guardrails server directly with `message`, returning the
+    detection names its input rail matched (e.g. "injection-ignore-
+    instructions", "credit-card") - empty if the message is clean.
+
+    Mirrors the exact request shape and response parsing of
+    components/agent-runtime/app/clients/guardrails_client.py's
+    _evaluate_nemo/_detection_names: `config_id`/`options` MUST nest under
+    `guardrails` (a flat top-level shape is silently dropped by the server,
+    not rejected - see that module's own docstring for the live-caught
+    HTTP-200-with-"Internal server error" trap), and `model` is required by
+    the schema even though no rail ever resolves it (422 without it).
+
+    Synchronous and immediate - no OTel/Prometheus scrape lag - because it
+    talks to the rails server itself rather than waiting on agent-runtime's
+    fire-and-forget observe_exchange() to report a metric.
+    """
+    resp = httpx.post(
+        f"{GUARDRAILS_URL}/v1/chat/completions",
+        json={
+            "model": GUARDRAILS_CONFIG_ID,
+            "messages": [{"role": "user", "content": message}],
+            "guardrails": {
+                "config_id": GUARDRAILS_CONFIG_ID,
+                "options": {"rails": ["input"], "log": {"activated_rails": True}},
+            },
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    payload = resp.json()
+    names: List[str] = []
+    log_block = ((payload or {}).get("guardrails") or {}).get("log") or {}
+    for rail in log_block.get("activated_rails") or []:
+        for executed in (rail or {}).get("executed_actions") or []:
+            if (executed or {}).get("action_name") != "zuno_scan":
+                continue
+            result = executed.get("return_value")
+            if isinstance(result, list):
+                names.extend(str(item) for item in result)
+    return names
 
 REALM = "zuno"
 # Shared demo-persona password (ADR-0041) - never hardcoded; read from the
