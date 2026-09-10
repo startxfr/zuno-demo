@@ -36,6 +36,18 @@ spec:
 {{- range .Values.evalHub.providers }}
     - {{ . }}
 {{- end }}
+  # The operator auto-injects MLFLOW_CA_CERT_PATH/MLFLOW_WORKSPACE/
+  # MLFLOW_TOKEN_PATH into the deployment but never MLFLOW_TRACKING_URI
+  # (live-diagnosed 2026-09-10: "MLFlow tracking URI is not set" at
+  # startup, every CreateEvaluationJob call then 400s with
+  # mlflow_required_for_experiment) - a real operator gap on this RHOAI
+  # 3.5.0 build, not something this chart can fix upstream. The CRD's
+  # generic `env` field is the documented escape hatch. URI matches the
+  # operand's own /mlflow path-prefix requirement, same value already
+  # proven live by components/mlops/src/mlflow_tracking.py.
+  env:
+    - name: MLFLOW_TRACKING_URI
+      value: https://mlflow.redhat-ods-applications.svc:8443/mlflow
   # NO otel block on purpose: this ea build's server exits with
   # "Failed to setup OTEL: Not implemented" when OTEL is configured
   # (live-diagnosed 2026-09-02, CrashLoop on first deploy). The CRD
