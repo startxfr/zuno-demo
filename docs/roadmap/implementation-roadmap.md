@@ -27,7 +27,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
 | v0.4 | 35 | 9 | 30 | WP-55, WP-101 |
-| v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122, WP-139 |
+| v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
@@ -852,7 +852,7 @@ token-budget exhaustion proof.
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-138 | [wp-138](work-packages/wp-138-perses-infrastructure-and-pilot-dashboards.md) | 0551, 0552, 0553 | none | Done (2026-09-07 - data layer live-verified; no visual UI exists on this cluster for these dashboards, confirmed and accepted) | none |
-| WP-139 | [wp-139](work-packages/wp-139-perses-parity-remaining-dashboards.md) | 0551, 0552, 0553 | WP-138 | Repo work merged (2026-09-07 - all 8 dashboards translated and passing chart/docs checks; cluster apply and live verification deferred) | Apply `zuno-perses-d1`, confirm `Available: true` on all 8, then live-verify per WP-138's method |
+| WP-139 | [wp-139](work-packages/wp-139-perses-parity-remaining-dashboards.md) | 0551, 0552, 0553 | WP-138 | Done (2026-09-10) - all 10 `PersesDashboard`s `Available: true` on `demo333`, content confirmed via the Perses REST API (3 live schema defects found and fixed along the way) | none |
 | WP-141 | [wp-141](work-packages/wp-141-widen-rhoai-monitoringstack-scope.md) | 0554 | none | Done (2026-09-09 - all 4 parts live-verified, including a 4th piece (a `monitoring.rhobs/v1` PodMonitor) found necessary only after live-testing the original 3-part plan) | none |
 | WP-142 | [wp-142](work-packages/wp-142-parallel-quota-exhaustive-stresstest.md) | 0555 | none | Done (2026-09-09 - parallel execution + request-rate proof live-capable; token-budget proof code-complete, needs an ai-gateway rebuild for genuine-exhaustion behavior) | `make d2 build ai-gateway` then redeploy, so `token_quota_429.py`'s 429 comes from real budget exhaustion rather than the current fail-closed unknown-class response |
 

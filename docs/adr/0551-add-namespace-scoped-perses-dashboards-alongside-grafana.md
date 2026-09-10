@@ -180,6 +180,16 @@ which moves every dashboard into `redhat-ods-monitoring` to make this the
 working access path, trading away per-application-namespace placement for
 actual human-visible rendering.
 
+## Fourth dated confirmation note (2026-09-10)
+
+WP-139 applied the remaining eight dashboards to `demo333` and confirmed
+all ten `PersesDashboard`s (WP-138's two pilots plus these eight) reached
+`Available: true`, with panel/query content spot-checked against the
+Perses REST API. Decision 4 (`UIPlugin`) and decision 5 (phased WP-138/
+WP-139 rollout) are now both fully executed; this note does not change the
+`Superseded in part` status above, which remains accurate for decisions
+1/6 (ADR-0553) and 2/3 (ADR-0552).
+
 ## Related ADRs
 
 - [ADR-0522](0522-enable-openshift-ai-monitoring-stack-side-by-side.md) - the

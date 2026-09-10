@@ -1,9 +1,7 @@
 # WP-139: Perses parity for the remaining eight dashboards
 
-- **State:** Repo work merged (2026-09-07 - all 8
-  `PersesDashboard` files written, chart renders clean, hardening/docs
-  checks pass; not yet applied to the cluster or live-verified, deferred by
-  the user to resume later)
+- **State:** Done (2026-09-10 - all 10 `PersesDashboard`s `Available: true`
+  on `demo333`, content spot-checked via the Perses REST API)
 - **ADRs:** ADR-0551, ADR-0552, ADR-0553
 - **Depends on:** WP-138
 - **Related:** none
@@ -86,9 +84,9 @@ translation.
 
 1. `oc get persesdashboard -n redhat-ods-monitoring` shows all 10 of this
    repo's dashboards (2 from WP-138 + 8 from this WP) `Available: true`,
-   alongside RHOAI's own eight, unchanged and unaffected. **Not yet run -
-   these 8 files are not applied to the cluster** (ArgoCD sync deferred,
-   see Status updates).
+   alongside RHOAI's own eight, unchanged and unaffected. **Done,
+   2026-09-10** on `demo333` - see Status updates for the three real schema
+   defects found and fixed along the way.
 2. `platform/security/check_workload_hardening.py` passes on the updated
    chart - **done**, 2026-09-07 (pre-existing, unrelated `ai-gateway`
    finding aside).
@@ -102,18 +100,15 @@ translation.
 
 ## Live verification
 
-Same method as WP-138: log into `rhods-dashboard`, open "Monitor & observe",
-confirm each of the eight dashboards appears and renders live data, with a
-spot-check against its Grafana equivalent for the same time range.
-**Deferred** - per ADR-0553's dated correction note, this tab only ever
-renders RHOAI's own fixed 6 tabs regardless of what this repo adds to
-`redhat-ods-monitoring`, so this step is expected to reconfirm the same
-no-visual-rendering finding WP-138 already made, not to newly pass. Not run
-in this pass; resume by applying `gitops/apps/perses/application-d1.yaml`
-and re-checking `oc get persesdashboard -n redhat-ods-monitoring` for
-`Available: true` on all 8 (the realistic completion bar, per WP-138's own
-precedent), with the console/dashboard-tab check kept only as a courtesy
-recheck, not a gate.
+Live-confirmed 2026-09-10 on `demo333` via the Perses REST API through
+`data-science-perses-route` (`GET
+/api/v1/projects/redhat-ods-monitoring/dashboards/<name>` spot-checked on
+`zuno-usage-cost`, `zuno-agents-tools-rag`, `zuno-run-trace` - panel counts
+match this WP's own table: 11/17/21), same method as WP-138. The
+`rhods-dashboard` "Monitor & observe" browser check was kept only as a
+courtesy recheck, not a gate, and was not repeated - ADR-0553's dated
+correction note already established it only renders RHOAI's own fixed 6
+tabs regardless of what this repo adds to `redhat-ods-monitoring`.
 
 ## Status updates (then re-run check_docs.py)
 
@@ -167,17 +162,33 @@ recheck, not a gate.
     `oc get persesdashboard` availability check, or the `rhods-dashboard`
     visual spot-check - deferred by explicit user request to resume this
     work later, not blocked on anything technical.
-- Next session resuming this WP: nothing new needs writing - apply
-  `gitops/charts/perses/templates/*.yaml` via the existing
-  `zuno-perses-d1` Application (`make d1 install perses` or a plain ArgoCD
-  sync), confirm `Available: true` on all 8, then work through the Tests /
-  verification checklist and Live verification section above before
-  flipping `State` to `Done`.
-- After that: `docs/roadmap/implementation-roadmap.md`'s Phase 41 tracker
-  row for WP-139 updated to match, and ADR-0551 gains a dated confirmation
-  note that all ten dashboards reached parity, without changing its
-  `Accepted`/`Superseded in part` status unless the ADR's own acceptance
-  criteria require it.
+- **2026-09-10** - resumed on `demo333`. The 8 files were already
+  `Available: true`-pending via ArgoCD's pre-existing auto-sync (applied
+  automatically when this WP's commits landed on the `demo333` branch, no
+  `make d1 install perses` needed) but 2 of the 8 came up
+  `Available: false` with real `PersesBackendError`s, exactly the kind of
+  unconfirmed judgment call flagged above:
+  - `dashboard-usage-cost.yaml`'s `costByProviderModel` `PieChart` shipped
+    an empty `plugin.spec: {}` - `radius` has no default in the plugin's
+    CUE schema (`spec.radius: number`, no `*default`) and was left
+    incomplete. Fixed per the plugin's own shipped valid test fixture
+    (`radius: 50`, `calculation: last`).
+  - `dashboard-agents-tools-rag.yaml` had two separate format-unit
+    defects: `nonAllowedRatio`/`ragSearchErrorRatio` used
+    `format.unit: percentunit` (not a valid Perses unit - `percent` or
+    `percent-decimal` only), and `freshnessAlertsFiring` used
+    `format.unit: short` (Grafana-only, no Perses equivalent). Both fixed
+    to match this chart's own already-`Available` precedent
+    (`mesh5xxRatio` in `dashboard-mesh-gateway.yaml`): `unit: percent`
+    with thresholds scaled x100, and `unit: decimal` for the plain count,
+    respectively.
+  - All 10 `PersesDashboard`s reached `Available: true` after these three
+    fixes (3 commits, pushed to `demo333`, picked up by the existing
+    `zuno-perses-d1` Application's `selfHeal` auto-sync - no manual
+    `argocd app sync` needed either). `docs/roadmap/implementation-roadmap.md`'s
+    Phase 41 row and ADR-0551 both updated to match (ADR-0551's own
+    `Superseded in part` status left unchanged, per its acceptance
+    criteria).
 
 ## Out of scope / deferred
 
@@ -199,7 +210,6 @@ existing Grafana or RHOAI-owned resource. The original
 "renders in `rhods-dashboard`" bar is kept only as a courtesy recheck, not a
 gate - it is expected to reconfirm, not overturn, WP-138's finding.
 
-As of 2026-09-07, the repo-side half of this (all 8 files written,
-chart/docs/hardening checks passing) is complete; the cluster-apply and
-data-layer-verification half is deferred, to be picked up in a later
-session.
+Met in full 2026-09-10: all 10 dashboards `Available: true` on `demo333`
+with panel/query content confirmed via the Perses REST API, zero changes
+to any Grafana or RHOAI-owned resource.
