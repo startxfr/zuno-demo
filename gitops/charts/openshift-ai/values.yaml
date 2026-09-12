@@ -116,24 +116,33 @@ cluster-ods:
       # dies on "certificate verify failed", and spec.env on the MLflow CR
       # does NOT reach that Job (verified live 2026-09-02).
       #
-      # Pinning a certificate in git is acceptable here because this one is
-      # the PGO cluster's self-signed root, valid 2026-09-06 -> 2036-09-03.
-      # It is public key material, not a secret. If the PGO cluster is ever
-      # rebuilt, this value must be refreshed from
-      # `oc get secret zuno-postgresql-cluster-cert -n zuno-data -o jsonpath='{.data.ca\.crt}' | base64 -d`.
+      # Pinning certificates in git is acceptable here: these are the PGO
+      # clusters' self-signed roots - public key material, not secrets.
       #
-      # ADR-0517 live finding (demo333, 2026-09-08): the value committed here
-      # was still demo222's cert (issued 2026-08-24) - PGO generates a fresh,
-      # per-cluster self-signed root every time its PostgresCluster is
-      # (re)created, so demo333's from-scratch PGO cluster got its own CA
-      # that this bundle never matched. mlflow's migration Job (which pins
-      # PGSSLMODE=verify-full, see above) retried "certificate verify
-      # failed" in an unbounded loop - the operator recreates the Job on
-      # every reconcile, so failed pods kept accumulating for hours. Refresh
-      # this value after ANY PGO cluster rebuild, not just the first install.
+      # This bundle is ADDITIVE and multi-cluster (post-upgrade live finding,
+      # demo222, 2026-09-12): PGO generates a fresh per-cluster root every
+      # time its PostgresCluster is (re)created, and this chart is shared by
+      # every cluster. The 2026-09-08 fix (ADR-0517, demo333) REPLACED
+      # demo222's root with demo333's, which broke mlflow on demo222 with the
+      # exact failure it was fixing on demo333. So: after ANY PGO cluster
+      # rebuild, APPEND that cluster's root here - never replace the list.
+      # Certs below: demo222 (2026-08-24 -> 2036-08-21), then
+      # demo333 (2026-09-06 -> 2036-09-03). Read a cluster's current root:
+      # `oc get secret zuno-postgresql-cluster-cert -n zuno-data -o jsonpath='{.data.ca\.crt}' | base64 -d`.
       trustedCABundle:
         managementState: Managed
         customCABundle: |
+          -----BEGIN CERTIFICATE-----
+          MIIBgTCCASigAwIBAgIRAKBF4htl4S+VJw0iaws8BcowCgYIKoZIzj0EAwMwHzEd
+          MBsGA1UEAxMUcG9zdGdyZXMtb3BlcmF0b3ItY2EwHhcNMjYwODI0MTcxMzAyWhcN
+          MzYwODIxMTgxMzAyWjAfMR0wGwYDVQQDExRwb3N0Z3Jlcy1vcGVyYXRvci1jYTBZ
+          MBMGByqGSM49AgEGCCqGSM49AwEHA0IABMsiEzes2k1qRCLzU3Snpcc83NSySxZS
+          u2LW/57sRJU9TLxNGXo6UcR4JMT9y49PFw643+FgNUMco0TsLyx0wwajRTBDMA4G
+          A1UdDwEB/wQEAwIBBjASBgNVHRMBAf8ECDAGAQH/AgEAMB0GA1UdDgQWBBTy1Fwm
+          3rOd9k60h4/+FX+j5MmYOjAKBggqhkjOPQQDAwNHADBEAiAKWriY0ao+bGGvFNZ3
+          on7UaTFEabZOc+SJZVbXKjm1mQIgQ+i0EwGqZ3ZXxPGZub/EwR2rvpOG9duusuqL
+          I9nrZYI=
+          -----END CERTIFICATE-----
           -----BEGIN CERTIFICATE-----
           MIIBgjCCASegAwIBAgIQWCLpKAUKJuwWx1nZJa245DAKBggqhkjOPQQDAzAfMR0w
           GwYDVQQDExRwb3N0Z3Jlcy1vcGVyYXRvci1jYTAeFw0yNjA5MDYxNzA3MzZaFw0z
