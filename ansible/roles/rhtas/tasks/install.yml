@@ -16,6 +16,25 @@
     name: "{{ rhtas_package_name | default('rhtas-operator') }}"
   register: _rhtas_pkg_info
 
+# WP-143 live finding (demo222, 2026-09-12, post OCP 5.0.0-rc.2): the
+# redhat-operators index shipped with the upgrade DROPPED the
+# rhtas-operator PackageManifest while the installed operator
+# (Subscription + CSV rhtas-operator.v1.4.3) kept running fine. A hard
+# fail here blocked the whole role - including the -d1 operand config
+# this repo still owns - for a discovery that only feeds the -d0
+# Subscription values. New contract: a missing PackageManifest is fatal
+# ONLY when the operator is not already installed; with an existing
+# Subscription the -d0 apply is skipped (its Application keeps its last
+# synced values) and the rest of the role proceeds.
+- name: "rhtas | look up an existing rhtas-operator Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    namespace: openshift-operators
+    name: "{{ rhtas_package_name | default('rhtas-operator') }}"
+  register: _rhtas_existing_sub
+  when: (_rhtas_pkg_info.resources | default([]) | length) == 0
+
 - name: "rhtas | fail if the package isn't published anywhere on this cluster"
   ansible.builtin.fail:
     msg: >-
@@ -25,9 +44,24 @@
       this cluster (it must be published by the Red Hat Operators catalog).
       Re-run with `-e rhtas_package_name=<name>` or update this role's
       default if the catalog on this cluster differs.
-  when: (_rhtas_pkg_info.resources | default([]) | length) == 0
+  when:
+    - (_rhtas_pkg_info.resources | default([]) | length) == 0
+    - (_rhtas_existing_sub.resources | default([]) | length) == 0
+
+- name: "rhtas | note that discovery is skipped (operator already installed, package absent from the catalog)"
+  ansible.builtin.debug:
+    msg: >-
+      PackageManifest '{{ rhtas_package_name | default('rhtas-operator') }}'
+      is absent from the catalogs but the Subscription exists - skipping
+      the -d0 apply (it keeps its last synced values) and proceeding with
+      the operand configuration. Operator updates will not resolve until
+      the catalog publishes the package again.
+  when:
+    - (_rhtas_pkg_info.resources | default([]) | length) == 0
+    - (_rhtas_existing_sub.resources | default([]) | length) > 0
 
 - name: "rhtas | select the catalog/channel to subscribe from"
+  when: (_rhtas_pkg_info.resources | default([]) | length) > 0
   ansible.builtin.set_fact:
     _rhtas_catalog_source: "{{ _rhtas_pkg_info.resources[0].status.catalogSource }}"
     _rhtas_channel: >-
@@ -44,19 +78,23 @@
       (catalog '{{ _rhtas_catalog_source }}') has no "stable" channel and
       no defaultChannel to fall back to. Published channels:
       {{ _rhtas_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
-  when: _rhtas_channel | length == 0
+  when:
+    - (_rhtas_pkg_info.resources | default([]) | length) > 0
+    - _rhtas_channel | length == 0
 
 - name: "rhtas | discovery summary"
   ansible.builtin.debug:
     msg: >-
       Subscribing to package '{{ rhtas_package_name | default('rhtas-operator') }}',
       catalog '{{ _rhtas_catalog_source }}', channel '{{ _rhtas_channel }}'.
+  when: (_rhtas_pkg_info.resources | default([]) | length) > 0
 
 # The Subscription (operator.enabled) lives in gitops/charts/rhtas, applied
 # via the separate zuno-rhtas-d0 Application. No dedicated OperatorGroup:
 # same reasoning as mariadb/postgresql (AllNamespaces-only CSV).
 - name: "rhtas | apply the RHTAS GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  when: (_rhtas_pkg_info.resources | default([]) | length) > 0
   vars:
     gitops_component_name: "rhtas"
     gitops_app_phase: "d0"
@@ -130,6 +168,23 @@
 - name: "rhtas | resolve the MariaDB endpoint (ADR-0352/WP-143)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_mariadb_endpoint.yml"
 
+# WP-143 live finding (demo222, 2026-09-12): a leftover ExternalSecret
+# from an earlier failed run had synced BEFORE the mode flip re-seeded
+# Vault, and its 1h refreshInterval froze the stale password - while the
+# materialize-wait below only asserts the Secret EXISTS, so it passed
+# instantly on stale data and the schema Job got Access denied. Delete
+# any previous copy first: a freshly created ExternalSecret always
+# fetches current Vault data.
+- name: "rhtas | drop any stale schema-Job ExternalSecret"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: external-secrets.io/v1beta1
+    kind: ExternalSecret
+    namespace: zuno-rhtas
+    name: rhtas-trillian-schema-db
+    wait: true
+    wait_timeout: 60
+
 - name: "rhtas | materialize the Trillian DB password for the schema Job"
   kubernetes.core.k8s:
     state: present
@@ -142,7 +197,7 @@
         labels:
           zuno.io/managed-by: zuno-ansible
       spec:
-        refreshInterval: 1h
+        refreshInterval: 1m
         secretStoreRef:
           name: vault-backend
           kind: ClusterSecretStore
