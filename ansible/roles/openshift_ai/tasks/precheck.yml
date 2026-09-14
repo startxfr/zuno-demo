@@ -154,6 +154,19 @@
       {%- endfor -%}
       {{ hits | unique | list }}
 
+# The off-by-one lives in SIX places in the generated policy: five CEL
+# expressions and one OPA rego block. This tripwire used to look only for the
+# rego form, `path_parts[0]`, so a partial upstream fix that repaired the rego
+# alone - or merely renamed that variable - would turn it green while five CEL
+# sites stayed broken. A guard whose whole purpose is to not be silent must not
+# have a silent false negative of its own, so both forms are matched.
+- name: "openshift_ai | precheck: detect the [0]-indexed path identity in either form"
+  ansible.builtin.set_fact:
+    _oai_offby1_present: >-
+      {{ ['path_parts[0]', 'filter(x, x != "")[0]']
+         | select('in', _oai_diag_maas_authpolicy.resources | default([]) | to_json)
+         | list | length > 0 }}
+
 - name: "openshift_ai | precheck: record that a live /llm/ route has hit the identity off-by-one"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
   vars:
@@ -166,7 +179,59 @@
       auto_fix: "manual only - upstream RHOAI defect, see docs/roadmap/evidence/maas-llm-path-identity-off-by-one.md"
   when:
     - (_oai_llm_route_hits | default([]) | length) > 0
-    - "'path_parts[0]' in (_oai_diag_maas_authpolicy.resources | default([]) | to_json)"
+    - _oai_offby1_present | bool
+    - blocked_findings is defined
+
+# --- Orphaned MaaS admission webhook tripwire (RHOAI 3.5.0 GA) -------------
+# Reports the FIELD, never a symptom: the three webhooks match CREATE only, so
+# a silent return to failurePolicy: Fail breaks nothing that is already
+# running and stays invisible until the next MaaS resource is created - at
+# which point a sync freezes for reasons that look nothing like admission.
+# neutralize_maas_webhook_failurepolicy.yml re-asserts Ignore on every install
+# and reconcile; this is what says the re-assertion has not run, or that the
+# operand took the field back in between.
+- name: "openshift_ai | precheck: look up the MaaS validating webhook configuration"
+  kubernetes.core.k8s_info:
+    api_version: admissionregistration.k8s.io/v1
+    kind: ValidatingWebhookConfiguration
+    name: maas-validating-webhook-configuration
+  register: _oai_diag_maas_webhook
+  failed_when: false
+
+- name: "openshift_ai | precheck: look up the endpoints behind the MaaS webhook Service"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Endpoints
+    namespace: "{{ _svc.namespace | default('redhat-ods-applications') }}"
+    name: "{{ _svc.name | default('maas-controller-webhook-service') }}"
+  register: _oai_diag_maas_webhook_eps
+  failed_when: false
+  vars:
+    _svc: >-
+      {{ ((_oai_diag_maas_webhook.resources | default([]) | first | default({}))
+          .get('webhooks', []) | first | default({}))
+         .get('clientConfig', {}).get('service', {}) }}
+  when: (_oai_diag_maas_webhook.resources | default([]) | length) > 0
+
+- name: "openshift_ai | precheck: record that an unbacked MaaS webhook is set to Fail"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    _oai_maas_webhook_policies: >-
+      {{ (_oai_diag_maas_webhook.resources | default([]) | first | default({}))
+         .get('webhooks', []) | map(attribute='failurePolicy') | list }}
+    blocked_finding:
+      component: openshift-ai
+      resource: "ValidatingWebhookConfiguration/maas-validating-webhook-configuration"
+      state: "failurePolicy is {{ _oai_maas_webhook_policies | join(', ') }} while its Service has no endpoints"
+      cause: "RHOAI 3.5.0 GA vendor defect - the ModelsAsService operand creates these three webhooks pointing at maas-controller-webhook-service, but no maas-controller Deployment exists to back it. The API server cannot reach an unbacked webhook, so with failurePolicy Fail it refuses every MaaS CREATE cluster-wide, including the Tenant gitops/charts/models renders. They match CREATE only, so nothing already running breaks and nothing looks wrong until the next create is refused."
+      solution: "Run `make d1 reconcile openshift-ai` - neutralize_maas_webhook_failurepolicy.yml sets the three back to Ignore and switches itself off again as soon as the Service has endpoints. If endpoints HAVE appeared, the controller is back and the vendor default is correct: delete the ValidatingWebhookConfiguration and let the operand recreate it with real validation."
+      auto_fix: "make d1 reconcile openshift-ai"
+  when:
+    - (_oai_diag_maas_webhook.resources | default([]) | length) > 0
+    - ((_oai_diag_maas_webhook_eps.resources | default([]) | first | default({})).get('subsets', []) | length) == 0
+    - >-
+      'Fail' in ((_oai_diag_maas_webhook.resources | default([]) | first | default({}))
+                 .get('webhooks', []) | map(attribute='failurePolicy') | list)
     - blocked_findings is defined
 
 # --- Tempo gateway authz-sidecar starvation tripwire (ADR-0523/WP-081) -----

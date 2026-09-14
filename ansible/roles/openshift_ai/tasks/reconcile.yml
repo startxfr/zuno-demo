@@ -357,6 +357,13 @@
 - name: "openshift_ai | reconcile: widen the RHOAI MonitoringStack to observe zuno-ai-run"
   ansible.builtin.include_tasks: widen_monitoringstack_namespace_selector.yml
 
+# --- Orphaned MaaS admission webhooks: shared with install.yml. Re-asserted
+# here rather than patched once because `modelsasservice` is the resource's
+# own Apply manager and can reclaim failurePolicy at any reconcile - the same
+# ownership argument as the payload-processing NetworkPolicy above.
+- name: "openshift_ai | reconcile: keep the orphaned MaaS admission webhooks from blocking creates"
+  ansible.builtin.include_tasks: neutralize_maas_webhook_failurepolicy.yml
+
 # --- Dashboard feature flags: shared with install.yml for the same reason as
 # the TempoStack above. These four flags had no applier at all until
 # 2026-09-03 - they were posted by hand with `oc patch` and recorded only in

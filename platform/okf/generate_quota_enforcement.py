@@ -232,12 +232,52 @@ def _render_budgets(doc: Dict) -> str:
     return header + yaml.safe_dump(slim, sort_keys=False)
 
 
+# Both spellings, because CEL accepts both and this repo already needs the
+# bracket form in places: `has()` rejects a bracket-index argument, and a
+# hyphenated name cannot use dot notation at all (see COUNTER_EXPRESSIONS'
+# note above). Matching only `auth.identity.<name>` would let a dimension
+# written `auth.identity["model-id"]` contribute NO required property, so the
+# lint below would find nothing missing and pass - on exactly the config that
+# disables enforcement. A guard against a silent failure must not have a
+# silent failure of its own.
+_IDENTITY_REF = re.compile(
+    r"auth\.identity(?:\.([A-Za-z_][A-Za-z0-9_]*)"
+    r"|\[\s*(['\"])([A-Za-z_][A-Za-z0-9_.-]*)\2\s*\])"
+)
+
+
 def _required_identity_properties() -> List[str]:
-    """The `auth.identity.<name>` suffixes the generated counters read."""
+    """The identity properties the generated counters read, in either spelling."""
     names = set()
     for expression in COUNTER_EXPRESSIONS.values():
-        names.update(re.findall(r"auth\.identity\.([A-Za-z_][A-Za-z0-9_]*)", expression))
+        for dotted, _quote, bracketed in _IDENTITY_REF.findall(expression):
+            names.add(dotted or bracketed)
     return sorted(names)
+
+
+def _published_identity_properties(block: str) -> set:
+    """The property names an identity filter block publishes.
+
+    Keys are taken at the block's own outermost indentation rather than at a
+    fixed column, and a quoted key counts the same as a bare one. The previous
+    form hardcoded sixteen spaces and refused quotes, so re-indenting the
+    template - or quoting a key, which YAML requires for some names - made
+    every property read as unpublished or, worse, made a genuinely missing one
+    read as published.
+    """
+    key_re = re.compile(
+        r"^([ \t]*)(?:(['\"])(?P<quoted>[A-Za-z_][A-Za-z0-9_.-]*)\2"
+        r"|(?P<bare>[A-Za-z_][A-Za-z0-9_.-]*))\s*:",
+        re.M,
+    )
+    hits = [
+        (len(m.group(1)), m.group("quoted") or m.group("bare"))
+        for m in key_re.finditer(block)
+    ]
+    if not hits:
+        return set()
+    outermost = min(indent for indent, _ in hits)
+    return {name for indent, name in hits if indent == outermost}
 
 
 def _check_identity_filter() -> List[str]:
@@ -287,6 +327,51 @@ def _check_identity_filter() -> List[str]:
     return []
 
 
+def _self_test_identity_lint() -> List[str]:
+    """Proves the identity lint can still fail, before trusting it to pass.
+
+    `_check_identity_filter` guards a failure that is invisible in the
+    cluster, so a version of it that always returns [] would look exactly
+    like a clean repo - and that is not hypothetical: reading only
+    `auth.identity.<name>` made it blind to the bracket spelling, and keying
+    published properties off a hardcoded sixteen-space indent made it blind
+    to a reformatted or quoted key. Either blindness turns this lint into a
+    rubber stamp.
+
+    So the mechanism is exercised against a dimension that must fail, on
+    every run rather than in a test file nobody executes. Same reasoning as
+    the wrong-path counter-test documented in the postgresql role: a check
+    that reports the same thing either way is not reading anything.
+    """
+    problems: List[str] = []
+    saved = dict(COUNTER_EXPRESSIONS)
+    try:
+        COUNTER_EXPRESSIONS["__selftest__"] = 'auth.identity["__never_published__"]'
+        if "__never_published__" not in _required_identity_properties():
+            problems.append(
+                "identity lint self-test: a bracket-spelled auth.identity reference "
+                "contributes no required property, so such a dimension could never "
+                "be reported as unpublished"
+            )
+        elif not _check_identity_filter():
+            problems.append(
+                "identity lint self-test: an unpublished identity property was not "
+                "reported - the lint cannot fail and therefore proves nothing"
+            )
+    finally:
+        COUNTER_EXPRESSIONS.clear()
+        COUNTER_EXPRESSIONS.update(saved)
+
+    if _published_identity_properties(
+        '        "quoted_key":\n          expression: auth.identity.sub\n'
+    ) != {"quoted_key"}:
+        problems.append(
+            "identity lint self-test: a quoted property key is not recognised as "
+            "published, so the lint would report a published property as missing"
+        )
+    return problems
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="ADR-0511 quota enforcement generator")
     parser.add_argument("--check", action="store_true",
@@ -301,7 +386,7 @@ def main() -> int:
 
     # Runs in both modes: a regeneration that leaves enforcement silently
     # inert is not a success, so this is reported even when writing.
-    failures: List[str] = _check_identity_filter()
+    failures: List[str] = _self_test_identity_lint() + _check_identity_filter()
     written: List[str] = []
     for path, content in expected.items():
         rel = path.relative_to(REPO_ROOT)

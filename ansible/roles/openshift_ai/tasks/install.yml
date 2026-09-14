@@ -262,6 +262,13 @@
 - name: "openshift_ai | widen the RHOAI MonitoringStack to observe zuno-ai-run"
   ansible.builtin.include_tasks: widen_monitoringstack_namespace_selector.yml
 
+# Must run before anything tries to CREATE a MaaS resource - the models
+# component's Tenant is one - or the API server refuses it. Shared with
+# reconcile.yml because the operand can reclaim the field; see the included
+# file for why this is a re-assertion and why it switches itself off.
+- name: "openshift_ai | keep the orphaned MaaS admission webhooks from blocking creates"
+  ansible.builtin.include_tasks: neutralize_maas_webhook_failurepolicy.yml
+
 # After the TempoStack, and last overall, because the dashboard component only
 # creates its OdhDashboardConfig once the DSC above is accepted. Shared with
 # reconcile.yml for the same reason the TempoStack remediation is: until

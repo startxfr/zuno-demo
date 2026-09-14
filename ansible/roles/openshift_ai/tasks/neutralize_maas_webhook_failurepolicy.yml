@@ -1,0 +1,117 @@
+---
+# Keeps the orphaned MaaS admission webhooks from blocking every MaaS
+# resource creation on this cluster - and stops doing so the moment they
+# stop being orphaned.
+#
+# The defect (live, demo222, 2026-09-12/14): the ModelsAsService operand
+# creates maas-validating-webhook-configuration with three webhooks
+# (vaitenant, vmaassubscription, vmaasauthpolicy) pointing at
+# redhat-ods-applications/maas-controller-webhook-service - a Service with
+# NO endpoints, because no maas-controller Deployment exists in that
+# namespace at all. With the vendor default failurePolicy: Fail, the API
+# server cannot reach the webhook and therefore refuses every CREATE it
+# matches. The three only fire on CREATE, never UPDATE, so existing MaaS
+# objects keep working and the breakage is invisible until something is
+# created: gitops/charts/models/templates/maas.yaml's own Tenant
+# "default-tenant" is exactly such a create, and its rejection froze every
+# sync of zuno-models-d1.
+#
+# Why a re-assertion rather than a patch-once-and-forget (the
+# widen_monitoringstack_namespace_selector.yml idiom): that idiom is only
+# licensed when managedFields proves no manager claims the field. Here the
+# resource's Apply manager is `modelsasservice` itself, while the live
+# mitigation was an Update by `kubectl-patch` - so the operand reclaims
+# failurePolicy the moment its next Apply carries it. Observed 2026-09-14:
+# the mitigation survived a full cluster stop/start with generation
+# unchanged, which is a reprieve, not immunity. Re-asserted every install
+# and reconcile for the same reason reconcile.yml re-asserts the
+# payload-processing NetworkPolicy.
+#
+# Why it is conditional on the Service having no endpoints: the vendor
+# default is CORRECT whenever the controller is actually running. If
+# maas-controller ever ships, its endpoints appear and this task stops
+# touching the webhook, restoring real admission validation without anyone
+# having to remember to remove this file. A mitigation that cannot switch
+# itself off is how a workaround outlives its defect.
+#
+# JSON-Patch on each failurePolicy rather than a merge patch on `webhooks`:
+# webhooks is a list, so a merge patch replaces it wholesale and would make
+# this repo the field manager for the caBundle, the rules and everything
+# else in it. Same reasoning as connectivity_link's Authorino Service
+# annotation.
+
+- name: "openshift_ai | look up the MaaS validating webhook configuration"
+  kubernetes.core.k8s_info:
+    api_version: admissionregistration.k8s.io/v1
+    kind: ValidatingWebhookConfiguration
+    name: maas-validating-webhook-configuration
+  register: _oai_maas_webhook
+  failed_when: false
+
+- name: "openshift_ai | look up the endpoints behind the MaaS webhook Service"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Endpoints
+    namespace: "{{ _svc.namespace | default('redhat-ods-applications') }}"
+    name: "{{ _svc.name | default('maas-controller-webhook-service') }}"
+  register: _oai_maas_webhook_eps
+  failed_when: false
+  vars:
+    _svc: >-
+      {{ ((_oai_maas_webhook.resources | default([]) | first | default({}))
+          .get('webhooks', []) | first | default({}))
+         .get('clientConfig', {}).get('service', {}) }}
+  when: (_oai_maas_webhook.resources | default([]) | length) > 0
+
+- name: "openshift_ai | decide whether the MaaS webhooks need neutralising"
+  ansible.builtin.set_fact:
+    _oai_maas_webhook_orphaned: >-
+      {{ (_oai_maas_webhook.resources | default([]) | length) > 0
+         and ((_oai_maas_webhook_eps.resources | default([]) | first | default({}))
+              .get('subsets', []) | length) == 0 }}
+    _oai_maas_webhook_fail_indexes: >-
+      {{ (_oai_maas_webhook.resources | default([]) | first | default({}))
+         .get('webhooks', [])
+         | map(attribute='failurePolicy') | list }}
+
+- name: "openshift_ai | re-assert failurePolicy Ignore on each orphaned MaaS webhook"
+  kubernetes.core.k8s_json_patch:
+    api_version: admissionregistration.k8s.io/v1
+    kind: ValidatingWebhookConfiguration
+    name: maas-validating-webhook-configuration
+    patch:
+      - op: replace
+        path: "/webhooks/{{ item }}/failurePolicy"
+        value: Ignore
+  loop: "{{ range(_oai_maas_webhook_fail_indexes | length) | list }}"
+  loop_control:
+    label: "webhooks[{{ item }}]"
+  when:
+    - _oai_maas_webhook_orphaned | bool
+    - _oai_maas_webhook_fail_indexes[item | int] != 'Ignore'
+
+- name: "openshift_ai | report the MaaS webhook decision"
+  ansible.builtin.debug:
+    msg: >-
+      {% if (_oai_maas_webhook.resources | default([]) | length) == 0 -%}
+      No maas-validating-webhook-configuration on this cluster - nothing to do.
+      {%- elif not (_oai_maas_webhook_orphaned | bool) -%}
+      maas-controller-webhook-service has endpoints, so the MaaS admission
+      webhooks are backed by a running controller and their vendor
+      failurePolicy is left exactly as the operand set it. If this repo had
+      previously forced Ignore, restore real validation by deleting the
+      ValidatingWebhookConfiguration and letting the operand recreate it.
+      {%- elif 'Fail' not in _oai_maas_webhook_fail_indexes -%}
+      maas-controller-webhook-service still has NO endpoints (no
+      maas-controller Deployment), and all
+      {{ _oai_maas_webhook_fail_indexes | length }} webhook(s) are already
+      Ignore - the mitigation is in place and nothing was changed. It stays
+      needed until the controller ships.
+      {%- else -%}
+      maas-controller-webhook-service has NO endpoints (no maas-controller
+      Deployment) and {{ _oai_maas_webhook_fail_indexes | select('equalto', 'Fail') | list | length }}
+      webhook(s) were set to Fail - forced back to Ignore. Left alone, the API
+      server refuses every MaaS CREATE cluster-wide, including the Tenant
+      gitops/charts/models renders, which freezes zuno-models-d1. This is a
+      vendor defect mitigation, not a configuration choice.
+      {%- endif %}
