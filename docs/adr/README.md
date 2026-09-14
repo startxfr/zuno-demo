@@ -321,6 +321,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | Proposed | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
 | [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 | [ADR-0558](0558-tolerate-catalogs-that-stop-publishing-an-installed-operator.md) | Implemented | Tolerate catalogs that stop publishing an installed operator |
+| [ADR-0559](0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md) | Accepted | Follow the cluster's version and never branch the repository by OCP version |
 
 ## v0.10
 
