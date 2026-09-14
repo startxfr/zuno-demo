@@ -22,7 +22,17 @@ operator, and then **stopped carrying it**.
 
 The upgrade of `demo222` to OCP 5.0.0-rc.2 replaced the three
 CatalogSources with the `:v5.0` indexes, which are markedly poorer than
-their predecessors. Thirteen Subscriptions cluster-wide now name a package
+their predecessors. That replacement is not a decision anyone here made and
+not an artifact this repository owns: the three CatalogSources carry
+`operatorframework.io/managed-by: marketplace-operator`, `OperatorHub/cluster`
+runs with the default sources (`disableAllDefaultSources` unset), the index
+tag follows the cluster version automatically, and the string
+`operator-index` appears nowhere in `gitops/` or `ansible/`. It follows that
+**no change on the repository side can restore a package a catalog has
+dropped** — which is why the decision below is about tolerating and
+reporting the condition rather than correcting it.
+
+Thirteen Subscriptions on that cluster now name a package
 their own catalog no longer publishes — `rhtas-operator`,
 `crunchy-postgres-operator`, `rhcl-operator`, `dns-operator`,
 `limitador-operator`, `rhods-operator`, `lightspeed-operator`, `nfd`,
@@ -60,11 +70,19 @@ Worse, the state is indistinguishable from health by the obvious check: all
 thirteen Subscriptions report `AtLatestKnown`, which means "no candidate in
 the channel", not "up to date". On a poor index the two are the same string.
 
-Pinning the catalog indexes was considered and rejected: this repository
-deliberately does not manage CatalogSources (the single exception is
-postgresql's community fallback), the indexes follow the OCP version, and
-pinning them would trade a silent freeze for a silent divergence from the
-platform the cluster actually runs.
+Taking the indexes over was considered and rejected. This repository
+deliberately does not manage CatalogSources — the single exception is
+postgresql's community fallback — and the default ones follow the OCP
+version by design; asserting our own would trade a silent freeze for a
+silent divergence from the platform the cluster actually runs. Adding
+*extra*, pinned CatalogSources alongside the defaults is a different
+proposition and a real one, but it is an upgrade-policy decision rather than
+a discovery one, and it belongs with the `startingCSV` question in its own
+record.
+
+All measurements in this record were taken on `demo222`. `demo333` was
+powered off throughout and is on a different OCP version; nothing here
+should be read as a fleet-wide count.
 
 ## Decision
 
