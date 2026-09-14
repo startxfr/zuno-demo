@@ -192,8 +192,17 @@ managing the cluster from a remote ArgoCD (native vs RHACM — study concluded
 model ruled out of external mode), and ADR-0556
 records the long-term `zuno` operator contract
 (ZunoFoundation/ZunoInfra/ZunoStack CRDs mirroring the Day 0/1/2 playbooks).
+The band closes with ADR-0558 (2026-09-14, **Implemented**), opened by an
+incident during WP-143's own flip back rather than planned: an OCP upgrade's
+catalog indexes stopped publishing packages whose operators were installed
+and running, and because OLM resolves a namespace as a unit, one
+unsatisfiable Subscription blocked every InstallPlan in it — including
+`mariadb-operator`'s. A missing `PackageManifest` is now fatal only when the
+operator is not already installed, the fourteen duplicated discovery blocks
+become one shared task, and readiness probe P8 reports a frozen Subscription
+instead of leaving `AtLatestKnown` to pass for up to date.
 
-**7 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410, ADR-0556, ADR-0557.
+**8 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410, ADR-0556, ADR-0557.
 
 ## v0.10
 

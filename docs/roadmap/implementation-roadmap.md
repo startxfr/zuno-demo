@@ -31,7 +31,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
-| v0.9 | 7 | 5 | 6 | — |
+| v0.9 | 8 | 5 | 7 | — |
 | v0.10 | 5 | 5 | 6 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -874,6 +874,21 @@ mid-external by a cluster stop; completed end to end on `demo222`,
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-143 | [wp-143](work-packages/wp-143-mariadb-internal-external-pilot.md) | 0352 | none | Done (2026-09-14 - full there-and-back rehearsal completed on demo222, data intact both ways, d1 check and supply-chain 14/14 green at nominal internal end state; eight live findings recorded in this brief) | none |
+
+### Phase 43 — OLM catalog-drop tolerance (added 2026-09-14)
+
+Opened by an incident inside Phase 42 rather than planned: the flip back to
+the internal MariaDB wedged because three unrelated Subscriptions in
+`openshift-operators` named packages the OCP 5.0.0-rc.2 indexes had stopped
+publishing, and OLM resolves a namespace as a unit. ADR-0558 makes a missing
+`PackageManifest` fatal only when the operator is not already installed,
+factors the fourteen duplicated discovery blocks into one shared task, and
+adds readiness probe P8 so a frozen Subscription is reported instead of
+being discovered by whoever tries the next install.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-144 | [wp-144](work-packages/wp-144-olm-catalog-drop-tolerance.md) | 0558 | none | Done (2026-09-14 - shared discovery task adopted by the twelve exact-name roles, readiness probe P8 live-verified on demo222 reporting 13 frozen Subscriptions and naming openshift-operators as the namespace where they block others) | decide per operator whether to drop each of the 13 frozen Subscriptions (forfeits its update path) or wait for the catalog to publish again - P8 reports, deliberately does not repair |
 
 ### OKF stream phases
 

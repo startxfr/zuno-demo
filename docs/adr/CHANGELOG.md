@@ -9,6 +9,19 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## New record (2026-09-14) - ADR-0558 added to v0.9
+
+Opened by a live incident rather than planned. ADR-0048 ruled that a role must
+"fail with a clear diagnostic" when a package is not discoverable, which was
+written for a first install against a catalog that never carried it. The OCP
+5.0.0-rc.2 upgrade produced the case it did not anticipate: catalogs that
+carried a package, installed the operator from it, then stopped carrying it -
+thirteen such Subscriptions on demo222, every CSV `Succeeded`. ADR-0558
+extends ADR-0048 rather than superseding it: the hard failure is kept for a
+genuine first install and dropped when the operator is already installed, and
+a new readiness probe reports the namespace-wide OLM resolution freeze that
+one unsatisfiable Subscription imposes on every other operator beside it.
+
 ## Amendment note (2026-09-10) - ADR-0352 corrected in place; ADR-0556/0557 added
 
 ADR-0352 (day-0 internal/external mode, still `Proposed`, never implemented -
