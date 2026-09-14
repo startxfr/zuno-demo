@@ -7,55 +7,16 @@
 # as "job-set" (ADR-0318 originally guessed "jobset-operator"); still
 # discover catalog/channel from the PackageManifest rather than hardcoding
 # them, same pattern as ansible/roles/external_secrets/tasks/install.yml.
-- name: "jobset | look up the {{ jobset_package_name | default('job-set') }} PackageManifest"
-  kubernetes.core.k8s_info:
-    api_version: packages.operators.coreos.com/v1
-    kind: PackageManifest
-    namespace: openshift-marketplace
-    name: "{{ jobset_package_name | default('job-set') }}"
-  register: _jobset_pkg_info
-
-- name: "jobset | fail if the package isn't published anywhere on this cluster"
-  ansible.builtin.fail:
-    msg: >-
-      No PackageManifest named '{{ jobset_package_name | default('job-set') }}'
-      was found in openshift-marketplace. Check `oc get packagemanifest -n
-      openshift-marketplace | grep -i jobset` for the correct package name
-      on this cluster - JobSet may not be OLM-packaged at all on this
-      catalog (see this role's README); if so, install it via its
-      upstream raw-manifest release instead and update this role
-      accordingly. Otherwise re-run with `-e jobset_package_name=<name>`
-      or update this role's default - the catalog on this cluster changed
-      from what ADR-0318 last confirmed.
-  when: (_jobset_pkg_info.resources | default([]) | length) == 0
-
-- name: "jobset | select the catalog/channel to subscribe from"
-  ansible.builtin.set_fact:
-    _jobset_catalog_source: "{{ _jobset_pkg_info.resources[0].status.catalogSource }}"
-    _jobset_channel: >-
-      {{
-        'stable'
-        if (_jobset_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
-        else (_jobset_pkg_info.resources[0].status.defaultChannel | default(''))
-      }}
-
-- name: "jobset | fail if no usable channel was found"
-  ansible.builtin.fail:
-    msg: >-
-      Package '{{ jobset_package_name | default('job-set') }}'
-      (catalog '{{ _jobset_catalog_source }}') has no "stable" channel and
-      no defaultChannel to fall back to. Published channels:
-      {{ _jobset_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
-  when: _jobset_channel | length == 0
-
-- name: "jobset | discovery summary"
-  ansible.builtin.debug:
-    msg: >-
-      Subscribing to package '{{ jobset_package_name | default('job-set') }}',
-      catalog '{{ _jobset_catalog_source }}', channel '{{ _jobset_channel }}'.
+- name: "jobset | resolve the operator package"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  vars:
+    operator_package_name: "{{ jobset_package_name | default('job-set') }}"
+    operator_subscription_namespace: "openshift-jobset-operator"
+    operator_package_catalog_hint: "job-set"
 
 - name: "jobset | apply the jobset GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  when: not (operator_package_skip_d0 | bool)
   vars:
     gitops_component_name: "jobset"
     gitops_app_phase: "d0"
@@ -71,9 +32,9 @@
         enabled: true
         subscription:
           operator:
-            channel: "{{ _jobset_channel }}"
+            channel: "{{ operator_package_channel }}"
             source:
-              name: "{{ _jobset_catalog_source }}"
+              name: "{{ operator_package_catalog }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

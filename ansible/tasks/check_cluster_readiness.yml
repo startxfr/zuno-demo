@@ -470,6 +470,94 @@
       blocking: true
   when: (_readiness_placeholder_apps | default([]) | length) > 0
 
+# --- P8: a Subscription whose package the catalogs no longer serve ----------
+# WP-143 live finding (demo222, 2026-09-12). The indexes an OCP upgrade ships
+# can stop publishing a package while the operator installed from it keeps
+# running: five Subscriptions here (crunchy-postgres, rhtas, rhcl, dns,
+# limitador) survived the 5.0.0-rc.2 upgrade with their CSVs Succeeded and
+# their packages gone. Two consequences, both silent:
+#   * the operator is frozen - no update path, not even for a CVE, and its
+#     Subscription reports `AtLatestKnown`, which is indistinguishable from
+#     genuinely up to date (that is the trap this probe exists to break);
+#   * OLM resolves a namespace as a whole, so ONE unsatisfiable Subscription
+#     makes every other Subscription in it unresolvable. This is what blocked
+#     mariadb-operator's InstallPlan during WP-143's flip back, on a cluster
+#     where nothing about mariadb was wrong.
+# Advisory, never blocking: the cluster runs perfectly in this state and the
+# remedy - drop the Subscription, keep the CSV, or wait for the catalog to
+# publish again - is an operator's call, not an installer's.
+- name: "readiness | P8: list Subscriptions and the packages the catalogs publish"
+  kubernetes.core.k8s_info:
+    api_version: "{{ item.api_version }}"
+    kind: "{{ item.kind }}"
+  loop:
+    - { api_version: "operators.coreos.com/v1alpha1", kind: "Subscription" }
+    - { api_version: "packages.operators.coreos.com/v1", kind: "PackageManifest" }
+  loop_control:
+    label: "{{ item.kind }}"
+  register: _readiness_olm
+  failed_when: false
+
+- name: "readiness | P8: index the package/catalog pairs actually served"
+  ansible.builtin.set_fact:
+    _readiness_served: >-
+      {{ _pkgs | map(attribute='metadata.name') | list
+         | zip(_pkgs | map(attribute='status.catalogSource') | list)
+         | map('join', '@') | list }}
+    _readiness_all_subs: >-
+      {{ _readiness_olm.results | default([]) | selectattr('item.kind', 'equalto', 'Subscription')
+         | map(attribute='resources') | flatten | list }}
+  vars:
+    _pkgs: >-
+      {{ (_readiness_olm.results | default([]) | selectattr('item.kind', 'equalto', 'PackageManifest')
+          | map(attribute='resources') | flatten | default([]))
+         | selectattr('status.catalogSource', 'defined') | list }}
+
+# Compared as package@catalog, not by package name alone: a Subscription is
+# only satisfiable from the catalog it names, and this cluster has homonyms
+# across catalogs that are entirely different operators (community's
+# limitador/dns/authorino versus Red Hat's).
+- name: "readiness | P8: collect the Subscriptions whose package is no longer served"
+  ansible.builtin.set_fact:
+    _readiness_orphan_subs: >-
+      {{ (_readiness_orphan_subs | default([]))
+         + [{'ns': item['metadata']['namespace'],
+             'name': item['metadata']['name'],
+             'key': _key}] }}
+  loop: "{{ _readiness_all_subs }}"
+  loop_control:
+    label: "{{ item['metadata']['name'] }}"
+  vars:
+    _key: >-
+      {{ (item['spec'] | default({}))['name'] | default('') ~ '@'
+         ~ (item['spec'] | default({}))['source'] | default('') }}
+  when: _key not in (_readiness_served | default([]))
+
+# The namespace-wide freeze only bites where the unsatisfiable Subscription
+# shares its namespace with others - openshift-operators, here. Alone in its
+# own namespace an orphan costs that one operator its update path and nothing
+# more, which is a different severity and deserves a different sentence.
+- name: "readiness | P8: find the namespaces where this also blocks other operators"
+  ansible.builtin.set_fact:
+    _readiness_orphan_shared_ns: "{{ (_readiness_orphan_shared_ns | default([])) + [item] }}"
+  loop: "{{ _readiness_orphan_subs | default([]) | map(attribute='ns') | unique | list }}"
+  when: (_readiness_all_subs | selectattr('metadata.namespace', 'equalto', item) | list | length) > 1
+
+- name: "readiness | P8: record a finding for the unsatisfiable Subscriptions"
+  ansible.builtin.set_fact:
+    _readiness: "{{ _readiness + [_finding] }}"
+  vars:
+    _shared: "{{ _readiness_orphan_shared_ns | default([]) }}"
+    _finding:
+      component: admin-context
+      resource: "Subscription(s) {{ _readiness_orphan_subs | map(attribute='ns') | zip(_readiness_orphan_subs | map(attribute='name')) | map('join', '/') | list }}"
+      state: "{{ _readiness_orphan_subs | length }} Subscription(s) name a package their catalog no longer publishes{{ ', blocking every other Subscription in: ' ~ (_shared | join(', ')) if (_shared | length) > 0 else '' }}"
+      cause: "WP-143 live finding - an OCP upgrade replaced the catalog indexes and they stopped publishing these packages, while the operators installed from them keep running. Every one of these Subscriptions is now unsatisfiable, so the operator is frozen with no update path, not even for a CVE - and its state reads `AtLatestKnown`, which is indistinguishable from genuinely up to date. Worse where a namespace is listed above: OLM resolves a namespace as a whole, so ONE unsatisfiable Subscription blocks every InstallPlan in it, including a brand-new operator that has nothing to do with it. That is what blocked mariadb-operator during WP-143's flip back."
+      solution: "Decide per operator. If the package is gone for good, delete the Subscription - the CSV and the running operator are unaffected - and remove it from the chart that declares it, or ArgoCD selfHeal will put it straight back. If it is expected to return, leave it, but know that nothing else in that namespace can install or update until it does. Never repoint one at a same-named package in another catalog: community-operators' limitador/dns/authorino are different operators from Red Hat's."
+      auto_fix: "manual only - dropping a Subscription forfeits that operator's update path, which is an operator's decision"
+      blocking: false
+  when: (_readiness_orphan_subs | default([]) | length) > 0
+
 # --- publish -----------------------------------------------------------------
 - name: "readiness | publish the findings"
   ansible.builtin.set_fact:

@@ -1,0 +1,127 @@
+---
+# Resolves the catalog/channel an operator Subscription should be created
+# from (ADR-0048: discover, never hardcode), and decides whether the -d0
+# Subscription apply can run at all.
+#
+# WP-143 live finding (demo222, 2026-09-12, post OCP 5.0.0-rc.2): the
+# indexes shipped with an OCP upgrade can STOP publishing a package while
+# the operator installed from it keeps running perfectly - `rhtas-operator`
+# and `crunchy-postgres-operator` both vanished from their catalogs with
+# their CSVs still Succeeded. Every role reproduced the same hard `fail`
+# on an empty PackageManifest lookup, so a discovery that only feeds the
+# -d0 Subscription values took down the whole role, including the -d1
+# operand config this repo still owns.
+#
+# Contract: a missing PackageManifest is fatal ONLY when the operator is
+# not already installed. With an existing Subscription the caller is told
+# to skip its -d0 apply (that Application keeps its last synced values)
+# and to proceed with everything else.
+#
+# Inputs (vars on the include):
+#   operator_package_name          required - PackageManifest name
+#   operator_subscription_name     default: operator_package_name
+#   operator_subscription_namespace default: openshift-operators
+#   operator_preferred_channel     default: stable
+#   operator_package_catalog_hint  optional - named in the fail message
+#
+# Outputs (facts):
+#   operator_package_catalog   catalogSource to subscribe from ('' if skipped)
+#   operator_package_channel   channel to subscribe on ('' if skipped)
+#   operator_package_skip_d0   true when the package is gone but the
+#                              operator is already installed
+
+# Reset first, unconditionally. set_fact persists for the rest of the play,
+# and day0_install.yml walks many components in one play - without this a
+# later component whose lookup is skipped would silently inherit the
+# previous component's catalog and channel.
+- name: "operator-package | reset the resolution facts"
+  ansible.builtin.set_fact:
+    operator_package_catalog: ""
+    operator_package_channel: ""
+    operator_package_skip_d0: false
+    _op_pkg_name: "{{ operator_package_name }}"
+    _op_sub_name: "{{ operator_subscription_name | default(operator_package_name) }}"
+    _op_sub_ns: "{{ operator_subscription_namespace | default('openshift-operators') }}"
+    _op_want_channel: "{{ operator_preferred_channel | default('stable') }}"
+
+- name: "operator-package | look up the PackageManifest for {{ operator_package_name }}"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ _op_pkg_name }}"
+  register: _op_pkg_info
+
+- name: "operator-package | look up an existing Subscription for {{ operator_package_name }}"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    namespace: "{{ _op_sub_ns }}"
+    name: "{{ _op_sub_name }}"
+  register: _op_existing_sub
+  when: (_op_pkg_info.resources | default([]) | length) == 0
+
+# Both absent means this really is a first install against a catalog that
+# does not carry the package - a human has to pick the right name.
+- name: "operator-package | fail if the package isn't published anywhere on this cluster"
+  ansible.builtin.fail:
+    msg: >-
+      No PackageManifest named '{{ _op_pkg_name }}' was found in
+      openshift-marketplace, and no '{{ _op_sub_name }}' Subscription
+      exists in {{ _op_sub_ns }} either - so this is a first install
+      against a catalog that does not publish it. Check `oc get
+      packagemanifest -n openshift-marketplace | grep -i
+      {{ operator_package_catalog_hint | default(_op_pkg_name) }}` for the
+      name this cluster publishes, then re-run with an explicit package
+      name or update the calling role's default.
+  when:
+    - (_op_pkg_info.resources | default([]) | length) == 0
+    - (_op_existing_sub.resources | default([]) | length) == 0
+
+- name: "operator-package | keep the installed operator and skip its -d0 apply"
+  ansible.builtin.set_fact:
+    operator_package_skip_d0: true
+  when:
+    - (_op_pkg_info.resources | default([]) | length) == 0
+    - (_op_existing_sub.resources | default([]) | length) > 0
+
+- name: "operator-package | note that discovery was skipped"
+  ansible.builtin.debug:
+    msg: >-
+      PackageManifest '{{ _op_pkg_name }}' is absent from this cluster's
+      catalogs but the '{{ _op_sub_name }}' Subscription exists - skipping
+      the -d0 apply (its Application keeps its last synced values) and
+      proceeding with the rest of the role. The operator stays installed
+      and functional, but it will not resolve updates until a catalog
+      publishes the package again.
+  when: operator_package_skip_d0 | bool
+
+- name: "operator-package | select the catalog/channel to subscribe from"
+  ansible.builtin.set_fact:
+    operator_package_catalog: "{{ _op_pkg_info.resources[0].status.catalogSource }}"
+    operator_package_channel: >-
+      {{
+        _op_want_channel
+        if (_op_pkg_info.resources[0].status.channels
+            | selectattr('name', 'equalto', _op_want_channel) | list | length) > 0
+        else (_op_pkg_info.resources[0].status.defaultChannel | default(''))
+      }}
+  when: (_op_pkg_info.resources | default([]) | length) > 0
+
+- name: "operator-package | fail if no usable channel was found"
+  ansible.builtin.fail:
+    msg: >-
+      Package '{{ _op_pkg_name }}' (catalog '{{ operator_package_catalog }}')
+      publishes no '{{ _op_want_channel }}' channel and has no defaultChannel
+      to fall back to. Published channels:
+      {{ _op_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
+  when:
+    - (_op_pkg_info.resources | default([]) | length) > 0
+    - operator_package_channel | trim | length == 0
+
+- name: "operator-package | discovery summary"
+  ansible.builtin.debug:
+    msg: >-
+      Subscribing to package '{{ _op_pkg_name }}', catalog
+      '{{ operator_package_catalog }}', channel '{{ operator_package_channel }}'.
+  when: not (operator_package_skip_d0 | bool)

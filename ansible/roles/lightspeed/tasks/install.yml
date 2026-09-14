@@ -15,55 +15,19 @@
 # InstallModes OwnNamespace only. Still discovered from the PackageManifest
 # rather than hardcoded (ADR-0048), same pattern as every other
 # operator-backed role in this repo.
-- name: "lightspeed | look up the {{ lightspeed_package_name | default('lightspeed-operator') }} PackageManifest"
-  kubernetes.core.k8s_info:
-    api_version: packages.operators.coreos.com/v1
-    kind: PackageManifest
-    namespace: openshift-marketplace
-    name: "{{ lightspeed_package_name | default('lightspeed-operator') }}"
-  register: _lightspeed_pkg_info
-
-- name: "lightspeed | fail if the package isn't published anywhere on this cluster"
-  ansible.builtin.fail:
-    msg: >-
-      No PackageManifest named
-      '{{ lightspeed_package_name | default('lightspeed-operator') }}' was found
-      in openshift-marketplace. Check `oc get packagemanifest -n
-      openshift-marketplace | grep -i lightspeed` for the correct package name
-      on this cluster (note: "ansible-lightspeed" is a DIFFERENT product, the
-      AAP one from ADR-0354 - do not subscribe to it here); re-run with `-e
-      lightspeed_package_name=<name>` or update this role's default.
-  when: (_lightspeed_pkg_info.resources | default([]) | length) == 0
-
-- name: "lightspeed | select the catalog/channel to subscribe from"
-  ansible.builtin.set_fact:
-    _lightspeed_catalog_source: "{{ _lightspeed_pkg_info.resources[0].status.catalogSource }}"
-    _lightspeed_channel: >-
-      {{
-        'stable'
-        if (_lightspeed_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
-        else (_lightspeed_pkg_info.resources[0].status.defaultChannel | default(''))
-      }}
-
-- name: "lightspeed | fail if no usable channel was found"
-  ansible.builtin.fail:
-    msg: >-
-      Package '{{ lightspeed_package_name | default('lightspeed-operator') }}'
-      (catalog '{{ _lightspeed_catalog_source }}') has no "stable" channel and
-      no defaultChannel to fall back to. Published channels:
-      {{ _lightspeed_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
-  when: _lightspeed_channel | length == 0
-
-- name: "lightspeed | discovery summary"
-  ansible.builtin.debug:
-    msg: >-
-      Subscribing to package
-      '{{ lightspeed_package_name | default('lightspeed-operator') }}',
-      catalog '{{ _lightspeed_catalog_source }}',
-      channel '{{ _lightspeed_channel }}'.
+# Package-name warning kept from the pre-factorisation fail message:
+# "ansible-lightspeed" is a DIFFERENT product (the AAP one from ADR-0354)
+# - never subscribe to it here.
+- name: "lightspeed | resolve the operator package"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  vars:
+    operator_package_name: "{{ lightspeed_package_name | default('lightspeed-operator') }}"
+    operator_subscription_namespace: "openshift-lightspeed"
+    operator_package_catalog_hint: "lightspeed"
 
 - name: "lightspeed | apply the lightspeed GitOps Application (d0: namespace + operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  when: not (operator_package_skip_d0 | bool)
   vars:
     gitops_component_name: "lightspeed"
     gitops_app_phase: "d0"
@@ -77,9 +41,9 @@
         enabled: true
         subscription:
           operator:
-            channel: "{{ _lightspeed_channel }}"
+            channel: "{{ operator_package_channel }}"
             source:
-              name: "{{ _lightspeed_catalog_source }}"
+              name: "{{ operator_package_catalog }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

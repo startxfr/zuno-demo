@@ -12,47 +12,11 @@
     # Catalog source varies per cluster (e.g. community-operators, not always
     # redhat-operators); discover it from the PackageManifest rather than
     # hardcoding, or the Subscription fails to resolve.
-- name: "external_secrets | look up the external-secrets-operator PackageManifest"
-  kubernetes.core.k8s_info:
-    api_version: packages.operators.coreos.com/v1
-    kind: PackageManifest
-    namespace: openshift-marketplace
-    name: external-secrets-operator
-  register: _eso_pkg_info
-
-- name: "external_secrets | fail if the package isn't published anywhere on this cluster"
-  ansible.builtin.fail:
-    msg: >-
-      No PackageManifest named 'external-secrets-operator' was found in
-      openshift-marketplace. Check `oc get packagemanifest -n
-      openshift-marketplace | grep -i external-secrets` for the correct
-      package name on this cluster and update this role's selection.
-  when: (_eso_pkg_info.resources | default([]) | length) == 0
-
-- name: "external_secrets | select the catalog/channel to subscribe from"
-  ansible.builtin.set_fact:
-    _eso_catalog_source: "{{ _eso_pkg_info.resources[0].status.catalogSource }}"
-    _eso_channel: >-
-      {{
-        'stable'
-        if (_eso_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
-        else (_eso_pkg_info.resources[0].status.defaultChannel | default(''))
-      }}
-
-- name: "external_secrets | fail if no usable channel was found"
-  ansible.builtin.fail:
-    msg: >-
-      Package 'external-secrets-operator' (catalog
-      '{{ _eso_catalog_source }}') has no "stable" channel and no
-      defaultChannel to fall back to. Published channels:
-      {{ _eso_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
-  when: _eso_channel | length == 0
-
-- name: "external_secrets | discovery summary"
-  ansible.builtin.debug:
-    msg: >-
-      Subscribing to package 'external-secrets-operator', catalog
-      '{{ _eso_catalog_source }}', channel '{{ _eso_channel }}'.
+- name: "external_secrets | resolve the operator package"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  vars:
+    operator_package_name: "external-secrets-operator"
+    operator_package_catalog_hint: "external-secrets"
 
 # Operator install (d0) is separate from OperatorConfig and the
 # Vault-backed ClusterSecretStore (both d1, applied below once the Vault
@@ -61,6 +25,7 @@
 # already gone Synced+Healthy (CSV installed).
 - name: "external_secrets | apply the external-secrets GitOps Application (d0: operator install only)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  when: not (operator_package_skip_d0 | bool)
   vars:
     gitops_component_name: "external-secrets"
     gitops_app_phase: "d0"
@@ -70,9 +35,9 @@
         enabled: true
         subscription:
           operator:
-            channel: "{{ _eso_channel }}"
+            channel: "{{ operator_package_channel }}"
             source:
-              name: "{{ _eso_catalog_source }}"
+              name: "{{ operator_package_catalog }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 10
 

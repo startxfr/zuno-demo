@@ -8,93 +8,23 @@
 # the shared openshift-operators namespace, same Pattern B shape as
 # ansible/roles/mariadb/tasks/install.yml. Still discover catalog/channel
 # from the PackageManifest rather than hardcoding them (ADR-0048).
-- name: "rhtas | look up the {{ rhtas_package_name | default('rhtas-operator') }} PackageManifest"
-  kubernetes.core.k8s_info:
-    api_version: packages.operators.coreos.com/v1
-    kind: PackageManifest
-    namespace: openshift-marketplace
-    name: "{{ rhtas_package_name | default('rhtas-operator') }}"
-  register: _rhtas_pkg_info
-
-# WP-143 live finding (demo222, 2026-09-12, post OCP 5.0.0-rc.2): the
-# redhat-operators index shipped with the upgrade DROPPED the
-# rhtas-operator PackageManifest while the installed operator
-# (Subscription + CSV rhtas-operator.v1.4.3) kept running fine. A hard
-# fail here blocked the whole role - including the -d1 operand config
-# this repo still owns - for a discovery that only feeds the -d0
-# Subscription values. New contract: a missing PackageManifest is fatal
-# ONLY when the operator is not already installed; with an existing
-# Subscription the -d0 apply is skipped (its Application keeps its last
-# synced values) and the rest of the role proceeds.
-- name: "rhtas | look up an existing rhtas-operator Subscription"
-  kubernetes.core.k8s_info:
-    api_version: operators.coreos.com/v1alpha1
-    kind: Subscription
-    namespace: openshift-operators
-    name: "{{ rhtas_package_name | default('rhtas-operator') }}"
-  register: _rhtas_existing_sub
-  when: (_rhtas_pkg_info.resources | default([]) | length) == 0
-
-- name: "rhtas | fail if the package isn't published anywhere on this cluster"
-  ansible.builtin.fail:
-    msg: >-
-      No PackageManifest named '{{ rhtas_package_name | default('rhtas-operator') }}'
-      was found in openshift-marketplace. Check `oc get packagemanifest -n
-      openshift-marketplace | grep -i rhtas` for the correct package name on
-      this cluster (it must be published by the Red Hat Operators catalog).
-      Re-run with `-e rhtas_package_name=<name>` or update this role's
-      default if the catalog on this cluster differs.
-  when:
-    - (_rhtas_pkg_info.resources | default([]) | length) == 0
-    - (_rhtas_existing_sub.resources | default([]) | length) == 0
-
-- name: "rhtas | note that discovery is skipped (operator already installed, package absent from the catalog)"
-  ansible.builtin.debug:
-    msg: >-
-      PackageManifest '{{ rhtas_package_name | default('rhtas-operator') }}'
-      is absent from the catalogs but the Subscription exists - skipping
-      the -d0 apply (it keeps its last synced values) and proceeding with
-      the operand configuration. Operator updates will not resolve until
-      the catalog publishes the package again.
-  when:
-    - (_rhtas_pkg_info.resources | default([]) | length) == 0
-    - (_rhtas_existing_sub.resources | default([]) | length) > 0
-
-- name: "rhtas | select the catalog/channel to subscribe from"
-  when: (_rhtas_pkg_info.resources | default([]) | length) > 0
-  ansible.builtin.set_fact:
-    _rhtas_catalog_source: "{{ _rhtas_pkg_info.resources[0].status.catalogSource }}"
-    _rhtas_channel: >-
-      {{
-        'stable'
-        if (_rhtas_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
-        else (_rhtas_pkg_info.resources[0].status.defaultChannel | default(''))
-      }}
-
-- name: "rhtas | fail if no usable channel was found"
-  ansible.builtin.fail:
-    msg: >-
-      Package '{{ rhtas_package_name | default('rhtas-operator') }}'
-      (catalog '{{ _rhtas_catalog_source }}') has no "stable" channel and
-      no defaultChannel to fall back to. Published channels:
-      {{ _rhtas_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
-  when:
-    - (_rhtas_pkg_info.resources | default([]) | length) > 0
-    - _rhtas_channel | length == 0
-
-- name: "rhtas | discovery summary"
-  ansible.builtin.debug:
-    msg: >-
-      Subscribing to package '{{ rhtas_package_name | default('rhtas-operator') }}',
-      catalog '{{ _rhtas_catalog_source }}', channel '{{ _rhtas_channel }}'.
-  when: (_rhtas_pkg_info.resources | default([]) | length) > 0
+# Catalog/channel discovery, and the "package dropped by a catalog while
+# the operator keeps running" tolerance, both live in the shared task
+# (WP-143 live finding: the upgrade to OCP 5.0.0-rc.2 dropped this very
+# package from redhat-operators with CSV rhtas-operator.v1.4.3 still
+# Succeeded).
+- name: "rhtas | resolve the operator package"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  vars:
+    operator_package_name: "{{ rhtas_package_name | default('rhtas-operator') }}"
+    operator_package_catalog_hint: "rhtas"
 
 # The Subscription (operator.enabled) lives in gitops/charts/rhtas, applied
 # via the separate zuno-rhtas-d0 Application. No dedicated OperatorGroup:
 # same reasoning as mariadb/postgresql (AllNamespaces-only CSV).
 - name: "rhtas | apply the RHTAS GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  when: (_rhtas_pkg_info.resources | default([]) | length) > 0
+  when: not (operator_package_skip_d0 | bool)
   vars:
     gitops_component_name: "rhtas"
     gitops_app_phase: "d0"
@@ -106,9 +36,9 @@
           name: "{{ rhtas_package_name | default('rhtas-operator') }}"
           operator:
             name: "{{ rhtas_package_name | default('rhtas-operator') }}"
-            channel: "{{ _rhtas_channel }}"
+            channel: "{{ operator_package_channel }}"
             source:
-              name: "{{ _rhtas_catalog_source }}"
+              name: "{{ operator_package_catalog }}"
     gitops_app_wait_retries: 60
     gitops_app_wait_delay: 15
 

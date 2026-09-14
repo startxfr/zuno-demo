@@ -5,50 +5,16 @@
     # No bare "stable" channel exists for this operator (channels are
     # version-qualified, e.g. stable-v22/v24/v26); prefer an exact "stable"
     # match if one ever exists, else fall back to defaultChannel.
-- name: "keycloak | look up the rhbk-operator PackageManifest"
-  kubernetes.core.k8s_info:
-    api_version: packages.operators.coreos.com/v1
-    kind: PackageManifest
-    namespace: openshift-marketplace
-    name: rhbk-operator
-  register: _keycloak_pkg_info
-
-- name: "keycloak | fail if the rhbk-operator package isn't published anywhere on this cluster"
-  ansible.builtin.fail:
-    msg: >-
-      No PackageManifest named 'rhbk-operator' was found in
-      openshift-marketplace. Check `oc get packagemanifest -n
-      openshift-marketplace | grep -i keycloak` for the correct package
-      name on this cluster and update this role's selection.
-  when: (_keycloak_pkg_info.resources | default([]) | length) == 0
-
-- name: "keycloak | select the channel/catalog to subscribe from"
-  ansible.builtin.set_fact:
-    _keycloak_catalog_source: "{{ _keycloak_pkg_info.resources[0].status.catalogSource }}"
-    _keycloak_channel: >-
-      {{
-        'stable'
-        if (_keycloak_pkg_info.resources[0].status.channels | selectattr('name', 'equalto', 'stable') | list | length) > 0
-        else (_keycloak_pkg_info.resources[0].status.defaultChannel | default(''))
-      }}
-
-- name: "keycloak | fail if no usable channel was found"
-  ansible.builtin.fail:
-    msg: >-
-      Package 'rhbk-operator' (catalog '{{ _keycloak_catalog_source }}')
-      has no "stable" channel and no defaultChannel to fall back to.
-      Published channels:
-      {{ _keycloak_pkg_info.resources[0].status.channels | map(attribute='name') | list }}.
-  when: _keycloak_channel | length == 0
-
-- name: "keycloak | discovery summary"
-  ansible.builtin.debug:
-    msg: >-
-      Subscribing to package 'rhbk-operator', catalog
-      '{{ _keycloak_catalog_source }}', channel '{{ _keycloak_channel }}'.
+- name: "keycloak | resolve the operator package"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  vars:
+    operator_package_name: "rhbk-operator"
+    operator_subscription_namespace: "zuno-auth"
+    operator_package_catalog_hint: "rhbk"
 
 - name: "keycloak | apply the keycloak GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  when: not (operator_package_skip_d0 | bool)
   vars:
     gitops_component_name: "keycloak"
     gitops_app_phase: "d0"
@@ -59,9 +25,9 @@
         enabled: true
         subscription:
           operator:
-            channel: "{{ _keycloak_channel }}"
+            channel: "{{ operator_package_channel }}"
             source:
-              name: "{{ _keycloak_catalog_source }}"
+              name: "{{ operator_package_catalog }}"
     gitops_app_wait_retries: 60
 
 # Optional read (unlike vault's hard fail on a missing confidential.yml):
