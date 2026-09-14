@@ -1,6 +1,6 @@
 # WP-143: MariaDB internal/external mode pilot
 
-- **State:** Repo work merged (2026-09-10 - commit 19dca0e6; live rehearsal pending)
+- **State:** Done (2026-09-14 - full there-and-back rehearsal completed on demo222, data intact both ways, d1 check and supply-chain 14/14 green at nominal internal end state; eight live findings recorded in this brief)
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md)
 - **Depends on:** none
 - **Related:** [ADR-0345](../../adr/0345-make-self-generated-vault-credentials-idempotent.md), [ADR-0547](../../adr/0547-parameterize-every-cluster-specific-value-in-ansible.md)
@@ -168,6 +168,37 @@ with operator confirmation before each destructive step:
   templates rendering, mechanism proven alive with a changed host), the
   rhtas schema client Job, confidential.example.yml block, role README.
   Live rehearsal on demo333 is next.
+- **2026-09-12 — Live rehearsal, venue moved to demo222.** The demo333
+  run froze mid-external (cluster stopped, resume pending separately);
+  the full protocol re-ran on demo222 instead. Flip ALLER fully proven:
+  external install green, rhtas/rag-ingestion/mlops rewired, Trillian
+  serving from `ext-mariadb.zuno-ext-sim`, `d2 check supply-chain` green,
+  `d1 check` failed=0. Retour dumps taken (LeafData=102, run_details
+  119/36 — zero external-window writes), then the cluster was stopped
+  mid-RETOUR (operator reinstalled, internal cluster CR not yet
+  reconciled) — the second mid-mode freeze of this WP.
+- **2026-09-14 — Done.** Retour completed at nominal internal state:
+  `make d1 install mariadb` (idempotent resume) → MariaDB CR Ready, the
+  three dumps imported and verified (LeafData=102, mlops run_details=36,
+  mlpipeline=119 + the re-registration run), consumers re-run and
+  re-wired to `mariadb.zuno-data.svc`, Trillian recycled, `make d1
+  check` failed=0, `d2 check supply-chain` 14/14 PASS (after re-signing
+  the two pre-existing unsigned images), `zuno-ext-sim` deleted. Eight
+  live findings: (a) DSPA DSN `tls=true` default kills plaintext
+  external endpoints (fixed via `mariadb_endpoint_tls`, commit
+  07ef9c75); (b) Application values frozen while the chart advances
+  under targetRevision — "Synced" on a stale render; (c) AAP-checkout
+  blind spot: a scheduled install without confidential.yml would treat
+  an external cluster as internal and reinstall the built-in; (d)
+  cluster stop mid-mode ×2 — the mode machinery survived both; (e)
+  post-upgrade catalog drops packages whose CSV still runs; (f) a stale
+  ExternalSecret passes a bare existence-wait (refreshInterval froze old
+  values); (g) orphaned Subscriptions freeze OLM resolution for the
+  whole namespace; (h) operator version jump on flip-back (v26.3.0 →
+  v26.6.0, no pinning). (e)-(g) hardened by commits cfecd615 and
+  44f29c0b..0dccb288 (`resolve_operator_package.yml`, P8 probe,
+  stale-ES drop). Bonus proof: external mode survived a full cluster
+  stop/start — all three consumers reconnected unaided.
 
 ## Out of scope / deferred
 

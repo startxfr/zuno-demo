@@ -31,7 +31,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
-| v0.9 | 7 | 5 | 6 | WP-143 |
+| v0.9 | 7 | 5 | 6 | — |
 | v0.10 | 5 | 5 | 6 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -866,12 +866,14 @@ of the mariadb chart. WP-143 lands the first `zuno_<c>_mode` key end to
 end - symmetric verb gating, external check assertions, Vault seeding of
 external credentials, endpoint-fact abstraction for consumers (clause 11),
 and the rhtas Trillian schema load converted from a `mariadb-0` pod exec to
-a mode-agnostic client Job - proven by a live external-flip rehearsal on
-`demo333` with full data migration there and back.
+a mode-agnostic client Job - proven by a live external-flip rehearsal with
+full data migration there and back (started on `demo333`, frozen
+mid-external by a cluster stop; completed end to end on `demo222`,
+2026-09-14).
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-143 | [wp-143](work-packages/wp-143-mariadb-internal-external-pilot.md) | 0352 | none | Repo work merged (2026-09-10 - commit 19dca0e6; live rehearsal pending) | run the WP's live-verification protocol on demo333 (simulated external endpoint, full data migration there and back) |
+| WP-143 | [wp-143](work-packages/wp-143-mariadb-internal-external-pilot.md) | 0352 | none | Done (2026-09-14 - full there-and-back rehearsal completed on demo222, data intact both ways, d1 check and supply-chain 14/14 green at nominal internal end state; eight live findings recorded in this brief) | none |
 
 ### OKF stream phases
 

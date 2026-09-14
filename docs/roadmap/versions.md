@@ -193,7 +193,7 @@ model ruled out of external mode), and ADR-0556
 records the long-term `zuno` operator contract
 (ZunoFoundation/ZunoInfra/ZunoStack CRDs mirroring the Day 0/1/2 playbooks).
 
-**7 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410, ADR-0556, ADR-0557; WP-143.
+**7 ADRs.** Open: ADR-0307, ADR-0352, ADR-0410, ADR-0556, ADR-0557.
 
 ## v0.10
 

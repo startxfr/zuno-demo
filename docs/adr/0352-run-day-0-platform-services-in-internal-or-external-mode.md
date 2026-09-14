@@ -1,6 +1,6 @@
 # ADR-0352: Run day-0 platform services in internal or external mode
 
-- **Status:** Proposed
+- **Status:** Partially implemented
 - **Target:** v0.9
 - **Date:** 2026-08-17
 - **Amended:** 2026-09-10 (re-derived against the post-ADR-0421 component
@@ -447,7 +447,21 @@ assumption structural, not incidental:
    ExternalSecret shape — with minimal consumer-seam surgery (the
    endpoint hosts are chart literals to parameterize, and the rhtas
    Trillian schema load must stop exec-ing into the built-in pod) and
-   the smallest possible blast radius. WP-143 carries this pilot. Then keycloak (highest value; exercises CA supply, mandatory
+   the smallest possible blast radius. WP-143 carries this pilot.
+
+   *Clause-9 progress (2026-09-14):* the MariaDB pilot is proven live —
+   full there-and-back migration on `demo222` (simulated external
+   endpoint in a dedicated namespace, dump/import of the three
+   databases, both DSPAs and Trillian re-wired each way, transparency
+   log intact: `d2 check supply-chain` green against the external AND
+   the restored internal endpoint, `d1 check` green at nominal end
+   state). The rehearsal was rehearsed first on `demo333` up to
+   external mode (frozen there by a cluster stop, folded into the
+   demo222 run). Eight live findings recorded in the WP brief. The
+   remaining clause-9 components (keycloak next) keep this ADR
+   Partially implemented.
+
+   Then keycloak (highest value; exercises CA supply, mandatory
    admin-credential provisioning, the oauth integration and the widest
    seam set), then vault (the full-setup contract), then postgresql,
    redis, aap, and the two Tier A-operator components
