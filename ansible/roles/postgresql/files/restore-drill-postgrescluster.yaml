@@ -18,6 +18,16 @@
 # zuno-postgresql. repo2 has never been restored from - the 2026-08-18 and
 # 2026-08-25 drills both used repo1, the local PVC that disappears with the
 # cluster it protects. Deleted, with its PVCs, as soon as the row counts match.
+#
+# STALE VALUES, DELIBERATELY: the bucket and repo2-path below are the ones the
+# 2026-09-04 drill actually ran against, kept so this stays a record of what
+# was run rather than a guess at what would run today. WP-131 P13 has since
+# moved the repo (bucket per cluster, path /postgresql), so before reusing
+# this manifest read the live values off the operand instead of copying these:
+#   oc get postgrescluster zuno-postgresql -n zuno-data \
+#     -o jsonpath='{.spec.backups.pgbackrest.global}{"\n"}{range .spec.backups.pgbackrest.repos[*]}{.name} {.s3.bucket}{"\n"}{end}'
+# Restoring from the wrong prefix does not error - pgBackRest reports an
+# empty repo - so a stale copy here reads as "there is no backup".
 apiVersion: postgres-operator.crunchydata.com/v1beta1
 kind: PostgresCluster
 metadata:

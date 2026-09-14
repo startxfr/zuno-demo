@@ -76,7 +76,7 @@
 # succeeded, and says nothing about whether that data is reachable at the
 # path the operand is configured to use. That is exactly the blind spot
 # P0-a lived in: check_s3_backup.yml queried pgBackRest's built-in default
-# repo path (/var/lib/pgbackrest) while PGO writes /pgbackrest/repo2, so it
+# repo path (/var/lib/pgbackrest) while PGO writes its own, so it
 # listed a prefix that does not exist - and `pgbackrest info` on an empty
 # prefix returns [] and exits 0. The probe SUCCEEDED while reporting no
 # backup, against a bucket holding three full backups.
@@ -115,13 +115,13 @@
       the zuno_postgresql_backup_s3_* fields in ansible/confidential.yml.
       {%- elif not (_postgresql_s3_check_succeeded | default(false) | bool) -%}
       COULD NOT QUERY S3 repo2 at path
-      {{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }} in
+      {{ zuno_postgresql_backup_s3_path | default('<unresolved>', true) }} in
       bucket {{ zuno_postgresql_backup_s3_bucket | default('?') }} - this is
       NOT the same as "no backup exists" (credentials/connectivity?). See the
       check Job output above.
       {%- elif (_postgresql_s3_backup_count | int) == 0 -%}
       MISMATCH RISK: S3 repo2 is reachable at path
-      {{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }} in
+      {{ zuno_postgresql_backup_s3_path | default('<unresolved>', true) }} in
       bucket {{ zuno_postgresql_backup_s3_bucket | default('?') }} but holds
       NO completed backup, while the operator reports
       {{ _postgresql_successful_backups | length }} successful scheduled
@@ -134,7 +134,7 @@
       {%- else -%}
       S3 repo2 holds {{ _postgresql_s3_backup_count }} completed backup(s)
       in stanza(s) {{ _postgresql_s3_stanza_names | join(', ') }} at path
-      {{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }} in
+      {{ zuno_postgresql_backup_s3_path | default('<unresolved>', true) }} in
       bucket {{ zuno_postgresql_backup_s3_bucket | default('?') }} - the
       bucket agrees with the operator's
       {{ _postgresql_successful_backups | length }} successful scheduled

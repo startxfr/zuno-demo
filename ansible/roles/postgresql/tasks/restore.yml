@@ -70,13 +70,20 @@
       # the chart default - the exact drift gitops_values_clobber exists for.
       cluster:
         storageClassName: "{{ cluster_default_storage_class }}"
+      # `path` only when it resolved - see install.yml's note. A restore
+      # reads the repo it is pointed at, so a stale literal here would look
+      # for the backup in a prefix nothing ever wrote to.
       backups:
-        s3:
-          enabled: true
-          bucket: "{{ zuno_postgresql_backup_s3_bucket }}"
-          endpoint: "{{ zuno_postgresql_backup_s3_endpoint }}"
-          region: "{{ zuno_postgresql_backup_s3_region }}"
-          path: "{{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }}"
+        s3: >-
+          {{
+            {'enabled': true,
+             'bucket': zuno_postgresql_backup_s3_bucket,
+             'endpoint': zuno_postgresql_backup_s3_endpoint,
+             'region': zuno_postgresql_backup_s3_region}
+            | combine({'path': zuno_postgresql_backup_s3_path}
+                      if (zuno_postgresql_backup_s3_path | default('')) | length > 0
+                      else {})
+          }}
     gitops_app_wait_retries: 60
 
 # Same readiness signal install.yml's normal path waits on (PGO never sets
@@ -127,11 +134,18 @@
       # WP-118 B5 - see the comment on the restore apply above.
       cluster:
         storageClassName: "{{ cluster_default_storage_class }}"
+      # `path` only when it resolved - see install.yml's note. A restore
+      # reads the repo it is pointed at, so a stale literal here would look
+      # for the backup in a prefix nothing ever wrote to.
       backups:
-        s3:
-          enabled: true
-          bucket: "{{ zuno_postgresql_backup_s3_bucket }}"
-          endpoint: "{{ zuno_postgresql_backup_s3_endpoint }}"
-          region: "{{ zuno_postgresql_backup_s3_region }}"
-          path: "{{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }}"
+        s3: >-
+          {{
+            {'enabled': true,
+             'bucket': zuno_postgresql_backup_s3_bucket,
+             'endpoint': zuno_postgresql_backup_s3_endpoint,
+             'region': zuno_postgresql_backup_s3_region}
+            | combine({'path': zuno_postgresql_backup_s3_path}
+                      if (zuno_postgresql_backup_s3_path | default('')) | length > 0
+                      else {})
+          }}
     gitops_app_wait_retries: 30

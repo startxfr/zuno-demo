@@ -211,13 +211,24 @@
       # too - each REPLACES spec.source.helm.values wholesale.
       cluster:
         storageClassName: "{{ cluster_default_storage_class }}"
+      # `path` is added only when it actually resolved. It is NOT defaulted
+      # here: resolve_backup_s3_creds.yml reads it from the operand, and on a
+      # first bootstrap (no PostgresCluster yet) it stays absent so the
+      # chart's own value stands. A stale literal in this position silently
+      # MOVES the repo and orphans every existing backup - which is exactly
+      # what the old default('/pgbackrest/repo2') would do now that WP-131
+      # moved the chart to /postgresql.
       backups:
-        s3:
-          enabled: "{{ _postgresql_backup_s3_enabled | bool }}"
-          bucket: "{{ zuno_postgresql_backup_s3_bucket | default('') }}"
-          endpoint: "{{ zuno_postgresql_backup_s3_endpoint | default('') }}"
-          region: "{{ zuno_postgresql_backup_s3_region | default('') }}"
-          path: "{{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }}"
+        s3: >-
+          {{
+            {'enabled': _postgresql_backup_s3_enabled | bool,
+             'bucket': zuno_postgresql_backup_s3_bucket | default(''),
+             'endpoint': zuno_postgresql_backup_s3_endpoint | default(''),
+             'region': zuno_postgresql_backup_s3_region | default('')}
+            | combine({'path': zuno_postgresql_backup_s3_path}
+                      if (zuno_postgresql_backup_s3_path | default('')) | length > 0
+                      else {})
+          }}
     gitops_app_wait_retries: 60
   when: not (_postgresql_auto_restored | default(false))
 

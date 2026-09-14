@@ -54,6 +54,8 @@
     namespace: zuno-data
     name: zuno-postgresql
   register: _postgresql_backup_s3_fallback_cluster
+  # Also read when the credentials DID come from confidential.yml but the
+  # repo path did not - see "the path is resolved separately" below.
   # Never fatal (ADR-0524, live finding 2026-09-09/10): this whole file is
   # reached unconditionally from every *-check Job Template via
   # check_s3_backup.yml, whose own header already documents "deliberately
@@ -65,7 +67,9 @@
   # this one is safe: it degrades to that existing, correct behavior rather
   # than a bare Ansible module traceback.
   failed_when: false
-  when: not (_postgresql_backup_s3_enabled | bool)
+  when: >-
+    not (_postgresql_backup_s3_enabled | bool)
+    or zuno_postgresql_backup_s3_path is not defined
 
 - name: "postgresql | look up the zuno-postgresql-backup-s3 Secret for the in-cluster S3 fallback"
   kubernetes.core.k8s_info:
@@ -147,7 +151,9 @@
         if (_postgresql_backup_s3_fallback_cluster.resources | default([]) | length) > 0
         else ''
       }}
-  when: not (_postgresql_backup_s3_enabled | bool)
+  when: >-
+    not (_postgresql_backup_s3_enabled | bool)
+    or zuno_postgresql_backup_s3_path is not defined
 
 - name: "postgresql | apply the in-cluster S3 fallback, if fully resolved"
   ansible.builtin.set_fact:
@@ -164,3 +170,42 @@
     - (_postgresql_backup_s3_fallback_access_key | default('')) | length > 0
     - (_postgresql_backup_s3_fallback_secret_key | default('')) | length > 0
     - (_postgresql_backup_s3_fallback_path | default('')) | length > 0
+
+# The path is resolved separately from the credentials, and the operand is
+# its source of truth. WP-131 P13 moved the repo from /pgbackrest/repo2 to
+# /postgresql in the chart (gitops/charts/postgresql/values.yaml) but left a
+# stale `default('/pgbackrest/repo2')` behind in six Ansible sites, so on any
+# machine where zuno_postgresql_backup_s3_path is unset - and
+# confidential.example.yml explicitly says to leave it unset unless you are
+# moving the repo - the probe queried a prefix the operand never writes to.
+# `pgbackrest info` on an empty prefix returns [] and exits 0, so the check
+# Job SUCCEEDS while reporting no backup; that fact gates install.yml's
+# auto-restore, so a rebuild bootstraps an EMPTY database and calls it a
+# genuinely fresh environment. docs/platform/backup-recovery.md already
+# promises "the repo path is read by the probe and the operand alike so they
+# cannot drift again" - this is what makes that true. The credentials being
+# configured says nothing about the path, which is why this runs even on the
+# confidential.yml path rather than only in the in-cluster fallback.
+- name: "postgresql | adopt the operand's repo2 path when none was configured explicitly"
+  ansible.builtin.set_fact:
+    zuno_postgresql_backup_s3_path: "{{ _postgresql_backup_s3_fallback_path }}"
+  when:
+    - (zuno_postgresql_backup_s3_path | default('')) | length == 0
+    - (_postgresql_backup_s3_fallback_path | default('')) | length > 0
+
+- name: "postgresql | report the resolved repo2 path"
+  ansible.builtin.debug:
+    msg: >-
+      {% if (zuno_postgresql_backup_s3_path | default('')) | length == 0 -%}
+      pgBackRest repo2 path UNRESOLVED - neither ansible/confidential.yml nor
+      the zuno-postgresql PostgresCluster provided one. Anything that reads the
+      repo will report "couldn't tell" rather than guess a prefix.
+      {%- elif (_postgresql_backup_s3_fallback_path | default('')) == zuno_postgresql_backup_s3_path -%}
+      pgBackRest repo2 path '{{ zuno_postgresql_backup_s3_path }}' read from the
+      PostgresCluster's own pgbackrest global options - probe and operand cannot
+      disagree.
+      {%- else -%}
+      pgBackRest repo2 path '{{ zuno_postgresql_backup_s3_path }}' explicitly
+      configured, overriding whatever the operand carries.
+      {%- endif %}
+  when: _postgresql_backup_s3_enabled | bool

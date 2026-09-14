@@ -38,6 +38,7 @@
   when: >-
     not (_postgresql_backup_s3_enabled | bool)
     or (_postgresql_ns_probe.resources | length == 0)
+    or ((zuno_postgresql_backup_s3_path | default('')) | length == 0)
 
 - name: "postgresql | report the S3 cross-check cannot run before the zuno-data namespace exists"
   ansible.builtin.debug:
@@ -49,10 +50,31 @@
     - _postgresql_backup_s3_enabled | bool
     - _postgresql_ns_probe.resources | length == 0
 
+# "Couldn't tell", not "no backup". Querying a guessed prefix is the one
+# thing this probe must never do: an empty prefix answers [] and exits 0,
+# so a wrong path is reported as an empty repo - and that fact gates
+# install.yml's auto-restore. Without a path from the operand there is no
+# honest answer to give.
+- name: "postgresql | report the S3 cross-check cannot run without a resolved repo2 path"
+  ansible.builtin.debug:
+    msg: >-
+      The pgBackRest repo2 path could not be resolved - neither
+      zuno_postgresql_backup_s3_path in ansible/confidential.yml nor
+      spec.backups.pgbackrest.global['repo2-path'] on the zuno-postgresql
+      PostgresCluster provided one. The S3 cross-check is skipped
+      ("couldn't tell" semantics) rather than run against a guessed prefix,
+      which would report an empty repo and could gate an auto-restore into
+      bootstrapping an empty database.
+  when:
+    - _postgresql_backup_s3_enabled | bool
+    - _postgresql_ns_probe.resources | length > 0
+    - (zuno_postgresql_backup_s3_path | default('')) | length == 0
+
 - name: "postgresql | check the S3 pgBackRest repo for existing data"
   when:
     - _postgresql_backup_s3_enabled | bool
     - _postgresql_ns_probe.resources | length > 0
+    - (zuno_postgresql_backup_s3_path | default('')) | length > 0
   block:
     - name: "postgresql | delete any previous S3-backup-check Job (idempotent-by-recreation)"
       kubernetes.core.k8s:
@@ -131,8 +153,8 @@
                       - name: PGBACKREST_REPO2_S3_REGION
                         value: "{{ zuno_postgresql_backup_s3_region }}"
                       # WP-131 P0-a. Without this the probe used pgBackRest's
-                      # own default repo-path, /var/lib/pgbackrest, while PGO
-                      # writes /pgbackrest/repo2 - so it listed a prefix that
+                      # own default repo-path, /var/lib/pgbackrest, while the
+                      # operand writes elsewhere - so it listed a prefix that
                       # does not exist. `pgbackrest info` on an empty prefix
                       # returns [] and exits 0, so this Job SUCCEEDED while
                       # reporting no backup, against a bucket holding three
@@ -143,10 +165,18 @@
                       # zuno-postgresql bootstrapped an EMPTY database and said
                       # it looked like a genuinely fresh environment - and
                       # `make d3 restore postgresql` refused a backup that
-                      # exists. Same variable as the operand (install.yml,
-                      # restore.yml) so the two cannot drift again.
+                      # exists.
+                      #
+                      # No default here any more. A wrong path is
+                      # indistinguishable from an empty repo, so guessing one
+                      # re-creates the very failure this block documents -
+                      # which is what happened when WP-131 P13 moved the repo
+                      # and this literal stayed on the old value. The path now
+                      # comes from the operand via resolve_backup_s3_creds.yml,
+                      # and when it cannot be resolved the block above refuses
+                      # to run at all and reports "couldn't tell" instead.
                       - name: PGBACKREST_REPO2_PATH
-                        value: "{{ zuno_postgresql_backup_s3_path | default('/pgbackrest/repo2') }}"
+                        value: "{{ zuno_postgresql_backup_s3_path }}"
                     volumeMounts:
                       - name: s3-creds
                         mountPath: /etc/pgbackrest/conf.d
