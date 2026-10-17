@@ -36,7 +36,7 @@ spec:
   type: mcp_server
   config:
     mcp_url: {{ .Values.mcpGateway.url }}
-    transport_type: streamable_http
+    transport_type: "streamable http"
     auth_method: forward_user_token
     additional_headers:
       X-Zuno-Run-Id: "{session_id}"
