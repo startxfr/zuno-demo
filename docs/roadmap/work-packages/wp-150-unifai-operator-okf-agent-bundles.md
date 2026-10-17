@@ -38,12 +38,27 @@ the implementation differs from its first text.
   CI; `ansible/tasks/publish_okf_bundles.yml` runs from `make d3 sign
   agents` when `zuno_okf_oci_repository_prefix` is set. The OKF schemas
   were repaired: 8 of 50 documents failed them before.
-- **Remaining:** the operator release (0.1.16, handed to the startx-unifai
-  session; 0.1.15 shipped without this kind), a first real publication to
-  `quay.io/zuno/okf-tekos`, and a live run on demo333 (`unifai-devel`) - the
-  latter two can be done here once 0.1.16 is live. `plan_draft_write`
-  (Arkos) needs its blueprint template; soursage and cognos need a graph
-  shape.
+- **Released** in unifai-operator 0.1.16 (startx-unifai session, OLM on
+  demo333).
+- **Live-proven on demo333, 2026-10-17** (`unifai-devel` only). The
+  platform signatures in demo333's Vault do not match the current
+  `agents/` tree (the deployed agent-runtime image is older, so `make d2
+  check agents` fails there), so the bundle was signed with a throwaway
+  cosign key and published with `publish_okf_bundle.py` to
+  `quay.io/zuno/okf-test-tekos@sha256:33d648f4...`. The UnifaiAgentBundle
+  went Verified, Valid, WithinCeilings, Emitted and Ready: 13 objects
+  (4 LLMs, 4 agents, 1 condition, 4 workflows), all Ready in UnifAI. A real
+  browser login then ran the `tekos` and `tekos-write-code` workflows: the
+  model endpoint received the user's own JWT and `X-Zuno-Agent: tekos`,
+  `X-Zuno-Task`, `X-Zuno-Run-Id` and `X-Zuno-Data-Classification` C1 and C2
+  (the `write-code` override raised it). The same bundle checked against
+  another public key went `Verified=False/SignatureInvalid` and emitted
+  nothing. Everything was deleted and the stack spec restored afterwards.
+- **Remaining:** publication with the real platform key (needs `make d2
+  build agent` + `make d3 sign agents` on a cluster, then
+  `zuno_okf_oci_repository_prefix: quay.io/zuno`; the `okf-tekos` repository
+  exists); `plan_draft_write` (Arkos) needs its blueprint template;
+  soursage and cognos need a graph shape.
 
 ## Steps
 
