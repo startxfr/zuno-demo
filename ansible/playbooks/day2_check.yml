@@ -29,6 +29,7 @@
       - trustyai_config
       - mlflow
       - lightspeed_config
+      - unifai
       - supply_chain
   tasks:
     - name: Resolve cluster API credentials

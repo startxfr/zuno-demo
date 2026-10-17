@@ -1,0 +1,64 @@
+{{- if .Values.stack.enabled }}
+{{- $s := .Values.stack }}
+# ADR-0561/0574: one UnifaiStack per namespace, named `unifai`.
+apiVersion: unifai.startx.fr/v1alpha1
+kind: UnifaiStack
+metadata:
+  name: unifai
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  profile: {{ $s.profile }}
+  deletionPolicy: Retain
+  {{- with $s.images }}
+  images:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  storage:
+    className: {{ $s.storageClass }}
+    sharedClassName: {{ $s.sharedStorageClass }}
+  exposure:
+    networkPolicy: true
+  identity:
+    {{- with $s.adminUsers }}
+    adminUsers:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    forwardUserToken: {{ $s.identity.forwardUserToken }}
+    external:
+      url: https://keycloak.{{ .Values.clusterBaseDomain }}
+      realm: {{ $s.identity.realm }}
+      clientId: {{ $s.identity.clientId }}
+      clientSecret: {name: unifai-oidc, key: client-secret}
+  rag:
+    embedding:
+      mode: remote
+      url: {{ $s.rag.embeddingUrl }}
+      model: {{ $s.rag.embeddingModel }}
+      dimension: {{ $s.rag.embeddingDimension }}
+    hybrid: {{ $s.rag.hybrid }}
+    {{- with $s.rag.sharedPublishers }}
+    sharedPublishers:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- if $s.rag.confluenceVaultPath }}
+    confluence:
+      username: {name: unifai-confluence, key: CONFLUENCE_USERNAME}
+      token: {name: unifai-confluence, key: CONFLUENCE_TOKEN}
+    {{- end }}
+  {{- if $s.backup.enabled }}
+  backup:
+    schedule: {{ $s.backup.schedule | quote }}
+    retention: {{ $s.backup.retention }}
+    s3:
+      bucket: {{ $s.backup.bucket }}
+      {{- with $s.backup.endpoint }}
+      endpoint: {{ . }}
+      {{- end }}
+      {{- with $s.backup.region }}
+      region: {{ . }}
+      {{- end }}
+      credentialsSecret: unifai-backup-s3
+  {{- end }}
+{{- end }}

@@ -106,6 +106,14 @@ spec:
                       - key: client_secret
                         path: zuno_tekos__frontend__client__secret
                 - secret:
+                    # ADR-0562 (WP-151): the UnifAI identity service's
+                    # confidential client, ${vault.unifai_client_secret}.
+                    name: unifai-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_unifai__client__secret
+                - secret:
                     # ADR-0326 (WP-31): arkos-frontend flipped to a
                     # confidential client, same shape as tekos-frontend
                     # above.

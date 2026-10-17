@@ -1,0 +1,33 @@
+---
+# ADR-0574 (WP-151): unifai-operator from its pinned catalog. The role sets
+# operator.install=false when a Subscription for the package already exists
+# and is not owned by this Application (demo333's was created by hand), so
+# this Application then renders nothing and never duplicates it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-unifai-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-60"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/unifai
+    helm:
+      releaseName: zuno-unifai-d0
+      values: |
+        clusterBaseDomain: apps.mycluster.example.com
+        operator:
+          install: false
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-operators
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -578,6 +578,17 @@
       client_secret: "{{ zuno_admin_tekos_frontend_token |
         default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
+# ADR-0562 (WP-151): the UnifAI identity service's confidential client of
+# realm zuno - same single-secret shape as tekos-frontend. Read by Keycloak
+# (KC_VAULT) and by the UnifaiStack (gitops/charts/unifai ExternalSecret).
+- name: "vault | generate and seed the unifai confidential OIDC client secret (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: keycloak/unifai
+    vault_seed_fields:
+      client_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+
 # ADR-0326 (WP-31): Arkos's own confidential OIDC client - same
 # single-secret shape as tekos-frontend above, its own Vault path since
 # each agent frontend is a distinct Keycloak client (gitops/charts/arkos).

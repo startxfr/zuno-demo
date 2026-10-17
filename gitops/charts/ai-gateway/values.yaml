@@ -139,3 +139,7 @@ semanticCache:
   redis:
     addr: "zuno-redis-master.zuno-auth.svc.cluster.local:6379"
     secretName: ai-gateway-redis-credentials
+
+# ADR-0560/0563 (WP-151): namespace of the UnifAI stack whose multi-agent
+# pods may call this gateway. Empty = no UnifAI peer in the NetworkPolicy.
+unifaiNamespace: zuno-unifai

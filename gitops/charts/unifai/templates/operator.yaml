@@ -1,0 +1,30 @@
+{{- if .Values.operator.install }}
+# ADR-0574: the operator comes from a catalog pinned by tag or digest, with an
+# explicit source on the Subscription (ADR-0559).
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: {{ .Values.operator.catalogSourceName }}
+  namespace: openshift-marketplace
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  sourceType: grpc
+  image: {{ .Values.operator.catalogImage }}
+  displayName: UnifAI operator (startxfr fork)
+  publisher: startx
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: {{ .Values.operator.package }}
+  namespace: {{ .Values.operator.subscriptionNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  name: {{ .Values.operator.package }}
+  channel: {{ .Values.operator.channel }}
+  source: {{ .Values.operator.catalogSourceName }}
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+{{- end }}

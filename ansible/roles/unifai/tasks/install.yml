@@ -1,0 +1,59 @@
+---
+- name: "unifai | load ansible/confidential.yml (zuno_unifai_values) if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: (zuno_repo_root + '/ansible/confidential.yml') is file
+
+- name: "unifai | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "unifai | look for an existing unifai-operator Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+  register: _unifai_subscriptions
+
+- name: "unifai | keep the unifai-operator Subscriptions"
+  ansible.builtin.set_fact:
+    _unifai_package_subs: >-
+      {{ _unifai_subscriptions.resources | default([])
+         | selectattr('spec.name', 'defined')
+         | selectattr('spec.name', 'equalto', 'unifai-operator') | list }}
+
+# Install unless a Subscription for the package exists that this component does
+# not own (ArgoCD's tracking label app.kubernetes.io/instance names the owner).
+# A loop, not selectattr: selectattr cannot address a dotted label key.
+- name: "unifai | install the operator only when no foreign Subscription exists"
+  ansible.builtin.set_fact:
+    _unifai_install_operator: >-
+      {% set ns = namespace(foreign=0) %}{% for s in _unifai_package_subs %}{% if (s.metadata.labels | default({})).get('app.kubernetes.io/instance', '') != 'zuno-unifai-d0' %}{% set ns.foreign = ns.foreign + 1 %}{% endif %}{% endfor %}{{ ns.foreign == 0 }}
+
+- name: "unifai | report the operator decision"
+  ansible.builtin.debug:
+    msg: >-
+      {{ 'Installing unifai-operator from the pinned catalog (zuno-unifai-d0).'
+         if _unifai_install_operator | bool else
+         'A unifai-operator Subscription already exists and is not ours: zuno-unifai-d0 renders nothing.' }}
+
+- name: "unifai | apply the operator Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "unifai"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-unifai-d0"
+    gitops_app_extra_helm_values:
+      clusterBaseDomain: "{{ cluster_base_domain }}"
+      operator:
+        install: "{{ _unifai_install_operator | bool }}"
+
+- name: "unifai | apply the stack Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "unifai"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-unifai-d1"
+    gitops_app_extra_helm_values: >-
+      {{ {'clusterBaseDomain': cluster_base_domain,
+          'stack': {'enabled': true},
+          'okf': {'publicKey': lookup('ansible.builtin.file', zuno_repo_root + '/agents/zuno-platform-signer.pub')}}
+         | combine(zuno_unifai_values | default({}), recursive=True) }}

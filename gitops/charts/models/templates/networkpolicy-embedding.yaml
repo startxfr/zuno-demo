@@ -28,6 +28,18 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: rag-service
+        {{- with .Values.unifaiNamespace }}
+        # ADR-0568 (WP-151): the UnifAI RAG server and Celery workers embed
+        # through this model (UnifaiStack spec.rag.embedding mode remote).
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+          podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [rag, unifai-rag-celery]
+        {{- end }}
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: zuno-ai-build

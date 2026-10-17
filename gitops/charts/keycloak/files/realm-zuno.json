@@ -1086,6 +1086,69 @@
         }
     ],
     "clients": [{
+            "clientId": "unifai",
+            "name": "UnifAI agent platform",
+            "description": "Confidential client of the UnifAI identity service (ADR-0562): sign-in for the UnifAI UI; MAS forwards the user's token to the ai-gateway and mcp-gateway (ADR-0563)",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "${vault.unifai_client_secret}",
+            "redirectUris": [
+                "https://unifai-identity-zuno-unifai.apps.mycluster.example.com/*"
+            ],
+            "webOrigins": [
+                "https://unifai-ui-zuno-unifai.apps.mycluster.example.com"
+            ],
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": false,
+            "protocolMappers": [
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
+                    }
+                },
+                {
+                    "name": "audience-self",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "unifai",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                },
+                {
+                    "name": "maas-gateway-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-admin-api",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                }
+            ],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ],
+            "attributes": {
+                "post.logout.redirect.uris": "https://unifai-ui-zuno-unifai.apps.mycluster.example.com/*"
+            }
+        }, {
             "clientId": "comage-frontend",
             "name": "Comage frontend (sales)",
             "description": "Confidential client for the Comage sales agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-33; agent-frontend requires OIDC_CLIENT_SECRET, no public/PKCE-only code path)",

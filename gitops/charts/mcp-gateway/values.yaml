@@ -109,3 +109,7 @@ lightspeed:
     - knowledge.tech.search
     - aap.platform.audit
     - aap.cluster.audit
+
+# ADR-0560/0563 (WP-151): namespace of the UnifAI stack whose multi-agent
+# pods may call this gateway. Empty = no UnifAI peer in the NetworkPolicy.
+unifaiNamespace: zuno-unifai

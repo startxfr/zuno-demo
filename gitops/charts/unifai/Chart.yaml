@@ -1,0 +1,6 @@
+apiVersion: v2
+name: unifai
+description: UnifAI agent and RAG platform for Zuno (ADR-0561, ADR-0574) - unifai-operator subscription, UnifaiStack and its object CRs
+type: application
+version: 0.1.0
+appVersion: "0.1.18"

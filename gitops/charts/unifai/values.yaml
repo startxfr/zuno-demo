@@ -1,0 +1,87 @@
+# ADR-0574 (WP-151). Two Applications render this chart: -d0 with
+# operator.install (CatalogSource + Subscription, cluster-scoped) and -d1 with
+# stack.enabled (the UnifaiStack and its objects, in `namespace`). The Ansible
+# role `unifai` passes the cluster-specific values (gitops_app_extra_helm_values
+# replaces this block's defaults in the Application).
+
+clusterBaseDomain: apps.mycluster.example.com
+namespace: zuno-unifai
+
+operator:
+  # Install the operator from the pinned catalog. The role sets it to false
+  # when a Subscription for the package already exists (demo333 runs one
+  # created by hand, which must not be duplicated).
+  install: false
+  catalogImage: quay.io/zuno/unifai-operator-catalog:v0.1.18
+  catalogSourceName: unifai-operator-catalog
+  channel: stable
+  package: unifai-operator
+  subscriptionNamespace: openshift-operators
+
+stack:
+  enabled: false
+  profile: dev
+  # Pinned per release (ADR-0574): never a moving tag in production values.
+  images: {}
+  adminUsers: []
+  storageClass: gp3-csi
+  sharedStorageClass: nfs
+  identity:
+    realm: zuno
+    clientId: unifai
+    # Vault path of the client secret (seeded by ansible/roles/vault).
+    clientSecretVaultPath: keycloak/unifai
+    forwardUserToken: true
+  rag:
+    embeddingUrl: http://embeddings-predictor.zuno-ai-run.svc:8080
+    embeddingModel: qwen3-embedding-0.6b
+    embeddingDimension: 1024
+    hybrid: true
+    # UnifAI users allowed to publish shared sources (ADR-0568). The
+    # UnifaiRAGSource objects below are owned by the first one.
+    sharedPublishers: []
+    # Confluence credentials for the Confluence source type (Vault path of
+    # the existing technical identity, ADR-0568).
+    confluenceVaultPath: confluence/technical
+  backup:
+    enabled: false
+    schedule: "0 2 * * *"
+    retention: 7
+    bucket: ""
+    endpoint: ""
+    region: ""
+    credentialsVaultPath: ""
+
+# Shared LLM of the platform: the ai-gateway, called with the user's own token
+# (ADR-0560, ADR-0563). Agent bundles emit their own per-task copies.
+gatewayLLM:
+  enabled: true
+  name: zuno-gateway
+  baseUrl: http://ai-gateway.zuno-ai-run.svc:8080/v1
+
+# MCP tools through mcp-gateway's MCP endpoint, with the user's own token
+# (ADR-0571 path B until the RHOAI MCP gateway evaluation concludes).
+mcpGateway:
+  enabled: true
+  name: mcp-gateway
+  url: http://mcp-gateway.zuno-ai-run.svc:8080/mcp
+
+# Signed OKF agent bundles (ADR-0564). publicKey is the PEM of
+# agents/zuno-platform-signer.pub (the role passes it).
+okf:
+  publicKey: ""
+  bundles: []
+  # - name: tekos
+  #   reference: quay.io/zuno/okf-tekos@sha256:<digest>
+  #   ceilings: {toolCapabilities: [...], knowledgeDomains: [...], minClassification: C1}
+  #   entitlement: GatewayOnly
+  #   classificationOverrides: {}
+
+# Incrementally synced RAG sources (ADR-0568).
+ragSources: []
+# - name: tech-satellite
+#   type: confluence
+#   confluence: {baseUrl: https://startxfr.atlassian.net, spaceKey: SXSI, rootTitle: "Technologie : Satellite", excludeLabels: [obsolete]}
+#   visibility: shared
+#   aclGroups: [agent_tekos]
+#   syncInterval: 6h

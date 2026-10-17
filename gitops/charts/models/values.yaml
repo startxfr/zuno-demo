@@ -1453,3 +1453,7 @@ lmEval:
 lightspeed:
   enabled: true
   namespace: openshift-lightspeed
+
+# ADR-0568 (WP-151): namespace of the UnifAI stack whose RAG pods embed through
+# the embedding model. Empty = no UnifAI peer in its NetworkPolicy.
+unifaiNamespace: zuno-unifai

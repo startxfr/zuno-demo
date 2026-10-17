@@ -1,0 +1,24 @@
+---
+- name: "unifai | check the Applications are Synced and Healthy"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  loop: ["zuno-unifai-d0", "zuno-unifai-d1"]
+  loop_control:
+    loop_var: gitops_app_name
+
+- name: "unifai | read the UnifaiStack"
+  kubernetes.core.k8s_info:
+    api_version: unifai.startx.fr/v1alpha1
+    kind: UnifaiStack
+    namespace: zuno-unifai
+    name: unifai
+  register: _unifai_stack
+
+- name: "unifai | fail unless the UnifaiStack is Ready"
+  ansible.builtin.fail:
+    msg: >-
+      UnifaiStack zuno-unifai/unifai is
+      {{ (_unifai_stack.resources | default([{}]))[0].status.phase | default('absent') }}:
+      {{ (_unifai_stack.resources | default([{}]))[0].status.message | default('') }}
+  when: >-
+    (_unifai_stack.resources | default([]) | length == 0) or
+    (_unifai_stack.resources[0].status.phase | default('') != 'Ready')

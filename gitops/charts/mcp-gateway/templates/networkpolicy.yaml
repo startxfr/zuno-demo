@@ -42,6 +42,17 @@ spec:
           podSelector:
             matchLabels:
               pipelines.kubeflow.org/v2_component: "true"
+        {{- with .Values.unifaiNamespace }}
+        # ADR-0560/0563 (WP-151): UnifAI's multi-agent pods (backend and
+        # Temporal worker) call this gateway with the user's own token. One
+        # peer element = namespace AND pod labels (intersection), as above.
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: multiagent
+        {{- end }}
       ports:
         - protocol: TCP
           port: 8080

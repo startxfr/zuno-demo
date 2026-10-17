@@ -1,0 +1,17 @@
+{{- /* Fails the render on values that would deploy something unsafe or broken (ADR-0574). */ -}}
+{{- if .Values.operator.install -}}
+{{- if or (hasSuffix ":latest" .Values.operator.catalogImage) (not (contains ":" .Values.operator.catalogImage)) -}}
+{{- fail "operator.catalogImage must be pinned to a version tag or digest, never latest (ADR-0574)" -}}
+{{- end -}}
+{{- end -}}
+{{- range .Values.okf.bundles -}}
+{{- if not (contains "@sha256:" .reference) -}}
+{{- fail (printf "okf.bundles[%s].reference must be pinned by digest (ADR-0564)" .name) -}}
+{{- end -}}
+{{- if not $.Values.okf.publicKey -}}
+{{- fail "okf.publicKey is required when okf.bundles is set (ADR-0564)" -}}
+{{- end -}}
+{{- end -}}
+{{- if and .Values.ragSources (not .Values.stack.rag.sharedPublishers) -}}
+{{- fail "ragSources need stack.rag.sharedPublishers (their owner is its first entry)" -}}
+{{- end -}}

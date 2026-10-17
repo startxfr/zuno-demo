@@ -1,0 +1,34 @@
+---
+# ADR-0561/0574 (WP-151): the UnifaiStack in zuno-unifai (identity on realm
+# zuno, user-token forwarding, remote embedding, hybrid search) and its
+# objects: the shared ai-gateway LLM, the mcp-gateway MCP provider, signed OKF
+# bundles and RAG sources. The role passes the cluster values
+# (zuno_unifai_values in confidential.yml).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-unifai-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-59"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/unifai
+    helm:
+      releaseName: zuno-unifai-d1
+      values: |
+        clusterBaseDomain: apps.mycluster.example.com
+        stack:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-unifai
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

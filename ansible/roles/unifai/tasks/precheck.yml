@@ -1,0 +1,7 @@
+---
+- name: "unifai | precheck - the Vault seed path of the OIDC client secret must exist"
+  ansible.builtin.debug:
+    msg: >-
+      The unifai client secret is seeded at Vault keycloak/unifai by
+      `make d0 install vault` (idempotent, seeds only missing paths) and
+      read by both Keycloak and the UnifaiStack.

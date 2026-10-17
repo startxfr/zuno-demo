@@ -31,6 +31,17 @@ mesh:
   controlPlanePorts: [15012, 15010, 15014]
 
 platformNamespaces:
+  # ADR-0561/0574 (WP-151): the UnifAI agent and RAG platform (one UnifaiStack,
+  # reconciled by unifai-operator). Not meshed: it reaches the gateways in
+  # zuno-ai-run through their NetworkPolicy peers (unifaiNamespace), and users
+  # through the router (always allowed by the baseline). No caller namespace
+  # needs to reach it directly.
+  - name: zuno-unifai
+    displayName: Zuno UnifAI
+    description: UnifAI agent and RAG platform (UnifaiStack managed by unifai-operator).
+    allowedFromNamespaces: []
+    extraLabels:
+      zuno.io/managed: "true"
   - name: zuno-auth
     displayName: Zuno Authentication
     description: Keycloak, the platform's central identity provider.

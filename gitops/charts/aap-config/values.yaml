@@ -114,7 +114,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config, supply-chain]
+    surveyComponents: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config, unifai, supply-chain]
   - name: zuno-day2-build
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
@@ -125,7 +125,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config]
+    surveyComponents: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config, unifai]
 
   - name: zuno-day3-test
     playbook: ansible/playbooks/day3_test.yml
@@ -367,6 +367,10 @@ workflowTemplates:
       - id: mlflow
         successNodes: [lightspeed-config]
       - id: lightspeed-config
+        successNodes: [unifai]
+      # ADR-0574/WP-151: UnifAI stack (operator, UnifaiStack, CRs) last -
+      # it consumes the ai-gateway, mcp-gateway and embeddings set up above.
+      - id: unifai
         successNodes: []
   - name: zuno-day2-check-workflow
     jobTemplate: zuno-day2-check
@@ -396,6 +400,8 @@ workflowTemplates:
         successNodes: [lightspeed-config]
       # check-only tail (ADR-0420/WP-070) - no install/build of its own.
       - id: lightspeed-config
+        successNodes: [unifai]
+      - id: unifai
         successNodes: [supply-chain]
       - id: supply-chain
         successNodes: []
