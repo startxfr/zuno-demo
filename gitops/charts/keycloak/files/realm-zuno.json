@@ -1094,7 +1094,8 @@
             "publicClient": false,
             "secret": "${vault.unifai_client_secret}",
             "redirectUris": [
-                "https://unifai-identity-zuno-unifai.apps.mycluster.example.com/*"
+                "https://unifai-identity-zuno-unifai.apps.mycluster.example.com/*",
+                "https://unifai-ui-zuno-unifai.apps.mycluster.example.com/*"
             ],
             "webOrigins": [
                 "https://unifai-ui-zuno-unifai.apps.mycluster.example.com"

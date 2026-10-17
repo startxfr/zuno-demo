@@ -23,7 +23,9 @@ stack:
   profile: dev
   # Pinned per release (ADR-0574): never a moving tag in production values.
   images: {}
-  adminUsers: []
+  # Usernames of realm zuno (the operator defaults to `admin`, which realm zuno
+  # does not have). ai-ops-01 is the AI platform operations persona.
+  adminUsers: [ai-ops-01]
   storageClass: gp3-csi
   sharedStorageClass: nfs
   identity:
@@ -39,7 +41,7 @@ stack:
     hybrid: true
     # UnifAI users allowed to publish shared sources (ADR-0568). The
     # UnifaiRAGSource objects below are owned by the first one.
-    sharedPublishers: []
+    sharedPublishers: [ai-ops-01]
     # Confluence credentials for the Confluence source type (Vault path of
     # the existing technical identity, ADR-0568).
     confluenceVaultPath: confluence/technical
