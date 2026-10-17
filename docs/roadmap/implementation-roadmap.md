@@ -33,6 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 6 | 8 | WP-145 |
 | v0.10 | 5 | 5 | 6 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53 |
+| v0.11 | 16 | 16 | 12 | WP-146, WP-147, WP-148, WP-149, WP-150, WP-151, WP-152, WP-153, WP-154, WP-155, WP-156, WP-157 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -891,6 +892,32 @@ being discovered by whoever tries the next install.
 | WP-144 | [wp-144](work-packages/wp-144-olm-catalog-drop-tolerance.md) | 0558 | none | Done (2026-09-14 - shared discovery task adopted by the twelve exact-name roles, readiness probe P8 live-verified on demo222 reporting 13 frozen Subscriptions and naming openshift-operators as the namespace where they block others) | decide per operator whether to drop each of the 13 frozen Subscriptions (forfeits its update path) or wait for the catalog to publish again - P8 reports, deliberately does not repair |
 | WP-145 | [wp-145](work-packages/wp-145-fleet-version-and-catalog-policy.md) | 0559 | WP-144 | Not started | blocked on measuring demo333 at its next power-on (powered off, reported 4.22 but unverified) - that single read-only measurement decides whether additional CatalogSources are justified |
 
+### Phase 44 — adopt UnifAI as the agent and RAG platform (added 2026-10-17)
+
+Opened by a user-led review of the startxfr fork of UnifAI (`startx-unifai`,
+branch `devel`, with its `unifai-operator`) as a replacement for as much
+zuno-specific code as possible. The review found that UnifAI is not a model
+gateway, so the ai-gateway stays (ADR-0560) and is slimmed onto MaaS
+(ADR-0570), while the agent layer (agent-runtime, agent-bff, agent-frontend,
+aiagent-operator) and the RAG layer (rag-service, rag-ingestion) move to
+UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
+(ADR-0575). Sixteen decisions, ADR-0560 – ADR-0575, one per decision.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-146 | [wp-146](work-packages/wp-146-unifai-identity-and-context-header-forwarding.md) | 0563, 0562, 0575 | none | Repo work in review | MAS forwarding merged into fork devel (45b2f85a1, not pushed); operator env wiring, image build and header-authorship decision remain |
+| WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Not started | none until a live check; fork-side work runs offline |
+| WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Not started | none until a live check; fork-side work runs offline |
+| WP-149 | [wp-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md) | 0568, 0575 | none | Not started | none until a live check; fork-side work runs offline |
+| WP-150 | [wp-150](work-packages/wp-150-unifai-operator-okf-agent-bundles.md) | 0564, 0565 | WP-146 | Not started | none until a live check; fork-side work runs offline |
+| WP-151 | [wp-151](work-packages/wp-151-deploy-unifai-on-zuno-via-argocd.md) | 0574, 0562, 0560 | WP-146, WP-150 | Not started | demo333 is powered off - live steps wait for the user to power it on |
+| WP-152 | [wp-152](work-packages/wp-152-mcp-gateway-evaluation-and-mcp-north-side.md) | 0571 | none | Not started | demo333 is powered off - live steps wait for the user to power it on |
+| WP-153 | [wp-153](work-packages/wp-153-guardrails-into-the-ai-gateway.md) | 0567 | none | Not started | none until a live check; fork-side work runs offline |
+| WP-154 | [wp-154](work-packages/wp-154-tekos-pilot-on-demo333.md) | 0573, 0561 | WP-146 - WP-153 | Not started | demo333 is powered off - live steps wait for the user to power it on |
+| WP-155 | [wp-155](work-packages/wp-155-migrate-remaining-agents-and-cut-demo222-over.md) | 0573, 0561 | WP-154 | Not started | demo333 is powered off - live steps wait for the user to power it on |
+| WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Not started | none until a live check; fork-side work runs offline |
+| WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Not started | demo333 is powered off - live steps wait for the user to power it on |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1034,6 +1061,9 @@ moving.
 10. **Autonomy sign-off** after one observed cycle (WP-42).
 
 ## Change log
+
+- 2026-10-17 — Phase 44 added: UnifAI adoption, ADR-0560 – ADR-0575
+  (new v0.11 band) and WP-146 – WP-157.
 
 - 2026-09-03 — index revamp. This file renamed from
   `v0.1-v0.3-implementation-roadmap.md`: it had carried phases through 32,

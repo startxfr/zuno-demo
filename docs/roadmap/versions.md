@@ -218,6 +218,19 @@ repository that does not yet exist.
 
 **5 ADRs, all `Proposed`.** Open: ADR-0506 – ADR-0510; WP-48 – WP-53.
 
+## v0.11
+
+Adopt the startxfr fork of UnifAI (`startx-unifai`, branch `devel`) and its
+`unifai-operator` as the agent and RAG platform, retiring as much
+zuno-specific code as UnifAI and OpenShift AI can replace. The agent layer
+(agent-runtime, agent-bff, agent-frontend, aiagent-operator) and the RAG
+layer (rag-service, rag-ingestion) move to UnifAI; OKF stays the agent source
+of truth, delivered to the operator as signed OCI artifacts; the ai-gateway
+stays the model policy router and is slimmed onto MaaS. Piloted on demo333
+with tekos; demo222 cuts over only after full validation.
+
+**16 ADRs, all `Accepted`.** Open: ADR-0560 – ADR-0575; WP-146 – WP-157.
+
 ## OKF stream
 
 A standalone version line for the Open Knowledge Format initiative, decoupled

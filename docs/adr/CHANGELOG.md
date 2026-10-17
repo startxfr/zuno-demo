@@ -9,6 +9,18 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## New band (2026-10-17) - v0.11 added with ADR-0560 to ADR-0575
+
+A user-led review of the startxfr UnifAI fork as a replacement for
+zuno-specific code produced sixteen decisions, recorded one per ADR in a new
+v0.11 band. None declares a `Supersedes:` field yet: the records they will
+retire (the agent-runtime, RAG and aiagent-operator decisions) stay live
+architecture until the demo222 cutover, and each new record lists its
+planned supersessions in its own body. The supersessions are written, with
+their reciprocal status changes, by WP-156. ADR-0556 is amended in place
+(still `Proposed`, never implemented): its Stack scope is narrowed by
+ADR-0572.
+
 ## New record (2026-09-14) - ADR-0558 added to v0.9
 
 Opened by a live incident rather than planned. ADR-0048 ruled that a role must

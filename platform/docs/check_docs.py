@@ -736,7 +736,7 @@ def _wp_governing_adrs(wp_path: pathlib.Path) -> List[str]:
 
 
 ADR_VERSIONS = ["v0", "v0.1", "v0.2", "v0.3", "v0.4", "v0.5", "v0.6",
-                "v0.7", "v0.8", "v0.9", "v0.10", "OKF v0.1"]
+                "v0.7", "v0.8", "v0.9", "v0.10", "v0.11", "OKF v0.1"]
 WP_OPEN_EXCLUDED = {"done", "abandoned", "cancelled", "closed — deferred"}
 
 

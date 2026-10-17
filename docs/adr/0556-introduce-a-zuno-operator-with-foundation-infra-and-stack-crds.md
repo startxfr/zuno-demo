@@ -34,6 +34,24 @@ carry. This ADR is the long-term destination for that vocabulary: a
 cluster describes its own platform in CRs, and an operator reconciles
 it.
 
+## Amendment (2026-10-17) - Stack scope narrowed by ADR-0572
+
+Corrected in place while still `Proposed` and unimplemented, following the
+ADR-0352 precedent, and logged in [CHANGELOG.md](CHANGELOG.md).
+[ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md)
+reduces this operator to the platform foundation. `ZunoFoundation` and
+`ZunoInfra` stand as written below, except that the `aiagent_operator` entry
+of `ZunoInfra` is replaced by the installation of `unifai-operator` from its
+pinned catalog ([ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md)).
+In `ZunoStack`, the entries `rag`, `rag_ingestion` and `agents` no longer
+name zuno components: they are delegated to one `UnifaiStack` and its object
+CRs, reconciled by `unifai-operator`
+([ADR-0561](0561-adopt-unifai-as-the-agent-platform.md),
+[ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)).
+The zuno operator applies and asserts that `UnifaiStack` the way it applies
+an ArgoCD Application, and never reconciles its children. Clause 3's reading
+of ADR-0327's boundary loses its object once aiagent-operator is retired.
+
 ## Decision
 
 This is a **contract ADR**, following the ADR-0327 → ADR-0308
