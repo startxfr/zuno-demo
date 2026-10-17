@@ -905,7 +905,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-146 | [wp-146](work-packages/wp-146-unifai-identity-and-context-header-forwarding.md) | 0563, 0562, 0575 | none | Repo work in review | MAS forwarding merged into fork devel (45b2f85a1, not pushed); operator env wiring, image build and header-authorship decision remain |
+| WP-146 | [wp-146](work-packages/wp-146-unifai-identity-and-context-header-forwarding.md) | 0563, 0562, 0575 | none | Repo work in review | live-proven on demo333 2026-10-17 (user JWT + templated X-Zuno-* headers, fail-closed, MAS-side refresh); operator 0.1.13 wiring released; upstream Temporal context bug fixed (5ba7aed85); header-authorship decision and the X-Authenticated-User exposure fix remain |
 | WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Not started | none until a live check; fork-side work runs offline |
 | WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Not started | none until a live check; fork-side work runs offline |
 | WP-149 | [wp-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md) | 0568, 0575 | none | Not started | none until a live check; fork-side work runs offline |

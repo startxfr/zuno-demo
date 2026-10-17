@@ -113,6 +113,15 @@ caller-token forwarding and templated per-call headers, on both the
    Until then UnifAI does not send them and calls draw on the user's own
    budget.
 
+## Implementation note (2026-10-17)
+
+Live-proven on demo333 (WP-146 step 5). The live run also exposed an
+upstream defect clause 2 depends on: foreground runs on the Temporal engine
+did not ship the `ExecutionContext` to workers, so nodes ran with no session
+id and an `unknown` identity. Fixed in the fork (`5ba7aed85`) and proposed
+upstream; until a stack runs an image carrying that fix, forwarding fails
+closed for foreground Temporal runs.
+
 ## Planned supersession
 
 None. ADR-0032's decision stands and is implemented by a new hop; its
