@@ -57,3 +57,18 @@
           'stack': {'enabled': true},
           'okf': {'publicKey': lookup('ansible.builtin.file', zuno_repo_root + '/agents/zuno-platform-signer.pub')}}
          | combine(zuno_unifai_values | default({}), recursive=True) }}
+
+# ArgoCD has no health check for UnifaiStack: zuno-unifai-d1 reports Healthy
+# while the stack is in Error (demo333, WP-151). Wait on the operator's phase.
+- name: "unifai | wait for the UnifaiStack to be Ready"
+  kubernetes.core.k8s_info:
+    api_version: unifai.startx.fr/v1alpha1
+    kind: UnifaiStack
+    namespace: zuno-unifai
+    name: unifai
+  register: _unifai_stack
+  until: >-
+    (_unifai_stack.resources | default([]) | length > 0) and
+    (_unifai_stack.resources[0].status.phase | default('') == 'Ready')
+  retries: 60
+  delay: 20
