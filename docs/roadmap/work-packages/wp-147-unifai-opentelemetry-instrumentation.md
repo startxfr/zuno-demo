@@ -1,6 +1,6 @@
 # WP-147: UnifAI OpenTelemetry instrumentation
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0566](../../adr/0566-instrument-unifai-with-opentelemetry.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
 - **Depends on:** none
 - **Related:** [ADR-0029](../../adr/0029-instrument-model-usage-costs-and-distributed-traces.md), [WP-151](wp-151-deploy-unifai-on-zuno-via-argocd.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
@@ -17,6 +17,29 @@ MAS, RAG and backend emit OTel traces and metrics over OTLP to an endpoint
 configured in `UnifaiStack.spec.integrations`, and every outbound model call
 carries `traceparent`, so a single Tempo trace runs UnifAI -> ai-gateway ->
 model.
+
+## Progress (2026-10-17)
+
+startx-unifai branch `feat/otel-instrumentation` (`b72bf2c14`, `b551ce848`,
+`004021adc`), merged into `devel` as `c918f732b`.
+
+- Shared opt-in bootstrap in `global_utils/telemetry`; inert unless
+  `OTEL_EXPORTER_OTLP_ENDPOINT` (or `UNIFAI_OTEL_ENABLED=true`) is set.
+- MAS: an OTel adapter of the existing tracing port (`mas.session` ->
+  `mas.node` -> `chat {model}` / `execute_tool`), GenAI semantic-convention
+  attributes, a composite so Langfuse and OTel can both run, metrics
+  (`gen_ai.client.operation.duration`, `gen_ai.client.token.usage`, node and
+  session durations); no prompt, completion or id on metrics.
+  `traceparent` propagates through requests, httpx and the openai client's
+  httpx2, across Temporal (interceptor) and Celery.
+- RAG: `rag.search` and `rag.pipeline` span trees and metrics.
+- The run id attribute for the zuno collector's `zuno.run_id` rule is
+  `mas.run.id`.
+- Tests: MAS +13 (no new failure against the pre-existing baseline), RAG +9.
+- **Remaining:** the operator `openTelemetry` block on `UnifaiStack` (the
+  `OTEL_*` variables must be set by hand until then), the zuno collector
+  rule and run-trace dashboard, ai-gateway/mcp-gateway reading the incoming
+  `traceparent` (ADR-0566), an end-to-end trace on demo333.
 
 ## Steps
 

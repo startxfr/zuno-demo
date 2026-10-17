@@ -1,6 +1,6 @@
 # WP-149: UnifAI RAG on Qdrant with hybrid search, Confluence and git sources, and backup
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
 - **Depends on:** none
 - **Related:** [ADR-0046](../../adr/0046-make-rag-retrieval-metadata-aware-and-bilingual.md), [ADR-0105](../../adr/0105-automate-source-specific-knowledge-ingestion.md), [ADR-0330](../../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md), [ADR-0519](../../adr/0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md), [WP-151](wp-151-deploy-unifai-on-zuno-via-argocd.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
@@ -18,6 +18,51 @@ UnifAI ingests Confluence spaces and git repositories incrementally, embeds
 them with `qwen3-embedding-0.6b` served by RHOAI (dimension 1024), answers
 with dense+sparse hybrid search over Qdrant, and its Qdrant and Mongo data
 can be backed up to S3 and restored.
+
+## Progress (2026-10-17)
+
+All in startx-unifai `devel` (generic parts on feature branches from `main`).
+
+- **Hybrid search** (`9485e3bb8`): `QDRANT_HYBRID_ENABLED` creates
+  `<name>_hybrid` collections with a named dense vector and an IDF sparse
+  vector from a hashing BM25 encoder (no model download, works offline);
+  queries fuse both by RRF with the same filters. Stable point ids fix a
+  pre-existing defect (re-running a pipeline duplicated every chunk);
+  collection and embedding dimension mismatches now fail loudly.
+- **Shared sources by OIDC group** (`decac72c2`, user decision): a source can
+  be `shared` with ACL groups; only `RAG_SHARED_PUBLISHERS` may publish one;
+  the caller's groups come from the session token or a forwarded user token
+  verified against `OIDC_ISSUER_URL`; no group means own sources only.
+  MAS `docs_rag` gains `forward_user_token` (`fc0770be6`) and `source_type`
+  (`954782278`); RAG gains `/api/sources/query.match` (`7aaeac1ae`).
+- **Confluence source** (`ba6d851ec`): space or page subtree, incremental by
+  page version (manifest in the source's type_data), stale points deleted
+  before storing. No git source: the current zuno ingestion has none
+  (Confluence, documentation sites and the SXA dump are its sources).
+- **Operator** (`0bca13a87`, `06acea665`, fix `f50a0963f`):
+  `UnifaiStack.spec.rag.{hybrid,sharedPublishers,confluence}` rendered only
+  when set (no rollout of existing stacks), kind `UnifaiRAGSource`
+  (`syncInterval` instead of cron: the operator has no cron parser), and
+  `spec.backup` (MongoDB dump + one Qdrant snapshot per collection to S3,
+  retention). Released in 0.1.17 except the fix (needs 0.1.18).
+- **Live on demo333, 2026-10-17** (`unifai-devel`, operator 0.1.17, rag
+  image `devel-75c057d02`, the zuno Confluence credentials): a
+  `UnifaiRAGSource` on `SXSI / Technologie : Satellite` ingested 90 pages into
+  the hybrid collection; every later sync reported "0 new or changed, 90
+  unchanged" (nothing re-embedded). Searches as another user: with
+  `agent_tekos` the shared pages are returned, without it 0 hits; an exact
+  identifier (`foreman-maintain`) and a paraphrase both found the relevant
+  pages. **Incident:** 0.1.17 read the wrong response key and re-triggered
+  the sync every 10 s; ~2,900 syncs were queued (each listing 90 pages on
+  startxfr.atlassian.net) before the CR was deleted and `confluence_queue`
+  purged; fixed in `f50a0963f` with a regression spec. Everything was
+  deleted and the stack spec restored afterwards.
+- **Backups** were exercised against Qdrant v1.16.0 by hand (three runs with
+  retention 2, a deleted collection restored with all its points), not yet
+  on the cluster.
+- **Remaining:** release 0.1.18; step 8 (the zuno Day-3 `unifai` role) once
+  WP-151 deploys UnifAI; a cluster backup and restore drill; the
+  documentation-site and SXA sources if those corpora move to UnifAI.
 
 ## Steps
 
