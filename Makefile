@@ -660,7 +660,7 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 stresstest SEQUENTIAL=1   # one agent at a time, like every run before ADR-0561' \
     'Example: make d3 backup postgresql' \
     'Example: make d3 restore postgresql' \
-    'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything' \
+    'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything; also publishes the OCI bundles when zuno_okf_oci_repository_prefix is set (ADR-0564)' \
     'Example: make d3 run mlops   # triggers one real LoRA training run (WP-126) - scales up zuno-gpu-burst-a' \
     'Example: git tag v0.2.0 && git push origin v0.2.0 && make d3 release TAG=v0.2.0   # named in-cluster release (ADR-0549)' \
     'Example: make d3 scenario-failover-node   # interactive - pauses for confirmation between cordon+kill and uncordon+restore'; \

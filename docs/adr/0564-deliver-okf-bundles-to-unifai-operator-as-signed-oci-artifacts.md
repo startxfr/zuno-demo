@@ -125,6 +125,52 @@ updates `spec.source.oci.reference`, Argo CD applies it, and the operator
 re-emits. An `UnifaiTemplate` has no update API and is deleted and recreated
 (`fork/unifai-operator/README.md`). Workflows and agents are updated in place.
 
+## Amendment (2026-10-17) - as implemented by WP-150
+
+Corrected while `Accepted` and before the kind's first release, after
+implementation exposed the following. Every other clause stands as written.
+
+- **Clause 1, what is signed.** The artifact carries the bundle's existing
+  signature instead of a new signature over the manifest digest. `make d3
+  sign agents` already signs the bundle *content* digest with the Transit
+  key (`sign_okf_bundle.py`); `publish_okf_bundle.py` re-verifies it and
+  pushes one deterministic layer with that signature in the manifest
+  annotation `zuno.okf.signature`. The operator recomputes the content digest
+  from the pulled layer and verifies the signature before parsing. Integrity
+  is the same (the content digest covers every file, the reference pins the
+  manifest), no second signing call is added, and the existing offline
+  `sign_okf_bundle.py verify` still checks the same signature. Publication is
+  a step of the same verb, run after signing and verification, and only when
+  `zuno_okf_oci_repository_prefix` is set.
+- **Clause 2, fields.** `spec.verify` has `publicKeyRef` only: the Transit
+  public key is the committed `agents/zuno-platform-signer.pub`, placed in a
+  Secret by the deployment (ADR-0574). `vaultTransit` is not implemented; a
+  key rotation therefore still needs that Secret updated. The classification
+  ceiling is named `ceilings.minClassification`: the least restrictive level
+  a bundle may declare (C1 < C2 < C3), which is what "never widen" means for
+  classification. `spec.entitlement` (`Enforced` by default, or
+  `GatewayOnly`) makes clause 5's `EntitlementUnsupported` refusal the
+  default while allowing the ADR-0562 interim of gateway-only enforcement on
+  an explicitly reviewed CR.
+- **Clause 3, schemas.** The OKF JSON schemas had drifted from the bundles
+  they describe (8 of 50 documents failed, Tekos's primary task among them):
+  hand-kept enums of tool names and entitlement groups, and the arkos
+  `prompts` slots. The tool and group enums became name patterns (the
+  vocabulary stays in `policies/tools/tool-policy.yaml`, checked by
+  `validate_okf_bundle.py`) and `prompts` was added; all 50 now validate,
+  and the operator embeds copies of these schemas.
+- **Clause 4, shapes.** Only `retrieve_reason_respond` has a blueprint
+  template. `plan_draft_write` (Arkos) is refused with
+  `Valid=False/ShapeNotImplemented` until its template exists.
+- **Clause 3 step 5 and clause 5, emitted objects.** No `UnifaiTemplate` is
+  emitted yet (catalog display moves to ADR-0569). Each task gets its own
+  `UnifaiLLM`, identical to the shared ai-gateway LLM except for its Zuno
+  headers (agent, task, effective classification): UnifAI cannot attach
+  per-node headers to one shared LLM. Model selection is still never emitted
+  per bundle. Per-task tool names and `rag.top_k` are not mapped onto the
+  provider and retriever (both are shared objects); they are listed in
+  `status.unmapped`, and tools stay enforced by mcp-gateway.
+
 ## Planned supersession
 
 At cutover (WP-156):

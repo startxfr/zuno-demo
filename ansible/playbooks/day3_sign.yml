@@ -73,6 +73,9 @@
     # Vault now holds the right signatures; the runtime does not yet. The
     # ExternalSecret's refreshInterval is 1h, so without this the pods keep
     # reading the old .sig blobs for up to an hour after a "successful" sign.
+    - name: "okf-sign | publish the signed bundles as OCI artifacts (ADR-0564)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/publish_okf_bundles.yml"
+
     - name: "okf-sign | force the signatures ExternalSecret to re-read Vault"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/force_externalsecret_refresh.yml"
       vars:

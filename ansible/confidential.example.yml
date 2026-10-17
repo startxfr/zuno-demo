@@ -147,6 +147,13 @@ zuno_mariadb_external_db_trillian_password: "xxxxxx"
 zuno_quay_username: "xxxxxx"
 zuno_quay_password: "xxxxxx"
 
+# --- OKF bundle publication (ADR-0564, WP-150): optional. When set,
+# `make d3 sign agents` also pushes every signed agents/<name>/ bundle to
+# <prefix>/okf-<name> as an OCI artifact that unifai-operator's
+# UnifaiAgentBundle pulls by digest. The controller host must already be
+# logged in to that registry (oras login / podman login).
+# zuno_okf_oci_repository_prefix: "quay.io/zuno"
+
 # --- Jira (no consumer in this repo yet - slot reserved for a future
 # integration, same "stored ahead of time" status as Confluence originally
 # had) ------------------------------------------------------------------

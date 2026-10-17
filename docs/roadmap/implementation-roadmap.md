@@ -909,7 +909,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Not started | none until a live check; fork-side work runs offline |
 | WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Not started | none until a live check; fork-side work runs offline |
 | WP-149 | [wp-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md) | 0568, 0575 | none | Not started | none until a live check; fork-side work runs offline |
-| WP-150 | [wp-150](work-packages/wp-150-unifai-operator-okf-agent-bundles.md) | 0564, 0565 | WP-146 | Not started | none until a live check; fork-side work runs offline |
+| WP-150 | [wp-150](work-packages/wp-150-unifai-operator-okf-agent-bundles.md) | 0564, 0565 | WP-146 | Repo work in review | operator UnifaiAgentBundle in fork devel (223c45157) awaiting release 0.1.16; publish step in make d3 sign agents; first quay.io publication and demo333 live run pending |
 | WP-151 | [wp-151](work-packages/wp-151-deploy-unifai-on-zuno-via-argocd.md) | 0574, 0562, 0560 | WP-146, WP-150 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-152 | [wp-152](work-packages/wp-152-mcp-gateway-evaluation-and-mcp-north-side.md) | 0571 | none | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-153 | [wp-153](work-packages/wp-153-guardrails-into-the-ai-gateway.md) | 0567 | none | Not started | none until a live check; fork-side work runs offline |

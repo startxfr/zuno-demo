@@ -190,7 +190,7 @@
               "minItems": 1,
               "items": {
                 "type": "string",
-                "enum": ["agent_comage", "agent_tekos", "agent_advantage", "agent_finage", "agent_arkos"]
+                "pattern": "^agent_[a-z0-9_]+$"
               },
               "uniqueItems": true
             }

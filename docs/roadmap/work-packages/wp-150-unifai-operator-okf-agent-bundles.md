@@ -1,6 +1,6 @@
 # WP-150: unifai-operator consumes signed OKF agent bundles
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md), [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md)
 - **Depends on:** [WP-146](wp-146-unifai-identity-and-context-header-forwarding.md)
 - **Related:** [ADR-0342](../../adr/0342-support-multiple-agent-graph-shapes-in-agent-runtime.md), [ADR-0308](../../adr/0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md), [ADR-0327](../../adr/0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md), [ADR-0509](../../adr/0509-deliver-okf-content-as-mounted-versioned-artifacts.md), [ADR-0510](../../adr/0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md), [ADR-0021](../../adr/0021-route-models-according-to-c1-c2-c3-classification.md), [ADR-0035](../../adr/0035-prevent-restricted-internal-context-from-reaching-external-models.md), [ADR-0544](../../adr/0544-bound-every-model-call-at-both-ends.md)
@@ -19,6 +19,31 @@ pull it, verify its signature, parse `agent.okf.md` and its `tasks/`,
 `prompts/`, `tools/`, `rag/`, `policies/`, and emit owned `UnifaiAgent`,
 `UnifaiWorkflow` and `UnifaiTemplate` objects, with each task's default
 classification injected and only ever raised.
+
+## Progress (2026-10-17)
+
+Steps 1-7 are done; ADR-0564 carries a dated amendment for every point where
+the implementation differs from its first text.
+
+- **Operator** (startx-unifai `devel`, fork-only): `e76330286` then
+  `223c45157`. Kind `UnifaiAgentBundle`; package `internal/okf` (digest
+  identical to `sign_okf_bundle.py`, ECDSA verification without cosign,
+  embedded OKF v0.2 schemas, oras-go pull). Pipeline and conditions
+  Verified -> Valid -> WithinCeilings -> Emitted; `spec.ceilings`,
+  `spec.entitlement`, raise-only `classificationOverrides`, pruning of
+  removed tasks. 9 envtest specs and the okf unit tests (including a real
+  `cosign sign-blob` fixture) pass; the full operator suite is green.
+- **zuno-demo**: `platform/supply-chain/publish_okf_bundle.py` (deterministic
+  layer, re-verification before push, `oras push`) with tests wired into
+  CI; `ansible/tasks/publish_okf_bundles.yml` runs from `make d3 sign
+  agents` when `zuno_okf_oci_repository_prefix` is set. The OKF schemas
+  were repaired: 8 of 50 documents failed them before.
+- **Remaining:** the operator release (0.1.16, handed to the startx-unifai
+  session; 0.1.15 shipped without this kind), a first real publication to
+  `quay.io/zuno/okf-tekos`, and a live run on demo333 (`unifai-devel`) - the
+  latter two can be done here once 0.1.16 is live. `plan_draft_write`
+  (Arkos) needs its blueprint template; soursage and cognos need a graph
+  shape.
 
 ## Steps
 

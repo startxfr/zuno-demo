@@ -199,6 +199,9 @@ jobs:
       - name: supply-chain sign_okf_bundle.py tests (ADR-0106)
         working-directory: platform/supply-chain
         run: python3 tests/test_sign_okf_bundle.py
+      - name: supply-chain publish_okf_bundle.py tests (ADR-0564)
+        working-directory: platform/supply-chain
+        run: python3 tests/test_publish_okf_bundle.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence
         run: |

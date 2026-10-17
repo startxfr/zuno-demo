@@ -29,30 +29,11 @@
       "required": ["allowed_tools"],
       "properties": {
         "allowed_tools": {
-          "description": "MCP tool names this task may invoke, drawn from the platform tool-policy vocabulary (policies/tools/README.md). Effective authorization is the intersection of this list with the user's group/task/data-classification policy (ADR-0011) - this field is a ceiling, not a grant on its own. Empty for placeholder agents' stub tasks. A task can only ever narrow, never widen, its parent agent's overall declared-tools union (ADR-0036 Security considerations).",
+          "description": "MCP tool names this task may invoke, drawn from the platform tool-policy vocabulary (policies/tools/README.md). Effective authorization is the intersection of this list with the user's group/task/data-classification policy (ADR-0011) - this field is a ceiling, not a grant on its own. Empty for placeholder agents' stub tasks. A task can only ever narrow, never widen, its parent agent's overall declared-tools union (ADR-0036 Security considerations). The vocabulary itself is policies/tools/tool-policy.yaml, checked by platform/supply-chain/validate_okf_bundle.py; this schema only constrains the name format, so a new tool is declared in one place.",
           "type": "array",
           "items": {
             "type": "string",
-            "enum": [
-              "search_confluence",
-              "list_drive_files",
-              "read_gmail",
-              "web_search",
-              "send_technical_report_email",
-              "confluence.page.read",
-              "confluence.page.search",
-              "drive.document.create",
-              "drive.document.update",
-              "salesforce.opportunity.read",
-              "salesforce.opportunity.create",
-              "salesforce.opportunity.update",
-              "git.repository.read",
-              "git.repository.list",
-              "git.repository.private.read",
-              "git.repository.private.list",
-              "git.file.write",
-              "git.repository.create"
-            ]
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
           },
           "uniqueItems": true
         },
@@ -84,6 +65,17 @@
             "pattern": "^knowledge\\.[a-z][a-z0-9_-]*$"
           },
           "uniqueItems": true
+        },
+        "prompts": {
+          "description": "Extra prompt slots of this task for multi-stage graph shapes (ADR-0342): slot name -> slot settings. Each slot's text lives in prompts/<task>--<slot>.md (components/agent-runtime/app/registry.py).",
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "classification_ceiling": { "type": "string", "enum": ["C1", "C2", "C3"] }
+            }
+          }
         },
         "prompt_examples": {
           "description": "ADR-0515/WP-061: editable example prompts for this task, surfaced in two places by the agent frontend - the empty-state (\"Create new chat\") view when the caller has no conversation history yet, and the composer's slash menu, which lists every task carrying at least one example and drops the chosen text into the message box for the user to edit before sending. UX only - purely decorative, never parsed/enforced server-side, and choosing one does NOT select which task runs: the chat route always executes the agent's primary_task (ADR-0342). Optional/omitted simply drops this task from the slash menu.",
