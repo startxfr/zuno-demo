@@ -22,6 +22,9 @@ stack:
   enabled: false
   profile: dev
   # Pinned per release (ADR-0574): never a moving tag in production values.
+  # `version` is the tag of the five UnifAI images (an immutable devel-<sha>
+  # or a release); `images` overrides single images, by digest.
+  version: ""
   images: {}
   # Usernames of realm zuno (the operator defaults to `admin`, which realm zuno
   # does not have). ai-ops-01 is the AI platform operations persona.

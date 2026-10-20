@@ -11,6 +11,9 @@ metadata:
 spec:
   profile: {{ $s.profile }}
   deletionPolicy: Retain
+  {{- with $s.version }}
+  version: {{ . | quote }}
+  {{- end }}
   {{- with $s.images }}
   images:
     {{- toYaml . | nindent 4 }}
