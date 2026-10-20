@@ -1,6 +1,6 @@
 # WP-151: Deploy UnifAI on zuno through ArgoCD
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0574](../../adr/0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md), [ADR-0562](../../adr/0562-authenticate-unifai-against-the-zuno-keycloak-realm.md), [ADR-0560](../../adr/0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md)
 - **Depends on:** [WP-146](wp-146-unifai-identity-and-context-header-forwarding.md), [WP-150](wp-150-unifai-operator-okf-agent-bundles.md)
 - **Related:** [ADR-0557](../../adr/0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md), [ADR-0558](../../adr/0558-tolerate-catalogs-that-stop-publishing-an-installed-operator.md), [ADR-0559](../../adr/0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md), [WP-147](wp-147-unifai-opentelemetry-instrumentation.md), [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md), [WP-154](wp-154-tekos-pilot-on-demo333.md)
@@ -89,6 +89,59 @@ and is Synced and Healthy in ArgoCD.
    demo333 via values. Agree the choice with the startx-unifai session first
    — any operator change rolls out to both existing stacks. Use
    `oc --context <demo333-context>` on every command; never touch demo222.
+
+## Progress (2026-10-17, demo333)
+
+1. **Done: repo work** (`05a65658`, fixes `f1fc5668`, `e1a2ed92`, `5a05eddd`).
+   - Chart `gitops/charts/unifai/` and Applications `zuno-unifai-d0`/`-d1`.
+   - Role `ansible/roles/unifai/`. The role renders no operator objects when
+     a Subscription for the package exists that `zuno-unifai-d0` does not own.
+   - Client `unifai` in realm zuno, with its secret seeded in Vault at
+     `keycloak/unifai`.
+   - Namespace `zuno-unifai` (not meshed), plus NetworkPolicy peers on
+     ai-gateway, mcp-gateway and the embedding predictor.
+   - Wiring into the Makefile, the Day 2 playbooks and the AAP DAGs.
+   - `check_docs.py` is green.
+2. **Done: deployed on demo333.** Branch `demo333` was fast-forwarded to
+   `demo222`. The Vault path was seeded, and the client reconcile Job logged
+   `created client unifai`. The token endpoint accepts the seeded secret and
+   rejects a wrong one. The role was run locally, never through AAP, with
+   `zuno_gitops_target_revision=demo333`. On demo333, `zuno-unifai-d0`
+   renders nothing because the hand-made Subscription is kept.
+   - `UnifaiStack zuno-unifai/unifai` is Ready, with all 14 pods Running.
+     `unifai-devel` and `unifai-olm` stayed Ready throughout.
+   - `UnifaiLLM zuno-gateway` and `UnifaiProvider mcp-gateway` are Ready.
+   - From the UnifAI pods, the ai-gateway and the mcp-gateway answer, and the
+     embedding predictor returns 1024-dimension vectors to the RAG pods only.
+3. **Live findings, fixed in the repo.**
+   - Vault `confluence/technical` carries `email`/`token`, not the
+     `CONFLUENCE_*` names.
+   - The MCP transport enum value is `"streamable http"`.
+   - Realm zuno has no `admin` user. `adminUsers` and `sharedPublishers`
+     now default to the `ai-ops-01` persona.
+   - The client needs the UI redirect URI as well as the identity one.
+   - ArgoCD has no health check for `UnifaiStack`: the Application read
+     Healthy while the stack was in Error. The install role now waits on the
+     operator's phase.
+   - The operator does not retry an object after a permanent HTTP 400 until
+     its spec changes. Recreate the object after fixing the backend.
+   - The `:devel` UnifAI images are built from `origin/devel`, which does
+     not yet contain the WP-146/147/149 commits. Multiagent is pinned to
+     `devel-75c057d02` by digest, through `zuno_unifai_values`, until the
+     fork's `devel` is pushed and rebuilt.
+4. **Partly done: acceptance.** A real browser login as `ai-ops-01` through
+   realm zuno landed on the UnifAI UI. The run of a throwaway workflow
+   (`purpose=wp151-live-test` objects) returned 409 "already RUNNING" on the
+   non-streamed execute, most likely a proxy retry of a long call. demo333
+   then went offline before the ai-gateway log could be read.
+
+**Remaining:**
+- Read the ai-gateway log for session `7e53f467-8cd4-423f-a3ef-2d27cb945d01`
+  (realm zuno JWT accepted, `X-Zuno-Agent: wp151-...`), or re-run with
+  `stream: true`.
+- Delete the `purpose=wp151-live-test` objects.
+- Re-pin all images once the fork images contain the merged work.
+- Create `UnifaiRAGSource` objects only after operator 0.1.18 is on stable.
 
 ## Acceptance
 
