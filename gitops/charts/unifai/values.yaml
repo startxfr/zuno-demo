@@ -29,6 +29,10 @@ stack:
   # or a release); `images` overrides single images, by digest.
   version: ""
   images: {}
+  # Extra environment by component (operator >= 0.1.22): multiagent,
+  # multiagentWorker, rag, ragCelery, backend, identity, ui. Values come from
+  # Secrets or ConfigMaps (valueFrom) when they are sensitive.
+  extraEnv: {}
   # Usernames of realm zuno (the operator defaults to `admin`, which realm zuno
   # does not have). ai-ops-01 is the AI platform operations persona.
   adminUsers: [ai-ops-01]
@@ -49,6 +53,9 @@ stack:
     # Vault path of the client secret (seeded by ansible/roles/vault).
     clientSecretVaultPath: keycloak/unifai
     forwardUserToken: true
+    # Let a UnifAI team name Keycloak groups (identity directory provider
+    # oidc-claims, ADR-0583): needs images that contain the provider.
+    oidcClaims: false
   rag:
     embeddingUrl: http://embeddings-predictor.zuno-ai-run.svc:8080
     embeddingModel: qwen3-embedding-0.6b
