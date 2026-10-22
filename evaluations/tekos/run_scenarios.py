@@ -58,6 +58,15 @@ AGENT = os.getenv("AGENT", "tekos")
 # Tekos's real task name keeps the unparameterized case unchanged.
 TASK_NAME = os.getenv("TASK_NAME", "answer-technical-question")
 
+# WP-154 (ADR-0573): "agent-runtime" (default, unchanged) or "unifai". Selected
+# by `--target unifai` on the command line or EVAL_TARGET in the environment;
+# the scenarios file is the same, only the transport of some handlers changes.
+TARGET = os.getenv("EVAL_TARGET", "agent-runtime")
+if "--target" in sys.argv:
+    _i = sys.argv.index("--target")
+    if _i + 1 < len(sys.argv):
+        TARGET = sys.argv[_i + 1]
+
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "https://keycloak.apps.mycluster.example.com")
 FRONTEND_URL = os.getenv("FRONTEND_URL", f"https://{AGENT}.apps.mycluster.example.com")
 BFF_URL = os.getenv("BFF_URL", f"http://{AGENT}-bff.zuno-ai-run.svc.cluster.local:8080")
@@ -178,6 +187,10 @@ class ScenarioResult:
     title: str
     passed: bool
     detail: str = ""
+    # WP-154: a scenario that cannot apply to the chosen target (e.g. a portal
+    # tile on UnifAI) is reported and excluded from the pass rate, never
+    # counted as a pass.
+    skipped: bool = False
 
 
 _token_cache: Dict[str, str] = {}
@@ -861,6 +874,182 @@ def chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], ok, detail)
 
 
+# --------------------------------------------------------------------------
+# UnifAI target (WP-154). The same scenarios, served by UnifAI's own session
+# API (evaluations/tekos/unifai_target.py). Scenarios that exercise shared
+# platform services (MCP gateway, model router, Keycloak) keep their
+# agent-runtime-era handlers; the ones tied to components UnifAI replaces
+# (portal tiles, BFF, agent-runtime health) get an equivalent or are skipped.
+# --------------------------------------------------------------------------
+
+_unifai_target = None
+
+# UnifAI reports a tool by its capability id; scenarios name the legacy alias.
+_UNIFAI_TOOL_ALIASES = {"search_confluence": "confluence.page.search"}
+
+
+def _unifai():
+    global _unifai_target
+    if _unifai_target is None:
+        from unifai_target import UnifaiTarget  # lazy: only the unifai target ships this file
+
+        _unifai_target = UnifaiTarget(DEMO_PASSWORD, agent=AGENT)
+    return _unifai_target
+
+
+def _skip(s: Dict[str, Any], why: str) -> ScenarioResult:
+    return ScenarioResult(s["id"], s["title"], False, f"skipped: {why}", skipped=True)
+
+
+def u_portal_lists_all_agents(s: Dict[str, Any]) -> ScenarioResult:
+    names = _unifai().visible_workflows(s["persona"])
+    ok = AGENT in names
+    return ScenarioResult(s["id"], s["title"], ok, f"visible workflows={names}")
+
+
+def u_portal_requires_login(s: Dict[str, Any]) -> ScenarioResult:
+    status = _unifai().anonymous_status("/api2/blueprints/available.blueprints.summary.get")
+    return ScenarioResult(s["id"], s["title"], status == 401, f"anonymous status={status}")
+
+
+def u_portal_tile_state(s: Dict[str, Any]) -> ScenarioResult:
+    # A "tile" is a workflow visible to the persona. UnifAI scopes visibility
+    # by owner/team, not by Keycloak group (the entitlement by group is enforced
+    # at the gateways, ADR-0562), so a disabled tile is proven twice: no
+    # workflow listed AND the MCP gateway refusing the agent for that persona.
+    if s.get("expect_placeholder"):
+        return _skip(s, "UnifAI has no placeholder agent tiles")
+    names = _unifai().visible_workflows(s["persona"])
+    visible = s["agent"] in names
+    if s["expect_enabled"]:
+        return ScenarioResult(s["id"], s["title"], visible, f"visible workflows={names}")
+    resp = httpx.post(
+        f"{MCP_GATEWAY_URL}/mcp",
+        headers={**auth_headers(s["persona"]), "X-Zuno-Agent": s["agent"], "X-Zuno-Task": TASK_NAME},
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+        timeout=15,
+    )
+    refused = resp.status_code == 403
+    return ScenarioResult(
+        s["id"], s["title"], (not visible) and refused, f"visible={visible} mcp_status={resp.status_code}"
+    )
+
+
+def u_chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
+    t = _unifai()
+    timeout = s.get("timeout_seconds", 120)
+    first = t.run(s["persona"], s["message"], timeout=timeout)
+    if first.status != 200:
+        return ScenarioResult(s["id"], s["title"], False, f"status={first.status}")
+    ok = bool(first.reply)
+    detail = f"reply_len={len(first.reply)} seconds={first.seconds:.1f} (citations: RAG source not deployed yet)"
+    follow_up = s.get("follow_up")
+    if ok and follow_up:
+        second = t.run(s["persona"], follow_up, session_id=first.session_id, timeout=timeout)
+        follow_ok = second.status == 200 and bool(second.reply)
+        ok = ok and follow_ok
+        detail += f" follow_up_status={second.status} follow_up_ok={follow_ok}"
+    return ScenarioResult(s["id"], s["title"], ok, detail)
+
+
+def u_chat_first_token_latency(s: Dict[str, Any]) -> ScenarioResult:
+    start = time.monotonic()
+    first_token_at: Optional[float] = None
+    try:
+        for chunk in _unifai().stream(s["persona"], s["message"], timeout=60):
+            if chunk.get("type") == "llm_token":
+                first_token_at = time.monotonic()
+                break
+    except Exception as exc:  # noqa: BLE001
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
+    if first_token_at is None:
+        return ScenarioResult(s["id"], s["title"], False, "no token received")
+    elapsed = first_token_at - start
+    return ScenarioResult(
+        s["id"], s["title"], elapsed <= s["max_seconds"], f"first_token_seconds={elapsed:.2f} max={s['max_seconds']}"
+    )
+
+
+def u_chat_streaming(s: Dict[str, Any]) -> ScenarioResult:
+    kinds: Dict[str, int] = {}
+    try:
+        for chunk in _unifai().stream(s["persona"], s["message"], timeout=s.get("timeout_seconds", 120)):
+            kinds[chunk.get("type", "?")] = kinds.get(chunk.get("type", "?"), 0) + 1
+    except Exception as exc:  # noqa: BLE001
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
+    ok = kinds.get("llm_token", 0) > 0 and kinds.get("complete", 0) > 0
+    return ScenarioResult(s["id"], s["title"], ok, f"events={kinds}")
+
+
+def u_chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
+    want = _UNIFAI_TOOL_ALIASES.get(s["expect_tool"], s["expect_tool"])
+    tools: List[str] = []
+    try:
+        for chunk in _unifai().stream(s["persona"], s["message"], timeout=s.get("timeout_seconds", 180)):
+            if chunk.get("type") == "tool_calling" and chunk.get("tool"):
+                tools.append(chunk["tool"])
+    except Exception as exc:  # noqa: BLE001
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
+    return ScenarioResult(s["id"], s["title"], want in tools, f"expected={want} tool_calls={tools}")
+
+
+def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
+    return _skip(s, "UnifAI RAG source not deployed yet (WP-149 phase B, needs the GPU embedding service)")
+
+
+def u_agent_isolation(s: Dict[str, Any]) -> ScenarioResult:
+    try:
+        import kubernetes  # noqa: F401
+    except ImportError:
+        return _skip(s, "needs the in-cluster Kubernetes client (runs in the Day 3 evaluation Job)")
+    return agent_isolation_placeholder_empty(s)
+
+
+def u_bff_rejects_missing_jwt(s: Dict[str, Any]) -> ScenarioResult:
+    resp = httpx.post(
+        f"{_unifai().ui_url}/api2/sessions/user.session.create",
+        json={"blueprintId": "x"},
+        timeout=15,
+        verify=False,
+    )
+    return ScenarioResult(s["id"], s["title"], resp.status_code == 401, f"status={resp.status_code}")
+
+
+def u_bff_rejects_wrong_audience(s: Dict[str, Any]) -> ScenarioResult:
+    return _skip(s, "UnifAI authenticates a server-side session cookie, it accepts no bearer token")
+
+
+def u_health_endpoints_all_ok(s: Dict[str, Any]) -> ScenarioResult:
+    urls = {
+        "unifai-ui": f"{_unifai().ui_url}/",
+        "mcp-gateway": f"{MCP_GATEWAY_URL}/healthz",
+        "ai-gateway": f"{os.getenv('AI_GATEWAY_URL', 'http://ai-gateway.zuno-ai-run.svc.cluster.local:8080')}/healthz",
+    }
+    statuses: Dict[str, Any] = {}
+    for name, url in urls.items():
+        try:
+            statuses[name] = httpx.get(url, timeout=10, verify=False).status_code
+        except Exception as exc:  # noqa: BLE001
+            statuses[name] = str(exc)
+    return ScenarioResult(s["id"], s["title"], all(v == 200 for v in statuses.values()), json.dumps(statuses))
+
+
+UNIFAI_HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
+    "portal_lists_all_agents": u_portal_lists_all_agents,
+    "portal_requires_login": u_portal_requires_login,
+    "portal_tile_state": u_portal_tile_state,
+    "chat_basic_qa": u_chat_basic_qa,
+    "chat_first_token_latency": u_chat_first_token_latency,
+    "chat_streaming_sse": u_chat_streaming,
+    "chat_triggers_tool": u_chat_triggers_tool,
+    "rag_retrieval_has_citation": u_rag_retrieval,
+    "bff_rejects_missing_jwt": u_bff_rejects_missing_jwt,
+    "bff_rejects_wrong_audience": u_bff_rejects_wrong_audience,
+    "agent_isolation_placeholder_empty": u_agent_isolation,
+    "health_endpoints_all_ok": u_health_endpoints_all_ok,
+}
+
+
 HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "portal_lists_all_agents": portal_lists_all_agents,
     "portal_requires_login": portal_requires_login,
@@ -896,9 +1085,10 @@ def run() -> List[ScenarioResult]:
     scenarios_path = pathlib.Path(__file__).resolve().parent.parent / AGENT / "scenarios.yaml"
     scenarios = yaml.safe_load(scenarios_path.read_text())["scenarios"]
 
+    handlers = {**HANDLERS, **UNIFAI_HANDLERS} if TARGET == "unifai" else HANDLERS
     results: List[ScenarioResult] = []
     for s in scenarios:
-        handler = HANDLERS.get(s["type"])
+        handler = handlers.get(s["type"])
         if handler is None:
             result = ScenarioResult(s["id"], s["title"], False, f"no handler for type '{s['type']}'")
         else:
@@ -914,18 +1104,24 @@ def run() -> List[ScenarioResult]:
 def main() -> int:
     results = run()
 
+    skipped = [r for r in results if r.skipped]
+    results = [r for r in results if not r.skipped]
     passed = sum(1 for r in results if r.passed)
     total = len(results)
     rate = passed / total if total else 0.0
 
+    print(f"target: {TARGET}")
     print(f"{'ID':<4}{'PASS':<6}{'TITLE'}")
     for r in results:
         print(f"{r.id:<4}{'✓' if r.passed else '✗':<6}{r.title}")
         if not r.passed and r.detail:
             print(f"      -> {r.detail}")
+    for r in skipped:
+        print(f"{r.id:<4}{'-':<6}{r.title}\n      -> {r.detail}")
 
     threshold = 0.75
-    print(f"\n{passed}/{total} passed ({rate:.0%}) - threshold {threshold:.0%} (ADR-0028)")
+    print(f"\n{passed}/{total} passed ({rate:.0%}) - threshold {threshold:.0%} (ADR-0028)"
+          + (f", {len(skipped)} skipped (not applicable on this target)" if skipped else ""))
 
     # Only reached for a standalone `python3 run_scenarios.py` invocation -
     # when imported by platform/testing/day2_stresstest.py (the Job's real
@@ -934,7 +1130,7 @@ def main() -> int:
     # security, stress_test) has had a chance to add to the same shared
     # _CREATED_RUN_IDS list.
     if os.getenv("CLEANUP_TEST_DATA", "1") != "0":
-        deleted, failed = cleanup_created_runs()
+        deleted, failed = _unifai().cleanup() if TARGET == "unifai" else cleanup_created_runs()
         print(f"cleanup: {deleted} conversation(s) removed, {failed} failed")
     else:
         print(f"cleanup: skipped (CLEANUP_TEST_DATA=0), {len(_CREATED_RUN_IDS)} conversation(s) left in place")
