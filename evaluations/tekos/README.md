@@ -67,6 +67,30 @@ This cannot be executed in the sandbox this repo was built in (no live
 OpenShift cluster) - see the top-level feasibility plan for what "make
 check" and a full evaluation run require.
 
+## Running the scenarios against UnifAI (WP-154)
+
+`run_scenarios.py --target unifai` (or `EVAL_TARGET=unifai`) serves the same
+`scenarios.yaml` through UnifAI instead of agent-runtime/the BFF. A persona
+signs in to the UnifAI UI through realm `zuno` (`unifai_target.py`), then
+creates and streams a session with `/api2/sessions/user.session.*`, the way a
+browser does. Scenarios about shared services (MCP gateway, model router,
+Keycloak) run unchanged.
+
+| Scenario | UnifAI equivalent |
+|---|---|
+| 1, 4 portal tiles | the persona sees the agent's workflows |
+| 5 tile disabled | no workflows listed for a non-member **and** the MCP gateway refuses the agent (403) |
+| 2, 16 login required | an anonymous API call gets 401 |
+| 7-10 chat | session create + streamed execute (`llm_token`, `tool_calling`, `complete` events) |
+| 6, 11, 17, 19 | reported as skipped, not counted: no placeholder tiles, RAG source not deployed yet, no bearer-token API, in-cluster-only check |
+
+Environment: `UNIFAI_URL` (UI route), `UNIFAI_TEAM_ID` (the team workspace that
+owns the agent's workflows; without it the persona sees only its own objects),
+`DEMO_PERSONA_PASSWORD`, plus the usual `MCP_GATEWAY_URL`, `KEYCLOAK_URL` and
+`TEKOS_FRONTEND_CLIENT_SECRET`. Run it from a workstation with the gateways
+port-forwarded, or in the Day 3 evaluation Job. Skipped scenarios are excluded
+from the pass rate, which is still compared with the 75% threshold.
+
 ## Security-negative checks
 
 `security_checks.py` (same setup as above, run from this directory) checks
