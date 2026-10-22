@@ -41,6 +41,10 @@ class AgentDeclaration:
     name: str
     status: str
     tasks: Dict[str, List[str]] = field(default_factory=dict)  # task name -> allowed_tools
+    # ADR-0040: zuno.access.groups, the Keycloak groups entitled to use this
+    # agent. Checked by the /mcp front-door for callers that declare an agent
+    # (ADR-0571); the REST contract's caller (agent-runtime) checks it itself.
+    access_groups: List[str] = field(default_factory=list)
 
     def declared_tools(self) -> List[str]:
         tools: List[str] = []
@@ -87,7 +91,10 @@ class AgentDeclarationStore:
             task_frontmatter = _split_frontmatter(task_path)
             task_zuno = task_frontmatter.get("zuno") or {}
             tasks[task_name] = list(task_zuno.get("allowed_tools", []))
-        return AgentDeclaration(name=name, status=zuno.get("status", "placeholder"), tasks=tasks)
+        access_groups = list((zuno.get("access") or {}).get("groups") or [])
+        return AgentDeclaration(
+            name=name, status=zuno.get("status", "placeholder"), tasks=tasks, access_groups=access_groups
+        )
 
     @property
     def loaded(self) -> bool:

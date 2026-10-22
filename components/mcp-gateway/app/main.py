@@ -424,6 +424,16 @@ async def mcp_frontdoor_endpoint(
         raise HTTPException(
             status_code=403, detail="X-Zuno-Agent requires a Keycloak user token, not an OpenShift token"
         )
+    if agent_mode:
+        # ADR-0571 security: the declared agent must be one the caller's groups
+        # entitle (ADR-0040, zuno.access.groups). An agent declaring no group is
+        # refused, never open to everyone. An unknown agent falls through to an
+        # empty surface below.
+        agent = agent_declarations.get(agent_name)
+        if agent is not None and not set(agent.access_groups) & set(identity.groups):
+            raise HTTPException(
+                status_code=403, detail=f"caller is not entitled to agent '{agent_name}' (ADR-0040)"
+            )
     classification = x_zuno_data_classification.upper()
     surface = _agent_surface(identity, agent_name, task_name, classification) if agent_mode else None
 

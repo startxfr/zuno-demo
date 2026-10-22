@@ -6,6 +6,7 @@ bindings, tool policy and OKF bundles:
   declares AND the caller's groups/classification allow;
 - a tool outside the task's declaration is refused on tools/call;
 - a caller whose groups lack the right sees nothing and is refused;
+- a caller outside the agent's zuno.access.groups is refused (ADR-0040);
 - without X-Zuno-Agent the ADR-0524 ceiling (Lightspeed) still applies;
 - an unknown agent gets an empty surface;
 - an OpenShift (TokenReview) identity cannot declare an agent.
@@ -42,6 +43,9 @@ AGENT, TASK = "tekos", "answer-technical-question"
 
 _CONSULTANT = CallerIdentity(
     sub="consultant-01", groups=["consultant", "agent_tekos"], raw_claims={"iss": "zuno"}, token="caller-jwt"
+)
+_ENTITLED_ONLY = CallerIdentity(
+    sub="tekos-entitlement-only-user-01", groups=["agent_tekos"], raw_claims={"iss": "zuno"}, token="caller-jwt"
 )
 _FINANCE = CallerIdentity(sub="finance-01", groups=["finance"], raw_claims={"iss": "zuno"}, token="caller-jwt")
 _OPENSHIFT = CallerIdentity(
@@ -108,8 +112,8 @@ def test_tool_outside_the_task_declaration_is_refused() -> None:
 
 
 def test_caller_without_the_group_sees_nothing_and_is_refused() -> None:
-    assert "confluence.page.search" not in _listed(_FINANCE)
-    resp = _rpc(_FINANCE, "tools/call", {"name": "confluence.page.search", "arguments": {"query": "x"}})
+    assert "confluence.page.search" not in _listed(_ENTITLED_ONLY)
+    resp = _rpc(_ENTITLED_ONLY, "tools/call", {"name": "confluence.page.search", "arguments": {"query": "x"}})
     result = resp.json()["result"]
     assert result["isError"] is True, result
     assert "denied" in result["content"][0]["text"], result
@@ -118,6 +122,13 @@ def test_caller_without_the_group_sees_nothing_and_is_refused() -> None:
 def test_without_agent_the_lightspeed_ceiling_applies() -> None:
     listed = _listed(_CONSULTANT, agent="")
     assert listed <= set(mcp_frontdoor.frontdoor_capabilities()), listed
+
+
+def test_caller_not_entitled_to_the_agent_is_refused() -> None:
+    assert "agent_tekos" not in _FINANCE.groups
+    assert _rpc(_FINANCE, "tools/list").status_code == 403
+    resp = _rpc(_FINANCE, "tools/call", {"name": "confluence.page.search", "arguments": {"query": "x"}})
+    assert resp.status_code == 403, resp.text
 
 
 def test_unknown_agent_gets_an_empty_surface() -> None:
@@ -134,6 +145,7 @@ TESTS = [
     test_tool_outside_the_task_declaration_is_refused,
     test_caller_without_the_group_sees_nothing_and_is_refused,
     test_without_agent_the_lightspeed_ceiling_applies,
+    test_caller_not_entitled_to_the_agent_is_refused,
     test_unknown_agent_gets_an_empty_surface,
     test_openshift_identity_cannot_declare_an_agent,
 ]
