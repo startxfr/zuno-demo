@@ -37,7 +37,7 @@ from dataclasses import dataclass
 import httpx
 import yaml
 
-from run_scenarios import BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers
+from run_scenarios import BFF_URL, MCP_GATEWAY_URL, RUNTIME_URL, TARGET, _invoke_tool, _unifai, auth_headers
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -447,6 +447,89 @@ def tekos_chat_never_returns_photorealistic_images() -> CheckResult:
     )
 
 
+# --------------------------------------------------------------------------
+# UnifAI target (WP-154, `--target unifai`). The same ADRs, proven through
+# UnifAI's session API instead of the BFF/agent-runtime. Checks about shared
+# services (MCP gateway, ai-gateway, confluence-mcp) are reused unchanged.
+# --------------------------------------------------------------------------
+
+_DIAGRAM_PROMPT = "Generate a diagram illustrating a Kubernetes Deployment rolling update."
+
+
+def unifai_forwards_identity_to_the_gateways() -> CheckResult:
+    """ADR-0032 on UnifAI: the signed-in person's own token must reach the tool
+    gateway. The MCP gateway only serves a validated Keycloak JWT (the provider
+    is `forward_user_token`), so a Confluence tool call that returns a result is
+    direct evidence the token travelled UnifAI -> mcp-gateway."""
+    tools, reply = [], ""
+    for chunk in _unifai().stream(
+        "consultant-01", "Search our Confluence for the Satellite page and tell me its title.", timeout=120
+    ):
+        if chunk.get("type") == "tool_calling" and chunk.get("tool"):
+            tools.append(chunk["tool"])
+        state = chunk.get("state")
+        if chunk.get("type") == "complete" and isinstance(state, dict) and state.get("output"):
+            reply = state["output"]
+    ok = "confluence.page.search" in tools and bool(reply)
+    return CheckResult("unifai_forwards_identity_to_the_gateways", ok, f"tool_calls={tools} reply_len={len(reply)}")
+
+
+def unifai_ignores_a_client_supplied_identity_header() -> CheckResult:
+    """ADR-0033 on UnifAI: there is no body field to forge, but UnifAI trusts an
+    internal `X-Authenticated-User` header from inside the cluster. From outside,
+    a caller without a session who sends it must still be refused (the UI route
+    deletes it); anything but 401 would be an impersonation."""
+    import httpx as _httpx
+
+    with _httpx.Client(follow_redirects=False, timeout=20, verify=False) as c:
+        resp = c.post(
+            f"{_unifai().ui_url}/api2/sessions/user.session.create",
+            headers={"X-Authenticated-User": "admin"},
+            json={"blueprintId": "x"},
+        )
+    return CheckResult("unifai_ignores_a_client_supplied_identity_header", resp.status_code == 401, f"status={resp.status_code}")
+
+
+def business_role_without_entitlement_denied_by_unifai() -> CheckResult:
+    """ADR-0040 converse case on UnifAI: consultant-role-only-user-01 has the
+    business role but no `agent_tekos`. The agent must not appear for it AND the
+    MCP gateway must refuse the agent declaration (`zuno.access.groups`)."""
+    persona = "consultant-role-only-user-01"
+    visible = "tekos" in _unifai().visible_workflows(persona)
+    resp = httpx.post(
+        f"{MCP_GATEWAY_URL}/mcp",
+        headers={**auth_headers(persona), "X-Zuno-Agent": "tekos", "X-Zuno-Task": "answer-technical-question"},
+        json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+        timeout=20,
+    )
+    return CheckResult(
+        "business_role_without_entitlement_denied_by_unifai",
+        (not visible) and resp.status_code == 403,
+        f"workflow_visible={visible} mcp_status={resp.status_code}",
+    )
+
+
+def unifai_tekos_never_generates_photorealistic_images() -> CheckResult:
+    """ADR-0415/ADR-0516 on UnifAI: the tekos task declares `diagram.generation.create`
+    but never `image.generation.create`, so a diagram request may call the
+    diagram tool but must never reach the SDXL tool nor return a PNG."""
+    tools, blob = [], ""
+    for chunk in _unifai().stream("consultant-01", _DIAGRAM_PROMPT, timeout=180):
+        if chunk.get("type") == "tool_calling" and chunk.get("tool"):
+            tools.append(chunk["tool"])
+        blob += str(chunk)
+    ok = "image.generation.create" not in tools and "image/png" not in blob
+    return CheckResult("unifai_tekos_never_generates_photorealistic_images", ok, f"tool_calls={tools}")
+
+
+_UNIFAI_REPLACEMENTS = {
+    bff_forwards_identity_to_runtime: unifai_forwards_identity_to_the_gateways,
+    runtime_ignores_mismatched_user_sub: unifai_ignores_a_client_supplied_identity_header,
+    business_role_without_entitlement_denied_by_bff: business_role_without_entitlement_denied_by_unifai,
+    tekos_chat_never_returns_photorealistic_images: unifai_tekos_never_generates_photorealistic_images,
+}
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
@@ -465,7 +548,8 @@ CHECKS = [
 
 def run() -> list:
     results = []
-    for check in CHECKS:
+    checks = [_UNIFAI_REPLACEMENTS.get(c, c) for c in CHECKS] if TARGET == "unifai" else CHECKS
+    for check in checks:
         try:
             result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
@@ -478,12 +562,15 @@ def run() -> list:
 def main() -> int:
     results = run()
 
+    print(f"target: {TARGET}")
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
         print(f"{'✓' if r.passed else '✗':<6}{r.name}")
         if not r.passed and r.detail:
             print(f"      -> {r.detail}")
 
+    if TARGET == "unifai":
+        _unifai().cleanup()
     if all(r.passed for r in results):
         print("\nRESULT: PASS")
         return 0
