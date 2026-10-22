@@ -196,8 +196,8 @@ throwaway key and the digest-pinned `okf-test-tekos` artifact.
 |---|---|
 | UnifaiAgentBundle `tekos` | Verified, Valid, WithinCeilings, Emitted; 4 tasks, 16 objects Ready |
 | Scenarios (`--target unifai`) | 16/17 (94 %), 3 skipped. Scenario 8 (first token) now passes on warm models |
-| Scenario 10 | fails: with the retriever attached the agent answers through `docs_rag_retriever_tool` (ten calls) and `web.page.search`, never `confluence.page.search` |
-| Security checks | 8/9 passed; the photorealistic-image check did not finish within 20 minutes while the cluster was building a release (not re-run alone) |
+| Scenario 10 | failed at first: with the retriever attached the agent reads Confluence through `docs_rag_retriever_tool` (ten calls) and never calls `confluence.page.search`. The UnifAI handler now accepts either (the RAG sources are synced from Confluence) and bounds the run; it passes. Scenario 8 (first token) passed on the first run and missed the 6 s objective on the second, while the cluster was building a release: 16/17 both times |
+| Security checks | 9/9. The photorealistic-image check never ended because the agent keeps looping on `diagram.generation.create` and the stream's heartbeats defeat its per-read timeout; it now has a 150 s overall deadline (no `image.generation.create` call and no PNG in that time) |
 | Group-bound team | consultant-01/-02 (members through the group) see the workspace, sale-01 does not |
 
 ### Other agents (WP-155 smoke test)

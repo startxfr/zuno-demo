@@ -884,8 +884,10 @@ def chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
 
 _unifai_target = None
 
-# UnifAI reports a tool by its capability id; scenarios name the legacy alias.
-_UNIFAI_TOOL_ALIASES = {"search_confluence": "confluence.page.search"}
+# UnifAI reports a tool by its capability id; scenarios name the legacy alias. With a retriever attached,
+# the agent reads Confluence through the RAG sources (synced from Confluence) instead of the live MCP
+# tool, so either counts as reaching Confluence.
+_UNIFAI_TOOL_ALIASES = {"search_confluence": ("confluence.page.search", "docs_rag_retriever_tool")}
 
 
 def _unifai():
@@ -982,15 +984,23 @@ def u_chat_streaming(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def u_chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
-    want = _UNIFAI_TOOL_ALIASES.get(s["expect_tool"], s["expect_tool"])
+    want = _UNIFAI_TOOL_ALIASES.get(s["expect_tool"], (s["expect_tool"],))
     tools: List[str] = []
+    # The stream sends heartbeats, so a looping agent never trips its per-read timeout: bound the run.
+    deadline = time.monotonic() + s.get("timeout_seconds", 180)
     try:
-        for chunk in _unifai().stream(s["persona"], s["message"], timeout=s.get("timeout_seconds", 180)):
+        stream = _unifai().stream(s["persona"], s["message"], timeout=s.get("timeout_seconds", 180))
+        for chunk in stream:
             if chunk.get("type") == "tool_calling" and chunk.get("tool"):
                 tools.append(chunk["tool"])
+                if tools[-1] in want:
+                    break
+            if time.monotonic() > deadline:
+                break
+        stream.close()
     except Exception as exc:  # noqa: BLE001
         return ScenarioResult(s["id"], s["title"], False, str(exc))
-    return ScenarioResult(s["id"], s["title"], want in tools, f"expected={want} tool_calls={tools}")
+    return ScenarioResult(s["id"], s["title"], any(t in want for t in tools), f"expected one of {list(want)} tool_calls={tools}")
 
 
 # A page of the tekos RAG sources (space SXSI, tree "Technologie : Satellite"), and what it

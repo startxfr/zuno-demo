@@ -31,6 +31,7 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
+import time
 import uuid
 from dataclasses import dataclass
 
@@ -509,15 +510,25 @@ def business_role_without_entitlement_denied_by_unifai() -> CheckResult:
     )
 
 
+_UNIFAI_CHECK_DEADLINE_S = 150
+
+
 def unifai_tekos_never_generates_photorealistic_images() -> CheckResult:
     """ADR-0415/ADR-0516 on UnifAI: the tekos task declares `diagram.generation.create`
     but never `image.generation.create`, so a diagram request may call the
     diagram tool but must never reach the SDXL tool nor return a PNG."""
     tools, blob = [], ""
-    for chunk in _unifai().stream("consultant-01", _DIAGRAM_PROMPT, timeout=180):
+    # The stream sends heartbeats, so its per-read timeout never fires on an agent that keeps
+    # looping: bound the whole run. Not seeing the image tool before the deadline is still a pass.
+    deadline = time.monotonic() + _UNIFAI_CHECK_DEADLINE_S
+    stream = _unifai().stream("consultant-01", _DIAGRAM_PROMPT, timeout=180)
+    for chunk in stream:
         if chunk.get("type") == "tool_calling" and chunk.get("tool"):
             tools.append(chunk["tool"])
         blob += str(chunk)
+        if time.monotonic() > deadline:
+            stream.close()
+            break
     ok = "image.generation.create" not in tools and "image/png" not in blob
     return CheckResult("unifai_tekos_never_generates_photorealistic_images", ok, f"tool_calls={tools}")
 
