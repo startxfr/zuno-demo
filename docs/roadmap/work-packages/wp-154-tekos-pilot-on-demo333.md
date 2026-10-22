@@ -1,6 +1,6 @@
 # WP-154: tekos pilot on demo333
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0573](../../adr/0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md), [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md)
 - **Depends on:** [WP-146](wp-146-unifai-identity-and-context-header-forwarding.md), [WP-147](wp-147-unifai-opentelemetry-instrumentation.md), [WP-148](wp-148-unifai-parity-memory-routing-quota-ux.md), [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md), [WP-150](wp-150-unifai-operator-okf-agent-bundles.md), [WP-151](wp-151-deploy-unifai-on-zuno-via-argocd.md), [WP-152](wp-152-mcp-gateway-evaluation-and-mcp-north-side.md), [WP-153](wp-153-guardrails-into-the-ai-gateway.md)
 - **Related:** [ADR-0021](../../adr/0021-route-models-according-to-c1-c2-c3-classification.md), [ADR-0566](../../adr/0566-instrument-unifai-with-opentelemetry.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md)
@@ -68,6 +68,31 @@ operator release. Never touch demo222.
 7. **Evidence.** Write the results to `docs/roadmap/evidence/` (follow the
    naming of existing files there) and list every defect found as a new WP
    or an open question here.
+
+## Progress (2026-10-22, demo333)
+
+Phase A (no GPU) and the first part of phase B (GPUs back) are done and measured:
+see [the evidence file](../evidence/wp-154-tekos-pilot-phase-a.md).
+
+- Step 1 (evaluations): `run_scenarios.py` and `security_checks.py` take
+  `--target unifai` (`evaluations/tekos/unifai_target.py`).
+- Step 2 (objects): the tekos bundle (throwaway signing key), a per-task MCP
+  provider, a UnifAI team workspace, the retriever and two RAG sources
+  (`tekos-satellite` 90 pages, `tekos-openshift` 411 pages, group ACLs) were deployed.
+  The chart supports `okf.bundles[].teamId`, `retrievers` and `ragSources`.
+- Steps 3-4: 16 / 17 scenarios (94%) against 16 / 20 for agent-runtime the same day,
+  12 / 12 security checks, on a secured fork build held in demo333's internal registry.
+- Defects found and fixed in the fork: team sessions without an acting user, the
+  validator probing a forwarded-token LLM, RAG groups discarded in a team workspace,
+  empty answer when the rounds run out; and in the operator the identity URL.
+- Removed on 2026-10-22 at the user's request, to be redeployed later: the tekos
+  test bundle and its objects, the retriever and the pilot team. The two RAG sources
+  stay (ingested data).
+
+Still to do: scenario 8 on warm local models, C3 local-only routing end to end,
+the restore drill (step 5), the quota 429 and routing badge (WP-148 UI), the
+guardrails counter (WP-153), the Playwright screenshot (step 6), and the real-key
+bundle (waits for WP-158).
 
 ## Acceptance
 
