@@ -36,10 +36,18 @@ startx-unifai branch `feat/otel-instrumentation` (`b72bf2c14`, `b551ce848`,
 - The run id attribute for the zuno collector's `zuno.run_id` rule is
   `mas.run.id`.
 - Tests: MAS +13 (no new failure against the pre-existing baseline), RAG +9.
-- **Remaining:** the operator `openTelemetry` block on `UnifaiStack` (the
-  `OTEL_*` variables must be set by hand until then), the zuno collector
-  rule and run-trace dashboard, ai-gateway/mcp-gateway reading the incoming
-  `traceparent` (ADR-0566), an end-to-end trace on demo333.
+- **Done 2026-10-22: operator, gateways and end-to-end trace.**
+  - `UnifaiStack.spec.openTelemetry` ships in operator 0.1.20 and is set by the
+    `unifai` chart (`gitops/charts/unifai`): endpoint
+    `http://zuno-otel-collector-collector.zuno-monitoring.svc:4318`, protocol
+    `http/protobuf`.
+  - The ai-gateway and the mcp-gateway adopt the incoming `traceparent`
+    (`components/{ai,mcp}-gateway/app/telemetry.py`, async FastAPI dependency).
+  - A tool-using tekos turn on demo333 is one Tempo trace across UnifAI, the
+    Temporal worker, the ai-gateway, the mcp-gateway and the Confluence MCP
+    server (evidence: `docs/roadmap/evidence/wp-154-tekos-pilot-phase-a.md`).
+- **Remaining:** the zuno collector rule and the run-trace dashboard for the
+  UnifAI spans (`mas.*`, `gen_ai.*`).
 
 ## Steps
 
