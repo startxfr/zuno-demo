@@ -1045,7 +1045,9 @@ _TEKOS_RAG_QUESTION = (
 _UNIFAI_RAG_QUESTION = os.getenv("UNIFAI_RAG_QUESTION") or (_TEKOS_RAG_QUESTION if AGENT == "tekos" else "")
 _UNIFAI_RAG_EXPECT = os.getenv("UNIFAI_RAG_EXPECT", "S0R42" if AGENT == "tekos" else "")
 # A member of the agent's knowledge groups (override with UNIFAI_RAG_PERSONA).
-_UNIFAI_RAG_PERSONAS = {"tekos": "consultant-01", "arkos": "consultant-01", "comage": "sale-01"}
+_UNIFAI_RAG_PERSONAS = {
+    "tekos": "consultant-01", "arkos": "consultant-01", "comage": "sale-01", "advantage": "adv-01", "finage": "finance-01",
+}
 
 
 def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
