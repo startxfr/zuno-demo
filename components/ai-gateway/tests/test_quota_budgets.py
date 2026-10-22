@@ -88,6 +88,16 @@ class QuotaLedgerTests(unittest.TestCase):
         one_window_later = NOW + 3600 + 1
         self.assertIsNone(self.ledger.check("standard", "u1", GROUPS, None, now=one_window_later))
 
+    def test_denial_carries_seconds_until_the_window_rolls_over(self) -> None:
+        self.ledger.consume("standard", "u1", GROUPS, None, 100, now=NOW)
+        denial = self.ledger.check("standard", "u1", GROUPS, None, now=NOW)
+        remaining = 3600 - (NOW % 3600)
+        self.assertEqual(denial.retry_after, max(1, int(remaining)))
+        self.assertGreaterEqual(denial.retry_after, 1)
+        self.assertLessEqual(denial.retry_after, 3600)
+        # the response body is unchanged: the delay travels in the header
+        self.assertNotIn("retry_after", denial.detail())
+
     def test_unknown_class_fails_closed(self) -> None:
         denial = self.ledger.check("nonexistent", "u1", GROUPS, None, now=NOW)
         self.assertIsNotNone(denial)
