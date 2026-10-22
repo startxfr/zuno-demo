@@ -1,6 +1,7 @@
 # WP-49: Pinned-ref builds (promotes ADR-0507)
 
-- **State:** Not started
+- **State:** Abandoned
+- **Abandoned:** 2026-10-22 - its ADRs were superseded by ADR-0576 and ADR-0580 before any work started (no code landed); replaced by WP-160.
 - **ADRs:** ADR-0507
 - **Depends on:** WP-48
 - **Blocks:** WP-50, WP-51

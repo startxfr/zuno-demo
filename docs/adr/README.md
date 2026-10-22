@@ -327,11 +327,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | Proposed | Extract OKF content into a standalone zuno-okf repository |
-| [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | Proposed | Consume the zuno-okf repository through a single pinned reference |
 | [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
-| [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | Proposed | Deliver OKF content as mounted versioned artifacts |
-| [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | Proposed | Make the AIAgent operator watch the zuno-okf repository |
 
 ## v0.11
 
@@ -341,7 +337,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Accepted | Adopt UnifAI as the agent platform |
 | [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md) | Accepted | Authenticate UnifAI against the zuno Keycloak realm |
 | [ADR-0563](0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md) | Accepted | Forward caller identity and Zuno context headers from UnifAI |
-| [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) | Accepted | Deliver OKF bundles to unifai-operator as signed OCI artifacts |
+| [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) | Superseded in part by ADR-0577 and ADR-0578 | Deliver OKF bundles to unifai-operator as signed OCI artifacts |
 | [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Accepted | Derive data classification from OKF and only allow raising it |
 | [ADR-0566](0566-instrument-unifai-with-opentelemetry.md) | Accepted | Instrument UnifAI with OpenTelemetry |
 | [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Accepted | Move TrustyAI guardrails into the ai-gateway |
@@ -353,6 +349,20 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Accepted | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
 | [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) | Accepted | Deploy UnifAI through ArgoCD from a pinned OLM catalog |
 | [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Accepted | Upstream generic UnifAI changes and isolate zuno-specific code |
+
+## v0.12
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md) | Accepted | Extract agent definitions and corp policies into the zuno-demo-agents repository |
+| [ADR-0577](0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md) | Accepted | Publish OKF as per-agent artifacts plus a corp index artifact |
+| [ADR-0578](0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md) | Accepted | Sign OKF artifacts keyless with GitHub OIDC and verify them offline by identity |
+| [ADR-0579](0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md) | Accepted | Extend OKF to v0.3 with skills, model roles, guardrails and limits |
+| [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Accepted | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
+| [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Accepted | Derive stack configuration from the admitted corp bundle |
+| [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Proposed | Serve a per-agent entry and descriptive sheet from the admitted bundle |
+| [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Proposed | Require group visibility and object-level authorisation before per-agent entries |
+| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Proposed | Define agent lifecycle states, roles and incident revocation |
 
 ## OKF v0.1
 
@@ -388,6 +398,10 @@ part of its decision is still in force.
 | [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |
 | [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Superseded by ADR-0535 | Sign supply-chain artifacts in-cluster with Vault Transit |
 | [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) | OKF v0.1 | Superseded by ADR-0515 | Open OKF tasks as concurrent per-agent frontend tabs |
+| [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md) | v0.10 | Superseded by ADR-0576 | Extract OKF content into a standalone zuno-okf repository |
+| [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | v0.10 | Superseded by ADR-0576 | Consume the zuno-okf repository through a single pinned reference |
+| [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | v0.10 | Superseded by ADR-0580 | Deliver OKF content as mounted versioned artifacts |
+| [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | v0.10 | Superseded by ADR-0576 | Make the AIAgent operator watch the zuno-okf repository |
 
 ## Standard clauses
 

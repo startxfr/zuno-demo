@@ -1,6 +1,7 @@
 # WP-53: OKF live reconciliation (promotes ADR-0510; closes the stream)
 
-- **State:** Not started
+- **State:** Abandoned
+- **Abandoned:** 2026-10-22 - its ADRs were superseded by ADR-0576 and ADR-0580 before any work started (no code landed); replaced by WP-160 and WP-164.
 - **ADRs:** ADR-0510
 - **Depends on:** WP-52
 - **Estimated files touched:** ~15 (A) + ~8 (B)

@@ -1,6 +1,7 @@
 # WP-52: Mounted OKF artifacts (promotes ADR-0509)
 
-- **State:** Not started
+- **State:** Abandoned
+- **Abandoned:** 2026-10-22 - its ADRs were superseded by ADR-0576 and ADR-0580 before any work started (no code landed); replaced by WP-161.
 - **ADRs:** ADR-0509
 - **Depends on:** WP-50, WP-51
 - **Blocks:** WP-53

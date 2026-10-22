@@ -1,6 +1,7 @@
 # WP-50: OKF extraction cutover (completes ADR-0506 and ADR-0507)
 
-- **State:** Not started
+- **State:** Abandoned
+- **Abandoned:** 2026-10-22 - its ADRs were superseded by ADR-0576 and ADR-0580 before any work started (no code landed); replaced by WP-165.
 - **ADRs:** ADR-0506, ADR-0507 (both completed here)
 - **Depends on:** WP-49
 - **Blocks:** WP-52

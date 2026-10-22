@@ -32,8 +32,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 6 | 8 | WP-145 |
-| v0.10 | 5 | 5 | 6 | WP-48, WP-49, WP-50, WP-51, WP-52, WP-53 |
-| v0.11 | 16 | 16 | 12 | WP-146, WP-147, WP-148, WP-149, WP-150, WP-153, WP-154, WP-155, WP-156, WP-157 |
+| v0.10 | 5 | 1 | 6 | WP-51 |
+| v0.11 | 16 | 15 | 12 | WP-146, WP-147, WP-148, WP-149, WP-150, WP-153, WP-154, WP-155, WP-156, WP-157 |
+| v0.12 | 9 | 9 | 8 | WP-158, WP-159, WP-160, WP-161, WP-162, WP-163, WP-164, WP-165 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -907,7 +908,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 |---|---|---|---|---|---|
 | WP-146 | [wp-146](work-packages/wp-146-unifai-identity-and-context-header-forwarding.md) | 0563, 0562, 0575 | none | Repo work in review | live-proven on demo333 2026-10-17 (user JWT + templated X-Zuno-* headers, fail-closed, MAS-side refresh); operator 0.1.13 wiring released; upstream Temporal context bug fixed (5ba7aed85); header-authorship decision and the X-Authenticated-User exposure fix remain |
 | WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Repo work in review | instrumentation merged in fork devel (c918f732b); operator env block, zuno collector rule/dashboard, gateway traceparent and a live trace remain |
-| WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Not started | none until a live check; fork-side work runs offline |
+| WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Repo work in review | none until a live check; fork-side work runs offline |
 | WP-149 | [wp-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md) | 0568, 0575 | none | Repo work in review | repo work done and live-proven on demo333 (Confluence incremental sync, hybrid search, group ACL); 0.1.17 sync-loop bug fixed in f50a0963f, needs release 0.1.18; Day-3 role waits for WP-151 |
 | WP-150 | [wp-150](work-packages/wp-150-unifai-operator-okf-agent-bundles.md) | 0564, 0565 | WP-146 | Repo work in review | live-proven on demo333 2026-10-17 with operator 0.1.16 (throwaway-key bundle from quay.io/zuno/okf-test-tekos: verified, 13 objects emitted, workflows ran with the user JWT and per-task X-Zuno-* headers, wrong key refused); remaining: publication with the real platform key, plan_draft_write template, graph shape for soursage/cognos |
 | WP-151 | [wp-151](work-packages/wp-151-deploy-unifai-on-zuno-via-argocd.md) | 0574, 0562, 0560 | WP-146, WP-150 | Done | live-proven on demo333 2026-10-22: persona login via realm zuno, user JWT + X-Zuno-Agent + classification at the ai-gateway; stack pinned to devel-38279972f |
@@ -917,6 +918,37 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-155 | [wp-155](work-packages/wp-155-migrate-remaining-agents-and-cut-demo222-over.md) | 0573, 0561 | WP-154 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Not started | none until a live check; fork-side work runs offline |
 | WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Not started | demo333 is powered off - live steps wait for the user to power it on |
+
+### Phase 45 — agents in their own repository, delivered as signed OCI releases (added 2026-10-22)
+
+Opened by a user request to move agent definitions out of `zuno-demo`. Agent
+bundles and the corp policies that bound them move to
+`startxfr/zuno-demo-agents` (ADR-0576); its CI publishes per-agent artifacts
+and a corp index to quay.io (ADR-0577), signed keyless with GitHub OIDC and
+verified offline by identity (ADR-0578); OKF grows to v0.3 (ADR-0579);
+`zuno-demo` pins one corp digest promoted by pull request and fetches content
+at pod start (ADR-0580), and derives its stack configuration from that
+release (ADR-0581). Supersedes the never-started v0.10 extraction chain
+(ADR-0506, ADR-0507, ADR-0509, ADR-0510; WP-48 - WP-50, WP-52, WP-53
+abandoned).
+
+Order rationale: repository (WP-158) → release (WP-159) → admission
+(WP-160), strictly. WP-161, WP-162 and WP-163 can then run in parallel;
+WP-164 needs v0.3 (WP-163). The cutover (WP-165) waits for WP-156, so that no
+image still bakes `agents/`. Single-writer rule from WP-158 to WP-165:
+agents are edited only in `zuno-demo-agents`, `zuno-demo` keeps a CI-checked
+frozen mirror.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-158 | [wp-158](work-packages/wp-158-bootstrap-the-zuno-demo-agents-repository.md) | 0576 | none | Repo work in review | local repository ready, not pushed; user creates the GitHub App, rulesets, quay.io repositories and robot |
+| WP-159 | [wp-159](work-packages/wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md) | 0577, 0578 | WP-158 | Repo work in review | workflows built and simulated locally; user sets the secrets and variables, then a first release |
+| WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Not started | none until a live check |
+| WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Not started | demo333 must be powered on for the live steps |
+| WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Not started | operator release; demo333 live check |
+| WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Not started | none until a live check |
+| WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Not started | demo333 live promotion |
+| WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Not started | parity proof on the running cluster, outside any demo freeze |
 
 ### OKF stream phases
 
@@ -960,10 +992,10 @@ WP-50's.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-48 | [wp-48](work-packages/wp-48-okf-repo-bootstrap.md) | 0506 (start) | WP-44, WP-45, WP-46 | Not started | create zuno-okf repo + protection + CODEOWNERS (blocking precondition) |
-| WP-49 | [wp-49](work-packages/wp-49-pinned-ref-builds.md) | 0507 | WP-48 | Not started | read-only CI credential for zuno-okf; one signed-bundle verification |
-| WP-50 | [wp-50](work-packages/wp-50-okf-extraction-cutover.md) | 0506+0507 (close) | WP-49 | Not started | one ArgoCD sync cycle + one evaluation run post-cutover |
-| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-49 (∥ WP-50) | Not started | none (deploys ride the next rollout) |
+| WP-48 | [wp-48](work-packages/wp-48-okf-repo-bootstrap.md) | 0506 (start) | WP-44, WP-45, WP-46 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-158) |
+| WP-49 | [wp-49](work-packages/wp-49-pinned-ref-builds.md) | 0507 | WP-48 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-160) |
+| WP-50 | [wp-50](work-packages/wp-50-okf-extraction-cutover.md) | 0506+0507 (close) | WP-49 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-165) |
+| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-160 (was WP-49, abandoned) | Not started | none (deploys ride the next rollout) |
 
 ### Phase 35 — OKF: live reconciliation
 
@@ -973,8 +1005,8 @@ demo pair is the stream's closing proof.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-52 | [wp-52](work-packages/wp-52-mounted-okf-artifacts.md) | 0509 | WP-50, WP-51 | Not started | deploy operator + Naveo chart bump; mounted-content confirmation |
-| WP-53 | [wp-53](work-packages/wp-53-okf-live-reconciliation.md) | 0510 | WP-52 Done | Not started | two live demos (prompt propagation; ceiling violation); stream sign-off |
+| WP-52 | [wp-52](work-packages/wp-52-mounted-okf-artifacts.md) | 0509 | WP-50, WP-51 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-161) |
+| WP-53 | [wp-53](work-packages/wp-53-okf-live-reconciliation.md) | 0510 | WP-52 Done | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-160, WP-164) |
 
 ## Cross-version carve-outs
 
@@ -1061,6 +1093,11 @@ moving.
 10. **Autonomy sign-off** after one observed cycle (WP-42).
 
 ## Change log
+
+- 2026-10-22 — Phase 45 added: agents extracted to `zuno-demo-agents`,
+  ADR-0576 – ADR-0581 (new v0.12 band) and WP-158 – WP-165; ADR-0506,
+  ADR-0507, ADR-0509, ADR-0510 superseded, WP-48 – WP-50, WP-52, WP-53
+  abandoned, WP-51 re-pointed at WP-160.
 
 - 2026-10-17 — Phase 44 added: UnifAI adoption, ADR-0560 – ADR-0575
   (new v0.11 band) and WP-146 – WP-157.

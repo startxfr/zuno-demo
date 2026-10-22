@@ -1,6 +1,6 @@
 # ADR-0506: Extract OKF content into a standalone zuno-okf repository
 
-- **Status:** Proposed
+- **Status:** Superseded by ADR-0576 (2026-10-22) - never implemented; the repository becomes `startxfr/zuno-demo-agents` and also carries the corp policies, consumed as a signed OCI release rather than a git tree.
 - **Target:** v0.10 (retargeted from v0.7 on 2026-09-05 — opened a dedicated v0.10 band for the OKF extraction-and-reconciliation chain, separating it from v0.7's release/supply-chain automation scope; still gated on an owner-created `zuno-okf` GitHub repository not yet provisioned. Previously retargeted from OKF v0.2 on 2026-08-30 — folded the standalone OKF version line into the platform milestone sequence)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team

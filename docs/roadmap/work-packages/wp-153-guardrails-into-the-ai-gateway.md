@@ -113,9 +113,37 @@ C1 observe, C2 block, C3 off.
 - Block mode added about 150 ms per evaluation on this cluster (the rail is
   pattern-only, 0 LLM calls).
 
-Still to do once a GPU node is back (or the image is built and rolled): the
-in-cluster run with a real model and the raw Prometheus counter check
-(step 7), and the benign-response byte comparison with the hook on and off.
+## Live check with a real model (demo333, 2026-10-22)
+
+GPU nodes were back. The ai-gateway already ran the image carrying the hook
+(`guardrails.enabled` was false). Without a git change, ArgoCD auto-sync of
+`zuno-ai-gateway-d1` was paused, `GUARDRAILS_NEMO_URL` and
+`GUARDRAILS_MODE_BY_CLASSIFICATION` (C1 observe, C2 block, C3 observe) were set
+on the Deployment, calls were sent with a persona token (`X-Zuno-Local-Only`
+true so nothing left the cluster), then auto-sync was restored and the live
+override was reverted (Application back to Synced, env back to the chart).
+
+- C2 benign prompt: 200, served by qwen3.6-27b (about 30 to 40 s on the cold
+  model, same order as C1).
+- C2 prompt with an injection phrase: 400 `guardrails_blocked`, stage `prompt`,
+  detections `injection-ignore-instructions` and `injection-system-prompt-leak`,
+  in 0.3 s, the model not called.
+- C2 prompt with a card number: 400, `credit-card`, 0.2 s.
+- C2 prompt that makes the model write a test card number: 400, stage `reply`,
+  `credit-card`, after the model answered.
+- C1 (observe) with an injection phrase: 200, the model answered, the
+  detection was counted.
+- Raw Prometheus (thanos-querier, not the dashboard):
+  `zuno_guardrails_evaluations_total` for the test agent shows `clean` 4 and
+  `detected` 4, and `zuno_guardrails_detections_total` shows `credit-card` 2,
+  `injection-ignore-instructions` 3, `injection-system-prompt-leak` 1,
+  matching the calls above.
+
+Not done: the byte-identical comparison of a benign answer with the hook on
+and off (the model is not deterministic), the decision to set
+`guardrails.enabled` in the demo333 values (agent-runtime's own hook is still
+on, so enabling both double counts), and the latency bound of ADR-0544 under
+load.
 
 ## Acceptance
 

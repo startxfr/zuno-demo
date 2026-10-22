@@ -1,6 +1,7 @@
 # WP-48: zuno-okf repository bootstrap (starts ADR-0506)
 
-- **State:** Not started
+- **State:** Abandoned
+- **Abandoned:** 2026-10-22 - its ADRs were superseded by ADR-0576 and ADR-0580 before any work started (no code landed); replaced by WP-158.
 - **ADRs:** ADR-0506 (started here, completed by WP-50)
 - **Depends on:** WP-44, WP-45, WP-46 (extract the finished v0.1
   content, not a draft)

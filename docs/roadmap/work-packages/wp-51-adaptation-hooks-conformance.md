@@ -2,9 +2,14 @@
 
 - **State:** Not started
 - **ADRs:** ADR-0508
-- **Depends on:** WP-49 (fixtures consumed at the pin); runs in
-  parallel with WP-50
-- **Blocks:** WP-52
+- **Depends on:** WP-160 (fixtures consumed from the admitted corp
+  release; WP-49 and WP-50, its original predecessors, were abandoned on
+  2026-10-22 with ADR-0507)
+- **Blocks:** none (WP-52 abandoned on 2026-10-22)
+- **Note (2026-10-22):** ADR-0508 still stands, but the repository it
+  names is now `startxfr/zuno-demo-agents` (ADR-0576) and the consumers
+  left after WP-156 are mcp-gateway, mlops, `unifai-operator` and the
+  ADR-0581 generator. Re-scope Parts A-C to those before starting.
 - **Estimated files touched:** ~8 (A, in zuno-okf) + ~10 (B) + ~12 (C)
 
 > Execute this brief as a standalone task. Parts are independently

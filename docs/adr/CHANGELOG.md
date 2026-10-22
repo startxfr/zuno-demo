@@ -9,6 +9,30 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Additions (2026-10-22) - ADR-0582 to ADR-0584 join v0.12
+
+Follow-up of the WP-148 review of per-agent landing pages: a per-agent entry
+and sheet (ADR-0582), the group-visibility and object-level authorisation it
+depends on (ADR-0583), and agent lifecycle, roles and incident revocation
+(ADR-0584). All `Proposed`. ADR-0582 amends the single-UI clause of ADR-0561
+without superseding it. Signing authority is already settled by ADR-0578 and
+review ownership by ADR-0576, so neither is repeated.
+
+## New band (2026-10-22) - v0.12 added with ADR-0576 to ADR-0581
+
+A user request to move agent definitions into their own repository,
+published as signed OCI releases and consumed by `zuno-demo`, produced six
+decisions in a new v0.12 band. They replace the v0.10 extraction chain
+before any of it started: ADR-0576 supersedes ADR-0506, ADR-0507 and
+ADR-0510; ADR-0580 supersedes ADR-0509. These four move to Retired. For
+ADR-0509 and ADR-0510 this anticipates the supersession ADR-0564 had planned
+for the WP-156 cutover, for the same reasons (no git polling, no
+operator-rendered mounts). ADR-0564 becomes `Superseded in part by ADR-0577
+and ADR-0578`: its artifact layout and Transit signature change, its
+`UnifaiAgentBundle` contract stands, so it stays in v0.11. ADR-0508 stays in
+v0.10. The keyless signing of ADR-0578 is a bounded exception, for OKF only,
+to the in-cluster signing posture of ADR-0420 and ADR-0535.
+
 ## New band (2026-10-17) - v0.11 added with ADR-0560 to ADR-0575
 
 A user-led review of the startxfr UnifAI fork as a replacement for

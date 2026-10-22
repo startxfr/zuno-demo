@@ -1,6 +1,6 @@
 # ADR-0510: Make the AIAgent operator watch the zuno-okf repository
 
-- **Status:** Proposed
+- **Status:** Superseded by ADR-0576 (2026-10-22) - never implemented; no git polling: a release is promoted by a reviewed digest bump (ADR-0580). The one-way ceiling rule of clause 2 lives on in ADR-0564 clause 3 and ADR-0579 clause 5. Anticipates the supersession ADR-0564 had planned for the WP-156 cutover.
 - **Target:** v0.10 (retargeted from v0.7 on 2026-09-05 — see ADR-0506's note. Previously retargeted from OKF v0.3 on 2026-08-30 — see ADR-0506's note)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
