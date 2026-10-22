@@ -67,6 +67,43 @@ point a demo333 command at demo222 or the reverse. demo333 also runs
    URLs) to the UnifAI UI. Keep the zuno agent stack running, unused, as
    the rollback path until WP-156.
 
+## Preparation (2026-10-23, read-only inventory)
+
+State: tekos is proven on UnifAI (94 % against 94 % for agent-runtime's baseline
+on the same pilot; evidence file of WP-154). A smoke test already deployed
+advantage, comage, finage and naveo with a group-bound team each: a member sees
+the workflow and gets a streamed answer, a non-member sees nothing. That does
+not prove parity: no evaluation was run on them. arkos, cognos and soursage are
+signed and published but not deployed.
+
+| Agent | Status | Tasks | Tools and knowledge | Ceiling | Needs UnifAI work |
+|---|---|---|---|---|---|
+| naveo | placeholder | 1 | Confluence search, web search, Drive; tech and project | C1 | none, simplest |
+| advantage | placeholder | 4 | web search, image generation, Drive, Gmail; `adv` has no source | C2 | no corpus: weak parity point |
+| finage | placeholder | 4 | web search, Salesforce read, Drive, Gmail | C2, `local_only` | `local_only` has no known equivalent in the chart |
+| comage | active | 4 | Salesforce read and update, web search, images, diagrams, Drive, Gmail | C2 | Salesforce MCP deferred, `comage-lora` routing |
+| arkos | active | 4 | Confluence, git including writes, diagrams, AAP audit | C3, project-derived (WP-137) | `plan_draft_write` shape has no blueprint template; project memory |
+| cognos, soursage | placeholder | 2, 1 | none | C3, C2 | no `graph_shape`: cannot be instantiated |
+
+Waves: 0 prerequisites (real signing key through WP-158 to WP-162, the
+evaluations' `--target unifai` extended to every agent, same-day agent-runtime
+baseline); 1 naveo, advantage, finage; 2 comage; 3 arkos last; 4 cognos and
+soursage.
+
+Cutover to demo222 (needs the user, a window outside any demo freeze, parallel
+sessions frozen first): same chart and role as demo333 next to the old stack,
+corpus ingested, execution chain proven (scenarios plus a browser login, never
+only custom resources), agents switched one at a time with tekos first, demo
+entry points redirected (`ansible/playbooks/demo_step_1..5.yml` open
+`https://<agent>.<domain>`). Rollback: the old stack stays deployed and unused
+until WP-156, so rollback re-enables its routes and applications.
+
+Gaps found: `min_reasoning_length` not exposed through `agentConfig`;
+scenarios 10 and 17; the parity-table rows still marked unverified
+(cross-user resume, citations, team rights); agent tiles and cross navigation
+(ADR-0515) have no UnifAI equivalent; images are held in demo333's internal
+registry, a reproducible path is needed for demo222.
+
 ## Acceptance
 
 Every agent's evaluations on demo333 pass at a rate not lower than its
@@ -75,6 +112,19 @@ playbooks open UnifAI; parallel sessions confirmed the window; no demo
 freeze was broken.
 
 ## Open questions
+
+- Salesforce: repair the Vault secret `salesforce/technical` (missing `url`)
+  so comage and finage are really testable, or accept those tasks out of
+  parity at cutover?
+- cognos and soursage: write minimal scenarios as this WP says, or accept
+  `Valid=False` as ADR-0573 does? Which agents must appear on demo222,
+  placeholders included?
+- Cut over before or after WP-161, WP-163 and WP-165 (OKF delivery chain)?
+  Before means `okf.bundles[]` is filled by hand once more.
+- Window and soak: which date outside any freeze, and how long the old stack
+  stays before WP-156.
+- Accepted losses to confirm: classification per session instead of per turn,
+  no stars or hard delete, one UI instead of one Route per agent.
 
 - Rollback criterion on demo222: how long does the zuno agent stack stay
   deployed after cutover before WP-156 may start? Ask the user.
