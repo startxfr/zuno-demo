@@ -30,6 +30,17 @@ generation are gone; routing behaviour and metrics are unchanged.
    vendor fix for both, with a passing live request through MaaS for a
    local model. Do not start step 2 until this holds.
 
+   Observed on demo333 on 2026-10-22 (third item, to look at in the same
+   step): the MaaS front (`maas-default-gateway`) answers HTTP 503 to most
+   `qwen36-27b-instruct` calls under load (about 140 of 170 in one hour, while
+   the UnifAI evaluations ran), whereas the model's own `kserve-workload-svc`
+   answers 200 right after. The gateway pod was stable (running since 10:36),
+   the model pod and its router-scheduler were Running with no restart. The
+   ai-gateway recovers by trying its direct provider next, at the cost of one
+   retry and, when several providers fail in turn, tens of seconds. Suspect the
+   llm-d scheduler refusing requests on a single replica; confirm with the
+   scheduler's logs and metrics before changing quotas or replicas.
+
 2. **Inventory.** Read `components/ai-gateway/app/quota.py`,
    `app/quota_budgets.yaml`, `tests/test_quota_budgets.py`,
    `platform/okf/generate_quota_enforcement.py`,
