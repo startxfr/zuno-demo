@@ -153,6 +153,24 @@ Two questions about the Satellite procedures, in the pilot team workspace:
 | consultant-01 (Satellite groups) | what does it describe, name the page | answered in 16-18 s from the internal page, naming it (retriever then answer) |
 | consultant-03 (no Satellite group) | same | no content for him (ACL), the agent searches, then explains that it could not read the page, instead of returning nothing |
 
+## Backup, check and restore drill (2026-10-22, Day 3)
+
+`make d3 backup unifai`, `make d3 check unifai` and `make d3 restore unifai` (role
+`unifai`, tasks `backup`, `check_s3_backup`, `restore`).
+
+| Step | Result |
+|---|---|
+| spec.backup | on for `zuno-unifai`: bucket `zuno-demo333-backups`, prefix `unifai/zuno-unifai`, the same AWS identity as PostgreSQL's pgBackRest; two daily CronJobs (02:00) |
+| On-demand backup | both Jobs succeeded: MongoDB archive (62.8 KiB) and a Qdrant snapshot of `confluence_data_hybrid` (7.1 MiB) |
+| Check | newest MongoDB archive and Qdrant run 0.0 h old; fails when a store has none or the newest is older than 36 h |
+| Restore drill | into a scratch namespace with throw-away MongoDB 8.0.3 and Qdrant v1.16.0: **501 points** restored in `confluence_data_hybrid` (live 501) and **18 MongoDB collections** (3041 documents), all counts equal to the live stores; namespace deleted afterwards |
+
+The drill never writes to the live stores. Two things only the real run showed:
+the throw-away Qdrant crashes at start without the live `qdrant-config` (restricted
+SCC, relative storage paths), so the role copies it; and each side is counted from a
+Job inside its own namespace because the stack's NetworkPolicies refuse
+cross-namespace callers.
+
 ## Not yet covered
 
 Scenario 8 on warm local models, the C3 local-only routing end to end, the

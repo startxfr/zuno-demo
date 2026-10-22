@@ -64,6 +64,16 @@ All in startx-unifai `devel` (generic parts on feature branches from `main`).
   WP-151 deploys UnifAI; a cluster backup and restore drill; the
   documentation-site and SXA sources if those corpora move to UnifAI.
 
+## Progress (2026-10-22, demo333)
+
+- Day-3 role `unifai` (`backup`, `check_s3_backup`, `restore`) is live: spec.backup
+  on `zuno-unifai` with the PostgreSQL S3 identity, on-demand backup and check, and a
+  restore drill into a scratch namespace that compared 501 Qdrant points and 18
+  MongoDB collections with the live stores (evidence:
+  `docs/roadmap/evidence/wp-154-tekos-pilot-phase-a.md`).
+- The Confluence sources `tekos-satellite` (90 pages) and `tekos-openshift` (411 pages)
+  are ingested with group ACLs; the second pass re-embeds nothing.
+
 ## Steps
 
 Work in `/home/cl/ClaudeCode/startx-unifai`. Python changes (steps 1-4) are
