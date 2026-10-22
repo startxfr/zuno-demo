@@ -67,6 +67,12 @@ metadata:
     argocd.argoproj.io/sync-wave: "20"
 spec:
   owner: {{ $owner }}
+  {{- with .teamId }}
+  # The UnifAI team workspace that owns the emitted objects. Its members (not
+  # the publisher) see the agent's workflows; the team is created in the
+  # identity service (WP-154).
+  teamId: {{ . }}
+  {{- end }}
   source:
     oci:
       reference: {{ .reference }}

@@ -84,6 +84,7 @@ okf:
   #   reference: quay.io/zuno/okf-tekos@sha256:<digest>
   #   ceilings: {toolCapabilities: [...], knowledgeDomains: [...], minClassification: C1}
   #   entitlement: GatewayOnly
+  #   teamId: <UnifAI team workspace owning the agent's workflows>
   #   classificationOverrides: {}
 
 # Incrementally synced RAG sources (ADR-0568).
