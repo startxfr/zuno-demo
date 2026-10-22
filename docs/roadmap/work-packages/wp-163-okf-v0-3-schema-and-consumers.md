@@ -31,6 +31,12 @@ bundles) has NOT started, on purpose.
   exposes each agent's `models`, `guardrails` and `limits` (with the v0.2
   `zuno.memory` alias) for the consumers still to come.
 
+Corp skills reach consumers inside the agent artifact (zuno-demo-agents
+8a26fc2): every `corp/<name>` a task references is written into the agent's
+v2 layer as `skills/corp/<name>.md`, so unifai-operator needs no second
+source; the agent's digest changes with the skill and the version gate
+forces the agent's bump. This refines ADR-0577 clause 1's layer content.
+
 Bundles stay v0.2 until both: unifai-operator embeds the v0.3 schemas and
 maps skills (owned by the session that owns the fork), and agent-runtime,
 whose registry refuses anything but v0.2 (`app/registry.py`), is retired by
