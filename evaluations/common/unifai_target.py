@@ -45,6 +45,17 @@ VERIFY_TLS = os.getenv("UNIFAI_VERIFY_TLS", "0") == "1"
 _LOGIN_FORM_RE = re.compile(r'<form[^>]*id="kc-form-login"[^>]*action="([^"]+)"')
 
 
+# UnifAI reports a tool by its capability id; scenarios name the legacy alias. With a retriever attached,
+# the agent reads Confluence through the RAG sources (synced from Confluence) instead of the live MCP
+# tool, so either counts as reaching Confluence.
+TOOL_ALIASES = {"search_confluence": ("confluence.page.search", "docs_rag_retriever_tool")}
+
+
+def wanted_tools(expect_tool: str) -> tuple:
+    """The UnifAI capability ids that satisfy a scenario's `expect_tool`."""
+    return TOOL_ALIASES.get(expect_tool, (expect_tool,))
+
+
 class UnifaiError(RuntimeError):
     pass
 
@@ -228,6 +239,43 @@ class UnifaiTarget:
                         yield json.loads(line)
                     except ValueError:
                         continue
+
+    def collect(
+        self,
+        persona: str,
+        message: str,
+        *,
+        workflow: Optional[str] = None,
+        deadline_seconds: float = 150,
+        stop_on: Optional[tuple] = None,
+    ) -> Dict[str, Any]:
+        """Drive one streamed turn under an OVERALL deadline and summarise it.
+
+        The stream sends heartbeats, so a looping agent never trips the per-read
+        timeout: the whole run is bounded here. Returns ``tools`` (tool names in
+        order), ``reply`` (the final output), ``blob`` (str of every chunk),
+        ``timed_out`` and ``stopped`` (a ``stop_on`` tool was seen).
+        """
+        deadline = time.monotonic() + deadline_seconds
+        out: Dict[str, Any] = {"tools": [], "reply": "", "blob": "", "timed_out": False, "stopped": False}
+        stream = self.stream(persona, message, workflow=workflow, timeout=deadline_seconds + 30)
+        try:
+            for chunk in stream:
+                out["blob"] += str(chunk)
+                if chunk.get("type") == "tool_calling" and chunk.get("tool"):
+                    out["tools"].append(chunk["tool"])
+                    if stop_on and chunk["tool"] in stop_on:
+                        out["stopped"] = True
+                        break
+                state = chunk.get("state")
+                if chunk.get("type") == "complete" and isinstance(state, dict):
+                    out["reply"] = _reply_of(state) or out["reply"]
+                if time.monotonic() > deadline:
+                    out["timed_out"] = True
+                    break
+        finally:
+            stream.close()
+        return out
 
     def cleanup(self) -> tuple:
         """Delete every session this run created. Returns (deleted, failed)."""

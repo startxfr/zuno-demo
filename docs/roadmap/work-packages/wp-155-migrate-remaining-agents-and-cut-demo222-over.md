@@ -34,8 +34,10 @@ point a demo333 command at demo222 or the reverse. demo333 also runs
    - sign and publish the bundle (`make d3 sign agents`, OCI push);
    - enable its `UnifaiAgentBundle`, RAG sources and providers in
      `gitops/charts/unifai/values.yaml`;
-   - run `evaluations/<agent>/` with `--target unifai` (add the mode as in
-     WP-154). `cognos` and `soursage` have no `evaluations/` directory
+   - run `evaluations/<agent>/` with `--target unifai` (the mode exists for every
+     agent that has evaluations since wave 0: `run_scenarios.py`,
+     `security_checks.py` and `run_acceptance_gate.py`, see
+     `evaluations/README.md`). `cognos` and `soursage` have no `evaluations/` directory
      today: write a minimal scenario file for each before migrating them,
      and say so in the evidence.
 

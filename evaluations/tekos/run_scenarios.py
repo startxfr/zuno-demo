@@ -884,10 +884,7 @@ def chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
 
 _unifai_target = None
 
-# UnifAI reports a tool by its capability id; scenarios name the legacy alias. With a retriever attached,
-# the agent reads Confluence through the RAG sources (synced from Confluence) instead of the live MCP
-# tool, so either counts as reaching Confluence.
-_UNIFAI_TOOL_ALIASES = {"search_confluence": ("confluence.page.search", "docs_rag_retriever_tool")}
+# Tool-name aliases (capability ids, retriever fallback) live in the shared transport module.
 
 
 def _unifai():
@@ -903,7 +900,34 @@ def _skip(s: Dict[str, Any], why: str) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], False, f"skipped: {why}", skipped=True)
 
 
+_PLACEHOLDER_WHY = "placeholder agent (ADR-0007): it has no UnifAI workflow to chat with"
+
+
+def _unifai_wanted_tools(expect_tool: str) -> tuple:
+    from unifai_target import wanted_tools  # shared transport (evaluations/common)
+
+    return wanted_tools(expect_tool)
+
+
+def _unifai_placeholder_skip(s: Dict[str, Any]) -> bool:
+    """True when this agent is a `status: placeholder` OKF bundle: no UnifAI workflow exists for
+    it, so a scenario that needs a live chat turn cannot run (the blocked-chat scenarios prove
+    the boundary instead)."""
+    return _agent_status() == "placeholder"
+
+
+def _agent_status() -> str:
+    path = pathlib.Path(__file__).resolve().parents[2] / "agents" / AGENT / "agent.okf.md"
+    try:
+        front = yaml.safe_load(path.read_text().split("---", 2)[1])
+        return str((front.get("zuno") or {}).get("status", "")).strip()
+    except Exception:  # noqa: BLE001 - unknown status means "assume active"
+        return ""
+
+
 def u_portal_lists_all_agents(s: Dict[str, Any]) -> ScenarioResult:
+    if _unifai_placeholder_skip(s):
+        return _skip(s, _PLACEHOLDER_WHY)
     names = _unifai().visible_workflows(s["persona"])
     ok = AGENT in names
     return ScenarioResult(s["id"], s["title"], ok, f"visible workflows={names}")
@@ -938,6 +962,8 @@ def u_portal_tile_state(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def u_chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
+    if _unifai_placeholder_skip(s):
+        return _skip(s, _PLACEHOLDER_WHY)
     t = _unifai()
     timeout = s.get("timeout_seconds", 120)
     first = t.run(s["persona"], s["message"], timeout=timeout)
@@ -955,6 +981,8 @@ def u_chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def u_chat_first_token_latency(s: Dict[str, Any]) -> ScenarioResult:
+    if _unifai_placeholder_skip(s):
+        return _skip(s, _PLACEHOLDER_WHY)
     start = time.monotonic()
     first_token_at: Optional[float] = None
     try:
@@ -973,6 +1001,8 @@ def u_chat_first_token_latency(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def u_chat_streaming(s: Dict[str, Any]) -> ScenarioResult:
+    if _unifai_placeholder_skip(s):
+        return _skip(s, _PLACEHOLDER_WHY)
     kinds: Dict[str, int] = {}
     try:
         for chunk in _unifai().stream(s["persona"], s["message"], timeout=s.get("timeout_seconds", 120)):
@@ -984,49 +1014,104 @@ def u_chat_streaming(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def u_chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
-    want = _UNIFAI_TOOL_ALIASES.get(s["expect_tool"], (s["expect_tool"],))
-    tools: List[str] = []
-    # The stream sends heartbeats, so a looping agent never trips its per-read timeout: bound the run.
-    deadline = time.monotonic() + s.get("timeout_seconds", 180)
+    if _unifai_placeholder_skip(s):
+        return _skip(s, _PLACEHOLDER_WHY)
+    want = _unifai_wanted_tools(s["expect_tool"])
     try:
-        stream = _unifai().stream(s["persona"], s["message"], timeout=s.get("timeout_seconds", 180))
-        for chunk in stream:
-            if chunk.get("type") == "tool_calling" and chunk.get("tool"):
-                tools.append(chunk["tool"])
-                if tools[-1] in want:
-                    break
-            if time.monotonic() > deadline:
-                break
-        stream.close()
+        # Overall deadline: heartbeats keep a looping agent from tripping the per-read timeout.
+        run_ = _unifai().collect(
+            s["persona"], s["message"], deadline_seconds=s.get("timeout_seconds", 180), stop_on=want
+        )
     except Exception as exc:  # noqa: BLE001
         return ScenarioResult(s["id"], s["title"], False, str(exc))
-    return ScenarioResult(s["id"], s["title"], any(t in want for t in tools), f"expected one of {list(want)} tool_calls={tools}")
+    tools = run_["tools"]
+    return ScenarioResult(
+        s["id"], s["title"], any(t in want for t in tools), f"expected one of {list(want)} tool_calls={tools}"
+    )
 
 
 # A page of the tekos RAG sources (space SXSI, tree "Technologie : Satellite"), and what it
-# is called; the answer must name it. Override for another corpus.
-_UNIFAI_RAG_QUESTION = os.getenv(
-    "UNIFAI_RAG_QUESTION",
+# is called; the answer must name it. Override for another corpus. Other agents ask their own
+# scenario's `query` and only require that the retriever was used, unless UNIFAI_RAG_EXPECT is set.
+_TEKOS_RAG_QUESTION = (
     "What does the internal procedure S0R42 'Schedule Satellite' describe? "
-    "Answer from the internal documentation and name the page.",
+    "Answer from the internal documentation and name the page."
 )
-_UNIFAI_RAG_EXPECT = os.getenv("UNIFAI_RAG_EXPECT", "S0R42")
+_UNIFAI_RAG_QUESTION = os.getenv("UNIFAI_RAG_QUESTION") or (_TEKOS_RAG_QUESTION if AGENT == "tekos" else "")
+_UNIFAI_RAG_EXPECT = os.getenv("UNIFAI_RAG_EXPECT", "S0R42" if AGENT == "tekos" else "")
+# A member of the agent's knowledge groups (override with UNIFAI_RAG_PERSONA).
+_UNIFAI_RAG_PERSONAS = {"tekos": "consultant-01", "arkos": "consultant-01", "comage": "sale-01"}
 
 
 def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
     """The RAG scenario through UnifAI: a member of the source's groups gets an answer that
-    went through the retriever and names the page. The agent-runtime scenario queries the
-    rag-service directly; here the whole path (retriever, forwarded token, ACL) is exercised."""
-    tools: List[str] = []
-    reply = ""
-    for chunk in _unifai().stream("consultant-01", _UNIFAI_RAG_QUESTION, timeout=170):
-        if chunk.get("type") == "tool_calling" and chunk.get("tool"):
-            tools.append(chunk["tool"])
-        state = chunk.get("state")
-        if chunk.get("type") == "complete" and isinstance(state, dict) and state.get("output"):
-            reply = state["output"]
-    ok = any("retriever" in t for t in tools) and _UNIFAI_RAG_EXPECT in reply
-    return ScenarioResult(s["id"], s["title"], ok, f"tool_calls={tools} names_page={_UNIFAI_RAG_EXPECT in reply}")
+    went through the retriever (and names the page when one is expected). The agent-runtime
+    scenario queries the rag-service directly; here the whole path (retriever, forwarded
+    token, ACL) is exercised."""
+    persona = os.getenv("UNIFAI_RAG_PERSONA") or _UNIFAI_RAG_PERSONAS.get(AGENT) or s.get("persona", "consultant-01")
+    question = _UNIFAI_RAG_QUESTION or s.get("query", "")
+    try:
+        run_ = _unifai().collect(persona, question, deadline_seconds=170)
+    except Exception as exc:  # noqa: BLE001
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
+    tools, reply = run_["tools"], run_["reply"]
+    names_page = (_UNIFAI_RAG_EXPECT in reply) if _UNIFAI_RAG_EXPECT else bool(reply)
+    ok = any("retriever" in t for t in tools) and names_page
+    return ScenarioResult(s["id"], s["title"], ok, f"tool_calls={tools} names_page={names_page}")
+
+
+def u_chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:
+    """ADR-0007 on UnifAI: a placeholder agent must not answer. Its workflow is not exposed to
+    the persona; if it nevertheless is, a chat turn must not return a reply."""
+    t = _unifai()
+    names = t.visible_workflows(s["persona"])
+    workflow = os.getenv("UNIFAI_WORKFLOW") or AGENT
+    if workflow not in names:
+        return ScenarioResult(s["id"], s["title"], True, f"no {workflow!r} workflow visible (visible={names})")
+    try:
+        first = t.run(s["persona"], s["message"], timeout=s.get("timeout_seconds", 60))
+    except Exception as exc:  # noqa: BLE001 - a refused session is the expected outcome
+        return ScenarioResult(s["id"], s["title"], True, f"refused: {exc}")
+    return ScenarioResult(
+        s["id"], s["title"], first.status != 200 or not first.reply, f"status={first.status} reply_len={len(first.reply)}"
+    )
+
+
+def u_chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
+    """ADR-0526 on UnifAI: same scoring as the BFF handler (register_conformance.score_text), the
+    turns go through a UnifAI session instead."""
+    if _unifai_placeholder_skip(s):
+        return _skip(s, _PLACEHOLDER_WHY)
+    _here = pathlib.Path(__file__).resolve().parent
+    for candidate in (_here, _here.parent):
+        if str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+    import register_conformance
+
+    timeout = s.get("timeout_seconds", 30)
+    num_samples = int(s.get("samples", 1))
+    scored: List[Dict[str, Any]] = []
+    for i in range(num_samples):
+        r = _unifai().run(s["persona"], s["message"], timeout=timeout)
+        if r.status != 200:
+            return ScenarioResult(s["id"], s["title"], False, f"status={r.status} (sample {i + 1}/{num_samples})")
+        scored.append(register_conformance.score_text(r.reply))
+    for sc in scored:
+        if sc["violations"]:
+            return ScenarioResult(
+                s["id"], s["title"], False,
+                "rules 11-13: " + "; ".join(f"{v['marker']} in {v['kind']}" for v in sc["violations"][:3]),
+            )
+    if s.get("expect_register", True):
+        min_markers = int(s.get("min_markers", 1))
+        best = max(scored, key=lambda sc: sc["marker_count"])
+        hits = sum(1 for sc in scored if sc["marker_count"] >= min_markers)
+        return ScenarioResult(
+            s["id"], s["title"], hits > 0, f"samples={num_samples} hits={hits}/{num_samples} best_markers={best['marker_count']}"
+        )
+    max_density = float(s.get("max_density", 0.25))
+    mean = sum(sc["density"] for sc in scored) / num_samples
+    return ScenarioResult(s["id"], s["title"], mean <= max_density, f"samples={num_samples} mean_density={mean:.3f}")
 
 
 def u_agent_isolation(s: Dict[str, Any]) -> ScenarioResult:
@@ -1075,6 +1160,8 @@ UNIFAI_HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "chat_streaming_sse": u_chat_streaming,
     "chat_triggers_tool": u_chat_triggers_tool,
     "rag_retrieval_has_citation": u_rag_retrieval,
+    "chat_blocked_for_placeholder_agent": u_chat_blocked_for_placeholder_agent,
+    "chat_register_conformance": u_chat_register_conformance,
     "bff_rejects_missing_jwt": u_bff_rejects_missing_jwt,
     "bff_rejects_wrong_audience": u_bff_rejects_wrong_audience,
     "agent_isolation_placeholder_empty": u_agent_isolation,
