@@ -111,6 +111,12 @@ okf:
   #   classificationOverrides: {}
 
 # Incrementally synced RAG sources (ADR-0568).
+# Retrievers over the RAG sources (ADR-0568). The caller's token is forwarded so
+# the sources' group ACLs apply.
+retrievers: []
+# - name: knowledge
+#   teamId: <UnifAI team workspace of the agents using it>
+#   config: {source_type: CONFLUENCE, forward_user_token: true, top_k_results: 5, threshold: 0.3}
 ragSources: []
 # - name: tech-satellite
 #   type: confluence
