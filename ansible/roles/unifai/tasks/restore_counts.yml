@@ -1,0 +1,106 @@
+---
+# Counts what a UnifAI data plane holds, from a short-lived Job in the namespace
+# that owns it (the stack's NetworkPolicies only admit callers in their own
+# namespace, so the live stores and the drill's scratch stores are each counted
+# from inside).
+#
+# In:  counts_ns, counts_qdrant (base URL), counts_mongo (mongodb:// URI),
+#      counts_mongo_image, counts_aws_image
+# Out: _unifai_counts = {'qdrant': {collection: points}, 'mongo': {db.collection: documents}}
+- name: "unifai | counts | start the counting Job in {{ counts_ns }}"
+  ansible.builtin.set_fact:
+    _unifai_counts_id: "{{ lookup('pipe', 'date -u +%H%M%S%N') | truncate(12, True, '') }}"
+
+- name: "unifai | counts | run the Job in {{ counts_ns }}"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: "unifai-counts-{{ _unifai_counts_id }}"
+        namespace: "{{ counts_ns }}"
+        labels:
+          zuno.io/unifai-counts: "{{ _unifai_counts_id }}"
+      spec:
+        ttlSecondsAfterFinished: 3600
+        backoffLimit: 0
+        template:
+          spec:
+            restartPolicy: Never
+            volumes:
+              - {name: out, emptyDir: {}}
+            initContainers:
+              - name: mongo
+                image: "{{ counts_mongo_image }}"
+                command: ["/bin/sh", "-c"]
+                args:
+                  - |
+                    mongosh --quiet "$MONGO_URI" --eval '
+                      db.getMongo().getDBNames().filter(n => !["admin","local","config"].includes(n)).forEach(n => {
+                        const d = db.getSiblingDB(n);
+                        d.getCollectionNames().forEach(c => print("mongo " + n + "." + c + " " + d.getCollection(c).countDocuments({})));
+                      })' > /out/mongo.txt
+                env:
+                  - {name: MONGO_URI, value: "{{ counts_mongo }}"}
+                volumeMounts:
+                  - {name: out, mountPath: /out}
+            containers:
+              - name: counts
+                image: "{{ counts_aws_image }}"
+                command: ["/bin/sh", "-c"]
+                args:
+                  - |
+                    Q="$QDRANT_URL"
+                    for c in $(curl -sf "$Q/collections" | grep -o '"name":"[^"]*"' | cut -d'"' -f4); do
+                      n=$(curl -sf -X POST -H 'content-type: application/json' -d '{"exact":true}' \
+                            "$Q/collections/$c/points/count" | grep -o '"count":[0-9]*' | cut -d: -f2)
+                      echo "qdrant $c ${n:-0}"
+                    done
+                    cat /out/mongo.txt
+                    echo "counts-done"
+                env:
+                  - {name: QDRANT_URL, value: "{{ counts_qdrant }}"}
+                volumeMounts:
+                  - {name: out, mountPath: /out}
+
+- name: "unifai | counts | wait for the Job in {{ counts_ns }}"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ counts_ns }}"
+    name: "unifai-counts-{{ _unifai_counts_id }}"
+  register: _unifai_counts_job
+  until: >-
+    (_unifai_counts_job.resources[0].status.succeeded | default(0)) | int >= 1
+    or (_unifai_counts_job.resources[0].status.failed | default(0)) | int >= 1
+  retries: 60
+  delay: 5
+
+- name: "unifai | counts | read the counts"
+  kubernetes.core.k8s_log:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ counts_ns }}"
+    label_selectors:
+      - "job-name=unifai-counts-{{ _unifai_counts_id }}"
+    container: counts
+  register: _unifai_counts_log
+
+- name: "unifai | counts | fail when the counting Job did not finish"
+  ansible.builtin.fail:
+    msg: "Counting the stores in {{ counts_ns }} failed: {{ _unifai_counts_log.log | default('no log') }}"
+  when: "'counts-done' not in (_unifai_counts_log.log | default(''))"
+
+# "qdrant <collection> <n>" and "mongo <db.collection> <n>" lines -> two dictionaries.
+- name: "unifai | counts | parse the counts"
+  ansible.builtin.set_fact:
+    _unifai_counts:
+      qdrant: >-
+        {{ dict(_unifai_counts_log.log.splitlines() | select('match', '^qdrant ')
+                | map('regex_replace', '^qdrant (\S+) (\d+)$', '\1=\2')
+                | map('split', '=') | list) }}
+      mongo: >-
+        {{ dict(_unifai_counts_log.log.splitlines() | select('match', '^mongo ')
+                | map('regex_replace', '^mongo (\S+) (\d+)$', '\1=\2')
+                | map('split', '=') | list) }}

@@ -96,7 +96,7 @@ DAY2_VERBS := check install build uninstall all reinstall
 # availability test for agents/platform and to each component's own
 # precheck.yml otherwise (ansible/playbooks/day3_check.yml).
 DAY3_TEST_COMPONENTS := agents platform
-DAY3_BACKUP_COMPONENTS := postgresql
+DAY3_BACKUP_COMPONENTS := postgresql unifai
 # ADR-0420/WP-069: re-signing the OKF bundles acts on already-installed
 # agent bundles - it builds nothing - so it belongs in this tier by the
 # definition above, not inside `make d2 build agent`. Its own component

@@ -30,6 +30,13 @@ spec:
   {{- $oidc := list (dict "name" "DIRECTORY_PROVIDER" "value" "oidc-claims") (dict "name" "DIRECTORY_OIDC_JWKS_URL" "value" (printf "%s/protocol/openid-connect/certs" $kc)) (dict "name" "DIRECTORY_OIDC_ISSUER" "value" $kc) }}
   {{- $_ := set $extra "identity" (concat $oidc (index $extra "identity" | default list)) }}
   {{- end }}
+  {{- if $s.memory.enabled }}
+  {{- /* The memory tool reads Qdrant and the embedding model through these names; the Kubernetes service link would otherwise inject QDRANT_PORT as tcp://<ip>:6333 and leave QDRANT_IP unset (found in the WP-148 live test). */}}
+  {{- $mem := list (dict "name" "QDRANT_IP" "value" "qdrant") (dict "name" "QDRANT_PORT" "value" "6333") (dict "name" "EMBEDDING_SERVICE_URL" "value" $s.rag.embeddingUrl) (dict "name" "EMBEDDING_SERVICE_MODEL" "value" $s.rag.embeddingModel) }}
+  {{- range $c := list "multiagent" "multiagentWorker" }}
+  {{- $_ := set $extra $c (concat $mem (index $extra $c | default list)) }}
+  {{- end }}
+  {{- end }}
   {{- if $s.identity.internalCalls }}
   {{- /* Service-to-service identity calls must reach the identity Service, not the public route: the route strips X-Internal-Auth, so the secured identity API answers 401 (found live on demo333, 2026-10-22). IDENTITY_HOST stays the public URL for OAuth redirects. */}}
   {{- /* The bare Service name on purpose: it is one of the hosts the services trust with the internal secret (internal_auth_headers); <name>.<ns>.svc only counts when POD_NAMESPACE is set, which the charts do not do. */}}
