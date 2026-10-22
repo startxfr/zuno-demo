@@ -386,3 +386,9 @@ jobs:
             exit 0
           fi
           python3 platform/supply-chain/admit_okf_bundle.py admit
+      # ADR-0581/WP-164: the stack configuration derived from that release
+      # must be the committed one.
+      - name: Generated stack configuration matches the locked release
+        run: python3 platform/okf/generate_stack_config.py --check
+      - name: generate_stack_config.py tests
+        run: python3 platform/okf/tests/test_generate_stack_config.py

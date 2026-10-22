@@ -70,6 +70,7 @@ jobs:
           CURRENT: ${{ steps.candidate.outputs.current }}
         run: |
           python3 platform/supply-chain/admit_okf_bundle.py admit --release "$TAG" --update-lock --out "$RUNNER_TEMP/new"
+          python3 platform/okf/generate_stack_config.py --release-dir "$RUNNER_TEMP/new"
           old=""
           if [ -n "$CURRENT" ]; then
             python3 platform/supply-chain/admit_okf_bundle.py extract "$CURRENT" --out "$RUNNER_TEMP/old"
@@ -95,7 +96,9 @@ jobs:
         uses: peter-evans/create-pull-request@v7
         with:
           branch: okf-promote/${{ steps.candidate.outputs.tag }}
-          add-paths: platform/okf/agents.lock
+          add-paths: |
+            platform/okf/agents.lock
+            platform/okf/stack-config.generated.yaml
           commit-message: "okf: promote zuno-demo-agents ${{ steps.candidate.outputs.tag }}"
           title: "okf: promote zuno-demo-agents ${{ steps.candidate.outputs.tag }}"
           body-path: ${{ runner.temp }}/body.md
