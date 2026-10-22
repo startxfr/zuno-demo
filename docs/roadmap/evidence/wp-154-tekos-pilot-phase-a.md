@@ -102,6 +102,39 @@ The same request to the in-cluster Service returned 200. Worked around in the ch
 `http://identity:13456`, the bare name the services trust) and fixed in the operator
 by startx-unifai-a9 for 0.1.23.
 
+## Phase B started: GPU nodes back (2026-10-22, evening)
+
+Both GPU nodes returned and the embedding predictor (`qwen3-embedding-0.6b`)
+became ready.
+
+| Step | Result |
+|---|---|
+| `UnifaiRAGSource` `tekos-satellite` (space SXSI, tree "Technologie : Satellite") | 90 pages, ready in about 1 min |
+| `UnifaiRAGSource` `tekos-openshift` (tree "Technologie : Openshift") | 411 pages, ready in about 1.5 min |
+| Retry storm check (operator >= 0.1.18) | none: the Confluence queue stayed at 0 messages, one sync per source |
+| Both sources | shared, ACL = the matching `consultant/confluence-{archi,build,run}-<tech>` Keycloak groups, resync every 6 h |
+| Retriever `knowledge` | `docs_rag`, source type CONFLUENCE, the caller's token forwarded, attached to the tekos bundle |
+
+ACL proof through the RAG API, from the multi-agent pod, in the pilot team workspace,
+with each persona's own token (5 matches requested):
+
+| Persona | Satellite query | OpenShift query |
+|---|---|---|
+| consultant-01 (Satellite tiers) | 5 matches (Satellite pages) | 5 matches |
+| consultant-02 | 5 matches (Satellite pages) | 5 matches |
+| consultant-03 (no Satellite group) | 5 matches, none from the Satellite tree | 5 matches |
+| ai-dev-01 (no Confluence tier group) | 0 | 0 |
+| sale-01 | 0 | 0 |
+
+Defect found and fixed on the way: in a team workspace the request acts for the
+team id while the forwarded token is the person's own, so the RAG service
+discarded the groups ("Forwarded bearer token belongs to another user than the
+request") and every shared source returned 0 results; the agent then searched
+until its rounds ran out. The RAG service now also accepts the token of a member
+of the workspace (fork `fix/rag-team-workspace-groups`, `a66f9a302`, 194 RAG unit
+tests pass). Operator 0.1.23 sets the identity Service URL itself, so the chart's
+workaround is off by default.
+
 ## Not yet covered
 
 C3 local-only routing, RAG answers with citations and the second-pass
