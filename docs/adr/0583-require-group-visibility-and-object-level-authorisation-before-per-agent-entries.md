@@ -25,6 +25,19 @@ are hard to guess, has not been established for the fork.
 A per-agent entry (ADR-0582) makes both gaps visible and easy to use, so they
 are prerequisites, not follow-ups.
 
+### Evidence from the pilot (demo333, 2026-10-22)
+
+Measured on the live pilot stack: UnifAI visibility is owner or team
+workspace. An object owned by one persona is invisible to the others (the
+list is empty); selecting a team workspace (`teamId` on each request) shows it;
+a non-member gets `403 TEAM_ACCESS_DENIED`. Teams hold user members or LDAP
+group members only, because the identity directory provider supports `ldap`
+only (`shared-resources/identity/directory/factory.py`). No source exists for
+OIDC groups, so a team cannot be "all members of `agent_<name>`". The identity
+service already receives the user's access token when it caches groups, so a
+claims-based provider is a small generic change. For the pilot a team was
+created by hand and the bundle takes a `teamId`; that does not scale.
+
 ## Decision
 
 **No per-agent entry is exposed until UnifAI itself restricts visibility by
@@ -32,7 +45,10 @@ group and checks authorisation on every object read.**
 
 1. **Group visibility in UnifAI.** The operator emits, and UnifAI honours, a
    group restriction per agent derived from `zuno.access.groups`, using the
-   `oidc-claims` mechanism of ADR-0562 and WP-146. `GatewayOnly` stays a
+   `oidc-claims` mechanism of ADR-0562 and WP-146: a generic `oidc-claims`
+   directory provider in the identity service reads groups from the verified
+   access token claims, a team references a group, and the operator emits the
+   `teamId` of the team bound to the agent's group. `GatewayOnly` stays a
    documented escape hatch for stacks without per-agent entries and is
    refused when an entry or sheet is enabled.
 2. **Object-level authorisation audit.** Before ADR-0582 is implemented, the
