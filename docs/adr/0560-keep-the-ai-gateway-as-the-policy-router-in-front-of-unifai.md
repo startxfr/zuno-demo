@@ -1,6 +1,6 @@
 # ADR-0560: Keep the ai-gateway as the policy router in front of UnifAI
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

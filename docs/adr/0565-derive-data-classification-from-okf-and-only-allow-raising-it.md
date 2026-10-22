@@ -1,6 +1,6 @@
 # ADR-0565: Derive data classification from OKF and only allow raising it
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

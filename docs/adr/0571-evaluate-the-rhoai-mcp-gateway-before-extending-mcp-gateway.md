@@ -1,6 +1,6 @@
 # ADR-0571: Evaluate the RHOAI MCP gateway before extending mcp-gateway
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

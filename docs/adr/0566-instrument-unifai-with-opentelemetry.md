@@ -1,6 +1,6 @@
 # ADR-0566: Instrument UnifAI with OpenTelemetry
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

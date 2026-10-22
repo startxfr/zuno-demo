@@ -1,6 +1,6 @@
 # ADR-0574: Deploy UnifAI through ArgoCD from a pinned OLM catalog
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

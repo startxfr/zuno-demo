@@ -1,6 +1,6 @@
 # ADR-0573: Pilot UnifAI on demo333 with Tekos before cutting demo222 over
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

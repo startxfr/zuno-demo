@@ -1,6 +1,6 @@
 # ADR-0569: Close UnifAI parity gaps generically
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
