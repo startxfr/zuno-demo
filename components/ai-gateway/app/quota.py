@@ -62,6 +62,9 @@ class QuotaDenial:
     dimension: str
     budget: int
     window: str
+    # Seconds until the fixed window rolls over and the budget refills; sent
+    # as the Retry-After header so clients can tell the user when to retry.
+    retry_after: Optional[int] = None
 
     def detail(self) -> Dict[str, object]:
         return {
@@ -117,7 +120,9 @@ class TokenBudgetLedger:
             return None
         amount, window, window_secs = budget
         if self._consumed(quota_class, dimension, key, window_secs, now) >= amount:
-            return QuotaDenial(quota_class, dimension, amount, window)
+            # Fixed window: the budget refills when the current bucket ends.
+            retry_after = max(1, int(window_secs - (now % window_secs)))
+            return QuotaDenial(quota_class, dimension, amount, window, retry_after)
         return None
 
     @staticmethod

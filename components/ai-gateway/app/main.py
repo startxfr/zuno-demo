@@ -342,7 +342,8 @@ async def chat_completions(
     # Exhaustion is an explicit 429, never silent degradation.
     denial = quota.ledger.check(quota_class, identity.sub, identity.groups, project_id)
     if denial is not None:
-        return JSONResponse(denial.detail(), status_code=429)
+        headers = {"Retry-After": str(denial.retry_after)} if denial.retry_after else None
+        return JSONResponse(denial.detail(), status_code=429, headers=headers)
     # ADR-0412: per-(agent,task) preference from the git-managed policy
     # only (never the ADR-0309 autonomy surface - "prefer" is on the
     # optimizer's code-level denylist). Only permutes the candidates that
