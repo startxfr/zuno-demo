@@ -189,7 +189,7 @@ depend on UnifAI: it is the gateway UnifAI calls with the user's token.
 ## Not yet covered
 
 Scenario 8 on warm local models, the
-Qdrant and Mongo restore drill, the quota 429 and the routing badge in the UI
+quota 429 and the routing badge in the UI
 (WP-148), the guardrails counter (WP-153, hook still disabled in the chart), the
 Playwright screenshot of the tekos chat, and the real-key bundle publication
 (waiting for the zuno-demo-agents repository, WP-158).
