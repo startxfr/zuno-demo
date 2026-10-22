@@ -1,6 +1,6 @@
 # WP-152: Evaluate the RHOAI MCP Gateway, else extend the mcp-gateway north side
 
-- **State:** Repo work in review
+- **State:** Done
 - **ADRs:** [ADR-0571](../../adr/0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md)
 - **Depends on:** none
 - **Related:** [ADR-0043](../../adr/0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md), [ADR-0116](../../adr/0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md), [ADR-0036](../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md), [ADR-0011](../../adr/0011-define-tool-authorization-as-policy-intersection.md), [ADR-0524](../../adr/0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md), [WP-146](wp-146-unifai-identity-and-context-header-forwarding.md), [WP-151](wp-151-deploy-unifai-on-zuno-via-argocd.md)
@@ -143,11 +143,22 @@ mcp-gateway otherwise.
    of two tries. The gateway round trip is fine; the agent prompt, rounds or
    model need tuning in the tekos pilot.
 
-**Remaining:** turn on `mcpGateway.perTask` once operator 0.1.19 is on
-stable, then repeat the UnifAI proof with a bundle-emitted provider. The
-entitlement check (step 3) still needs to be deployed on demo333; the
-image proven in step 5 predates it.
-
+7. **Done: operator 0.1.19 and full proof.**
+   - unifai-operator 0.1.19 (with `spec.mcp`) is on stable on demo333.
+   - The `unifai` chart pins catalog v0.1.19, and `mcpGateway.perTask` now
+     defaults to true.
+   - A test `UnifaiAgentBundle` (signed throwaway artifact
+     `okf-test-tekos@sha256:33d648f4...`, `spec.mcp` to `/mcp`, task
+     `answer-technical-question` raised to C2) emitted 16 objects. Among them
+     are 3 per-task providers carrying `X-Zuno-Agent: tekos`, their task and
+     classification.
+   - Run as `consultant-01` through a browser login, the bundle's `tekos`
+     workflow called `confluence.page.search` through its own provider and
+     answered with the "Satellite" page. The audit log reads `agent=tekos
+     task=answer-technical-question ... classification=C2 allowed=True`.
+   - With the image built from `f13e0097`, `finance-01` declaring `tekos`
+     got `403 caller is not entitled to agent 'tekos' (ADR-0040)`.
+   - Test objects deleted.
 ## Acceptance
 
 The evaluation table of step 2 exists with evidence. Branch B: the mcp-gateway

@@ -84,7 +84,7 @@ spec:
       forward_user_token: true
   {{- if and $.Values.mcpGateway.enabled $.Values.mcpGateway.perTask }}
   # ADR-0571: one provider per task, carrying X-Zuno-Agent/X-Zuno-Task so the
-  # mcp-gateway applies that task's own tool declaration (operator >= 0.1.19).
+  # mcp-gateway applies that task's own tool declaration (ADR-0571).
   mcp:
     config:
       mcp_url: {{ $.Values.mcpGateway.url }}

@@ -12,7 +12,7 @@ operator:
   # when a Subscription for the package already exists (demo333 runs one
   # created by hand, which must not be duplicated).
   install: false
-  catalogImage: quay.io/zuno/unifai-operator-catalog:v0.1.18
+  catalogImage: quay.io/zuno/unifai-operator-catalog:v0.1.19
   catalogSourceName: unifai-operator-catalog
   channel: stable
   package: unifai-operator
@@ -73,7 +73,7 @@ mcpGateway:
   # Agent bundles get one MCP provider per task with the X-Zuno-Agent/Task
   # headers (ADR-0571), so tools are the agent task's own declaration instead
   # of the Lightspeed ceiling. Needs unifai-operator >= 0.1.19 (spec.mcp).
-  perTask: false
+  perTask: true
 
 # Signed OKF agent bundles (ADR-0564). publicKey is the PEM of
 # agents/zuno-platform-signer.pub (the role passes it).
