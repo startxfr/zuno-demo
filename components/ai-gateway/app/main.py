@@ -39,7 +39,7 @@ from app.schemas import (
     ImageGenerationResponse,
     RoutingDecision,
 )
-from app.telemetry import init_telemetry, model_call_span, record_cache_outcome
+from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ai_gateway")
@@ -277,7 +277,7 @@ async def _guardrails_refusal(
     return JSONResponse(guardrails.refusal_body(stage, detections), status_code=400)
 
 
-@app.post("/v1/chat/completions")
+@app.post("/v1/chat/completions", dependencies=[Depends(adopt_incoming_trace_context)])
 async def chat_completions(
     payload: ChatCompletionRequest,
     identity: CallerIdentity = Depends(validate_token),
