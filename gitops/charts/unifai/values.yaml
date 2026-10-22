@@ -56,10 +56,10 @@ stack:
     # Let a UnifAI team name Keycloak groups (identity directory provider
     # oidc-claims, ADR-0583): needs images that contain the provider.
     oidcClaims: false
-    # Point the services' identity-API clients at the identity Service instead
+    # Operator >= 0.1.23 sets this itself; only for older operators. Points the identity-API clients at the identity Service instead
     # of the public route (needed once the identity API requires the internal
     # secret, which the route strips).
-    internalCalls: true
+    internalCalls: false
   rag:
     embeddingUrl: http://embeddings-predictor.zuno-ai-run.svc:8080
     embeddingModel: qwen3-embedding-0.6b
