@@ -39,6 +39,17 @@
     name: qdrant
   register: _unifai_drill_qdrant
 
+# The live Qdrant runs under the cluster's restricted SCC with its own config
+# (storage and snapshot paths on writable volumes); the throw-away one needs the
+# same file or it cannot start.
+- name: "unifai | restore drill | read the live Qdrant config"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: ConfigMap
+    namespace: zuno-unifai
+    name: qdrant-config
+  register: _unifai_drill_qdrant_config
+
 - name: "unifai | restore drill | read the backup credentials Secret"
   kubernetes.core.k8s_info:
     api_version: v1
@@ -50,9 +61,10 @@
 
 - name: "unifai | restore drill | fail when the live stores cannot be read"
   ansible.builtin.fail:
-    msg: "Deployment qdrant or Secret {{ _unifai_s3.credentialsSecret }} not found in zuno-unifai."
+    msg: "Deployment qdrant, ConfigMap qdrant-config or Secret {{ _unifai_s3.credentialsSecret }} not found in zuno-unifai."
   when: >-
     (_unifai_drill_qdrant.resources | length == 0) or (_unifai_drill_creds.resources | length == 0)
+    or (_unifai_drill_qdrant_config.resources | length == 0)
 
 - name: "unifai | restore drill | create the scratch namespace {{ _unifai_drill_ns }}"
   kubernetes.core.k8s:
@@ -77,6 +89,17 @@
       type: Opaque
       data: "{{ _unifai_drill_creds.resources[0].data }}"
   no_log: true
+
+- name: "unifai | restore drill | copy the Qdrant config into the scratch namespace"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: qdrant-config
+        namespace: "{{ _unifai_drill_ns }}"
+      data: "{{ _unifai_drill_qdrant_config.resources[0].data }}"
 
 - name: "unifai | restore drill | start throw-away MongoDB and Qdrant"
   kubernetes.core.k8s:
@@ -117,8 +140,16 @@
               - name: qdrant
                 image: "{{ _unifai_drill_qdrant.resources[0].spec.template.spec.containers[0].image }}"
                 ports: [{containerPort: 6333}]
-                volumeMounts: [{name: data, mountPath: /qdrant/storage}]
-            volumes: [{name: data, emptyDir: {}}]
+                env: [{name: QDRANT__CONFIG_PATH, value: /qdrant/config/config.yaml}]
+                volumeMounts:
+                  - {name: data, mountPath: /qdrant/storage}
+                  - {name: config, mountPath: /qdrant/config}
+            volumes:
+              - {name: data, emptyDir: {}}
+              - name: config
+                configMap:
+                  name: qdrant-config
+                  items: [{key: config.yaml, path: config.yaml}]
     - apiVersion: v1
       kind: Service
       metadata: {name: qdrant, namespace: "{{ _unifai_drill_ns }}"}
