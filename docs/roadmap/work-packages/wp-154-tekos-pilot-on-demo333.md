@@ -91,7 +91,7 @@ see [the evidence file](../evidence/wp-154-tekos-pilot-phase-a.md).
   test bundle and its objects, the retriever and the pilot team. The two RAG sources
   stay (ingested data).
 
-Still to do: scenario 8 on warm local models, C3 local-only routing end to end,
+Still to do: scenario 8 on warm local models,
 the quota 429 and routing badge (WP-148 UI), the
 guardrails counter (WP-153), the Playwright screenshot (step 6), and the real-key
 bundle (waits for WP-158).

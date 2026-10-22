@@ -171,9 +171,24 @@ SCC, relative storage paths), so the role copies it; and each side is counted fr
 Job inside its own namespace because the stack's NetworkPolicies refuse
 cross-namespace callers.
 
+## Classification routing at the ai-gateway (GPUs back)
+
+Same task as the tekos pilot (`X-Zuno-Agent: tekos`, `X-Zuno-Task: answer-technical-question`),
+called with the persona's own token, two requests per level, the provider read back
+from `/v1/routing-decisions/{request_id}`:
+
+| Declared classification | Provider that served it |
+|---|---|
+| C1 (x2) | `ovhcloud-gpt-oss-120b` (the task's first preference) |
+| C2 (x2) | `ovhcloud-gpt-oss-120b` |
+| C3 (x2) | `local-gpt-oss` (`gpt-oss-20b`): the SaaS preference is not eligible for C3, so only local providers remain |
+
+C3 never reached a SaaS provider, which is the ADR-0021 rule. This check does not
+depend on UnifAI: it is the gateway UnifAI calls with the user's token.
+
 ## Not yet covered
 
-Scenario 8 on warm local models, the C3 local-only routing end to end, the
+Scenario 8 on warm local models, the
 Qdrant and Mongo restore drill, the quota 429 and the routing badge in the UI
 (WP-148), the guardrails counter (WP-153, hook still disabled in the chart), the
 Playwright screenshot of the tekos chat, and the real-key bundle publication
