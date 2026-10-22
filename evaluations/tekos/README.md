@@ -84,6 +84,19 @@ Keycloak) run unchanged.
 | 7-10 chat | session create + streamed execute (`llm_token`, `tool_calling`, `complete` events) |
 | 6, 11, 17, 19 | reported as skipped, not counted: no placeholder tiles, RAG source not deployed yet, no bearer-token API, in-cluster-only check |
 
+`security_checks.py --target unifai` swaps four checks for their UnifAI
+equivalents and runs the shared-service checks unchanged:
+
+| agent-runtime check | UnifAI check |
+|---|---|
+| `bff_forwards_identity_to_runtime` | `unifai_forwards_identity_to_the_gateways`: a Confluence tool call succeeds through the MCP gateway, which only serves the user's own JWT |
+| `runtime_ignores_mismatched_user_sub` | `unifai_ignores_a_client_supplied_identity_header`: an outside `X-Authenticated-User` without a session gets 401 |
+| `business_role_without_entitlement_denied_by_bff` | `business_role_without_entitlement_denied_by_unifai`: the workflow is not visible and the MCP gateway refuses the agent |
+| `tekos_chat_never_returns_photorealistic_images` | `unifai_tekos_never_generates_photorealistic_images`: no SDXL tool call, no PNG |
+
+A diagram request takes over a minute (several tool calls), so run the checks
+with a generous timeout.
+
 Environment: `UNIFAI_URL` (UI route), `UNIFAI_TEAM_ID` (the team workspace that
 owns the agent's workflows; without it the persona sees only its own objects),
 `DEMO_PERSONA_PASSWORD`, plus the usual `MCP_GATEWAY_URL`, `KEYCLOAK_URL` and
