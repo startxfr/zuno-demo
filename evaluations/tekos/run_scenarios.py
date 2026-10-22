@@ -1013,10 +1013,15 @@ def u_chat_streaming(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], ok, f"events={kinds}")
 
 
+_UNIFAI_LIVE_READ_TOOLS = {"comage": "salesforce.opportunity.read"}
+
+
 def u_chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     if _unifai_placeholder_skip(s):
         return _skip(s, _PLACEHOLDER_WHY)
-    want = _unifai_wanted_tools(s["expect_tool"])
+    # comage's scenario 10 has no `expect_tool` (agent-runtime checks source_mode); on
+    # UnifAI the live read is the tool call itself.
+    want = _unifai_wanted_tools(s.get("expect_tool") or _UNIFAI_LIVE_READ_TOOLS.get(AGENT, ""))
     try:
         # Overall deadline: heartbeats keep a looping agent from tripping the per-read timeout.
         run_ = _unifai().collect(
