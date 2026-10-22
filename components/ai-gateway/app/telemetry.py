@@ -26,11 +26,15 @@ import logging
 import os
 import time
 from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Iterable, Iterator, List, Optional
 
+from fastapi import Request
+from opentelemetry import context as otel_context
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from opentelemetry.propagate import extract
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
@@ -198,6 +202,31 @@ def record_guardrails_evaluation(agent: str, outcome: str, detections: Iterable[
         logger.debug("guardrails span annotation failed", exc_info=True)
 
 
+# ADR-0566 (WP-147): the W3C trace context an agent platform (UnifAI) sent with
+# the request, so the gateway's spans join the caller's trace instead of
+# starting a new root. A ContextVar, not a function argument: the two
+# `model_call_span` call sites sit several frames below the handler, on both the
+# streaming and non-streaming paths.
+_incoming_trace_context: ContextVar[Optional[otel_context.Context]] = ContextVar(
+    "zuno_incoming_trace_context", default=None
+)
+
+
+def adopt_incoming_trace_context(request: Request) -> None:
+    """FastAPI dependency: remember the caller's `traceparent`/`tracestate`.
+
+    Content is never read beyond those two headers. A request without a valid
+    `traceparent` leaves the variable empty, which keeps the previous behaviour
+    (each model call is its own trace root).
+    """
+    carrier = {k: v for k, v in request.headers.items() if k.lower() in ("traceparent", "tracestate")}
+    ctx = extract(carrier) if carrier else None
+    if ctx is not None and trace.get_current_span(ctx).get_span_context().is_valid:
+        _incoming_trace_context.set(ctx)
+    else:
+        _incoming_trace_context.set(None)
+
+
 @contextmanager
 def guardrails_observe_span(
     run_id: str, agent: str, backend: str, project_id: Optional[str] = None, mode: str = "observe",
@@ -209,7 +238,7 @@ def guardrails_observe_span(
     span-only (no metric cardinality)."""
     tracer = _tracer or trace.get_tracer("ai-gateway")
     start = time.monotonic()
-    with tracer.start_as_current_span("guardrails_observe") as span:
+    with tracer.start_as_current_span("guardrails_observe", context=_incoming_trace_context.get()) as span:
         span.set_attribute("zuno.run_id", run_id)
         span.set_attribute("zuno.agent", agent)
         span.set_attribute("zuno.backend", backend)
@@ -322,7 +351,7 @@ def model_call_span(
     """
     tracer = _tracer or trace.get_tracer("ai-gateway")
     start = time.monotonic()
-    with tracer.start_as_current_span("model_call") as span:
+    with tracer.start_as_current_span("model_call", context=_incoming_trace_context.get()) as span:
         span.set_attribute("zuno.provider", provider)
         span.set_attribute("zuno.model", model)
         span.set_attribute("zuno.classification", classification)
