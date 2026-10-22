@@ -82,7 +82,15 @@ spec:
       base_url: {{ $.Values.gatewayLLM.baseUrl }}
       api_key: EMPTY
       forward_user_token: true
-  {{- if $.Values.mcpGateway.enabled }}
+  {{- if and $.Values.mcpGateway.enabled $.Values.mcpGateway.perTask }}
+  # ADR-0571: one provider per task, carrying X-Zuno-Agent/X-Zuno-Task so the
+  # mcp-gateway applies that task's own tool declaration (operator >= 0.1.19).
+  mcp:
+    config:
+      mcp_url: {{ $.Values.mcpGateway.url }}
+      transport_type: "streamable http"
+      auth_method: forward_user_token
+  {{- else if $.Values.mcpGateway.enabled }}
   providers: [{{ $.Values.mcpGateway.name }}]
   {{- end }}
   {{- with .retriever }}
