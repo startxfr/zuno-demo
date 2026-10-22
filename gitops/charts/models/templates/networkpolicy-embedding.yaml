@@ -31,6 +31,9 @@ spec:
         {{- with .Values.unifaiNamespace }}
         # ADR-0568 (WP-151): the UnifAI RAG server and Celery workers embed
         # through this model (UnifaiStack spec.rag.embedding mode remote).
+        # WP-148: the multi-agent pods (backend and Temporal worker) embed
+        # through it for the project-memory tool (live finding 2026-10-22:
+        # without this allowance the call timed out).
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: {{ . }}
@@ -38,7 +41,7 @@ spec:
             matchExpressions:
               - key: app.kubernetes.io/name
                 operator: In
-                values: [rag, unifai-rag-celery]
+                values: [rag, unifai-rag-celery, multiagent]
         {{- end }}
         - namespaceSelector:
             matchLabels:
