@@ -88,7 +88,6 @@
 - name: "unifai | report the backup"
   ansible.builtin.debug:
     msg: >-
-      On-demand backup {{ _unifai_backup_id }} done: MongoDB dump and Qdrant snapshots
-      are under s3://{{ _unifai_backup_stack.resources[0].spec.backup.s3.bucket }}/
-      {{ _unifai_backup_stack.resources[0].spec.backup.s3.prefix | default('unifai/zuno-unifai') }}/.
+      On-demand backup {{ _unifai_backup_id }} done: MongoDB dump and Qdrant snapshots are under
+      s3://{{ _unifai_backup_stack.resources[0].spec.backup.s3.bucket }}/{{ _unifai_backup_stack.resources[0].spec.backup.s3.prefix | default('unifai/zuno-unifai') }}/.
       Verify with 'make d3 check unifai'.
