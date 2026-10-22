@@ -1,6 +1,6 @@
 # WP-148: UnifAI parity for project memory, routing display and quota UX
 
-- **State:** Repo work in review
+- **State:** Done
 - **ADRs:** [ADR-0569](../../adr/0569-close-unifai-parity-gaps-generically.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
 - **Depends on:** [WP-146](wp-146-unifai-identity-and-context-header-forwarding.md)
 - **Related:** [ADR-0209](../../adr/0209-introduce-project-scoped-agent-memory.md), [ADR-0528](../../adr/0528-rekey-project-binding-quota-and-telemetry-onto-the-zuno-project-id.md), [WP-135](wp-135-routing-decision-explainability.md), [WP-154](wp-154-tekos-pilot-on-demo333.md)
@@ -122,12 +122,51 @@ is unchanged (78 failed / 34 errors before and after, pre-existing).
   ADR-0584 (lifecycle, roles, revocation), all Proposed. Signing authority is
   settled by ADR-0578. Not started.
 
-## Open questions
+## Live proof (demo333, 2026-10-22, fork devel `e76c71cd0`)
 
-- The gateway publishes routing decisions under `X-Zuno-Request-Id`, while
-  the lookup template receives the completion id. Check live that the two
-  match, otherwise make the client send the completion id as request id.
-- Live checks (memory end to end, routing panel, a real quota 429, browser
-  rendering) wait for a GPU node and the WP-154 pilot.
+Run on the pilot stack with throwaway objects (all removed afterwards), two
+personas in a team workspace and one outside it:
+
+- **Routing explanation:** the LLM element sends `X-Zuno-Request-Id` and
+  fetches the gateway's decision server side; the message carries
+  `llm_response.routing` (class, kind, provider, model, fallback) and
+  `request_id`.
+- **Rate limit:** a real HTTP 429 with `Retry-After: 7` from a throwaway
+  server gives `metadata.error = {type: rate_limited, retry_after: 7}` on the
+  message and the `agent_error` stream event, one request only (no SDK retry),
+  the run completes. The ai-gateway now sends `Retry-After` on a quota 429.
+- **Memory tool:** an agent calls `set_fact` and `write` (also both in one
+  response), recalls the fact in a second session; a non-member is refused at
+  the workspace and at the tool (`access.mode: team`, fail closed).
+- **Extraction node:** `memory_extractor` writes validated facts and memories
+  with provenance; a restricted classification without a local model writes
+  nothing.
+- **Distributed mode:** resources referenced by plain id reach the worker; a
+  plain id without a config is refused at save time with a `$ref:<id>` hint.
+- **Failure handling:** a session whose elements cannot be built ends FAILED
+  with a structured `session_build_failed` error (run, stream and submit), no
+  element configuration in any response, a chat message carrying the error, and
+  the session can be run again.
+- **Group-bound teams:** a team whose member is the group `agent_tekos` admits
+  a second user through the verified token claim and refuses a user outside the
+  group (identity `oidc-claims`, ADR-0583 clause 1).
+- **UI build:** `vite build` passes with Node 20 (podman `node:20`, README.md of
+  the repository root provided; the workstation's Node 16 is too old).
+
+## Not verified
+
+- Rendering in a real browser: the rate-limit notice, the response metadata
+  badge and the "why this model" panel (build and type-check only).
+- The memory tool against Qdrant with a large corpus, and the embedding model
+  under load (functional checks only).
+- The Temporal worker path for a build failure beyond the unit tests.
+
+## Follow-ups
+
+- Emit the group-bound `teamId` from the AgentBundle in the operator and chart
+  (WP-154 / WP-155) instead of the hand-made pilot team.
+- The per-agent entry and sheet: ADR-0582 to ADR-0584, Proposed.
 - Is UnifAI's agent repository enough for per-agent landing pages? No: it is a
-  generic element browser with no stable per-agent URL.
+  generic element browser with no stable per-agent URL (see ADR-0582).
+- The MaaS front answers 503 to most calls for the large local model under
+  load; each costs a retry and a fallback hop (WP-157).
