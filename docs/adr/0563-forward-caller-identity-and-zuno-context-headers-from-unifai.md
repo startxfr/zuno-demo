@@ -1,6 +1,6 @@
 # ADR-0563: Forward caller identity and Zuno context headers from UnifAI
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

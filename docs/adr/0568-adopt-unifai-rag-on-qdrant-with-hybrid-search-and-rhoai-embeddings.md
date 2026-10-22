@@ -1,6 +1,6 @@
 # ADR-0568: Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

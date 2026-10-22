@@ -333,21 +333,21 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md) | Accepted | Keep the ai-gateway as the policy router in front of UnifAI |
+| [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md) | Implemented | Keep the ai-gateway as the policy router in front of UnifAI |
 | [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Accepted | Adopt UnifAI as the agent platform |
-| [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md) | Accepted | Authenticate UnifAI against the zuno Keycloak realm |
-| [ADR-0563](0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md) | Accepted | Forward caller identity and Zuno context headers from UnifAI |
+| [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md) | Implemented | Authenticate UnifAI against the zuno Keycloak realm |
+| [ADR-0563](0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md) | Partially implemented | Forward caller identity and Zuno context headers from UnifAI |
 | [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) | Superseded in part by ADR-0577 and ADR-0578 | Deliver OKF bundles to unifai-operator as signed OCI artifacts |
-| [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Accepted | Derive data classification from OKF and only allow raising it |
-| [ADR-0566](0566-instrument-unifai-with-opentelemetry.md) | Accepted | Instrument UnifAI with OpenTelemetry |
-| [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Accepted | Move TrustyAI guardrails into the ai-gateway |
-| [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) | Accepted | Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings |
-| [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Accepted | Close UnifAI parity gaps generically |
+| [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Partially implemented | Derive data classification from OKF and only allow raising it |
+| [ADR-0566](0566-instrument-unifai-with-opentelemetry.md) | Partially implemented | Instrument UnifAI with OpenTelemetry |
+| [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Partially implemented | Move TrustyAI guardrails into the ai-gateway |
+| [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) | Partially implemented | Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings |
+| [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Partially implemented | Close UnifAI parity gaps generically |
 | [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Accepted | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
-| [ADR-0571](0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md) | Accepted | Evaluate the RHOAI MCP gateway before extending mcp-gateway |
+| [ADR-0571](0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md) | Implemented | Evaluate the RHOAI MCP gateway before extending mcp-gateway |
 | [ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md) | Accepted | Scope the zuno operator to the platform foundation |
-| [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Accepted | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
-| [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) | Accepted | Deploy UnifAI through ArgoCD from a pinned OLM catalog |
+| [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Partially implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
+| [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) | Implemented | Deploy UnifAI through ArgoCD from a pinned OLM catalog |
 | [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Accepted | Upstream generic UnifAI changes and isolate zuno-specific code |
 
 ## v0.12

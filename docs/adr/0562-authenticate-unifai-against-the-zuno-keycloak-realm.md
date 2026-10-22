@@ -1,6 +1,6 @@
 # ADR-0562: Authenticate UnifAI against the zuno Keycloak realm
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

@@ -1,6 +1,6 @@
 # ADR-0567: Move TrustyAI guardrails into the ai-gateway
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
