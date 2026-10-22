@@ -186,10 +186,35 @@ from `/v1/routing-decisions/{request_id}`:
 C3 never reached a SaaS provider, which is the ADR-0021 rule. This check does not
 depend on UnifAI: it is the gateway UnifAI calls with the user's token.
 
+## Redeploy on `devel-e76c71cd0` (2026-10-23)
+
+The pilot was removed after phase A and redeployed on fork `devel` e76c71cd0 with
+a team bound to the directory group `agent_tekos` (identity teams API), the
+throwaway key and the digest-pinned `okf-test-tekos` artifact.
+
+| Check | Result |
+|---|---|
+| UnifaiAgentBundle `tekos` | Verified, Valid, WithinCeilings, Emitted; 4 tasks, 16 objects Ready |
+| Scenarios (`--target unifai`) | 16/17 (94 %), 3 skipped. Scenario 8 (first token) now passes on warm models |
+| Scenario 10 | fails: with the retriever attached the agent answers through `docs_rag_retriever_tool` (ten calls) and `web.page.search`, never `confluence.page.search` |
+| Security checks | 8/9 passed; the photorealistic-image check did not finish within 20 minutes while the cluster was building a release (not re-run alone) |
+| Group-bound team | consultant-01/-02 (members through the group) see the workspace, sale-01 does not |
+
+### Other agents (WP-155 smoke test)
+
+advantage, comage, finage and naveo (graph shape `retrieve_reason_respond`) were
+signed with the throwaway key, published next to tekos in `okf-test-tekos` (one
+tag per bundle digest) and deployed, each in its own group-bound team
+(`agent_<name>`). For each, a member persona sees the workflow and gets a
+streamed answer (HTTP 200), and a persona outside the group does not see the
+workflow. They run on the shared `knowledge-<agent>` retrievers; no new RAG
+source exists for their sourceless domains. arkos (`plan_draft_write`, no
+blueprint template in the operator), cognos and soursage (no `graph_shape`)
+were signed and published but not deployed.
+
 ## Not yet covered
 
-Scenario 8 on warm local models, the
-quota 429 and the routing badge in the UI
+The quota 429 and the routing badge in the UI
 (WP-148), the guardrails counter (WP-153, hook still disabled in the chart), the
-Playwright screenshot of the tekos chat, and the real-key bundle publication
+Playwright screenshot of the tekos chat, scenario 10 with the retriever, and the real-key bundle publication
 (waiting for the zuno-demo-agents repository, WP-158).
