@@ -105,7 +105,10 @@ guardrails:
   # and DETECTOR_PARAMS is deliberately still in the image so that
   # rollback is a working observer and not an empty one.
   backend: nemo
-  detectorUrl: http://zuno-guardrails-smoke-service.zuno-ai-run.svc:8080
+  # WP-153 (demo333): emptied - the ai-gateway now evaluates every model
+  # exchange (gitops/charts/ai-gateway guardrails.enabled), so this hook would
+  # count each one twice. An empty URL turns the observer off.
+  detectorUrl: ""
   # CORRECTED 2026-09-03 from a live reading, and the correction is the
   # point: the operator does NOT follow the <cr-name>-service convention
   # that detectorUrl uses. Deploying the CR produced Service
@@ -115,7 +118,7 @@ guardrails:
   # erroring, by design, so this would have surfaced as "guardrails
   # stopped detecting" long after the flip. Assumed conventions are
   # exactly what the WP-120 discovery gate exists to catch.
-  nemoUrl: http://zuno-guardrails.zuno-ai-run.svc:80
+  nemoUrl: ""
   # Must match trustyai-config's nemoGuardrails.configId.
   configId: zuno-observe
   timeoutSeconds: "10"

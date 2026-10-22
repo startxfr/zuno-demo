@@ -149,11 +149,12 @@ unifaiNamespace: zuno-unifai
 # agent-runtime's hook uses (gitops/charts/agent-runtime/values.yaml).
 guardrails:
   # false = hook off. Keep false on a cluster where agent-runtime's own
-  # observe hook is still enabled (double counting of the same exchange);
-  # flip it here, then disable agent-runtime's detectorUrl/nemoUrl, once
-  # the gateway hook is live-proven (WP-153 step 7). WP-156 removes the
-  # agent-runtime hook for good.
-  enabled: false
+  # observe hook is still enabled (double counting of the same exchange).
+  # On this branch (demo333) the gateway hook is live-proven (WP-153 step 7,
+  # 2026-10-22) and agent-runtime's detectorUrl/nemoUrl are emptied, so the
+  # gateway is the single observer. WP-156 removes the agent-runtime hook for
+  # good.
+  enabled: true
   backend: nemo
   detectorUrl: http://zuno-guardrails-smoke-service.zuno-ai-run.svc:8080
   nemoUrl: http://zuno-guardrails.zuno-ai-run.svc:80
