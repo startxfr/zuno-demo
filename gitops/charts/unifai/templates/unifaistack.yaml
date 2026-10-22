@@ -32,7 +32,8 @@ spec:
   {{- end }}
   {{- if $s.identity.internalCalls }}
   {{- /* Service-to-service identity calls must reach the identity Service, not the public route: the route strips X-Internal-Auth, so the secured identity API answers 401 (found live on demo333, 2026-10-22). IDENTITY_HOST stays the public URL for OAuth redirects. */}}
-  {{- $idsvc := printf "http://identity.%s.svc:13456" $.Values.namespace }}
+  {{- /* The bare Service name on purpose: it is one of the hosts the services trust with the internal secret (internal_auth_headers); <name>.<ns>.svc only counts when POD_NAMESPACE is set, which the charts do not do. */}}
+  {{- $idsvc := "http://identity:13456" }}
   {{- $_ := set $extra "multiagent" (concat (list (dict "name" "DIRECTORY_SSO_URL" "value" $idsvc)) (index $extra "multiagent" | default list)) }}
   {{- $_ := set $extra "multiagentWorker" (concat (list (dict "name" "DIRECTORY_SSO_URL" "value" $idsvc)) (index $extra "multiagentWorker" | default list)) }}
   {{- range $c := list "rag" "ragCelery" "backend" }}
