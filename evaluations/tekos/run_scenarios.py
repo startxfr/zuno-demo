@@ -876,7 +876,7 @@ def chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
 
 # --------------------------------------------------------------------------
 # UnifAI target (WP-154). The same scenarios, served by UnifAI's own session
-# API (evaluations/tekos/unifai_target.py). Scenarios that exercise shared
+# API (evaluations/common/unifai_target.py). Scenarios that exercise shared
 # platform services (MCP gateway, model router, Keycloak) keep their
 # agent-runtime-era handlers; the ones tied to components UnifAI replaces
 # (portal tiles, BFF, agent-runtime health) get an equivalent or are skipped.
