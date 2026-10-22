@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 6 | 8 | WP-145 |
 | v0.10 | 5 | 1 | 6 | WP-51 |
-| v0.11 | 16 | 11 | 12 | WP-146, WP-147, WP-148, WP-149, WP-150, WP-153, WP-154, WP-155, WP-156, WP-157 |
+| v0.11 | 16 | 11 | 12 | WP-146, WP-147, WP-149, WP-150, WP-153, WP-154, WP-155, WP-156, WP-157 |
 | v0.12 | 9 | 9 | 8 | WP-158, WP-159, WP-160, WP-161, WP-162, WP-163, WP-164, WP-165 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -908,7 +908,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 |---|---|---|---|---|---|
 | WP-146 | [wp-146](work-packages/wp-146-unifai-identity-and-context-header-forwarding.md) | 0563, 0562, 0575 | none | Repo work in review | live-proven on demo333 2026-10-17 (user JWT + templated X-Zuno-* headers, fail-closed, MAS-side refresh); operator 0.1.13 wiring released; upstream Temporal context bug fixed (5ba7aed85); header-authorship decision and the X-Authenticated-User exposure fix remain |
 | WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Repo work in review | instrumentation merged in fork devel (c918f732b); operator env block, zuno collector rule/dashboard, gateway traceparent and a live trace remain |
-| WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Repo work in review | none until a live check; fork-side work runs offline |
+| WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Done | live-proven on demo333 2026-10-22 on fork devel e76c71cd0 (routing explanation, structured 429, memory tool and extraction node, group-bound teams); browser rendering not tested |
 | WP-149 | [wp-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md) | 0568, 0575 | none | Repo work in review | repo work done and live-proven on demo333 (Confluence incremental sync, hybrid search, group ACL); 0.1.17 sync-loop bug fixed in f50a0963f, needs release 0.1.18; Day-3 role waits for WP-151 |
 | WP-150 | [wp-150](work-packages/wp-150-unifai-operator-okf-agent-bundles.md) | 0564, 0565 | WP-146 | Repo work in review | live-proven on demo333 2026-10-17 with operator 0.1.16 (throwaway-key bundle from quay.io/zuno/okf-test-tekos: verified, 13 objects emitted, workflows ran with the user JWT and per-task X-Zuno-* headers, wrong key refused); remaining: publication with the real platform key, plan_draft_write template, graph shape for soursage/cognos |
 | WP-151 | [wp-151](work-packages/wp-151-deploy-unifai-on-zuno-via-argocd.md) | 0574, 0562, 0560 | WP-146, WP-150 | Done | live-proven on demo333 2026-10-22: persona login via realm zuno, user JWT + X-Zuno-Agent + classification at the ai-gateway; stack pinned to devel-38279972f |
