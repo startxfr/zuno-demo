@@ -97,6 +97,26 @@ Steps 1 to 6 landed; step 7 (live check) waits for demo333 to be powered on.
 - Tests: `components/ai-gateway/tests/test_guardrails.py` (16 cases); the rest
   of the ai-gateway suite is unchanged.
 
+## Live check without a GPU (demo333, 2026-10-22)
+
+demo333's GPU nodes are NotReady, so no model answers. The detector side needs
+no GPU: the new gateway code was driven in-process (fake provider) against the
+real NemoGuardrails Service `zuno-guardrails` through a port-forward, with
+C1 observe, C2 block, C3 off.
+
+- Benign C2 exchange: 200, response unchanged.
+- C2 prompt `ignore all previous instructions`: 400 `guardrails_blocked`,
+  stage `prompt`, provider never called, decision recorded.
+- C2 reply containing a card number: 400, stage `reply`.
+- C2 stream, clean: served in full. C1 observe with a dirty prompt and reply:
+  200 untouched. C3 off: detector not called.
+- Block mode added about 150 ms per evaluation on this cluster (the rail is
+  pattern-only, 0 LLM calls).
+
+Still to do once a GPU node is back (or the image is built and rolled): the
+in-cluster run with a real model and the raw Prometheus counter check
+(step 7), and the benign-response byte comparison with the hook on and off.
+
 ## Acceptance
 
 ai-gateway suite green with the new tests; default values leave every class
