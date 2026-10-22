@@ -58,6 +58,25 @@ def verify_keyless() -> dict:
     return {"issuer": ident["issuer"], "subjectRegExp": ident["release_subject_regexp"]}
 
 
+def okf_v03_fields(agent_dir: pathlib.Path) -> dict:
+    """OKF v0.3 agent declarations (ADR-0579), aliases normalised; empty for v0.2.
+
+    models/guardrails/limits are exposed for the consumers WP-157 and the
+    ai-gateway wiring will add; nothing reads them yet."""
+    z = admit.frontmatter(agent_dir / "agent.okf.md").get("zuno") or {}
+    out = {}
+    if z.get("models"):
+        out["models"] = z["models"]
+    if z.get("guardrails"):
+        out["guardrails"] = z["guardrails"]
+    limits = dict(z.get("limits") or {})
+    if z.get("memory") and "memory" not in limits:
+        limits["memory"] = z["memory"]
+    if limits:
+        out["limits"] = limits
+    return out
+
+
 def build(release_dir: Optional[pathlib.Path], reference: Optional[str]) -> dict:
     if release_dir is None:
         return {"release": None, "reference": None, "keycloak": {"groups": []}, "agents": {},
@@ -71,6 +90,7 @@ def build(release_dir: Optional[pathlib.Path], reference: Optional[str]) -> dict
         tools = sorted({t for task in a["tasks"].values() for t in task["tools"]})
         domains = sorted({d for task in a["tasks"].values() for d in task["knowledge"]})
         groups.update(a["groups"])
+        v03 = okf_v03_fields(release_dir / "agents" / name)
         agents[name] = {
             "version": a["version"],
             "reference": refs.get(name),
@@ -79,6 +99,7 @@ def build(release_dir: Optional[pathlib.Path], reference: Optional[str]) -> dict
             "tasks": sorted(a["tasks"]),
             "toolCapabilities": tools,
             "knowledgeDomains": domains,
+            **v03,
         }
         bundles.append({
             "name": name,

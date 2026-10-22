@@ -15,7 +15,8 @@ agent (ADR-0577). Nothing is trusted because of where it came from:
     validate  the platform can serve what the release asks for: every model
               its routing prefers is bound in provider-routing.yaml, every
               tool its tasks allow has a backend binding, every knowledge
-              domain has a database binding (ADR-0576 amendment)
+              domain has a database binding (ADR-0576 amendment); and no OKF
+              v0.3 bundle widens the release's corp policies (ADR-0579)
     diff      what changes between two extracted releases, for a promotion
               pull request (ADR-0580 clause 2)
     latest    the newest vX.Y.Z release in the registry
@@ -49,6 +50,10 @@ import textwrap
 from typing import Dict, Iterator, List, Optional, Set, Tuple
 
 import yaml
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+import okf_narrowing  # noqa: E402
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 LOCK_PATH = REPO_ROOT / "platform" / "okf" / "agents.lock"
@@ -312,6 +317,9 @@ def validate(release: pathlib.Path) -> Tuple[List[str], List[str]]:
                 if domain not in domains:
                     errors.append(f"{agent}/{task} allows knowledge domain {domain!r}, "
                                   f"which has no database binding")
+    # OKF v0.3: the release's bundles may only narrow its own corp policies
+    # (ADR-0579 clause 5), re-checked here after the agents repository's CI.
+    errors += okf_narrowing.check_release(release)
     return errors, warnings
 
 

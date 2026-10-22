@@ -59,6 +59,12 @@ agents:
     knowledgeDomains:
     - knowledge.project
     - knowledge.tech
+    limits:
+      memory:
+        history:
+          enabled: true
+          max_turns: 6
+          token_budget: 6000
   cognos:
     version: 0.1.0
     reference: quay.io/zuno/okf-cognos@sha256:f8fbd52a40f3186279e80c2716ad5b965018d2a9b6d744e658a1c81f9ee603d5

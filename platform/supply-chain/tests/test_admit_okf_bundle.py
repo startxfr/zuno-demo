@@ -112,6 +112,17 @@ class ValidateTest(AdmitTestCase):
         write(admit.TOOL_BINDINGS_PATH, "bindings:\n  - capability: x.y.z\n    aliases: [search_docs]\n")
         self.assertEqual(admit.validate(self.release)[0], [])
 
+    def test_v03_widening_is_refused_at_admission(self) -> None:
+        # ADR-0579 clause 5, re-checked here after the agents repository's CI.
+        write(self.release / "agents/demo/agent.okf.md",
+              AGENT.replace("okf_version: v0.2", "okf_version: v0.3")
+                   .replace("  model: {preferred_classification: C1}\n",
+                            "  model: {preferred_classification: C1}\n  limits: {max_tokens: 99999}\n"))
+        write(self.release / "policies/limits/limits-policy.yaml", "max_tokens: 8192\n")
+        errors = admit.validate(self.release)[0]
+        self.assertEqual(len(errors), 1)
+        self.assertIn("exceeds the corp ceiling 8192", errors[0])
+
     def test_unbound_knowledge_domain(self) -> None:
         write(admit.KNOWLEDGE_BINDINGS_PATH, "bindings: []\n")
         self.assertIn("no database binding", admit.validate(self.release)[0][0])

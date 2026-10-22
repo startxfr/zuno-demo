@@ -1,6 +1,6 @@
 # WP-163: OKF v0.3 schema and its consumers
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0579](../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md)
 - **Depends on:** [WP-158](wp-158-bootstrap-the-zuno-demo-agents-repository.md), [WP-160](wp-160-admit-the-corp-okf-release-in-zuno-demo.md)
 - **Related:** [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md), [ADR-0567](../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md), [WP-162](wp-162-keyless-okf-verification-in-unifai-operator.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)
@@ -10,7 +10,33 @@
 > Consumers first, bundles last: no bundle declares `okf_version: v0.3`
 > until every reader accepts it.
 
-## Goal
+## Progress (2026-10-23)
+
+Steps 1-3 and the zuno-demo half of step 4 are built; step 5 (migrating
+bundles) has NOT started, on purpose.
+
+- zuno-demo-agents `devel` (5d51969): v0.3 schemas for every type plus
+  `skill`; corp ceilings `policies/guardrails/guardrails-policy.yaml`
+  (modes off < observe < block, minimum per classification seeded from the
+  ai-gateway's observe everywhere, categories pii/injection) and
+  `policies/limits/limits-policy.yaml` (max_tokens 8192, the schema bound;
+  max_concurrent_requests 10, a seed value nothing enforces yet);
+  `check_narrowing.py` with 13 tests; both in CI and in publish.yml.
+  Deviation from ADR-0579 clause 1: corp skills live in `policies/skills/`,
+  not at the repository root, so they ship in the corp artifact's policies
+  layer without a new layer type.
+- zuno-demo: `platform/supply-chain/okf_narrowing.py`, a copy of the rule
+  re-rooted on an extracted release, run by `admit_okf_bundle.py validate`
+  (a widening is refused at admission too; tested); `generate_stack_config.py`
+  exposes each agent's `models`, `guardrails` and `limits` (with the v0.2
+  `zuno.memory` alias) for the consumers still to come.
+
+Bundles stay v0.2 until both: unifai-operator embeds the v0.3 schemas and
+maps skills (owned by the session that owns the fork), and agent-runtime,
+whose registry refuses anything but v0.2 (`app/registry.py`), is retired by
+WP-156. mcp-gateway, mlops and agent-frontend do not check the version and
+read only fields v0.3 keeps.
+
 
 OKF v0.3 expresses skills, model roles, guardrail modes and per-agent
 limits; a widening against the corp policies is refused in CI and at
