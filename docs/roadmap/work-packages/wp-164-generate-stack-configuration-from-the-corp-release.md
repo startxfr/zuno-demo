@@ -22,12 +22,16 @@ classification, groups, tasks, tool and knowledge unions) and
 promotion PR. 3 unit tests; proven on the devel release. With the lock
 still empty, the committed file is empty.
 
-Part 2, the consumers, is not started and is coordinated:
+Part 2, the consumers, is under way and coordinated:
 
-- `unifai` role: build `okf.bundles` from the generated file merged by name
-  with the platform's own per-agent settings (team, entitlement,
-  overrides) instead of `zuno_unifai_values`; the unifai chart belongs to
-  the zuno-demo-68 session (asked 2026-10-23);
+- `unifai` role: done (zuno-demo-68). It reads the generated file, builds
+  `okf.bundles` from `unifai.bundles` merged BY NAME with the platform's own
+  `zuno_unifai_bundle_settings.<agent>` (groupTeam/teamId, entitlement,
+  overrides), and passes `unifai.verify.keyless` and the committed
+  `trusted_root.json` to the chart. While the generated list is empty,
+  `zuno_unifai_values.okf` stays the only source; the two lists are never
+  merged. Needs unifai-operator 0.1.25 (WP-162); first live use waits for a
+  pinned release;
 - Keycloak: extend the ADR-0530 reconcile Job to the generated groups
   (create/update, never delete, never membership);
 - quotas, MaaS subscriptions, model routing and guardrail inputs wait for
