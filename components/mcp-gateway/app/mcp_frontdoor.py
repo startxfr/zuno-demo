@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger("mcp_gateway.frontdoor")
@@ -64,6 +65,21 @@ def frontdoor_capabilities() -> List[str]:
     if raw is None:
         return list(DEFAULT_FRONTDOOR_CAPABILITIES)
     return [c.strip() for c in raw.split(",") if c.strip()]
+
+@dataclass(frozen=True)
+class Surface:
+    """What one `/mcp` request may see and call, built by main.py (ADR-0571).
+
+    `capabilities` is the exposed set and `decide(capability, binding)` returns
+    the PolicyDecision for one of them. Both come from main.py, which owns the
+    ADR-0011 intersection: this module only iterates and asks, it never decides.
+    When a request carries no surface, the deployment-time ceiling below applies
+    (`frontdoor_capabilities()` + factors 3-5), as for OpenShift Lightspeed.
+    """
+
+    capabilities: List[str]
+    decide: Callable[[str, Any], Any]
+
 
 # The MCP revision this front-door implements. Clients send their own in
 # `initialize`; we echo ours back and let the client decide whether it can
@@ -155,6 +171,7 @@ def list_tools(
     binding_registry: Any,
     identity: Any,
     classification: str,
+    surface: Optional[Surface] = None,
 ) -> List[Dict[str, Any]]:
     """Every capability this caller is actually authorized for, right now.
 
@@ -166,21 +183,25 @@ def list_tools(
     from app.policy import evaluate_without_declaration
 
     tools: List[Dict[str, Any]] = []
-    for capability in frontdoor_capabilities():
+    capabilities = surface.capabilities if surface else frontdoor_capabilities()
+    for capability in capabilities:
         binding = binding_registry.resolve(capability)
         if binding is None:
             logger.warning(
-                "frontdoor allowlist names '%s', which resolves to no binding - skipping",
+                "frontdoor surface names '%s', which resolves to no binding - skipping",
                 capability,
             )
             continue
-        decision = evaluate_without_declaration(
-            store=policy_store,
-            tool_name=capability,
-            caller_groups=identity.groups,
-            request_classification=classification,
-            equivalent_names=binding.all_names(),
-        )
+        if surface:
+            decision = surface.decide(capability, binding)
+        else:
+            decision = evaluate_without_declaration(
+                store=policy_store,
+                tool_name=capability,
+                caller_groups=identity.groups,
+                request_classification=classification,
+                equivalent_names=binding.all_names(),
+            )
         if not decision.allowed:
             continue
         entry = policy_store.get_tool(capability)
@@ -214,6 +235,7 @@ async def dispatch(
     identity: Any,
     classification: str,
     invoke_tool: Callable[..., Any],
+    surface: Optional[Surface] = None,
 ) -> Optional[Dict[str, Any]]:
     """Handle one JSON-RPC message. Returns None for notifications.
 
@@ -273,6 +295,7 @@ async def dispatch(
                     binding_registry=binding_registry,
                     identity=identity,
                     classification=classification,
+                    surface=surface,
                 )
             },
         )
@@ -288,13 +311,19 @@ async def dispatch(
         if not isinstance(arguments, dict):
             raise JsonRpcError(INVALID_PARAMS, "'params.arguments' must be an object")
 
-        # The allowlist is enforced HERE as well as in tools/list. Relying on
-        # tools/list alone would make the ceiling advisory: a client is free to
-        # call a name it was never advertised, and this endpoint's whole
-        # read-only guarantee rests on that not working.
-        if name not in frontdoor_capabilities():
+        # The exposed set is enforced HERE as well as in tools/list. Relying on
+        # tools/list alone would make it advisory: a client is free to call a
+        # name it was never advertised, and this endpoint's whole read-only
+        # guarantee rests on that not working.
+        if surface:
+            binding = binding_registry.resolve(name)
+            names = set(binding.all_names()) if binding else {name}
+            exposed = bool(names & set(surface.capabilities))
+        else:
+            exposed = name in frontdoor_capabilities()
+        if not exposed:
             logger.warning(
-                "frontdoor refused '%s' - not in MCP_FRONTDOOR_CAPABILITIES (caller=%s)",
+                "frontdoor refused '%s' - not exposed to this caller (caller=%s)",
                 name,
                 getattr(identity, "sub", "?"),
             )
@@ -302,7 +331,7 @@ async def dispatch(
                 request_id,
                 _tool_error(
                     f"'{name}' is not exposed through this MCP endpoint "
-                    "(ADR-0524 front-door capability allowlist)"
+                    "(ADR-0524 front-door allowlist / ADR-0571 agent declaration)"
                 ),
             )
 

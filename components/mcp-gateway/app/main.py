@@ -344,6 +344,38 @@ async def invoke_tool(
         x_zuno_run_id=x_zuno_run_id,
     )
 
+
+def _agent_surface(
+    identity: CallerIdentity, agent_name: str, task_name: str, classification: str
+) -> mcp_frontdoor.Surface:
+    """The `/mcp` surface of one agent task (ADR-0571): the task's declared
+    tools, each decided by the same evaluate() `/v1/tools/{name}/invoke` uses.
+    An unknown agent or task yields an empty surface; evaluate() would refuse
+    every call anyway, so nothing is listed that could not be called."""
+    agent = agent_declarations.get(agent_name)
+    declared = (agent.tasks.get(task_name) or []) if agent else []
+    capabilities: list = []
+    for name in declared:
+        binding = binding_registry.resolve(name)
+        capability = binding.capability if binding else name
+        if capability not in capabilities:
+            capabilities.append(capability)
+
+    def decide(capability: str, binding: Any) -> PolicyDecision:
+        return evaluate(
+            store=policy_store,
+            agents=agent_declarations,
+            tool_name=capability,
+            agent_name=agent_name,
+            task_name=task_name,
+            caller_groups=identity.groups,
+            request_classification=classification,
+            equivalent_names=binding.all_names(),
+        )
+
+    return mcp_frontdoor.Surface(capabilities=capabilities, decide=decide)
+
+
 # ADR-0524 clause 3: the standard MCP streamable-HTTP front-door.
 #
 # Same deployment, same process, same authorization path as the REST contract
@@ -363,19 +395,38 @@ async def invoke_tool(
 #   * a Keycloak JWT, for the service-identity fallback when the plugin cannot
 #     forward a user token.
 #
-# Both land on the same authorization decision. What this endpoint does NOT do
-# is carry an agent/task declaration: ADR-0011's factors 1-2 need an OKF bundle,
-# a standard MCP client has none, and inventing one for it was rejected. They are
-# replaced by mcp_frontdoor.frontdoor_capabilities(), a deployment-time ceiling
-# enforced on both tools/list and tools/call - see evaluate_without_declaration()
-# for the full reasoning on what that trades away and what it does not.
+# Both land on the same authorization decision. A standard MCP client carries no
+# agent/task declaration: ADR-0011's factors 1-2 need an OKF bundle, it has
+# none, and inventing one for it was rejected. For it they are replaced by
+# mcp_frontdoor.frontdoor_capabilities(), a deployment-time ceiling enforced on
+# both tools/list and tools/call - see evaluate_without_declaration() for what
+# that trades away. ADR-0571: a caller that DOES declare an agent (UnifAI,
+# Keycloak JWT + X-Zuno-Agent/X-Zuno-Task) gets all five factors instead,
+# through _agent_surface() above.
 @app.post("/mcp")
 async def mcp_frontdoor_endpoint(
     request: Request,
     identity: CallerIdentity = Depends(validate_token_or_kubernetes),
     x_zuno_data_classification: str = Header(default="C2", alias="X-Zuno-Data-Classification"),
     x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
+    x_zuno_agent: str = Header(default="", alias="X-Zuno-Agent"),
+    x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
 ) -> JSONResponse:
+    # ADR-0571 (WP-152): a caller that declares an agent (UnifAI forwards
+    # X-Zuno-Agent/X-Zuno-Task with the user's own Keycloak JWT, ADR-0563) gets
+    # the full five-factor intersection the REST contract applies, exposed as
+    # that agent task's declared tools. A caller without one keeps ADR-0524's
+    # deployment-time ceiling. An OpenShift token (TokenReview) cannot declare
+    # an agent: agents are Keycloak-realm callers only.
+    agent_name, task_name = x_zuno_agent.strip(), x_zuno_task.strip()
+    agent_mode = bool(agent_name)
+    if agent_mode and "tokenReview" in identity.raw_claims:
+        raise HTTPException(
+            status_code=403, detail="X-Zuno-Agent requires a Keycloak user token, not an OpenShift token"
+        )
+    classification = x_zuno_data_classification.upper()
+    surface = _agent_surface(identity, agent_name, task_name, classification) if agent_mode else None
+
     # Classification defaults to C2 because `confluence` is a C2 domain
     # (policies/data-classification/classification.yaml). A C1 default would
     # deny every Confluence call for a reason the client could neither see nor
@@ -400,11 +451,11 @@ async def mcp_frontdoor_endpoint(
                 tool_name=tool_name,
                 arguments=arguments,
                 identity=identity,
-                classification=x_zuno_data_classification.upper(),
-                x_zuno_agent="",
-                x_zuno_task="",
+                classification=classification,
+                x_zuno_agent=agent_name,
+                x_zuno_task=task_name,
                 x_zuno_run_id=x_zuno_run_id,
-                frontdoor_policy=True,
+                frontdoor_policy=not agent_mode,
             )
         except HTTPException as exc:
             if exc.status_code == 404:
@@ -428,8 +479,9 @@ async def mcp_frontdoor_endpoint(
                 policy_store=policy_store,
                 binding_registry=binding_registry,
                 identity=identity,
-                classification=x_zuno_data_classification.upper(),
+                classification=classification,
                 invoke_tool=_invoke,
+                surface=surface,
             )
         except mcp_frontdoor.JsonRpcError as exc:
             resp = mcp_frontdoor.error_response(
