@@ -85,12 +85,14 @@ see [the evidence file](../evidence/wp-154-tekos-pilot-phase-a.md).
 - Defects found and fixed in the fork: team sessions without an acting user, the
   validator probing a forwarded-token LLM, RAG groups discarded in a team workspace,
   empty answer when the rounds run out; and in the operator the identity URL.
+- Restore drill passed (step 5): `make d3 backup|check|restore unifai`; 501 Qdrant points
+  and 18 MongoDB collections restored identical in a scratch namespace.
 - Removed on 2026-10-22 at the user's request, to be redeployed later: the tekos
   test bundle and its objects, the retriever and the pilot team. The two RAG sources
   stay (ingested data).
 
 Still to do: scenario 8 on warm local models, C3 local-only routing end to end,
-the restore drill (step 5), the quota 429 and routing badge (WP-148 UI), the
+the quota 429 and routing badge (WP-148 UI), the
 guardrails counter (WP-153), the Playwright screenshot (step 6), and the real-key
 bundle (waits for WP-158).
 
