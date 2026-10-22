@@ -81,6 +81,21 @@
         label: "{{ _precheck_component }}"
       when: (selected_precheck_components | length) > 0
 
+    # ADR-0568/WP-149: UnifAI's backups are checked in S3 (a recent MongoDB
+    # archive and Qdrant run). Kept out of day3_precheck_components because its
+    # role precheck.yml also runs outside a Day 3 check.
+    - name: Check the UnifAI backups
+      when: target_component | default('all') in ['unifai', 'all']
+      block:
+        - name: "day3-check | UnifAI backups in S3"
+          ansible.builtin.include_role:
+            name: unifai
+            tasks_from: check_s3_backup
+      rescue:
+        - name: "day3-check | record the UnifAI backup check as failed"
+          ansible.builtin.set_fact:
+            _precheck_failed_components: "{{ (_precheck_failed_components | default([])) + ['unifai'] }}"
+
     - name: Display the state report
       ansible.builtin.debug:
         msg: "{{ lookup('ansible.builtin.file', state_report_file).split('\n') | select() | list }}"

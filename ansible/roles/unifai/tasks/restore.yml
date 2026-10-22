@@ -1,0 +1,318 @@
+---
+# `make d3 restore unifai` (ADR-0568, ADR-0112, WP-149): a restore DRILL.
+#
+# Restores the newest MongoDB archive and Qdrant snapshots into a scratch
+# namespace, with throw-away stores, and compares what they hold with the live
+# stores. The live stack is never written to: a backup that has not been
+# restored is only a hope, and overwriting a working data plane is a decision
+# for a person, not for a make target (the manual procedure is in
+# fork/unifai-operator/README.md, "Backups").
+#
+# Steps: take a fresh on-demand backup (skip with unifai_restore_use_latest=true
+# to drill the newest scheduled one), restore it into the scratch namespace,
+# count Qdrant points per collection and MongoDB documents per collection on both
+# sides, fail on any difference beyond the allowance, delete the scratch
+# namespace (keep it with unifai_restore_keep=true).
+#
+# Allowance: Qdrant counts must be equal when the drill took its own backup; with
+# unifai_restore_use_latest MongoDB may differ by unifai_restore_tolerance_pct
+# (default 5) because the data plane keeps changing between the backup and the count.
+- name: "unifai | restore drill | settings"
+  ansible.builtin.set_fact:
+    _unifai_drill_ns: "{{ unifai_restore_ns | default('zuno-unifai-restore-drill') }}"
+    _unifai_drill_aws_image: "{{ unifai_restore_aws_image | default('public.ecr.aws/aws-cli/aws-cli:2.22.35') }}"
+    _unifai_drill_mongo_image: "{{ unifai_restore_mongo_image | default('docker.io/library/mongo:8.0.3') }}"
+
+- name: "unifai | restore drill | take a fresh backup of the live stores"
+  ansible.builtin.include_tasks: backup.yml
+  when: not (unifai_restore_use_latest | default(false) | bool)
+
+# Also fails when there is no recent backup (and sets the newest names).
+- name: "unifai | restore drill | check the newest backups in S3"
+  ansible.builtin.include_tasks: check_s3_backup.yml
+
+- name: "unifai | restore drill | read the live Qdrant image and the backup credentials"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: zuno-unifai
+    name: qdrant
+  register: _unifai_drill_qdrant
+
+- name: "unifai | restore drill | read the backup credentials Secret"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: zuno-unifai
+    name: "{{ _unifai_s3.credentialsSecret }}"
+  register: _unifai_drill_creds
+  no_log: true
+
+- name: "unifai | restore drill | fail when the live stores cannot be read"
+  ansible.builtin.fail:
+    msg: "Deployment qdrant or Secret {{ _unifai_s3.credentialsSecret }} not found in zuno-unifai."
+  when: >-
+    (_unifai_drill_qdrant.resources | length == 0) or (_unifai_drill_creds.resources | length == 0)
+
+- name: "unifai | restore drill | create the scratch namespace {{ _unifai_drill_ns }}"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ _unifai_drill_ns }}"
+        labels:
+          zuno.io/purpose: unifai-restore-drill
+
+- name: "unifai | restore drill | copy the backup credentials into the scratch namespace"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: "{{ _unifai_s3.credentialsSecret }}"
+        namespace: "{{ _unifai_drill_ns }}"
+      type: Opaque
+      data: "{{ _unifai_drill_creds.resources[0].data }}"
+  no_log: true
+
+- name: "unifai | restore drill | start throw-away MongoDB and Qdrant"
+  kubernetes.core.k8s:
+    state: present
+    definition: "{{ item }}"
+  loop:
+    - apiVersion: apps/v1
+      kind: Deployment
+      metadata: {name: mongodb, namespace: "{{ _unifai_drill_ns }}"}
+      spec:
+        replicas: 1
+        selector: {matchLabels: {app: mongodb}}
+        template:
+          metadata: {labels: {app: mongodb}}
+          spec:
+            containers:
+              - name: mongodb
+                image: "{{ _unifai_drill_mongo_image }}"
+                ports: [{containerPort: 27017}]
+                volumeMounts: [{name: data, mountPath: /data/db}]
+            volumes: [{name: data, emptyDir: {}}]
+    - apiVersion: v1
+      kind: Service
+      metadata: {name: mongodb, namespace: "{{ _unifai_drill_ns }}"}
+      spec:
+        selector: {app: mongodb}
+        ports: [{port: 27017}]
+    - apiVersion: apps/v1
+      kind: Deployment
+      metadata: {name: qdrant, namespace: "{{ _unifai_drill_ns }}"}
+      spec:
+        replicas: 1
+        selector: {matchLabels: {app: qdrant}}
+        template:
+          metadata: {labels: {app: qdrant}}
+          spec:
+            containers:
+              - name: qdrant
+                image: "{{ _unifai_drill_qdrant.resources[0].spec.template.spec.containers[0].image }}"
+                ports: [{containerPort: 6333}]
+                volumeMounts: [{name: data, mountPath: /qdrant/storage}]
+            volumes: [{name: data, emptyDir: {}}]
+    - apiVersion: v1
+      kind: Service
+      metadata: {name: qdrant, namespace: "{{ _unifai_drill_ns }}"}
+      spec:
+        selector: {app: qdrant}
+        ports: [{port: 6333}]
+  loop_control:
+    label: "{{ item.kind }}/{{ item.metadata.name }}"
+
+- name: "unifai | restore drill | wait for the throw-away stores"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ _unifai_drill_ns }}"
+    name: "{{ item }}"
+  register: _unifai_drill_ready
+  until: (_unifai_drill_ready.resources[0].status.readyReplicas | default(0)) | int >= 1
+  retries: 60
+  delay: 5
+  loop: [mongodb, qdrant]
+
+# MongoDB: the archive is downloaded by the aws-cli init container, restored by
+# the mongo image's own mongorestore.
+- name: "unifai | restore drill | restore the MongoDB archive"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata: {name: restore-mongodb, namespace: "{{ _unifai_drill_ns }}"}
+      spec:
+        backoffLimit: 0
+        template:
+          spec:
+            restartPolicy: Never
+            volumes: [{name: backup, emptyDir: {}}]
+            initContainers:
+              - name: download
+                image: "{{ _unifai_drill_aws_image }}"
+                command: ["/bin/sh", "-c"]
+                args:
+                  - |
+                    export HOME=/tmp
+                    aws ${S3_ENDPOINT:+--endpoint-url $S3_ENDPOINT} s3 cp "$DEST/mongodb/$BACKUP" /backup/mongodb.archive.gz
+                envFrom: [{secretRef: {name: "{{ _unifai_s3.credentialsSecret }}"}}]
+                env: &drill_s3_env
+                  - {name: S3_ENDPOINT, value: "{{ _unifai_s3.endpoint | default('') }}"}
+                  - {name: AWS_DEFAULT_REGION, value: "{{ _unifai_s3.region | default('us-east-1') }}"}
+                  - {name: DEST, value: "s3://{{ _unifai_s3.bucket }}/{{ _unifai_s3.prefix | default('unifai/zuno-unifai') }}"}
+                  - {name: BACKUP, value: "{{ _unifai_backup_latest_mongodb }}"}
+                volumeMounts: [{name: backup, mountPath: /backup}]
+            containers:
+              - name: restore
+                image: "{{ _unifai_drill_mongo_image }}"
+                command: ["mongorestore", "--uri=mongodb://mongodb:27017", "--archive=/backup/mongodb.archive.gz", "--gzip", "--drop"]
+                volumeMounts: [{name: backup, mountPath: /backup}]
+
+# Qdrant: every collection snapshot of the newest run is uploaded to the scratch
+# Qdrant, which recreates the collection from it.
+- name: "unifai | restore drill | restore the Qdrant snapshots"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata: {name: restore-qdrant, namespace: "{{ _unifai_drill_ns }}"}
+      spec:
+        backoffLimit: 0
+        template:
+          spec:
+            restartPolicy: Never
+            volumes: [{name: backup, emptyDir: {}}]
+            containers:
+              - name: restore
+                image: "{{ _unifai_drill_aws_image }}"
+                command: ["/bin/sh", "-c"]
+                args:
+                  - |
+                    set -eu
+                    export HOME=/tmp
+                    AWS="aws ${S3_ENDPOINT:+--endpoint-url $S3_ENDPOINT}"
+                    $AWS s3 cp --recursive "$DEST/qdrant/$BACKUP/" /backup/
+                    for f in /backup/*.snapshot; do
+                      c=$(basename "$f" .snapshot)
+                      curl -sf -X POST "http://qdrant:6333/collections/$c/snapshots/upload?priority=snapshot&wait=true" \
+                        -F "snapshot=@$f" >/dev/null
+                      echo "restored $c"
+                    done
+                envFrom: [{secretRef: {name: "{{ _unifai_s3.credentialsSecret }}"}}]
+                env:
+                  - {name: S3_ENDPOINT, value: "{{ _unifai_s3.endpoint | default('') }}"}
+                  - {name: AWS_DEFAULT_REGION, value: "{{ _unifai_s3.region | default('us-east-1') }}"}
+                  - {name: DEST, value: "s3://{{ _unifai_s3.bucket }}/{{ _unifai_s3.prefix | default('unifai/zuno-unifai') }}"}
+                  - {name: BACKUP, value: "{{ _unifai_backup_latest_qdrant }}"}
+                volumeMounts: [{name: backup, mountPath: /backup}]
+
+- name: "unifai | restore drill | wait for both restores to succeed"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: "{{ _unifai_drill_ns }}"
+    name: "{{ item }}"
+  register: _unifai_drill_restore_jobs
+  until: >-
+    (_unifai_drill_restore_jobs.resources[0].status.succeeded | default(0)) | int >= 1
+    or (_unifai_drill_restore_jobs.resources[0].status.failed | default(0)) | int >= 1
+  retries: 120
+  delay: 10
+  loop: [restore-mongodb, restore-qdrant]
+
+- name: "unifai | restore drill | fail when a restore Job failed"
+  ansible.builtin.fail:
+    msg: "The {{ item.item }} Job in {{ _unifai_drill_ns }} failed (oc -n {{ _unifai_drill_ns }} logs job/{{ item.item }})."
+  when: (item.resources[0].status.succeeded | default(0)) | int < 1
+  loop: "{{ _unifai_drill_restore_jobs.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: "unifai | restore drill | count the live stores"
+  ansible.builtin.include_tasks: restore_counts.yml
+  vars:
+    counts_ns: zuno-unifai
+    counts_qdrant: "http://qdrant:6333"
+    counts_mongo: "mongodb://mongodb:27017"
+    counts_mongo_image: "{{ _unifai_drill_mongo_image }}"
+    counts_aws_image: "{{ _unifai_drill_aws_image }}"
+
+- name: "unifai | restore drill | keep the live counts"
+  ansible.builtin.set_fact:
+    _unifai_live_counts: "{{ _unifai_counts }}"
+
+- name: "unifai | restore drill | count the restored stores"
+  ansible.builtin.include_tasks: restore_counts.yml
+  vars:
+    counts_ns: "{{ _unifai_drill_ns }}"
+    counts_qdrant: "http://qdrant:6333"
+    counts_mongo: "mongodb://mongodb:27017"
+    counts_mongo_image: "{{ _unifai_drill_mongo_image }}"
+    counts_aws_image: "{{ _unifai_drill_aws_image }}"
+
+# Qdrant counts must match exactly after the drill's own backup. MongoDB gets the
+# tolerance because sessions and runs keep being written between the dump and the
+# count; a collection that is missing or empty after the restore is always a problem.
+- name: "unifai | restore drill | compare the live and the restored stores"
+  ansible.builtin.set_fact:
+    _unifai_drill_problems: >-
+      {%- set out = [] -%}
+      {%- set tol = (unifai_restore_tolerance_pct | default(5) | float) / 100 -%}
+      {%- set exact = not (unifai_restore_use_latest | default(false) | bool) -%}
+      {%- for name, live in _unifai_live_counts.qdrant.items() -%}
+        {%- if name not in _unifai_counts.qdrant -%}
+          {%- set _ = out.append('qdrant ' ~ name ~ ': missing after the restore') -%}
+        {%- elif exact and (_unifai_counts.qdrant[name] | int) != (live | int) -%}
+          {%- set _ = out.append('qdrant ' ~ name ~ ': ' ~ live ~ ' points live, ' ~ _unifai_counts.qdrant[name] ~ ' restored') -%}
+        {%- elif (live | int) > 0 and (_unifai_counts.qdrant[name] | int) < ((live | int) * (1 - tol)) -%}
+          {%- set _ = out.append('qdrant ' ~ name ~ ': ' ~ live ~ ' points live, only ' ~ _unifai_counts.qdrant[name] ~ ' restored') -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {%- for name, live in _unifai_live_counts.mongo.items() -%}
+        {%- if name not in _unifai_counts.mongo -%}
+          {%- set _ = out.append('mongo ' ~ name ~ ': missing after the restore') -%}
+        {%- elif (live | int) > 0 and (_unifai_counts.mongo[name] | int) < ((live | int) * (1 - tol)) -%}
+          {%- set _ = out.append('mongo ' ~ name ~ ': ' ~ live ~ ' documents live, only ' ~ _unifai_counts.mongo[name] ~ ' restored') -%}
+        {%- endif -%}
+      {%- endfor -%}
+      {{ out }}
+
+- name: "unifai | restore drill | report"
+  ansible.builtin.debug:
+    msg:
+      live_qdrant: "{{ _unifai_live_counts.qdrant }}"
+      restored_qdrant: "{{ _unifai_counts.qdrant }}"
+      live_mongo: "{{ _unifai_live_counts.mongo }}"
+      restored_mongo: "{{ _unifai_counts.mongo }}"
+      problems: "{{ _unifai_drill_problems }}"
+
+# Always clean up, then decide: the scratch namespace is of no use once compared.
+- name: "unifai | restore drill | delete the scratch namespace"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: Namespace
+    name: "{{ _unifai_drill_ns }}"
+    wait: true
+    wait_timeout: 300
+  when: not (unifai_restore_keep | default(false) | bool)
+
+- name: "unifai | restore drill | fail when the restored stores differ from the live ones"
+  ansible.builtin.fail:
+    msg: "The restore drill found differences: {{ _unifai_drill_problems }}"
+  when: _unifai_drill_problems | length > 0
+
+- name: "unifai | restore drill | result"
+  ansible.builtin.debug:
+    msg: >-
+      Restore drill passed: {{ _unifai_counts.qdrant | length }} Qdrant collection(s) and
+      {{ _unifai_counts.mongo | length }} MongoDB collection(s) restored with the live counts.

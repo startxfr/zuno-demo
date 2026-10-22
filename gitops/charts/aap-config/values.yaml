@@ -143,18 +143,18 @@ jobTemplates:
     playbook: ansible/playbooks/day3_backup.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [postgresql]
+    surveyComponents: [postgresql, unifai]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day3-restore
     playbook: ansible/playbooks/day3_restore.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [postgresql]
+    surveyComponents: [postgresql, unifai]
   - name: zuno-day3-check
     playbook: ansible/playbooks/day3_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [postgresql, lightspeed, lightspeed-config, agents, platform]
+    surveyComponents: [postgresql, unifai, lightspeed, lightspeed-config, agents, platform]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day3-sign
     playbook: ansible/playbooks/day3_sign.yml

@@ -8,6 +8,9 @@
   vars:
     day3_backup_components:
       - postgresql
+      # ADR-0568/WP-149: MongoDB dump + Qdrant snapshots of the UnifAI stack;
+      # restore is a drill into a scratch namespace (roles/unifai/tasks/restore.yml).
+      - unifai
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

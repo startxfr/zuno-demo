@@ -1,0 +1,94 @@
+---
+# `make d3 backup unifai` (ADR-0568, ADR-0112, WP-149) - runs the stack's two
+# backup CronJobs once, on demand: a MongoDB dump and one Qdrant snapshot per
+# collection, both uploaded to the cluster's backups bucket under
+# unifai/zuno-unifai/. The CronJobs are created by unifai-operator from
+# UnifaiStack.spec.backup, which the unifai role fills from the PostgreSQL S3
+# settings of ansible/confidential.yml (install.yml).
+#
+# Like the PostgreSQL role, this is an explicit action: it fails loudly when a
+# job does not complete instead of reporting an old scheduled backup as the
+# one just requested.
+- name: "unifai | read the UnifaiStack"
+  kubernetes.core.k8s_info:
+    api_version: unifai.startx.fr/v1alpha1
+    kind: UnifaiStack
+    namespace: zuno-unifai
+    name: unifai
+  register: _unifai_backup_stack
+
+- name: "unifai | fail when the stack has no backup configured"
+  ansible.builtin.fail:
+    msg: >-
+      zuno-unifai/unifai has no spec.backup. Set the zuno_postgresql_backup_s3_*
+      values in ansible/confidential.yml (or zuno_unifai_values.stack.backup)
+      and run 'make d2 install unifai' first.
+  when: >-
+    (_unifai_backup_stack.resources | default([]) | length == 0)
+    or (_unifai_backup_stack.resources[0].spec.backup | default({}, true) | length == 0)
+
+- name: "unifai | read the backup CronJobs"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: CronJob
+    namespace: zuno-unifai
+    name: "{{ item }}"
+  loop: [unifai-backup-mongodb, unifai-backup-qdrant]
+  register: _unifai_backup_cronjobs
+
+- name: "unifai | keep the two backup CronJobs"
+  ansible.builtin.set_fact:
+    _unifai_backup_jobs_src: "{{ _unifai_backup_cronjobs.results | map(attribute='resources') | flatten }}"
+
+- name: "unifai | fail when a backup CronJob is missing"
+  ansible.builtin.fail:
+    msg: >-
+      Expected the CronJobs unifai-backup-mongodb and unifai-backup-qdrant in
+      zuno-unifai, found {{ _unifai_backup_jobs_src | map(attribute='metadata.name') | list }}.
+      Check the UnifaiStack status (the operator creates them from spec.backup).
+  when: _unifai_backup_jobs_src | length != 2
+
+- name: "unifai | generate the on-demand backup id"
+  ansible.builtin.set_fact:
+    _unifai_backup_id: "{{ lookup('pipe', 'date -u +%Y%m%d%H%M%S') }}"
+
+- name: "unifai | start one Job per CronJob"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: "{{ item.metadata.name }}-manual-{{ _unifai_backup_id }}"
+        namespace: zuno-unifai
+        labels:
+          zuno.io/on-demand-backup: "true"
+          zuno.io/backup-id: "{{ _unifai_backup_id }}"
+      spec: "{{ item.spec.jobTemplate.spec | combine({'ttlSecondsAfterFinished': 86400}) }}"
+  loop: "{{ _unifai_backup_jobs_src }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+
+# A Job counts only when it succeeded (status.succeeded), not when it merely
+# stopped running.
+- name: "unifai | wait for both Jobs to succeed"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-unifai
+    label_selectors:
+      - "zuno.io/backup-id={{ _unifai_backup_id }}"
+  register: _unifai_backup_poll
+  until: >-
+    (_unifai_backup_poll.resources | length == 2)
+    and (_unifai_backup_poll.resources | map(attribute='status.succeeded') | map('default', 0) | min) | int >= 1
+  retries: 90
+  delay: 10
+
+- name: "unifai | report the backup"
+  ansible.builtin.debug:
+    msg: >-
+      On-demand backup {{ _unifai_backup_id }} done: MongoDB dump and Qdrant snapshots
+      are under s3://{{ _unifai_backup_stack.resources[0].spec.backup.s3.bucket }}/
+      {{ _unifai_backup_stack.resources[0].spec.backup.s3.prefix | default('unifai/zuno-unifai') }}/.
+      Verify with 'make d3 check unifai'.

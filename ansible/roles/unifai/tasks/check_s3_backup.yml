@@ -1,0 +1,143 @@
+---
+# Is there a recent UnifAI backup in S3? (ADR-0112, WP-149)
+#
+# Lists the newest MongoDB archive and Qdrant run under the stack's backup
+# prefix from a short-lived pod that uses the same image and credentials as the
+# backup CronJobs, and fails when either is missing or older than
+# unifai_backup_max_age_hours (default 36: a daily schedule plus slack).
+# Facts set for callers: _unifai_backup_latest_mongodb, _unifai_backup_latest_qdrant
+# (the UTC timestamps in the object names).
+- name: "unifai | read the UnifaiStack"
+  kubernetes.core.k8s_info:
+    api_version: unifai.startx.fr/v1alpha1
+    kind: UnifaiStack
+    namespace: zuno-unifai
+    name: unifai
+  register: _unifai_check_stack
+
+- name: "unifai | fail when the stack has no backup configured"
+  ansible.builtin.fail:
+    msg: "zuno-unifai/unifai has no spec.backup: nothing is backed up. See 'make d3 backup unifai'."
+  when: >-
+    (_unifai_check_stack.resources | default([]) | length == 0)
+    or (_unifai_check_stack.resources[0].spec.backup | default({}, true) | length == 0)
+
+- name: "unifai | resolve the backup location"
+  ansible.builtin.set_fact:
+    _unifai_s3: "{{ _unifai_check_stack.resources[0].spec.backup.s3 }}"
+    _unifai_check_id: "{{ lookup('pipe', 'date -u +%Y%m%d%H%M%S') }}"
+
+- name: "unifai | list the newest backups from a short-lived Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: batch/v1
+      kind: Job
+      metadata:
+        name: "unifai-backup-check-{{ _unifai_check_id }}"
+        namespace: zuno-unifai
+        labels:
+          zuno.io/backup-check: "{{ _unifai_check_id }}"
+      spec:
+        ttlSecondsAfterFinished: 3600
+        backoffLimit: 0
+        template:
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: aws
+                image: public.ecr.aws/aws-cli/aws-cli:2.22.35
+                command: ["/bin/sh", "-c"]
+                args:
+                  - |
+                    export HOME=/tmp
+                    AWS="aws ${S3_ENDPOINT:+--endpoint-url $S3_ENDPOINT}"
+                    for store in mongodb qdrant; do
+                      last=$($AWS s3 ls "$DEST/$store/" | awk '{print $NF}' | sed 's#/$##' | sort | tail -n 1)
+                      echo "latest $store ${last:-none}"
+                    done
+                envFrom:
+                  - secretRef:
+                      name: "{{ _unifai_s3.credentialsSecret }}"
+                env:
+                  - name: S3_ENDPOINT
+                    value: "{{ _unifai_s3.endpoint | default('') }}"
+                  - name: AWS_DEFAULT_REGION
+                    value: "{{ _unifai_s3.region | default('us-east-1') }}"
+                  - name: DEST
+                    value: "s3://{{ _unifai_s3.bucket }}/{{ _unifai_s3.prefix | default('unifai/zuno-unifai') }}"
+
+- name: "unifai | wait for the listing to finish"
+  kubernetes.core.k8s_info:
+    api_version: batch/v1
+    kind: Job
+    namespace: zuno-unifai
+    name: "unifai-backup-check-{{ _unifai_check_id }}"
+  register: _unifai_check_job
+  until: >-
+    (_unifai_check_job.resources[0].status.succeeded | default(0)) | int >= 1
+    or (_unifai_check_job.resources[0].status.failed | default(0)) | int >= 1
+  retries: 36
+  delay: 5
+
+- name: "unifai | read the listing"
+  kubernetes.core.k8s_log:
+    api_version: v1
+    kind: Pod
+    namespace: zuno-unifai
+    label_selectors:
+      - "job-name=unifai-backup-check-{{ _unifai_check_id }}"
+  register: _unifai_check_log
+
+- name: "unifai | fail when the listing job failed"
+  ansible.builtin.fail:
+    msg: >-
+      Could not list s3://{{ _unifai_s3.bucket }}/{{ _unifai_s3.prefix | default('unifai/zuno-unifai') }}:
+      {{ _unifai_check_log.log | default('no log') }}
+  when: (_unifai_check_job.resources[0].status.succeeded | default(0)) | int < 1
+
+- name: "unifai | parse the newest backup names (UTC timestamps)"
+  ansible.builtin.set_fact:
+    _unifai_backup_latest_mongodb: >-
+      {{ (_unifai_check_log.log | regex_search('latest mongodb (\S+)', '\1') | first) | default('none') }}
+    _unifai_backup_latest_qdrant: >-
+      {{ (_unifai_check_log.log | regex_search('latest qdrant (\S+)', '\1') | first) | default('none') }}
+
+- name: "unifai | fail when a store has no backup"
+  ansible.builtin.fail:
+    msg: >-
+      No {{ item.store }} backup under s3://{{ _unifai_s3.bucket }}/{{ _unifai_s3.prefix | default('unifai/zuno-unifai') }}/{{ item.store }}/.
+      Run 'make d3 backup unifai'.
+  when: item.name == 'none'
+  loop:
+    - {store: mongodb, name: "{{ _unifai_backup_latest_mongodb }}"}
+    - {store: qdrant, name: "{{ _unifai_backup_latest_qdrant }}"}
+  loop_control:
+    label: "{{ item.store }}"
+
+# Names start with the UTC time as 20261022T020000Z (MongoDB archives carry a
+# suffix after it).
+- name: "unifai | compute the age of the newest backups"
+  ansible.builtin.set_fact:
+    _unifai_backup_age_hours: >-
+      {{ {
+        'mongodb': ((now(utc=true).strftime('%s') | int) - ((_unifai_backup_latest_mongodb[:15] | to_datetime('%Y%m%dT%H%M%S')).strftime('%s') | int)) / 3600,
+        'qdrant': ((now(utc=true).strftime('%s') | int) - ((_unifai_backup_latest_qdrant[:15] | to_datetime('%Y%m%dT%H%M%S')).strftime('%s') | int)) / 3600
+      } }}
+
+- name: "unifai | fail when a backup is too old"
+  ansible.builtin.fail:
+    msg: >-
+      The newest {{ item.key }} backup is {{ item.value | round(1) }} h old
+      (limit {{ unifai_backup_max_age_hours | default(36) }} h).
+  when: (item.value | float) > (unifai_backup_max_age_hours | default(36) | float)
+  loop: "{{ _unifai_backup_age_hours | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: "unifai | report the newest backups"
+  ansible.builtin.debug:
+    msg: >-
+      newest MongoDB {{ _unifai_backup_latest_mongodb }}
+      ({{ _unifai_backup_age_hours.mongodb | round(1) }} h), newest Qdrant run
+      {{ _unifai_backup_latest_qdrant }} ({{ _unifai_backup_age_hours.qdrant | round(1) }} h)

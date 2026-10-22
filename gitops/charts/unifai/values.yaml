@@ -33,6 +33,10 @@ stack:
   # multiagentWorker, rag, ragCelery, backend, identity, ui. Values come from
   # Secrets or ConfigMaps (valueFrom) when they are sensitive.
   extraEnv: {}
+  # Wiring of the memory tool (WP-148) to the stack's Qdrant and to the
+  # embedding model of `rag` below.
+  memory:
+    enabled: true
   # Usernames of realm zuno (the operator defaults to `admin`, which realm zuno
   # does not have). ai-ops-01 is the AI platform operations persona.
   adminUsers: [ai-ops-01]
@@ -78,7 +82,11 @@ stack:
     bucket: ""
     endpoint: ""
     region: ""
-    credentialsVaultPath: ""
+    # Vault path of the AWS identity that writes the backups: by default the
+    # one PostgreSQL's pgBackRest uses on the same cluster (field names below).
+    credentialsVaultPath: postgresql/backup-s3
+    accessKeyProperty: access_key
+    secretKeyProperty: secret_key
 
 # Shared LLM of the platform: the ai-gateway, called with the user's own token
 # (ADR-0560, ADR-0563). Agent bundles emit their own per-task copies.
