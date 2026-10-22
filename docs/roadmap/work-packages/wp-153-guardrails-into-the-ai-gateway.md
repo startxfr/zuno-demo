@@ -1,6 +1,6 @@
 # WP-153: Move TrustyAI guardrails into the ai-gateway
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0567](../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md)
 - **Depends on:** none
 - **Related:** [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md), [ADR-0540](../../adr/0540-express-guardrail-policy-as-nemo-rails-configuration.md), [ADR-0021](../../adr/0021-route-models-according-to-c1-c2-c3-classification.md), [ADR-0560](../../adr/0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
@@ -74,6 +74,28 @@ step 7.
    detector-triggering prompt through the gateway and verify the counter in
    raw Prometheus, not in the Grafana panel (the TrustyAI "0% detection"
    dashboard illusion).
+
+## Repo work done (2026-10-22)
+
+Steps 1 to 6 landed; step 7 (live check) waits for demo333 to be powered on.
+
+- `components/ai-gateway/app/guardrails.py` ports the agent-runtime client
+  (both backends, same payloads, same metric names, empty URL = off) and adds
+  `mode_for(classification)`, `evaluate`, `observe_exchange` and a typed
+  `refusal_body`.
+- `main.py`: the mode comes from the declared `X-Zuno-Data-Classification`.
+  Only the last user message and the reply are sent. `block` refuses a prompt
+  before routing and a reply before returning (HTTP 400,
+  `error.type=guardrails_blocked`, detection names only, recorded in the
+  routing-decisions store). A streamed reply is observed, never blocked.
+- A detector outage is fail-open in both modes (counted `unavailable`).
+  Fail-closed `block` is a separate decision.
+- Chart: `guardrails.enabled` ships `false` so a cluster that still runs
+  agent-runtime's hook does not count each exchange twice. No NetworkPolicy
+  change is needed: the detector Services carry no ingress policy and
+  ai-gateway has no egress policy.
+- Tests: `components/ai-gateway/tests/test_guardrails.py` (16 cases); the rest
+  of the ai-gateway suite is unchanged.
 
 ## Acceptance
 

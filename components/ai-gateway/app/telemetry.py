@@ -26,7 +26,7 @@ import logging
 import os
 import time
 from contextlib import contextmanager
-from typing import Iterator, List, Optional
+from typing import Iterable, Iterator, List, Optional
 
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
@@ -110,11 +110,14 @@ _token_counter = None
 _cost_counter = None
 _cache_lookup_counter = None
 _model_call_duration_histogram = None
+_guardrails_eval_counter = None
+_guardrails_detection_counter = None
 
 
 def init_telemetry(service_name: str = "ai-gateway") -> None:
     global _tracer, _model_call_counter, _token_counter, _cost_counter, _cache_lookup_counter
     global _model_call_duration_histogram
+    global _guardrails_eval_counter, _guardrails_detection_counter
 
     resource = Resource.create({"service.name": service_name})
 
@@ -154,8 +157,69 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
         unit="ms",
         description="Model call latency, by provider/model/outcome - same attrs as zuno.model_calls",
     )
+    # ADR-0567/WP-153: same metric names agent-runtime emitted, so the
+    # zuno-trustyai dashboard keeps working across the move.
+    _guardrails_eval_counter = meter.create_counter(
+        "zuno.guardrails_evaluations",
+        description="Guardrails evaluations of model exchanges, by agent and "
+        "outcome (clean/detected/unavailable) - ADR-0534/ADR-0567",
+    )
+    _guardrails_detection_counter = meter.create_counter(
+        "zuno.guardrails_detections",
+        description="Individual guardrails detections, by agent and detection "
+        "name - ADR-0534/ADR-0567",
+    )
 
     logger.info("telemetry initialized: service=%s otlp_endpoint=%s", service_name, OTEL_ENDPOINT)
+
+
+def record_guardrails_evaluation(agent: str, outcome: str, detections: Iterable[str] = ()) -> None:
+    """`outcome` is "clean", "detected" or "unavailable"; `detections` the
+    detection names of a "detected" outcome (the detector's own bounded
+    vocabulary). Never raises: metrics must not affect a response. Names,
+    never matched text, go onto the enclosing guardrails_observe span."""
+    names = list(detections)
+    try:
+        if _guardrails_eval_counter is not None:
+            _guardrails_eval_counter.add(1, {"agent": agent, "outcome": outcome})
+        if _guardrails_detection_counter is not None:
+            for name in names:
+                _guardrails_detection_counter.add(1, {"agent": agent, "detection": name or "unknown"})
+    except Exception:  # noqa: BLE001
+        logger.debug("guardrails metric recording failed", exc_info=True)
+    try:
+        span = trace.get_current_span()
+        if span is not None and span.is_recording():
+            span.set_attribute("zuno.outcome", outcome)
+            span.set_attribute("zuno.detection_count", len(names))
+            if names:
+                span.set_attribute("zuno.detections", sorted(set(names)))
+    except Exception:  # noqa: BLE001
+        logger.debug("guardrails span annotation failed", exc_info=True)
+
+
+@contextmanager
+def guardrails_observe_span(
+    run_id: str, agent: str, backend: str, project_id: Optional[str] = None, mode: str = "observe",
+) -> Iterator[None]:
+    """ADR-0540/ADR-0567: wraps one guardrails evaluation so a run drill-down
+    (TraceQL over zuno.run_id) can show whether an exchange was evaluated.
+    zuno.outcome / zuno.detection_count are stamped by
+    record_guardrails_evaluation. zuno.backend, zuno.mode and project_id are
+    span-only (no metric cardinality)."""
+    tracer = _tracer or trace.get_tracer("ai-gateway")
+    start = time.monotonic()
+    with tracer.start_as_current_span("guardrails_observe") as span:
+        span.set_attribute("zuno.run_id", run_id)
+        span.set_attribute("zuno.agent", agent)
+        span.set_attribute("zuno.backend", backend)
+        span.set_attribute("zuno.guardrails_mode", mode)
+        if project_id:
+            span.set_attribute("zuno.project_id", project_id)
+        try:
+            yield
+        finally:
+            span.set_attribute("zuno.latency_ms", (time.monotonic() - start) * 1000.0)
 
 
 def record_cache_outcome(outcome: str, model: str) -> None:

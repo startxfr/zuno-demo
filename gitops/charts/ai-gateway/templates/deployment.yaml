@@ -84,6 +84,20 @@ spec:
             # above (see platform/ai-gateway/kustomization.yaml).
             - name: IMAGE_PROVIDER_ROUTING_PATH
               value: /app/config/image-provider-routing.yaml
+            # ADR-0567/WP-153: guardrails at the gateway. Empty URLs (the
+            # default, guardrails.enabled=false) disable the hook entirely.
+            - name: GUARDRAILS_DETECTOR_URL
+              value: {{ if .Values.guardrails.enabled }}{{ .Values.guardrails.detectorUrl | quote }}{{ else }}""{{ end }}
+            - name: GUARDRAILS_NEMO_URL
+              value: {{ if .Values.guardrails.enabled }}{{ .Values.guardrails.nemoUrl | quote }}{{ else }}""{{ end }}
+            - name: GUARDRAILS_BACKEND
+              value: {{ .Values.guardrails.backend | quote }}
+            - name: GUARDRAILS_CONFIG_ID
+              value: {{ .Values.guardrails.configId | quote }}
+            - name: GUARDRAILS_TIMEOUT_SECONDS
+              value: {{ .Values.guardrails.timeoutSeconds | quote }}
+            - name: GUARDRAILS_MODE_BY_CLASSIFICATION
+              value: {{ .Values.guardrails.modeByClassification | toJson | quote }}
             - name: OPENAI_API_KEY
               valueFrom:
                 secretKeyRef:

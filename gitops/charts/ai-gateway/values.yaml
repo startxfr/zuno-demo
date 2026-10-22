@@ -143,3 +143,29 @@ semanticCache:
 # ADR-0560/0563 (WP-151): namespace of the UnifAI stack whose multi-agent
 # pods may call this gateway. Empty = no UnifAI peer in the NetworkPolicy.
 unifaiNamespace: zuno-unifai
+
+# ADR-0567/WP-153: TrustyAI guardrails evaluated on every
+# /v1/chat/completions exchange. Same detector Services and backend switch
+# agent-runtime's hook uses (gitops/charts/agent-runtime/values.yaml).
+guardrails:
+  # false = hook off. Keep false on a cluster where agent-runtime's own
+  # observe hook is still enabled (double counting of the same exchange);
+  # flip it here, then disable agent-runtime's detectorUrl/nemoUrl, once
+  # the gateway hook is live-proven (WP-153 step 7). WP-156 removes the
+  # agent-runtime hook for good.
+  enabled: false
+  backend: nemo
+  detectorUrl: http://zuno-guardrails-smoke-service.zuno-ai-run.svc:8080
+  nemoUrl: http://zuno-guardrails.zuno-ai-run.svc:80
+  configId: zuno-observe
+  timeoutSeconds: "10"
+  # off | observe | block, per DECLARED data classification
+  # (X-Zuno-Data-Classification). observe = evaluate after the response,
+  # never alter it; block = refuse a flagged prompt/reply with HTTP 400 (a
+  # streamed reply is observed, not blocked). Every class ships observe:
+  # switching one to block is a values change, decided on evidence
+  # (ADR-0534). An unlisted class is observe.
+  modeByClassification:
+    C1: observe
+    C2: observe
+    C3: observe

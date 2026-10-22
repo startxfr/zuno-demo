@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from app import quota, routing_decisions, semantic_cache
+from app import guardrails, quota, routing_decisions, semantic_cache
 from app.auth import CallerIdentity, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
 from app.image_routing import ImageRoutingError, ImageRoutingTable
@@ -224,6 +224,59 @@ def _estimate_prompt_tokens(messages: List[Any], tools: Optional[List[Dict[str, 
     return total_chars // _CHARS_PER_TOKEN + 1
 
 
+def _last_user_text(messages: List[ChatMessage]) -> str:
+    """The prompt guardrails evaluate: the last user message only - never the
+    system prompt, retrieved bodies or tool results (ADR-0567)."""
+    for m in reversed(messages):
+        if m.role == "user":
+            return m.content or ""
+    return ""
+
+
+async def _observed_stream(
+    stream: AsyncIterator[str], *, prompt: str, agent: str, run_id: Optional[str], project_id: Optional[str],
+) -> AsyncIterator[str]:
+    """Pass the SSE stream through untouched and, once it ends, hand the
+    accumulated reply to the fire-and-forget observer. Nothing is held back:
+    in a stream the reply is observed, never blocked (ADR-0567)."""
+    reply: List[str] = []
+    try:
+        async for chunk in stream:
+            if chunk.startswith("data: ") and not chunk.startswith("data: [DONE]"):
+                try:
+                    delta = json.loads(chunk[6:])["choices"][0]["delta"]
+                    reply.append(delta.get("content") or "")
+                except (ValueError, KeyError, IndexError, TypeError):
+                    pass
+            yield chunk
+    finally:
+        guardrails.observe_exchange(
+            message=prompt, reply="".join(reply), agent=agent or "unknown",
+            run_id=run_id or "", project_id=project_id,
+        )
+
+
+async def _guardrails_refusal(
+    stage: str, detections: List[Dict[str, Any]], *, request_id: str, classification: str,
+) -> JSONResponse:
+    """400 for a blocked exchange, recorded in the routing-decisions store so
+    the caller's routing panel shows why nothing was served."""
+    await routing_decisions.set_routing_decision(
+        request_id,
+        {
+            "provider": None,
+            "model": None,
+            "kind": None,
+            "classification": classification,
+            "blocked_by": "guardrails",
+            "guardrails_stage": stage,
+            "fallback_used": False,
+            "fallback_from": None,
+        },
+    )
+    return JSONResponse(guardrails.refusal_body(stage, detections), status_code=400)
+
+
 @app.post("/v1/chat/completions")
 async def chat_completions(
     payload: ChatCompletionRequest,
@@ -326,18 +379,38 @@ async def chat_completions(
 
     messages = _to_langchain_messages(payload.messages)
 
+    # ADR-0567 (WP-153): guardrails mode follows the DECLARED classification.
+    # It is the same value routing uses, so a caller cannot get a laxer
+    # guardrails mode than the routing it is subject to.
+    gr_mode = guardrails.mode_for(classification)
+    gr_prompt = _last_user_text(payload.messages) if gr_mode != "off" else ""
+    if gr_mode == "block":
+        found = await guardrails.evaluate(
+            [gr_prompt], agent=x_zuno_agent or "unknown", run_id=x_zuno_run_id.strip(),
+            project_id=project_id, mode="block",
+        )
+        if found:
+            return await _guardrails_refusal(
+                "prompt", found, request_id=request_id, classification=classification,
+            )
+
     if payload.stream:
+        stream = _stream_completion(
+            candidates, classification, messages, request_id, adapter_decl,
+            identity=identity, tools=payload.tools, agent=x_zuno_agent, run_id=run_id,
+            project_id=project_id, quota_class=quota_class, max_tokens=max_tokens,
+        )
+        if gr_mode != "off":
+            stream = _observed_stream(
+                stream, prompt=gr_prompt, agent=x_zuno_agent, run_id=run_id, project_id=project_id,
+            )
         return StreamingResponse(
-            _stream_completion(
-                candidates, classification, messages, request_id, adapter_decl,
-                identity=identity, tools=payload.tools, agent=x_zuno_agent, run_id=run_id,
-                project_id=project_id, quota_class=quota_class, max_tokens=max_tokens,
-            ),
+            stream,
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    return await _invoke_with_fallback(
+    result = await _invoke_with_fallback(
         candidates,
         classification,
         messages,
@@ -357,6 +430,24 @@ async def chat_completions(
         run_id=run_id,
         max_tokens=max_tokens,
     )
+    if gr_mode == "off":
+        return result
+    reply = result.choices[0].message.content or ""
+    if gr_mode == "block":
+        found = await guardrails.evaluate(
+            [reply], agent=x_zuno_agent or "unknown", run_id=x_zuno_run_id.strip(),
+            project_id=project_id, mode="block",
+        )
+        if found:
+            return await _guardrails_refusal(
+                "reply", found, request_id=request_id, classification=classification,
+            )
+        return result
+    guardrails.observe_exchange(
+        message=gr_prompt, reply=reply, agent=x_zuno_agent or "unknown",
+        run_id=x_zuno_run_id.strip(), project_id=project_id,
+    )
+    return result
 
 
 @app.get("/v1/routing-decisions/{request_id}")
