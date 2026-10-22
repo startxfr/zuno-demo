@@ -99,56 +99,59 @@ _TRACE_ID = "0af7651916cd43dd8448eb211c80319c"
 _TRACEPARENT = f"00-{_TRACE_ID}-b7ad6b7169203331-01"
 
 
-class _FakeRequest:
-    def __init__(self, headers):
-        self.headers = headers
+def _span_via_http(headers):
+    """Drive the real dependency through FastAPI, the way the gateway does.
 
+    A plain `def` dependency runs in a worker thread on a copy of the context,
+    so the ContextVar it sets would never reach the handler (found live on
+    2026-10-22); only a request through FastAPI proves the propagation.
+    """
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
 
-def _adopt(headers) -> None:
-    telemetry.adopt_incoming_trace_context(_FakeRequest(headers))
+    api = FastAPI()
+
+    @api.post("/probe", dependencies=[Depends(telemetry.adopt_incoming_trace_context)])
+    async def probe():
+        with telemetry.model_call_span("local", "qwen3.5-9b", "C2", run_id="run-1"):
+            return {"ok": True}
+
+    def _run():
+        assert TestClient(api).post("/probe", headers=headers).status_code == 200
+
+    return _recorded_span(_run)
 
 
 def test_model_call_span_joins_the_callers_trace() -> None:
-    def _run():
-        _adopt({"traceparent": _TRACEPARENT})
-        with telemetry.model_call_span("local", "qwen3.5-9b", "C2", run_id="run-1"):
-            pass
-
-    span = _recorded_span(_run)
+    span = _span_via_http({"traceparent": _TRACEPARENT})
     assert format(span.context.trace_id, "032x") == _TRACE_ID
     assert format(span.parent.span_id, "016x") == "b7ad6b7169203331"
 
 
 def test_streaming_path_joins_the_callers_trace() -> None:
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
     candidates = [ProviderCandidate(name="local", kind="local")]
+    api = FastAPI()
 
-    async def _go():
-        _adopt({"traceparent": _TRACEPARENT})
+    @api.post("/probe", dependencies=[Depends(telemetry.adopt_incoming_trace_context)])
+    async def probe():
         await _fake_stream(candidates, "req-1", None)
+        return {"ok": True}
 
-    span = _recorded_span(lambda: asyncio.run(_go()))
+    span = _recorded_span(lambda: TestClient(api).post("/probe", headers={"traceparent": _TRACEPARENT}))
     assert format(span.context.trace_id, "032x") == _TRACE_ID
 
 
 def test_without_traceparent_the_span_is_its_own_root() -> None:
-    def _run():
-        _adopt({})
-        with telemetry.model_call_span("local", "qwen3.5-9b", "C2"):
-            pass
-
-    span = _recorded_span(_run)
+    span = _span_via_http({})
     assert span.parent is None
     assert format(span.context.trace_id, "032x") != _TRACE_ID
 
 
 def test_a_malformed_traceparent_is_ignored() -> None:
-    def _run():
-        _adopt({"traceparent": "00-not-a-trace-id-01"})
-        with telemetry.model_call_span("local", "qwen3.5-9b", "C2"):
-            pass
-
-    span = _recorded_span(_run)
-    assert span.parent is None
+    assert _span_via_http({"traceparent": "00-not-a-trace-id-01"}).parent is None
 
 
 TESTS = [
