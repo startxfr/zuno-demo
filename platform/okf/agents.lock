@@ -1,0 +1,5 @@
+# The zuno-demo-agents release this platform runs (ADR-0580). The only
+# file that names an agents version; change it through a promotion PR
+# (.github/workflows/okf-promote.yml) or `make d3 admit agents
+# RELEASE=vX.Y.Z UPDATE_LOCK=1`, never by hand.
+# No release admitted yet: the first one is v0.1.1.

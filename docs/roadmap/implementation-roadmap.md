@@ -943,7 +943,7 @@ frozen mirror.
 |---|---|---|---|---|---|
 | WP-158 | [wp-158](work-packages/wp-158-bootstrap-the-zuno-demo-agents-repository.md) | 0576 | none | Repo work in review | local repository ready, not pushed; user creates the GitHub App, rulesets, quay.io repositories and robot |
 | WP-159 | [wp-159](work-packages/wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md) | 0577, 0578 | WP-158 | Repo work in review | workflows built and simulated locally; user sets the secrets and variables, then a first release |
-| WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Not started | none until a live check |
+| WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Repo work in review | tooling built and proven on devel artifacts; first promotion waits for v0.1.1; allow Actions to create PRs on zuno-demo |
 | WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Not started | demo333 must be powered on for the live steps |
 | WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Not started | operator release; demo333 live check |
 | WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Not started | none until a live check |

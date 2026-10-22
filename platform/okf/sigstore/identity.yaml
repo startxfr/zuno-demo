@@ -1,0 +1,23 @@
+# Who may sign the OKF releases this platform admits (ADR-0578, as amended
+# on 2026-10-22). Read by platform/supply-chain/admit_okf_bundle.py; the
+# only place these identities are written in zuno-demo.
+
+# GitHub Actions' OIDC issuer: the agents repository signs keyless from CI.
+issuer: https://token.actions.githubusercontent.com
+
+# A release: the publish workflow of startxfr/zuno-demo-agents, run on a
+# vX.Y.Z tag. publish.yml is the only workflow there that signs releases.
+release_subject_regexp: '^https://github\.com/startxfr/zuno-demo-agents/\.github/workflows/publish\.yml@refs/tags/v'
+
+# Dev artifacts (devel-<sha>, main-<sha>): accepted only with --dev, for
+# tests; never for platform/okf/agents.lock.
+dev_subject_regexp: '^https://github\.com/startxfr/zuno-demo-agents/\.github/workflows/publish-dev\.yml@refs/heads/(devel|main)$'
+
+# The attestation every release artifact carries (publish.yml).
+contract_tests_predicate: https://zuno.startx.fr/okf/contract-tests/v1
+
+# Where releases live, and the transparency/CT logs of trusted_root.json the
+# signatures are checked against (cosign 2.x signs into these).
+corp_repository: quay.io/zuno/okf-corp
+rekor_url: https://rekor.sigstore.dev
+ctlog_url: https://ctfe.sigstore.dev/2022

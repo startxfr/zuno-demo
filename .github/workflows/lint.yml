@@ -202,6 +202,9 @@ jobs:
       - name: supply-chain publish_okf_bundle.py tests (ADR-0564)
         working-directory: platform/supply-chain
         run: python3 tests/test_publish_okf_bundle.py
+      - name: supply-chain admit_okf_bundle.py tests (ADR-0580)
+        working-directory: platform/supply-chain
+        run: python3 tests/test_admit_okf_bundle.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence
         run: |
@@ -357,3 +360,29 @@ jobs:
           for playbook in ansible/playbooks/*.yml; do
             ansible-playbook -i ansible/inventories/demo/hosts.yml "$playbook" --syntax-check
           done
+
+  # ADR-0580/WP-160: the agents release this platform pins is re-verified on
+  # every change, offline against the committed Sigstore trust root, and
+  # checked servable against this tree's bindings - so neither a hand-edited
+  # lock nor a binding removed from under a released agent can merge.
+  okf-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - uses: oras-project/setup-oras@v1
+        with:
+          version: 1.2.2
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
+      - name: Verify and validate the locked agents release
+        run: |
+          if ! grep -q '^[^#]' platform/okf/agents.lock; then
+            echo "::notice::platform/okf/agents.lock pins no release yet"
+            exit 0
+          fi
+          python3 platform/supply-chain/admit_okf_bundle.py admit
