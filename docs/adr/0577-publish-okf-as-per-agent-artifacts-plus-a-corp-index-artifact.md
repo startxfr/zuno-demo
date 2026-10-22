@@ -74,6 +74,29 @@ ceilings, the verify-then-parse order, the shapes and the OKF-to-UnifAI
 mapping (clauses 2 to 7) stand; the operator reads `v2` and, during the
 transition, `v1`.
 
+## Amendment (2026-10-22) - tags, dev channels and annotations, as built
+
+Corrected while `Accepted`, before the first release, by the user's choices
+for the release chain. Clauses 1, 2, 4 and 6 stand.
+
+- **Clause 3, grains.** There is one release grain: a merge to `main` of
+  the agents repository releases `v<VERSION>`. Agents carry independent
+  versions (`agents/<name>/VERSION`); a release tags `<agent>-v<version>`
+  only for agent versions not released before, and an agent whose files did
+  not change keeps its digest. Tags `<agent>-v*` mark versions, they do not
+  start a publication.
+- **Dev channels.** Every push to `devel` or `main` also publishes, in the
+  same repositories, tags `devel-<sha12>` and `main-<sha12>`. They are
+  signed by another workflow identity than releases (ADR-0578 amendment),
+  so they can be run on a dev cluster but never admitted as a release.
+- **Clause 1, annotations.** An agent manifest's
+  `org.opencontainers.image.revision` and `org.opencontainers.image.created`
+  are those of the last commit touching that agent, not of the release, and
+  it carries `org.opencontainers.image.version` (the agent version). This is
+  what keeps an unchanged agent's manifest digest stable across releases.
+  The corp manifest carries the release commit, `zuno.okf.release` and
+  `zuno.okf.channel`.
+
 ## Consequences
 
 The platform admits one coherent release instead of n independent agents,

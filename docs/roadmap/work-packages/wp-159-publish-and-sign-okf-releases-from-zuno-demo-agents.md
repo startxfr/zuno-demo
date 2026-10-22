@@ -1,6 +1,6 @@
 # WP-159: Publish and sign OKF releases from zuno-demo-agents
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0577](../../adr/0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md), [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md)
 - **Depends on:** [WP-158](wp-158-bootstrap-the-zuno-demo-agents-repository.md)
 - **Related:** [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md), [WP-150](wp-150-unifai-operator-okf-agent-bundles.md), [WP-160](wp-160-admit-the-corp-okf-release-in-zuno-demo.md)
@@ -9,6 +9,15 @@
 
 > A tag is a release. Nothing is published from a branch, and nothing
 > deployable exists without a corp artifact.
+
+## Progress (2026-10-22)
+
+Built in `zuno-demo-agents` with the user's choices (ADR-0577 and ADR-0578
+amendments): a merge to `main` is a release (`release.yml`: main into
+stable, changelog, immutable tag commit), `publish.yml` publishes on `v*`,
+`publish-dev.yml` and `run-dev.yml` cover `devel`/`main`. No
+`repository_dispatch` (ADR-0580 amendment). Tested locally against an OCI
+layout; nothing pushed to quay.io yet. Steps 3-4 wait for the secrets.
 
 ## Goal
 

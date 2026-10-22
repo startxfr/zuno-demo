@@ -86,6 +86,24 @@ as a verified OCI artifact pulled by each consumer, not as an
 operator-rendered ConfigMap. It also takes over, for the pin, the role ADR-0507
 gave `platform/okf/zuno-okf.ref` (ADR-0507 is superseded by ADR-0576).
 
+## Amendment (2026-10-22) - the platform pulls, the agents repository never calls
+
+Corrected while `Accepted`, before implementation, after the user made the
+two life cycles independent: the agents repository must not know
+`zuno-demo`. Clauses 1, 3, 4, 5 and 6 stand.
+
+- **Clause 2, promotion, no longer starts from the agents repository.**
+  There is no `repository_dispatch` and no token of `zuno-demo` in the
+  agents repository. `okf-promote.yml` in `zuno-demo` starts on a schedule
+  and on demand (a release tag as input): it lists the `v*` tags of
+  `okf-corp`, and for a release newer than the lock runs steps 1 to 5
+  unchanged. The platform decides when it looks, and a release nobody
+  promotes changes nothing.
+- **Clause 3, admission,** also checks that every model name of the
+  release's `policies/models/model-catalog.yaml` that its agents may reach
+  is bound in `platform/ai-gateway/provider-routing.yaml` (ADR-0576
+  amendment).
+
 ## Consequences
 
 A prompt edit reaches the cluster without any image rebuild: tag in

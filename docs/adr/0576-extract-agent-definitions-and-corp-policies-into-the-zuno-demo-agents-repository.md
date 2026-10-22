@@ -100,6 +100,43 @@ ownership), ADR-0507 (a pinned git reference becomes a pinned OCI digest,
 ADR-0580) and ADR-0510 (a git-polling operator becomes digest promotion by
 pull request, ADR-0580).
 
+## Amendment (2026-10-22) - independent life cycles, as bootstrapped
+
+Corrected while `Accepted`, the same day, before any consumer exists, after
+the user set the boundary between the two repositories: the agents
+repository has its own life cycle and knows nothing about `zuno-demo`; the
+only link is that `zuno-demo` consumes a release. Every other clause stands.
+
+- **Clause 4, the boundary contract, is reversed.** The agents repository
+  defines its own vocabulary in its corp policies; it no longer validates
+  against a `platform-contract.json` exported by `zuno-demo`. The model
+  vocabulary becomes a corp policy, `policies/models/model-catalog.yaml`:
+  logical model names with `kind`, `model`, `role` and `eligible_for`,
+  seeded from `platform/ai-gateway/provider-routing.yaml` without endpoints
+  or credentials; `model-routing-policy.yaml` prefers those names and the
+  authorization matrices are generated from them. `zuno-demo` keeps the
+  last word at admission (ADR-0580 clause 3): it refuses a release naming a
+  model, tool capability or knowledge domain it cannot serve, which is the
+  same check `platform/bindings/` already gives tools.
+- **Clause 1, moved content.** The Vault Transit scripts
+  (`sign_okf_bundle.py`, `publish_okf_bundle.py`) were not carried over:
+  releases are signed keyless (ADR-0578). The release tooling is new,
+  `platform/release/okf_release.py`.
+- **Versions.** `VERSION` is the release version and
+  `agents/<name>/VERSION` each agent's own version, both bumped by hand on
+  `devel`. The per-agent version is a file, not a `zuno.version` key: the
+  OKF schemas, and the copies `unifai-operator` embeds, refuse unknown
+  `zuno` keys, so a new key would invalidate every live bundle.
+- **Branches.** `devel` (direct push), `main` (pull requests from `devel`
+  only; every merge is a release), `stable` and the release tags (written
+  only by the release GitHub App, never moved). The repository's
+  `RELEASING.md` is the reference.
+- **Bootstrap record.** Extracted on 2026-10-22 from `demo222` at
+  `9b5507c6`, 120 commits of history kept, into
+  `/home/cl/ClaudeCode/zuno-demo-agents` (WP-158). The extraction also
+  regenerated the authorization matrices, which in `zuno-demo` had not
+  picked up the `ocp-ai-ops` group `tool-policy.yaml` already allowed.
+
 ## Consequences
 
 Agent owners change agents without touching the platform repository, and the

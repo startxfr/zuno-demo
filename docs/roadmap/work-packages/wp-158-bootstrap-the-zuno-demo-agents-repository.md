@@ -1,6 +1,6 @@
 # WP-158: Bootstrap the zuno-demo-agents repository
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md)
 - **Depends on:** none
 - **Related:** [ADR-0504](../../adr/0504-define-the-agent-tests-directory-structure-and-promotion-gate.md), [ADR-0513](../../adr/0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md), [WP-159](wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md), [WP-165](wp-165-cut-over-and-remove-agents-from-zuno-demo.md)
@@ -10,6 +10,19 @@
 > Mirror first, cut over last. From this WP's merge until WP-165,
 > `zuno-demo-agents` is where agents are edited and `zuno-demo`'s copy is a
 > frozen mirror checked by CI. Never edit the same content in both.
+
+## Progress (2026-10-22)
+
+Done locally, not pushed, in `/home/cl/ClaudeCode/zuno-demo-agents` (branches
+`main` and `devel`): history-preserving extraction from `demo222` at
+`9b5507c6` (120 commits), then four commits making it self-contained
+(model catalog instead of `provider-routing.yaml`, ADR-0576 amendment),
+adding the release tooling, the workflows and the docs. Every check passes
+locally, gitleaks finds nothing in the history, and the release chain was
+simulated against a bare remote for two successive releases. Step 2
+(contract export) is dropped by the ADR-0576 amendment; step 6 (frozen
+mirror) remains. Open: the push, then the user's GitHub App, rulesets,
+quay.io repositories and robot (the repository's `RELEASING.md`, Setup).
 
 ## Goal
 

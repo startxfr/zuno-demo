@@ -10,6 +10,14 @@
 > The lock is the only place an agents version is named. Everything else
 > reads it.
 
+## Note (2026-10-22)
+
+ADR-0580 is amended: `okf-promote.yml` polls the `okf-corp` release tags on
+a schedule and on demand instead of reacting to a dispatch, and admission
+also checks that every reachable model name of the release's model catalog
+is bound in `provider-routing.yaml`. Step 1 drops `identity.yaml`'s
+dependency on a dispatch; the rest stands.
+
 ## Goal
 
 `zuno-demo` pins one corp digest, verifies it offline by identity, validates

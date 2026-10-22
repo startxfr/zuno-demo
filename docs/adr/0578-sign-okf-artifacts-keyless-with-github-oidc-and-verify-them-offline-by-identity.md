@@ -86,6 +86,28 @@ required; there is still no "skip".
 the in-cluster-only posture of ADR-0420 and ADR-0535, for the OKF supply
 chain only. Container images keep RHTAS (ADR-0535).
 
+## Amendment (2026-10-22) - identities and attestations, as built
+
+Corrected while `Accepted`, before the first release. Clauses 1, 4, 5, 6
+and 7 stand.
+
+- **Clause 2, revision check.** The certificate commit is compared with the
+  corp artifact's `org.opencontainers.image.revision` only. An agent
+  artifact's revision is the last commit touching that agent (ADR-0577
+  amendment), so it legitimately differs from the release commit; the agent
+  is bound to the release through the signed corp index instead.
+- **Dev artifacts** are signed keyless by `publish-dev.yml` on
+  `refs/heads/devel` or `refs/heads/main`. That identity never matches
+  clause 2's release subject, and the dev cluster run verifies exactly it.
+- **Clause 3, attestations.** Every artifact carries the
+  `https://zuno.startx.fr/okf/contract-tests/v1` attestation. SLSA build
+  provenance is produced by `actions/attest-build-provenance` for the corp
+  artifact, the release unit, and pushed to the registry.
+- **Trust root.** Release tags are created only by the release GitHub App
+  (`zuno-release-bot`), enforced by a tag ruleset on `v*` and `*-v*` that
+  also forbids moving or deleting them; `stable` likewise. This replaces
+  "maintainers only" in the security considerations.
+
 ## Consequences
 
 The signature now proves origin (this repository, this workflow, this tag,
