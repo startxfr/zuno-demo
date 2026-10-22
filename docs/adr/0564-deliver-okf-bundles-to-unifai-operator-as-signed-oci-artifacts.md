@@ -1,6 +1,6 @@
 # ADR-0564: Deliver OKF bundles to unifai-operator as signed OCI artifacts
 
-- **Status:** Accepted
+- **Status:** Superseded in part by ADR-0577 and ADR-0578 (2026-10-22) - clause 1 (artifact layout, and the Transit content-digest signature of its 2026-10-17 amendment) and the key-only `spec.verify` of clause 2 are replaced; the `UnifaiAgentBundle` kind, ceilings, verify-then-parse order, shapes, OKF-to-UnifAI mapping and digest-bump cadence stand.
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team

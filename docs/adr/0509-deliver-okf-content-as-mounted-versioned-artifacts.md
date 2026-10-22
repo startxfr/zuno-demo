@@ -1,6 +1,6 @@
 # ADR-0509: Deliver OKF content as mounted versioned artifacts
 
-- **Status:** Proposed
+- **Status:** Superseded by ADR-0580 (2026-10-22) - never implemented; components pull and verify the admitted OCI release themselves instead of mounting operator-rendered artifacts. Anticipates the supersession ADR-0564 had planned for the WP-156 cutover.
 - **Target:** v0.10 (retargeted from v0.7 on 2026-09-05 — see ADR-0506's note. Previously retargeted from OKF v0.3 on 2026-08-30 — see ADR-0506's note)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team

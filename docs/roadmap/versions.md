@@ -216,7 +216,11 @@ artifacts, and the AIAgent operator watches `zuno-okf` to reconcile running
 agents within CR-declared boundaries. Gated on an owner-created `zuno-okf`
 repository that does not yet exist.
 
-**5 ADRs, all `Proposed`.** Open: ADR-0506 – ADR-0510; WP-48 – WP-53.
+Overtaken on 2026-10-22 by v0.12: ADR-0506, ADR-0507, ADR-0509 and ADR-0510
+are superseded without having started, and their work packages are
+abandoned. Only ADR-0508 (adaptation hooks) remains.
+
+**5 ADRs: 1 `Proposed`, 4 superseded.** Open: ADR-0508; WP-51.
 
 ## v0.11
 
@@ -229,7 +233,23 @@ of truth, delivered to the operator as signed OCI artifacts; the ai-gateway
 stays the model policy router and is slimmed onto MaaS. Piloted on demo333
 with tekos; demo222 cuts over only after full validation.
 
-**16 ADRs, all `Accepted`.** Open: ADR-0560 – ADR-0575; WP-146 – WP-157.
+**16 ADRs: 15 `Accepted`, ADR-0564 superseded in part by ADR-0577 and
+ADR-0578.** Open: ADR-0560 – ADR-0563, ADR-0565 – ADR-0575; WP-146 – WP-157.
+
+## v0.12
+
+Agent definitions leave `zuno-demo`. Agent bundles and the corp policies that
+bound them (tools, knowledge, quotas, model routing, guardrails) move to the
+public `startxfr/zuno-demo-agents` repository, whose release workflow
+publishes one OCI artifact per agent plus a corp index to quay.io, signed
+keyless with GitHub OIDC. OKF grows to v0.3 (skills, model roles, guardrail
+modes, per-agent limits), always narrowing the corp policies. `zuno-demo`
+pins a single corp digest, promoted by a pull request it opens itself,
+verifies it offline by identity, fetches agent content at pod start instead
+of baking it into images, and generates Keycloak groups, MaaS subscriptions,
+Kuadrant policies, ai-gateway inputs and UnifAI bundles from the release.
+
+**6 ADRs, all `Accepted`.** Open: ADR-0576 – ADR-0581; WP-158 – WP-165.
 
 ## OKF stream
 

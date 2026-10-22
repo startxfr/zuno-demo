@@ -1,6 +1,6 @@
 # ADR-0507: Consume the zuno-okf repository through a single pinned reference
 
-- **Status:** Proposed
+- **Status:** Superseded by ADR-0576 (2026-10-22) - never implemented; the single pinned git reference becomes the single pinned corp OCI digest of ADR-0580, and `okfBundleRef` leaves with the AIAgent operator (ADR-0561).
 - **Target:** v0.10 (retargeted from v0.7 on 2026-09-05 — see ADR-0506's note. Previously retargeted from OKF v0.2 on 2026-08-30 — see ADR-0506's note)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
