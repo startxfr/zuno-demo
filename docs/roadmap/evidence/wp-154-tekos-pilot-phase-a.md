@@ -135,10 +135,28 @@ of the workspace (fork `fix/rag-team-workspace-groups`, `a66f9a302`, 194 RAG uni
 tests pass). Operator 0.1.23 sets the identity Service URL itself, so the chart's
 workaround is off by default.
 
+### Evaluation with the GPUs back and the RAG sources (same evening)
+
+Images: multi-agent `devel-0190df466` (adds a final answer when an agent runs out of
+rounds), rag `devel-66f5bdc7a` (team-workspace groups), the rest `devel-e25e40beb`.
+
+| | Result |
+|---|---|
+| Scenarios | 16 / 17 (94%), 3 skipped. Scenario 11 now runs through UnifAI: the answer goes through the retriever and names the page. |
+| Failing scenario | 8, first token in 38.6 s (limit 6 s): the local models were cold right after the GPUs came back. Re-measure once warm. |
+| Security checks | 12 / 12, including `ai_gateway_local_only_forces_local_provider`, which needs a local model |
+
+Two questions about the Satellite procedures, in the pilot team workspace:
+
+| Persona | Question about page "S0R42 : Schedule Satellite" | Result |
+|---|---|---|
+| consultant-01 (Satellite groups) | what does it describe, name the page | answered in 16-18 s from the internal page, naming it (retriever then answer) |
+| consultant-03 (no Satellite group) | same | no content for him (ACL), the agent searches, then explains that it could not read the page, instead of returning nothing |
+
 ## Not yet covered
 
-C3 local-only routing, RAG answers with citations and the second-pass
-idempotence, the Qdrant and Mongo restore drill, scenario 8 on healthy local
-models, the quota 429 in the UI and the routing badge (WP-148 UI), the
-guardrails counter (WP-153, hook still disabled), the Playwright screenshot of
-the tekos chat.
+Scenario 8 on warm local models, the C3 local-only routing end to end, the
+Qdrant and Mongo restore drill, the quota 429 and the routing badge in the UI
+(WP-148), the guardrails counter (WP-153, hook still disabled in the chart), the
+Playwright screenshot of the tekos chat, and the real-key bundle publication
+(waiting for the zuno-demo-agents repository, WP-158).

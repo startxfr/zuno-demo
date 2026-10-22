@@ -993,8 +993,30 @@ def u_chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], want in tools, f"expected={want} tool_calls={tools}")
 
 
+# A page of the tekos RAG sources (space SXSI, tree "Technologie : Satellite"), and what it
+# is called; the answer must name it. Override for another corpus.
+_UNIFAI_RAG_QUESTION = os.getenv(
+    "UNIFAI_RAG_QUESTION",
+    "What does the internal procedure S0R42 'Schedule Satellite' describe? "
+    "Answer from the internal documentation and name the page.",
+)
+_UNIFAI_RAG_EXPECT = os.getenv("UNIFAI_RAG_EXPECT", "S0R42")
+
+
 def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
-    return _skip(s, "UnifAI RAG source not deployed yet (WP-149 phase B, needs the GPU embedding service)")
+    """The RAG scenario through UnifAI: a member of the source's groups gets an answer that
+    went through the retriever and names the page. The agent-runtime scenario queries the
+    rag-service directly; here the whole path (retriever, forwarded token, ACL) is exercised."""
+    tools: List[str] = []
+    reply = ""
+    for chunk in _unifai().stream("consultant-01", _UNIFAI_RAG_QUESTION, timeout=170):
+        if chunk.get("type") == "tool_calling" and chunk.get("tool"):
+            tools.append(chunk["tool"])
+        state = chunk.get("state")
+        if chunk.get("type") == "complete" and isinstance(state, dict) and state.get("output"):
+            reply = state["output"]
+    ok = any("retriever" in t for t in tools) and _UNIFAI_RAG_EXPECT in reply
+    return ScenarioResult(s["id"], s["title"], ok, f"tool_calls={tools} names_page={_UNIFAI_RAG_EXPECT in reply}")
 
 
 def u_agent_isolation(s: Dict[str, Any]) -> ScenarioResult:

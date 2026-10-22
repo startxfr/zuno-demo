@@ -82,7 +82,8 @@ Keycloak) run unchanged.
 | 5 tile disabled | no workflows listed for a non-member **and** the MCP gateway refuses the agent (403) |
 | 2, 16 login required | an anonymous API call gets 401 |
 | 7-10 chat | session create + streamed execute (`llm_token`, `tool_calling`, `complete` events) |
-| 6, 11, 17, 19 | reported as skipped, not counted: no placeholder tiles, RAG source not deployed yet, no bearer-token API, in-cluster-only check |
+| 11 RAG citation | a member of the source's groups asks about a known page; the answer must come through the retriever and name the page (`UNIFAI_RAG_QUESTION`, `UNIFAI_RAG_EXPECT`) |
+| 6, 17, 19 | reported as skipped, not counted: no placeholder tiles, no bearer-token API, in-cluster-only check |
 
 `security_checks.py --target unifai` swaps four checks for their UnifAI
 equivalents and runs the shared-service checks unchanged:
