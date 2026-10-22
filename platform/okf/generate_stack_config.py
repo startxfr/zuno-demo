@@ -11,6 +11,8 @@ which the deployment reads instead of hand-copied values:
     agents.<name>     version, artifact reference, classification, groups,
                       and the unions of the tasks' tools and knowledge
                       domains (what per-agent charts used to hand-copy)
+    unifai.verify     spec.verify.keyless of every bundle (WP-162): issuer and
+                      release subject, from platform/okf/sigstore/identity.yaml
     unifai.bundles    one UnifaiAgentBundle source + ceilings per agent,
                       pinned by digest (ADR-0564); platform-owned settings
                       (team, entitlement mode, overrides) stay in the
@@ -49,10 +51,17 @@ HEADER = (
 )
 
 
+def verify_keyless() -> dict:
+    """spec.verify.keyless of every UnifaiAgentBundle (WP-162), from the one
+    place zuno-demo names the signing identities (platform/okf/sigstore/identity.yaml)."""
+    ident = admit.identity()
+    return {"issuer": ident["issuer"], "subjectRegExp": ident["release_subject_regexp"]}
+
+
 def build(release_dir: Optional[pathlib.Path], reference: Optional[str]) -> dict:
     if release_dir is None:
-        return {"release": None, "reference": None,
-                "keycloak": {"groups": []}, "agents": {}, "unifai": {"bundles": []}}
+        return {"release": None, "reference": None, "keycloak": {"groups": []}, "agents": {},
+                "unifai": {"verify": {"keyless": verify_keyless()}, "bundles": []}}
     index = json.loads((release_dir / "okf-index.json").read_text(encoding="utf-8"))
     refs = {a["name"]: a["reference"] for a in index["agents"]}
     agents: Dict[str, dict] = {}
@@ -85,7 +94,7 @@ def build(release_dir: Optional[pathlib.Path], reference: Optional[str]) -> dict
         "reference": reference,
         "keycloak": {"groups": sorted(groups)},
         "agents": agents,
-        "unifai": {"bundles": bundles},
+        "unifai": {"verify": {"keyless": verify_keyless()}, "bundles": bundles},
     }
 
 

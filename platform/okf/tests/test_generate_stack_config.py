@@ -85,6 +85,12 @@ class GenerateTest(unittest.TestCase):
         config = gen.build(None, None)
         self.assertEqual(config["unifai"]["bundles"], [])
         self.assertIsNone(config["release"])
+        self.assertIn("publish", config["unifai"]["verify"]["keyless"]["subjectRegExp"])
+
+    def test_keyless_identity_comes_from_identity_yaml(self) -> None:
+        keyless = gen.build(self.dir, None)["unifai"]["verify"]["keyless"]
+        self.assertEqual(keyless["issuer"], "https://token.actions.githubusercontent.com")
+        self.assertTrue(keyless["subjectRegExp"].endswith("publish\\.yml@refs/tags/v"))
 
 
 if __name__ == "__main__":

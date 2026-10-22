@@ -9,7 +9,17 @@
 
 > Fork-only code (ADR-0575): nothing here leaves `fork/`.
 
-## Goal
+## Note (2026-10-23)
+
+Taken by the session that owns `fork/unifai-operator` (the UnifaiAgentBundle
+files), after its teamRef/UnifaiTeam bundle work; nobody else edits the fork
+meanwhile. The chart takes `spec.verify.keyless` (issuer, subjectRegExp) from
+`unifai.verify.keyless` in `platform/okf/stack-config.generated.yaml`
+(WP-164), itself read from `platform/okf/sigstore/identity.yaml`: the
+identities are written in one place only. Test artifact:
+`quay.io/zuno/okf-tekos@sha256:bf429d3e6173781f10c858ed81a7f7c23073d9b0ba7ddd1044651d3868fcadba`
+(dev-signed); the trusted root is `platform/okf/sigstore/trusted_root.json`.
+
 
 `UnifaiAgentBundle.spec.verify.keyless` verifies an agent artifact by
 issuer and subject against a mounted trusted root, offline, and reads the
