@@ -34,6 +34,29 @@ spec:
       realm: {{ $s.identity.realm }}
       clientId: {{ $s.identity.clientId }}
       clientSecret: {name: unifai-oidc, key: client-secret}
+  {{- with $s.openTelemetry }}
+  {{- if .endpoint }}
+  # ADR-0566 (WP-147): OTLP export of multiagent, RAG and backend (operator >= 0.1.20).
+  openTelemetry:
+    endpoint: {{ .endpoint }}
+    {{- with .protocol }}
+    protocol: {{ . }}
+    {{- end }}
+    {{- with .sampler }}
+    sampler: {{ . }}
+    {{- end }}
+    {{- with .samplerArg }}
+    samplerArg: {{ . | quote }}
+    {{- end }}
+    {{- if .disableMetrics }}
+    disableMetrics: true
+    {{- end }}
+    {{- with .resourceAttributes }}
+    resourceAttributes:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- end }}
   rag:
     embedding:
       mode: remote

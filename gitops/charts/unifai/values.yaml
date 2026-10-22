@@ -12,7 +12,10 @@ operator:
   # when a Subscription for the package already exists (demo333 runs one
   # created by hand, which must not be duplicated).
   install: false
-  catalogImage: quay.io/zuno/unifai-operator-catalog:v0.1.19
+  # The catalog repository only publishes a moving `latest` tag (each release
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.20 as
+  # the stable channel head (checked 2026-10-22).
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:3c7e224ff869c0d65795c1924a03aeb75f67009a11c84828d0e9f0c8e8470f08
   catalogSourceName: unifai-operator-catalog
   channel: stable
   package: unifai-operator
@@ -29,6 +32,15 @@ stack:
   # Usernames of realm zuno (the operator defaults to `admin`, which realm zuno
   # does not have). ai-ops-01 is the AI platform operations persona.
   adminUsers: [ai-ops-01]
+  # OTLP export of the UnifAI services to zuno's collector (ADR-0566). Port
+  # 4318 is HTTP: the SDK default protocol is grpc, so set it explicitly.
+  openTelemetry:
+    endpoint: http://zuno-otel-collector-collector.zuno-monitoring.svc:4318
+    protocol: http/protobuf
+    sampler: parentbased_always_on
+    disableMetrics: false
+    resourceAttributes:
+      deployment.environment: demo
   storageClass: gp3-csi
   sharedStorageClass: nfs
   identity:
