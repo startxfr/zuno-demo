@@ -71,6 +71,37 @@ One Tempo trace (`7d48c3f2...`, root `unifai-multiagent-be mas.session`) now cro
 | `ai-gateway` | 2 `model_call` |
 | `mcp-gateway` | `tool_invoke`, then the MCP calls `initialize`, `tools/list`, `tools/call search_pages` to the Confluence server |
 
+## Same checks on the secured fork build (2026-10-22, later)
+
+zuno-unifai was repinned to images built from the fork's secured `devel`
+(access-control fixes, `INTERNAL_AUTH_SECRET`, `oidc-claims` identity directory),
+held in demo333's internal registry only; the fork is not public while the
+upstream report is pending. Operator 0.1.22 injects the shared secret.
+
+| | before (devel-46b9a60f4) | secured build (devel-ee33a47ca) |
+|---|---|---|
+| Scenarios | 15 / 16 (94%) | 14 / 16 (88%) |
+| Security checks | 11 / 12 | 11 / 12 (same failing check, GPU outage) |
+| Failed scenarios | 8 first token latency | 8 first token latency, 9 streaming: no answer |
+
+Scenario 9 is not a regression of the secured code. Without the RAG corpus and
+with no Confluence page on the topic, the model keeps searching (Confluence,
+then the web) for all 6 rounds and the agent ends with "Agent completed without
+producing output"; three runs: 0, 0 and 43 tokens. The old agent-runtime graph
+answers after one retrieval pass. Two follow-ups: the RAG corpus in phase B, and a
+generic wrap-up in the fork (when `max_rounds` is exhausted, ask the model for a
+final answer instead of returning nothing).
+
+### Defect found on the secured build
+
+The services' identity clients called `IDENTITY_HOST`, the public route. The route
+strips `X-Internal-Auth`, so the secured identity API answered 401 to every team
+lookup; team workspaces became invisible (403) and the tekos agent could not run.
+The same request to the in-cluster Service returned 200. Worked around in the chart
+(`DIRECTORY_SSO_URL` for multi-agent, `IDENTITY_HOST` for rag and backend, set to
+`http://identity:13456`, the bare name the services trust) and fixed in the operator
+by startx-unifai-a9 for 0.1.23.
+
 ## Not yet covered
 
 C3 local-only routing, RAG answers with citations and the second-pass
