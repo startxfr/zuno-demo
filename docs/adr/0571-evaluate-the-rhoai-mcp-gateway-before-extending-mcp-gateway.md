@@ -170,3 +170,16 @@ writing and the user is asked to power it on. Every `oc` command passes
 
 The outcome, with the measured result of each criterion, is recorded in
 WP-152 and in a dated note on this record before either path starts.
+
+## Evaluation outcome (2026-10-22)
+
+The platform gateway is the Red Hat Connectivity Link `mcp-gateway` operator
+v0.7.1 (upstream Kuadrant/mcp-gateway), a Technology Preview on `demo333`. It
+federates MCP servers behind one endpoint, authorizes per tool by JWT claim
+through Kuadrant AuthPolicy and forwards the user's token. It does not carry
+ADR-0011's agent declaration and task rights, which would have to be
+re-implemented as custom policy twice (listing and calling) over an
+unauthenticated header. The user chose path B: `/mcp` applies the full
+intersection to callers that declare an agent, and the platform gateway is
+re-evaluated when it reaches GA. Details and evidence: WP-152.
+
