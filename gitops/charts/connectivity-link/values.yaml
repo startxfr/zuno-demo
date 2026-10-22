@@ -113,6 +113,18 @@ operator:
       source:
         name: ""
         namespace: openshift-marketplace
+      # OLM Subscription config: the CSV default (200m CPU / 300Mi) throttles the
+      # kuadrant controller at startup until its 1s liveness probe fails and it
+      # restarts in a loop (313 restarts seen on demo333, 2026-10-22). Applies
+      # to every Deployment of the rhcl-operator CSV.
+      config:
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: "1"
+            memory: 1Gi
   # rhcl-operator's own CSV/controller already creates this ConsolePlugin
   # (confirmed on a live cluster: labels app.kubernetes.io/managed-by:
   # kuadrant-operator) - declaring it here too is intentional, not a

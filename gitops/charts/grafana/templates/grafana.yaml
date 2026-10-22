@@ -88,6 +88,12 @@ spec:
         insecureEdgeTerminationPolicy: Redirect
   deployment:
     spec:
+      # grafana-data is a ReadWriteOnce volume holding Grafana's search index
+      # lock: with the default RollingUpdate the new pod starts next to the old
+      # one and crash-loops on "index is locked by another process" (seen on
+      # demo333 after the 2026-10-22 restart).
+      strategy:
+        type: Recreate
       template:
         spec:
           serviceAccountName: grafana-oauth-proxy
