@@ -212,8 +212,11 @@ _incoming_trace_context: ContextVar[Optional[otel_context.Context]] = ContextVar
 )
 
 
-def adopt_incoming_trace_context(request: Request) -> None:
+async def adopt_incoming_trace_context(request: Request) -> None:
     """FastAPI dependency: remember the caller's `traceparent`/`tracestate`.
+
+    `async` on purpose: a plain `def` dependency runs in a worker thread on a
+    copy of the context, so the ContextVar it sets would never reach the handler.
 
     Content is never read beyond those two headers. A request without a valid
     `traceparent` leaves the variable empty, which keeps the previous behaviour

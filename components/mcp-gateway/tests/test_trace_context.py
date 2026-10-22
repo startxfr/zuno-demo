@@ -26,21 +26,27 @@ TRACE_ID = "0af7651916cd43dd8448eb211c80319c"
 TRACEPARENT = f"00-{TRACE_ID}-b7ad6b7169203331-01"
 
 
-class _Request:
-    def __init__(self, headers):
-        self.headers = headers
-
-
 def _span(headers):
+    """Drive the real dependency through FastAPI: a plain `def` dependency runs
+    in a worker thread on a copy of the context, so its ContextVar would never
+    reach the handler (found live on 2026-10-22)."""
+    from fastapi import Depends, FastAPI
+    from fastapi.testclient import TestClient
+
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
+    api = FastAPI()
+
+    @api.post("/probe", dependencies=[Depends(telemetry.adopt_incoming_trace_context)])
+    async def probe():
+        with telemetry.tool_invoke_span("confluence.page.search", "C2"):
+            return {"ok": True}
+
     saved = telemetry._tracer
     telemetry._tracer = provider.get_tracer("test")
     try:
-        telemetry.adopt_incoming_trace_context(_Request(headers))
-        with telemetry.tool_invoke_span("confluence.page.search", "C2"):
-            pass
+        assert TestClient(api).post("/probe", headers=headers).status_code == 200
     finally:
         telemetry._tracer = saved
     spans = exporter.get_finished_spans()
