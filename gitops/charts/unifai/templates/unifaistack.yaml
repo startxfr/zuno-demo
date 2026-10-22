@@ -30,6 +30,15 @@ spec:
   {{- $oidc := list (dict "name" "DIRECTORY_PROVIDER" "value" "oidc-claims") (dict "name" "DIRECTORY_OIDC_JWKS_URL" "value" (printf "%s/protocol/openid-connect/certs" $kc)) (dict "name" "DIRECTORY_OIDC_ISSUER" "value" $kc) }}
   {{- $_ := set $extra "identity" (concat $oidc (index $extra "identity" | default list)) }}
   {{- end }}
+  {{- if $s.identity.internalCalls }}
+  {{- /* Service-to-service identity calls must reach the identity Service, not the public route: the route strips X-Internal-Auth, so the secured identity API answers 401 (found live on demo333, 2026-10-22). IDENTITY_HOST stays the public URL for OAuth redirects. */}}
+  {{- $idsvc := printf "http://identity.%s.svc:13456" $.Values.namespace }}
+  {{- $_ := set $extra "multiagent" (concat (list (dict "name" "DIRECTORY_SSO_URL" "value" $idsvc)) (index $extra "multiagent" | default list)) }}
+  {{- $_ := set $extra "multiagentWorker" (concat (list (dict "name" "DIRECTORY_SSO_URL" "value" $idsvc)) (index $extra "multiagentWorker" | default list)) }}
+  {{- range $c := list "rag" "ragCelery" "backend" }}
+  {{- $_ := set $extra $c (concat (list (dict "name" "IDENTITY_HOST" "value" $idsvc)) (index $extra $c | default list)) }}
+  {{- end }}
+  {{- end }}
   {{- if $extra }}
   extraEnv:
     {{- toYaml $extra | nindent 4 }}
