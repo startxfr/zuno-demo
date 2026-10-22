@@ -392,3 +392,9 @@ jobs:
         run: python3 platform/okf/generate_stack_config.py --check
       - name: generate_stack_config.py tests
         run: python3 platform/okf/tests/test_generate_stack_config.py
+      # ADR-0576 clause 6/WP-158: until the cutover, agents are edited in
+      # zuno-demo-agents only; agents/ here must say what the release says.
+      - name: agents/ mirrors the admitted release
+        run: python3 platform/okf/check_agents_mirror.py
+      - name: check_agents_mirror.py tests
+        run: python3 platform/okf/tests/test_check_agents_mirror.py

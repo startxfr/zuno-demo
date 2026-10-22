@@ -20,8 +20,13 @@ Done locally, not pushed, in `/home/cl/ClaudeCode/zuno-demo-agents` (branches
 adding the release tooling, the workflows and the docs. Every check passes
 locally, gitleaks finds nothing in the history, and the release chain was
 simulated against a bare remote for two successive releases. Step 2
-(contract export) is dropped by the ADR-0576 amendment; step 6 (frozen
-mirror) remains. Open: the push, then the user's GitHub App, rulesets,
+(contract export) is dropped by the ADR-0576 amendment. Step 6 (frozen
+mirror) is done on 2026-10-23: `platform/okf/check_agents_mirror.py` compares
+`agents/` with the admitted release (runtime files byte for byte,
+`agent.okf.md` frontmatter only, since its body is the generated matrix) and
+the moved policies; it runs in the `okf-release` job of `lint.yml` and passes
+against v0.1.1. It reports, it never rewrites: agent-runtime verifies a
+Transit signature over every bundle file, so a sync needs `make d3 sign agents`. Open: the push, then the user's GitHub App, rulesets,
 quay.io repositories and robot (the repository's `RELEASING.md`, Setup).
 
 ## Goal
