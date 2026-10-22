@@ -25,7 +25,7 @@ from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
 from app.policy import PolicyDecision, PolicyStore, evaluate, evaluate_without_declaration
 from app import mcp_frontdoor
-from app.telemetry import init_telemetry, tool_invoke_span
+from app.telemetry import adopt_incoming_trace_context, init_telemetry, tool_invoke_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("mcp_gateway")
@@ -311,7 +311,7 @@ async def _authorize_and_invoke(
         }
 
 
-@app.post("/v1/tools/{tool_name}/invoke")
+@app.post("/v1/tools/{tool_name}/invoke", dependencies=[Depends(adopt_incoming_trace_context)])
 async def invoke_tool(
     tool_name: str,
     request: Request,
@@ -403,7 +403,7 @@ def _agent_surface(
 # that trades away. ADR-0571: a caller that DOES declare an agent (UnifAI,
 # Keycloak JWT + X-Zuno-Agent/X-Zuno-Task) gets all five factors instead,
 # through _agent_surface() above.
-@app.post("/mcp")
+@app.post("/mcp", dependencies=[Depends(adopt_incoming_trace_context)])
 async def mcp_frontdoor_endpoint(
     request: Request,
     identity: CallerIdentity = Depends(validate_token_or_kubernetes),

@@ -15,11 +15,15 @@ import logging
 import os
 import time
 from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Iterator, Optional
 
+from fastapi import Request
+from opentelemetry import context as otel_context
 from opentelemetry import metrics, trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
+from opentelemetry.propagate import extract
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
@@ -68,6 +72,29 @@ def init_telemetry(service_name: str = "mcp-gateway") -> None:
     logger.info("telemetry initialized: service=%s otlp_endpoint=%s", service_name, OTEL_ENDPOINT)
 
 
+# ADR-0566 (WP-147): the W3C trace context an agent platform (UnifAI) sent with
+# the request, so `tool_invoke` joins the caller's trace instead of starting a
+# new root. A ContextVar because the span is opened several frames below the
+# handler, shared by the REST contract and the /mcp front-door.
+_incoming_trace_context: ContextVar[Optional[otel_context.Context]] = ContextVar(
+    "zuno_incoming_trace_context", default=None
+)
+
+
+def adopt_incoming_trace_context(request: Request) -> None:
+    """FastAPI dependency: remember the caller's `traceparent`/`tracestate`.
+
+    Nothing else is read. A request without a valid `traceparent` leaves the
+    variable empty, which keeps the previous behaviour (own trace root).
+    """
+    carrier = {k: v for k, v in request.headers.items() if k.lower() in ("traceparent", "tracestate")}
+    ctx = extract(carrier) if carrier else None
+    if ctx is not None and trace.get_current_span(ctx).get_span_context().is_valid:
+        _incoming_trace_context.set(ctx)
+    else:
+        _incoming_trace_context.set(None)
+
+
 @contextmanager
 def tool_invoke_span(
     tool_name: str, classification: str, run_id: Optional[str] = None
@@ -83,7 +110,7 @@ def tool_invoke_span(
     """
     tracer = _tracer or trace.get_tracer("mcp-gateway")
     start = time.monotonic()
-    with tracer.start_as_current_span("tool_invoke") as span:
+    with tracer.start_as_current_span("tool_invoke", context=_incoming_trace_context.get()) as span:
         span.set_attribute("zuno.tool", tool_name)
         span.set_attribute("zuno.classification", classification)
         if run_id:
