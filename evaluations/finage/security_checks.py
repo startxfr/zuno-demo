@@ -147,6 +147,9 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
     )
 
 
+PROJECT_BINDING_CAPABILITY = "salesforce.opportunity.read"
+
+
 def finage_never_declares_sales_or_adv_knowledge_domains() -> CheckResult:
     """ADR-0326 config-consistency check (no live cluster needed, same
     style as run_scenarios.py's model_router_fails_closed) - the
@@ -155,7 +158,9 @@ def finage_never_declares_sales_or_adv_knowledge_domains() -> CheckResult:
     allowed_tools declaration (the YAML frontmatter - never the Markdown
     body, which is free-form prose and may legitimately reference other
     agents' capabilities by name) may declare the sales or ADV knowledge
-    domains, or any salesforce.*/aramis.* capability. The runtime half (a
+    domains, or any salesforce.*/aramis.* capability - except
+    salesforce.opportunity.read on a project_required task (ADR-0512's
+    project-binding check, see below). The runtime half (a
     live attempt denied by the MCP Gateway) is scenarios 12/13/18 in
     scenarios.yaml, not repeated here.
     """
@@ -176,6 +181,14 @@ def finage_never_declares_sales_or_adv_knowledge_domains() -> CheckResult:
         if "knowledge.adv" in allowed_knowledge:
             offending.append(f"{task_path.name}: allowed_knowledge includes knowledge.adv")
         for tool in allowed_tools:
+            # ADR-0512 (WP-55), kept by ADR-0528: a project_required task
+            # declares salesforce.opportunity.read for the project-binding
+            # check only - a pre-graph call under the caller's identity
+            # whose record never reaches the model. That one capability, on
+            # those tasks only, is the documented exception; this check
+            # predates it (2026-08-15 vs 2026-08-21).
+            if tool == PROJECT_BINDING_CAPABILITY and zuno.get("project_required") is True:
+                continue
             if tool.startswith("salesforce.") or tool.startswith("aramis."):
                 offending.append(f"{task_path.name}: allowed_tools includes {tool}")
     ok = not offending
