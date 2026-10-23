@@ -26,7 +26,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.1 | 29 | — | 18 | — |
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
-| v0.4 | 35 | 9 | 31 | WP-55, WP-101, WP-169 |
+| v0.4 | 35 | 9 | 31 | WP-55, WP-101 |
 | v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
@@ -34,7 +34,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.9 | 9 | 6 | 8 | WP-145 |
 | v0.10 | 5 | 1 | 6 | WP-51 |
 | v0.11 | 16 | 11 | 14 | WP-146, WP-147, WP-149, WP-150, WP-154, WP-155, WP-156, WP-157, WP-166, WP-168 |
-| v0.12 | 9 | 9 | 9 | WP-158, WP-159, WP-160, WP-161, WP-163, WP-164, WP-165, WP-167 |
+| v0.12 | 9 | 9 | 9 | WP-161, WP-163, WP-164, WP-165, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -916,7 +916,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-153 | [wp-153](work-packages/wp-153-guardrails-into-the-ai-gateway.md) | 0567 | none | Done | live-proven on demo333 2026-10-22; enabled in observe on devel 2026-10-23; C2 block waits for WP-156 |
 | WP-154 | [wp-154](work-packages/wp-154-tekos-pilot-on-demo333.md) | 0573, 0561 | WP-146 - WP-153 | Repo work in review | phase A and B started on demo333 (16/17 scenarios, 12/12 security); GPU-dependent checks, restore drill and real-key bundle remain |
 | WP-155 | [wp-155](work-packages/wp-155-migrate-remaining-agents-and-cut-demo222-over.md) | 0573, 0561 | WP-154 | Not started | demo333 is powered off - live steps wait for the user to power it on |
-| WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Repo work in review | phase 2 (agent stack code removal) prepared on prep/wp156-phase2; PGO users drop and the live step-6 chain remain |
+| WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Repo work merged | phase 2 landed on devel 2026-10-23 (1c845c92; frontend Keycloak clients 8f6935d4), agent stack uninstalled on demo333; left: step-6 live chain, reviewed drop of the agent-checkpoints/agent-conversations PGO users, decision on ADR-0042/0214/0411; rag stack moved to WP-168 |
 | WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Not started | split out of WP-156 by user decision 2026-10-23 |
 | WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Repo work merged | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |
@@ -943,16 +943,16 @@ frozen mirror.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-158 | [wp-158](work-packages/wp-158-bootstrap-the-zuno-demo-agents-repository.md) | 0576 | none | Repo work in review | local repository ready, not pushed; user creates the GitHub App, rulesets, quay.io repositories and robot |
-| WP-159 | [wp-159](work-packages/wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md) | 0577, 0578 | WP-158 | Repo work in review | workflows built and simulated locally; user sets the secrets and variables, then a first release |
-| WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Repo work in review | tooling built and proven on devel artifacts; first promotion waits for v0.1.1; allow Actions to create PRs on zuno-demo |
+| WP-158 | [wp-158](work-packages/wp-158-bootstrap-the-zuno-demo-agents-repository.md) | 0576 | none | Done | repository, rulesets, quay.io repositories and robot, release GitHub App in place; releases v0.1.0, v0.1.1, v0.2.0 cut from it |
+| WP-159 | [wp-159](work-packages/wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md) | 0577, 0578 | WP-158 | Done | publish.yml published and signed keyless v0.1.1 and v0.2.0 (per-agent and corp artifacts on quay.io) |
+| WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Done | v0.2.0 admitted offline and pinned in platform/okf/agents.lock by okf-promote (target branch devel) |
 | WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Operator pending | live and durable on demo333 since 2026-10-23 (okf-fetch on supply-chain-signer:latest built from devel); mlops stays baked until WP-165 |
 | WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Done | operator 0.1.25 on stable; five agents of release v0.1.1 verified keyless on demo333 |
 | WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Repo work in review | schemas, corp ceilings and the narrowing rule built (agents repo + admission); bundle migration waits for unifai-operator v0.3 and WP-156 |
 | WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator (part 1); unifai role and Keycloak groups Job wired and live on demo333 (part 2); quotas/MaaS/routing wait for WP-157 |
 | WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Not started | parity proof on the running cluster, outside any demo freeze |
 | WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Not started | split out of WP-156 by user decision 2026-10-23: rag-service and rag-ingestion stay for the Red Hat docs until this lands |
-| WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Repo work in review | user decision 2026-10-23: evaluations stop spending the demo personas' budget; harness switch owned by the evaluation harness work |
+| WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Done | live on demo333 2026-10-23 (89ec9fba): five eval-* personas; harnesses switched (86ef03e4); platform/keycloak/tests now run in CI |
 
 ### OKF stream phases
 

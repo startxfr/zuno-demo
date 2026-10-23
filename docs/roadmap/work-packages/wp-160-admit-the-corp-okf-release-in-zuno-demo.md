@@ -1,6 +1,6 @@
 # WP-160: Admit the corp OKF release in zuno-demo
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-23)
 - **ADRs:** [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md), [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md)
 - **Depends on:** [WP-159](wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md)
 - **Related:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md), [WP-161](wp-161-fetch-okf-content-at-pod-start.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)

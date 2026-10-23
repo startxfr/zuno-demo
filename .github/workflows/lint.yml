@@ -86,6 +86,17 @@ jobs:
             helm lint "$chart"
           done
       - run: pip install pyyaml
+      # Renders the keycloak chart (needs helm, installed above): realm
+      # column limits, the client reconcile Job and the WP-169 eval
+      # personas. Unrun in CI until 2026-10-23, when a 260-character client
+      # description it guards against broke the live reconcile Job.
+      - name: keycloak realm and reconcile Job tests (ADR-0530, WP-169)
+        run: |
+          # Chart.yaml names its operator dependency by the alias "startx".
+          helm repo add startx http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+          helm dependency build gitops/charts/keycloak
+          pip install pytest
+          python3 -m pytest -q platform/keycloak/tests
       - name: Workload hardening baseline (ADR-0052)
         run: python3 platform/security/check_workload_hardening.py
 
@@ -104,6 +115,10 @@ jobs:
           python3 tests/test_downstream_streamable_http.py
           python3 tests/test_bindings.py
           python3 tests/test_auth_mode_enforcement.py
+          # pytest-style (monkeypatch fixture): the search_technical_docs
+          # handler, UnifAI + rag-service merge (WP-156).
+          pip install pytest
+          python3 -m pytest -q tests/test_rag_query.py
       - name: ai-gateway tests
         working-directory: components/ai-gateway
         run: |

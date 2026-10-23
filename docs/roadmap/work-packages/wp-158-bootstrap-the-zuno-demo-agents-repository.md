@@ -1,6 +1,6 @@
 # WP-158: Bootstrap the zuno-demo-agents repository
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-23)
 - **ADRs:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md)
 - **Depends on:** none
 - **Related:** [ADR-0504](../../adr/0504-define-the-agent-tests-directory-structure-and-promotion-gate.md), [ADR-0513](../../adr/0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md), [WP-159](wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md), [WP-165](wp-165-cut-over-and-remove-agents-from-zuno-demo.md)

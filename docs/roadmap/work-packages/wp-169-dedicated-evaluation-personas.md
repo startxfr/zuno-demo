@@ -1,6 +1,6 @@
 # WP-169: Dedicated evaluation personas
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-23)
 - **ADRs:** [ADR-0530](../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) (dated note of 2026-10-23)
 - **Depends on:** none
 - **Related:** [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [WP-157](wp-157-slim-the-ai-gateway-via-maas.md)

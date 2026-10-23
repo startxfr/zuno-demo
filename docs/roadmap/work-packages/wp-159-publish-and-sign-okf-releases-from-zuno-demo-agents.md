@@ -1,6 +1,6 @@
 # WP-159: Publish and sign OKF releases from zuno-demo-agents
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-23)
 - **ADRs:** [ADR-0577](../../adr/0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md), [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md)
 - **Depends on:** [WP-158](wp-158-bootstrap-the-zuno-demo-agents-repository.md)
 - **Related:** [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md), [WP-150](wp-150-unifai-operator-okf-agent-bundles.md), [WP-160](wp-160-admit-the-corp-okf-release-in-zuno-demo.md)
