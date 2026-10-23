@@ -13,6 +13,27 @@ spec:
   image: {{ .Values.operator.catalogImage }}
   displayName: UnifAI operator (startxfr fork)
   publisher: startx
+{{- if ne .Values.operator.subscriptionNamespace "openshift-operators" }}
+---
+# The operator runs in its own namespace (operator >= 0.1.21: its ServiceMonitor and
+# metrics scraper token live there) with a global OperatorGroup: it reconciles the
+# UnifaiStacks of every namespace.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.operator.subscriptionNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-8"
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: {{ .Values.operator.package }}
+  namespace: {{ .Values.operator.subscriptionNamespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-7"
+spec: {}
+{{- end }}
 ---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription

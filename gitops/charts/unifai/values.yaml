@@ -13,13 +13,16 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.20 as
-  # the stable channel head (checked 2026-10-22).
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:3c7e224ff869c0d65795c1924a03aeb75f67009a11c84828d0e9f0c8e8470f08
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.30 as
+  # the stable channel head (checked 2026-10-23).
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:8b296b21f723426628c047ec2c2352fb89b97f9d2258c26e7cfaed212f03c7aa
   catalogSourceName: unifai-operator-catalog
   channel: stable
   package: unifai-operator
-  subscriptionNamespace: openshift-operators
+  # Own namespace + global OperatorGroup (created by the chart), as on demo333
+  # since operator 0.1.21; openshift-operators is still accepted (no namespace or
+  # OperatorGroup rendered).
+  subscriptionNamespace: unifai-operator
 
 stack:
   enabled: false
