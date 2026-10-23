@@ -195,10 +195,11 @@ def test_the_job_mounts_what_the_configmap_publishes() -> None:
 
 
 def test_the_admin_client_secret_reaches_both_sides() -> None:
-    """Keycloak validates the secret it resolves through KC_VAULT; agent-bff
-    presents the one it reads from Vault. Two paths, one value - if the
-    projected-volume file name and the ExternalSecret ever disagree, the
-    failure is a 401 that reads like a permissions problem."""
+    """Keycloak validates the secret it resolves through KC_VAULT from the
+    ExternalSecret's Vault path (its BFF consumer was retired in WP-156; the
+    client stays for MaaS). If the projected-volume file name and the
+    ExternalSecret ever disagree, the failure is a 401 that reads like a
+    permissions problem."""
     es = _by_kind("ExternalSecret", "zuno-admin-api-client-secret")
     if es is None:
         return
@@ -253,40 +254,6 @@ def test_the_reconcile_script_is_valid_bash() -> None:
     )
 
 
-def test_agent_charts_reference_the_admin_secret_optionally() -> None:
-    """The sequencing trap. ansible/roles/vault seeds the Vault path; ArgoCD
-    syncs these charts. Nothing orders the two, so every agent chart WILL sync
-    before the Secret exists at least once. A non-optional secretKeyRef makes
-    that a CreateContainerConfigError and takes the whole BFF down - chat
-    included - to enable a feature that is meant to fail closed on its own."""
-    if shutil.which("helm") is None:
-        print("SKIP: helm not on PATH")
-        return
-
-    import yaml
-
-    for agent in ("tekos", "comage", "advantage", "finage"):
-        chart = REPO_ROOT / "gitops" / "charts" / agent
-        out = subprocess.run(
-            ["helm", "template", str(chart)], capture_output=True, text=True, check=True
-        )
-        found = False
-        for doc in yaml.safe_load_all(out.stdout):
-            if not doc or doc.get("kind") != "Deployment":
-                continue
-            for container in doc["spec"]["template"]["spec"]["containers"]:
-                for env in container.get("env") or []:
-                    ref = (env.get("valueFrom") or {}).get("secretKeyRef")
-                    if not ref or env["name"] != "KEYCLOAK_ADMIN_CLIENT_SECRET":
-                        continue
-                    found = True
-                    assert ref.get("optional") is True, (
-                        f"{agent}: KEYCLOAK_ADMIN_CLIENT_SECRET must be optional, "
-                        "or the BFF cannot start before the Vault seed exists"
-                    )
-        assert found, f"{agent} chart does not wire KEYCLOAK_ADMIN_CLIENT_SECRET at all"
-
-
 TESTS = [
     test_the_realm_file_is_valid_json_and_declares_the_admin_client,
     test_client_text_fields_fit_keycloak_s_columns,
@@ -297,7 +264,6 @@ TESTS = [
     test_the_job_mounts_what_the_configmap_publishes,
     test_the_admin_client_secret_reaches_both_sides,
     test_the_reconcile_script_is_valid_bash,
-    test_agent_charts_reference_the_admin_secret_optionally,
 ]
 
 

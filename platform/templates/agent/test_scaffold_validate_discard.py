@@ -4,8 +4,10 @@ agent in CI, validate, discard." scaffold_agent.py writes real files into
 the real repository tree (see its own module docstring for why - the
 onboarding workflow is a reviewed PR, not a scratch directory), so this
 test scaffolds a clearly-marked throwaway agent, runs the exact
-validators an onboarding PR's own CI run would (composing OKF, knowledge-
-reference and AIAgent-contract validation, per ADR-0307's Decision text),
+validators an onboarding PR's own CI run would (composing OKF and
+knowledge-reference validation, per ADR-0307's Decision text; the
+AIAgent-contract validation and the chart left with the AIAgent operator
+in WP-156),
 and ALWAYS deletes every file it created afterward - in a `finally`
 block, so a failed validation still cleans up rather than leaving a
 throwaway agent committed by accident.
@@ -41,8 +43,6 @@ SCAFFOLD_ARGS = [
 
 THROWAWAY_PATHS = [
     REPO_ROOT / "agents" / THROWAWAY_NAME,
-    REPO_ROOT / "gitops" / "charts" / THROWAWAY_NAME,
-    REPO_ROOT / "gitops" / "apps" / THROWAWAY_NAME,
     REPO_ROOT / "evaluations" / THROWAWAY_NAME,
 ]
 
@@ -71,12 +71,6 @@ def main() -> int:
             print("RESULT: FAIL - scaffold_agent.py itself failed")
             return 1
 
-        # operator/aiagent-operator/validate_contract.py is deliberately
-        # NOT run here: it validates config/samples/ against the CRD
-        # schema, not arbitrary gitops/charts/<agent>/templates/aiagent.yaml
-        # output - the throwaway agent's own AIAgent CR shape is proven
-        # correct by `helm template` + the schema fields it shares with
-        # every real sample below instead.
         checks = [
             ("validate_okf_bundle.py (ADR-0106)", [sys.executable, "platform/supply-chain/validate_okf_bundle.py"]),
             ("check_knowledge_refs.py (ADR-0202/ADR-0203)", [sys.executable, "platform/docs/check_knowledge_refs.py"]),
@@ -91,19 +85,6 @@ def main() -> int:
                 print(result.stdout)
                 print(result.stderr, file=sys.stderr)
                 failures.append(label)
-
-        helm = shutil.which("helm")
-        if helm:
-            chart_dir = f"gitops/charts/{THROWAWAY_NAME}"
-            lint = _run([helm, "lint", chart_dir])
-            ok = lint.returncode == 0
-            print(f"{'PASS' if ok else 'FAIL'}: helm lint {chart_dir}")
-            if not ok:
-                print(lint.stdout)
-                print(lint.stderr, file=sys.stderr)
-                failures.append("helm lint")
-        else:
-            print("SKIP: helm not on PATH")
 
         if failures:
             print(f"\nRESULT: FAIL - {failures}")

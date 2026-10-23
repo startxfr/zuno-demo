@@ -11,9 +11,16 @@ the same ADR-0326 completion pattern and ADR-0027/0028 gates as the
 first five - self-service changes who authors the definition, never the
 acceptance bar."
 
+WP-156 (2026-10-23): the AIAgent CR, its chart and Applications, and the
+frontend/BFF images are no longer generated - the AIAgent operator,
+agent-frontend and agent-bff were retired. An agent is served by UnifAI
+(ADR-0561) from its OKF bundle, delivered as a signed OCI release
+(ADR-0564, ADR-0580); since ADR-0576 the bundle itself is authored in the
+zuno-demo-agents repository, so the agents/<name>/ output here is a draft
+to move there (agents/ in this tree is that repository's mirror).
+
 This module writes real files into the real repository tree (agents/,
-gitops/charts/<name>/, gitops/apps/<name>/, evaluations/<name>/) - the
-onboarding workflow is "run this, review the diff, open a PR," not a
+evaluations/<name>/) - the onboarding workflow is "run this, review the diff, open a PR," not a
 throwaway scratch directory. Two things it deliberately does NOT write,
 because doing so programmatically would either corrupt heavily-commented
 shared files or apply a change no generator should make unreviewed:
@@ -32,11 +39,10 @@ shared files or apply a change no generator should make unreviewed:
     agents/<name>/keycloak-fragment.json (documented, for manual merge)
     instead.
 
-The scaffolded agent reuses ADR-0327/ADR-0308's operator substrate from
-day one: gitops/charts/<name>/templates/aiagent.yaml renders a single
-AIAgent CR (the post-WP-38-migration Arkos shape), never a raw manifest
-set - "self-service" and "CR-managed" arrive together, not as a later
-migration.
+No chart and no Application are generated: UnifAI serves the agent once
+its bundle is in an admitted release (the `unifai` Day 2 component deploys
+the UnifaiAgentBundle), so onboarding needs no per-agent Kubernetes
+manifest.
 
 Usage:
 
@@ -172,10 +178,9 @@ pattern, the same bar every hand-built agent clears) - see this bundle's
 own `NEXT_STEPS.md` for what remains.
 
 Scaffolded by `platform/templates/agent/scaffold_agent.py` (ADR-0307,
-roadmap WP-41). No dedicated namespace is reserved (ADR-0329): {spec.title}'s
-frontend/BFF deploy into the shared `zuno-ai-run` namespace via the
-`zuno.zuno.ai/v1alpha1 AIAgent` CR the operator (ADR-0327/ADR-0308)
-reconciles - see `gitops/charts/{spec.name}/templates/aiagent.yaml`.
+roadmap WP-41). {spec.title} is served by UnifAI (ADR-0561) from this bundle,
+delivered as a signed OCI release (ADR-0564, ADR-0580) - no per-agent
+deployment of its own.
 """
 
 
@@ -202,12 +207,10 @@ and tool capabilities, all reused from the existing platform catalog
 (ADR-0410 - no new knowledge domain or external backend for a
 template-scaffolded agent).
 
-This is the task Agent Runtime's generic chat dispatch (`POST
-/v1/agents/{spec.name}/chat`, ADR-0342) executes once `status: active` -
-see `components/agent-runtime/app/registry.py` (ADR-0039) for how the
-`allowed_tools`/`allowed_knowledge` above and
-`prompts/{spec.primary_task}.md`'s system prompt are resolved into the
-running `retrieve_reason_respond` LangGraph workflow.
+This is the task UnifAI runs once `status: active`: unifai-operator maps
+the `allowed_tools`/`allowed_knowledge` above and
+`prompts/{spec.primary_task}.md`'s system prompt onto the bundle's
+blueprint (ADR-0564), the `retrieve_reason_respond` shape by default.
 """
 
 
@@ -216,7 +219,7 @@ def render_prompt_md(spec: AgentSpec) -> str:
     # bundle file (type: prompt) - AgentRegistry fails the whole bundle
     # load on a prompt file without a leading `---` block, a real
     # constraint this generator's own scaffold-validate-discard CI test
-    # originally missed until the agent-runtime suite caught it.
+    # originally missed (the bundle loader, then agent-runtime's, caught it).
     return f"""---
 okf_version: v0.2
 type: prompt
@@ -235,205 +238,14 @@ def render_tasks_readme(spec: AgentSpec) -> str:
     return f"""# {spec.title} Tasks
 
 One OKF Markdown bundle (ADR-0038), linked from `../agent.okf.md`'s
-`zuno.tasks`: `{spec.primary_task}.md` - the only task with a live Agent
-Runtime route (`POST /v1/agents/{spec.name}/chat`, ADR-0342's
-`retrieve_reason_respond` graph shape, reused unchanged - ADR-0307/WP-41's
-own proof that self-service onboarding needs zero new runtime code).
-"""
-
-
-def render_chart_yaml(spec: AgentSpec) -> str:
-    return f"""apiVersion: v2
-name: {spec.name}
-description: >-
-  ADR-0410/ADR-0307 (WP-41): renders a single AIAgent CR that the
-  aiagent-operator reconciles into {spec.title}'s frontend (portal + chat
-  UI) and BFF Deployment/Service/Route in the shared zuno-ai-run
-  namespace - scaffolded from platform/templates/agent/, CR-managed from
-  day one (never a raw-manifest chart).
-type: application
-version: 0.1.0
-appVersion: "0.1.0"
-"""
-
-
-def render_chart_values_yaml(spec: AgentSpec) -> str:
-    knowledge_lines = "\n".join(f"  - {k}" for k in spec.knowledge_domains)
-    tool_lines = "\n".join(f"  - {t}" for t in spec.tools)
-    return f"""# ADR-0410/ADR-0307 (WP-41): scaffolded by platform/templates/agent/ -
-# see gitops/charts/arkos/values.yaml's own comment for why this chart
-# carries only CR-population fields, never platform-wide constants
-# (those live once, in gitops/charts/aiagent-operator/).
-
-namespace: zuno-ai-run
-
-agentName: {spec.name}
-
-okfBundleRef: agents/{spec.name}
-
-image:
-  registry: image-registry.openshift-image-registry.svc:5000
-  frontendRepository: zuno-ai-build/agent-frontend
-  bffRepository: zuno-ai-build/agent-bff
-  tag: latest
-
-frontend:
-  replicas: 1
-  # Empty means "{spec.name}.<the operator's own clusterBaseDomain>".
-  routeHost: ""
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 256Mi
-  oidcClientId: {spec.name}-frontend
-
-bff:
-  replicas: 1
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 500m
-      memory: 256Mi
-  oidcAudience: {spec.name}-frontend
-
-# ADR-0040: agent entitlement group, orthogonal to the business role that
-# governs tool/data permissions inside {spec.title}.
-groups:
-  entitlementGroup: {spec.entitlement_group}
-  businessRoles:
-    - {spec.business_role}
-
-knowledgeDomains:
-{knowledge_lines}
-
-toolCapabilities:
-{tool_lines}
-"""
-
-
-def render_chart_aiagent_yaml(spec: AgentSpec) -> str:
-    return f"""# ADR-0410/ADR-0307 (WP-41 scaffold): the ONLY resource this chart
-# renders - see gitops/charts/arkos/templates/aiagent.yaml's own comment
-# for the full ownership-model rationale (identical here).
-apiVersion: zuno.zuno.ai/v1alpha1
-kind: AIAgent
-metadata:
-  name: {{{{ .Values.agentName }}}}
-  namespace: {{{{ .Values.namespace }}}}
-  labels:
-    zuno.io/agent: {{{{ .Values.agentName }}}}
-    zuno.io/managed-by: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "90"
-spec:
-  agentName: {{{{ .Values.agentName }}}}
-  targetNamespace: {{{{ .Values.namespace }}}}
-  okfBundleRef: {{{{ .Values.okfBundleRef }}}}
-  frontend:
-    image:
-      registry: {{{{ .Values.image.registry }}}}
-      repository: {{{{ .Values.image.frontendRepository }}}}
-      tag: {{{{ .Values.image.tag }}}}
-    replicas: {{{{ .Values.frontend.replicas }}}}
-    {{{{- if .Values.frontend.routeHost }}}}
-    routeHost: {{{{ .Values.frontend.routeHost }}}}
-    {{{{- end }}}}
-    resources:
-      {{{{- toYaml .Values.frontend.resources | nindent 6 }}}}
-    oidcClientId: {{{{ .Values.frontend.oidcClientId }}}}
-  bff:
-    image:
-      registry: {{{{ .Values.image.registry }}}}
-      repository: {{{{ .Values.image.bffRepository }}}}
-      tag: {{{{ .Values.image.tag }}}}
-    replicas: {{{{ .Values.bff.replicas }}}}
-    resources:
-      {{{{- toYaml .Values.bff.resources | nindent 6 }}}}
-    oidcAudience: {{{{ .Values.bff.oidcAudience }}}}
-  groups:
-    entitlementGroup: {{{{ .Values.groups.entitlementGroup }}}}
-    businessRoles:
-      {{{{- toYaml .Values.groups.businessRoles | nindent 6 }}}}
-  knowledgeDomains:
-    {{{{- toYaml .Values.knowledgeDomains | nindent 4 }}}}
-  toolCapabilities:
-    {{{{- toYaml .Values.toolCapabilities | nindent 4 }}}}
-"""
-
-
-def render_app_d0(spec: AgentSpec, sync_wave: int) -> str:
-    return f"""---
-# No Day0 content for {spec.name}; see gitops/apps/README.md's -d0/-d1 convention.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: zuno-{spec.name}-d0
-  namespace: openshift-gitops
-  annotations:
-    argocd.argoproj.io/sync-wave: "{sync_wave - 1}"
-spec:
-  project: zuno
-  source:
-    repoURL: https://github.com/startxfr/zuno-demo.git
-    targetRevision: main
-    path: gitops/charts/noop
-    helm:
-      releaseName: zuno-{spec.name}-d0
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: openshift-gitops
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
-"""
-
-
-def render_app_d1(spec: AgentSpec, sync_wave: int) -> str:
-    return f"""---
-# {spec.title}'s frontend + BFF (ADR-0410/ADR-0307/WP-41, sixth agent,
-# scaffolded from platform/templates/agent/). Depends on the
-# {spec.name}-frontend confidential OIDC client from keycloak (see this
-# agent's own keycloak-fragment.json) and on
-# gitops/apps/aiagent-operator/application-d1.yaml (earlier sync-wave)
-# having already reconciled the AIAgent CRD + operator manager - this
-# chart's only resource is a CR the operator must exist to act on.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: zuno-{spec.name}-d1
-  namespace: openshift-gitops
-  annotations:
-    argocd.argoproj.io/sync-wave: "{sync_wave}"
-spec:
-  project: zuno
-  source:
-    repoURL: https://github.com/startxfr/zuno-demo.git
-    targetRevision: main
-    path: gitops/charts/{spec.name}
-    helm:
-      releaseName: zuno-{spec.name}-d1
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: zuno-ai-run
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=false
+`zuno.tasks`: `{spec.primary_task}.md` - the agent's one task, served by
+UnifAI on the `retrieve_reason_respond` blueprint (ADR-0564), reused
+unchanged - self-service onboarding needs zero new platform code
+(ADR-0307/WP-41).
 """
 
 
 def render_eval_readme(spec: AgentSpec) -> str:
-    env_prefix = spec.name.upper()
     return f"""# {spec.title} Evaluation
 
 The 20 acceptance scenarios and the 75% pass-threshold report for
@@ -454,8 +266,9 @@ runs it explicitly:
 cd evaluations/{spec.name}
 pip install -r requirements.txt
 export KEYCLOAK_URL=https://keycloak.apps.<cluster-domain>
-export FRONTEND_URL=https://{spec.name}.apps.<cluster-domain>
-export {env_prefix}_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/{spec.name}-frontend)
+export UNIFAI_URL=https://unifai-ui-zuno-unifai.apps.<cluster-domain>
+export UNIFAI_TEAM_NAME=agent-{spec.name}
+export EVAL_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/zuno-evaluations)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)
 python3 run_acceptance_gate.py     # scenarios + security_checks + gate_checks, one exit code
 python3 run_scenarios.py           # just the 20 scenarios
@@ -546,23 +359,21 @@ def render_security_checks_py(spec: AgentSpec) -> str:
     # spec.name is a URL/Kubernetes-style slug (hyphens allowed, e.g.
     # "sixth-agent") - not a valid Python identifier as-is, so the
     # generated check FUNCTION name uses an underscored variant while
-    # every path/CR/persona name below keeps the real hyphenated slug.
+    # every path/persona name below keeps the real hyphenated slug.
     py_name = spec.name.replace("-", "_")
+    placeholder = f"{spec.name} is a placeholder agent (ADR-0007): it has no UnifAI workflow to chat with"
     return f'''#!/usr/bin/env python3
 """Security-negative checks for {spec.title} (ADR-0410/ADR-0307/WP-41,
 scaffolded from platform/templates/agent/). Only the checks generic
 enough to apply to any agent are generated here - identity propagation
 (ADR-0032/0033) and the two-directional ADR-0040 entitlement/business-role
-separation - plus one self-consistency check with no live-cluster
-dependency at all. A hand-authored slice typically adds its own
-narrative-specific checks on top (see evaluations/advantage/
-security_checks.py for an example) - this scaffold deliberately doesn't
-invent one, since {spec.title} declares no cross-domain boundary to prove
-(ADR-0410: reuses existing knowledge/capabilities only).
-
-This cannot be executed in the sandbox this repo was built in (no live
-cluster) - written to be genuinely runnable once one exists, same as
-run_scenarios.py.
+separation, proven through UnifAI (the only target since WP-156) with the
+shared factories of evaluations/common/unifai_checks.py - plus one
+self-consistency check with no live-cluster dependency at all. A freshly
+scaffolded agent is a placeholder (ADR-0007) with no UnifAI workflow, so
+the two checks that need a chat turn are reported as skipped until it is
+served; a hand-authored slice typically adds its own narrative-specific
+checks on top (see evaluations/advantage/security_checks.py).
 """
 from __future__ import annotations
 
@@ -571,13 +382,22 @@ import pathlib
 import sys
 from dataclasses import dataclass
 
-import httpx
 import yaml
 
 os.environ.setdefault("AGENT", "{spec.name}")
+os.environ.setdefault("TASK_NAME", "{spec.primary_task}")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, auth_headers  # noqa: E402
+from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _unifai, auth_headers  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
+import unifai_checks  # noqa: E402
+try:
+    from day2_report import log_test_line
+except ImportError:
+    def log_test_line(*_args, **_kwargs) -> None:
+        pass
+
+_LOG_AGENT = AGENT
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 
@@ -587,78 +407,7 @@ class CheckResult:
     name: str
     passed: bool
     detail: str = ""
-
-
-def bff_forwards_identity_to_runtime() -> CheckResult:
-    """ADR-0032: the BFF must forward the validated end-user bearer token
-    to the Agent Runtime, which requires one and rejects calls without it.
-    """
-    resp = httpx.post(
-        f"{{BFF_URL}}/api/chat",
-        headers=auth_headers("consultant-user-01"),
-        json={{"session_id": "sec-check-1", "message": "Where do I find the onboarding checklist?"}},
-        timeout=30,
-    )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult("bff_forwards_identity_to_runtime", ok, f"status={{resp.status_code}} body={{resp.text[:200]}}")
-
-
-def runtime_ignores_mismatched_user_sub() -> CheckResult:
-    """ADR-0033: a request body's user_sub is informational only - the
-    Runtime must derive the authoritative subject from the validated
-    token, never this field.
-    """
-    import uuid
-
-    forged_sub = f"not-a-real-user-{{uuid.uuid4().hex[:8]}}"
-    resp = httpx.post(
-        f"{{RUNTIME_URL}}/v1/agents/{{AGENT}}/chat",
-        headers=auth_headers("consultant-user-01"),
-        json={{"session_id": "sec-check-2", "user_sub": forged_sub, "message": "Where do I find the onboarding checklist?"}},
-        timeout=30,
-    )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult("runtime_ignores_mismatched_user_sub", ok, f"status={{resp.status_code}} forged_sub={{forged_sub}} body={{resp.text[:200]}}")
-
-
-def entitlement_without_business_role_denied() -> CheckResult:
-    """ADR-0040: {spec.entitlement_group} entitlement without any
-    business role must still be denied by the BFF/Runtime chat path
-    (the agent entitlement alone never substitutes for the business-role
-    check the MCP Gateway/policy layer performs).
-    """
-    resp = httpx.post(
-        f"{{BFF_URL}}/api/chat",
-        headers=auth_headers("{spec.name}-entitlement-only-user-01"),
-        json={{"session_id": "sec-check-3", "message": "Where do I find the onboarding checklist?"}},
-        timeout=30,
-    )
-    # A business-role-less caller can still authenticate and chat (the
-    # entitlement/role separation this scaffold's tools rely on is
-    # enforced per-tool-call by the MCP Gateway, not by the chat route
-    # itself) - this check instead proves the *tool* boundary: no tool
-    # call reachable from this chat turn should succeed silently without
-    # the business role. Left as a documented scaffold seam: fill in a
-    # concrete tool-call assertion once {spec.title}'s real persona is
-    # reviewed (see NEXT_STEPS.md).
-    ok = resp.status_code in (200, 403)
-    return CheckResult("entitlement_without_business_role_denied", ok, f"status={{resp.status_code}} body={{resp.text[:200]}}")
-
-
-def business_role_without_entitlement_denied_by_bff() -> CheckResult:
-    """ADR-0040: the converse case. {role_only_persona} holds the
-    {spec.business_role} business role but lacks {spec.entitlement_group}
-    entitlement - the BFF's own entitlement check must deny with 403
-    before the request ever reaches the Agent Runtime.
-    """
-    resp = httpx.post(
-        f"{{BFF_URL}}/api/chat",
-        headers=auth_headers("{role_only_persona}"),
-        json={{"session_id": "sec-check-4", "message": "Where do I find the onboarding checklist?"}},
-        timeout=30,
-    )
-    ok = resp.status_code == 403
-    return CheckResult("business_role_without_entitlement_denied_by_bff", ok, f"status={{resp.status_code}} body={{resp.text[:200]}}")
+    skipped: bool = False
 
 
 def {py_name}_declares_only_scaffolded_knowledge_and_tools() -> CheckResult:
@@ -694,11 +443,24 @@ def {py_name}_declares_only_scaffolded_knowledge_and_tools() -> CheckResult:
     )
 
 
+unifai_forwards_identity_to_the_gateways = unifai_checks.skip(
+    CheckResult, "unifai_forwards_identity_to_the_gateways", "{placeholder}",
+)
+unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
+business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
+    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="{role_only_persona}",
+    mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
+)
+entitlement_without_business_role_denied = unifai_checks.skip(
+    CheckResult, "entitlement_without_business_role_denied", "{placeholder}",
+)
+
+
 CHECKS = [
-    bff_forwards_identity_to_runtime,
-    runtime_ignores_mismatched_user_sub,
+    unifai_forwards_identity_to_the_gateways,
+    unifai_ignores_a_client_supplied_identity_header,
     entitlement_without_business_role_denied,
-    business_role_without_entitlement_denied_by_bff,
+    business_role_without_entitlement_denied_by_unifai,
     {py_name}_declares_only_scaffolded_knowledge_and_tools,
 ]
 
@@ -707,20 +469,25 @@ def run() -> list:
     results = []
     for check in CHECKS:
         try:
-            results.append(check())
+            result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
-            results.append(CheckResult(check.__name__, False, f"unhandled error: {{exc}}"))
+            result = CheckResult(check.__name__, False, f"unhandled error: {{exc}}")
+        results.append(result)
+        log_test_line(_LOG_AGENT, "security", result.name, result.name, result.passed, result.detail)
     return results
 
 
 def main() -> int:
     results = run()
+
     print(f"{{'PASS':<6}}{{'CHECK'}}")
     for r in results:
-        print(f"{{'✓' if r.passed else '✗':<6}}{{r.name}}")
-        if not r.passed and r.detail:
+        print(f"{{'-' if r.skipped else '✓' if r.passed else '✗':<6}}{{r.name}}")
+        if (not r.passed or r.skipped) and r.detail:
             print(f"      -> {{r.detail}}")
-    if all(r.passed for r in results):
+
+    _unifai().cleanup()
+    if all(r.passed for r in results if not r.skipped):
         print("\\nRESULT: PASS")
         return 0
     print("\\nRESULT: FAIL")
@@ -874,7 +641,7 @@ scenarios:
   - id: 20
     title: Every service's health endpoint returns 200
     type: health_endpoints_all_ok
-    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]
+    services: [unifai-ui, mcp-gateway, ai-gateway]
 """
 
 
@@ -886,18 +653,12 @@ def render_keycloak_fragment(spec: AgentSpec) -> str:
             f"gitops/charts/keycloak/files/realm-zuno.json by hand (see "
             f"agents/{spec.name}/NEXT_STEPS.md), the same way every prior "
             f"agent's realm entries were added - see agent_arkos's own "
-            f"client/group/user entries in that file as the worked example."
+            f"group/user entries in that file as the worked example. No "
+            f"per-agent OIDC client: UnifAI signs users in (WP-156)."
         ),
-        "client": {
-            "clientId": f"{spec.name}-frontend",
-            "name": f"{spec.title} frontend",
-            "publicClient": False,
-            "secret": f"${{{{vault.{spec.name}_frontend_client_secret}}}}",
-        },
         "group": {
             "name": spec.entitlement_group,
             "path": f"/{spec.entitlement_group}",
-            "clientRoles": {f"{spec.name}-frontend": ["access"]},
         },
         "entitlement_only_fixture_user": f"{spec.name}-entitlement-only-user-01",
     }
@@ -908,22 +669,17 @@ def render_next_steps(spec: AgentSpec) -> str:
     return f"""# {spec.title} onboarding - remaining steps
 
 Scaffolded by `platform/templates/agent/scaffold_agent.py` (ADR-0307,
-WP-41). What's real already: the OKF bundle, the CR-managed gitops chart
-+ Application, and a 20-scenario evaluation skeleton. What still needs a
-human:
+WP-41). What's real already: the OKF bundle draft and a 20-scenario
+evaluation skeleton. What still needs a human:
 
 1. **Review/adjust the prose** in `agent.okf.md`, `tasks/{spec.primary_task}.md`
    and `prompts/{spec.primary_task}.md` - the scaffold fills in a working
    skeleton, not a finished persona.
 2. **Merge `keycloak-fragment.json`** into
-   `gitops/charts/keycloak/files/realm-zuno.json` by hand (client, group,
-   fixture user) - see `agent_arkos`'s own entries there as the worked
-   example this fragment mirrors. Also register the new
-   `externalsecret-{spec.name}-frontend.yaml` + `templates/keycloak.yaml`
-   vault-file mount, and the Vault seed tasks in
-   `ansible/roles/vault/tasks/install.yml` (`keycloak/{spec.name}-frontend`,
-   `{spec.name}/frontend-session`) - mirror the most recently added
-   agent's own entries in each file.
+   `gitops/charts/keycloak/files/realm-zuno.json` by hand (entitlement
+   group, fixture user) - see `agent_arkos`'s own entries there as the
+   worked example this fragment mirrors. No per-agent OIDC client or
+   Vault seed: UnifAI signs users in (WP-156).
 3. **Add policy entries** (never auto-written - see this module's own
    docstring for why):
    - `policies/tools/tool-policy.yaml`: add `{spec.business_role}` to
@@ -932,27 +688,24 @@ human:
    - `policies/knowledge/knowledge-policy.yaml`: add `{spec.business_role}`
      to `allowed_groups` for each of: {", ".join(spec.knowledge_domains) or "(none declared)"}
      - only if not already present.
-4. **Register the GitOps Application** the same way every other agent's
-   is: confirm `gitops/apps/{spec.name}/application-d0.yaml`/`application-d1.yaml`
-   look right (sync-wave chosen to land after
-   `gitops/apps/aiagent-operator`'s own).
-5. **Add `{spec.name}` to `ansible/roles/agents/tasks/check.yml`'s**
-   frontend reachability smoke test block, following the existing
-   per-agent pattern.
-6. **Run the validators** this scaffold's own CI test also runs:
+4. **Move the bundle to zuno-demo-agents** (ADR-0576): `agents/` in
+   zuno-demo is that repository's mirror. Once a release carrying it is
+   admitted (`make d3 admit agents`, ADR-0580), the `unifai` component
+   deploys its `UnifaiAgentBundle` and `make d2 check agents` reports its
+   availability - no per-agent check entry to add.
+5. **Run the validators** this scaffold's own CI test also runs:
    `python3 platform/supply-chain/validate_okf_bundle.py`,
    `python3 platform/docs/check_knowledge_refs.py`,
-   `python3 operator/aiagent-operator/validate_contract.py`,
    `python3 platform/docs/check_docs.py`.
-7. **Promote** (ADR-0502): follow
+6. **Promote** (ADR-0502): follow
    `platform/templates/agent/PROMOTION.md` - the named Stage-1 -> Stage-2
-   checklist (scenario review, CR deploy, 75% gate, Stage-2 directory
-   content, `zuno.status: active`, README update). Steps 1-6 above are
+   checklist (scenario review, UnifAI deploy, 75% gate, Stage-2 directory
+   content, `zuno.status: active`, README update). Steps 1-5 above are
    its assumed scaffold-time baseline.
 """
 
 
-def write_all(spec: AgentSpec, sync_wave: int, repo_root: pathlib.Path = REPO_ROOT) -> List[pathlib.Path]:
+def write_all(spec: AgentSpec, repo_root: pathlib.Path = REPO_ROOT) -> List[pathlib.Path]:
     written: List[pathlib.Path] = []
 
     def _write(rel_path: str, content: str) -> None:
@@ -967,13 +720,6 @@ def write_all(spec: AgentSpec, sync_wave: int, repo_root: pathlib.Path = REPO_RO
     _write(f"agents/{spec.name}/prompts/{spec.primary_task}.md", render_prompt_md(spec))
     _write(f"agents/{spec.name}/keycloak-fragment.json", render_keycloak_fragment(spec))
     _write(f"agents/{spec.name}/NEXT_STEPS.md", render_next_steps(spec))
-
-    _write(f"gitops/charts/{spec.name}/Chart.yaml", render_chart_yaml(spec))
-    _write(f"gitops/charts/{spec.name}/values.yaml", render_chart_values_yaml(spec))
-    _write(f"gitops/charts/{spec.name}/templates/aiagent.yaml", render_chart_aiagent_yaml(spec))
-
-    _write(f"gitops/apps/{spec.name}/application-d0.yaml", render_app_d0(spec, sync_wave))
-    _write(f"gitops/apps/{spec.name}/application-d1.yaml", render_app_d1(spec, sync_wave))
 
     _write(f"evaluations/{spec.name}/README.md", render_eval_readme(spec))
     _write(f"evaluations/{spec.name}/scenarios.yaml", render_scenarios_yaml(spec))
@@ -1030,7 +776,6 @@ def main() -> int:
     parser.add_argument("--icon", default="compass")
     parser.add_argument("--tile-description", default=None)
     parser.add_argument("--rag-top-k", type=int, default=5)
-    parser.add_argument("--sync-wave", type=int, default=-96, help="Application sync-wave for the -d1 Application (-d0 is one earlier)")
     parser.add_argument("--force", action="store_true", help="overwrite files if agents/<name>/ already exists")
     args = parser.parse_args()
 
@@ -1044,7 +789,7 @@ def main() -> int:
         print(f"SCAFFOLD ERROR: {exc}", file=sys.stderr)
         return 2
 
-    written = write_all(spec, args.sync_wave)
+    written = write_all(spec)
 
     print(f"Scaffolded {spec.title!r} ({len(written)} files):")
     for path in written:
