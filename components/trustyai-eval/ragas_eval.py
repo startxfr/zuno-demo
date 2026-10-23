@@ -31,7 +31,7 @@ Env (all have working in-cluster defaults):
                     see persona_token())
   EVAL_CLIENT_ID    default zuno-evaluations
   EVAL_CLIENT_SECRET  required, the client's secret
-  EVAL_PERSONA      default consultant-01 - retrieval quality must be
+  EVAL_PERSONA      default eval-consultant-01 (WP-169) - retrieval quality must be
                     measured as a realistic caller, not an entitlement-less
                     one that only ever sees ACL-unrestricted documents
   DEMO_PERSONA_PASSWORD  required, the demo personas' shared password
@@ -63,7 +63,7 @@ KEYCLOAK_TOKEN_URL = os.getenv(
 )
 EVAL_CLIENT_ID = os.getenv("EVAL_CLIENT_ID", "zuno-evaluations")
 EVAL_CLIENT_SECRET = os.getenv("EVAL_CLIENT_SECRET", "")
-EVAL_PERSONA = os.getenv("EVAL_PERSONA", "consultant-01")
+EVAL_PERSONA = os.getenv("EVAL_PERSONA", "eval-consultant-01")
 DEMO_PERSONA_PASSWORD = os.getenv("DEMO_PERSONA_PASSWORD", "")
 JUDGE_BASE_URL = os.getenv(
     "JUDGE_BASE_URL",

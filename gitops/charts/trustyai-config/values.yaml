@@ -202,5 +202,6 @@ ragasEval:
   judgeModel: qwen3.6-27b-instruct
   # Retrieval quality must be measured as a realistic caller, not an
   # entitlement-less one that only ever sees ACL-unrestricted documents.
-  persona: consultant-01
+  # WP-169: the evaluation copy of consultant-01 (same groups, its own budget).
+  persona: eval-consultant-01
   deadlineSeconds: 3600
