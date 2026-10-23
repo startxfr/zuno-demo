@@ -187,8 +187,8 @@
 # a Secret naming the CA bundle the Gateway trusts for its own outbound
 # HTTPS calls, which is what a Keycloak OIDC authenticator (WP-073) would
 # need if the Keycloak Route's certificate is Vault-PKI-signed rather than
-# publicly trusted. Unlike `ansible/tasks/sync_keycloak_serving_ca.yml`
-# (which produces a ConfigMap, consumed by pods that mount it directly),
+# publicly trusted. Unlike the former `ansible/tasks/sync_keycloak_serving_ca.yml`
+# (ADR-0411, retired in WP-156; it produced a ConfigMap pods mounted),
 # this CR field wants a Secret, and its expected key name is not confirmed
 # from the CRD schema alone (no alm-examples were published on this
 # channel). Deferred to WP-073 alongside the OIDC authenticator wiring

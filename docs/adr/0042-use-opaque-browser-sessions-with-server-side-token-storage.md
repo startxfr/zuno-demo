@@ -1,6 +1,6 @@
 # ADR-0042: Use opaque browser sessions with server-side token storage
 
-- **Status:** Implemented - see `components/agent-frontend/internal/session/{session,store}.go`, `gitops/charts/redis/`, `ansible/roles/redis/`.
+- **Status:** Superseded by [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) (2026-10-23, WP-156) - the agent frontends whose browser sessions it governed are retired; UnifAI keeps its own server-side session. Previously: Implemented - see `components/agent-frontend/internal/session/{session,store}.go`, `gitops/charts/redis/`, `ansible/roles/redis/`.
 - **Target:** v0.1
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team

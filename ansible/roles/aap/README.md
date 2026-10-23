@@ -143,8 +143,8 @@ first.
   CA bundle the Gateway trusts for its own outbound HTTPS calls) is left
   unset. It would matter once a Keycloak OIDC authenticator depends on
   verifying a Vault-PKI-signed Keycloak Route; reconciling the CR itself
-  needs no Keycloak trust. `ansible/tasks/sync_keycloak_serving_ca.yml`
-  produces a ConfigMap, not a Secret, so wiring this field also needs a
+  needs no Keycloak trust. The former `ansible/tasks/sync_keycloak_serving_ca.yml`
+  (ADR-0411, retired in WP-156) produced a ConfigMap, not a Secret, so wiring this field also needs a
   ConfigMap-to-Secret conversion step this role deliberately does not add
   yet - see WP-073.
 - The AAP-side Keycloak OIDC authenticator itself (Gateway API/UI

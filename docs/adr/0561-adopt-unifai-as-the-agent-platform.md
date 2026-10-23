@@ -92,7 +92,7 @@ landing place. A capability not in this list is not carried over.
 
 At cutover (WP-156), per `docs/adr/README.md` "How a decision changes":
 
-- **In full by this ADR:** ADR-0008 (one frontend and BFF per agent), ADR-0039
+- **In full by this ADR:** ADR-0008 (one frontend and BFF per agent), ADR-0042 (opaque browser sessions), ADR-0214 (frontend chrome), ADR-0411 (Vault PKI trust for the tekos-frontend client; all three decided 2026-10-23), ADR-0039
   (its clauses migrate into ADR-0564), ADR-0044 (PatternFly frontend),
   ADR-0045 (SSE chain), ADR-0054 (BFF OpenAPI contract), ADR-0103 (LangGraph
   Postgres checkpoints), ADR-0212 (conversations database), ADR-0342 (shapes

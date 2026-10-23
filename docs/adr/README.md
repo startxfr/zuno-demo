@@ -152,7 +152,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md) | Implemented | Use opaque browser sessions with server-side token storage |
 | [ADR-0043](0043-use-standard-mcp-protocol-behind-the-zuno-mcp-gateway.md) | Implemented | Use standard MCP protocol behind the Zuno MCP Gateway |
 | [ADR-0055](0055-repository-review-change-set-index.md) | Implemented | Repository review change-set index |
 | [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | Implemented | Provide HA for shared agent platform services |
@@ -189,7 +188,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | Implemented | Prefer indexed knowledge for read and live tools for freshness and write |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | Implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0211](0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md) | Implemented | Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01 |
-| [ADR-0214](0214-refresh-agent-frontend-chrome-branding-footer-and-menu-icons.md) | Implemented | Refresh agent-frontend chrome: branding, footer and menu icons |
 | [ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md) | Implemented | Serve SXA only as a pre-2021 historical RAG corpus |
 | [ADR-0354](0354-add-ansible-automation-platform-as-a-day-1-component.md) | Implemented | Add Ansible Automation Platform as a new Day 1 component |
 
@@ -222,7 +220,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views) *(stub)* | Proposed | Add specialized task-oriented frontend views |
 | [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) *(stub)* | Proposed | Automate removal of inaccessible private RAG content |
 | [ADR-0409](../roadmap/adr-decisions-v0.4.md#adr-0409-introduce-advanced-human-approval-workflows) *(stub)* | Proposed | Introduce advanced human approval workflows |
-| [ADR-0411](0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) | Implemented | Trust the Vault PKI root in every agent frontend's OIDC client |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | Implemented | Consolidate Grafana dashboards into six platform views |
 | [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | Implemented | Consolidate zuno-ai-run into three tiered MIG predictors |
 | [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | Implemented | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
@@ -375,6 +372,7 @@ part of its decision is still in force.
 | [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) | v0 | Superseded by ADR-0322 | Use OGX with LangChain and LangGraph for agentic workflows |
 | [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md) | v0 | Superseded by ADR-0329 | Use a namespace-per-agent isolation model |
 | [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md) | v0 | Superseded by ADR-0561 | Make Agent Runtime execute the OKF agent contract |
+| [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md) | v0.1 | Superseded by ADR-0561 | Use opaque browser sessions with server-side token storage |
 | [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | v0 | Superseded by ADR-0561 | Use PatternFly React for the agent frontend |
 | [ADR-0045](0045-stream-responses-end-to-end-with-sse.md) | v0 | Superseded by ADR-0561 | Stream responses end to end with SSE |
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v0.1 | Superseded by ADR-0322 | Abstract the RAG backend and integrate OpenShift AI OGX |
@@ -385,6 +383,7 @@ part of its decision is still in force.
 | [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v0.2 | Superseded by ADR-0569 | Introduce project-scoped agent memory |
 | [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md) | v0.2 | Superseded by ADR-0561 | Introduce persistent, navigable chat conversations |
 | [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.6 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
+| [ADR-0214](0214-refresh-agent-frontend-chrome-branding-footer-and-menu-icons.md) | v0.2 | Superseded by ADR-0561 | Refresh agent-frontend chrome: branding, footer and menu icons |
 | [ADR-0215](0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md) | v0.2 | Superseded by ADR-0569 | Carry conversation history into agent prompts with budgeted compaction |
 | [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) | v0.2 | Superseded by ADR-0219 | Import real SXA content via S3 into MariaDB, served through MCP and RAG |
 | [ADR-0217](0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md) | v0.2 | Superseded by ADR-0219 | Ingest a weekly SXA corpus as a new RAG domain |
@@ -394,6 +393,7 @@ part of its decision is still in force.
 | [ADR-0332](0332-remove-console-favorites-provisioning.md) | v0 | Deprecated | Remove Console favorites provisioning |
 | [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v0.3 | Superseded by ADR-0561 | Support multiple agent graph shapes in Agent Runtime |
 | [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.3 | Superseded by ADR-0564 | Provide an AIAgent Kubernetes CRD and operator |
+| [ADR-0411](0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) | v0.4 | Superseded by ADR-0561 | Trust the Vault PKI root in every agent frontend's OIDC client |
 | [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |
 | [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Superseded by ADR-0535 | Sign supply-chain artifacts in-cluster with Vault Transit |
 | [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) | OKF v0.1 | Superseded by ADR-0515 | Open OKF tasks as concurrent per-agent frontend tabs |

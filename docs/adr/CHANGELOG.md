@@ -23,8 +23,10 @@ ADR-0534 and ADR-0540 (by ADR-0567). The RAG supersessions of ADR-0568 wait
 for WP-168, since rag-service and rag-ingestion stay for the Red Hat
 documentation. ADR-0507, ADR-0509 and ADR-0510 were already retired by
 ADR-0576/ADR-0580; ADR-0508 stays `Proposed`. ADR-0042, ADR-0214 and
-ADR-0411 concern only the retired frontend but are in no planned list and
-are left for a decision.
+ADR-0411 concern only the retired frontend and were in no planned list; on
+2026-10-23 the user decided to supersede them by ADR-0561 as well, in full
+(ADR-0411's task, `ansible/tasks/sync_keycloak_serving_ca.yml`, had no
+includer left and is removed).
 
 ## Additions (2026-10-22) - ADR-0582 to ADR-0584 join v0.12
 

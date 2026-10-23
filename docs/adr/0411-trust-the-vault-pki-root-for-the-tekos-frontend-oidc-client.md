@@ -1,6 +1,6 @@
 # ADR-0411: Trust the Vault PKI root in every agent frontend's OIDC client
 
-- **Status:** Implemented
+- **Status:** Superseded by [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) (2026-10-23, WP-156) - the tekos-frontend OIDC client whose trust it configured is retired, and nothing includes ansible/tasks/sync_keycloak_serving_ca.yml any more. Previously: Implemented
 - **Target:** v0.4
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team
