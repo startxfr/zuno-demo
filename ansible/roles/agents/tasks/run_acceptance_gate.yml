@@ -281,6 +281,19 @@
                     value: "https://keycloak.{{ cluster_base_domain }}"
                   - name: FRONTEND_URL
                     value: "https://{{ _gate_agent }}.{{ cluster_base_domain }}"
+                  # WP-156: the gate drives the agent on UnifAI, as its
+                  # scenario's persona, in the agent's team workspace
+                  # agent-<agent> (id resolved at sign-in). EVAL_TARGET is
+                  # explicit so the Job does not depend on run_scenarios.py's
+                  # default; TLS is verified (internal root CA from /gate-ca).
+                  - name: EVAL_TARGET
+                    value: unifai
+                  - name: UNIFAI_URL
+                    value: "https://unifai-ui-zuno-unifai.{{ cluster_base_domain }}"
+                  - name: UNIFAI_TEAM_NAME
+                    value: "agent-{{ _gate_agent }}"
+                  - name: UNIFAI_VERIFY_TLS
+                    value: "1"
                   - name: DEMO_PERSONA_PASSWORD
                     valueFrom:
                       secretKeyRef:

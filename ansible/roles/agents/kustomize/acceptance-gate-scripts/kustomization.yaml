@@ -10,6 +10,11 @@ configMapGenerator:
       - security_checks.py=../../../../../evaluations/tekos/security_checks.py
       - gate_checks.py=../../../../../evaluations/tekos/gate_checks.py
       - run_acceptance_gate.py=../../../../../evaluations/tekos/run_acceptance_gate.py
+      # WP-156: evaluations target UnifAI by default. run_scenarios.py imports
+      # its transport (`from unifai_target import ...`) and every agent's
+      # security_checks.py `import unifai_checks`; both resolve from /gate.
+      - unifai_target.py=../../../../../evaluations/common/unifai_target.py
+      - unifai_checks.py=../../../../../evaluations/common/unifai_checks.py
       # ADR-0526 (WP-087): the register-conformance scorer, imported by
       # run_scenarios.py's chat_register_conformance handler. It lives at
       # evaluations/ root rather than in tekos/ because components/mlops's
