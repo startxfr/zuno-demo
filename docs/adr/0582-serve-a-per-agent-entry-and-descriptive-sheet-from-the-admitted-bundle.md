@@ -1,6 +1,6 @@
 # ADR-0582: Serve a per-agent entry and descriptive sheet from the admitted bundle
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team

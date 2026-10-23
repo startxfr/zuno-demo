@@ -155,3 +155,13 @@ freeze was broken.
   stays before WP-156.
 - Accepted losses to confirm: classification per session instead of per turn,
   no stars or hard delete, one UI instead of one Route per agent.
+- **Agents not migrated in this wave (2026-10-23):** cognos and soursage stay on
+  agent-runtime; their absence on UnifAI is an accepted gap, documented here.
+  Arkos follows the same rule until its bundle is served.
+- **Salesforce on demo333:** Vault `salesforce/technical` has no `url`, so the live
+  Salesforce read stays unwired (WP-101 has no owner). Scenarios that need it are
+  an accepted failure; comage scenario 10 and 11 prove the reply path only.
+- **comage first-token latency:** scenario 8 measures 9-10 s inside a full run but
+  3.7-4.2 s when run alone (3 runs, sign-in included), under the 6 s objective.
+  Suspected cause: load from the preceding scenarios; not yet proven.
+

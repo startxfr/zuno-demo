@@ -1,6 +1,6 @@
 # ADR-0583: Require group visibility and object-level authorisation before per-agent entries
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team

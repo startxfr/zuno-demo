@@ -1,6 +1,6 @@
 # ADR-0584: Define agent lifecycle states, roles and incident revocation
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -34,7 +34,7 @@ recorded.**
    reviewer*: consulted on every change to `access`, `allowed_*`,
    classification, `local_only_for` and quota class, and responsible for
    incident revocation. These two roles are new and are assigned by the
-   decision owners before this ADR is accepted.
+   decision owners (see the acceptance note below).
 2. **Responsibility matrix** (R responsible, A accountable, C consulted, I
    informed):
 
@@ -90,3 +90,12 @@ Role assignment and the runbook are human actions confirmed by the decision
 owners. The operator work follows the release flow of the fork. The state
 values and the revocation list are checked in the pilot before they are used
 on demo222.
+
+## Acceptance note (2026-10-23)
+
+The decision owners accepted ADR-0582, ADR-0583 and this ADR together. For the
+demo platform the *agent owner* and the *security reviewer* are both the
+decision owner of the demo, with a written checklist for every change to
+`access`, `allowed_*`, classification, `local_only_for` and quota class. Clause 7
+(a second approver) is relaxed to the owner plus the platform session until the
+team grows. Revisit this assignment when a second person owns an agent.
