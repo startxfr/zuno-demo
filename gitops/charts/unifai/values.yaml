@@ -110,12 +110,19 @@ mcpGateway:
 # agents/zuno-platform-signer.pub (the role passes it).
 okf:
   publicKey: ""
+  # Keyless verification (ADR-0578): set verify.keyless {issuer, subjectRegExp}
+  # (from platform/okf/stack-config.generated.yaml, unifai.verify.keyless) and
+  # trustedRoot (platform/okf/sigstore/trusted_root.json content) instead of
+  # publicKey. Empty = the bundles are verified with publicKey.
+  verify: {}
+  trustedRoot: ""
   bundles: []
   # - name: tekos
   #   reference: quay.io/zuno/okf-tekos@sha256:<digest>
   #   ceilings: {toolCapabilities: [...], knowledgeDomains: [...], minClassification: C1}
   #   entitlement: GatewayOnly
   #   teamId: <UnifAI team workspace owning the agent's workflows>
+  #   groupTeam: true   # or let the bundle emit a team from zuno.access.groups
   #   classificationOverrides: {}
 
 # Incrementally synced RAG sources (ADR-0568).
@@ -124,6 +131,7 @@ okf:
 retrievers: []
 # - name: knowledge
 #   teamId: <UnifAI team workspace of the agents using it>
+#   teamRef: agent-<bundle>   # or the UnifaiTeam a groupTeam bundle emits (unifai-operator >= 0.1.25)
 #   config: {source_type: CONFLUENCE, forward_user_token: true, top_k_results: 5, threshold: 0.3}
 ragSources: []
 # - name: tech-satellite
