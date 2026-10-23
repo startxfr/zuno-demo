@@ -153,10 +153,33 @@ personas in a team workspace and one outside it:
 - **UI build:** `vite build` passes with Node 20 (podman `node:20`, README.md of
   the repository root provided; the workstation's Node 16 is too old).
 
+## Browser check (demo333, 2026-10-23, Playwright, bundles of release v0.1.1)
+
+A real login as ai-ops-01 in team `agent-tekos`, chat with the `tekos` workflow
+in the Collaboration Hub:
+
+- The first run showed no routing information: the answers of bundle agents had
+  empty message metadata (`{}`), because the LLM elements of the unifai chart did
+  not send a request id nor ask for the routing decision. Fixed in the chart
+  (zuno-demo `c5123c1a`, `gatewayLLM.routingLookup`): the message now carries
+  `llm_response.routing` (class C2, provider `ovhcloud-gpt-oss-120b`, model
+  `gpt-oss-120b`, no fallback), fetched from the ai-gateway's
+  `/v1/routing-decisions/{id}`.
+- With it, the chat shows the response badge under the final answer
+  (`gpt-oss-120b`, collapsed); the expanded "Why this model" panel was not
+  captured.
+- A "Request failed with status 404" notice sat over the live workflow graph:
+  the graph hook asked for the blueprint without the team id on the first render
+  of a team workspace (the team is not resolved yet) and that stale request's
+  error was shown after the second request had succeeded. Fixed in the fork (UI
+  hook ignores a cancelled run, devel `777cccde4`, `vite build` and the type
+  check pass); it needs a UI image to be seen fixed on the cluster.
+
 ## Not verified
 
-- Rendering in a real browser: the rate-limit notice, the response metadata
-  badge and the "why this model" panel (build and type-check only).
+- The rate-limit notice in a browser (a real 429 needs an exhausted budget;
+  consultant-01's budget was not exhausted when tried), and the expanded
+  "Why this model" panel.
 - The memory tool against Qdrant with a large corpus, and the embedding model
   under load (functional checks only).
 - The Temporal worker path for a build failure beyond the unit tests.
