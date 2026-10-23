@@ -199,3 +199,11 @@ Confluence search tool; the tool call then reaches the MCP gateway with the call
 Margin is thin (78% against 75%) and varies between runs with the model's tool choice and
 the first-token latency under load. Scenarios 10 and 11 should accept a read or the expected
 page as proof, as the tekos scenario already does; not changed here.
+
+### arkos harness hardening (same day)
+
+Scenario 11 now asks the S0R42 question and requires the page name, as tekos does (arkos reads the
+same Confluence sources, `retrieveFirst` emits no retriever event). Scenario 10 accepts
+`confluence.page.read` as well as `confluence.page.search` as proof of reaching live Confluence (the
+model chooses between them). Scenarios `--target unifai`: **17/18 (94%)**, only 19 (in-cluster client)
+fails; first token passed on this run, so the latency remains load-dependent.

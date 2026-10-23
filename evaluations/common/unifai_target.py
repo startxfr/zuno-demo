@@ -48,7 +48,11 @@ _LOGIN_FORM_RE = re.compile(r'<form[^>]*id="kc-form-login"[^>]*action="([^"]+)"'
 # UnifAI reports a tool by its capability id; scenarios name the legacy alias. With a retriever attached,
 # the agent reads Confluence through the RAG sources (synced from Confluence) instead of the live MCP
 # tool, so either counts as reaching Confluence.
-TOOL_ALIASES = {"search_confluence": ("confluence.page.search", "docs_rag_retriever_tool")}
+TOOL_ALIASES = {
+    "search_confluence": ("confluence.page.search", "docs_rag_retriever_tool"),
+    # The model chooses between searching and reading a page; either one reached live Confluence.
+    "confluence.page.search": ("confluence.page.search", "confluence.page.read"),
+}
 
 
 def wanted_tools(expect_tool: str) -> tuple:
