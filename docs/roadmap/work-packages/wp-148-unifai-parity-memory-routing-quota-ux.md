@@ -180,11 +180,20 @@ in the Collaboration Hub:
 
   ![The tekos chat with the routing badge under the answer](../evidence/wp-148-chat-routing-badge.png)
 
+## Why this model panel (demo333, 2026-10-23)
+
+Verified in a real browser (Playwright, ai-ops-01, team agent-arkos, Collaboration Hub, UI
+`devel-387573fec`): the response badge expands and shows the response id and the routing
+decision (classification C3, fallback from `local-gpt-oss-maas` to `local-gpt-oss`, kind local,
+model `gpt-oss-20b`), see `docs/roadmap/evidence/wp-148-why-this-model-panel.png`. The browser check
+found a defect: the panel snapped shut about 300 ms after a click because the chat re-renders and
+remounts the badge; fixed by keeping the open state outside React (fork `387573fec`).
+
 ## Not verified
 
-- The rate-limit notice in a browser (a real 429 needs an exhausted budget;
-  consultant-01's budget was not exhausted when tried), and the expanded
-  "Why this model" panel.
+- The rate-limit notice in a browser: a real 429 needs an exhausted budget, and the
+  evaluation personas now keep their own budget, so it needs a throwaway persona with a
+  low quota (not created).
 - The memory tool against Qdrant with a large corpus, and the embedding model
   under load (functional checks only).
 - The Temporal worker path for a build failure beyond the unit tests.
