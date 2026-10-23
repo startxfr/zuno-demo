@@ -13,7 +13,9 @@
 # verifies and extracts it) instead of its baked copy. The digest comes from
 # platform/okf/stack-config.generated.yaml, itself derived from
 # platform/okf/agents.lock, so promoting a release and re-running this role
-# rolls the pods. apply_gitops_app.yml REPLACES the Application's inline
+# rolls the pods. zuno_okf_fetch_image_tag picks the okf-fetch image tag
+# (default latest: the supply-chain-signer image, whose Dockerfile carries
+# oras and the admission files since WP-161). apply_gitops_app.yml REPLACES the Application's inline
 # helm values, so they are read back and merged (same pattern as
 # ansible/roles/mlops). Off by default: the baked copy stays until WP-165.
 - name: "mcp | read the admitted agents release"
@@ -53,7 +55,9 @@
         ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/mcp/application-d1.yaml')
           | replace('apps.mycluster.example.com', cluster_base_domain)
           | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
-        | combine({'okf': {'fetch': {'enabled': true, 'corpReference': _mcp_okf_reference}}}, recursive=True)
+        | combine({'okf': {'fetch': {'enabled': true, 'corpReference': _mcp_okf_reference,
+                                     'image': {'tag': zuno_okf_fetch_image_tag | default('latest')}}}},
+                  recursive=True)
       }}
     gitops_app_refresh: true
   when: zuno_okf_fetch_enabled | default(false) | bool
