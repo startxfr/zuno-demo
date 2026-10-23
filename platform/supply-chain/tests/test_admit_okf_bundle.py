@@ -64,14 +64,17 @@ class AdmitTestCase(unittest.TestCase):
         platform = self.tmp / "platform"
         write(platform / "provider-routing.yaml", "providers:\n  - {name: local}\n")
         write(platform / "tool-bindings.yaml", "bindings:\n  - capability: knowledge.tech.search\n")
-        write(platform / "knowledge.yaml", "bindings:\n  - domain: knowledge.tech\n")
-        self.saved = (admit.PROVIDER_ROUTING_PATH, admit.TOOL_BINDINGS_PATH, admit.KNOWLEDGE_BINDINGS_PATH)
+        write(platform / "unifai-values.yaml", "ragSources: []\n")
+        write(platform / "redhat-docs.yaml",
+              "sources:\n  - {name: rh-x, tags: [knowledge.tech, product:x]}\n")
+        self.saved = (admit.PROVIDER_ROUTING_PATH, admit.TOOL_BINDINGS_PATH, admit.UNIFAI_RAG_SOURCE_FILES)
         admit.PROVIDER_ROUTING_PATH = platform / "provider-routing.yaml"
         admit.TOOL_BINDINGS_PATH = platform / "tool-bindings.yaml"
-        admit.KNOWLEDGE_BINDINGS_PATH = platform / "knowledge.yaml"
+        admit.UNIFAI_RAG_SOURCE_FILES = ((platform / "unifai-values.yaml", "ragSources"),
+                                         (platform / "redhat-docs.yaml", "sources"))
 
     def tearDown(self) -> None:
-        admit.PROVIDER_ROUTING_PATH, admit.TOOL_BINDINGS_PATH, admit.KNOWLEDGE_BINDINGS_PATH = self.saved
+        admit.PROVIDER_ROUTING_PATH, admit.TOOL_BINDINGS_PATH, admit.UNIFAI_RAG_SOURCE_FILES = self.saved
         shutil.rmtree(self.tmp)
 
     def copy(self) -> pathlib.Path:
@@ -123,9 +126,21 @@ class ValidateTest(AdmitTestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("exceeds the corp ceiling 8192", errors[0])
 
-    def test_unbound_knowledge_domain(self) -> None:
-        write(admit.KNOWLEDGE_BINDINGS_PATH, "bindings: []\n")
-        self.assertIn("no database binding", admit.validate(self.release)[0][0])
+    def test_unserved_knowledge_domain_is_a_warning(self) -> None:
+        # WP-168: nothing serves the domain (no UnifAI source tagged with it).
+        # Allowing it grants no access, so the release stays servable.
+        write(admit.UNIFAI_RAG_SOURCE_FILES[1][0], "sources:\n  - {name: rh-x, tags: [product:x]}\n")
+        errors, warnings = admit.validate(self.release)
+        self.assertEqual(errors, [])
+        self.assertTrue(any("which no UnifAI RAG source serves" in w for w in warnings), warnings)
+
+    def test_knowledge_domain_served_by_a_rag_source_in_the_chart_values(self) -> None:
+        write(admit.UNIFAI_RAG_SOURCE_FILES[1][0], "sources: []\n")
+        write(admit.UNIFAI_RAG_SOURCE_FILES[0][0],
+              "ragSources:\n  - {name: tech-satellite, tags: [knowledge.tech], type: confluence}\n")
+        errors, warnings = admit.validate(self.release)
+        self.assertEqual(errors, [])
+        self.assertFalse(any("knowledge.tech" in w for w in warnings), warnings)
 
 
 class DiffTest(AdmitTestCase):

@@ -60,7 +60,14 @@ LOCK_PATH = REPO_ROOT / "platform" / "okf" / "agents.lock"
 SIGSTORE_DIR = REPO_ROOT / "platform" / "okf" / "sigstore"
 PROVIDER_ROUTING_PATH = REPO_ROOT / "platform" / "ai-gateway" / "provider-routing.yaml"
 TOOL_BINDINGS_PATH = REPO_ROOT / "platform" / "bindings" / "tools" / "tool-bindings.yaml"
-KNOWLEDGE_BINDINGS_PATH = REPO_ROOT / "platform" / "bindings" / "knowledge" / "bindings.yaml"
+# WP-168: knowledge domains are served by UnifAI RAG sources, scoped by a
+# `knowledge.*` tag; rag-service and its per-domain database bindings are
+# retired. The sources are declared in the unifai chart: `ragSources` in its
+# values and the Red Hat documentation catalogue.
+UNIFAI_RAG_SOURCE_FILES = (
+    (REPO_ROOT / "gitops" / "charts" / "unifai" / "values.yaml", "ragSources"),
+    (REPO_ROOT / "gitops" / "charts" / "unifai" / "files" / "redhat-docs.yaml", "sources"),
+)
 
 INDEX_MEDIA_TYPE = "application/vnd.zuno.okf.index.v1+json"
 SEMVER_TAG_RE = re.compile(r"^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$")
@@ -245,6 +252,15 @@ def load_yaml(path: pathlib.Path) -> dict:
     return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}) if path.is_file() else {}
 
 
+def served_knowledge_domains() -> Set[str]:
+    """The knowledge domains some UnifAI RAG source carries as a tag."""
+    domains: Set[str] = set()
+    for path, key in UNIFAI_RAG_SOURCE_FILES:
+        for source in load_yaml(path).get(key) or []:
+            domains.update(t for t in source.get("tags") or [] if str(t).startswith("knowledge."))
+    return domains
+
+
 def agents_view(release: pathlib.Path) -> Dict[str, dict]:
     """agent -> {groups, classification, tasks: {task: {tools, knowledge, quota_class}}}"""
     view: Dict[str, dict] = {}
@@ -303,7 +319,7 @@ def validate(release: pathlib.Path) -> Tuple[List[str], List[str]]:
     for b in load_yaml(TOOL_BINDINGS_PATH).get("bindings") or []:
         bound.add(b["capability"])
         bound.update(b.get("aliases") or [])
-    domains = {b["domain"] for b in load_yaml(KNOWLEDGE_BINDINGS_PATH).get("bindings") or []}
+    domains = served_knowledge_domains()
 
     for agent, a in sorted(agents_view(release).items()):
         for task, t in sorted(a["tasks"].items()):
@@ -315,9 +331,11 @@ def validate(release: pathlib.Path) -> Tuple[List[str], List[str]]:
                     errors.append(f"{agent}/{task} allows tool {tool!r} ({entry.get('capability')}), "
                                   f"which has no backend binding in tool-bindings.yaml")
             for domain in t["knowledge"]:
+                # Not an error: allowing a domain nothing serves grants no
+                # access, the task just retrieves nothing from it.
                 if domain not in domains:
-                    errors.append(f"{agent}/{task} allows knowledge domain {domain!r}, "
-                                  f"which has no database binding")
+                    warnings.append(f"{agent}/{task} allows knowledge domain {domain!r}, "
+                                    f"which no UnifAI RAG source serves (no source tagged with it)")
     # OKF v0.3: the release's bundles may only narrow its own corp policies
     # (ADR-0579 clause 5), re-checked here after the agents repository's CI.
     errors += okf_narrowing.check_release(release)
