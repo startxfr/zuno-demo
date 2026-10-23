@@ -12,7 +12,7 @@ name: Promote agents release
 # The promotion targets a deployment branch, not the branch the workflow
 # runs from: a scheduled run always starts on the default branch, which no
 # cluster tracks. Target = the `base` input, else the OKF_PROMOTE_BASE
-# repository variable, else demo222. The lock, the tooling and the pull
+# repository variable, else devel. The lock, the tooling and the pull
 # request are all on that branch.
 on:
   schedule:
@@ -23,7 +23,7 @@ on:
         description: "Release tag to promote (vX.Y.Z); empty = the newest"
         required: false
       base:
-        description: "Deployment branch whose platform/okf/agents.lock moves (default demo222)"
+        description: "Deployment branch whose platform/okf/agents.lock moves (default devel)"
         required: false
 
 permissions:
@@ -38,7 +38,7 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     env:
-      BASE: ${{ inputs.base || vars.OKF_PROMOTE_BASE || 'demo222' }}
+      BASE: ${{ inputs.base || vars.OKF_PROMOTE_BASE || 'devel' }}
     steps:
       - uses: actions/checkout@v4
         with:

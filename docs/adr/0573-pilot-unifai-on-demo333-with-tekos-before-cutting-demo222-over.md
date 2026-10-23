@@ -6,6 +6,13 @@
 - **Decision owners:** Zuno Demo architecture team
 - **Related:** [ADR-0517](0517-redeploy-the-full-platform-from-scratch-on-a-new-demo333-cluster.md), [ADR-0559](0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md), [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md), [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md), [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0569](0569-close-unifai-parity-gaps-generically.md), [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md)
 
+> **Progress note 2026-10-23.** The cluster `demo222` was retired (wiped) and the
+> branch `demo222` merged into `devel`; demo333 became the demo platform. The
+> cutover of `demo222` (Phase 3) no longer applies. The rules above about not
+> mutating `demo222` are now moot, and the other rules (explicit `--context`,
+> peer-session freezes before a demo, human arbitration for shared charts)
+> apply to demo333.
+
 ## Context
 
 ADR-0561 replaces the agent layer, and ADR-0568 replaces RAG. Both cut over

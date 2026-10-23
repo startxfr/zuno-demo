@@ -11,6 +11,9 @@
 > leave the repository, and the decision records move to Superseded in the
 > same change so docs and code never disagree.
 
+> **Update 2026-10-23.** demo222 is retired, so the "uninstall on each cluster"
+> steps apply to demo333 only, and the soak criterion is measured on demo333.
+
 ## Goal
 
 `components/{agent-runtime,agent-bff,agent-frontend,rag-service,rag-ingestion}`

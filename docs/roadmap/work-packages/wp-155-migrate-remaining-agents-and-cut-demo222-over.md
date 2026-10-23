@@ -10,6 +10,13 @@
 > tekos proved the stack. This WP repeats the proof for the seven other
 > agents on demo333, then moves demo222 — the demo cluster — and only then.
 
+> **Update 2026-10-23.** The cluster demo222 is retired (it is wiped) and the
+> branch `demo222` was merged into the single working branch `devel`. demo333
+> is now the demo platform: Part B below, the cutover of demo222, no longer
+> applies. What replaces it is the parity proof of every agent on demo333 and
+> the demo scripts pointing at its routes. Kept below as the record of the
+> original plan.
+
 ## Goal
 
 All eight agents run on UnifAI on demo333 with green evaluations, then
