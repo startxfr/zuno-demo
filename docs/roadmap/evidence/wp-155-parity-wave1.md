@@ -126,3 +126,39 @@ the window resets or with a persona-specific budget.
 Commands: as above, with `UNIFAI_TEAM_ID` taken from `teams.list` (names `agent-<name>`):
 `run_scenarios.py --target unifai` (comage twice, tekos), `security_checks.py --target unifai`
 (comage, finage). advantage and naveo were not re-run (placeholders, ADR-0007 decision pending).
+
+## Re-run after the ReAct retry and the gateway reasoning fallback (2026-10-23, later)
+
+Deployed: multiagent `devel-472339706` (a recoverable ReAct error such as "Reasoning too
+short" lets the model retry instead of ending the turn; `retrieve_first` present, not yet
+enabled, operator 0.1.26 pending) and the ai-gateway built from `7685df12` (when the content
+is empty, no tool call is made and a `reasoning` text exists, it is served as content with
+`zuno_reasoning_fallback: true`; counter `zuno.model_empty_responses`). Harness: `origin/demo222`
+(`d1b5c997`). comage only, personas as in the harness (sale-01, sale-02; no persona hit a budget).
+
+| Run | Before fixes (operator 0.1.22) | After the operator 0.1.25 prompt | After ReAct retry + gateway fallback |
+|---|---|---|---|
+| comage scenarios `--target unifai`, run 1 | 18/20 (90%) | 17/20 (85%) | 16/20 (80%): 8 first token 9.7 s, 10 `tool_calls=[]`, 11, 19 |
+| comage scenarios, run 2 | - | 17/20 (85%) | 18/20 (90%): 11, 19 only |
+| comage security `--target unifai` | 8/8 | 7/8 | 7/8 (`unifai_forwards_identity_to_the_gateways`: `tool_calls=[] reply_len=115`) |
+| comage gate `--target unifai` (scenarios, security, gate checks) | PASS | - | PASS: 17/20 (8 first token 6.75 s, 11, 19), security 8/8, gate checks 4/4 |
+
+Scenario 11 still fails on every run: `tool_calls=['salesforce.opportunity.read']`, the model
+reads Salesforce and never calls the retriever, so the retry does not change the choice of
+tool; the intended lever is `retrieve_first` (operator 0.1.26). Scenarios 8 and 10 vary
+from run to run (first-token 6.75 to 9.7 s on the shared local model, a turn without any tool
+call), as do the identity check and its 115-character reply: the results are within the noise
+of a shared GPU model, the totals 16 to 18 out of 20 cover the whole range seen before.
+
+Raw Prometheus (thanos-querier, `oc whoami -t`):
+`sum by (provider,model,recovered)(zuno_model_empty_responses_total)` returns a single series,
+`provider=local-wesh, model=qwen3.5-9b-wesh, recovered=true`, value 7 (about 4.5 over the last
+hour); no series with `recovered=false`. So the gateway recovered 7 empty responses from
+qwen3.5-9b-wesh and none were lost. `Reasoning too short` occurrences in
+`unifai-multiagent-temporal-worker` and `unifai-multiagent-be` logs over the last 40 and 60
+minutes: 0 (it was the reply of the failing turns before).
+
+Commands: `run_scenarios.py --target unifai` (twice), `security_checks.py --target unifai`,
+`run_acceptance_gate.py --target unifai` in `evaluations/comage` (setup as above); then
+`oc -n zuno-unifai logs deploy/unifai-multiagent-temporal-worker --since=40m | grep -c 'Reasoning too short'`
+and an instant query on `zuno_model_empty_responses_total` against the thanos-querier route.
