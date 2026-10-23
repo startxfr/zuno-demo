@@ -1,6 +1,6 @@
 # WP-161: Fetch OKF content at pod start instead of baking it
 
-- **State:** Repo work in review
+- **State:** Operator pending
 - **ADRs:** [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)
 - **Depends on:** [WP-160](wp-160-admit-the-corp-okf-release-in-zuno-demo.md)
 - **Related:** [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [WP-165](wp-165-cut-over-and-remove-agents-from-zuno-demo.md)
