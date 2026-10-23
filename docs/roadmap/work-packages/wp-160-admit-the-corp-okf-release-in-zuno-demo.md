@@ -44,6 +44,8 @@ zuno-demo; the scheduled run only fires from the default branch (`main`);
 first promotion once v0.1.1 is published.
 
 
+## Goal
+
 `zuno-demo` pins one corp digest, verifies it offline by identity, validates
 it against its own contract, and receives every new release as a reviewed
 pull request it opened itself.

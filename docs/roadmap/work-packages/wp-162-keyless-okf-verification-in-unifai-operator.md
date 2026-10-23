@@ -21,6 +21,8 @@ identities are written in one place only. Test artifact:
 (dev-signed); the trusted root is `platform/okf/sigstore/trusted_root.json`.
 
 
+## Goal
+
 `UnifaiAgentBundle.spec.verify.keyless` verifies an agent artifact by
 issuer and subject against a mounted trusted root, offline, and reads the
 `v2` media type; the zuno chart renders keyless bundles from generated

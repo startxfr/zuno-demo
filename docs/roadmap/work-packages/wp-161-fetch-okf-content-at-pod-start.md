@@ -51,6 +51,43 @@ Not done, on purpose:
   to this work.
 
 
+## Live proof on demo333 (2026-10-23)
+
+Coordinated with the sessions running the UnifAI pilot there (window agreed,
+single sync, revert plan ready).
+
+- Image: a BuildConfig `okf-fetch-wp161` (zuno-ai-build) built
+  `supply-chain-signer:wp161` from 97fd352c (sha256:37dc154a...), leaving
+  `:latest` untouched. Isolated pods first: v0.2.0 extracted under the
+  restricted SCC; a dev-signed corp artifact refused with exit 1.
+- The chart, role, Dockerfile and admission files went to the demo333 branch
+  as a6c854fe (files only; default render byte-identical).
+- `zuno-mcp-d1` values gained `okf.fetch` (enabled, v0.2.0 digest, tag
+  wp161): one rolling update, `Synced Healthy`; `okf-fetch` exited 0 with
+  `VERIFIED ... release 0.2.0, 8 agent(s)`, alongside the istio native
+  sidecar; `AGENTS_DIR=/okf/agents`, `TOOL_POLICY_PATH=/okf/policies/...`;
+  `/readyz` ready.
+- No behaviour change: tekos scenarios 12 (consultant-01 ->
+  salesforce.opportunity.read 403), 13 (unknown tool 404), 18 (board-01 ->
+  undeclared git.repository.delete 403) pass; `/mcp` tools/list with
+  `X-Zuno-Agent: tekos` gives consultant-01 200, sale-01 and adv-01 403;
+  security checks tekos 12/12, comage 8/8, finage 7/7, advantage 7/7,
+  naveo 5/5, arkos 11/11 - all equal to the baseline.
+- Durable the same day (91761085 on demo222, 2ee40777 on demo333):
+  `ansible/clusters/demo333.yml` sets `zuno_okf_fetch_enabled: true` and
+  `zuno_okf_fetch_image_tag: wp161`, and `ansible/roles/mcp` passes the tag;
+  the role renders exactly the values patched live, so a re-run keeps the
+  release path. `okf-fetch-wp161` is kept, relabelled and annotated as the
+  source of that image.
+
+Operator action left: every zuno-ai-build BuildConfig builds from `main`,
+whose supply-chain-signer Dockerfile predates okf-fetch. Once main carries
+the WP-161 Dockerfile, rebuild `supply-chain-signer:latest`, drop
+`zuno_okf_fetch_image_tag` from demo333.yml (back to latest) and delete
+`okf-fetch-wp161`.
+
+## Goal
+
 mcp-gateway and mlops read agents and corp policies from an `emptyDir`
 filled and verified by an `okf-fetch` init container at the digest in their
 pod template; their images no longer contain `agents/` or `policies/`; a

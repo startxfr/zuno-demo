@@ -44,6 +44,8 @@ WP-156. mcp-gateway, mlops and agent-frontend do not check the version and
 read only fields v0.3 keeps.
 
 
+## Goal
+
 OKF v0.3 expresses skills, model roles, guardrail modes and per-agent
 limits; a widening against the corp policies is refused in CI and at
 admission; every consumer reads v0.2 and v0.3; the eight agents are

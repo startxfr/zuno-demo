@@ -40,6 +40,8 @@ Part 2, the consumers, is under way and coordinated:
   charts.
 
 
+## Goal
+
 `generate_stack_config.py` produces, from the locked release, the Keycloak
 groups, MaaS subscriptions, Kuadrant policies, ai-gateway routing and
 guardrail inputs, per-agent values and UnifAI bundle values; `--check` gates
