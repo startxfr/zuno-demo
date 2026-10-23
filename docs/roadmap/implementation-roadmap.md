@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 6 | 8 | WP-145 |
 | v0.10 | 5 | 1 | 6 | WP-51 |
-| v0.11 | 16 | 11 | 13 | WP-146, WP-147, WP-149, WP-150, WP-154, WP-155, WP-156, WP-157, WP-166 |
+| v0.11 | 16 | 11 | 14 | WP-146, WP-147, WP-149, WP-150, WP-154, WP-155, WP-156, WP-157, WP-166, WP-168 |
 | v0.12 | 9 | 9 | 9 | WP-158, WP-159, WP-160, WP-161, WP-163, WP-164, WP-165, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -951,6 +951,7 @@ frozen mirror.
 | WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Repo work in review | schemas, corp ceilings and the narrowing rule built (agents repo + admission); bundle migration waits for unifai-operator v0.3 and WP-156 |
 | WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator (part 1); unifai role and Keycloak groups Job wired and live on demo333 (part 2); quotas/MaaS/routing wait for WP-157 |
 | WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Not started | parity proof on the running cluster, outside any demo freeze |
+| WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Not started | split out of WP-156 by user decision 2026-10-23: rag-service and rag-ingestion stay for the Red Hat docs until this lands |
 
 ### OKF stream phases
 

@@ -169,6 +169,17 @@ first.
    amendment of ADR-0556 in force. Run `python3 platform/docs/check_docs.py`.
    Update `components/README.md`.
 
+## Decision of 2026-10-23: the Red Hat documentation keeps `rag-service` alive
+
+The knowledge corpus of `rag-service` is the Red Hat product documentation
+(about 874 `docs.redhat.com` pages loaded by `rag-ingestion`); UnifAI's RAG holds
+only the tekos Confluence spaces. The user decided to retire everything else of the
+old stack now and to **keep `rag` (rag-service) and `rag-ingestion`** for that
+documentation only, until [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md)
+moves it to UnifAI. In this work package, `rag-service`, `rag-ingestion`, their
+charts, Applications, raw S3 prefix and the mcp-gateway fallback to `rag-service`
+therefore stay; the removal of the rag stack is part of WP-168.
+
 ## Acceptance
 
 No file references the removed components (`grep -rn` returns only ADR
