@@ -49,6 +49,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos")
 from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _invoke_tool, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
+from okf_release import okf_root  # noqa: E402  (WP-165: agents and corp policies)
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -99,7 +100,7 @@ def finage_never_declares_sales_or_adv_knowledge_domains() -> CheckResult:
     live attempt denied by the MCP Gateway) is scenarios 12/13/18 in
     scenarios.yaml, not repeated here.
     """
-    tasks_dir = REPO_ROOT / "agents" / "finage" / "tasks"
+    tasks_dir = okf_root(REPO_ROOT) / "agents" / "finage" / "tasks"
     offending: list = []
     checked = 0
     for task_path in sorted(tasks_dir.glob("*.md")):

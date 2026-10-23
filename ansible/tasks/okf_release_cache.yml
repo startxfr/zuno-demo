@@ -1,0 +1,22 @@
+---
+# ADR-0580/WP-165: agent definitions and the corp policies are no longer in
+# this repository; they come from the zuno-demo-agents release pinned in
+# platform/okf/agents.lock. platform/okf/release_cache.py extracts it once
+# per digest into .cache/okf-release/<digest>/ (verifying the keyless
+# signatures and attestations offline first, as `make d3 admit agents`
+# does) and points .cache/okf-release/current at it - the path the
+# acceptance-gate and stresstest kustomize configMapGenerators read.
+#
+# Include this before any task that reads the release. Sets
+# zuno_okf_release_dir. Needs cosign and oras on the control node (or in
+# the AAP execution environment) the first time a digest is extracted.
+- name: "okf-release | extract the admitted agents release (verified, cached per digest)"
+  ansible.builtin.command:
+    cmd: python3 platform/okf/release_cache.py
+    chdir: "{{ zuno_repo_root }}"
+  register: _okf_release_cache
+  changed_when: false
+
+- name: "okf-release | remember where the release is"
+  ansible.builtin.set_fact:
+    zuno_okf_release_dir: "{{ _okf_release_cache.stdout_lines | last }}"

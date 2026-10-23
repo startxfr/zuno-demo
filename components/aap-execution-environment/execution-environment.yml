@@ -81,3 +81,16 @@ additional_build_steps:
       "https://github.com/sigstore/cosign/releases/download/${COSIGN_VERSION}/cosign-linux-amd64"
       && echo "${COSIGN_SHA256}  /usr/bin/cosign" | sha256sum -c -
       && chmod +x /usr/bin/cosign
+    # ADR-0580/WP-165: oras pulls the agents release pinned in
+    # platform/okf/agents.lock (platform/okf/release_cache.py). Same pin as
+    # components/supply-chain-signer/Dockerfile; digest from the release's
+    # oras_1.2.2_checksums.txt.
+    - ARG ORAS_VERSION=1.2.2
+    - ARG ORAS_SHA256=bff970346470e5ef888e9f2c0bf7f8ee47283f5a45207d6e7a037da1fb0eae0d
+    - >-
+      RUN curl -sSL -o /tmp/oras.tar.gz
+      "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz"
+      && echo "${ORAS_SHA256}  /tmp/oras.tar.gz" | sha256sum -c -
+      && tar -xzf /tmp/oras.tar.gz -C /usr/bin oras
+      && chmod +x /usr/bin/oras
+      && rm -f /tmp/oras.tar.gz

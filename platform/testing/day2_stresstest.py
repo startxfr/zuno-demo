@@ -41,12 +41,11 @@ platform/testing/day2_report.py - the same split
 ansible/tasks/day2_availability_check.yml and
 ansible/roles/day2/tasks/platform_health_check.yml already use.
 
-Contract tests (platform/okf/run_agent_contract_tests.py) are
-deliberately NOT run here: that script has no per-agent hook and needs no
-cluster access at all, so it runs once, directly from the control node
-(platform/testing/day2_contract_attribution.py) - running it once per
-agent inside this Job would just repeat the same whole-repo scan six
-times for no benefit.
+The contract layer is deliberately NOT run here: since WP-165 the
+contract suites run in the zuno-demo-agents CI and reach this platform as
+a signed attestation of the admitted release, which needs no cluster
+access, so it is reported once from the control node
+(platform/testing/day2_contract_attribution.py).
 
 Bulk-interaction load mode (ADR-0058 decision 3) is a separate script,
 platform/testing/day2_bulk.py, invoked by the same Job when

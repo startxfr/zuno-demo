@@ -123,8 +123,10 @@ unifaiNamespace: zuno-unifai
 # there. The data-classification policy and the tool bindings stay the
 # platform's own (baked). A failed verification keeps the pod in Init
 # (fail closed). The digest is a pod-template annotation, so promoting a
-# release rolls the pods. Off by default: the baked copy stays the fallback
-# until the cutover (WP-165).
+# release rolls the pods. Since the cutover (WP-165) the image carries no
+# agents and no tool policy: ansible/roles/mcp always enables this with the
+# locked digest. The chart default stays off only so a bare `helm lint`
+# renders; a pod deployed that way denies every agent-scoped call.
 okf:
   fetch:
     enabled: false

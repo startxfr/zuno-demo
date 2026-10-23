@@ -14,8 +14,10 @@ from reporting):
     endpoint, secret or credential (ADR-0202: "must not contain physical
     database names, service endpoints, secrets or credentials"). Also
     validates `knowledge/metadata-schema.yaml`'s own shape.
-  - knowledge_refs: every `knowledge.<domain>` reference under `agents/`
-    and `policies/` resolves to a descriptor declared in `knowledge/`.
+  - knowledge_refs: every `knowledge.<domain>` reference under the
+    admitted agents release's `agents/` and `policies/` (ADR-0580, WP-165:
+    platform/okf/release_cache.py) and this tree's own `policies/` resolves
+    to a descriptor declared in `knowledge/`.
 
 Run from the repository root:
 
@@ -34,7 +36,9 @@ import yaml
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 KNOWLEDGE_DIR = REPO_ROOT / "knowledge"
 METADATA_SCHEMA_PATH = KNOWLEDGE_DIR / "metadata-schema.yaml"
-AGENTS_DIR = REPO_ROOT / "agents"
+# The platform's own policies (data-classification, optimization, database).
+# Agents and the corp policies come from the admitted agents release since
+# WP-165 (platform/okf/release_cache.py).
 POLICIES_DIR = REPO_ROOT / "policies"
 
 REQUIRED_DESCRIPTOR_FIELDS = (
@@ -196,11 +200,25 @@ def check_domain_descriptors() -> List[Finding]:
     return findings
 
 
+def _label(path: pathlib.Path, release: pathlib.Path) -> str:
+    try:
+        return f"release:{path.relative_to(release)}"
+    except ValueError:
+        return str(path.relative_to(REPO_ROOT))
+
+
 def check_knowledge_refs() -> List[Finding]:
     findings: List[Finding] = []
     known_domains = _known_domains()
 
-    for scan_root in (AGENTS_DIR, POLICIES_DIR):
+    sys.path.insert(0, str(REPO_ROOT / "platform" / "okf"))
+    import release_cache  # noqa: E402
+    try:
+        release = release_cache.release_dir()
+    except release_cache.ReleaseUnavailable as exc:
+        return [Finding("knowledge_refs", f"the admitted agents release is unavailable: {exc}")]
+
+    for scan_root in (release / "agents", release / "policies", POLICIES_DIR):
         if not scan_root.is_dir():
             continue
         for path in sorted(scan_root.rglob("*")):
@@ -213,7 +231,7 @@ def check_knowledge_refs() -> List[Finding]:
                     if ref not in known_domains:
                         findings.append(Finding(
                             "knowledge_refs",
-                            f"{path.relative_to(REPO_ROOT)}:{lineno}: unknown knowledge domain reference "
+                            f"{_label(path, release)}:{lineno}: unknown knowledge domain reference "
                             f"'{ref}' (not declared under knowledge/)",
                         ))
     return findings
@@ -223,7 +241,7 @@ def main() -> int:
     findings = check_domain_descriptors() + check_knowledge_refs()
 
     print("Checked knowledge/ domain descriptors against knowledge/metadata-schema.yaml, "
-          "and scanned agents/ and policies/ for undeclared knowledge.* references.")
+          "and scanned the admitted release's agents/ and policies/ plus policies/ here for undeclared knowledge.* references.")
     if not findings:
         print("\nRESULT: PASS - no knowledge-domain contract issues found.")
         return 0

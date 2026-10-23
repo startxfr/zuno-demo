@@ -83,6 +83,9 @@ jobs:
         run: |
           python3 platform/supply-chain/admit_okf_bundle.py admit --release "$TAG" --update-lock --out "$RUNNER_TEMP/new"
           python3 platform/okf/generate_stack_config.py --release-dir "$RUNNER_TEMP/new"
+          # WP-165: the Kuadrant/ai-gateway quota files are generated from the
+          # release's corp quota policy, so they move with the lock.
+          python3 platform/okf/generate_quota_enforcement.py --release-dir "$RUNNER_TEMP/new"
           old=""
           if [ -n "$CURRENT" ]; then
             python3 platform/supply-chain/admit_okf_bundle.py extract "$CURRENT" --out "$RUNNER_TEMP/old"
@@ -111,6 +114,8 @@ jobs:
           add-paths: |
             platform/okf/agents.lock
             platform/okf/stack-config.generated.yaml
+            gitops/charts/connectivity-link/templates/quota-ratelimitpolicies.yaml
+            components/ai-gateway/app/quota_budgets.yaml
           commit-message: "okf: promote zuno-demo-agents ${{ steps.candidate.outputs.tag }}"
           title: "okf: promote zuno-demo-agents ${{ steps.candidate.outputs.tag }}"
           body-path: ${{ runner.temp }}/body.md

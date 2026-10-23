@@ -19,7 +19,18 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pyyaml
+      # ADR-0580/WP-165: agents and the corp policies are not in this
+      # repository; the steps below read the release pinned in
+      # platform/okf/agents.lock, verified offline and extracted once by
+      # platform/okf/release_cache.py (needs cosign and oras).
+      - uses: oras-project/setup-oras@v1
+        with:
+          version: 1.2.2
       - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
+      - name: Extract the locked agents release
+        run: python3 platform/okf/release_cache.py
       # ADR-0111/ADR-0549 (2026-09-05): the "immutable image tags" check
       # that used to run here (check_no_latest_tags.py, non-blocking) is
       # removed - zero GitHub Actions dependency for this compliance
@@ -107,6 +118,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - run: pip install pyyaml
+      # ADR-0580/WP-165: agents and the corp policies are not in this
+      # repository; the steps below read the release pinned in
+      # platform/okf/agents.lock, verified offline and extracted once by
+      # platform/okf/release_cache.py (needs cosign and oras).
+      - uses: oras-project/setup-oras@v1
+        with:
+          version: 1.2.2
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
+      - name: Extract the locked agents release
+        run: python3 platform/okf/release_cache.py
       - name: mcp-gateway tests
         working-directory: components/mcp-gateway
         run: |
@@ -240,6 +264,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - run: pip install pyyaml
+      # ADR-0580/WP-165: agents and the corp policies are not in this
+      # repository; the steps below read the release pinned in
+      # platform/okf/agents.lock, verified offline and extracted once by
+      # platform/okf/release_cache.py (needs cosign and oras).
+      - uses: oras-project/setup-oras@v1
+        with:
+          version: 1.2.2
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
+      - name: Extract the locked agents release
+        run: python3 platform/okf/release_cache.py
       - name: Determine which evaluations/<agent>/ directories changed (path filter)
         id: changed
         run: |
@@ -283,9 +320,9 @@ jobs:
           exit $exit_status
       # ADR-0305 (WP-40): "a candidate without a benchmark artifact cannot
       # be referenced by a routing-policy change" - fully repo-checkable
-      # (reads policies/model-routing/model-routing-policy.yaml and
-      # evaluations/benchmarks/*.json, both committed or absent, never a
-      # live call), unlike the scenario-rate verdict above, so this one
+      # (reads the admitted release's policies/model-routing/
+      # model-routing-policy.yaml and evaluations/benchmarks/*.json, never
+      # a live call), unlike the scenario-rate verdict above, so this one
       # IS a real, always-blocking gate rather than a wiring smoke check.
       # Passes trivially today: adapters: [] has nothing to check.
       - name: Enforce no-artifact-no-promotion for declared adapters (ADR-0305)

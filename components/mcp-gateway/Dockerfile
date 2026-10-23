@@ -3,18 +3,19 @@
 #   docker build -f components/mcp-gateway/Dockerfile -t zuno/mcp-gateway:local .
 #
 # A repo-root build context is required because this image bakes in the
-# policy files owned by another track (Track B):
-#   - policies/tools/tool-policy.yaml
-#   - policies/data-classification/classification.yaml
-# so that a policy change ships as an ordinary redeploy of this gateway.
-# See app/policy.py for the graceful-degradation behavior if those files
-# are still absent at build time (the service starts and serves /healthz,
-# but every /v1/tools/*/invoke call fails closed with a clear 503/403
-# until the files are present and the store is reloaded).
+# platform's own data-classification policy
+# (policies/data-classification/classification.yaml) and the backend
+# bindings (platform/bindings/).
 #
-# ADR-0036/0038: also bakes in agents/ (the OKF v0.2 Markdown bundles) so
-# app/agent_declarations.py can enforce the agent_declaration/task_rights
-# factors - same reasoning, same reload path (/admin/reload-policy).
+# ADR-0580/WP-165: the agent bundles (ADR-0036/0038, read by
+# app/agent_declarations.py) and the corp tool policy
+# (policies/tools/tool-policy.yaml) are NOT baked any more: they left this
+# repository for the zuno-demo-agents release, which the chart's okf-fetch
+# init container verifies and extracts into /okf at pod start
+# (gitops/charts/mcp-gateway, okf.fetch; enabled by ansible/roles/mcp). The
+# defaults below point there. Without that volume the gateway starts and
+# serves /healthz, but every agent-scoped call fails closed (see
+# app/policy.py and app/agent_declarations.py).
 #
 # FROM image below defaults to the zuno-ai-build ImageStream mirror
 # (ansible/roles/image_mirrors), not docker.io directly - a local
@@ -37,15 +38,14 @@ COPY components/mcp-gateway/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY components/mcp-gateway/app ./app
-COPY policies ./policies
-COPY agents ./agents
+COPY policies/data-classification ./policies/data-classification
 # ADR-0116: the backend-binding registry rides the same bake-in/reload
 # lifecycle as the policy files above.
 COPY platform/bindings ./platform/bindings
 
-ENV TOOL_POLICY_PATH=/app/policies/tools/tool-policy.yaml \
+ENV TOOL_POLICY_PATH=/okf/policies/tools/tool-policy.yaml \
     DATA_CLASSIFICATION_PATH=/app/policies/data-classification/classification.yaml \
-    AGENTS_DIR=/app/agents \
+    AGENTS_DIR=/okf/agents \
     TOOL_BINDINGS_PATH=/app/platform/bindings/tools/tool-bindings.yaml \
     PYTHONUNBUFFERED=1
 

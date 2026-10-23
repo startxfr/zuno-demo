@@ -15,29 +15,21 @@ WP-156 (2026-10-23): the AIAgent CR, its chart and Applications, and the
 frontend/BFF images are no longer generated - the AIAgent operator,
 agent-frontend and agent-bff were retired. An agent is served by UnifAI
 (ADR-0561) from its OKF bundle, delivered as a signed OCI release
-(ADR-0564, ADR-0580); since ADR-0576 the bundle itself is authored in the
-zuno-demo-agents repository, so the agents/<name>/ output here is a draft
-to move there (agents/ in this tree is that repository's mirror).
+(ADR-0564, ADR-0580).
 
-This module writes real files into the real repository tree (agents/,
-evaluations/<name>/) - the onboarding workflow is "run this, review the diff, open a PR," not a
-throwaway scratch directory. Two things it deliberately does NOT write,
-because doing so programmatically would either corrupt heavily-commented
-shared files or apply a change no generator should make unreviewed:
+WP-165 (ADR-0576 clause 1): the bundle half of this scaffold (agent.okf.md,
+tasks, prompts, the Keycloak fragment) and the corp policy entries live in
+the zuno-demo-agents repository, which has its own scaffold
+(platform/templates/agent/scaffold_agent.py there). What stays here is the
+platform half: the evaluation skeleton under evaluations/<name>/, which
+UnifAI's scenarios, the acceptance gate and the stresstest run against the
+agent once a release carrying it is admitted. The Keycloak entitlement
+group is generated from the release (ADR-0581) and reconciled by the
+ADR-0530 Job; nothing to merge by hand.
 
-  - policies/tools/tool-policy.yaml / policies/knowledge/knowledge-policy.yaml:
-    both files are hand-curated and densely commented; a naive
-    yaml.safe_load + yaml.safe_dump round-trip would silently destroy
-    every comment (verified: this repo's own realm-zuno.json round-trips
-    with a large spurious diff even though nothing semantic changed - the
-    same risk applies here). Emits exact instructions in NEXT_STEPS.md
-    instead.
-  - gitops/charts/keycloak/files/realm-zuno.json: same reasoning, plus a
-    generated client/group/user fragment needs a human's own judgment
-    call about *which* existing users, if any, should also gain the new
-    entitlement (see NEXT_STEPS.md's own worked example). Emits
-    agents/<name>/keycloak-fragment.json (documented, for manual merge)
-    instead.
+This module writes real files into the real repository tree
+(evaluations/<name>/) - the onboarding workflow is "run this, review the
+diff, open a PR," not a throwaway scratch directory.
 
 No chart and no Application are generated: UnifAI serves the agent once
 its bundle is in an admitted release (the `unifai` Day 2 component deploys
@@ -65,24 +57,22 @@ needs to spell out. Photorealistic image generation
 (`image.generation.create`) is NOT a default for the same reason it isn't
 default anywhere else in the platform: it's Comage-exclusive, scoped to
 marketing visuals - pass `--tool image.generation.create` explicitly only
-if a genuinely new agent has that same narrow use case, and update
-`policies/tools/tool-policy.yaml`'s own comment accordingly.
+if a genuinely new agent has that same narrow use case, and update the
+corp tool policy's own comment in zuno-demo-agents accordingly.
 
 Every `--knowledge`/`--tool` value must already be a real logical
 knowledge domain / tool capability this platform declares (ADR-0410:
 "existing knowledge domains and capabilities only, no new external
-systems") - this module does not validate that itself (platform/docs/
-check_knowledge_refs.py and platform/supply-chain/validate_okf_bundle.py
-do, as part of the same PR's own CI run).
+systems") - this module does not validate that itself; admission of the
+release carrying the agent does (`make d3 admit agents`: every tool and
+knowledge domain a released agent reaches must be bound here).
 """
 from __future__ import annotations
 
 import argparse
-import json
 import pathlib
 import sys
 from dataclasses import dataclass, field
-from datetime import date
 from typing import List, Optional
 
 # platform/templates/agent/scaffold_agent.py -> repo root is 3 levels up
@@ -117,132 +107,6 @@ class AgentSpec:
             self.entitlement_group = f"agent_{self.name}"
         if self.live_read_tool and self.live_read_tool not in self.tools:
             raise ValueError(f"--live-read-tool {self.live_read_tool!r} must also be declared with --tool")
-
-
-def render_agent_okf(spec: AgentSpec) -> str:
-    today = date.today().isoformat()
-    knowledge_list = "\n".join(f'    - "{k}"' for k in spec.knowledge_domains) or "    []"
-    return f"""---
-okf_version: v0.2
-type: agent
-title: {spec.title}
-description: >-
-  {spec.description}
-provenance:
-  maintainer: Zuno Demo architecture team
-  repository: zuno-demo
-verification:
-  status: unverified
-freshness:
-  last_reviewed: "{today}"
-sources:
-{knowledge_list}
-zuno:
-  name: {spec.name}
-  status: placeholder
-  graph_shape: retrieve_reason_respond
-  primary_task: {spec.primary_task}
-  tasks:
-    - {spec.primary_task}
-  rag:
-    top_k: {spec.rag_top_k}
-  model:
-    preferred_classification: {spec.preferred_classification}
-    notes: >-
-      Scaffolded by platform/templates/agent/ (ADR-0307/WP-41) - reuses
-      the retrieve_reason_respond shape and existing knowledge/tool
-      capabilities only, no new external systems (ADR-0410).
-  access:
-    # ADR-0040: agent entitlement group, orthogonal to the
-    # `{spec.business_role}` business role that governs tool/data
-    # permissions inside {spec.title} (policies/tools/tool-policy.yaml -
-    # see this bundle's own NEXT_STEPS.md for the exact policy entries to
-    # add).
-    groups:
-      - {spec.entitlement_group}
-  ui:
-    displayName: {spec.title}
-    tileDescription: {spec.tile_description}
-    color: "{spec.color}"
-    icon: {spec.icon}
----
-
-# {spec.title}
-
-{spec.description}
-
-Conforms to `platform/okf/schema/zuno-okf-v0.2.schema.json` (ADR-0005,
-ADR-0038). `status` stays `placeholder` until the operator confirms the
-live ADR-0027/ADR-0028 acceptance gate passes (ADR-0326's completion
-pattern, the same bar every hand-built agent clears) - see this bundle's
-own `NEXT_STEPS.md` for what remains.
-
-Scaffolded by `platform/templates/agent/scaffold_agent.py` (ADR-0307,
-roadmap WP-41). {spec.title} is served by UnifAI (ADR-0561) from this bundle,
-delivered as a signed OCI release (ADR-0564, ADR-0580) - no per-agent
-deployment of its own.
-"""
-
-
-def render_task_md(spec: AgentSpec) -> str:
-    knowledge_lines = "\n".join(f"    - {k}" for k in spec.knowledge_domains)
-    tool_lines = "\n".join(f"    - {t}" for t in spec.tools)
-    live_read = f"\n  live_read_tool: {spec.live_read_tool}" if spec.live_read_tool else ""
-    return f"""---
-okf_version: v0.2
-type: task
-title: {spec.primary_task_title}
-zuno:
-  allowed_tools:
-{tool_lines}
-{live_read}
-  allowed_knowledge:
-{knowledge_lines}
----
-
-# {spec.primary_task_title}
-
-{spec.primary_task_title} using {spec.title}'s declared knowledge domains
-and tool capabilities, all reused from the existing platform catalog
-(ADR-0410 - no new knowledge domain or external backend for a
-template-scaffolded agent).
-
-This is the task UnifAI runs once `status: active`: unifai-operator maps
-the `allowed_tools`/`allowed_knowledge` above and
-`prompts/{spec.primary_task}.md`'s system prompt onto the bundle's
-blueprint (ADR-0564), the `retrieve_reason_respond` shape by default.
-"""
-
-
-def render_prompt_md(spec: AgentSpec) -> str:
-    # Prompt files carry the same OKF frontmatter contract as every other
-    # bundle file (type: prompt) - AgentRegistry fails the whole bundle
-    # load on a prompt file without a leading `---` block, a real
-    # constraint this generator's own scaffold-validate-discard CI test
-    # originally missed (the bundle loader, then agent-runtime's, caught it).
-    return f"""---
-okf_version: v0.2
-type: prompt
-title: {spec.title} system prompt - {spec.primary_task}
----
-
-You are {spec.title}, {spec.description[0].lower()}{spec.description[1:]}
-
-Answer using the retrieved context below. Cite sources concisely. If the
-retrieved context does not ground an answer, say so rather than
-guessing.
-"""
-
-
-def render_tasks_readme(spec: AgentSpec) -> str:
-    return f"""# {spec.title} Tasks
-
-One OKF Markdown bundle (ADR-0038), linked from `../agent.okf.md`'s
-`zuno.tasks`: `{spec.primary_task}.md` - the agent's one task, served by
-UnifAI on the `retrieve_reason_respond` blueprint (ADR-0564), reused
-unchanged - self-service onboarding needs zero new platform code
-(ADR-0307/WP-41).
-"""
 
 
 def render_eval_readme(spec: AgentSpec) -> str:
@@ -391,6 +255,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos")
 from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
+from okf_release import okf_root  # noqa: E402  (WP-165: agents and corp policies)
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -412,14 +277,14 @@ class CheckResult:
 
 def {py_name}_declares_only_scaffolded_knowledge_and_tools() -> CheckResult:
     """Self-consistency check (no live cluster needed): every
-    agents/{spec.name}/tasks/*.md file's actual YAML frontmatter must
+    agents/{spec.name}/tasks/*.md file of the admitted release must
     stay within the knowledge domains and tool capabilities this agent
     was scaffolded with - catches undeclared scope creep as the bundle
     evolves past its initial scaffold.
     """
     allowed_knowledge_ceiling = {spec.knowledge_domains!r}
     allowed_tools_ceiling = {spec.tools!r}
-    tasks_dir = REPO_ROOT / "agents" / "{spec.name}" / "tasks"
+    tasks_dir = okf_root(REPO_ROOT) / "agents" / "{spec.name}" / "tasks"
     offending = []
     checked = 0
     for task_path in sorted(tasks_dir.glob("*.md")):
@@ -645,63 +510,33 @@ scenarios:
 """
 
 
-def render_keycloak_fragment(spec: AgentSpec) -> str:
-    fragment = {
-        "_comment": (
-            f"ADR-0410/ADR-0307 (WP-41) scaffold output - NOT auto-merged. "
-            f"A human merges the relevant pieces into "
-            f"gitops/charts/keycloak/files/realm-zuno.json by hand (see "
-            f"agents/{spec.name}/NEXT_STEPS.md), the same way every prior "
-            f"agent's realm entries were added - see agent_arkos's own "
-            f"group/user entries in that file as the worked example. No "
-            f"per-agent OIDC client: UnifAI signs users in (WP-156)."
-        ),
-        "group": {
-            "name": spec.entitlement_group,
-            "path": f"/{spec.entitlement_group}",
-        },
-        "entitlement_only_fixture_user": f"{spec.name}-entitlement-only-user-01",
-    }
-    return json.dumps(fragment, indent=2) + "\n"
-
-
 def render_next_steps(spec: AgentSpec) -> str:
     return f"""# {spec.title} onboarding - remaining steps
 
 Scaffolded by `platform/templates/agent/scaffold_agent.py` (ADR-0307,
-WP-41). What's real already: the OKF bundle draft and a 20-scenario
-evaluation skeleton. What still needs a human:
+WP-41): the 20-scenario evaluation skeleton of this directory. What still
+needs a human:
 
-1. **Review/adjust the prose** in `agent.okf.md`, `tasks/{spec.primary_task}.md`
-   and `prompts/{spec.primary_task}.md` - the scaffold fills in a working
-   skeleton, not a finished persona.
-2. **Merge `keycloak-fragment.json`** into
-   `gitops/charts/keycloak/files/realm-zuno.json` by hand (entitlement
-   group, fixture user) - see `agent_arkos`'s own entries there as the
-   worked example this fragment mirrors. No per-agent OIDC client or
-   Vault seed: UnifAI signs users in (WP-156).
-3. **Add policy entries** (never auto-written - see this module's own
-   docstring for why):
-   - `policies/tools/tool-policy.yaml`: add `{spec.business_role}` to
-     `allowed_groups` for each of: {", ".join(spec.tools) or "(none declared)"}
-     - only if not already present.
-   - `policies/knowledge/knowledge-policy.yaml`: add `{spec.business_role}`
-     to `allowed_groups` for each of: {", ".join(spec.knowledge_domains) or "(none declared)"}
-     - only if not already present.
-4. **Move the bundle to zuno-demo-agents** (ADR-0576): `agents/` in
-   zuno-demo is that repository's mirror. Once a release carrying it is
-   admitted (`make d3 admit agents`, ADR-0580), the `unifai` component
-   deploys its `UnifaiAgentBundle` and `make d2 check agents` reports its
-   availability - no per-agent check entry to add.
-5. **Run the validators** this scaffold's own CI test also runs:
-   `python3 platform/supply-chain/validate_okf_bundle.py`,
-   `python3 platform/docs/check_knowledge_refs.py`,
+1. **Author the bundle in zuno-demo-agents** (ADR-0576): agent.okf.md,
+   `tasks/{spec.primary_task}.md`, `prompts/{spec.primary_task}.md`, the
+   entitlement group `{spec.entitlement_group}` and the corp policy
+   entries (`{spec.business_role}` allowed for {", ".join(spec.tools) or "(no tool)"} and
+   {", ".join(spec.knowledge_domains) or "(no knowledge domain)"}), with that repository's own scaffold.
+   Tag a release there.
+2. **Admit it here** (ADR-0580): `make d3 admit agents RELEASE=vX.Y.Z
+   UPDATE_LOCK=1`, or merge the promotion PR `okf-promote.yml` opens; then
+   `python3 platform/okf/generate_stack_config.py` (ADR-0581). The `unifai`
+   component deploys its `UnifaiAgentBundle`, the Keycloak reconcile Job
+   creates `{spec.entitlement_group}`, and `make d2 check agents` reports
+   its availability - no per-agent check entry to add.
+3. **Review the scenarios** in `scenarios.yaml` - the scaffold fills in a
+   working skeleton, not the agent's real acceptance bar.
+4. **Run the validators**: `python3 platform/docs/check_knowledge_refs.py`,
    `python3 platform/docs/check_docs.py`.
-6. **Promote** (ADR-0502): follow
+5. **Promote** (ADR-0502): follow
    `platform/templates/agent/PROMOTION.md` - the named Stage-1 -> Stage-2
-   checklist (scenario review, UnifAI deploy, 75% gate, Stage-2 directory
-   content, `zuno.status: active`, README update). Steps 1-5 above are
-   its assumed scaffold-time baseline.
+   checklist (scenario review, UnifAI deploy, 75% gate, `zuno.status:
+   active` in the agents repository, README update).
 """
 
 
@@ -714,13 +549,6 @@ def write_all(spec: AgentSpec, repo_root: pathlib.Path = REPO_ROOT) -> List[path
         path.write_text(content, encoding="utf-8")
         written.append(path)
 
-    _write(f"agents/{spec.name}/agent.okf.md", render_agent_okf(spec))
-    _write(f"agents/{spec.name}/tasks/{spec.primary_task}.md", render_task_md(spec))
-    _write(f"agents/{spec.name}/tasks/README.md", render_tasks_readme(spec))
-    _write(f"agents/{spec.name}/prompts/{spec.primary_task}.md", render_prompt_md(spec))
-    _write(f"agents/{spec.name}/keycloak-fragment.json", render_keycloak_fragment(spec))
-    _write(f"agents/{spec.name}/NEXT_STEPS.md", render_next_steps(spec))
-
     _write(f"evaluations/{spec.name}/README.md", render_eval_readme(spec))
     _write(f"evaluations/{spec.name}/scenarios.yaml", render_scenarios_yaml(spec))
     _write(f"evaluations/{spec.name}/gate_config.yaml", render_gate_config(spec))
@@ -728,6 +556,7 @@ def write_all(spec: AgentSpec, repo_root: pathlib.Path = REPO_ROOT) -> List[path
     _write(f"evaluations/{spec.name}/run_scenarios.py", render_run_scenarios_py(spec))
     _write(f"evaluations/{spec.name}/run_acceptance_gate.py", render_run_acceptance_gate_py(spec))
     _write(f"evaluations/{spec.name}/security_checks.py", render_security_checks_py(spec))
+    _write(f"evaluations/{spec.name}/NEXT_STEPS.md", render_next_steps(spec))
 
     return written
 
@@ -776,11 +605,11 @@ def main() -> int:
     parser.add_argument("--icon", default="compass")
     parser.add_argument("--tile-description", default=None)
     parser.add_argument("--rag-top-k", type=int, default=5)
-    parser.add_argument("--force", action="store_true", help="overwrite files if agents/<name>/ already exists")
+    parser.add_argument("--force", action="store_true", help="overwrite files if evaluations/<name>/ already exists")
     args = parser.parse_args()
 
-    if not args.force and (REPO_ROOT / "agents" / args.name).exists():
-        print(f"agents/{args.name}/ already exists - pass --force to overwrite", file=sys.stderr)
+    if not args.force and (REPO_ROOT / "evaluations" / args.name).exists():
+        print(f"evaluations/{args.name}/ already exists - pass --force to overwrite", file=sys.stderr)
         return 2
 
     try:
@@ -794,7 +623,7 @@ def main() -> int:
     print(f"Scaffolded {spec.title!r} ({len(written)} files):")
     for path in written:
         print(f"  {path.relative_to(REPO_ROOT)}")
-    print(f"\nNext: read agents/{spec.name}/NEXT_STEPS.md")
+    print(f"\nNext: read evaluations/{spec.name}/NEXT_STEPS.md")
     return 0
 
 

@@ -59,7 +59,16 @@ import yaml
 EVALUATIONS_DIR = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = EVALUATIONS_DIR.parent
 BENCHMARKS_DIR = EVALUATIONS_DIR / "benchmarks"
-MODEL_ROUTING_POLICY_PATH = REPO_ROOT / "policies" / "model-routing" / "model-routing-policy.yaml"
+# The corp model-routing policy lives in the admitted agents release since
+# WP-165 (evaluations/common/okf_release.py), resolved when first needed.
+MODEL_ROUTING_POLICY_REL = pathlib.Path("policies") / "model-routing" / "model-routing-policy.yaml"
+
+
+def default_policy_path() -> pathlib.Path:
+    sys.path.insert(0, str(EVALUATIONS_DIR / "common"))
+    from okf_release import okf_root  # noqa: E402
+
+    return okf_root(REPO_ROOT) / MODEL_ROUTING_POLICY_REL
 
 
 @dataclass
@@ -80,7 +89,8 @@ class Recommendation:
     candidate: Optional[str] = None
 
 
-def load_policy(policy_path: pathlib.Path = MODEL_ROUTING_POLICY_PATH) -> Dict[str, Any]:
+def load_policy(policy_path: Optional[pathlib.Path] = None) -> Dict[str, Any]:
+    policy_path = policy_path or default_policy_path()
     if not policy_path.exists():
         return {"adapters": [], "objectives": []}
     with policy_path.open("r", encoding="utf-8") as fh:
@@ -195,14 +205,15 @@ def main() -> int:
     parser.add_argument("--metrics-file", default=None, help="JSON snapshot of live ai-gateway metrics (primary path)")
     parser.add_argument("--prometheus-url", default=None, help="live Prometheus query endpoint (operator-only seam)")
     parser.add_argument("--benchmarks-dir", default=str(BENCHMARKS_DIR))
-    parser.add_argument("--policy-path", default=str(MODEL_ROUTING_POLICY_PATH))
+    parser.add_argument("--policy-path", default=None,
+                        help="default: the admitted agents release's model-routing policy")
     parser.add_argument("--output", default=None, help="write the report JSON here (default: stdout only)")
     args = parser.parse_args()
 
     if args.metrics_file and args.prometheus_url:
         parser.error("--metrics-file and --prometheus-url are mutually exclusive")
 
-    policy = load_policy(pathlib.Path(args.policy_path))
+    policy = load_policy(pathlib.Path(args.policy_path) if args.policy_path else None)
     objectives = load_objectives(policy)
     adapters = current_adapters(policy)
     artifacts = scan_benchmark_artifacts(pathlib.Path(args.benchmarks_dir))

@@ -33,6 +33,10 @@ from dataclasses import dataclass
 
 import yaml
 
+# WP-165: agents and the corp policies come from the admitted release.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
+from okf_release import okf_root  # noqa: E402
+
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -86,7 +90,7 @@ def tekos_write_code_prefers_mistral_codestral() -> CheckResult:
     Tekos tasks and the newest one.
     """
     repo_root = pathlib.Path(__file__).resolve().parents[2]
-    policy = yaml.safe_load((repo_root / "policies/model-routing/model-routing-policy.yaml").read_text())
+    policy = yaml.safe_load((okf_root(repo_root) / "policies/model-routing/model-routing-policy.yaml").read_text())
     routing = yaml.safe_load((repo_root / "platform/ai-gateway/provider-routing.yaml").read_text())
 
     entry = next(
@@ -125,14 +129,14 @@ def tekos_declares_no_dat_or_image_generation_capability() -> CheckResult:
     """
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     bundle = yaml.safe_load(
-        (repo_root / "agents/tekos/agent.okf.md").read_text().split("---", 2)[1]
+        (okf_root(repo_root) / "agents/tekos/agent.okf.md").read_text().split("---", 2)[1]
     )
     tasks = bundle.get("zuno", {}).get("tasks", [])
     dat_declared = "draft-architecture-testimonial" in tasks
 
     image_gen_tasks = []
     for task_name in tasks:
-        task_path = repo_root / "agents/tekos/tasks" / f"{task_name}.md"
+        task_path = okf_root(repo_root) / "agents/tekos/tasks" / f"{task_name}.md"
         if not task_path.exists():
             continue
         task_frontmatter = yaml.safe_load(task_path.read_text().split("---", 2)[1])
@@ -163,13 +167,13 @@ def arkos_declares_no_photorealistic_image_generation_capability() -> CheckResul
     """
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     bundle = yaml.safe_load(
-        (repo_root / "agents/arkos/agent.okf.md").read_text().split("---", 2)[1]
+        (okf_root(repo_root) / "agents/arkos/agent.okf.md").read_text().split("---", 2)[1]
     )
     tasks = bundle.get("zuno", {}).get("tasks", [])
 
     image_gen_tasks = []
     for task_name in tasks:
-        task_path = repo_root / "agents/arkos/tasks" / f"{task_name}.md"
+        task_path = okf_root(repo_root) / "agents/arkos/tasks" / f"{task_name}.md"
         if not task_path.exists():
             continue
         task_frontmatter = yaml.safe_load(task_path.read_text().split("---", 2)[1])

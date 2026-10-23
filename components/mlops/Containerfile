@@ -12,6 +12,26 @@
 # real registry.access.redhat.com image, since its GitHub-hosted runners
 # can't reach the cluster-internal mirror at all.
 ARG BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/ubi9-python-311:latest
+# ADR-0580/WP-165: content of the admitted zuno-demo-agents release this
+# image bakes is read from the release pinned in platform/okf/agents.lock,
+# never from a copy in this repository. This stage installs cosign and oras
+# (pinned, checksum-verified), then platform/okf/release_cache.py verifies
+# the release offline against the committed Sigstore trust root - exactly
+# what `make d3 admit agents` checks - and extracts it to /okf. A release
+# that does not verify fails the build. Needs egress to github.com (the two
+# binaries) and quay.io (the release), like the pip installs already do.
+FROM ${BASE_IMAGE} AS okf-release
+USER 0
+WORKDIR /src
+COPY platform/okf/install_release_tools.py platform/okf/release_cache.py platform/okf/agents.lock ./platform/okf/
+COPY platform/okf/sigstore ./platform/okf/sigstore
+COPY platform/supply-chain/admit_okf_bundle.py platform/supply-chain/okf_narrowing.py ./platform/supply-chain/
+RUN python3 platform/okf/install_release_tools.py /src/bin \
+    && python3 -m pip install --no-cache-dir pyyaml==6.0.2 \
+    && PATH="/src/bin:${PATH}" python3 platform/okf/release_cache.py > /src/release-path \
+    && cp -r "$(cat /src/release-path)" /okf \
+    && chmod -R a+rX /okf
+
 FROM ${BASE_IMAGE}
 
 USER 0
@@ -50,7 +70,14 @@ COPY evaluations /opt/app-root/src/evaluations
 # are mandatory (a failure is not skippable), so without these two COPYs
 # the `evaluate` stage fails 100% of the time, on every agent, for a
 # reason that looks nothing like a missing file.
+#
+# ADR-0580/WP-165: the corp policies these checks read (tools,
+# model-routing, ...) come from the verified agents release (okf-release
+# stage above); the platform's own policies (data-classification,
+# optimization, database) from this repository. Both land under the same
+# policies/ root the scripts resolve.
 COPY policies /opt/app-root/src/policies
+COPY --from=okf-release /okf/policies /opt/app-root/src/policies
 COPY platform/ai-gateway /opt/app-root/src/platform/ai-gateway
 # Third directory of the same gap, found only by running the gate: two
 # gate_checks read agents/<name>/agent.okf.md off that same repo root
@@ -59,7 +86,12 @@ COPY platform/ai-gateway /opt/app-root/src/platform/ai-gateway
 # mandatory), so without this every run failed them with a bare ENOENT.
 # The checks are cross-agent by design - a comage run still reads tekos's
 # and arkos's bundles - so this cannot be narrowed to the target agent.
-COPY agents /opt/app-root/src/agents
+# mlops.py also reads each task's prompt from here (MLOPS_AGENTS_DIR).
+# ADR-0580/WP-165: from the verified agents release, read at build time:
+# this image has no Deployment to carry an okf-fetch init container (KFP
+# pipeline components and a TrainingRuntime run it) and is rebuilt per
+# training run, so the build is where the locked release is read.
+COPY --from=okf-release /okf/agents /opt/app-root/src/agents
 
 USER 1001
 WORKDIR /opt/app-root/src

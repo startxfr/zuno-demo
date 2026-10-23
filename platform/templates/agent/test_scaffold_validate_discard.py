@@ -3,11 +3,11 @@
 agent in CI, validate, discard." scaffold_agent.py writes real files into
 the real repository tree (see its own module docstring for why - the
 onboarding workflow is a reviewed PR, not a scratch directory), so this
-test scaffolds a clearly-marked throwaway agent, runs the exact
-validators an onboarding PR's own CI run would (composing OKF and
-knowledge-reference validation, per ADR-0307's Decision text; the
-AIAgent-contract validation and the chart left with the AIAgent operator
-in WP-156),
+test scaffolds a clearly-marked throwaway agent's evaluation skeleton
+(the OKF bundle half moved to zuno-demo-agents with its validators in
+WP-165; the AIAgent-contract validation and the chart left with the
+AIAgent operator in WP-156), checks the generated files compile and parse
+and that knowledge references still resolve,
 and ALWAYS deletes every file it created afterward - in a `finally`
 block, so a failed validation still cleans up rather than leaving a
 throwaway agent committed by accident.
@@ -41,8 +41,9 @@ SCAFFOLD_ARGS = [
     "--tile-description", "CI scaffold test tile.",
 ]
 
+# WP-165: the bundle half moved to zuno-demo-agents; only the evaluation
+# skeleton is scaffolded here.
 THROWAWAY_PATHS = [
-    REPO_ROOT / "agents" / THROWAWAY_NAME,
     REPO_ROOT / "evaluations" / THROWAWAY_NAME,
 ]
 
@@ -71,8 +72,15 @@ def main() -> int:
             print("RESULT: FAIL - scaffold_agent.py itself failed")
             return 1
 
+        generated = sorted(str(p.relative_to(REPO_ROOT)) for p in (REPO_ROOT / "evaluations" / THROWAWAY_NAME).glob("*.py"))
         checks = [
-            ("validate_okf_bundle.py (ADR-0106)", [sys.executable, "platform/supply-chain/validate_okf_bundle.py"]),
+            # The generated Python must at least compile; the scenarios and
+            # gate config must parse.
+            ("generated Python compiles", [sys.executable, "-m", "py_compile", *generated]),
+            ("generated YAML parses", [sys.executable, "-c",
+                                       "import sys, yaml; [yaml.safe_load(open(p)) for p in sys.argv[1:]]",
+                                       f"evaluations/{THROWAWAY_NAME}/scenarios.yaml",
+                                       f"evaluations/{THROWAWAY_NAME}/gate_config.yaml"]),
             ("check_knowledge_refs.py (ADR-0202/ADR-0203)", [sys.executable, "platform/docs/check_knowledge_refs.py"]),
         ]
 

@@ -30,6 +30,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos")
 from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
+from okf_release import okf_root  # noqa: E402  (WP-165: agents and corp policies)
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -58,7 +59,7 @@ def naveo_declares_only_scaffolded_knowledge_and_tools() -> CheckResult:
     """
     allowed_knowledge_ceiling = ['knowledge.tech', 'knowledge.project']
     allowed_tools_ceiling = ['search_confluence', 'web_search', 'list_drive_files']
-    tasks_dir = REPO_ROOT / "agents" / "naveo" / "tasks"
+    tasks_dir = okf_root(REPO_ROOT) / "agents" / "naveo" / "tasks"
     offending = []
     checked = 0
     for task_path in sorted(tasks_dir.glob("*.md")):

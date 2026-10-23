@@ -24,7 +24,9 @@ COMPONENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 REPO_ROOT = os.path.dirname(os.path.dirname(COMPONENT_DIR))
 
 REAL_BINDINGS_PATH = os.path.join(REPO_ROOT, "platform", "bindings", "tools", "tool-bindings.yaml")
-REAL_POLICY_PATH = os.path.join(REPO_ROOT, "policies", "tools", "tool-policy.yaml")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from okf_release_dir import AGENTS_DIR as _OKF_AGENTS_DIR, TOOL_POLICY_PATH as _OKF_TOOL_POLICY_PATH  # noqa: E402  (WP-165)
+REAL_POLICY_PATH = _OKF_TOOL_POLICY_PATH
 REAL_CLASSIFICATION_PATH = os.path.join(
     REPO_ROOT, "policies", "data-classification", "classification.yaml"
 )
@@ -37,7 +39,7 @@ REAL_CLASSIFICATION_PATH = os.path.join(
 os.environ.setdefault("TOOL_BINDINGS_PATH", REAL_BINDINGS_PATH)
 os.environ.setdefault("TOOL_POLICY_PATH", REAL_POLICY_PATH)
 os.environ.setdefault("DATA_CLASSIFICATION_PATH", REAL_CLASSIFICATION_PATH)
-os.environ.setdefault("AGENTS_DIR", os.path.join(REPO_ROOT, "agents"))
+os.environ.setdefault("AGENTS_DIR", _OKF_AGENTS_DIR)
 
 sys.path.insert(0, COMPONENT_DIR)
 

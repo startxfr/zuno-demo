@@ -25,11 +25,13 @@ _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 # Same "point the import-time singletons at the real repo files" pattern as
 # tests/test_auth_mode_enforcement.py - must run before `import app.main`.
 os.environ.setdefault("TOOL_BINDINGS_PATH", str(_REPO_ROOT / "platform/bindings/tools/tool-bindings.yaml"))
-os.environ.setdefault("TOOL_POLICY_PATH", str(_REPO_ROOT / "policies/tools/tool-policy.yaml"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from okf_release_dir import AGENTS_DIR as _OKF_AGENTS_DIR, TOOL_POLICY_PATH as _OKF_TOOL_POLICY_PATH  # noqa: E402  (WP-165)
+os.environ.setdefault("TOOL_POLICY_PATH", _OKF_TOOL_POLICY_PATH)
 os.environ.setdefault(
     "DATA_CLASSIFICATION_PATH", str(_REPO_ROOT / "policies/data-classification/classification.yaml")
 )
-os.environ.setdefault("AGENTS_DIR", str(_REPO_ROOT / "agents"))
+os.environ.setdefault("AGENTS_DIR", _OKF_AGENTS_DIR)
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))  # import app.*
 

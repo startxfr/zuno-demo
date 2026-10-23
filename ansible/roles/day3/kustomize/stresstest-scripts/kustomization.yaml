@@ -46,6 +46,9 @@ configMapGenerator:
       # Job (day2_stresstest.py puts this directory on sys.path).
       - unifai_target.py=../../../../../evaluations/common/unifai_target.py
       - unifai_checks.py=../../../../../evaluations/common/unifai_checks.py
+      # WP-165: where the checks find agents/ and the corp policies (the
+      # repository layout, or this Job's mounts below).
+      - okf_release.py=../../../../../evaluations/common/okf_release.py
       # Repo policy/routing files security_checks.py and gate_checks.py
       # each read relative to their own resolved location
       # once mounted (same ConfigMap-symlink-indirection arithmetic
@@ -53,9 +56,9 @@ configMapGenerator:
       # already document) - projected into the exact paths
       # stresstest_job.yml's volumeMounts expect.
       - classification.yaml=../../../../../policies/data-classification/classification.yaml
-      - tool-policy.yaml=../../../../../policies/tools/tool-policy.yaml
+      - tool-policy.yaml=../../../../../.cache/okf-release/current/policies/tools/tool-policy.yaml
       - provider-routing.yaml=../../../../../platform/ai-gateway/provider-routing.yaml
-      - model-routing-policy.yaml=../../../../../policies/model-routing/model-routing-policy.yaml
+      - model-routing-policy.yaml=../../../../../.cache/okf-release/current/policies/model-routing/model-routing-policy.yaml
       # Per-agent content (genuinely per-agent, never shared) - key
       # prefixed by agent name since ConfigMap keys are flat and every
       # agent's file is literally named "scenarios.yaml"/
@@ -80,22 +83,22 @@ configMapGenerator:
       # when AGENT == "tekos"), but these keys are harmless to carry for
       # every agent's Job run. Explicit files, not a glob - kustomize's
       # configMapGenerator needs each one named.
-      - tekos-agent.okf.md=../../../../../agents/tekos/agent.okf.md
-      - tekos-tasks-answer-technical-question.md=../../../../../agents/tekos/tasks/answer-technical-question.md
-      - tekos-tasks-check-my-drive-docs.md=../../../../../agents/tekos/tasks/check-my-drive-docs.md
-      - tekos-tasks-find-relevant-docs.md=../../../../../agents/tekos/tasks/find-relevant-docs.md
-      - tekos-tasks-write-code.md=../../../../../agents/tekos/tasks/write-code.md
+      - tekos-agent.okf.md=../../../../../.cache/okf-release/current/agents/tekos/agent.okf.md
+      - tekos-tasks-answer-technical-question.md=../../../../../.cache/okf-release/current/agents/tekos/tasks/answer-technical-question.md
+      - tekos-tasks-check-my-drive-docs.md=../../../../../.cache/okf-release/current/agents/tekos/tasks/check-my-drive-docs.md
+      - tekos-tasks-find-relevant-docs.md=../../../../../.cache/okf-release/current/agents/tekos/tasks/find-relevant-docs.md
+      - tekos-tasks-write-code.md=../../../../../.cache/okf-release/current/agents/tekos/tasks/write-code.md
       # gate_checks.py's arkos_declares_no_photorealistic_image_generation_
       # capability check cross-reads Arkos's own bundle the same way -
       # previously absent from this ConfigMap entirely, so that check
       # always errored with FileNotFoundError instead of running. Same
       # four declared tasks as agents/arkos/agent.okf.md's own
       # zuno.tasks list.
-      - arkos-agent.okf.md=../../../../../agents/arkos/agent.okf.md
-      - arkos-tasks-draft-architecture-testimonial.md=../../../../../agents/arkos/tasks/draft-architecture-testimonial.md
-      - arkos-tasks-workshop-presentation.md=../../../../../agents/arkos/tasks/workshop-presentation.md
-      - arkos-tasks-structure-demo.md=../../../../../agents/arkos/tasks/structure-demo.md
-      - arkos-tasks-write-code.md=../../../../../agents/arkos/tasks/write-code.md
+      - arkos-agent.okf.md=../../../../../.cache/okf-release/current/agents/arkos/agent.okf.md
+      - arkos-tasks-draft-architecture-testimonial.md=../../../../../.cache/okf-release/current/agents/arkos/tasks/draft-architecture-testimonial.md
+      - arkos-tasks-workshop-presentation.md=../../../../../.cache/okf-release/current/agents/arkos/tasks/workshop-presentation.md
+      - arkos-tasks-structure-demo.md=../../../../../.cache/okf-release/current/agents/arkos/tasks/structure-demo.md
+      - arkos-tasks-write-code.md=../../../../../.cache/okf-release/current/agents/arkos/tasks/write-code.md
 generatorOptions:
   disableNameSuffixHash: true
   labels:

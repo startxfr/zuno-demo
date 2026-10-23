@@ -22,7 +22,8 @@ from reporting):
     (the WP half of adr_index - the roadmap's rule wants five copies moved
     together, and this pair was the one nothing validated);
   - agent_status_vs_adr: for every wp-NN-<agent>-slice.md brief, if
-    agents/<agent>/agent.okf.md declares `zuno.status: active`, its own
+    agents/<agent>/agent.okf.md of the admitted agents release
+    (platform/okf/release_cache.py, WP-165) declares `zuno.status: active`, its own
     WP's governing ADR(s) (title + `- **ADRs:**` bullet) must be
     `Implemented`, not still `Partially implemented`/`Proposed` (caught a
     real drift live 2026-08-30 - see ADR-0326/WP-31);
@@ -136,9 +137,9 @@ WP_STATES = {
 }
 
 PROVIDER_ROUTING_PATH = REPO_ROOT / "platform" / "ai-gateway" / "provider-routing.yaml"
-MODEL_ROUTING_POLICY_PATH = (
-    REPO_ROOT / "policies" / "model-routing" / "model-routing-policy.yaml"
-)
+# The model-routing policy is a corp policy: since WP-165 it is read from the
+# admitted agents release (platform/okf/release_cache.py), relative to it.
+MODEL_ROUTING_POLICY_REL = pathlib.Path("policies") / "model-routing" / "model-routing-policy.yaml"
 MODELS_VALUES_PATH = REPO_ROOT / "gitops" / "charts" / "models" / "values.yaml"
 
 # The architectural roles provider-routing.yaml's `role` key may hold, and
@@ -712,7 +713,27 @@ def check_wp_state() -> List[Finding]:
     return findings
 
 
-AGENTS_DIR = REPO_ROOT / "agents"
+def _okf_release() -> pathlib.Path:
+    """The admitted agents release (ADR-0580): agents/ and the corp policies
+    left this tree at WP-165, so the checks that read them read the release
+    pinned in platform/okf/agents.lock, extracted and verified once into
+    .cache/okf-release/ (or ZUNO_OKF_RELEASE_DIR). Raises when it cannot be
+    obtained (no cosign/oras, no registry): reported as a finding, never
+    skipped silently."""
+    global _OKF_RELEASE
+    if _OKF_RELEASE is None:
+        sys.path.insert(0, str(REPO_ROOT / "platform" / "okf"))
+        import release_cache  # noqa: E402
+        try:
+            _OKF_RELEASE = release_cache.release_dir()
+        except release_cache.ReleaseUnavailable as exc:
+            _OKF_RELEASE = exc
+    if isinstance(_OKF_RELEASE, Exception):
+        raise _OKF_RELEASE
+    return _OKF_RELEASE
+
+
+_OKF_RELEASE = None
 # Matches the naming convention the ADR-0326 slice WPs use
 # (wp-31-arkos-slice.md, wp-33-comage-slice.md, ...) - deliberately not
 # every WP maps to exactly one agent, so this scopes the check to the
@@ -836,13 +857,17 @@ def check_agent_status_vs_adr() -> List[Finding]:
     the ADR/index pair or check_wp_state checks the WP/tracker pair.
     """
     findings: List[Finding] = []
+    try:
+        agents_dir = _okf_release() / "agents"
+    except RuntimeError as exc:
+        return [Finding("agent_status_vs_adr", f"the admitted agents release is unavailable: {exc}")]
 
     for wp_path in sorted(WP_DIR.glob("wp-*.md")):
         match = SLICE_WP_RE.match(wp_path.name)
         if not match:
             continue
         agent = match.group(1)
-        okf_path = AGENTS_DIR / agent / "agent.okf.md"
+        okf_path = agents_dir / agent / "agent.okf.md"
         if not okf_path.is_file():
             continue
 
@@ -979,7 +1004,11 @@ def check_model_roles() -> List[Finding]:
             f"ADR-0531 decision 1 defines exactly one fleet-wide default.",
         ))
 
-    policy_doc = yaml.safe_load(MODEL_ROUTING_POLICY_PATH.read_text(encoding="utf-8")) or {}
+    try:
+        release = _okf_release()
+    except RuntimeError as exc:
+        return findings + [Finding("model_roles", f"the admitted agents release is unavailable: {exc}")]
+    policy_doc = yaml.safe_load((release / MODEL_ROUTING_POLICY_REL).read_text(encoding="utf-8")) or {}
     preferences = policy_doc.get("preferences") or []
 
     declared = set()
@@ -996,7 +1025,7 @@ def check_model_roles() -> List[Finding]:
                         f"chain silently loses a candidate).",
                     ))
 
-    for okf_path in sorted(AGENTS_DIR.glob("*/agent.okf.md")):
+    for okf_path in sorted((release / "agents").glob("*/agent.okf.md")):
         zuno = (_okf_frontmatter(okf_path).get("zuno") or {})
         agent = zuno.get("name", okf_path.parent.name)
         for task in zuno.get("tasks") or []:

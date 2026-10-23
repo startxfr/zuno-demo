@@ -57,6 +57,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos")
 from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _invoke_tool, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
+from okf_release import okf_root  # noqa: E402  (WP-165: agents and corp policies)
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -103,7 +104,7 @@ def confluence_policy_is_c2_and_local_only() -> CheckResult:
     """
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     classification = yaml.safe_load((repo_root / "policies/data-classification/classification.yaml").read_text())
-    tool_policy = yaml.safe_load((repo_root / "policies/tools/tool-policy.yaml").read_text())
+    tool_policy = yaml.safe_load((okf_root(repo_root) / "policies/tools/tool-policy.yaml").read_text())
 
     confluence_domain = classification.get("data_domains", {}).get("confluence")
     entries = {

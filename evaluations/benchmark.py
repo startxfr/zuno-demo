@@ -85,7 +85,16 @@ import yaml
 EVALUATIONS_DIR = pathlib.Path(__file__).resolve().parent
 REPO_ROOT = EVALUATIONS_DIR.parent
 BENCHMARKS_DIR = EVALUATIONS_DIR / "benchmarks"
-MODEL_ROUTING_POLICY_PATH = REPO_ROOT / "policies" / "model-routing" / "model-routing-policy.yaml"
+# The corp model-routing policy lives in the admitted agents release since
+# WP-165 (evaluations/common/okf_release.py), resolved when first needed.
+MODEL_ROUTING_POLICY_REL = pathlib.Path("policies") / "model-routing" / "model-routing-policy.yaml"
+
+
+def default_policy_path() -> pathlib.Path:
+    sys.path.insert(0, str(EVALUATIONS_DIR / "common"))
+    from okf_release import okf_root  # noqa: E402
+
+    return okf_root(REPO_ROOT) / MODEL_ROUTING_POLICY_REL
 
 sys.path.insert(0, str(EVALUATIONS_DIR))
 import quality_gate  # noqa: E402
@@ -307,7 +316,7 @@ def load_benchmark_artifact(candidate: str, benchmarks_dir: pathlib.Path = BENCH
 
 
 def check_policy_artifacts(
-    policy_path: pathlib.Path = MODEL_ROUTING_POLICY_PATH, benchmarks_dir: pathlib.Path = BENCHMARKS_DIR
+    policy_path: Optional[pathlib.Path] = None, benchmarks_dir: pathlib.Path = BENCHMARKS_DIR
 ) -> List[str]:
     """ADR-0305's own enforcement bullet: "A candidate without a benchmark
     artifact cannot be referenced by a routing-policy change." Every
@@ -322,6 +331,7 @@ def check_policy_artifacts(
             return str(path)
 
     violations: List[str] = []
+    policy_path = policy_path or default_policy_path()
     if not policy_path.exists():
         return violations
     with policy_path.open("r", encoding="utf-8") as fh:

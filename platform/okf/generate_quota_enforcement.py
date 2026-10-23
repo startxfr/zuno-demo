@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """ADR-0511 (roadmap WP-54 Part B) quota enforcement generator.
 
-Translates policies/quotas/quota-policy.yaml - the single source of
+Translates policies/quotas/quota-policy.yaml of the admitted agents
+release (ADR-0580; read through platform/okf/release_cache.py since
+WP-165) - the single source of
 every usage limit - into the two enforcement surfaces (ADR-0511
 clause 3); enforcement config is generated, never hand-authored:
 
@@ -54,7 +56,10 @@ from typing import Dict, List
 import yaml
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
-POLICY_PATH = REPO_ROOT / "policies" / "quotas" / "quota-policy.yaml"
+# The corp quota policy, relative to the admitted agents release: it left this
+# tree with agents/ at WP-165 and is read from the release pinned in
+# platform/okf/agents.lock (platform/okf/release_cache.py, or --release-dir).
+POLICY_REL = pathlib.Path("policies") / "quotas" / "quota-policy.yaml"
 RLP_PATH = REPO_ROOT / "gitops" / "charts" / "connectivity-link" / "templates" / "quota-ratelimitpolicies.yaml"
 BUDGETS_PATH = REPO_ROOT / "components" / "ai-gateway" / "app" / "quota_budgets.yaml"
 # Not generated - hand-authored, because it carries the demo route's own
@@ -376,9 +381,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="ADR-0511 quota enforcement generator")
     parser.add_argument("--check", action="store_true",
                         help="verify committed outputs match regeneration; never writes")
+    parser.add_argument("--release-dir", type=pathlib.Path,
+                        help="an already extracted (and verified) agents release instead of the lock")
     args = parser.parse_args()
 
-    doc = yaml.safe_load(POLICY_PATH.read_text(encoding="utf-8")) or {}
+    release = args.release_dir
+    if release is None:
+        sys.path.insert(0, str(REPO_ROOT / "platform" / "okf"))
+        import release_cache  # noqa: E402
+        try:
+            release = release_cache.release_dir()
+        except release_cache.ReleaseUnavailable as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+    doc = yaml.safe_load((release / POLICY_REL).read_text(encoding="utf-8")) or {}
     expected = {
         RLP_PATH: _render_rlp(doc.get("classes") or {}),
         BUDGETS_PATH: _render_budgets(doc),

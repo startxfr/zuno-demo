@@ -31,7 +31,9 @@ from app.bindings import BindingRegistry  # noqa: E402
 from app.policy import PolicyStore  # noqa: E402
 
 REAL_BINDINGS_PATH = os.path.join(REPO_ROOT, "platform", "bindings", "tools", "tool-bindings.yaml")
-REAL_POLICY_PATH = os.path.join(REPO_ROOT, "policies", "tools", "tool-policy.yaml")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from okf_release_dir import AGENTS_DIR as _OKF_AGENTS_DIR, TOOL_POLICY_PATH as _OKF_TOOL_POLICY_PATH  # noqa: E402  (WP-165)
+REAL_POLICY_PATH = _OKF_TOOL_POLICY_PATH
 REAL_CLASSIFICATION_PATH = os.path.join(
     REPO_ROOT, "policies", "data-classification", "classification.yaml"
 )

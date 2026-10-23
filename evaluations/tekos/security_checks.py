@@ -42,6 +42,9 @@ import httpx
 import yaml
 
 from run_scenarios import MCP_GATEWAY_URL, _invoke_tool, _unifai, auth_headers
+# WP-165: agents and the corp policies come from the admitted release.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
+from okf_release import okf_root  # noqa: E402
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -87,7 +90,7 @@ def confluence_policy_is_c2_and_local_only() -> CheckResult:
     """
     repo_root = pathlib.Path(__file__).resolve().parents[2]
     classification = yaml.safe_load((repo_root / "policies/data-classification/classification.yaml").read_text())
-    tool_policy = yaml.safe_load((repo_root / "policies/tools/tool-policy.yaml").read_text())
+    tool_policy = yaml.safe_load((okf_root(repo_root) / "policies/tools/tool-policy.yaml").read_text())
 
     confluence_domain = classification.get("data_domains", {}).get("confluence")
     entry = next((t for t in tool_policy.get("tools", []) if t["tool"] == "search_confluence"), None)

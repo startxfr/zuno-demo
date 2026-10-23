@@ -15,6 +15,9 @@ configMapGenerator:
       # security_checks.py `import unifai_checks`; both resolve from /gate.
       - unifai_target.py=../../../../../evaluations/common/unifai_target.py
       - unifai_checks.py=../../../../../evaluations/common/unifai_checks.py
+      # WP-165: where the checks find agents/ and the corp policies (the
+      # repository layout, or this Job's mounts below).
+      - okf_release.py=../../../../../evaluations/common/okf_release.py
       # ADR-0526 (WP-087): the register-conformance scorer, imported by
       # run_scenarios.py's chat_register_conformance handler. It lives at
       # evaluations/ root rather than in tekos/ because components/mlops's
@@ -29,28 +32,28 @@ configMapGenerator:
       # exact paths by the Job's volume items, or both scripts raise
       # FileNotFoundError.
       - classification.yaml=../../../../../policies/data-classification/classification.yaml
-      - tool-policy.yaml=../../../../../policies/tools/tool-policy.yaml
+      - tool-policy.yaml=../../../../../.cache/okf-release/current/policies/tools/tool-policy.yaml
       - provider-routing.yaml=../../../../../platform/ai-gateway/provider-routing.yaml
       # gate_checks.py's two write-code/DAT-boundary checks (added
       # alongside stress_test.py's gaps) read these at /policies/model-
       # routing/model-routing-policy.yaml and /agents/tekos/(agent.okf.md,
       # tasks/*.md) - same repo_root=/ resolution as provider-routing.yaml
       # above, so they need the same treatment or FileNotFoundError.
-      - model-routing-policy.yaml=../../../../../policies/model-routing/model-routing-policy.yaml
-      - tekos-agent-okf.md=../../../../../agents/tekos/agent.okf.md
-      - tekos-task-answer-technical-question.md=../../../../../agents/tekos/tasks/answer-technical-question.md
-      - tekos-task-find-relevant-docs.md=../../../../../agents/tekos/tasks/find-relevant-docs.md
-      - tekos-task-check-my-drive-docs.md=../../../../../agents/tekos/tasks/check-my-drive-docs.md
-      - tekos-task-write-code.md=../../../../../agents/tekos/tasks/write-code.md
+      - model-routing-policy.yaml=../../../../../.cache/okf-release/current/policies/model-routing/model-routing-policy.yaml
+      - tekos-agent-okf.md=../../../../../.cache/okf-release/current/agents/tekos/agent.okf.md
+      - tekos-task-answer-technical-question.md=../../../../../.cache/okf-release/current/agents/tekos/tasks/answer-technical-question.md
+      - tekos-task-find-relevant-docs.md=../../../../../.cache/okf-release/current/agents/tekos/tasks/find-relevant-docs.md
+      - tekos-task-check-my-drive-docs.md=../../../../../.cache/okf-release/current/agents/tekos/tasks/check-my-drive-docs.md
+      - tekos-task-write-code.md=../../../../../.cache/okf-release/current/agents/tekos/tasks/write-code.md
       # gate_checks.py's arkos_declares_no_photorealistic_image_generation_
       # capability reads /agents/arkos/agent.okf.md and every declared
       # task's /agents/arkos/tasks/<task>.md - same / resolution as the
       # tekos-* entries above, same reason they need to be projected here.
-      - arkos-agent-okf.md=../../../../../agents/arkos/agent.okf.md
-      - arkos-task-draft-architecture-testimonial.md=../../../../../agents/arkos/tasks/draft-architecture-testimonial.md
-      - arkos-task-workshop-presentation.md=../../../../../agents/arkos/tasks/workshop-presentation.md
-      - arkos-task-structure-demo.md=../../../../../agents/arkos/tasks/structure-demo.md
-      - arkos-task-write-code.md=../../../../../agents/arkos/tasks/write-code.md
+      - arkos-agent-okf.md=../../../../../.cache/okf-release/current/agents/arkos/agent.okf.md
+      - arkos-task-draft-architecture-testimonial.md=../../../../../.cache/okf-release/current/agents/arkos/tasks/draft-architecture-testimonial.md
+      - arkos-task-workshop-presentation.md=../../../../../.cache/okf-release/current/agents/arkos/tasks/workshop-presentation.md
+      - arkos-task-structure-demo.md=../../../../../.cache/okf-release/current/agents/arkos/tasks/structure-demo.md
+      - arkos-task-write-code.md=../../../../../.cache/okf-release/current/agents/arkos/tasks/write-code.md
       # ADR-0326/WP-31/33/35/36: each remaining agent's own scenarios.yaml/
       # security_checks.py, prefixed (ConfigMap keys are flat) so
       # run_acceptance_gate.yml's gate-agent volume can select the right

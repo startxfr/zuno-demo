@@ -44,3 +44,7 @@ evaluations/benchmarks/*.json
 .DS_Store
 .idea/
 .vscode/
+
+# ADR-0580/WP-165: the admitted zuno-demo-agents release, extracted and
+# verified per locked digest by platform/okf/release_cache.py.
+.cache/
