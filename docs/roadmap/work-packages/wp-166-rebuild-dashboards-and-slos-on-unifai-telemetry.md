@@ -61,5 +61,7 @@ SLO one returns a series):
 Done in `gitops/charts/{grafana,perses,observability}` and `docs/platform/slo.md`. Left, to
 close the work package: the run-trace dashboard still correlates spans by `zuno.run_id` and has a
 `bff_request` panel, both gone with agent-runtime and agent-bff; UnifAI correlates by session id,
-so that dashboard needs its own redesign. Live check of the rebuilt panels after ArgoCD syncs the
-charts is still to do.
+so that dashboard needs its own redesign. Live on demo333 after the ArgoCD sync (zuno-grafana, zuno-perses, zuno-observability Synced
+and Healthy): the `zuno-agent-path-slo` rule carries the UnifAI session expressions and evaluates
+(one series), the freshness rule is gone, and all the rebuilt PromQL returns series against the
+cluster's Prometheus. Not done: a visual check of each rebuilt panel in the Grafana UI.
