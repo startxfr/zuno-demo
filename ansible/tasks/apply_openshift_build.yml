@@ -122,7 +122,12 @@
           type: Git
           git:
             uri: https://github.com/startxfr/zuno-demo.git
-            ref: main
+            # The branch images are built from. zuno_build_git_ref is per
+            # cluster (ansible/clusters/<cluster>.yml), default main: a
+            # cluster whose GitOps branch is not main builds from its own
+            # branch. Changing it changes the BuildConfig spec, so the
+            # ConfigChange trigger rebuilds that image on the next apply.
+            ref: "{{ zuno_build_git_ref | default('main') }}"
           contextDir: "{{ build_context_dir if build_context_dir != '.' else '' }}"
         strategy:
           type: Docker
