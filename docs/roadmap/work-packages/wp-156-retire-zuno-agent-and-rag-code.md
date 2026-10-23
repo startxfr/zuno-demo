@@ -110,8 +110,9 @@ command. On demo222 respect demo freezes and message the parallel sessions
 first.
 
 1. **Uninstall before deleting.** On each cluster, run the uninstall verbs
-   for the components still deployed (`make d2 uninstall agents`,
-   `rag`, `rag-ingestion`; `make d1 uninstall aiagent-operator`; check the
+   for the components still deployed (`make d2 uninstall agents`;
+   `make d1 uninstall aiagent-operator`; agent-runtime through the `llm`
+   role's loops, never `make d2 uninstall llm`, which removes ai-gateway; check the
    tier lists `DAY1_RUN_COMPONENTS`, `DAY2_RUN_COMPONENTS` in the `Makefile`
    for the exact names) while the roles still exist. Check the ArgoCD
    Applications are gone, not just OutOfSync.
@@ -119,14 +120,13 @@ first.
 2. **Inventory with grep, then delete.** `grep -rln` for each component name
    across the repo and delete, per component:
    - code: `components/agent-runtime`, `components/agent-bff`,
-     `components/agent-frontend`, `components/rag-service`,
-     `components/rag-ingestion`, `operator/aiagent-operator`;
-   - charts: `gitops/charts/{agent-runtime,aiagent-operator,rag-service,rag-ingestion}`
+     `components/agent-frontend`, `operator/aiagent-operator`;
+   - charts: `gitops/charts/{agent-runtime,aiagent-operator}`
      and the per-agent frontend charts (`gitops/charts/{advantage,arkos,comage,finage,naveo,tekos}`)
      if they only deploy agent-frontend — read each first;
-   - Applications: `gitops/apps/{agent-runtime,aiagent-operator,rag,rag-ingestion}`
+   - Applications: `gitops/apps/{agent-runtime,aiagent-operator}`
      and the per-agent ones under the same condition;
-   - Ansible roles: `ansible/roles/{agent_build,aiagent_operator,aiagent_operator_build,rag,rag_build,rag_ingestion,rag_ingestion_build}`;
+   - Ansible roles: `ansible/roles/{agent_build,aiagent_operator,aiagent_operator_build}`;
      keep `ansible/roles/agents` only if it still drives signing/OCI publish;
    - Makefile lists (`DAY1_*`, `DAY2_*`, `DAY3_*`) and help lines;
    - CI: matrix entries in `.github/workflows/build-publish.yml`, and
@@ -149,13 +149,12 @@ first.
    `gitops/charts/grafana/templates/dashboard-usage-cost.yaml` on UnifAI and
    ai-gateway metrics only (WP-147).
 
-5. **pgvector.** Remove the RAG schema apply
-   (`gitops/charts/rag-service/templates/{job-schema-apply.yaml,configmap-schema.yaml}`
-   go with the chart). Drop the RAG schema and tables with an explicit,
-   reviewed SQL script, never by deleting the PostgreSQL cluster or a
-   database PGO manages (PGO does not recreate a dropped database and
-   error-loops the whole cluster). Check which other users share the
-   cluster first.
+5. **PostgreSQL.** Drop only the agent-runtime databases' users and grants
+   (`agent-checkpoints`, `agent-conversations`) with an explicit, reviewed
+   change, never by deleting the PostgreSQL cluster or a database PGO
+   manages (PGO does not recreate a dropped database and error-loops the
+   whole cluster). The RAG schema and its pgvector tables stay with
+   rag-service (decision below; their removal is part of WP-168).
 
 6. **Run the full chain.** On demo333: `make d0 check`, `make d1 check`,
    `make d2 check`, `make d3 test`; every ArgoCD Application Synced and
@@ -185,7 +184,9 @@ therefore stay; the removal of the rag stack is part of WP-168.
 No file references the removed components (`grep -rn` returns only ADR
 history and CHANGELOG); `check_docs.py` green; CI lint and build workflows
 green; on demo333 the step-6 chain passes and no orphan Deployment,
-ExternalSecret, Keycloak client or RAG table remains; the PostgreSQL cluster
+ExternalSecret or Keycloak client of the four retired components remains;
+`search_technical_docs` still answers (Keycloak callers from UnifAI, OpenShift
+tokens from rag-service); the PostgreSQL cluster
 stays Healthy throughout.
 
 ## Open questions

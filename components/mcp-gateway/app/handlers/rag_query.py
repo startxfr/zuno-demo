@@ -7,12 +7,13 @@ UnifAI agents already answer from, through its bearer endpoint
 forwarded, so UnifAI resolves the user and applies its own group ACL
 (``metadata.acl_groups``) server-side; ``caller_groups`` is not sent.
 
-Transition: UnifAI's RAG server validates Keycloak JWTs only. An OpenShift
-access token (OpenShift Lightspeed forwards the console user's own token to
-the /mcp front-door, ADR-0524) is still answered by ``components/rag-service``
-(``POST /v1/search``), keyed on the ``caller_groups`` the gateway's
-TokenReview resolved, until UnifAI's RAG server reviews Kubernetes tokens
-too. Dropping that branch is what lets rag-service and rag-ingestion retire.
+An OpenShift access token (OpenShift Lightspeed forwards the console user's
+own token to the /mcp front-door, ADR-0524) is answered by
+``components/rag-service`` (``POST /v1/search``), keyed on the
+``caller_groups`` the gateway's TokenReview resolved. rag-service keeps the
+Red Hat product documentation, which UnifAI does not serve yet (decision of
+2026-10-23 in the WP-156 brief); WP-168 migrates it to UnifAI and removes
+this branch together with rag-service and rag-ingestion.
 """
 
 from __future__ import annotations

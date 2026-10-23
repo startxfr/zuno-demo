@@ -129,8 +129,8 @@ bindings:
   #     diagram_gen reach their own real in-cluster services. A Keycloak
   #     caller's own token goes to its bearer endpoint over the
   #     knowledge.tech sources; an OpenShift token (Lightspeed's front-door,
-  #     ADR-0524 clause 3 extension) still reaches components/rag-service
-  #     until UnifAI reviews Kubernetes tokens (handlers/rag_query.py).
+  #     ADR-0524 clause 3 extension) reaches components/rag-service and its
+  #     Red Hat product documentation until WP-168 (handlers/rag_query.py).
   - capability: knowledge.tech.search
     aliases: [search_technical_docs]
     backend: unifai-rag

@@ -27,8 +27,8 @@ Env (all have working in-cluster defaults):
   UNIFAI_RAG_TAG    default knowledge.tech
   KEYCLOAK_TOKEN_URL
                     default the in-cluster Keycloak Service's zuno realm
-                    token endpoint (the issuer stays the public hostname,
-                    Keycloak runs with a strict hostname)
+                    token endpoint (the issuer stays the public https one,
+                    see persona_token())
   EVAL_CLIENT_ID    default zuno-evaluations
   EVAL_CLIENT_SECRET  required, the client's secret
   EVAL_PERSONA      default consultant-01 - retrieval quality must be
@@ -127,9 +127,15 @@ def push_gauges_otlp(gauge_name: str, points: list[tuple[float, dict[str, str]]]
 
 def persona_token(client: httpx.Client) -> str:
     """A fresh access token for EVAL_PERSONA. Fetched per question: a run
-    outlives Keycloak's short access-token lifespan."""
+    outlives Keycloak's short access-token lifespan.
+
+    X-Forwarded-Proto: Keycloak takes the issuer's scheme from the request,
+    so a token fetched over the in-cluster http Service carries
+    iss=http://<public host>/realms/zuno, which UnifAI rejects (401, live
+    2026-10-23). The header makes it the public https issuer."""
     resp = client.post(
         KEYCLOAK_TOKEN_URL,
+        headers={"X-Forwarded-Proto": "https"},
         data={
             "grant_type": "password",
             "client_id": EVAL_CLIENT_ID,
