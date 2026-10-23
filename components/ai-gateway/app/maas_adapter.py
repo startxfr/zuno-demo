@@ -193,7 +193,9 @@ def chat_model_via_maas(
 
         http_async_client = httpx.AsyncClient(verify=ca_bundle)
 
-    return ChatOpenAI(
+    from app.reasoning import with_reasoning
+
+    return with_reasoning(ChatOpenAI)(
         base_url=endpoint,
         api_key=_maas_bearer_token(caller_bearer_token),
         model=cfg.get("maas_model_ref", cfg.get("model")),

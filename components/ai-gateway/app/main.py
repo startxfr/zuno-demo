@@ -16,11 +16,11 @@ import time
 import uuid
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException
+from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from app import guardrails, quota, routing_decisions, semantic_cache
+from app import guardrails, quota, reasoning as reasoning_fallback, routing_decisions, semantic_cache
 from app.auth import CallerIdentity, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
 from app.image_routing import ImageRoutingError, ImageRoutingTable
@@ -37,9 +37,11 @@ from app.schemas import (
     ImageGenerationData,
     ImageGenerationRequest,
     ImageGenerationResponse,
+    ModelList,
+    ModelObject,
     RoutingDecision,
 )
-from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome
+from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_empty_response
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ai_gateway")
@@ -451,6 +453,34 @@ async def chat_completions(
     return result
 
 
+@app.get("/v1/models")
+async def list_models(
+    response: Response,
+    identity: CallerIdentity = Depends(validate_token),
+    x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
+    x_zuno_local_only: str = Header(default="false", alias="X-Zuno-Local-Only"),
+) -> ModelList:
+    """OpenAI-standard model list: the distinct model ids of the routing-table
+    providers eligible for the caller's classification (same eligibility
+    filter as chat completions, `candidates_for`), plus the `auto` alias
+    clients send (routing is classification-driven, never model-name-driven).
+    Cheap (in-memory table) and short-cacheable."""
+    classification = x_zuno_data_classification.upper()
+    try:
+        candidates = routing_table.candidates_for(
+            classification, local_only=x_zuno_local_only.strip().lower() == "true"
+        )
+    except RoutingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    ids: List[str] = ["auto"]
+    for candidate in candidates:
+        model_id = routing_table.provider_config(candidate.name).get("model", candidate.name)
+        if model_id not in ids:
+            ids.append(model_id)
+    response.headers["Cache-Control"] = "private, max-age=30"
+    return ModelList(data=[ModelObject(id=i) for i in ids])
+
+
 @app.get("/v1/routing-decisions/{request_id}")
 async def get_routing_decision(
     request_id: str,
@@ -749,6 +779,18 @@ async def _invoke_with_fallback(
             }
             for tc in result_tool_calls
         ] or None
+        folded = False
+        if not wire_tool_calls:
+            reasoning_text = reasoning_fallback.reasoning_of(result)
+            if not (content if isinstance(content, str) else str(content or "")).strip():
+                folded = reasoning_fallback.should_fold(content, False, reasoning_text)
+                record_empty_response(candidate.name, effective_model_name, recovered=folded)
+                if folded:
+                    logger.warning(
+                        "provider '%s' returned blank content; serving its reasoning block "
+                        "(%d chars) as content", candidate.name, len(reasoning_text),
+                    )
+                    content = reasoning_text.strip()
         response = ChatCompletionResponse(
             model=effective_model_name,
             choices=[
@@ -763,9 +805,13 @@ async def _invoke_with_fallback(
                 total_tokens=prompt_tokens + completion_tokens,
             ),
             zuno_provider=candidate.name,
+            zuno_reasoning_fallback=folded,
         )
-        if cache_key is not None:
-            cacheable = response.model_dump(include={"model", "choices", "usage", "zuno_provider"})
+        # A blank answer is never cached (it would pin a transient glitch).
+        if cache_key is not None and (content or "").strip():
+            cacheable = response.model_dump(
+                include={"model", "choices", "usage", "zuno_provider", "zuno_reasoning_fallback"}
+            )
             await semantic_cache.set_cached_response(cache_key, cacheable)
         # ADR-0550 (WP-135): published unconditionally (not gated on
         # anything cache-related) - agent-runtime fetches this by
@@ -913,12 +959,17 @@ async def _stream_completion(
                 # single complete tool_calls delta the same as it would
                 # multiple partial ones.
                 final_chunk = None
+                reasoning_parts: List[str] = []
                 async for event in model.astream(messages):
                     final_chunk = event if final_chunk is None else final_chunk + event
                     token = getattr(event, "content", "") or ""
                     if token:
                         sent_any = True
                         yield _sse_chunk(completion_id, created, effective_model_name, {"content": token})
+                    elif (r_delta := reasoning_fallback.reasoning_of(event)):
+                        # Held back, never forwarded as it arrives: only served
+                        # if the stream ends with no content and no tool call.
+                        reasoning_parts.append(r_delta)
                 prompt_tokens, completion_tokens = _usage_tokens(final_chunk)
                 call.record_usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
                 # ADR-0511: attribute consumption per the precedence order,
@@ -958,6 +1009,19 @@ async def _stream_completion(
         )
 
         final_tool_calls = getattr(final_chunk, "tool_calls", None) or []
+        if not sent_any and not final_tool_calls:
+            reasoning_text = "".join(reasoning_parts)
+            recovered = reasoning_fallback.should_fold("", False, reasoning_text)
+            record_empty_response(candidate.name, effective_model_name, recovered=recovered)
+            if recovered:
+                logger.warning(
+                    "provider '%s' streamed no content; serving its reasoning block "
+                    "(%d chars) as content", candidate.name, len(reasoning_text),
+                )
+                yield _sse_chunk(
+                    completion_id, created, effective_model_name,
+                    {"content": reasoning_text.strip(), "zuno_reasoning_fallback": True},
+                )
         if final_tool_calls:
             wire_tool_calls = [
                 {

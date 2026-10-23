@@ -82,6 +82,24 @@ class ChatCompletionResponse(BaseModel):
     # for why - check this gateway's OTel traces for provider attribution
     # on a streaming call instead.
     zuno_provider: str
+    # Zuno extension: true when the provider returned blank content with the
+    # answer only in its reasoning block (vLLM --reasoning-parser) and the
+    # gateway served that reasoning text as `content` (app/reasoning.py).
+    zuno_reasoning_fallback: bool = False
+
+
+class ModelObject(BaseModel):
+    """One entry of GET /v1/models (OpenAI list-models format)."""
+
+    id: str
+    object: str = "model"
+    created: int = 0
+    owned_by: str = "zuno"
+
+
+class ModelList(BaseModel):
+    object: str = "list"
+    data: List[ModelObject]
 
 
 class RoutingDecision(BaseModel):

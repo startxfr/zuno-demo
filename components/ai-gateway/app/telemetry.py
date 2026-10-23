@@ -116,12 +116,13 @@ _cache_lookup_counter = None
 _model_call_duration_histogram = None
 _guardrails_eval_counter = None
 _guardrails_detection_counter = None
+_empty_response_counter = None
 
 
 def init_telemetry(service_name: str = "ai-gateway") -> None:
     global _tracer, _model_call_counter, _token_counter, _cost_counter, _cache_lookup_counter
     global _model_call_duration_histogram
-    global _guardrails_eval_counter, _guardrails_detection_counter
+    global _guardrails_eval_counter, _guardrails_detection_counter, _empty_response_counter
 
     resource = Resource.create({"service.name": service_name})
 
@@ -172,6 +173,12 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
         "zuno.guardrails_detections",
         description="Individual guardrails detections, by agent and detection "
         "name - ADR-0534/ADR-0567",
+    )
+
+    _empty_response_counter = meter.create_counter(
+        "zuno.model_empty_responses",
+        description="Model answers whose content was blank (no tool call), by provider/model "
+        "and whether the reasoning-block fallback (app/reasoning.py) could serve them",
     )
 
     logger.info("telemetry initialized: service=%s otlp_endpoint=%s", service_name, OTEL_ENDPOINT)
@@ -252,6 +259,16 @@ def guardrails_observe_span(
             yield
         finally:
             span.set_attribute("zuno.latency_ms", (time.monotonic() - start) * 1000.0)
+
+
+def record_empty_response(provider: str, model: str, recovered: bool) -> None:
+    """A model answered with blank content and no tool call. `recovered` is
+    true when the answer was served from the reasoning block
+    (`zuno_reasoning_fallback`), false when there was nothing to serve."""
+    if _empty_response_counter is not None:
+        _empty_response_counter.add(
+            1, {"provider": provider, "model": model, "recovered": str(recovered).lower()}
+        )
 
 
 def record_cache_outcome(outcome: str, model: str) -> None:

@@ -88,6 +88,30 @@ response field:
 - **Response `502`:** every eligible provider failed (non-streaming path
   only - see below for the streaming failure shape).
 
+- **Reasoning-block fallback.** Local models run in vLLM with
+  `--reasoning-parser=qwen3`; when a model puts its whole output in the
+  reasoning block, vLLM returns `content: null` with the text in
+  `message.reasoning` (newer) / `reasoning_content` (older), which
+  LangChain's `ChatOpenAI` drops (`app/reasoning.py` keeps it). One rule:
+  blank `content` AND no `tool_calls` AND reasoning text present -> the
+  reasoning is served as `content` and the response carries
+  `"zuno_reasoning_fallback": true` (streaming: reasoning deltas are held
+  back and emitted as one `content` delta, flagged the same way, only if
+  the stream ends with no content and no tool call). In every other case
+  reasoning is never exposed (no chain-of-thought leak when `content` is
+  non-empty). Counted by `zuno.model_empty_responses{provider,model,recovered}`.
+
+### `GET /v1/models`
+
+OpenAI list-models format (`{"object": "list", "data": [{"id", "object":
+"model", "created", "owned_by"}]}`), JWT-authenticated like the other
+routes. Lists the `auto` alias plus the distinct `model` of every
+`provider-routing.yaml` entry eligible for the caller's
+`X-Zuno-Data-Classification` (default `C1`; `X-Zuno-Local-Only: true`
+keeps local ones only) - the same eligibility filter as chat completions.
+`Cache-Control: private, max-age=30`. `422` on an unknown classification,
+`401` without a valid JWT.
+
 ### `GET /healthz` / `GET /readyz`
 
 Liveness always `200`. Readiness returns `503` until
@@ -182,6 +206,11 @@ always streams, `zuno.model_tokens`/`zuno.model_cost_usd` had zero series
 regardless of real traffic). `gemini`/`anthropic`/`mistral` candidates
 still record no usage either way - those LangChain classes have no
 equivalent flag.
+
+`zuno.model_empty_responses` (labels `provider`, `model`, `recovered`)
+counts answers with blank content and no tool call; `recovered=true` means
+the reasoning-block fallback served them, `false` means there was nothing
+to serve (the client still gets an empty answer).
 
 Estimated USD cost (`zuno.model_cost_usd`) follows that same usage-gated
 posture for remote/SaaS providers - billed per-1K-token, so no usage means
