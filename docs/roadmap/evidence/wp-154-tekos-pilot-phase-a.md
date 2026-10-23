@@ -200,6 +200,21 @@ throwaway key and the digest-pinned `okf-test-tekos` artifact.
 | Security checks | 9/9. The photorealistic-image check never ended because the agent keeps looping on `diagram.generation.create` and the stream's heartbeats defeat its per-read timeout; it now has a 150 s overall deadline (no `image.generation.create` call and no PNG in that time) |
 | Group-bound team | consultant-01/-02 (members through the group) see the workspace, sale-01 does not |
 
+### Browser check (Playwright, consultant-01)
+
+![The four tekos workflows in the tekos-pilot team workspace](wp-154-tekos-workflows.png)
+
+![The tekos chat opened from the Collaboration Hub, team tekos-pilot](wp-154-tekos-chat.png)
+
+A real Keycloak login as consultant-01 (member of the team through the group
+`agent_tekos`) lists the four workflows the bundle emitted, with their
+classification (C1/C2), and opens the tekos chat in the team workspace. The
+first capture showed "Validation Failed" on the workflow: the UI's MCP-provider
+validator did a real MCP handshake without the user's token, which an
+authenticating gateway refuses. Fixed in the fork (the validator now only checks
+reachability for `forward_user_token` providers, devel 86392d870); with that
+image the validation report has no error.
+
 ### Other agents (WP-155 smoke test)
 
 advantage, comage, finage and naveo (graph shape `retrieve_reason_respond`) were
@@ -214,7 +229,8 @@ were signed and published but not deployed.
 
 ## Not yet covered
 
-The quota 429 and the routing badge in the UI
-(WP-148), the guardrails counter (WP-153, hook still disabled in the chart), the
-Playwright screenshot of the tekos chat, scenario 10 with the retriever, and the real-key bundle publication
-(waiting for the zuno-demo-agents repository, WP-158).
+The quota 429 and the routing badge in the UI (WP-148), the guardrails counter
+(WP-153, hook still disabled in the chart), and the run of the pilot against the
+released, keyless-signed bundles (zuno-demo-agents v0.1.1): it needs
+unifai-operator 0.1.25, and the unifai role only switches to the released list
+with `zuno_unifai_released_bundles: true`.
