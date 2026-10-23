@@ -1,6 +1,8 @@
 ---
-# ADR-0058 decisions 1, 2 and 4: for every agent that BOTH exists
-# (agents/*/agent.okf.md) AND has real evaluations/<agent>/ content
+# ADR-0058 decisions 1, 2 and 4: for every agent that BOTH is in the
+# admitted agents release (platform/okf/stack-config.generated.yaml, WP-156 -
+# the agents UnifAI serves come from that release, ADR-0581, not from
+# agents/ in this tree) AND has real evaluations/<agent>/ content
 # (discovered, never a hand-maintained list - decision 4's binding
 # auto-coverage rule), runs platform/testing/day2_stresstest.py (and,
 # when bulk_interactions is set, platform/testing/day2_bulk.py) inside a
@@ -10,6 +12,12 @@
 # parameterized by agent name instead of hardcoded "tekos" (decision 2).
 # `make day1 check agents`'s own mandatory-gate invocation of that file is
 # untouched - this is additive, informational, never wired into it.
+#
+# WP-156: the Jobs drive the agents on UnifAI (ADR-0561) through the UnifAI
+# UI route, signed in as demo personas with the demo-persona password
+# (UNIFAI_URL, UNIFAI_TEAM_NAME, DEMO_PERSONA_PASSWORD). A placeholder agent
+# (ADR-0007) has no UnifAI workflow by design: it gets no Job, only a
+# report row saying so.
 
 - name: "day2-stresstest | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
@@ -19,13 +27,11 @@
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/agents/kustomize/namespace"
 
-- name: "day2-stresstest | discover agents/*/agent.okf.md bundles"
-  ansible.builtin.find:
-    paths: "{{ zuno_repo_root }}/agents"
-    patterns: "agent.okf.md"
-    recurse: true
-    depth: 2
-  register: _day2_stress_agent_bundles
+- name: "day2-stresstest | read the admitted agents release"
+  ansible.builtin.set_fact:
+    _day2_stress_release_agents: >-
+      {{ (lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/stack-config.generated.yaml')
+          | from_yaml)['agents'] | default({}, true) }}
 
 - name: "day2-stresstest | discover evaluations/*/run_scenarios.py (agents with real stresstest content)"
   ansible.builtin.find:
@@ -35,14 +41,26 @@
     depth: 2
   register: _day2_stress_eval_scripts
 
-- name: "day2-stresstest | resolve the candidate agent list (exists AND has evaluations content)"
+- name: "day2-stresstest | resolve the candidate agent list (admitted AND has evaluations content)"
   ansible.builtin.set_fact:
     day2_stresstest_agents: >-
       {{
-        (_day2_stress_agent_bundles.files | map(attribute='path') | map('dirname') | map('basename') | list)
+        (_day2_stress_release_agents.keys() | list)
         | intersect(_day2_stress_eval_scripts.files | map(attribute='path') | map('dirname') | map('basename') | list)
         | sort
       }}
+
+# stresstest_job_create_one.yml/stresstest_job_run_one.yml pass this to
+# the Job as ZUNO_AGENT_STATUS.
+- name: "day2-stresstest | split the candidates into served and placeholder agents"
+  ansible.builtin.set_fact:
+    _day2_stress_placeholder_agents: >-
+      {{ day2_stresstest_agents
+         | select('in', _day2_stress_release_agents | dict2items
+                        | selectattr('value.status', 'defined')
+                        | selectattr('value.status', 'equalto', 'placeholder')
+                        | map(attribute='key') | list)
+         | list }}
 
 - name: "day2-stresstest | read the platform's internal root CA from openshift-config"
   kubernetes.core.k8s_info:
@@ -89,61 +107,40 @@
       keycloak` first.
   when: (_day2_stress_demo_password_secret.resources | default([]) | length) == 0
 
-# Not every discovered agent necessarily has a Keycloak frontend client
-# secret provisioned yet (a brand-new agent might have evaluations
-# content authored before its Keycloak client exists) - flag any gap
-# instead of silently skipping it without explanation.
-- name: "day2-stresstest | read each candidate agent's frontend-client-secret from zuno-auth"
+# WP-156: every served agent is ready - the UnifAI transport needs only the
+# demo-persona password, read above. The <agent>-frontend client secrets
+# are copied when they still exist, for the layers that still mint a
+# persona bearer token with a ROPC grant on that client (run_scenarios.py's
+# shared-service scenarios, security_checks.py's direct MCP/ai-gateway
+# calls, quota_429.py, token_quota_429.py). They go with agent-frontend:
+# once absent those rows fail with the reason, an agent is never skipped
+# for it.
+- name: "day2-stresstest | resolve the agents to stresstest (served by UnifAI)"
+  ansible.builtin.set_fact:
+    _day2_stress_ready_agents: "{{ day2_stresstest_agents | difference(_day2_stress_placeholder_agents) | sort }}"
+
+- name: "day2-stresstest | read each served agent's frontend-client-secret from zuno-auth, if it still exists"
   kubernetes.core.k8s_info:
     kind: Secret
     namespace: zuno-auth
     name: "{{ item }}-frontend-client-secret"
   register: _day2_stress_client_secrets
-  loop: "{{ day2_stresstest_agents }}"
+  loop: "{{ _day2_stress_ready_agents }}"
   loop_control:
     label: "{{ item }}"
   no_log: true
-
-- name: "day2-stresstest | resolve agents actually ready to stresstest (credential precondition)"
-  ansible.builtin.set_fact:
-    _day2_stress_ready_agents: >-
-      {{
-        _day2_stress_client_secrets.results
-        | selectattr('resources', 'defined')
-        | rejectattr('resources', 'equalto', [])
-        | map(attribute='item')
-        | list
-      }}
-    _day2_stress_missing_agents: >-
-      {{
-        day2_stresstest_agents
-        | difference(
-            _day2_stress_client_secrets.results
-            | selectattr('resources', 'defined')
-            | rejectattr('resources', 'equalto', [])
-            | map(attribute='item')
-            | list
-          )
-      }}
-
-- name: "day2-stresstest | warn about any agent missing its frontend-client-secret"
-  ansible.builtin.debug:
-    msg: >-
-      Skipping stresstest content for: {{ _day2_stress_missing_agents | join(', ') }} -
-      no <agent>-frontend-client-secret found in zuno-auth yet.
-  when: _day2_stress_missing_agents | length > 0
 
 - name: "day2-stresstest | build the combined per-agent credentials data"
   ansible.builtin.set_fact:
     _day2_stress_secret_data: >-
       {{
         _day2_stress_secret_data | default({'demo-persona-password': _day2_stress_demo_password_secret.resources[0].data.password})
-        | combine({(item.item + '-client-secret'): item.resources[0].data.client_secret})
+        | combine({(item.item + '-client-secret'): item.resources[0].data.client_secret}
+                  if (item.resources | default([]) | length) > 0 else {})
       }}
-  loop: "{{ _day2_stress_client_secrets.results }}"
+  loop: "{{ _day2_stress_client_secrets.results | default([]) }}"
   loop_control:
     label: "{{ item.item }}"
-  when: (item.resources | default([]) | length) > 0
   no_log: true
 
 - name: "day2-stresstest | copy the combined credentials into one zuno-ai-run Secret the Job can mount"
@@ -184,6 +181,17 @@
 - name: "day2-stresstest | seed the accumulator with the contract-test results"
   ansible.builtin.set_fact:
     _day2_stress_results: "{{ (_day2_stress_contract.stdout | from_json) if _day2_stress_contract.stdout else [] }}"
+
+# Same row shape and reason as day2_availability_check.yml's placeholder
+# rows: "not served" is a placeholder's expected state, not a failure.
+- name: "day2-stresstest | record a skip row for each placeholder agent"
+  ansible.builtin.set_fact:
+    _day2_stress_results: >-
+      {{ _day2_stress_results + [{
+           'agent': item, 'layer': 'stresstest', 'id': 'n/a', 'category': 'coverage', 'passed': true,
+           'detail': 'skipped - placeholder (ADR-0007): not served by UnifAI by design, no stresstest Job',
+           'duration_ms': 0}] }}
+  loop: "{{ _day2_stress_placeholder_agents }}"
 
 # ADR-0555/WP-142: parallel by default (day2_stresstest_parallel, set from
 # Makefile's SEQUENTIAL=<0|1> via -e day2_stresstest_parallel=...). Sequential

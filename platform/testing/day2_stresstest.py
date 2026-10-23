@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ADR-0058: per-agent Day 2 stresstest entrypoint, run inside the
-generalized per-agent Job (ansible/roles/day2/tasks/stresstest_job.yml).
+generalized per-agent Job (ansible/roles/day3/tasks/stresstest_job.yml).
 The Job is recreated once per agent (not looped internally) - AGENT names
 which one this particular run is for, set by the Ansible task loop the
 same way evaluations/<agent>/run_scenarios.py's thin wrappers already set
@@ -24,6 +24,17 @@ every result into platform/testing/day2_report.py::Day2Result:
 An agent missing a given layer's file gets one explicit "coverage" row
 instead of a failure - ADR-0058 decision 1's informational, non-blocking
 posture.
+
+WP-156: the agents are served by UnifAI (ADR-0561). run_scenarios.py and
+security_checks.py follow their TARGET (default unifai, evaluations/common/
+unifai_target.py), signing the personas in through the UnifAI UI route; the
+Job passes UNIFAI_URL, UNIFAI_TEAM_NAME and DEMO_PERSONA_PASSWORD. Under
+that target the per-agent stress_test.py modules, which still post to
+agent-runtime's /v1/agents/<agent>/chat and the BFF directly, are reported
+as a coverage row saying so instead of being run against the stack being
+retired. The rag_ingestion layer (WP-25/ADR-0110's live Confluence listing)
+is gone with rag-ingestion: UnifAI's RAG syncs Confluence itself
+(ADR-0568), and its sources are checked by UnifAI, not here.
 
 Prints one JSON array of Day2Result-shaped dicts to stdout. The calling
 Ansible task fetches this Job's pod log and folds it into the overall
@@ -145,9 +156,19 @@ def _load_stress_test():
 
 
 def _stress_test_results() -> List[Day2Result]:
-    module = _load_stress_test()
-    if module is None:
+    if not (SCRIPT_DIR / AGENT / "stress_test.py").is_file():
         return [Day2Result(AGENT, "stress_test", "n/a", "coverage", True, "no stress_test.py for this agent")]
+    import run_scenarios
+
+    if run_scenarios.TARGET == "unifai":
+        # WP-156: these modules drive agent-runtime/BFF endpoints directly;
+        # under the UnifAI target they would test the stack being retired,
+        # not the one serving the agents. Reported, not run, until ported.
+        return [Day2Result(
+            AGENT, "stress_test", "n/a", "coverage", True,
+            "NOT RUN: stress_test.py drives agent-runtime/BFF directly and is not ported to UnifAI yet (WP-156)",
+        )]
+    module = _load_stress_test()
     return [
         Day2Result(AGENT, "stress_test", r.id, r.category, r.passed, r.detail)
         for r in module.run()
@@ -188,65 +209,12 @@ def _token_quota_results() -> List[Day2Result]:
     return token_quota_429.run()
 
 
-def _rag_ingestion_results() -> List[Day2Result]:
-    """WP-25/ADR-0110: a fast, bounded, read-only proof that
-    reconcile-acls's live Confluence listing path is reachable and
-    returns real content. Deliberately NOT a full space walk the way
-    reconcile-acls itself does - live-cluster-confirmed 2026-08-23: a real
-    listing of the "SXSI" space (the one every knowledge.tech Confluence
-    source points at) can run for the better part of an hour, unsuitable
-    for a recurring stresstest job with a normal timeout. A single
-    small-limit, unpaginated CQL request is enough to prove auth +
-    connectivity + real content without that cost. Tekos-only - it's the
-    one agent whose knowledge.tech domain has Confluence sources
-    configured at all.
-    """
-    if AGENT != "tekos":
-        return [
-            Day2Result(
-                AGENT, "rag_ingestion", "n/a", "coverage", True,
-                "reconcile-acls live check is Tekos-only (knowledge.tech domain)",
-            )
-        ]
-
-    base_url = os.environ.get("CONFLUENCE_URL")
-    username = os.environ.get("CONFLUENCE_USERNAME")
-    token = os.environ.get("CONFLUENCE_TOKEN")
-    if not (base_url and username and token):
-        return [
-            Day2Result(
-                AGENT, "rag_ingestion", "confluence-live-listing", "coverage", True,
-                "no CONFLUENCE_URL/CONFLUENCE_USERNAME/CONFLUENCE_TOKEN mounted in this Job",
-            )
-        ]
-
-    import httpx
-
-    try:
-        resp = httpx.get(
-            f"{base_url}/wiki/rest/api/content/search",
-            params={"cql": 'space="SXSI" and type=page', "limit": 5},
-            auth=(username, token),
-            timeout=15,
-        )
-        resp.raise_for_status()
-        results = resp.json().get("results", [])
-        passed = len(results) > 0
-        detail = f"{len(results)} real page(s) returned" if passed else "listing succeeded but returned zero pages"
-    except Exception as exc:  # noqa: BLE001 - reported as a failed row, not a crash
-        passed = False
-        detail = f"live listing failed: {exc}"
-
-    return [Day2Result(AGENT, "rag_ingestion", "confluence-live-listing", "connectivity", passed, detail)]
-
-
 def main() -> int:
     results: List[Day2Result] = []
     results += _safe_run("scenario", _scenario_results)
     results += _safe_run("security", _security_results)
     results += _safe_run("gate", _gate_check_results)
     results += _safe_run("stress_test", _stress_test_results)
-    results += _safe_run("rag_ingestion", _rag_ingestion_results)
     results += _safe_run("quota", _quota_results)
     results += _safe_run("token_quota", _token_quota_results)
 
@@ -256,16 +224,23 @@ def main() -> int:
     # cleanup call - see that file's own main()) is where scenario,
     # security and stress_test conversations all actually accumulate:
     # run_scenarios/security_checks/stress_test are imported in-process
-    # above, each `from run_scenarios import ..., record_run_id`
-    # resolving to the SAME cached module object, so one call here covers
-    # every layer's created run_ids. Printed to stderr, not stdout - the
-    # Ansible task parses stdout lines matching `^\[.*\]$` as this
-    # process's one JSON-array result line, and a second matching line
-    # here would corrupt that.
+    # above, each resolving to the SAME cached run_scenarios module, so one
+    # call here covers every layer. WP-156: UnifAI sessions are held by
+    # run_scenarios' shared UnifaiTarget (only when one was created), and
+    # agent-runtime run_ids by its _CREATED_RUN_IDS (only when a non-UnifAI
+    # handler recorded one) - each is cleaned up by its own mechanism.
+    # Printed to stderr, not stdout - the Ansible task parses stdout lines
+    # matching `^\[.*\]$` as this process's one JSON-array result line,
+    # and a second matching line here would corrupt that.
     if os.getenv("CLEANUP_TEST_DATA", "1") != "0":
         import run_scenarios
 
-        deleted, failed = run_scenarios.cleanup_created_runs()
+        deleted = failed = 0
+        if run_scenarios._unifai_target is not None:
+            deleted, failed = run_scenarios._unifai_target.cleanup()
+        if run_scenarios._CREATED_RUN_IDS:
+            d, f = run_scenarios.cleanup_created_runs()
+            deleted, failed = deleted + d, failed + f
         print(f"cleanup: {deleted} conversation(s) removed, {failed} failed", file=sys.stderr)
 
     return 0 if all(r.passed for r in results) else 1

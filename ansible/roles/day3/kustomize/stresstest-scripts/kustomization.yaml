@@ -4,7 +4,8 @@ namespace: zuno-ai-run
 configMapGenerator:
   # Canonical, shared implementation (ADR-0342/WP-31) - identical every
   # agent iteration. requirements.txt is evaluations/tekos's own (httpx +
-  # PyYAML; day2_stresstest.py/day2_bulk.py need nothing beyond that -
+  # PyYAML; day2_stresstest.py/day2_bulk.py and the UnifAI transport need
+  # nothing beyond that -
   # unlike the ADR-0053 acceptance-gate Job, this one never needs the
   # `kubernetes` client).
   - name: day2-stresstest-scripts
@@ -37,6 +38,14 @@ configMapGenerator:
       # run_scenarios.py's own sys.path search (its own directory) expects
       # to find it.
       - register_conformance.py=../../../../../evaluations/register_conformance.py
+      # WP-156: the UnifAI transport (run_scenarios.py's `from unifai_target
+      # import ...`, day2_bulk.py) and the UnifAI security-check factories
+      # every agent's security_checks.py imports (`import unifai_checks`).
+      # In the repo they live in evaluations/common/; flat here, next to
+      # run_scenarios.py, which is where those imports find them in the
+      # Job (day2_stresstest.py puts this directory on sys.path).
+      - unifai_target.py=../../../../../evaluations/common/unifai_target.py
+      - unifai_checks.py=../../../../../evaluations/common/unifai_checks.py
       # Repo policy/routing files security_checks.py, gate_checks.py and
       # stress_test.py each read relative to their own resolved location
       # once mounted (same ConfigMap-symlink-indirection arithmetic

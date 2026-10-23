@@ -47,20 +47,15 @@
 # gateway correctly 403s every real /api/chat call to them - live-confirmed
 # 2026-09-02: a full BULK=10 run gave each of the three a 100% bulk_load
 # error rate at ~30ms latency (an immediate policy denial, not a slow
-# backend). day2_bulk.py has no way to know this on its own (only
-# tekos's/arkos's own agent.okf.md are ever mounted into a stresstest Job,
-# for gate_checks.py's cross-reads - see the gate-tekos-agent/gate-arkos-
-# agent volumes below), so ansible resolves it here, the same way it
-# already resolves TASK_NAME above.
+# backend). day2_bulk.py has no way to know this on its own, so ansible
+# resolves it here, the same way it already resolves TASK_NAME above.
+# WP-156: read from the admitted release stresstest_job.yml already loaded
+# (platform/okf/stack-config.generated.yaml), the status UnifAI serves -
+# not agents/<agent>/agent.okf.md in this tree. stresstest_job.yml creates
+# no Job for a placeholder any more; this stays the Job's own guard.
 - name: "day2-stresstest | resolve {{ day2_stress_agent }}'s zuno.status (skip bulk_load for placeholder agents)"
   ansible.builtin.set_fact:
-    _day2_stress_agent_status: >-
-      {{
-        (
-          lookup('file', zuno_repo_root + '/agents/' + day2_stress_agent + '/agent.okf.md')
-          .split('---')[1] | from_yaml
-        ).zuno.status
-      }}
+    _day2_stress_agent_status: "{{ _day2_stress_release_agents[day2_stress_agent].status | default('active') }}"
 
 - name: "day2-stresstest | delete any previous stresstest Job for {{ day2_stress_agent }} (Jobs are immutable, this task is idempotent-by-recreation)"
   kubernetes.core.k8s:
@@ -164,14 +159,29 @@
                   # this generalization had dropped it.
                   - name: KEYCLOAK_URL
                     value: "https://keycloak.{{ cluster_base_domain }}"
-                  - name: FRONTEND_URL
-                    value: "https://{{ day2_stress_agent }}.{{ cluster_base_domain }}"
+                  # WP-156: run_scenarios.py/security_checks.py/day2_bulk.py
+                  # drive the agent on UnifAI through its UI route (the only
+                  # door from outside UnifAI's pods), signed in as each
+                  # scenario's persona, in the agent's group-bound team
+                  # workspace agent-<agent> (its id is resolved at sign-in:
+                  # the operator recreates teams with new ids). TLS is
+                  # verified - the internal root CA is appended to certifi
+                  # above. EVAL_TARGET is explicit so the Job does not
+                  # depend on run_scenarios.py's default.
+                  - name: EVAL_TARGET
+                    value: unifai
+                  - name: UNIFAI_URL
+                    value: "https://unifai-ui-zuno-unifai.{{ cluster_base_domain }}"
+                  - name: UNIFAI_TEAM_NAME
+                    value: "agent-{{ day2_stress_agent }}"
+                  - name: UNIFAI_VERIFY_TLS
+                    value: "1"
                   # ADR-0511/WP-54's quota layer builds the quota-demo
                   # Route's hostname from this. quota_429.py can also
                   # recover it by stripping the agent label off
-                  # FRONTEND_URL, but passing it outright keeps that
-                  # fallback for standalone dev runs rather than making
-                  # the Job depend on string surgery.
+                  # FRONTEND_URL, a fallback kept for standalone dev runs;
+                  # the Job passes no FRONTEND_URL since WP-156 (no agent
+                  # frontend to name), so this is the Job's only source.
                   - name: CLUSTER_BASE_DOMAIN
                     value: "{{ cluster_base_domain }}"
                   - name: BULK_INTERACTIONS
@@ -191,32 +201,18 @@
                       secretKeyRef:
                         name: day2-stresstest-credentials
                         key: demo-persona-password
+                  # WP-156: optional - only the layers that still mint a
+                  # persona bearer token on the <agent>-frontend client
+                  # read it (see stresstest_job.yml); it disappears with
+                  # agent-frontend. The rag_ingestion layer and its
+                  # confluence-technical-credentials env are gone with
+                  # rag-ingestion.
                   - name: "{{ (day2_stress_agent | upper | replace('-', '_')) }}_FRONTEND_CLIENT_SECRET"
                     valueFrom:
                       secretKeyRef:
                         name: day2-stresstest-credentials
                         key: "{{ day2_stress_agent }}-client-secret"
-                  # WP-25/ADR-0110's rag_ingestion layer (day2_stresstest.py):
-                  # a fast, bounded, read-only live Confluence connectivity
-                  # check, Tekos-only. Same secret the real rag-ingestion
-                  # Confluence MCP server already reads, already in this
-                  # Job's own namespace (zuno-ai-run) - no cross-namespace
-                  # secret copy needed.
-                  - name: CONFLUENCE_URL
-                    valueFrom:
-                      secretKeyRef:
-                        name: confluence-technical-credentials
-                        key: url
-                  - name: CONFLUENCE_USERNAME
-                    valueFrom:
-                      secretKeyRef:
-                        name: confluence-technical-credentials
-                        key: email
-                  - name: CONFLUENCE_TOKEN
-                    valueFrom:
-                      secretKeyRef:
-                        name: confluence-technical-credentials
-                        key: token
+                        optional: true
                 volumeMounts:
                   - name: gate
                     mountPath: /gate

@@ -11,19 +11,23 @@ content) - cycling through the corpus to reach the requested count. No
 new prompt content is authored here (ADR-0058's own scope boundary:
 aggregation and execution, not new test-content authoring).
 
-Each call goes through the same BFF /api/chat path
-evaluations/tekos/run_scenarios.py's chat_basic_qa handler already uses;
+Each call is one UnifAI turn (WP-156: UnifAI serves the agents, ADR-0561),
+through the same shared transport evaluations/tekos/run_scenarios.py's
+chat_basic_qa handler uses under its default unifai target
+(evaluations/common/unifai_target.py: the persona signs in through the
+UnifAI UI route and runs the agent's workflow in its team workspace).
 pass/fail reuses that same minimal assertion ("got a non-empty reply"),
-plus per-call latency is recorded. Produces one Day2Result summary row
+plus per-call latency is recorded - the execute call only: the workflow is
+resolved once and each call's session is created before the clock starts,
+so the latency is the agent's, not the session bookkeeping's. Produces one Day2Result summary row
 (category="bulk_load") per agent - interaction count, error rate,
 p50/p95/max latency - not one row per call, so the report table stays
 readable at any BULK size.
 
 Run inside the same per-agent Job as day2_stresstest.py (not a separate
-Job): it needs the exact same AGENT/<AGENT>_FRONTEND_CLIENT_SECRET/
-DEMO_PERSONA_PASSWORD env vars and the same mounted run_scenarios.py
-(reused here for its token-fetch helper) - duplicating that setup in a
-second Job would be pure overhead.
+Job): it needs the exact same AGENT/UNIFAI_URL/UNIFAI_TEAM_NAME/
+DEMO_PERSONA_PASSWORD env vars and the same mounted unifai_target.py -
+duplicating that setup in a second Job would be pure overhead.
 
 Prints a JSON array (usually one summary Day2Result, or none when
 BULK_INTERACTIONS is unset/zero) to stdout, same convention as
@@ -37,9 +41,8 @@ import pathlib
 import sys
 import time
 from dataclasses import asdict
-from typing import Dict, List, Optional
+from typing import List, Optional
 
-import httpx
 import yaml
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -47,16 +50,19 @@ from day2_report import Day2Result, log_test_line  # noqa: E402
 
 AGENT = os.getenv("AGENT", "tekos")
 BULK_INTERACTIONS = int(os.getenv("BULK_INTERACTIONS", "0") or "0")
-# advantage/finage/naveo declare zuno.status: placeholder (ADR-0011/
-# ADR-0040/ADR-0533 - none is promoted to active yet), so the entitlement
-# gateway correctly 403s every real /api/chat call to them - live-confirmed
-# 2026-09-02 as a 100% bulk_load error rate at ~30ms latency (an immediate
+# advantage/finage/naveo declare zuno.status: placeholder (ADR-0007/
+# ADR-0011/ADR-0040/ADR-0533 - none is promoted to active yet), so UnifAI
+# deliberately serves no workflow for them - live-confirmed 2026-09-02 on
+# the BFF as a 100% bulk_load error rate at ~30ms latency (an immediate
 # policy denial, not a slow backend or a real defect). Set by ansible
-# (stresstest_job_run_one.yml), which resolves the agent's own
-# agent.okf.md - not available inside every agent's Job (only tekos's/
-# arkos's bundles are ever mounted, for gate_checks.py's cross-reads).
+# (stresstest_job_run_one.yml) from the admitted release
+# (platform/okf/stack-config.generated.yaml); WP-156's stresstest_job.yml
+# no longer even creates a Job for a placeholder, this guard keeps a
+# standalone run honest.
 ZUNO_AGENT_STATUS = os.getenv("ZUNO_AGENT_STATUS", "")
-BFF_URL = os.getenv("BFF_URL", f"http://{AGENT}-bff.zuno-ai-run.svc.cluster.local:8080")
+# consultant-01 is a member of agent_comage, agent_tekos and agent_arkos
+# (gitops/charts/keycloak/files/realm-zuno.json), so it reaches every
+# active agent's team workspace.
 PERSONA = os.getenv("STRESS_TEST_PERSONA", "consultant-01")
 # Matches the local-provider timeout in platform/ai-gateway/provider-routing.yaml
 # (60s). The old hardcoded 30s here made every /api/chat call that took
@@ -99,20 +105,33 @@ def _tekos_stress_test_prompts() -> List[str]:
     return prompts
 
 
-def _auth_headers() -> Dict[str, str]:
-    # Reuses run_scenarios.py's own ROPC token-fetch helper (mounted
-    # alongside this file) instead of duplicating that grant logic.
-    import run_scenarios
+_TARGET = None
 
-    return run_scenarios.auth_headers(PERSONA)
+
+def _target():
+    """The shared UnifAI transport, created on first use. Imported lazily:
+    the percentile/corpus helpers below need neither httpx nor a password,
+    and the unit tests exercise them without either. Mounted flat next to
+    this file in the Job; under evaluations/common/ in the repo."""
+    global _TARGET
+    if _TARGET is None:
+        for candidate in (SCRIPT_DIR, SCRIPT_DIR.parent.parent / "evaluations" / "common"):
+            if str(candidate) not in sys.path:
+                sys.path.append(str(candidate))
+        from unifai_target import UnifaiTarget
+
+        _TARGET = UnifaiTarget(
+            os.getenv("DEMO_PERSONA_PASSWORD", ""),
+            agent=AGENT,
+            team_name=os.getenv("UNIFAI_TEAM_NAME") or f"agent-{AGENT}",
+        )
+    return _TARGET
 
 
 def _cleanup_created_runs() -> "tuple[int, int]":
-    # Imported lazily, same reasoning as _auth_headers() above - avoids a
-    # hard import-time dependency for callers that never invoke this.
-    import run_scenarios
-
-    return run_scenarios.cleanup_created_runs()
+    # Deletes exactly the sessions this process created (UnifaiTarget keeps
+    # their ids) - never a sweep of the persona's sessions.
+    return _TARGET.cleanup() if _TARGET is not None else (0, 0)
 
 
 def _percentile(sorted_values: List[float], pct: float) -> float:
@@ -122,27 +141,29 @@ def _percentile(sorted_values: List[float], pct: float) -> float:
     return sorted_values[index]
 
 
-def _post_chat(headers: Dict[str, str], message: str, i: int) -> "tuple[bool, bool, Optional[int], float]":
-    """One /api/chat call. Returns (ok, timed_out, status_code, elapsed_ms)."""
-    import run_scenarios
+def _post_chat(blueprint_id: str, message: str, i: int) -> "tuple[bool, bool, Optional[int], float]":
+    """One UnifAI turn in a fresh session. Returns (ok, timed_out, status_code, elapsed_ms).
 
+    UnifaiTarget.run() reports a transport failure as status 599 with the
+    exception text, so a timeout is recognised by that text (httpx's
+    timeout exceptions all say "timed out"); it is the stream's per-read
+    timeout, which heartbeats keep from tripping on a merely slow answer.
+    """
+    target = _target()
+    try:
+        session_id = target.create(PERSONA, blueprint_id)
+    except Exception:  # noqa: BLE001 - a failed session create counts as one failed interaction
+        return False, False, None, 0.0
     start = time.monotonic()
     try:
-        resp = httpx.post(
-            f"{BFF_URL}/api/chat",
-            headers=headers,
-            json={"session_id": f"day2-bulk-{AGENT}-{i}", "message": message},
-            timeout=BULK_TIMEOUT_SECONDS,
-        )
-        body = resp.json() if resp.status_code == 200 else {}
-        if resp.status_code == 200:
-            run_scenarios.record_run_id(PERSONA, body)
-        ok = resp.status_code == 200 and bool(body.get("reply"))
-        return ok, False, resp.status_code, (time.monotonic() - start) * 1000
-    except httpx.TimeoutException:
-        return False, True, None, (time.monotonic() - start) * 1000
+        run = target.run(PERSONA, message, session_id=session_id, timeout=BULK_TIMEOUT_SECONDS)
     except Exception:  # noqa: BLE001 - a call erroring counts as one failed interaction, not a crash
         return False, False, None, (time.monotonic() - start) * 1000
+    elapsed_ms = (time.monotonic() - start) * 1000
+    if run.status == 599:
+        timed_out = "timed out" in str(run.raw.get("error", "")).lower()
+        return False, timed_out, None, elapsed_ms
+    return run.status == 200 and bool(run.reply), False, run.status, elapsed_ms
 
 
 def run() -> List[Day2Result]:
@@ -152,9 +173,8 @@ def run() -> List[Day2Result]:
         return [Day2Result(
             AGENT, "bulk_load", "n/a", "coverage", True,
             "bulk_load skipped - zuno.status: placeholder (not yet "
-            "promoted, ADR-0011/ADR-0040/ADR-0533); real /api/chat calls "
-            "are correctly denied 403 by the entitlement gateway, not a "
-            "backend failure",
+            "promoted, ADR-0007/ADR-0011/ADR-0040/ADR-0533); UnifAI serves "
+            "no workflow for it by design, not a backend failure",
         )]
 
     corpus = _scenario_prompts() + _tekos_stress_test_prompts()
@@ -164,18 +184,22 @@ def run() -> List[Day2Result]:
             "no message-bearing scenario content to replay",
         )]
 
-    headers = _auth_headers()
+    try:
+        blueprint_id = _target().workflow_id(PERSONA)
+    except Exception as exc:  # noqa: BLE001 - no workflow to drive is one failed row, not a crash
+        return [Day2Result(AGENT, "bulk_load", "summary", "bulk_load", False, f"cannot resolve {AGENT}'s UnifAI workflow as {PERSONA}: {exc}")]
+
     latencies: List[float] = []
     errors = 0
     timeouts = 0
     for i in range(BULK_INTERACTIONS):
         message = corpus[i % len(corpus)]
-        ok, timed_out, status_code, elapsed_ms = _post_chat(headers, message, i)
+        ok, timed_out, status_code, elapsed_ms = _post_chat(blueprint_id, message, i)
         if not ok and timed_out:
             # One retry on a bare timeout absorbs a single slow response
             # instead of counting normal single-replica backend latency
             # as a hard failure.
-            ok, timed_out, status_code, retry_ms = _post_chat(headers, message, i)
+            ok, timed_out, status_code, retry_ms = _post_chat(blueprint_id, message, i)
             elapsed_ms += retry_ms
         latencies.append(elapsed_ms)
         if not ok:
