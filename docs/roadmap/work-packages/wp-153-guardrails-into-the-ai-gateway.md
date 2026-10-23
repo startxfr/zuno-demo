@@ -1,6 +1,6 @@
 # WP-153: Move TrustyAI guardrails into the ai-gateway
 
-- **State:** Repo work in review
+- **State:** Done
 - **ADRs:** [ADR-0567](../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md)
 - **Depends on:** none
 - **Related:** [ADR-0534](../../adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md), [ADR-0540](../../adr/0540-express-guardrail-policy-as-nemo-rails-configuration.md), [ADR-0021](../../adr/0021-route-models-according-to-c1-c2-c3-classification.md), [ADR-0560](../../adr/0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
@@ -159,3 +159,14 @@ with the hook on and off.
   provides the switch.
 - Block mode adds detector latency to the critical path; does it fit the
   ADR-0544 bounds on every model call? Measure in step 7.
+
+## Closure (2026-10-23)
+
+`guardrails.enabled: true` is now the chart value on `devel` (demo333): backend
+NemoGuardrails, C1, C2 and C3 in observe mode. agent-runtime's `detectorUrl` and
+`nemoUrl` are emptied in its chart, so the gateway is the single observer and no
+exchange is counted twice. The live proofs above (block, observe, counters in raw
+Prometheus) stand. Left to WP-156: switch C2 to `block` once comage, tekos and arkos
+run on UnifAI, and remove the agent-runtime hook. Fail-closed `block` stays a separate
+decision.
+

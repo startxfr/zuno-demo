@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 6 | 8 | WP-145 |
 | v0.10 | 5 | 1 | 6 | WP-51 |
-| v0.11 | 16 | 11 | 12 | WP-146, WP-147, WP-149, WP-150, WP-153, WP-154, WP-155, WP-156, WP-157 |
+| v0.11 | 16 | 11 | 12 | WP-146, WP-147, WP-149, WP-150, WP-154, WP-155, WP-156, WP-157 |
 | v0.12 | 9 | 9 | 8 | WP-158, WP-159, WP-160, WP-161, WP-163, WP-164, WP-165 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -913,7 +913,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-150 | [wp-150](work-packages/wp-150-unifai-operator-okf-agent-bundles.md) | 0564, 0565 | WP-146 | Repo work in review | live-proven on demo333 2026-10-17 with operator 0.1.16 (throwaway-key bundle from quay.io/zuno/okf-test-tekos: verified, 13 objects emitted, workflows ran with the user JWT and per-task X-Zuno-* headers, wrong key refused); remaining: publication with the real platform key, plan_draft_write template, graph shape for soursage/cognos |
 | WP-151 | [wp-151](work-packages/wp-151-deploy-unifai-on-zuno-via-argocd.md) | 0574, 0562, 0560 | WP-146, WP-150 | Done | live-proven on demo333 2026-10-22: persona login via realm zuno, user JWT + X-Zuno-Agent + classification at the ai-gateway; stack pinned to devel-38279972f |
 | WP-152 | [wp-152](work-packages/wp-152-mcp-gateway-evaluation-and-mcp-north-side.md) | 0571 | none | Done | RHCL MCP gateway is Tech Preview without agent/task rights; branch B (per-agent /mcp + operator 0.1.19 per-task providers) live-proven on demo333 2026-10-22 |
-| WP-153 | [wp-153](work-packages/wp-153-guardrails-into-the-ai-gateway.md) | 0567 | none | Repo work in review | none until a live check; fork-side work runs offline |
+| WP-153 | [wp-153](work-packages/wp-153-guardrails-into-the-ai-gateway.md) | 0567 | none | Done | live-proven on demo333 2026-10-22; enabled in observe on devel 2026-10-23; C2 block waits for WP-156 |
 | WP-154 | [wp-154](work-packages/wp-154-tekos-pilot-on-demo333.md) | 0573, 0561 | WP-146 - WP-153 | Repo work in review | phase A and B started on demo333 (16/17 scenarios, 12/12 security); GPU-dependent checks, restore drill and real-key bundle remain |
 | WP-155 | [wp-155](work-packages/wp-155-migrate-remaining-agents-and-cut-demo222-over.md) | 0573, 0561 | WP-154 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Not started | none until a live check; fork-side work runs offline |
