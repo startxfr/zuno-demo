@@ -131,6 +131,7 @@ okf:
 retrievers: []
 # - name: knowledge
 #   teamId: <UnifAI team workspace of the agents using it>
+#   teamRef: agent-<bundle>   # or the UnifaiTeam a groupTeam bundle emits (unifai-operator >= 0.1.25)
 #   config: {source_type: CONFLUENCE, forward_user_token: true, top_k_results: 5, threshold: 0.3}
 ragSources: []
 # - name: tech-satellite

@@ -72,7 +72,8 @@
 # (zuno_unifai_released_bundles, default false): released artifacts are v2 and
 # keyless, which unifai-operator reads from 0.1.25 on; an older operator leaves
 # every bundle Pending. Set it to true once the operator in the cluster is
-# >= 0.1.25.
+# >= 0.1.25. zuno_unifai_released_bundles_exclude lists agents to leave out
+# (graph shapes the operator has no template for yet: arkos, cognos, soursage).
 - name: "unifai | read the bundles of the pinned agents release"
   ansible.builtin.set_fact:
     _unifai_stack_config: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/stack-config.generated.yaml') | from_yaml }}"
@@ -83,7 +84,7 @@
       {%- set released = (_unifai_stack_config.unifai | default({})).bundles | default([]) -%}
       {%- if (zuno_unifai_released_bundles | default(false) | bool) and released | length > 0 -%}
       {%- set merged = [] -%}
-      {%- for b in released -%}
+      {%- for b in released if b.name not in (zuno_unifai_released_bundles_exclude | default([])) -%}
       {%- set _ = merged.append(b | combine((zuno_unifai_bundle_settings | default({}))[b.name] | default({}))) -%}
       {%- endfor -%}
       {{ {'okf': {'verify': _unifai_stack_config.unifai.verify,

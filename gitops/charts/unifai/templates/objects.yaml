@@ -145,11 +145,16 @@ metadata:
   name: {{ .name }}
   namespace: {{ $.Values.namespace }}
   annotations:
-    argocd.argoproj.io/sync-wave: "15"
+    # A retriever in a bundle-owned team (teamRef) can only be created once the
+    # bundle (wave 20) has emitted that team.
+    argocd.argoproj.io/sync-wave: {{ ternary "25" "15" (not (empty .teamRef)) | quote }}
 spec:
   owner: {{ $owner }}
   {{- with .teamId }}
   teamId: {{ . }}
+  {{- end }}
+  {{- with .teamRef }}
+  teamRef: {{ . }}
   {{- end }}
   type: {{ default "docs_rag" .type }}
   config:
