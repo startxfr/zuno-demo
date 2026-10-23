@@ -1,6 +1,6 @@
 # WP-167: Serve a per-agent entry and descriptive sheet from the admitted bundle
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0582](../../adr/0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md), [ADR-0583](../../adr/0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md), [ADR-0584](../../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md)
 - **Depends on:** [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md)
 - **Related:** [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md), [WP-148](wp-148-unifai-parity-memory-routing-quota-ux.md)
@@ -50,3 +50,23 @@ groups; anyone else gets the same not-found as for an unknown agent.
 
 - Placeholder agents: no entry for ordinary users; whether the platform team
   sees a "coming soon" entry is left to ADR-0584 and is not built here.
+
+## Progress (2026-10-23)
+
+Fork `devel` (9d4eb0218) carries lot 1 and the UI sheet; nothing is deployed yet.
+
+- Operator: `bundleDisplay` builds the closed public list (agent, title, description, tile
+  presentation, maintainer, state, classification ceiling, task titles) from the admitted bundle,
+  reports it in `status.display` and writes it as the `display` metadata of each emitted workflow
+  (`blueprint.metadata.set`). Tests: the sheet never carries a sentinel placed in a prompt, tool,
+  knowledge, retrieval, access group or limit field, and the field list is pinned.
+- multi-agent: `display` is a client-settable blueprint metadata key with a validator (known
+  fields, bounded plain text without raw HTML, icon and color shapes, at most 20 tasks); 26 unit tests.
+  The existing summary endpoint already returns the metadata under the caller's visibility rules.
+- UI: `/agents/<agent>` reads the summaries the caller can see and shows the sheet, or the same
+  not-found for an unknown and a hidden agent. The image builds; not yet seen in a browser.
+- Next: an operator release (a9), a UI image and the role rerun (68), then the proof of step 5
+  (consultant-01 sees tekos and arkos, sale-01 sees comage only, hidden equals unknown).
+- Open point: the OKF schema allowlists for `icon` and `color` (step 4) are not written; the
+  runtime validator accepts a keyword of lower case letters, digits and hyphens.
+

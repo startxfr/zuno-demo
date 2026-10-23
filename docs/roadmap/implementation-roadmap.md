@@ -919,7 +919,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Not started | none until a live check; fork-side work runs offline |
 | WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Not started | split out of WP-156 by user decision 2026-10-23 |
-| WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Not started | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |
+| WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Repo work in review | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |
 
 ### Phase 45 — agents in their own repository, delivered as signed OCI releases (added 2026-10-22)
 
