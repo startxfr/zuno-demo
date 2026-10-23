@@ -112,7 +112,7 @@ spec:
   config:
     display:
       name: "Run Trace (per-run drill-down)"
-      description: "ADR-0543: select an agent, paste a run_id, see every MCP/RAG/model/BFF/API hop that run consumed - cost, tokens, latency, outcomes. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0551/ADR-0553's dated correction notes)."
+      description: "ADR-0543: select an agent, paste a run_id, see every UnifAI/MCP/RAG/model hop that run consumed - cost, tokens, latency, outcomes. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0551/ADR-0553's dated correction notes)."
     duration: 6h
     refreshInterval: 30s
     variables:
@@ -178,12 +178,12 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{span.zuno.run_id=\"$run_id\"}"
+                    query: "{(span.zuno.run_id=\"$run_id\" || span.mas.run.id=\"$run_id\")}"
       bffTraces:
         kind: Panel
         spec:
           display:
-            name: "BFF Traces (agent-bff)"
+            name: "UnifAI session (multiagent)"
           plugin:
             kind: Table
             spec: {}
@@ -196,12 +196,12 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{name=\"bff_request\" && span.zuno.run_id=\"$run_id\"}"
+                    query: "{name=\"mas.session\" && span.mas.run.id=\"$run_id\"}"
       agentTraces:
         kind: Panel
         spec:
           display:
-            name: "Agent Traces (agent-runtime)"
+            name: "UnifAI graph nodes (multiagent)"
           plugin:
             kind: Table
             spec: {}
@@ -214,7 +214,7 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{name=\"api_request\" && span.zuno.run_id=\"$run_id\"}"
+                    query: "{span.mas.run.id=\"$run_id\"} && {name=~\"mas.node.*\"}"
       mcpTrace:
         kind: Panel
         spec:
@@ -237,7 +237,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: "RAG trace (rag_search spans)"
+            name: "RAG trace (UnifAI rag.search)"
           plugin:
             kind: Table
             spec: {}
@@ -250,7 +250,7 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{name=\"rag_search\" && span.zuno.run_id=\"$run_id\"}"
+                    query: "{span.mas.run.id=\"$run_id\"} && {name=\"rag.search\"}"
       modelCallsAll:
         kind: Panel
         spec:
@@ -364,7 +364,7 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{span.zuno.run_id=\"$run_id\" && status=error}"
+                    query: "{(span.zuno.run_id=\"$run_id\" || span.mas.run.id=\"$run_id\") && status=error}"
       mcpPolicyDenials:
         kind: Panel
         spec:
@@ -408,7 +408,7 @@ spec:
         spec:
           display:
             name: "Time spent by hop"
-            description: "Share of total latency across bff_request/api_request/agent_graph_run/tool_invoke/rag_search/model_call spans - where did the time go? Simplified from Grafana's donut+groupBy(sum) transformation: raw per-span latency_ms rows, not an aggregated pie - see this file's header."
+            description: "Share of total latency across mas.session/mas.node/tool_invoke/rag.search/model_call spans - where did the time go? Simplified from Grafana's donut+groupBy(sum) transformation: raw per-span latency_ms rows, not an aggregated pie - see this file's header."
           plugin:
             kind: Table
             spec: {}
@@ -421,7 +421,7 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{span.zuno.run_id=\"$run_id\"} | select(span.zuno.latency_ms)"
+                    query: "{(span.zuno.run_id=\"$run_id\" || span.mas.run.id=\"$run_id\")} | select(span.zuno.latency_ms)"
       costByProvider:
         kind: Panel
         spec:
@@ -459,7 +459,7 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{span.zuno.run_id=\"$run_id\"}"
+                    query: "{(span.zuno.run_id=\"$run_id\" || span.mas.run.id=\"$run_id\")}"
       totalRunCost:
         kind: Panel
         spec:
@@ -535,7 +535,7 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{name=\"rag_search\" && span.zuno.run_id=\"$run_id\"}"
+                    query: "{span.mas.run.id=\"$run_id\"} && {name=\"rag.search\"}"
     layouts:
       - kind: Grid
         spec:

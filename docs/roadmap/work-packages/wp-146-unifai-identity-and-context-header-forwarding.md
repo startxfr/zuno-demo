@@ -143,3 +143,19 @@ work package closes when step 6 is decided and step 7 is checked.
   commented out, and the header is honoured from outside through the UI
   routes `/api1` and `/api2` without any session: anonymous admin access.
   A fix is under review in the fork; step 7 must verify it.
+
+## Closing pass (2026-10-23, demo333)
+
+- **Step 5 holds on the production stack.** The acceptance gates of comage, tekos and arkos run the
+  check `unifai_forwards_identity_to_the_gateways` on `zuno-unifai` (realm `zuno` personas): a tool
+  call through the MCP gateway only succeeds with the signed-in user's own JWT, and all three gates
+  pass it. A single Tempo trace links the UnifAI run id to the gateways' `zuno.run_id`
+  (see WP-147).
+- **Step 7 is checked.** From a pod in another namespace (no mesh sidecar, so the connection test is
+  not a false positive) `unifai-multiagent-be:8003`, `unifai-rag-server:13456`, `identity:13456`
+  and `unifai-backend:8005` are unreachable, while the Kubernetes API (positive control) answers. The
+  `X-Authenticated-User` surface is therefore not reachable from outside the stack namespace.
+  The operator's `unifai-internal-apis` policy only admits the UnifAI pods, labelled internal
+  clients, the ingress and monitoring namespaces and the operator namespaces.
+- **Step 6 stays open.** Header authorship (who may create LLM or MCP resources with `X-Zuno-*`
+  templates, and what the gateways verify) needs a decision recorded in ADR-0563.

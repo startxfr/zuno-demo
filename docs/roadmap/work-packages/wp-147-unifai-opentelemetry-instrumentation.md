@@ -1,6 +1,6 @@
 # WP-147: UnifAI OpenTelemetry instrumentation
 
-- **State:** Repo work in review
+- **State:** Done
 - **ADRs:** [ADR-0566](../../adr/0566-instrument-unifai-with-opentelemetry.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
 - **Depends on:** none
 - **Related:** [ADR-0029](../../adr/0029-instrument-model-usage-costs-and-distributed-traces.md), [WP-151](wp-151-deploy-unifai-on-zuno-via-argocd.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
@@ -120,3 +120,25 @@ powered off; ask the user).
   WP-154 and fix there if not.
 - Should Langfuse and OTel coexist, or should Langfuse be fed from OTel?
   Out of scope; keep Langfuse untouched.
+
+## Closure (2026-10-23, demo333)
+
+Live proof, checked in raw Tempo (port-forward of `tempo-tempo`, not the dashboard): trace
+`b41a2cfe2bb4409bbe2473013642cd0b` is one continuous trace of 76 spans across nine services:
+`unifai-multiagent-be` (`mas.session`), `unifai-multiagent-temporal-worker` (workflow, activities,
+`mas.node`, `chat auto`, `execute_tool`), `unifai-rag-server` (`rag.search`, `rag.vector_search`),
+the embeddings predictor, `ai-gateway` (`model_call`, `guardrails_observe`), `mcp-gateway`
+(`tool_invoke`) and Keycloak. `traceparent` therefore propagates on the LLM and MCP calls and
+through Temporal. All carry the same run id: `mas.run.id` on the UnifAI spans, `zuno.run_id` on
+the gateways' spans.
+
+Operator surface: the multiagent pods export OTLP to the zuno collector
+(`OTEL_EXPORTER_OTLP_ENDPOINT=http://zuno-otel-collector-collector.zuno-monitoring.svc:4318`).
+UnifAI metrics reach Prometheus (`mas_session_duration_seconds`, `mas_node_duration_seconds`,
+`mas_tool_calls_total`, `gen_ai_*`, `rag_search_duration_seconds`, `rag_pipeline_*`) and feed
+the SLO rule and dashboards of WP-166.
+
+Step 8 is done: the run-trace dashboards (Grafana and Perses) now select UnifAI spans next to the
+gateways' (`mas.session`, `mas.node`, `rag.search` through their trace), the retired agent-runtime,
+agent-bff and rag-service panels are renamed or repointed, and every TraceQL query was run against
+the live Tempo with the run id of the trace above.

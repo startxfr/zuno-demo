@@ -4,10 +4,10 @@
 # run made, with cost/tokens/latency/outcome. Tempo-only by design (plus
 # one Prometheus sanity stat) - Prometheus can't filter by run_id
 # (unbounded cardinality), so every drill-down panel is a TraceQL query
-# against zuno.run_id, the span attribute every service now stamps
-# (agent-runtime's api_request/agent_graph_run, mcp-gateway's tool_invoke,
-# rag-service's rag_search, ai-gateway's model_call, agent-bff's
-# bff_request).
+# against the run id every service stamps: zuno.run_id (mcp-gateway's
+# tool_invoke, ai-gateway's model_call and guardrails_observe) and mas.run.id
+# (UnifAI multiagent's mas.session and mas.node spans, same value; rag.search
+# carries no run id and is selected through its trace). WP-166/WP-147.
 #
 # Panels needing a span attribute beyond Tempo's fixed search-result
 # columns (Trace ID/Start time/Service/Name/Duration) use TraceQL's
@@ -61,7 +61,7 @@ spec:
     {
       "uid": "zuno-run-trace",
       "title": "Run Trace (per-run drill-down)",
-      "description": "ADR-0543: select an agent, paste a run_id, see every MCP/RAG/model/BFF/API hop that run consumed - cost, tokens, latency, outcomes.",
+      "description": "ADR-0543: select an agent, paste a run_id, see every UnifAI/MCP/RAG/model hop that run consumed - cost, tokens, latency, outcomes.",
       "tags": [
         "zuno",
         "agents",
@@ -220,7 +220,7 @@ spec:
                 "uid": "tempo"
               },
               "queryType": "traceql",
-              "query": "{span.zuno.run_id=\"$run_id\"}",
+              "query": "{(span.zuno.run_id=\"$run_id\" || span.mas.run.id=\"$run_id\")}",
               "limit": 50,
               "tableType": "traces",
               "refId": "A"
@@ -241,7 +241,7 @@ spec:
           "panels": [
             {
               "id": 4,
-              "title": "BFF Traces (agent-bff)",
+              "title": "UnifAI session (multiagent)",
               "type": "table",
               "datasource": {
                 "type": "tempo",
@@ -294,7 +294,7 @@ spec:
                     "uid": "tempo"
                   },
                   "queryType": "traceql",
-                  "query": "{name=\"bff_request\" && span.zuno.run_id=\"$run_id\"}",
+                  "query": "{name=\"mas.session\" && span.mas.run.id=\"$run_id\"}",
                   "limit": 20,
                   "tableType": "traces",
                   "refId": "A"
@@ -303,7 +303,7 @@ spec:
             },
             {
               "id": 5,
-              "title": "Agent Traces (agent-runtime)",
+              "title": "UnifAI graph nodes (multiagent)",
               "type": "table",
               "datasource": {
                 "type": "tempo",
@@ -356,7 +356,7 @@ spec:
                     "uid": "tempo"
                   },
                   "queryType": "traceql",
-                  "query": "{name=\"api_request\" && span.zuno.run_id=\"$run_id\"}",
+                  "query": "{span.mas.run.id=\"$run_id\"} && {name=~\"mas.node.*\"}",
                   "limit": 20,
                   "tableType": "traces",
                   "refId": "A"
@@ -427,7 +427,7 @@ spec:
             },
             {
               "id": 7,
-              "title": "RAG trace (rag_search spans)",
+              "title": "RAG trace (UnifAI rag.search)",
               "type": "table",
               "datasource": {
                 "type": "tempo",
@@ -480,7 +480,7 @@ spec:
                     "uid": "tempo"
                   },
                   "queryType": "traceql",
-                  "query": "{name=\"rag_search\" && span.zuno.run_id=\"$run_id\"}",
+                  "query": "{span.mas.run.id=\"$run_id\"} && {name=\"rag.search\"}",
                   "limit": 20,
                   "tableType": "traces",
                   "refId": "A"
@@ -804,7 +804,7 @@ spec:
                     "uid": "tempo"
                   },
                   "queryType": "traceql",
-                  "query": "{span.zuno.run_id=\"$run_id\" && status=error}",
+                  "query": "{(span.zuno.run_id=\"$run_id\" || span.mas.run.id=\"$run_id\") && status=error}",
                   "limit": 20,
                   "tableType": "traces",
                   "refId": "A"
@@ -935,7 +935,7 @@ spec:
                 "type": "tempo",
                 "uid": "tempo"
               },
-              "description": "Share of total latency across bff_request/api_request/agent_graph_run/tool_invoke/rag_search/model_call spans - where did the time go?",
+              "description": "Share of total latency across mas.session/mas.node/tool_invoke/rag.search/model_call spans - where did the time go?",
               "gridPos": {
                 "h": 8,
                 "w": 8,
@@ -979,7 +979,7 @@ spec:
                     "uid": "tempo"
                   },
                   "queryType": "traceql",
-                  "query": "{span.zuno.run_id=\"$run_id\"} | select(span.zuno.latency_ms)",
+                  "query": "{(span.zuno.run_id=\"$run_id\" || span.mas.run.id=\"$run_id\")} | select(span.zuno.latency_ms)",
                   "limit": 50,
                   "tableType": "traces",
                   "refId": "A"
@@ -1098,7 +1098,7 @@ spec:
                     "uid": "tempo"
                   },
                   "queryType": "traceql",
-                  "query": "{span.zuno.run_id=\"$run_id\"}",
+                  "query": "{(span.zuno.run_id=\"$run_id\" || span.mas.run.id=\"$run_id\")}",
                   "limit": 50,
                   "tableType": "traces",
                   "refId": "A"
@@ -1313,7 +1313,7 @@ spec:
                     "uid": "tempo"
                   },
                   "queryType": "traceql",
-                  "query": "{name=\"rag_search\" && span.zuno.run_id=\"$run_id\"}",
+                  "query": "{span.mas.run.id=\"$run_id\"} && {name=\"rag.search\"}",
                   "limit": 50,
                   "tableType": "traces",
                   "refId": "A"
