@@ -23,6 +23,10 @@ agent-runtime target), optional UNIFAI_WORKFLOW (workflow name; default is the
 agent name, the operator's name for an OKF bundle's primary task) and
 UNIFAI_TEAM_ID (the team workspace that owns the agent's workflows; a persona
 only sees them by selecting that workspace, ``teamId`` on every request).
+UNIFAI_TEAM_NAME (WP-156) names that workspace instead of its id: the team id
+is resolved at sign-in from the identity service's ``teams.list`` (the
+operator recreates group-bound teams as ``agent-<name>`` with new ids, so an
+in-cluster Job cannot hard-code the id).
 """
 from __future__ import annotations
 
@@ -86,13 +90,19 @@ def _reply_of(result: Dict[str, Any]) -> str:
 
 class UnifaiTarget:
     def __init__(
-        self, password: str, ui_url: Optional[str] = None, agent: str = "tekos", team_id: Optional[str] = None
+        self,
+        password: str,
+        ui_url: Optional[str] = None,
+        agent: str = "tekos",
+        team_id: Optional[str] = None,
+        team_name: Optional[str] = None,
     ) -> None:
         if not password:
             raise UnifaiError("DEMO_PERSONA_PASSWORD is required to sign in to UnifAI")
         self.ui_url = (ui_url or os.getenv("UNIFAI_URL", UNIFAI_URL)).rstrip("/")
         self.agent = agent
         self.team_id = team_id if team_id is not None else os.getenv("UNIFAI_TEAM_ID", "")
+        self.team_name = team_name if team_name is not None else os.getenv("UNIFAI_TEAM_NAME", "")
         self._password = password
         self._clients: Dict[str, httpx.Client] = {}
         self._sessions: List[tuple] = []  # (persona, session_id), for cleanup
@@ -118,7 +128,38 @@ class UnifaiTarget:
             c.close()
             raise UnifaiError(f"UnifAI sign-in for {persona!r} failed (landed on {result.url})")
         self._clients[persona] = c
+        if self.team_name and not self.team_id:
+            # Resolved by the first persona that is a member; a non-member
+            # (an entitlement check) leaves it unset, and the next member sets it.
+            self.team_id = next((t["team_id"] for t in self.teams(persona) if t.get("name") == self.team_name), "")
         return c
+
+    # -- team workspaces (identity service, /api3 on the UI route) ------------
+
+    def teams(self, persona: str) -> List[Dict[str, Any]]:
+        """The team workspaces `persona` belongs to (directly or through a group)."""
+        resp = self.client(persona).get(f"{self.ui_url}/api3/teams/teams.list")
+        resp.raise_for_status()
+        return list(resp.json().get("teams") or [])
+
+    def create_team(self, persona: str, name: str, groups: List[str]) -> Dict[str, Any]:
+        """Create a team workspace owned by `persona` whose members are `groups`.
+
+        Group ids are Keycloak group names (the identity service strips the
+        leading `/` of full paths). Team names are unique: an existing name
+        is a 400 from the identity service, raised here as UnifaiError.
+        """
+        resp = self.client(persona).post(
+            f"{self.ui_url}/api3/teams/team.create",
+            json={
+                "name": name,
+                "createdBy": persona,
+                "members": [{"type": "group", "id": g, "display_name": g} for g in groups],
+            },
+        )
+        if resp.status_code not in (200, 201):
+            raise UnifaiError(f"team create {name!r} failed: {resp.status_code} {resp.text[:200]}")
+        return resp.json()
 
     def anonymous_status(self, path: str) -> int:
         """HTTP status of an unauthenticated call (redirects not followed)."""

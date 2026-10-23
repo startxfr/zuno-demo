@@ -2,16 +2,18 @@
 # WP-136/ADR-0550: runs evaluations/demo_presenter_probe.py as a one-shot
 # in-cluster Job, then parses its single JSON output line into the
 # `demo_persona_probe_result` fact. Included from ansible/playbooks/
-# demo_check.yml only.
+# demo_check.yml and demo_reset.yml only.
 #
-# Same "no external Route into agent-runtime, must run in-cluster with
-# the acceptance-gate identity" reasoning as
-# ansible/roles/day3/tasks/platform_health_check.yml and
-# ansible/tasks/scenario_failover_probe_job.yml (whose own comment
-# documents the NetworkPolicy allow-list this Job's pod label satisfies).
-# Deliberately smaller than scenario_failover_probe_job.yml: only one
-# frontend client secret (comage, since GET /v1/projects is agent-agnostic
-# - ADR-0527 clause 6) and no Prometheus token, since this probe never
+# WP-156: the probe signs the presenter persona in to UnifAI (ADR-0561)
+# through the UnifAI UI route, the only door into UnifAI from outside its
+# own pods (NetworkPolicy unifai-internal-apis admits UnifAI pods only).
+# It needs the demo-persona password and the route; the
+# comage-frontend client secret and the in-cluster agent-runtime URL are
+# gone with agent-runtime. It still runs in-cluster, with the same Job
+# shape as ansible/tasks/scenario_failover_probe_job.yml, so `make demo
+# check` keeps working from AAP or a workstation without Python packages,
+# and the Job trusts the platform's internal root CA (Keycloak's form, on
+# the sign-in path, chains to it). No Prometheus token: this probe never
 # reads a metric.
 #
 # Requires cluster_base_domain (ansible/tasks/resolve_cluster_base_domain.yml)
@@ -26,14 +28,6 @@
   register: _dpp_password_secret
   no_log: true
 
-- name: "demo-persona-probe | read the comage-frontend client secret from zuno-auth"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-auth
-    name: comage-frontend-client-secret
-  register: _dpp_client_secret
-  no_log: true
-
 - name: "demo-persona-probe | read the platform's internal root CA from openshift-config"
   kubernetes.core.k8s_info:
     kind: ConfigMap
@@ -44,13 +38,12 @@
 - name: "demo-persona-probe | fail if any required credential is missing"
   ansible.builtin.fail:
     msg: >-
-      One of demo-personas-password (zuno-auth), comage-frontend-client-secret
-      (zuno-auth) or openshift-config/keycloak-serving-ca was not found -
-      each is provisioned by an existing component (keycloak,
-      openshift-oauth) this check does not itself install.
+      One of demo-personas-password (zuno-auth) or
+      openshift-config/keycloak-serving-ca was not found - each is
+      provisioned by an existing component (keycloak, openshift-oauth)
+      this check does not itself install.
   when: >-
     (_dpp_password_secret.resources | default([]) | length) == 0 or
-    (_dpp_client_secret.resources | default([]) | length) == 0 or
     (_dpp_ca_cm.resources | default([]) | length) == 0
 
 - name: "demo-persona-probe | copy the credentials into a zuno-ai-run Secret the Job can mount"
@@ -67,7 +60,6 @@
       type: Opaque
       data:
         demo-persona-password: "{{ _dpp_password_secret.resources[0].data.password }}"
-        comage-client-secret: "{{ _dpp_client_secret.resources[0].data.client_secret }}"
   no_log: true
 
 - name: "demo-persona-probe | copy the internal root CA into a zuno-ai-run ConfigMap the Job can mount"
@@ -97,7 +89,7 @@
           zuno.io/managed-by: zuno-ansible
       data:
         demo_presenter_probe.py: "{{ lookup('file', zuno_repo_root + '/evaluations/demo_presenter_probe.py') }}"
-        run_scenarios.py: "{{ lookup('file', zuno_repo_root + '/evaluations/tekos/run_scenarios.py') }}"
+        unifai_target.py: "{{ lookup('file', zuno_repo_root + '/evaluations/common/unifai_target.py') }}"
 
 - name: "demo-persona-probe | delete any previous probe Job (Jobs are immutable, this task is idempotent-by-recreation)"
   kubernetes.core.k8s:
@@ -110,8 +102,9 @@
 
 # WP-136 amendment (2026-09-05): `make demo reset` sets
 # demo_persona_probe_ensure_projects: true so this Job also creates any
-# missing demo project (via the same POST /v1/projects the frontend uses -
-# see evaluations/demo_presenter_probe.py's own docstring). `make
+# missing demo project (WP-156: as a UnifAI team workspace, through the
+# identity service's team.create the UI uses - see
+# evaluations/demo_presenter_probe.py's own docstring). `make
 # demo check` never sets this var, so it defaults to false and this stays
 # purely read-only there, matching that playbook's own "never mutates
 # cluster state" contract.
@@ -148,7 +141,7 @@
                   - sh
                   - -c
                   - >-
-                    pip install --quiet --no-cache-dir httpx pyyaml &&
+                    pip install --quiet --no-cache-dir httpx &&
                     CERTIFI=$(python3 -c 'import certifi; print(certifi.where())') &&
                     cat /gate-ca/ca.crt >> "$CERTIFI" &&
                     export SSL_CERT_FILE="$CERTIFI" &&
@@ -170,39 +163,31 @@
                     value: /tmp/.pyuser
                   - name: AGENT
                     value: comage
-                  - name: KEYCLOAK_URL
-                    value: "https://keycloak.{{ cluster_base_domain }}"
-                  - name: RUNTIME_URL
-                    value: "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080"
+                  # Same route platform_health_check.yml probes. TLS is
+                  # verified: the internal root CA is appended to certifi
+                  # above, and the route and Keycloak chain to it or to a
+                  # public CA.
+                  - name: UNIFAI_URL
+                    value: "https://unifai-ui-zuno-unifai.{{ cluster_base_domain }}"
+                  - name: UNIFAI_VERIFY_TLS
+                    value: "1"
                   - name: DEMO_PERSONA_PASSWORD
                     valueFrom:
                       secretKeyRef:
                         name: demo-persona-probe-credentials
                         key: demo-persona-password
-                  - name: COMAGE_FRONTEND_CLIENT_SECRET
-                    valueFrom:
-                      secretKeyRef:
-                        name: demo-persona-probe-credentials
-                        key: comage-client-secret
                 volumeMounts:
                   - name: gate
                     mountPath: /gate
                   - name: gate-ca
                     mountPath: /gate-ca
             volumes:
-              # ConfigMap data keys can't contain '/' - run_scenarios.py
-              # must land under a tekos/ subdirectory since
-              # demo_presenter_probe.py does
-              # sys.path.insert(0, .../"tekos"), same remap
-              # scenario_failover_probe_job.yml already uses.
+              # Flat: demo_presenter_probe.py looks for unifai_target.py
+              # next to itself (the Job layout) or under common/ (the
+              # repo layout).
               - name: gate
                 configMap:
                   name: demo-persona-probe-scripts
-                  items:
-                    - key: demo_presenter_probe.py
-                      path: demo_presenter_probe.py
-                    - key: run_scenarios.py
-                      path: tekos/run_scenarios.py
               - name: gate-ca
                 configMap:
                   name: demo-persona-probe-ca

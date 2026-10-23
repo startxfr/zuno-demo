@@ -23,8 +23,9 @@
     demo_namespace: zuno-ai-run
     # webinar-*/{C1,C2,C3} - see docs/roadmap/work-packages/
     # wp-136-webinar-demo-orchestration.md's "Projects" section. Created
-    # live through the frontend, never by this playbook (WP-136: "do not
-    # add a second project mechanism").
+    # live in the UnifAI UI as team workspaces (WP-156, ADR-0569), or by
+    # `make demo reset`, never by this playbook (WP-136: "do not add a
+    # second project mechanism").
     demo_required_projects:
       webinar-public: C1
       webinar-confidential: C2
@@ -103,11 +104,12 @@
         msg: >-
           Project '{{ item.key }}' ({{ item.value }}) not found for the
           sale-01 persona - run `make demo reset` to create it
-          automatically (via the same POST /v1/projects the frontend uses,
-          granted to the consultant and sales groups), or create it live
-          through the frontend yourself if you want the audience to see it
-          created (any agent's "New project" action, title exactly
-          "{{ item.key }}", classification {{ item.value }}). demo-check
+          automatically (WP-156: as a UnifAI team workspace whose members
+          are the consultant and sales groups), or create it live in the
+          UnifAI UI yourself if you want the audience to see it created
+          (a new team named exactly "{{ item.key }}" with those two
+          groups). UnifAI teams carry no classification yet, so
+          {{ item.value }} is not enforced by the team itself. demo-check
           stays read-only and never creates it itself.
       loop: "{{ demo_required_projects | dict2items }}"
       loop_control:

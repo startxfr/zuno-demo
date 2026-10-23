@@ -60,6 +60,13 @@ class Recorder:
             )
         if path == "/api2/sessions/session.delete":
             return httpx.Response(200, json=True)
+        if path == "/api3/teams/teams.list":
+            return httpx.Response(200, json={"teams": [{"team_id": "t-other", "name": "x"}, {"team_id": "t-arkos", "name": "agent-arkos"}]})
+        if path == "/api3/teams/team.create":
+            body = json.loads(request.content)
+            if body["name"] == "taken":
+                return httpx.Response(400, json={"error": "Team with name 'taken' already exists"})
+            return httpx.Response(201, json={"team_id": "t-new", "name": body["name"], "members": body["members"]})
         return httpx.Response(404)
 
 
@@ -87,6 +94,40 @@ def test_login_session_stream_and_cleanup(monkeypatch):
     ebody = json.loads(execute.content)
     assert ebody["sessionId"] == "sess-1" and ebody["stream"] is True and ebody["teamId"] == "team-1"
     assert t.cleanup() == (1, 0)
+
+
+def test_team_name_is_resolved_at_sign_in(monkeypatch):
+    # WP-156: in-cluster Jobs name the team (agent-<name>), its id changes when the operator recreates it.
+    rec = Recorder()
+    real_client = httpx.Client
+
+    def factory(*a, **kw):
+        kw.pop("verify", None)
+        return real_client(*a, transport=httpx.MockTransport(rec.handler), **kw)
+
+    monkeypatch.setattr(ut.httpx, "Client", factory)
+    monkeypatch.delenv("UNIFAI_TEAM_ID", raising=False)
+    t = ut.UnifaiTarget("pw", ui_url=UI, agent="arkos", team_name="agent-arkos")
+    assert t.team_id == ""
+    t.client("consultant-01")
+    assert t.team_id == "t-arkos"
+    unknown = ut.UnifaiTarget("pw", ui_url=UI, agent="arkos", team_name="agent-nope")
+    unknown.client("consultant-01")
+    assert unknown.team_id == ""  # not a member: stays in the personal workspace
+
+
+def test_create_team_sends_group_members_and_reports_a_taken_name(monkeypatch):
+    t, rec = _target(monkeypatch)
+    team = t.create_team("consultant-01", "webinar-public", ["consultant", "sales"])
+    assert team["team_id"] == "t-new"
+    body = json.loads(next(q for q in rec.requests if q.url.path.endswith("team.create")).content)
+    assert [m["id"] for m in body["members"]] == ["consultant", "sales"] and {m["type"] for m in body["members"]} == {"group"}
+    try:
+        t.create_team("consultant-01", "taken", ["sales"])
+    except ut.UnifaiError as exc:
+        assert "400" in str(exc)
+    else:
+        raise AssertionError("a taken team name must raise")
 
 
 def test_workflow_defaults_to_agent_and_env_override(monkeypatch):

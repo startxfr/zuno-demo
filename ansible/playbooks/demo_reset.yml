@@ -20,9 +20,10 @@
 # projects exist, via the same in-cluster persona probe `make demo check`
 # uses - see ansible/tasks/demo_persona_probe_job.yml and
 # evaluations/demo_presenter_probe.py's own docstring for why this calls
-# the existing POST /v1/projects endpoint rather than a new mechanism, and
-# why each created project grants both the consultant and sales
-# business-role groups.
+# the existing creation endpoint rather than a new mechanism (WP-156: a
+# demo project is a UnifAI team workspace, created with the identity
+# service's team.create), and why each created project admits both the
+# consultant and sales business-role groups.
 - name: "Demo reset: ensure the demo projects exist"
   hosts: localhost
   gather_facts: false
