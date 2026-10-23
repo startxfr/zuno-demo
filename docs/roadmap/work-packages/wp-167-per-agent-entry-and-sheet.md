@@ -1,6 +1,6 @@
 # WP-167: Serve a per-agent entry and descriptive sheet from the admitted bundle
 
-- **State:** Repo work in review
+- **State:** Repo work merged
 - **ADRs:** [ADR-0582](../../adr/0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md), [ADR-0583](../../adr/0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md), [ADR-0584](../../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md)
 - **Depends on:** [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md)
 - **Related:** [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md), [WP-148](wp-148-unifai-parity-memory-routing-quota-ux.md)
@@ -70,3 +70,22 @@ Fork `devel` (9d4eb0218) carries lot 1 and the UI sheet; nothing is deployed yet
 - Open point: the OKF schema allowlists for `icon` and `color` (step 4) are not written; the
   runtime validator accepts a keyword of lower case letters, digits and hyphens.
 
+
+## Proof on demo333 (2026-10-23, operator 0.1.29, UI devel-124128985)
+
+Real browser (Playwright), sign-in through Keycloak, `/agents/<agent>`:
+
+| Persona (agent groups) | tekos | arkos | comage | unknown agent |
+| --- | --- | --- | --- | --- |
+| consultant-02 (`agent_tekos`, `agent_arkos`) | sheet | sheet | not found | not found |
+| sale-01 (`agent_comage`, `agent_finage`) | not found | not found | sheet | not found |
+
+A hidden agent and an unknown one show the same "Agent not found" page. The sheet shows the title,
+state, classification ceiling, tile description, description and task titles, and nothing else (the
+status block and the blueprint metadata carry the same closed list, tested in the operator).
+Two defects found on the way, both fixed: operator 0.1.29 with the older multiagent image left every
+bundle workflow in Error (HTTP 400 on the new metadata key; 0.1.30 will tolerate it), and the first
+version of the page only looked in the personal workspace, so every agent showed "not found" (it now
+looks in every team of the caller).
+
+Left: the conformance test in `zuno-demo-agents` for the icon and color shapes.
