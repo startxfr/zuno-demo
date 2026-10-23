@@ -119,8 +119,9 @@ mcpGateway:
   # of the Lightspeed ceiling. Needs unifai-operator >= 0.1.19 (spec.mcp).
   perTask: true
 
-# Signed OKF agent bundles (ADR-0564). publicKey is the PEM of
-# agents/zuno-platform-signer.pub (the role passes it).
+# Signed OKF agent bundles (ADR-0564). publicKey is the PEM of the frozen
+# Vault Transit key that signed the pre-release bundles
+# (ansible/roles/unifai/files/zuno-platform-signer.pub, the role passes it).
 okf:
   publicKey: ""
   # Keyless verification (ADR-0578): set verify.keyless {issuer, subjectRegExp}

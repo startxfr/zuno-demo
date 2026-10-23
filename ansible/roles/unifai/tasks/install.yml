@@ -103,7 +103,7 @@
     gitops_app_extra_helm_values: >-
       {{ {'clusterBaseDomain': cluster_base_domain,
           'stack': {'enabled': true},
-          'okf': {'publicKey': lookup('ansible.builtin.file', zuno_repo_root + '/agents/zuno-platform-signer.pub')}}
+          'okf': {'publicKey': lookup('ansible.builtin.file', zuno_repo_root + '/ansible/roles/unifai/files/zuno-platform-signer.pub')}}
          | combine(_unifai_backup_values, recursive=True)
          | combine(zuno_unifai_values | default({}), recursive=True)
          | combine(_unifai_okf_values, recursive=True) }}

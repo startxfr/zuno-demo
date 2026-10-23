@@ -4,7 +4,7 @@ A copy of zuno-demo-agents platform/okf/check_narrowing.py, re-rooted on an
 extracted release directory: the rule runs once in the agents repository's
 CI and once here, so a misconfigured CI on one side cannot admit a widening
 alone. Duplicated on purpose (small, well-specified logic, independent
-life cycles - the same convention validate_okf_bundle.py states); keep the
+life cycles - the same convention zuno-demo-agents' validate_okf_bundle.py states); keep the
 two in step when the rule changes.
 
 Used by admit_okf_bundle.py validate; v0.2 bundles pass trivially.
@@ -110,7 +110,7 @@ def check_bundle(bundle: pathlib.Path, corp: Corp, root: pathlib.Path) -> List[s
     for task in z.get("tasks") or []:
         task_path = bundle / "tasks" / f"{task}.md"
         if not task_path.is_file():
-            continue  # reported by validate_okf_bundle.py
+            continue  # reported by validate_okf_bundle.py in zuno-demo-agents
         where = f"{label}/tasks/{task}.md"
         tz = frontmatter(task_path).get("zuno") or {}
         findings += _models(where, tz.get("models") or {}, classification, corp)
