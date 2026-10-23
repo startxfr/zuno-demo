@@ -1,73 +1,20 @@
 ---
 # Provider API key placeholders are seeded by vault, not here; this role only
-# builds the images its Applications need (ai-gateway, agent-runtime), then
-# registers those Applications below - same name-mismatch self-sufficiency
-# pattern as ansible/roles/agents/tasks/install.yml (see there for the full
-# rationale and apply_openshift_build.yml's idempotency guarantee).
+# builds the image its Applications need (ai-gateway), then registers those
+# Applications below - the build component's name does not match this run
+# component's, so without it `make d2 install llm` would leave ai-gateway in
+# ImagePullBackOff on a fresh cluster (apply_openshift_build.yml documents
+# the idempotency guarantee: a status check, not a rebuild, once the image
+# exists). WP-156 removed agent-runtime from this role's loops (and its
+# first-run OKF signing); ai-gateway stays.
 - name: "llm | ensure the ai-gateway image is built"
   ansible.builtin.include_role:
     name: ai_gateway_build
     tasks_from: build
 
-- name: "llm | ensure the agent-runtime image is built"
-  ansible.builtin.include_role:
-    name: agent_build
-    tasks_from: build
-
-# ADR-0517 live finding (demo333, 2026-09-07): on a from-scratch cluster
-# NOTHING has run `make d3 sign` yet, so Vault KV zuno/okf-signatures is
-# empty and the agent-runtime chart's externalsecret-okf-signatures.yaml
-# (wave 0, ESO health check registered) goes Degraded on "could not get
-# secret data from provider" - ArgoCD's wave gating then never applies
-# the Deployment behind it and this Day 2 install times out waiting on
-# Synced/Healthy. Day 3's signing verb cannot be the first producer: it
-# runs two tiers later. The signing Job itself only needs what Day 1
-# already delivered (agent-runtime:latest + supply-chain-signer:latest in
-# zuno-ai-build, the zuno-signer SA and the Vault Transit key from d0),
-# so this role produces the signatures itself when they are missing -
-# same self-sufficiency pattern as the two image builds above.
-#
-# Probed via the materialized target Secret, not Vault: absent means no
-# consumer ever got signatures (fresh cluster), present means the
-# pipeline delivered them - re-signing then stays where it belongs, in
-# `make d3 sign agents` (ADR-0544's rebuild lever), so steady-state
-# installs never pay a signing-Job run.
-- name: "llm | probe the materialized OKF signatures Secret"
-  kubernetes.core.k8s_info:
-    api_version: v1
-    kind: Secret
-    name: agent-runtime-okf-signatures
-    namespace: zuno-ai-run
-  register: _llm_okf_signatures_secret
-  failed_when: false
-
-- name: "llm | first-run OKF bundle signing (fresh cluster: Day 3 has never signed)"
-  when:
-    - "'resources' in _llm_okf_signatures_secret"
-    - (_llm_okf_signatures_secret.resources | default([]) | length) == 0
-  block:
-    - name: "llm | sign the OKF bundles"
-      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/run_okf_signing_job.yml"
-
-    # ADR-0517 live finding continued: signing alone lost the race once.
-    # On a retry of a failed first install the ExternalSecret already
-    # exists and sits in ESO's failure backoff - it re-read Vault 90s
-    # AFTER this role's Synced/Healthy wait expired (signed 14:51:44,
-    # wait gave up ~14:57:05, ES Ready 14:58:39, live-measured). Same
-    # force-then-wait lever day3_sign.yml uses; the shared task is a
-    # documented no-op when the ES does not exist yet (virgin cluster:
-    # the Application below creates it and its INITIAL read succeeds
-    # immediately against the now-populated Vault path).
-    - name: "llm | force the signatures ExternalSecret to re-read Vault (retry path only)"
-      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/force_externalsecret_refresh.yml"
-      vars:
-        es_name: agent-runtime-okf-signatures
-        es_namespace: zuno-ai-run
-        es_wait_for_refresh: true
-
-# No OLM operator involved in any of these three - all content is -d1
+# No OLM operator involved in either - all content is -d1
 # (the -d0 Applications are no-ops).
-- name: "llm | apply the provider-routing/AI Inference Gateway/Agent Runtime GitOps Applications (d0, no-op)"
+- name: "llm | apply the provider-routing/AI Inference Gateway GitOps Applications (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "{{ _llm_component }}"
@@ -76,11 +23,10 @@
   loop:
     - llm
     - ai-gateway
-    - agent-runtime
   loop_control:
     loop_var: _llm_component
 
-- name: "llm | apply the provider-routing/AI Inference Gateway/Agent Runtime GitOps Applications (d1)"
+- name: "llm | apply the provider-routing/AI Inference Gateway GitOps Applications (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "{{ _llm_component }}"
@@ -89,6 +35,5 @@
   loop:
     - llm
     - ai-gateway
-    - agent-runtime
   loop_control:
     loop_var: _llm_component

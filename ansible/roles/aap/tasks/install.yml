@@ -212,7 +212,7 @@
 #
 # Deliberately hard-fails the whole install when enabled but broken (bad
 # credentials, unreachable API): aap precedes connectivity_link/lws/
-# jobset/kueue/openshift_ai/aiagent_operator in day1_components, so a
+# jobset/kueue/openshift_ai in day1_components, so a
 # subscription problem blocks the rest of Day 1 until resolved - the
 # user's explicit choice over a warn-and-continue.
 

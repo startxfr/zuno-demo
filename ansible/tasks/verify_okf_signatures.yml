@@ -120,8 +120,8 @@
       {{ bad_result.stdout }} {{ bad_result.stderr }}
       -- This normally means the bundle changed since it was last signed
       (any edit or regeneration of agents/*/agent.okf.md does it). Re-sign
-      with:  make d3 sign agents  -- and if that verb then reports the
-      image is older than this checkout, run  make d2 build agent  first.
+      with:  make d3 sign agents  -- or, since WP-156, admit the
+      zuno-demo-agents release instead:  make d3 admit agents  (ADR-0580).
   loop: "{{ _okf_verify_results.results | default([]) }}"
   loop_control:
     loop_var: bad_result
@@ -137,5 +137,5 @@
           | map(attribute='agent_dir.path') | map('basename') | list) }}
       have no signature in Vault KV yet (ZUNO_REQUIRE_SIGNED_BUNDLES stays
       off until all agents do - run the signing Job:
-      `make d2 build agent` - to populate the rest).
+      `make d3 sign agents` - to populate the rest).
   when: not _okf_verify_skip

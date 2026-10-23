@@ -10,11 +10,9 @@ data store - that's PostgreSQL/pgvector).
 
 ## Why this exists
 
-This is the server-side store backing `components/agent-frontend`'s
-opaque session-ID browser cookie. See
-`components/agent-frontend/internal/session/store.go` for the client side
-(AES-256-GCM encryption at rest, on top of Redis's own storage - Redis
-itself has no awareness of token contents).
+It backs ai-gateway's semantic cache (ADR-0104). It was first the
+server-side session store of the agent frontends (ADR-0042), retired with
+the zuno agent stack in WP-156.
 
 ## Network boundary
 
@@ -22,8 +20,8 @@ itself has no awareness of token contents).
 `NetworkPolicy` (its default ingress rule has no `from` selector, which
 would punch a hole through `zuno-auth`'s existing
 default-deny-other-namespaces baseline) in favor of a hand-authored one
-(`templates/networkpolicy.yaml`) scoped to `app.kubernetes.io/component:
-frontend` pods in any namespace carrying the `zuno.io/agent` label - the
+(`templates/networkpolicy.yaml`) scoped to the `ai-gateway` pods in
+`zuno-ai-run` - the
 same least-privilege bar `gitops/charts/mcp-confluence` sets for a
 comparable backing service.
 

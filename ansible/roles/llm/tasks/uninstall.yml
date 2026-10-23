@@ -1,19 +1,17 @@
 ---
 # d1 (real content) first, then d0 (no-op), for each component.
-- name: "llm | delete the llm/ai-gateway/agent-runtime ArgoCD Applications (d1)"
+- name: "llm | delete the llm/ai-gateway ArgoCD Applications (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-{{ item }}-d1"
   loop:
     - llm
     - ai-gateway
-    - agent-runtime
 
-- name: "llm | delete the llm/ai-gateway/agent-runtime ArgoCD Applications (d0)"
+- name: "llm | delete the llm/ai-gateway ArgoCD Applications (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
   vars:
     gitops_app_name: "zuno-{{ item }}-d0"
   loop:
     - llm
     - ai-gateway
-    - agent-runtime

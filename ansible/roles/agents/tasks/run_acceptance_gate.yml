@@ -2,7 +2,7 @@
 # Runs evaluations/<agent>/run_acceptance_gate.py (the canonical
 # evaluations/tekos/ implementation, AGENT-parameterized - ADR-0342/WP-31)
 # as a one-shot in-cluster Job rather than from the control node: most
-# services it calls (agent-runtime, mcp-gateway, ai-gateway, rag-service)
+# services it calls (UnifAI, mcp-gateway, ai-gateway, rag-service)
 # have no OpenShift Route and are only reachable over in-cluster Service
 # DNS.
 #
@@ -56,7 +56,7 @@
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/agents/kustomize/namespace"
 
-# The Routes this gate dials (Keycloak, agent frontends) chain to Vault's
+# The Routes this gate dials (Keycloak, UnifAI) chain to Vault's
 # internal root CA, absent from any stock container trust store. The
 # authoritative in-cluster copy is the same one the cluster OAuth trusts
 # for its Keycloak IdP (openshift-config/keycloak-serving-ca, created by
@@ -100,7 +100,7 @@
   register: _gate_demo_password_secret
   no_log: true
 
-- name: "acceptance-gate | read the {{ _gate_agent }}-frontend client secret from zuno-auth"
+- name: "acceptance-gate | read the zuno-evaluations client secret from zuno-auth"
   kubernetes.core.k8s_info:
     kind: Secret
     namespace: zuno-auth
@@ -231,7 +231,7 @@
                   # appended to certifi's bundle (httpx verifies against
                   # certifi) and SSL_CERT_FILE points urllib at the same
                   # combined bundle - every Route this gate dials
-                  # (Keycloak, the agent frontends) chains to Vault's
+                  # (Keycloak, UnifAI) chains to Vault's
                   # internal root, absent from any stock trust store;
                   # without this every HTTPS scenario fails
                   # CERTIFICATE_VERIFY_FAILED.

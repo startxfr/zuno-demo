@@ -678,13 +678,12 @@
       client_secret: "{{ zuno_admin_aap_client_token |
         default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
-# ADR-0530/WP-091: the "zuno-admin-api" client-credentials client backing
-# agent-bff's GET /api/colleagues and GET /api/groups. Unlike every client
-# above, this secret is read by TWO consumers - Keycloak resolves it through
-# KC_VAULT to validate the client, and agent-bff presents it to authenticate -
-# so it is seeded once here and both sides read this one path. Seeding it
-# twice, or letting either side generate its own, produces a 401 that looks
-# like a permissions problem.
+# ADR-0530/WP-091: the "zuno-admin-api" client-credentials client. It backed
+# agent-bff's GET /api/colleagues and GET /api/groups until WP-156 retired
+# the BFF; the client stays (MaaS externalOIDC.clientId and the audience
+# mapper of every realm client), so Keycloak still resolves this secret
+# through KC_VAULT. Seeded once here: seeding it twice, or letting a consumer
+# generate its own, produces a 401 that looks like a permissions problem.
 - name: "vault | generate and seed the zuno-admin-api client-credentials secret (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
@@ -750,78 +749,9 @@
     vault_seed_fields:
       token: "{{ zuno_admin_mcp_gateway_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
 
-- name: "vault | generate and seed the Tekos frontend session HMAC secret and encryption key (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: tekos/frontend-session
-    # ADR-0042: encryption_key is distinct from hmac_secret (signing vs.
-    # encryption keys stay separate) - must be 32 raw bytes, base64-encoded,
-    # not the printable-ASCII-chars generator every other secret here uses,
-    # since components/agent-frontend/internal/session/store.go base64-decodes
-    # it directly into an AES-256 key. Both keys must be written in the same
-    # `vault kv put` - KV v2 put replaces the whole secret version, so a
-    # second put to this path would silently wipe out hmac_secret; the
-    # check-first guard in vault_seed_if_missing.yml keeps that a one-shot.
-    vault_seed_fields:
-      hmac_secret: "{{ zuno_admin_tekos_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
-      encryption_key: "{{ zuno_admin_tekos_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
-
-# ADR-0326 (WP-31): Arkos's own frontend session secret - same shape/
-# idempotency-guard reasoning as tekos/frontend-session above.
-- name: "vault | generate and seed the Arkos frontend session HMAC secret and encryption key (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: arkos/frontend-session
-    vault_seed_fields:
-      hmac_secret: "{{ zuno_admin_arkos_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
-      encryption_key: "{{ zuno_admin_arkos_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
-
-# ADR-0326 (WP-33): Comage's own frontend session secret - same shape/
-# idempotency-guard reasoning as tekos/frontend-session above.
-- name: "vault | generate and seed the Comage frontend session HMAC secret and encryption key (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: comage/frontend-session
-    vault_seed_fields:
-      hmac_secret: "{{ zuno_admin_comage_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
-      encryption_key: "{{ zuno_admin_comage_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
-
-# ADR-0326 (WP-35): Advantage's own frontend session secret - same shape/
-# idempotency-guard reasoning as tekos/frontend-session above.
-- name: "vault | generate and seed the Advantage frontend session HMAC secret and encryption key (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: advantage/frontend-session
-    vault_seed_fields:
-      hmac_secret: "{{ zuno_admin_advantage_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
-      encryption_key: "{{ zuno_admin_advantage_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
-
-# ADR-0326 (WP-36): Finage's own frontend session secret - same shape/
-# idempotency-guard reasoning as tekos/frontend-session above.
-- name: "vault | generate and seed the Finage frontend session HMAC secret and encryption key (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: finage/frontend-session
-    vault_seed_fields:
-      hmac_secret: "{{ zuno_admin_finage_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
-      encryption_key: "{{ zuno_admin_finage_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
-
-# ADR-0410/ADR-0307 (WP-41): Naveo's own frontend session secret - same
-# shape/idempotency-guard reasoning as tekos/frontend-session above.
-- name: "vault | generate and seed the Naveo frontend session HMAC secret and encryption key (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: naveo/frontend-session
-    vault_seed_fields:
-      hmac_secret: "{{ zuno_admin_naveo_session_token | default(lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits'])) }}"
-      encryption_key: "{{ zuno_admin_naveo_session_encryption_key | default(lookup('ansible.builtin.pipe', 'openssl rand -base64 32')) }}"
-
+# WP-156: the per-agent frontend session secrets (<agent>/frontend-session,
+# ADR-0042) left with agent-frontend, their only consumer; existing Vault
+# paths are inert and are not deleted here.
 - name: "vault | generate and seed the Redis session-store password (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
@@ -1353,7 +1283,7 @@
       from confidential.example.yml. Fill them in and re-run
       `make d0 install vault` (this role re-seeds from confidential.yml on
       every run, without overwriting anything already populated another
-      way). Until filled in, components/agent-runtime's ModelRouter simply
+      way). Until filled in, ai-gateway's routing simply
       fails over past that provider (ADR-0020) - the local model always
       stays eligible.
 

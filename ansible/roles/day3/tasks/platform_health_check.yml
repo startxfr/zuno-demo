@@ -1,5 +1,5 @@
 ---
-# ADR-0057 decision 5 ("platform" component): agent-runtime, ai-gateway,
+# ADR-0057 decision 5 ("platform" component): ai-gateway,
 # mcp-gateway and rag-service have no OpenShift Route - only in-cluster
 # Service DNS - so this runs as a lightweight in-cluster Job, modeled on
 # ansible/roles/vault/tasks/install.yml's unseal-configure Job
@@ -28,7 +28,7 @@
 #
 # Reuses the acceptance-gate Job's own ServiceAccount name and
 # app.kubernetes.io/name: acceptance-gate pod label rather than a new
-# identity: that label is what agent-runtime/ai-gateway/mcp-gateway/
+# identity: that label is what ai-gateway/mcp-gateway/
 # rag-service's own NetworkPolicies already allow-list (see
 # run_acceptance_gate.yml's own header comment - "explicitly allow-listed
 # in the relevant NetworkPolicies, never a namespace-wide baseline",
@@ -94,7 +94,7 @@
                     import urllib.request
 
                     # WP-156: the agents and RAG are served by UnifAI (ADR-0561,
-                    # ADR-0568), not agent-runtime/rag-service. Its internal APIs
+                    # ADR-0568), not the retired agent-runtime. Its internal APIs
                     # only admit UnifAI pods (NetworkPolicy unifai-internal-apis),
                     # so they are probed through the UI route, which proxies
                     # /api2 to multiagent and /api1 to the RAG server. That route

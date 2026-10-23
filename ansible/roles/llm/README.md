@@ -1,6 +1,6 @@
 # llm
 
-Three responsibilities, all AI/model-layer concerns judged to belong
+Two responsibilities, both AI/model-layer concerns judged to belong
 together rather than splitting into yet another role:
 
 1. Seeds empty placeholders (never overwriting a real value) for the four
@@ -15,16 +15,10 @@ together rather than splitting into yet another role:
    meaningful existence without the routing config next to it, and this is
    also where the config's other consumer used to live before the
    ADR-0009 split.
-3. Applies `gitops/apps/agent-runtime` (`gitops/charts/agent-runtime`): the
-   shared LangGraph orchestration service (`components/agent-runtime`,
-   ADR-0009, ADR-0018). It no longer touches the provider routing config or
-   any provider secret directly - it only needs `ai-gateway`'s in-cluster
-   URL, set as a plain (non-secret) value in its own chart.
 
-Order matters here: `ai-gateway` before `agent-runtime`, since the latter
-calls the former. Applied in that order, always in the same `install`
-run (`ansible/playbooks/day1_install.yml`'s `llm` step, ADR-0056), so
-`make day1|d1 install` with no component brings both up together;
-`make day1|d1 install llm` alone does the same.
+The agent-runtime Application this role also applied (the shared
+LangGraph orchestration service, ADR-0009/ADR-0018) was retired with the
+zuno agent stack (WP-156); UnifAI calls `ai-gateway` instead (ADR-0560).
+`make d2 install llm` brings both Applications up together.
 
-A Day 1 component (ADR-0056) - no operator dependency of its own.
+A Day 2 component (ADR-0060) - no operator dependency of its own.

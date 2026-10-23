@@ -34,13 +34,12 @@ ingestion), and Day 3 (agent test/stresstest/operational actions):
    (ADR-0421, moved here from Day 0), `redis`, `observability`,
    `service-mesh`, `mesh-monitoring`, `kiali`, `grafana`, `mariadb`,
    `tempo`, `openshift-oauth`, `connectivity-link`, `lws`, `jobset`,
-   `kueue`, `openshift-ai`, `lightspeed`, `aiagent-operator`) -
+   `kueue`, `openshift-ai`, `lightspeed`, `rhtas`, `rhtas-config`) -
    `uninstall` walks the same list in reverse. `openshift-oauth` now sits
    where `keycloak` used to (right before `connectivity-link`) - it needs
    Keycloak's Ingress/TLS Secret, provided by Day 0's `keycloak` instead of
-   a Day 1 one. `aiagent-operator` runs last (operator-before-CR: Day 2's
-   `agents` creates the CRs it reconciles). `make day1 build` only builds
-   `ai-gateway`/`supply-chain-signer`/`aiagent-operator`.
+   a Day 1 one. `make day1 build` only builds
+   `ai-gateway`/`supply-chain-signer`/`aap-execution-environment`.
 3. `make day2 check` / `build` / `install` / `uninstall` (or the `d2`
    alias) walk `DAY2_RUN_COMPONENTS` - `namespaces`' ResourceQuota/
    NetworkPolicy overlay, then AI infrastructure and content ingestion

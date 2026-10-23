@@ -1,20 +1,19 @@
 ---
 # Day 1 install (`make day1 install`) - the remainder of the
-# AI-platform-operator stack (mesh, databases, Kueue, OpenShift AI, etc.)
-# plus aiagent_operator. ADR-0421 moved `smtp`/`nfd`/`nvidia_gpu`/
+# AI-platform-operator stack (mesh, databases, Kueue, OpenShift AI, etc.).
+# ADR-0421 moved `smtp`/`nfd`/`nvidia_gpu`/
 # `custom_metrics_autoscaler` here from Day 0, at the head of this list -
 # none of the three GPU-node components need anything beyond `machines`
 # (Day 0, unaffected: nfd before nvidia_gpu), and `smtp` only needs
 # `vault`/`external_secrets` (Day 0). `postgresql`/`keycloak`/`aap`/
 # `aap_config` moved the other way, into Day 0 right after `machines` (see
 # day0_install.yml) - they are this repo's "always-on infra" core.
-# `openshift_ai`/`kueue` back `models`' KServe/RHOAI serving path, so both
-# precede `aiagent_operator`. `openshift_oauth` runs where `keycloak` used
+# `openshift_ai`/`kueue` back `models`' KServe/RHOAI serving path.
+# `openshift_oauth` runs where `keycloak` used
 # to (right before `connectivity_link`) - it needs Keycloak's Ingress/TLS
 # Secret, now provided by Day 0's keycloak instead of a Day 1 one.
-# `aiagent_operator` runs last - standard operator-before-CR ordering: it
-# must be running before Day 2's `agents` component creates any `AIAgent`
-# CRs. `namespaces`, `llm`, `models`, and content-ingestion (rag/
+# `aiagent_operator`, which ran last, was retired with the zuno agent
+# stack (WP-156). `namespaces`, `llm`, `models`, and content-ingestion (rag/
 # rag_ingestion/mcp/agents/mlops) all moved to Day 2 - see
 # day2_install.yml.
 - name: "Day 1: install components"
@@ -53,7 +52,6 @@
       - lightspeed
       - rhtas
       - rhtas_config
-      - aiagent_operator
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

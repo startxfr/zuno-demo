@@ -112,7 +112,7 @@
 # are copied when they still exist, for the layers that still mint a
 # persona bearer token with a ROPC grant on that client (run_scenarios.py's
 # shared-service scenarios, security_checks.py's direct MCP/ai-gateway
-# calls, quota_429.py, token_quota_429.py). They go with agent-frontend:
+# calls, quota_429.py, token_quota_429.py). They go with those clients:
 # once absent those rows fail with the reason, an agent is never skipped
 # for it.
 - name: "day2-stresstest | resolve the agents to stresstest (served by UnifAI)"
@@ -121,7 +121,7 @@
 
 # WP-156: persona tokens come from the dedicated zuno-evaluations client
 # (one secret for every agent), which outlives the per-agent <agent>-frontend
-# clients retired with agent-frontend.
+# clients retired with the agent frontends.
 - name: "day2-stresstest | read the zuno-evaluations client secret from zuno-auth"
   kubernetes.core.k8s_info:
     kind: Secret

@@ -1,9 +1,7 @@
 ---
 # Day 1 uninstall (`make day1 uninstall`). Reverses day1_install.yml's
 # order. `namespaces`, `llm`, `models`, and content-ingestion moved to
-# Day 2 - see day2_uninstall.yml. `aiagent_operator` runs first here
-# (last in install) - reverse of operator-before-CR: nothing left in
-# Day 1 depends on it once uninstall starts. `openshift_oauth` runs right
+# Day 2 - see day2_uninstall.yml. `openshift_oauth` runs right
 # before `connectivity_link`'s reverse position, mirroring its install
 # position. ADR-0421 moved postgresql/keycloak/aap/aap_config to Day 0
 # (see day0_uninstall.yml, removed there before `aap_config`/`aap`/
@@ -19,7 +17,6 @@
     # in the shared blocked-findings tasks (ADR-0201 follow-up).
     zuno_day: d1
     day1_components:
-      - aiagent_operator
       - rhtas_config
       - rhtas
       - lightspeed

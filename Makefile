@@ -20,9 +20,8 @@ DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault e
 DAY0_VERBS := check install uninstall reconcile all reinstall
 
 # Day 1 is the remainder of the AI-platform-operator stack (mesh, Kueue,
-# OpenShift AI, etc.) plus aiagent-operator, which runs last - standard
-# operator-before-CR ordering, since Day 2's "agents" component creates
-# the AIAgent CRs it reconciles. No build/run split beyond ai-gateway (see
+# OpenShift AI, etc.). The aiagent-operator that used to run last here was
+# retired with the zuno agent stack (WP-156). No build/run split beyond ai-gateway (see
 # ansible/roles/ai_gateway_build) and supply-chain-signer (ADR-0420/
 # WP-068, see ansible/roles/supply_chain_signer_build) - neither has a
 # matching run component, both are build-only images. ADR-0421 moved
@@ -36,14 +35,14 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # still provides, now sourced from a Day-0-installed Keycloak instead of
 # a Day-1 one. "openshift-oauth" sits where "keycloak" used to, right
 # before "connectivity-link". "lightspeed" (ADR-0524/WP-085) sits after
-# "openshift-ai" and before "aiagent-operator": the OpenShift Lightspeed
+# "openshift-ai": the OpenShift Lightspeed
 # operator has no dependency beyond OLM, which is exactly why only the
 # OPERATOR is here. Its configuration is a separate Day 2 component
 # ("lightspeed-config") - an OLSConfig created in Day 1 would reference a
 # MaaS model and an MCP endpoint that don't exist until Day 2, and would
 # sit Degraded for the whole window while ArgoCD self-healed it back.
-DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config aiagent-operator
-DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aiagent-operator aap-execution-environment
+DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config
+DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aap-execution-environment
 DAY1_VERBS := check install build uninstall reconcile all reinstall
 
 # Day 2 is namespace policy overlay, AI infrastructure (llm, models), and
@@ -53,9 +52,12 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # quota/network-policy overlay is Day 2 now, see
 # ansible/roles/namespaces/README.md (internal task/Application naming
 # stays "_d1"/"-d1", an implementation detail, not renamed with the macro
-# tier). "build" only knows how to build the 5 named image groups (mcp,
-# rag, rag-ingestion, agent, mlops - see
-# ansible/roles/{mcp,rag,rag_ingestion,agent,mlops}_build); "check"/
+# tier). "build" only knows how to build the named image groups (mcp,
+# rag, rag-ingestion, mlops, trustyai-eval - see
+# ansible/roles/{mcp,rag,rag_ingestion,mlops,trustyai_eval}_build; the
+# "agent" image group was retired with the zuno agent stack, WP-156);
+# "agents" no longer deploys anything (UnifAI serves the agents) and stays
+# for its "check", the ADR-0053 acceptance gate against UnifAI; "check"/
 # "trustyai-config" (ADR-0534/WP-107) sits right after "mlops": it depends
 # only on "models" (the zuno-ai-run namespace its LMEvalJob-based health
 # check reads) - TrustyAI itself needs no Day 1 operator, it is already
@@ -74,7 +76,7 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # tasks/install.yml.
 DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops trustyai-config mlflow lightspeed-config unifai
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
-DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion agent mlops trustyai-eval
+DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion mlops trustyai-eval
 DAY2_VERBS := check install build uninstall all reinstall
 
 # ADR-0057/ADR-0058: Day 3 was originally agent test/stresstest operations
@@ -84,8 +86,8 @@ DAY2_VERBS := check install build uninstall all reinstall
 # Each verb has its own component list, same split Day 1 already uses for
 # "build" vs "check/install/uninstall" (DAY1_BUILD_COMPONENTS vs
 # DAY1_RUN_COMPONENTS) - not every Day 3 verb applies to every Day 3
-# component. "test"/"stresstest" only ever prove availability (agent
-# frontends' /healthz, shared platform services' /healthz+/readyz) or run
+# component. "test"/"stresstest" only ever prove availability (each agent's
+# UnifAI bundle, shared platform services' /healthz+/readyz) or run
 # the full per-agent test layer; component granularity matches Day 2's
 # "agents" (every agent bundle, collectively) plus "platform" for the
 # shared services - which agents/services actually exist is resolved
@@ -99,8 +101,10 @@ DAY3_TEST_COMPONENTS := agents platform
 DAY3_BACKUP_COMPONENTS := postgresql unifai
 # ADR-0420/WP-069: re-signing the OKF bundles acts on already-installed
 # agent bundles - it builds nothing - so it belongs in this tier by the
-# definition above, not inside `make d2 build agent`. Its own component
-# list, same per-verb split as backup/restore.
+# definition above, not inside a build verb. Its own component
+# list, same per-verb split as backup/restore. Since WP-156 retired the
+# agent-runtime image it signs from, the verb is replaced by `make d3 admit
+# agents` (ADR-0580) and removed with the OKF Transit chain in WP-165.
 DAY3_SIGN_COMPONENTS := agents
 # Components that support "check" but neither test/stresstest nor
 # backup/restore - they contribute only their own precheck.yml
@@ -618,12 +622,12 @@ if [[ -z "$$verb" ]]; then \
     '' \
     'Usage: make day3|d3 <verb> [component]' \
     '' \
-    '  test         Check availability only (agent frontends'"'"' /healthz, shared platform services'"'"' /healthz+/readyz)' \
+    '  test         Check availability only (agent bundles served by UnifAI, shared platform services'"'"' /healthz+/readyz)' \
     '  stresstest   Run every existing test layer per agent, plus an optional bulk-interaction load pass (ADR-0058)' \
     '  backup       Trigger an on-demand backup' \
     '  restore      Restore from the most recent backup (fails if none exists)' \
     '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
-    '  sign         Re-sign every OKF bundle against the deployed agent-runtime image, then verify (ADR-0420)' \
+    '  sign         Re-sign every OKF bundle (ADR-0420; superseded by admit, removed in WP-165)' \
     '               The signed digest covers every file under agents/<name>/, tasks/ included - not just agent.okf.md' \
     '  admit        Verify offline and validate the zuno-demo-agents release pinned in platform/okf/agents.lock (ADR-0580)' \
     '               RELEASE=vX.Y.Z admits that release instead; UPDATE_LOCK=1 also writes it to the lock' \

@@ -61,24 +61,24 @@ aap_config_job_templates:
     survey_components: []
   - name: zuno-day1-check
     credential: zuno-cluster-reader
-    survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+    survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   - name: zuno-day1-build
     credential: zuno-aap-installer
-    survey_components: [ai-gateway, supply-chain-signer, aiagent-operator, aap-execution-environment]
+    survey_components: [ai-gateway, supply-chain-signer, aap-execution-environment]
   - name: zuno-day1-install
     credential: zuno-aap-installer
     gated: true
-    survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+    survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   - name: zuno-day1-reconcile
     credential: zuno-aap-installer
     gated: true
-    survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+    survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   - name: zuno-day2-check
     credential: zuno-cluster-reader
     survey_components: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config, supply-chain]
   - name: zuno-day2-build
     credential: zuno-aap-installer
-    survey_components: [mcp, rag, rag-ingestion, agent, mlops]
+    survey_components: [mcp, rag, rag-ingestion, mlops]
   - name: zuno-day2-install
     credential: zuno-aap-installer
     gated: true

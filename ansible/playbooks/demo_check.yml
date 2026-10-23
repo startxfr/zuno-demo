@@ -37,12 +37,12 @@
     - name: Resolve the cluster base domain
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
-    # --- Zuno application: agent frontends + shared platform services ----
+    # --- Zuno application: agents on UnifAI + shared platform services ---
 
-    - name: "demo-check | run the agent frontends' availability check (Arkos/Tekos/Comage/...)"
+    - name: "demo-check | run the agents' availability check (UnifAI bundles)"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_availability_check.yml"
 
-    - name: "demo-check | run the shared platform services' health check (agent-runtime/ai-gateway/mcp-gateway/rag-service)"
+    - name: "demo-check | run the shared platform services' health check (ai-gateway/mcp-gateway/rag-service/UnifAI)"
       ansible.builtin.include_role:
         name: day3
         tasks_from: platform_health_check

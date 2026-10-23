@@ -4,8 +4,7 @@
 # mode WP-070 originally wired here). Included from
 # apply_openshift_build.yml right after a genuinely fresh Build completes
 # (day1_verb: build only - never on a routine "ensure this image exists"
-# install), so every component built this way gets signed, not just
-# agent-runtime (WP-069 covers OKF bundles specifically, untouched by
+# install), so every component built this way gets signed (WP-069 covers OKF bundles specifically, untouched by
 # this WP - still Vault Transit).
 #
 # The digest is resolved here, outside the signing container (same
@@ -14,7 +13,7 @@
 # kubectl binary, only cosign, so it can never need cluster API access
 # beyond talking to Keycloak/Fulcio/Rekor.
 #
-# Requires: sign_image_name set by the caller (e.g. "agent-runtime").
+# Requires: sign_image_name set by the caller (e.g. "ai-gateway").
 # Optional: sign_image_tag (default "latest") - set to a release tag by
 # ADR-0549/WP-134's day3_release.yml to sign a `tag_local_release.py`
 # -built `<component>:<release_tag>` image instead of the routine

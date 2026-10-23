@@ -1,60 +1,37 @@
 # agents
 
-Applies each real agent's frontend/BFF workloads GitOps Application:
-Tekos's (`gitops/apps/api` → `gitops/charts/tekos`, ADR-0008), Arkos's
-(`gitops/apps/arkos` → `gitops/charts/arkos`, WP-31), Comage's
-(`gitops/apps/comage` → `gitops/charts/comage`, WP-33), Advantage's
-(`gitops/apps/advantage` → `gitops/charts/advantage`, WP-35) and, since
-WP-36 (ADR-0326), Finage's (`gitops/apps/finage` → `gitops/charts/finage`,
-kept a distinct app-directory name rather than reusing `api`'s legacy
-name so each later agent's Application doesn't have to fight over it) -
-closing ADR-0326's four-agent generalization. This is Day 2's `agents`
-component (ADR-0056/ADR-0060) - `precheck.yml` reports (never fails) whether
-every one of the `zuno-{api,arkos,comage,advantage,finage}-{d0,d1}`
-Applications is Synced+Healthy. No operator involved, so all of this
-component's content is `-d1` - the `-d0` Applications are no-ops (see
-`gitops/apps/README.md`).
-
-Namespace creation used to live in this role too (a separate
-`gitops/apps/agents` → `gitops/charts/namespaces` Application apply); it
-moved to the new Day 0 `ansible/roles/namespaces` role (ADR-0056), so
-this role no longer touches namespaces at all - `make d0 install
-namespaces` must run first. The formerly separate `api` role/
-CONFIG_SCOPE was retired in the same change: once this role stopped
-applying namespaces, it was doing exactly what `api` did (apply the
-Tekos workloads Application, nothing else) - one role for that job is
-enough, and `agents` is the name Day 2's component list uses.
+Day 2's `agents` component (ADR-0056/ADR-0060). Since WP-156 it deploys
+nothing: the per-agent frontend/BFF Applications it used to apply
+(`zuno-api` for Tekos, `zuno-arkos`, `zuno-comage`, `zuno-advantage`,
+`zuno-finage`, `zuno-naveo`) and the Kuadrant quota-demo route Application
+(`zuno-connectivity-link-quota-d1`) were retired with the zuno agent stack.
+The agents are served by UnifAI (ADR-0561); their bundles are deployed by
+the `unifai` Day 2 component from the admitted zuno-demo-agents release
+(ADR-0580). `install.yml` and `uninstall.yml` only say so, and
+`precheck.yml` reports the component installed when at least one
+`UnifaiAgentBundle` exists in `zuno-unifai`.
 
 `check.yml` (`make day2|d2 check agents`) is the ADR-0053 layered
 acceptance and security gate - `day2_check.yml` runs it *instead of*
-`precheck.yml` for this role specifically (a full functional/security
-gate is a stronger "is this installed and working" signal than a
-lightweight Application state check). `precheck.yml` still exists for
-file-layout consistency but is never invoked while that special case is
-in place. It structurally validates the four catalog-only agents'
-`agent.okf.md` OKF v0.2 Markdown bundles (ADR-0038 -
-`okf_version`/`type`/`zuno.status: placeholder`) - v0 formalizes Tekos as
-the only mandatory end-to-end business path (ADR-0031), but catalog-only is
-not the same as unchecked. All four - Arkos (ADR-0326/WP-31), Comage
-(ADR-0326/WP-33), Advantage (ADR-0326/WP-35) and Finage (ADR-0326/WP-36) -
-deliberately stay in that same structural-check loop even though their
-bundles/graph-shapes/charts are all real now: `zuno.status` stays
-`placeholder` for each until the operator confirms its own live
-acceptance gate passes, so they still correctly report `placeholder`
-here. The check then does a basic HTTP reachability smoke test against
-the Tekos, Arkos, Comage, Advantage AND Finage frontends' `/healthz`
-routes (each gets a smoke test, never its behavioral gate -
-`evaluations/arkos/`/`evaluations/comage/`/`evaluations/advantage/`/
-`evaluations/finage/` each require their own human scenario review,
-gated by that WP's part (c) brief), then hands off to
-`run_acceptance_gate.yml`, which runs `evaluations/tekos/`'s full gate
-(the 20-scenario acceptance evaluation at a 75% threshold, ADR-0027/0028,
-plus every mandatory security-negative check,
-ADR-0032/0033/0034/0035/0037/0040) as a one-shot in-cluster Job in
-`zuno-ai-run` - see that file's own header comment for why a Job (most of
-what the gate calls has no OpenShift Route) and for the "acceptance-gate"
-workload identity's narrow NetworkPolicy allowances. Once any of Arkos's,
-Comage's, Advantage's or Finage's own scenarios are reviewed and its
-status flips to `active`, running its own
-`evaluations/<agent>/run_acceptance_gate.py` the same way becomes the
-operator's job, not this role's default automatic path.
+`precheck.yml` for this role. It:
+
+1. validates every `agents/*/` OKF bundle's schema and policy references
+   (`platform/supply-chain/validate_okf_bundle.py`) and verifies each
+   bundle's current signature (`ansible/tasks/verify_okf_signatures.yml`);
+2. structurally checks every catalog agent's `agent.okf.md` against its
+   expected `zuno.status` (`active` for comage/arkos, `placeholder` for
+   advantage, finage, naveo, soursage and cognos);
+3. runs the availability check (`ansible/tasks/day2_availability_check.yml`):
+   each agent of the admitted release is available when its
+   `UnifaiAgentBundle` is Ready (placeholder agents pass as "not served by
+   design", ADR-0007);
+4. hands off to `run_acceptance_gate.yml`, which runs `evaluations/tekos/`'s
+   full gate (the 20-scenario acceptance evaluation at a 75% threshold,
+   ADR-0027/0028, plus every mandatory security-negative check,
+   ADR-0032/0033/0034/0035/0037/0040) against UnifAI, as a one-shot
+   in-cluster Job in `zuno-ai-run`, with persona tokens from the
+   `zuno-evaluations` Keycloak client - see that file's own header
+   comment for why a Job and for the "acceptance-gate" workload identity's
+   narrow NetworkPolicy allowances. Running another agent's
+   `evaluations/<agent>/run_acceptance_gate.py` the same way is the
+   operator's job (`agent_name=<agent>`), not this role's default path.

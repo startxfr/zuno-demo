@@ -19,7 +19,6 @@
       - mcp_build
       - rag_build
       - rag_ingestion_build
-      - agent_build
       - mlops_build
       # ADR-0534/WP-109: the RAGAS evaluation image (no vendor image
       # exists in this OpenShift AI release train - WP-108 finding).

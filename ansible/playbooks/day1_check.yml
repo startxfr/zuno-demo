@@ -1,6 +1,6 @@
 ---
 # Day 1 state check (`make day1 check`) - the remainder of the
-# AI-platform-operator stack, plus aiagent_operator. `namespaces`, `llm`,
+# AI-platform-operator stack. `namespaces`, `llm`,
 # `models`, and content-ingestion (rag/rag_ingestion/mcp/agents/mlops) all
 # moved to Day 2 - see day2_check.yml. ADR-0421 moved postgresql/keycloak/
 # aap/aap_config out to Day 0 and smtp/nfd/nvidia_gpu/
@@ -37,7 +37,6 @@
       - lightspeed
       - rhtas
       - rhtas_config
-      - aiagent_operator
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

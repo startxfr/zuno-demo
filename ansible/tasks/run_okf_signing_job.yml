@@ -1,14 +1,19 @@
 ---
 # ADR-0420/WP-069: signs every agents/<agent>/ OKF bundle with the
 # in-cluster Vault Transit key and writes the results to Vault KV
-# (zuno/okf-signatures), where gitops/charts/agent-runtime/templates/
-# externalsecret-okf-signatures.yaml picks them up. Runs as a Job (deleted
+# (zuno/okf-signatures). Runs as a Job (deleted
 # and recreated each time, same idempotency-by-recreation pattern as
 # ansible/roles/vault's vault-unseal-configure), using the
 # supply-chain-signer image and the zuno-signer ServiceAccount
 # (ansible/roles/supply_chain_signer_build).
 #
-# The initContainer copies /app/agents out of the just-built
+# WP-156: agent-runtime, the consumer of these signatures, is retired and
+# its image is no longer rebuilt; this Job signs the bundles of the last
+# agent-runtime:latest image left in zuno-ai-build (absent on a fresh
+# cluster). `make d3 admit agents` (ADR-0580) replaces this path; WP-165
+# removes it with the OKF Transit chain.
+#
+# The initContainer copies /app/agents out of the
 # agent-runtime:latest image rather than this checkout's own agents/ tree:
 # BuildConfigs clone from a moving `main` ref, so a separate checkout could
 # in principle sign a different commit's bundle content than what the

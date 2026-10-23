@@ -94,7 +94,7 @@
 
 # ADR-0540/WP-120: the NeMo rails observer. Reported beside the
 # GuardrailsOrchestrator above rather than replacing it - the two coexist
-# and agent-runtime's guardrails.backend picks which one answers.
+# and the caller's guardrails backend setting picks which one answers.
 - name: "trustyai-config | look up the NemoGuardrails rails server (WP-120)"
   kubernetes.core.k8s_info:
     api_version: trustyai.opendatahub.io/v1alpha1

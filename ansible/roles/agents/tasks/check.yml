@@ -26,7 +26,7 @@
     msg: "{{ _agents_okf_validation.stdout_lines }}"
   when: _agents_okf_validation.rc != 0
 
-# Layered gate for the one functional agent (Tekos): a reachability smoke
+# Layered gate for the one functional agent (Tekos): an availability
 # check here (Layer 0), then the full acceptance/security gate
 # (run_acceptance_gate.yml, Layers 1-3) as an in-cluster Job.
 #
@@ -42,9 +42,9 @@
 # each agent's declared status against its own expected value
 # (_agents_catalog_expected_status below) rather than one shared literal -
 # it only checks structural validity + the declared status value, not
-# whether real content exists behind it. Every deployed agent's frontend
-# gets its OWN reachability smoke test below (ansible/tasks/
-# day2_availability_check.yml, unconditional on status) - deliberately NOT
+# whether real content exists behind it. Every agent gets its OWN
+# availability check below (its UnifaiAgentBundle, ansible/tasks/
+# day2_availability_check.yml) - deliberately NOT
 # the evaluations/<agent>/ gates, which require the human scenario review
 # each WP's part (c) gates on before any cluster gate run counts (see
 # run_acceptance_gate.yml's own docstring for the day this becomes
@@ -106,28 +106,6 @@
 - name: "agents | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
-# ADR-0411: every agent frontend's OIDC client trusts Keycloak's Route CA
-# via this one shared ConfigMap - if it's missing, every frontend's
-# /login will 502 "identity provider unreachable" even though the
-# /healthz probes below still report healthy (that endpoint never dials
-# Keycloak), so this deserves its own specific, actionable check rather
-# than surfacing only as an indirect login failure downstream.
-- name: "agents | check the shared Keycloak CA ConfigMap exists in zuno-ai-run"
-  kubernetes.core.k8s_info:
-    kind: ConfigMap
-    namespace: zuno-ai-run
-    name: agent-frontend-keycloak-ca
-  register: _agents_keycloak_ca_cm
-
-- name: "agents | fail the check if the shared Keycloak CA ConfigMap is missing"
-  ansible.builtin.fail:
-    msg: >-
-      zuno-ai-run/agent-frontend-keycloak-ca ConfigMap not found - every
-      agent frontend's /login will fail with "identity provider
-      unreachable" (ADR-0411). Run `make d2 install agents` to resync it
-      from openshift-config/keycloak-serving-ca.
-  when: (_agents_keycloak_ca_cm.resources | default([]) | length) == 0
-
 - name: "agents | run the Day 2 availability check for every discovered agent (ADR-0057)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_availability_check.yml"
 
@@ -136,49 +114,6 @@
   vars:
     _day2_render_results: "{{ _day2_availability_results | default([]) }}"
     day2_render_component: agents
-
-# ADR-0327's own acceptance bullet ("status.conditions provides useful
-# readiness/error state consumed by `make check`") discharged here, for
-# Arkos specifically - this repo's one CR-managed agent (WP-38 migration
-# proof; every other agent above stays plain-manifest and has no AIAgent
-# CR to read conditions from). Surfaced, not hard-gated: FrontendReady/
-# BFFReady/OKFReady/RuntimeBindingReady being transiently False during a
-# normal reconcile is expected and must not fail `make check` the way the
-# reachability probe above does - only a genuinely invalid spec
-# (ConfigValid: False, which the operator only ever sets for a spec
-# problem, never a timing one) fails this block.
-- name: "agents | fetch the Arkos AIAgent CR status"
-  kubernetes.core.k8s_info:
-    api_version: zuno.zuno.ai/v1alpha1
-    kind: AIAgent
-    name: arkos
-    namespace: zuno-ai-run
-  register: _agents_arkos_cr
-  failed_when: false
-
-- name: "agents | report the Arkos AIAgent CR's status.conditions"
-  ansible.builtin.debug:
-    msg: "{{ item.type }}: {{ item.status }} ({{ item.reason | default('') }})"
-  loop: "{{ _agents_arkos_cr.resources[0].status.conditions | default([]) }}"
-  loop_control:
-    label: "{{ item.type }}"
-  when: (_agents_arkos_cr.resources | default([])) | length > 0
-
-- name: "agents | warn if the Arkos AIAgent CR was not found (operator/CR not yet synced)"
-  ansible.builtin.debug:
-    msg: "No arkos AIAgent CR found in zuno-ai-run yet - confirm gitops/apps/aiagent-operator and gitops/apps/arkos have both synced."
-  when: (_agents_arkos_cr.resources | default([])) | length == 0
-
-- name: "agents | fail the check if the Arkos AIAgent CR reports ConfigValid: False"
-  ansible.builtin.fail:
-    msg: >-
-      arkos AIAgent CR's ConfigValid condition is False:
-      {{ (_agents_arkos_cr.resources[0].status.conditions | default([]))
-         | selectattr('type', 'equalto', 'ConfigValid') | map(attribute='message') | list }}
-  when: >-
-    (_agents_arkos_cr.resources | default([])) | length > 0 and
-    (_agents_arkos_cr.resources[0].status.conditions | default([])
-     | selectattr('type', 'equalto', 'ConfigValid') | map(attribute='status') | list | first | default('Unknown')) == 'False'
 
 # Layers 1-3: auth, RAG, MCP allow/deny, routing, the 20 Tekos scenarios
 # (75% threshold), and every security-negative check (100% mandatory).

@@ -8,8 +8,8 @@
 # through the UnifAI UI route, the only door into UnifAI from outside its
 # own pods (NetworkPolicy unifai-internal-apis admits UnifAI pods only).
 # It needs the demo-persona password and the route; the
-# comage-frontend client secret and the in-cluster agent-runtime URL are
-# gone with agent-runtime. It still runs in-cluster, with the same Job
+# comage-frontend client secret and the in-cluster runtime URL it used
+# are gone with the retired agent stack. It still runs in-cluster, with the same Job
 # shape as ansible/tasks/scenario_failover_probe_job.yml, so `make demo
 # check` keeps working from AAP or a workstation without Python packages,
 # and the Job trusts the platform's internal root CA (Keycloak's form, on

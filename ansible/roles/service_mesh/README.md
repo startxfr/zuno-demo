@@ -31,8 +31,8 @@ component's sidecar-injection webhook exists. That means:
   `StatefulSet`s (Crunchy PGO instance sets, label
   `postgres-operator.crunchydata.com/cluster=zuno-postgresql`) once the
   mesh control plane is Ready, so they pick one up retroactively.
-- **keycloak** and every Day 1 AI/agent workload (`agent-runtime`,
-  `ai-gateway`, `mcp-gateway`, `rag-service`, `tekos`, `models`) are
+- **keycloak** and every AI workload (`ai-gateway`, `mcp-gateway`,
+  `rag-service`, `models`) are
   created after this component installs and auto-inject on first deploy.
 
 `zuno-vault` is deliberately **not** labeled for injection - meshing it
