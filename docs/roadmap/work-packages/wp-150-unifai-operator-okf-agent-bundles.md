@@ -1,6 +1,6 @@
 # WP-150: unifai-operator consumes signed OKF agent bundles
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-24)
 - **ADRs:** [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md), [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md)
 - **Depends on:** [WP-146](wp-146-unifai-identity-and-context-header-forwarding.md)
 - **Related:** [ADR-0342](../../adr/0342-support-multiple-agent-graph-shapes-in-agent-runtime.md), [ADR-0308](../../adr/0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md), [ADR-0327](../../adr/0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md), [ADR-0509](../../adr/0509-deliver-okf-content-as-mounted-versioned-artifacts.md), [ADR-0510](../../adr/0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md), [ADR-0021](../../adr/0021-route-models-according-to-c1-c2-c3-classification.md), [ADR-0035](../../adr/0035-prevent-restricted-internal-context-from-reaching-external-models.md), [ADR-0544](../../adr/0544-bound-every-model-call-at-both-ends.md)
@@ -140,3 +140,7 @@ chain change runs offline with a local key. The live run on demo333 is in
 - Not every OKF field has a UnifAI equivalent (e.g. tool policy
   intersections enforced by mcp-gateway). List the unmapped fields in the
   bundle status rather than dropping them silently.
+
+## Closure (2026-10-24)
+
+Done: signed bundles are verified keyless and served live (arkos, comage, tekos). Evidence: [the closing evidence](../evidence/unifai-adoption-closure-2026-10-24.md).

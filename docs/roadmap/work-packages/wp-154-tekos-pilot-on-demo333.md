@@ -1,6 +1,6 @@
 # WP-154: tekos pilot on demo333
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-24)
 - **ADRs:** [ADR-0573](../../adr/0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md), [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md)
 - **Depends on:** [WP-146](wp-146-unifai-identity-and-context-header-forwarding.md), [WP-147](wp-147-unifai-opentelemetry-instrumentation.md), [WP-148](wp-148-unifai-parity-memory-routing-quota-ux.md), [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md), [WP-150](wp-150-unifai-operator-okf-agent-bundles.md), [WP-151](wp-151-deploy-unifai-on-zuno-via-argocd.md), [WP-152](wp-152-mcp-gateway-evaluation-and-mcp-north-side.md), [WP-153](wp-153-guardrails-into-the-ai-gateway.md)
 - **Related:** [ADR-0021](../../adr/0021-route-models-according-to-c1-c2-c3-classification.md), [ADR-0566](../../adr/0566-instrument-unifai-with-opentelemetry.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md)
@@ -109,3 +109,7 @@ are still Ready at the end.
   retrieved sources) for `gate_checks.py`? If not, read it from OTel spans.
 - Should the agent-runtime tekos be scaled down during the pilot to free
   CPU on demo333 (nodes already near full)? Ask the user.
+
+## Closure (2026-10-24)
+
+Done: tekos gates pass on UnifAI as eval-* personas (18/18, 12/12, 4/4) and the pilot objects are the released bundles. Evidence: [the closing evidence](../evidence/unifai-adoption-closure-2026-10-24.md).

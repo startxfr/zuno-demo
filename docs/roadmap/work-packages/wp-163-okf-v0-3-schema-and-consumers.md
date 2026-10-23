@@ -81,3 +81,12 @@ apart from the intended changes.
 - Where is the skill body injected for UnifAI nodes: the system prompt (as
   for agent-runtime) or a UnifAI-native construct, if one exists in the
   fork?
+
+## Update (2026-10-24)
+
+The consumer side is no longer blocked: unifai-operator reads OKF v0.2 and v0.3 since 0.1.27 (the v0.3
+schema maps, skills appended to the node's system message, `models`, `guardrails` and `limits` listed as
+unmapped in the bundle status), which answers the open question on where a skill body goes. The remaining
+step is the migration of the agents' bundles to v0.3 in `zuno-demo-agents` and its promotion (release
+0.3.0, [WP-165](wp-165-cut-over-and-remove-agents-from-zuno-demo.md)'s cycle), after which the
+acceptance is checked live.

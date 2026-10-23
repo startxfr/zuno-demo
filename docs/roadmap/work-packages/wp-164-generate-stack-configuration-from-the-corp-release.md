@@ -80,3 +80,12 @@ every PR; the hand-maintained copies are gone.
 `gitops/`; the step 7 promotion produces exactly the expected diff and
 takes effect live; a release that widens beyond corp policies is refused
 before generation.
+
+## Update (2026-10-24)
+
+Part 2 is live on demo333 through the `unifai` role (`zuno_unifai_released_bundles`): arkos, comage and
+tekos are served from the released bundles and the Keycloak groups come from the generated file. The
+admission of a release now also checks that each allowed knowledge domain is served by a tagged UnifAI
+RAG source (a warning when it is not). Open: quotas, MaaS subscriptions and routing (WP-157), the
+promotion of release 0.3.0 to prove the "takes effect live" acceptance, and the frozen
+`publicKeyRef` path of the hand-pinned Transit bundles.

@@ -1,6 +1,6 @@
 # WP-149: UnifAI RAG on Qdrant with hybrid search, Confluence and git sources, and backup
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-24)
 - **ADRs:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
 - **Depends on:** none
 - **Related:** [ADR-0046](../../adr/0046-make-rag-retrieval-metadata-aware-and-bilingual.md), [ADR-0105](../../adr/0105-automate-source-specific-knowledge-ingestion.md), [ADR-0330](../../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md), [ADR-0519](../../adr/0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md), [WP-151](wp-151-deploy-unifai-on-zuno-via-argocd.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
@@ -176,3 +176,7 @@ command.
 - Metadata-aware, bilingual retrieval (ADR-0046): which filters must be
   carried into Qdrant payload indexes? List them from
   `components/rag-service/app/search.py` before step 1.
+
+## Closure (2026-10-24)
+
+Done: hybrid search, group ACL, incremental sync and the restore drill are proven on demo333. Evidence: [the closing evidence](../evidence/unifai-adoption-closure-2026-10-24.md).
