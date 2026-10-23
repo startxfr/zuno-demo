@@ -1,6 +1,6 @@
 # WP-156: Retire the zuno agent and RAG code
 
-- **State:** Repo work merged (2026-10-23)
+- **State:** Done (2026-10-24)
 - **ADRs:** [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0572](../../adr/0572-scope-the-zuno-operator-to-the-platform-foundation.md)
 - **Depends on:** [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md)
 - **Related:** [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md), [ADR-0556](../../adr/0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md), [WP-147](wp-147-unifai-opentelemetry-instrumentation.md), [WP-153](wp-153-guardrails-into-the-ai-gateway.md), [WP-157](wp-157-slim-the-ai-gateway-via-maas.md)
@@ -274,3 +274,15 @@ stays Healthy throughout.
   in the same pass?~~ No: ADR-0506, ADR-0507, ADR-0509 and ADR-0510 were
   already retired by ADR-0576/ADR-0580 on 2026-10-22; ADR-0508 stays
   `Proposed`.
+
+## Step 6 on demo333 (2026-10-24)
+
+The full chain ran green on demo333 after phase 2, the PGO drop and the
+WP-165 cutover: `make d0 check` and `make d1 check` with no failure;
+`make d2 check` for every Day 2 component (all installed; supply-chain: 11
+images verified; agents: the pinned release admitted keyless and the tekos
+acceptance gate as the `eval-*` personas 18/18, 12/12, 4/4, catalog 8/8);
+`make d3 test` 15/15. Every Application Synced and Healthy apart from the
+three pre-existing OutOfSync ones. `rag-service` and `rag-ingestion` remain
+on purpose for the Red Hat documentation until WP-168 (decision above).
+
