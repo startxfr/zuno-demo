@@ -1,6 +1,6 @@
-"""WP-156: search_technical_docs answers from UnifAI's bearer RAG endpoint
-(with the caller's own token, Keycloak or OpenShift) and rag-service (the Red
-Hat product documentation, until WP-168), interleaved."""
+"""WP-156/WP-168: search_technical_docs answers from UnifAI's bearer RAG endpoint
+(with the caller's own token, Keycloak or OpenShift) over the CONFLUENCE sources and the
+WEB sources (the Red Hat product documentation), interleaved."""
 from __future__ import annotations
 
 import asyncio
@@ -49,39 +49,36 @@ UNIFAI_MATCH = {
     "content": "# S0R42 : Schedule Satellite",
     "metadata": {"title": "S0R42 : Schedule Satellite", "url": "https://wiki/S0R42"},
 }
-RAG_SERVICE_RESULTS = [
-    {"id": "r1", "source": "https://docs.redhat.com/a", "title": "A", "snippet": "a", "score": 3.1},
-    {"id": "r2", "source": "https://docs.redhat.com/b", "title": "B", "snippet": "b", "score": 2.0},
+WEB_MATCHES = [
+    {"id": "w1", "score": 0.5, "content": "a", "metadata": {"title": "A", "url": "https://docs.redhat.com/a"}},
+    {"id": "w2", "score": 0.3, "content": "b", "metadata": {"title": "B", "url": "https://docs.redhat.com/b"}},
 ]
 
 
-def _both(unifai_response, rag_service_response):
+def _by_type(confluence_response, web_response):
     def handler(request):
-        if request.url.host == "unifai-rag-server.zuno-unifai.svc":
-            return unifai_response
-        return rag_service_response
+        if request.url.params.get("sourceType") == "WEB":
+            return web_response
+        return confluence_response
     return handler
 
 
-def test_a_keycloak_jwt_queries_unifai_with_the_callers_token_and_rag_service(monkeypatch):
-    result, seen = _run(monkeypatch, JWT, _both(
+def test_a_keycloak_jwt_queries_both_source_types_with_the_callers_token(monkeypatch):
+    result, seen = _run(monkeypatch, JWT, _by_type(
         httpx.Response(200, json={"matches": [UNIFAI_MATCH]}),
-        httpx.Response(200, json={"results": RAG_SERVICE_RESULTS}),
+        httpx.Response(200, json={"matches": WEB_MATCHES}),
     ))
 
-    unifai = [r for r in seen if r.url.host == "unifai-rag-server.zuno-unifai.svc"]
-    rag_service = [r for r in seen if r.url.host == "rag-service.zuno-data.svc"]
-    assert len(unifai) == 1 and len(rag_service) == 1
-    request = unifai[0]
-    assert request.method == "GET"
-    assert request.url.path == "/api/sources/query.bearer"
-    assert request.url.params["tags"] == "knowledge.tech"
-    assert request.url.params["sourceType"] == "CONFLUENCE"
-    assert request.url.params["top_k_results"] == "3"
-    assert request.headers["authorization"] == f"Bearer {JWT}"
-    assert "authorization" not in rag_service[0].headers
-    # Interleaved, UnifAI first, capped at top_k=3.
-    assert [r["id"] for r in result["results"]] == ["c1", "r1", "r2"]
+    assert {r.url.host for r in seen} == {"unifai-rag-server.zuno-unifai.svc"}
+    assert sorted(r.url.params["sourceType"] for r in seen) == ["CONFLUENCE", "WEB"]
+    for request in seen:
+        assert request.method == "GET"
+        assert request.url.path == "/api/sources/query.bearer"
+        assert request.url.params["tags"] == "knowledge.tech"
+        assert request.url.params["top_k_results"] == "3"
+        assert request.headers["authorization"] == f"Bearer {JWT}"
+    # Interleaved, Confluence first, capped at top_k=3.
+    assert [r["id"] for r in result["results"]] == ["c1", "w1", "w2"]
     assert result["results"][0] == {
         "id": "c1",
         "source": "https://wiki/S0R42",
@@ -92,28 +89,35 @@ def test_a_keycloak_jwt_queries_unifai_with_the_callers_token_and_rag_service(mo
     }
 
 
-def test_one_failed_source_leaves_the_other(monkeypatch):
-    result, _ = _run(monkeypatch, JWT, _both(
+def test_one_failed_source_type_leaves_the_other(monkeypatch):
+    result, _ = _run(monkeypatch, JWT, _by_type(
         httpx.Response(401, json={"detail": "invalid bearer token"}),
-        httpx.Response(200, json={"results": RAG_SERVICE_RESULTS}),
+        httpx.Response(200, json={"matches": WEB_MATCHES}),
     ))
-    assert [r["id"] for r in result["results"]] == ["r1", "r2"]
+    assert [r["id"] for r in result["results"]] == ["w1", "w2"]
 
 
 def test_an_openshift_token_is_forwarded_to_unifai_too(monkeypatch):
-    result, seen = _run(monkeypatch, OPENSHIFT_TOKEN, _both(
+    result, seen = _run(monkeypatch, OPENSHIFT_TOKEN, _by_type(
         httpx.Response(200, json={"matches": [UNIFAI_MATCH]}),
-        httpx.Response(200, json={"results": RAG_SERVICE_RESULTS[:1]}),
+        httpx.Response(200, json={"matches": WEB_MATCHES[:1]}),
     ))
-    unifai = [r for r in seen if r.url.host == "unifai-rag-server.zuno-unifai.svc"]
-    assert unifai[0].headers["authorization"] == f"Bearer {OPENSHIFT_TOKEN}"
-    assert [r["id"] for r in result["results"]] == ["c1", "r1"]
+    assert all(r.headers["authorization"] == f"Bearer {OPENSHIFT_TOKEN}" for r in seen)
+    assert [r["id"] for r in result["results"]] == ["c1", "w1"]
 
 
-def test_both_sources_failing_is_reported_not_raised(monkeypatch):
+def test_all_source_types_failing_is_reported_not_raised(monkeypatch):
     result, _ = _run(monkeypatch, JWT, lambda request: httpx.Response(503))
     assert "error" in result
     assert "503" in result["error"]
+
+
+def test_a_call_without_a_bearer_token_contacts_no_backend(monkeypatch):
+    seen = []
+    monkeypatch.setattr(rag_query.httpx, "AsyncClient", lambda *a, **k: seen.append(1))
+    result = asyncio.run(rag_query.handle({"query": "satellite"}, "consultant-01", bearer_token=""))
+    assert "bearer token" in result["error"]
+    assert seen == []
 
 
 def test_an_empty_query_contacts_no_backend(monkeypatch):
