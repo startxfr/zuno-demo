@@ -94,6 +94,16 @@ spec:
   # objects in it (unifai-operator >= 0.1.25): no hand-made team.
   groupTeam: true
   {{- end }}
+  {{- if .servePlaceholder }}
+  # ADR-0007: a bundle whose OKF is zuno.status: placeholder is not served by
+  # default; this serves it (unifai-operator >= 0.1.26).
+  servePlaceholder: true
+  {{- end }}
+  {{- if .retrieveFirst }}
+  # Retriever-backed task agents search before the model reasons. Only for
+  # stacks whose multiagent image knows retrieve_first (unifai-operator >= 0.1.26).
+  retrieveFirst: true
+  {{- end }}
   source:
     oci:
       reference: {{ .reference }}

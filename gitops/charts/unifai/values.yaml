@@ -123,6 +123,8 @@ okf:
   #   entitlement: GatewayOnly
   #   teamId: <UnifAI team workspace owning the agent's workflows>
   #   groupTeam: true   # or let the bundle emit a team from zuno.access.groups
+  #   servePlaceholder: false   # ADR-0007: placeholder agents are not served by default
+  #   retrieveFirst: false      # needs a multiagent image with retrieve_first
   #   classificationOverrides: {}
 
 # Incrementally synced RAG sources (ADR-0568).
