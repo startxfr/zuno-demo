@@ -68,7 +68,11 @@
 # (teamId/groupTeam, entitlement, classificationOverrides, retriever) stay in the
 # deployment: zuno_unifai_bundle_settings.<agent>. While the generated list is
 # empty nothing is added and zuno_unifai_values.okf stays the only source;
-# the two lists are never merged.
+# the two lists are never merged. The switch is explicit
+# (zuno_unifai_released_bundles, default false): released artifacts are v2 and
+# keyless, which unifai-operator reads from 0.1.25 on; an older operator leaves
+# every bundle Pending. Set it to true once the operator in the cluster is
+# >= 0.1.25.
 - name: "unifai | read the bundles of the pinned agents release"
   ansible.builtin.set_fact:
     _unifai_stack_config: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/stack-config.generated.yaml') | from_yaml }}"
@@ -77,14 +81,14 @@
   ansible.builtin.set_fact:
     _unifai_okf_values: >-
       {%- set released = (_unifai_stack_config.unifai | default({})).bundles | default([]) -%}
-      {%- if released | length > 0 -%}
+      {%- if (zuno_unifai_released_bundles | default(false) | bool) and released | length > 0 -%}
       {%- set merged = [] -%}
       {%- for b in released -%}
       {%- set _ = merged.append(b | combine((zuno_unifai_bundle_settings | default({}))[b.name] | default({}))) -%}
       {%- endfor -%}
       {{ {'okf': {'verify': _unifai_stack_config.unifai.verify,
                   'trustedRoot': lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/sigstore/trusted_root.json'),
-                  'bundles': merged}}} }}
+                  'bundles': merged}} }}
       {%- else -%}
       {{ {} }}
       {%- endif -%}
