@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Orchestrator for WP-105/ADR-0536's node failover drill: fires one live
-chat turn each at Comage and Tekos and determines, from Prometheus, which
-`ai-gateway` provider actually served each one.
+chat turn each at Comage and Tekos and determines which `ai-gateway`
+provider actually served each one.
 
 Comage's `check-deal-status` task is the actual fallback under test
 (local-wesh -> local-qwen35 when the wesh pod is cordoned/killed - see
@@ -13,15 +13,26 @@ to ovhcloud-gpt-oss-120b regardless of on-prem GPU node health, so it is
 expected to report the SAME provider across all three phases
 (baseline/failover/restore).
 
-Runs as the in-cluster Job's entrypoint (agent-runtime/ai-gateway have no
-external Route - see ansible/roles/agents/tasks/run_acceptance_gate.yml's own
-header comment for why every live chat probe in this repo already runs
-in-cluster, never from the operator's shell). Delegates the actual chat call
-to scenario_failover_probe.py (invoked as a subprocess per agent, AGENT set
-in its environment - same cross-agent reuse trick
-evaluations/comage/stress_test.py already uses for run_scenarios.py).
+Runs as the in-cluster Job's entrypoint (ansible/tasks/
+scenario_failover_probe_job.yml). WP-156: the agents are served by UnifAI
+(ADR-0561), reached through its UI route like a browser; the Job stays
+in-cluster because the fallback below reads Thanos Querier, which has no
+external Route. Delegates the actual chat call to scenario_failover_probe.py
+(invoked as a subprocess per agent, AGENT set in its environment - each
+agent signs in to its own team workspace, so one process per agent keeps
+the two transports apart).
 
-Why poll instead of an instant before/after diff: `zuno.model_calls`
+Which provider served the turn: first the routing decision UnifAI carries on
+the answer (`metadata.llm_response.routing`, fetched by its LLM element from
+the ai-gateway, WP-148) - exact, per request, immune to concurrent traffic.
+When the answer carries none (the lookup is best effort), fall back to the
+before/after delta of `zuno_model_calls_total{agent, provider, outcome}`,
+the only signal agent-runtime ever offered. The `agent` label is set from
+the X-Zuno-Agent header that unifai-operator puts on every bundle LLM, so
+the counter still moves per agent. `source` in the output says which one
+decided.
+
+Why the fallback polls instead of an instant before/after diff: `zuno.model_calls`
 (components/ai-gateway/app/telemetry.py) is pushed via OTel's
 PeriodicExportingMetricReader (SDK default 60s export interval) to the
 otel-collector, which prometheus-k8s then scrapes on its own 30s interval
@@ -31,15 +42,18 @@ visible - an instant diff would false-negative on a perfectly healthy
 fallback. POLL_TIMEOUT_SECONDS below is set generously past that worst case.
 
 Usage (inside the Job container):
+    UNIFAI_URL=https://unifai-ui-zuno-unifai.<base-domain> DEMO_PERSONA_PASSWORD=... \\
     PROM_URL=https://thanos-querier.openshift-monitoring.svc.cluster.local:9091 \\
     PROM_BEARER_TOKEN=... \\
     python3 evaluations/scenario_failover_verify.py --phase baseline
 
 Prints one JSON object to stdout:
-    {"phase": "baseline", "comage": {"provider": "local-wesh", "ok": true},
-     "tekos": {"provider": "ovhcloud-gpt-oss-120b", "ok": true}}
-`provider` is null if no candidate's counter moved within the poll window -
-a real failure, not swallowed silently.
+    {"phase": "baseline",
+     "comage": {"provider": "local-wesh", "ok": true, "source": "routing-metadata"},
+     "tekos": {"provider": "ovhcloud-gpt-oss-120b", "ok": true, "source": "prometheus"}}
+`provider` is null if the answer carried no routing decision AND no
+candidate's counter moved within the poll window - a real failure, not
+swallowed silently.
 """
 from __future__ import annotations
 
@@ -58,9 +72,10 @@ PROM_BEARER_TOKEN = os.environ.get("PROM_BEARER_TOKEN", "")
 POLL_TIMEOUT_SECONDS = 150
 POLL_INTERVAL_SECONDS = 10
 
-# One fixed persona/message per agent - session_id is unique per drill phase
-# so each run creates its own conversation (cleaned up by
-# scenario_failover_probe.py's own call to cleanup_created_runs()).
+# One fixed persona/message per agent - each run creates its own UnifAI
+# session (deleted by scenario_failover_probe.py itself). The persona must
+# be a member of the agent's team workspace: sale-01 is in agent_comage,
+# consultant-01 in agent_tekos (gitops/charts/keycloak/files/realm-zuno.json).
 _AGENTS = [
     # check-deal-status is Comage's primary (only chat-reachable) task -
     # leads with local-wesh(-maas) then local-qwen35(-maas), non-reflexional.
@@ -99,13 +114,16 @@ def _query_provider_counts(agent: str) -> dict:
 # timeout at the old 30s default, well before the counter-polling phase even
 # started. 90s comfortably covers a cold-loaded 9B model's first response
 # without masking a truly broken fallback (POLL_TIMEOUT_SECONDS below still
-# bounds the overall wait separately).
+# bounds the overall wait separately). WP-156: on UnifAI it is the stream's
+# per-read timeout, and the stream sends heartbeats, so the subprocess
+# timeout is what bounds the whole turn: it also covers the browser-style
+# sign-in and a ReAct turn's tool calls, hence the larger margin.
 _PROBE_HTTP_TIMEOUT_SECONDS = 90
-_PROBE_SUBPROCESS_TIMEOUT_SECONDS = 110  # must stay above the probe's own HTTP timeout plus interpreter/network overhead
+_PROBE_SUBPROCESS_TIMEOUT_SECONDS = 150  # must stay above the probe's own timeout plus sign-in, tool calls and interpreter overhead
 
 
-def _run_probe(agent: str, persona: str, message: str, session_id: str) -> dict:
-    env = dict(os.environ, AGENT=agent)
+def _run_probe(agent: str, persona: str, message: str) -> dict:
+    env = dict(os.environ, AGENT=agent, UNIFAI_TEAM_NAME=f"agent-{agent}")
     script = str(pathlib.Path(__file__).resolve().parent / "scenario_failover_probe.py")
     try:
         proc = subprocess.run(
@@ -113,7 +131,6 @@ def _run_probe(agent: str, persona: str, message: str, session_id: str) -> dict:
                 sys.executable, script,
                 "--persona", persona,
                 "--message", message,
-                "--session-id", session_id,
                 "--timeout-seconds", str(_PROBE_HTTP_TIMEOUT_SECONDS),
             ],
             env=env,
@@ -129,12 +146,35 @@ def _run_probe(agent: str, persona: str, message: str, session_id: str) -> dict:
         return {"agent": agent, "persona": persona, "ok": False, "detail": f"probe subprocess failed: stdout={proc.stdout!r} stderr={proc.stderr!r}"}
 
 
-def verify_one_agent(agent: str, persona: str, message: str, phase: str) -> dict:
-    before = _query_provider_counts(agent)
-    probe_result = _run_probe(agent, persona, message, session_id=f"wp-105-{phase}-{agent}")
-    if not probe_result.get("ok"):
-        return {"provider": None, "ok": False, "detail": probe_result.get("detail")}
+def _query_provider_counts_or_none(agent: str):
+    """Counter snapshot, or None when Prometheus cannot be read: the
+    routing-metadata path must not fail because the fallback is unavailable."""
+    try:
+        return _query_provider_counts(agent)
+    except Exception:  # noqa: BLE001 - reported through the fallback's own detail
+        return None
 
+
+def verify_one_agent(agent: str, persona: str, message: str, phase: str) -> dict:
+    before = _query_provider_counts_or_none(agent)
+    probe_result = _run_probe(agent, persona, message)
+    if not probe_result.get("ok"):
+        return {"provider": None, "ok": False, "source": None, "detail": probe_result.get("detail")}
+
+    routing = probe_result.get("routing") or {}
+    if routing.get("provider"):
+        return {
+            "provider": routing["provider"],
+            "ok": True,
+            "source": "routing-metadata",
+            "detail": f"phase={phase} routing={json.dumps(routing, sort_keys=True)} session={probe_result.get('session_id')}",
+        }
+
+    if before is None:
+        return {
+            "provider": None, "ok": False, "source": None,
+            "detail": "the answer carried no routing decision and Prometheus could not be read for the fallback",
+        }
     deadline = time.monotonic() + POLL_TIMEOUT_SECONDS
     while time.monotonic() < deadline:
         after = _query_provider_counts(agent)
@@ -145,15 +185,18 @@ def verify_one_agent(agent: str, persona: str, message: str, phase: str) -> dict
             # report the one with the largest delta - ambiguous only under
             # concurrent unrelated traffic, which this drill does not expect.
             provider = max(moved, key=moved.get)
-            return {"provider": provider, "ok": True, "detail": f"counts_before={before} counts_after={after}"}
+            return {"provider": provider, "ok": True, "source": "prometheus", "detail": f"counts_before={before} counts_after={after}"}
         time.sleep(POLL_INTERVAL_SECONDS)
 
-    return {"provider": None, "ok": False, "detail": f"no provider counter moved within {POLL_TIMEOUT_SECONDS}s (before={before})"}
+    return {
+        "provider": None, "ok": False, "source": None,
+        "detail": f"no routing decision on the answer and no provider counter moved within {POLL_TIMEOUT_SECONDS}s (before={before})",
+    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--phase", required=True, help="baseline|failover|restore - used only for the session_id/output label")
+    parser.add_argument("--phase", required=True, help="baseline|failover|restore - used only for the output label")
     args = parser.parse_args()
 
     result = {"phase": args.phase}

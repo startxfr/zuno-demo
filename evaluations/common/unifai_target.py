@@ -27,6 +27,11 @@ UNIFAI_TEAM_NAME (WP-156) names that workspace instead of its id: the team id
 is resolved at sign-in from the identity service's ``teams.list`` (the
 operator recreates group-bound teams as ``agent-<name>`` with new ids, so an
 in-cluster Job cannot hard-code the id).
+
+Each turn's routing decision (WP-148: the ai-gateway's provider, model,
+classification and fallback, attached by the LLM element to the assistant
+message as ``metadata.llm_response.routing``) is exposed as
+``UnifaiRun.raw["routing"]``; ``routing_of()`` reads it from a final state.
 """
 from __future__ import annotations
 
@@ -75,6 +80,27 @@ class UnifaiRun:
     reply: str = ""
     seconds: float = 0.0
     raw: Dict[str, Any] = field(default_factory=dict)
+
+
+def routing_of(state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """The ai-gateway routing decision of the turn's last answer, or None.
+
+    The LLM element asks the gateway why it answered (`/v1/routing-decisions/
+    {request_id}`) and carries the JSON body on the assistant message as
+    ``metadata.llm_response.routing`` (WP-148, chart `gatewayLLM.routingLookup`):
+    ``{provider, model, kind, classification, fallback_used, fallback_from}``.
+    None when the lookup is off or failed (it is best effort by design) or when
+    the final answer merged several agents' results (no single routing).
+    """
+    candidates: List[Any] = list(reversed(state.get("messages") or []))
+    candidates.insert(0, state.get("output"))
+    for msg in candidates:
+        if not isinstance(msg, dict) or msg.get("role", "assistant") != "assistant":
+            continue
+        routing = ((msg.get("metadata") or {}).get("llm_response") or {}).get("routing")
+        if isinstance(routing, dict) and routing.get("provider"):
+            return routing
+    return None
 
 
 def _reply_of(result: Dict[str, Any]) -> str:
@@ -257,6 +283,7 @@ class UnifaiTarget:
             return UnifaiRun(sid, 599, "", time.monotonic() - started, {"error": str(exc)})
         raw = dict(last_state)
         raw["tool_calls"] = tools
+        raw["routing"] = routing_of(last_state)
         return UnifaiRun(sid, status, _reply_of(raw), time.monotonic() - started, raw)
 
     def stream(

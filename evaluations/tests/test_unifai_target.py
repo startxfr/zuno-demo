@@ -130,6 +130,36 @@ def test_create_team_sends_group_members_and_reports_a_taken_name(monkeypatch):
         raise AssertionError("a taken team name must raise")
 
 
+def test_routing_of_reads_the_last_assistant_message():
+    routing = {"provider": "local-wesh", "model": "qwen", "kind": "local", "classification": "C2", "fallback_used": False}
+    state = {
+        "messages": [
+            {"role": "assistant", "content": "older", "metadata": {"llm_response": {"routing": {"provider": "old"}}}},
+            {"role": "user", "content": "q"},
+            {"role": "assistant", "content": "a", "metadata": {"llm_response": {"request_id": "r", "routing": routing}}},
+        ]
+    }
+    assert ut.routing_of(state) == routing
+    assert ut.routing_of({"messages": [{"role": "assistant", "content": "a", "metadata": {}}]}) is None
+    assert ut.routing_of({}) is None
+
+
+def test_run_exposes_the_routing_decision(monkeypatch):
+    t, rec = _target(monkeypatch)
+    routing = {"provider": "ovhcloud-gpt-oss-120b", "model": "gpt-oss-120b"}
+    orig = rec.handler
+
+    def handler(request):
+        if request.url.path == "/api2/sessions/user.session.execute":
+            state = {"output": "ok", "messages": [{"role": "assistant", "content": "ok", "metadata": {"llm_response": {"routing": routing}}}]}
+            return httpx.Response(200, text=_ndjson({"type": "complete", "state": state}))
+        return orig(request)
+
+    rec.handler = handler
+    r = t.run("consultant-01", "hello")
+    assert r.raw["routing"] == routing
+
+
 def test_workflow_defaults_to_agent_and_env_override(monkeypatch):
     t, _ = _target(monkeypatch, agent="arkos")
     assert t.workflow_id("consultant-01") == "b1"

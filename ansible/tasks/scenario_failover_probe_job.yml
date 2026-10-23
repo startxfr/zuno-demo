@@ -7,12 +7,17 @@
 # by `scenario_failover_phase` (baseline|failover|restore - label only, used
 # for Job/session naming so consecutive runs don't collide).
 #
-# Same "no external Route, must run in-cluster" reasoning and Job shape as
-# ansible/roles/agents/tasks/run_acceptance_gate.yml and
-# ansible/roles/day3/tasks/stresstest_job_run_one.yml - this file is
-# deliberately smaller (inline ConfigMap `data:` instead of the
-# apply_kustomize.yml multi-file bundle those two use) since it only ever
-# mounts two flat Python files, not a per-agent OKF bundle.
+# WP-156: the chat turns run on UnifAI (ADR-0561) through its UI route,
+# signed in as each agent's demo persona with the demo-persona password -
+# the comage-frontend/tekos-frontend client secrets are gone with
+# agent-frontend. The provider that answered comes from the routing
+# decision UnifAI carries on the answer; the Prometheus counter delta stays
+# as the fallback, and Thanos Querier has no external Route, so the Job
+# still runs in-cluster with the existing grafana-prometheus-reader token
+# (ADR-0536 Decision 4). Same Job shape as
+# ansible/roles/day3/tasks/stresstest_job_run_one.yml, deliberately smaller
+# (inline ConfigMap `data:` instead of the apply_kustomize.yml multi-file
+# bundle) since it only ever mounts three flat Python files.
 #
 # Requires cluster_base_domain (ansible/tasks/resolve_cluster_base_domain.yml)
 # and k8s_auth_environment (ansible/tasks/load_k8s_auth_env.yml) already
@@ -26,15 +31,6 @@
   register: _sfp_password_secret
   no_log: true
 
-- name: "scenario-failover-probe | read the comage-frontend and tekos-frontend client secrets from zuno-auth"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-auth
-    name: "{{ item }}-frontend-client-secret"
-  register: _sfp_client_secret_lookups
-  loop: [comage, tekos]
-  no_log: true
-
 - name: "scenario-failover-probe | read the grafana-prometheus-reader token (existing identity, no new RBAC - ADR-0536 Decision 4)"
   kubernetes.core.k8s_info:
     kind: Secret
@@ -46,14 +42,12 @@
 - name: "scenario-failover-probe | fail if any required credential is missing"
   ansible.builtin.fail:
     msg: >-
-      One of demo-personas-password (zuno-auth), comage-frontend-client-secret
-      (zuno-auth), tekos-frontend-client-secret (zuno-auth) or
+      One of demo-personas-password (zuno-auth) or
       grafana-prometheus-reader-token (zuno-monitoring) was not found - each
       is provisioned by an existing component (keycloak, grafana) this drill
       does not itself install.
   when: >-
     (_sfp_password_secret.resources | default([]) | length) == 0 or
-    (_sfp_client_secret_lookups.results | selectattr('resources', 'defined') | map(attribute='resources') | map('length') | min | default(0)) == 0 or
     (_sfp_prom_token_secret.resources | default([]) | length) == 0
 
 - name: "scenario-failover-probe | copy the credentials into a zuno-ai-run Secret the Job can mount"
@@ -70,8 +64,6 @@
       type: Opaque
       data:
         demo-persona-password: "{{ _sfp_password_secret.resources[0].data.password }}"
-        comage-client-secret: "{{ (_sfp_client_secret_lookups.results | selectattr('item', 'equalto', 'comage') | first).resources[0].data.client_secret }}"
-        tekos-client-secret: "{{ (_sfp_client_secret_lookups.results | selectattr('item', 'equalto', 'tekos') | first).resources[0].data.client_secret }}"
         prom-bearer-token: "{{ _sfp_prom_token_secret.resources[0].data.token }}"
   no_log: true
 
@@ -89,8 +81,9 @@
       `make d1 install openshift-oauth` first (it publishes the internal
       root CA the platform's Routes chain to). Same requirement
       run_acceptance_gate.yml/stresstest_job_run_one.yml already have -
-      every HTTPS call this probe makes (Keycloak) chains to Vault's
-      internal root, absent from any stock container trust store.
+      every HTTPS call this probe makes (Keycloak, on the UnifAI sign-in
+      path) chains to Vault's internal root, absent from any stock
+      container trust store.
   when: (_sfp_ca_cm.resources | default([]) | length) == 0
 
 - name: "scenario-failover-probe | copy the internal root CA into a zuno-ai-run ConfigMap the Job can mount"
@@ -121,7 +114,7 @@
       data:
         scenario_failover_probe.py: "{{ lookup('file', zuno_repo_root + '/evaluations/scenario_failover_probe.py') }}"
         scenario_failover_verify.py: "{{ lookup('file', zuno_repo_root + '/evaluations/scenario_failover_verify.py') }}"
-        run_scenarios.py: "{{ lookup('file', zuno_repo_root + '/evaluations/tekos/run_scenarios.py') }}"
+        unifai_target.py: "{{ lookup('file', zuno_repo_root + '/evaluations/common/unifai_target.py') }}"
 
 - name: "scenario-failover-probe | delete any previous probe Job (Jobs are immutable, this task is idempotent-by-recreation)"
   kubernetes.core.k8s:
@@ -145,11 +138,13 @@
           zuno.io/managed-by: zuno-ansible
       spec:
         backoffLimit: 0
-        # Bounded: two agents, each up to a 110s probe HTTP call (cold-model
-        # first-response allowance, evaluations/scenario_failover_verify.py's
-        # _PROBE_SUBPROCESS_TIMEOUT_SECONDS) plus POLL_TIMEOUT_SECONDS (150s)
-        # of counter polling - never left to run unbounded (this repo's own
-        # "always bound cluster job runtime" lesson). ~260s/agent worst case
+        # Bounded: two agents, each up to a 150s probe turn (cold-model
+        # first-response allowance plus the UnifAI sign-in,
+        # evaluations/scenario_failover_verify.py's
+        # _PROBE_SUBPROCESS_TIMEOUT_SECONDS) plus, only when the answer
+        # carries no routing decision, POLL_TIMEOUT_SECONDS (150s) of
+        # counter polling - never left to run unbounded (this repo's own
+        # "always bound cluster job runtime" lesson). ~300s/agent worst case
         # x2 agents + pip install overhead, with headroom.
         activeDeadlineSeconds: 900
         template:
@@ -167,7 +162,7 @@
                   - sh
                   - -c
                   - >-
-                    pip install --quiet --no-cache-dir httpx pyyaml &&
+                    pip install --quiet --no-cache-dir httpx &&
                     CERTIFI=$(python3 -c 'import certifi; print(certifi.where())') &&
                     cat /gate-ca/ca.crt >> "$CERTIFI" &&
                     export SSL_CERT_FILE="$CERTIFI" &&
@@ -187,23 +182,18 @@
                     value: /tmp
                   - name: PYTHONUSERBASE
                     value: /tmp/.pyuser
-                  - name: KEYCLOAK_URL
-                    value: "https://keycloak.{{ cluster_base_domain }}"
+                  # Same route platform_health_check.yml probes. TLS is
+                  # verified: the internal root CA is appended to certifi
+                  # above.
+                  - name: UNIFAI_URL
+                    value: "https://unifai-ui-zuno-unifai.{{ cluster_base_domain }}"
+                  - name: UNIFAI_VERIFY_TLS
+                    value: "1"
                   - name: DEMO_PERSONA_PASSWORD
                     valueFrom:
                       secretKeyRef:
                         name: scenario-failover-node-credentials
                         key: demo-persona-password
-                  - name: COMAGE_FRONTEND_CLIENT_SECRET
-                    valueFrom:
-                      secretKeyRef:
-                        name: scenario-failover-node-credentials
-                        key: comage-client-secret
-                  - name: TEKOS_FRONTEND_CLIENT_SECRET
-                    valueFrom:
-                      secretKeyRef:
-                        name: scenario-failover-node-credentials
-                        key: tekos-client-secret
                   - name: PROM_BEARER_TOKEN
                     valueFrom:
                       secretKeyRef:
@@ -215,25 +205,12 @@
                   - name: gate-ca
                     mountPath: /gate-ca
             volumes:
-              # ConfigMap data keys can't contain '/' (same constraint
-              # documented in run_acceptance_gate.yml/
-              # stresstest_job_run_one.yml) - run_scenarios.py must land
-              # under a tekos/ subdirectory since scenario_failover_probe.py
-              # does `sys.path.insert(0, .../"tekos")`, matching the real
-              # repo layout (evaluations/tekos/run_scenarios.py) rather than
-              # the flat ConfigMap key it's stored under
-              # (scenario-failover-node-scripts). items[].path supports that
-              # nested remap; the bare `data:` key cannot.
+              # Flat: both scripts look for unifai_target.py next to
+              # themselves (the Job layout) or under common/ (the repo
+              # layout).
               - name: gate
                 configMap:
                   name: scenario-failover-node-scripts
-                  items:
-                    - key: scenario_failover_probe.py
-                      path: scenario_failover_probe.py
-                    - key: scenario_failover_verify.py
-                      path: scenario_failover_verify.py
-                    - key: run_scenarios.py
-                      path: tekos/run_scenarios.py
               - name: gate-ca
                 configMap:
                   name: scenario-failover-node-ca
