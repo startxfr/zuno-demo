@@ -1,0 +1,108 @@
+# Promote a zuno-demo-agents release (ADR-0580 as amended on 2026-10-22,
+# WP-160). The agents repository never calls this platform: this workflow
+# looks for a release newer than platform/okf/agents.lock, verifies it
+# offline (signatures + attestations), checks the platform can serve it,
+# and opens a pull request that moves the lock, with a readable summary of
+# what changes. Merging that pull request is the promotion.
+#
+# Needs: Settings > Actions > General > "Allow GitHub Actions to create and
+# approve pull requests" on this repository.
+name: Promote agents release
+
+# Run it from the Actions tab with "Use workflow from: demo222" (the branch
+# that carries platform/supply-chain/admit_okf_bundle.py). This copy on the
+# default branch exists so GitHub lists the workflow; it has no schedule,
+# because a scheduled run uses the default branch, which does not carry the
+# admission tooling yet. Add `schedule` back once it does.
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: "Release tag to promote (vX.Y.Z); empty = the newest"
+        required: false
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: okf-promote
+  cancel-in-progress: false
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - uses: oras-project/setup-oras@v1
+        with:
+          version: 1.2.2
+      - uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
+      - name: Find the candidate release
+        id: candidate
+        env:
+          RELEASE: ${{ inputs.release }}
+        run: |
+          if [ -n "$RELEASE" ]; then
+            ref="$(python3 -c 'import sys; sys.path.insert(0, "platform/supply-chain"); import admit_okf_bundle as a; print(a.release_reference(sys.argv[1]))' "$RELEASE")"
+            tag="$RELEASE"
+          else
+            read -r tag ref < <(python3 platform/supply-chain/admit_okf_bundle.py latest)
+          fi
+          current="$(grep -v '^#' platform/okf/agents.lock | grep . || true)"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
+          if [ "$ref" = "$current" ]; then
+            echo "::notice::$tag is already the locked release"
+            echo "promote=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "promote=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Verify, validate and describe the promotion
+        if: steps.candidate.outputs.promote == 'true'
+        env:
+          TAG: ${{ steps.candidate.outputs.tag }}
+          REF: ${{ steps.candidate.outputs.ref }}
+          CURRENT: ${{ steps.candidate.outputs.current }}
+        run: |
+          python3 platform/supply-chain/admit_okf_bundle.py admit --release "$TAG" --update-lock --out "$RUNNER_TEMP/new"
+          python3 platform/okf/generate_stack_config.py --release-dir "$RUNNER_TEMP/new"
+          old=""
+          if [ -n "$CURRENT" ]; then
+            python3 platform/supply-chain/admit_okf_bundle.py extract "$CURRENT" --out "$RUNNER_TEMP/old"
+            old="$RUNNER_TEMP/old"
+          fi
+          {
+            echo "Promotes zuno-demo-agents **$TAG** (ADR-0580)."
+            echo
+            echo "- Release: \`$REF\`"
+            echo "- Replaces: \`${CURRENT:-nothing (first admission)}\`"
+            echo "- Verified offline: keyless signatures of publish.yml on a release tag, contract-tests attestations"
+            echo "- Servable: every preferred model, tool and knowledge domain is bound on this platform"
+            echo
+            echo "### What changes"
+            echo
+            python3 platform/supply-chain/admit_okf_bundle.py diff $old "$RUNNER_TEMP/new"
+            echo
+            echo "Release notes: https://github.com/startxfr/zuno-demo-agents/releases/tag/$TAG"
+          } > "$RUNNER_TEMP/body.md"
+          cat "$RUNNER_TEMP/body.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Open the promotion pull request
+        if: steps.candidate.outputs.promote == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          branch: okf-promote/${{ steps.candidate.outputs.tag }}
+          add-paths: |
+            platform/okf/agents.lock
+            platform/okf/stack-config.generated.yaml
+          commit-message: "okf: promote zuno-demo-agents ${{ steps.candidate.outputs.tag }}"
+          title: "okf: promote zuno-demo-agents ${{ steps.candidate.outputs.tag }}"
+          body-path: ${{ runner.temp }}/body.md
+          labels: okf-promotion
