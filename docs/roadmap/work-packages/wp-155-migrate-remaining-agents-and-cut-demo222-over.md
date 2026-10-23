@@ -113,22 +113,38 @@ agent-runtime baseline; on demo222 the step-6 runs pass and the demo
 playbooks open UnifAI; parallel sessions confirmed the window; no demo
 freeze was broken.
 
+## Decisions taken (2026-10-23)
+
+- **Placeholders (ADR-0007):** the operator skips a bundle whose OKF is
+  `zuno.status: placeholder` (phase `Pending`, "placeholder agent: not served")
+  and prunes what it emitted, unless `spec.servePlaceholder: true`. No placeholder
+  is served on demo333 for now. Implemented by the session owning the operator and
+  the unifai chart, shipped with operator 0.1.26. After it, advantage, finage and
+  naveo have no workflow, so the harness' placeholder logic (chat skipped, blocked
+  scenarios expected) becomes correct as it stands.
+- **Evaluation token budget:** budgets are per user (`sub`) and per day in
+  `policies/quotas/quota-policy.yaml` (`standard`: 3 000 000 tokens, 24 h).
+  A campaign that repeats the same persona exhausts it (consultant-01 did on
+  2026-10-23). No policy change: spread a campaign over personas holding the same
+  group (for tekos consultant-01 and consultant-02 both carry `agent_tekos`), or
+  run after the window resets. The evaluation scripts report `quota_exceeded` as
+  an environment failure, never as a pass.
+- **finage and Salesforce:** the check accepts `salesforce.opportunity.read` on
+  `project_required` tasks only (ADR-0512 exception); no bundle change.
+- **comage scenario 11:** the retriever is attached; the model chooses
+  Salesforce first. The lever is `retrieve_first` (operator 0.1.26,
+  `spec.retrieveFirst`, opt-in).
+
 ## Open questions
 
 - Salesforce: repair the Vault secret `salesforce/technical` (missing `url`)
   so comage and finage are really testable, or accept those tasks out of
   parity at cutover?
 - cognos and soursage: write minimal scenarios as this WP says, or accept
-  `Valid=False` as ADR-0573 does? Which agents must appear on demo222,
-  placeholders included?
+  `Valid=False` as ADR-0573 does? Which agents must appear on demo222?
 - Cut over before or after WP-161, WP-163 and WP-165 (OKF delivery chain)?
   Before means `okf.bundles[]` is filled by hand once more.
 - Window and soak: which date outside any freeze, and how long the old stack
   stays before WP-156.
 - Accepted losses to confirm: classification per session instead of per turn,
   no stars or hard delete, one UI instead of one Route per agent.
-
-- Rollback criterion on demo222: how long does the zuno agent stack stay
-  deployed after cutover before WP-156 may start? Ask the user.
-- Which demo scripts hard-code agent-frontend URLs? Grep
-  `ansible/playbooks/demo_*.yml` and `docs/` during step 7.
