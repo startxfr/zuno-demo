@@ -203,6 +203,12 @@ spec:
   aclGroups:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .tags }}
+  # Domain tags (e.g. knowledge.tech) so a search can be scoped to a domain
+  # (unifai-operator >= 0.1.28).
+  tags:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- with .syncInterval }}
   syncInterval: {{ . }}
   {{- end }}

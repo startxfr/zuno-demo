@@ -24,6 +24,9 @@ operator:
 stack:
   enabled: false
   profile: dev
+  # Namespaces (and optional pod labels) allowed to reach the RAG search of the stack, with the user's own token
+  # (unifai-operator >= 0.1.28): ragClients: [{namespace: zuno-ai-run, podLabels: {app: mcp-gateway}}].
+  ragClients: []
   # Pinned per release (ADR-0574): never a moving tag in production values.
   # `version` is the tag of the five UnifAI images (an immutable devel-<sha>
   # or a release); `images` overrides single images, by digest.
@@ -141,6 +144,7 @@ retrievers: []
 #   config: {source_type: CONFLUENCE, forward_user_token: true, top_k_results: 5, threshold: 0.3}
 ragSources: []
 # - name: tech-satellite
+#   tags: [knowledge.tech]   # domain tag for scoped searches (operator >= 0.1.28)
 #   type: confluence
 #   confluence: {baseUrl: https://startxfr.atlassian.net, spaceKey: SXSI, rootTitle: "Technologie : Satellite", excludeLabels: [obsolete]}
 #   visibility: shared

@@ -23,6 +23,12 @@ spec:
     sharedClassName: {{ $s.sharedStorageClass }}
   exposure:
     networkPolicy: true
+    {{- with $s.ragClients }}
+    # Callers of the RAG search outside the stack's namespace (e.g. mcp-gateway acting for a user): they reach the
+    # RAG pods only, and still need the user's token (unifai-operator >= 0.1.28).
+    ragClients:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
   {{- $extra := deepCopy ($s.extraEnv | default dict) }}
   {{- if $s.identity.oidcClaims }}
   {{- /* ADR-0583: teams may hold Keycloak groups; the identity service verifies the token against the realm JWKS. */}}
