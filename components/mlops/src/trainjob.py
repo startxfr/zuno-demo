@@ -59,6 +59,9 @@ _NEVER_LITERAL = frozenset({
 # only needed by `evaluate`, and `evaluate` stays a KFP step - a training
 # pod has no business holding a persona password.
 _GATE_SUFFIX = "_FRONTEND_CLIENT_SECRET"
+# WP-156: the evaluation client's secret (zuno-evaluations) replaces the
+# per-agent frontend ones; same rule.
+_GATE_NAMES = frozenset({"EVAL_CLIENT_SECRET"})
 
 
 def _read(name: str) -> str:
@@ -102,7 +105,7 @@ def build_env(environ: Optional[Dict[str, str]] = None) -> List[Dict[str, Any]]:
     environ = os.environ if environ is None else environ
     env: List[Dict[str, Any]] = []
     for key in sorted(environ):
-        if key in _NEVER_LITERAL or key.endswith(_GATE_SUFFIX):
+        if key in _NEVER_LITERAL or key in _GATE_NAMES or key.endswith(_GATE_SUFFIX):
             continue
         if key.startswith(_ENV_PREFIXES):
             env.append({"name": key, "value": environ[key]})

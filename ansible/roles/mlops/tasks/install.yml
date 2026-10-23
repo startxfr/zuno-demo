@@ -270,7 +270,7 @@
   ansible.builtin.set_fact:
     _mlops_client_secrets: >-
       {{ _mlops_all_auth_secrets.resources | default([])
-         | selectattr('metadata.name', 'search', '-frontend-client-secret$')
+         | selectattr('metadata.name', 'search', '(-frontend-client-secret|^zuno-evaluations-client-secret)$')
          | list }}
   no_log: true
 

@@ -196,18 +196,14 @@
                       secretKeyRef:
                         name: day2-stresstest-credentials
                         key: demo-persona-password
-                  # WP-156: optional - only the layers that still mint a
-                  # persona bearer token on the <agent>-frontend client
-                  # read it (see stresstest_job.yml); it disappears with
-                  # agent-frontend. The rag_ingestion layer and its
-                  # confluence-technical-credentials env are gone with
-                  # rag-ingestion.
-                  - name: "{{ (day2_stress_agent | upper | replace('-', '_')) }}_FRONTEND_CLIENT_SECRET"
+                  # WP-156: persona tokens from the zuno-evaluations client;
+                  # the rag_ingestion layer and its confluence-technical-
+                  # credentials env are gone with rag-ingestion.
+                  - name: EVAL_CLIENT_SECRET
                     valueFrom:
                       secretKeyRef:
                         name: day2-stresstest-credentials
-                        key: "{{ day2_stress_agent }}-client-secret"
-                        optional: true
+                        key: eval-client-secret
                 volumeMounts:
                   - name: gate
                     mountPath: /gate

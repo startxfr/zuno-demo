@@ -310,6 +310,6 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    # auth_headers()/get_token() require COMAGE_FRONTEND_CLIENT_SECRET and
+    # auth_headers()/get_token() require EVAL_CLIENT_SECRET (zuno-evaluations client) and
     # DEMO_PERSONA_PASSWORD - see README.md.
     sys.exit(main())

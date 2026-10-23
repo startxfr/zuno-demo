@@ -590,5 +590,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    # auth_headers()/get_token() require TEKOS_FRONTEND_CLIENT_SECRET - see README.md.
+    # auth_headers()/get_token() require EVAL_CLIENT_SECRET (zuno-evaluations client) - see README.md.
     sys.exit(main())

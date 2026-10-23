@@ -119,28 +119,23 @@
   ansible.builtin.set_fact:
     _day2_stress_ready_agents: "{{ day2_stresstest_agents | difference(_day2_stress_placeholder_agents) | sort }}"
 
-- name: "day2-stresstest | read each served agent's frontend-client-secret from zuno-auth, if it still exists"
+# WP-156: persona tokens come from the dedicated zuno-evaluations client
+# (one secret for every agent), which outlives the per-agent <agent>-frontend
+# clients retired with agent-frontend.
+- name: "day2-stresstest | read the zuno-evaluations client secret from zuno-auth"
   kubernetes.core.k8s_info:
     kind: Secret
     namespace: zuno-auth
-    name: "{{ item }}-frontend-client-secret"
-  register: _day2_stress_client_secrets
-  loop: "{{ _day2_stress_ready_agents }}"
-  loop_control:
-    label: "{{ item }}"
+    name: zuno-evaluations-client-secret
+  register: _day2_stress_eval_client_secret
   no_log: true
 
-- name: "day2-stresstest | build the combined per-agent credentials data"
+- name: "day2-stresstest | build the credentials data"
   ansible.builtin.set_fact:
     _day2_stress_secret_data: >-
-      {{
-        _day2_stress_secret_data | default({'demo-persona-password': _day2_stress_demo_password_secret.resources[0].data.password})
-        | combine({(item.item + '-client-secret'): item.resources[0].data.client_secret}
-                  if (item.resources | default([]) | length) > 0 else {})
-      }}
-  loop: "{{ _day2_stress_client_secrets.results | default([]) }}"
-  loop_control:
-    label: "{{ item.item }}"
+      {{ {'demo-persona-password': _day2_stress_demo_password_secret.resources[0].data.password}
+         | combine({'eval-client-secret': _day2_stress_eval_client_secret.resources[0].data.client_secret}
+                   if (_day2_stress_eval_client_secret.resources | default([]) | length) > 0 else {}) }}
   no_log: true
 
 - name: "day2-stresstest | copy the combined credentials into one zuno-ai-run Secret the Job can mount"

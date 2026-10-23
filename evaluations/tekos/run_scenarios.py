@@ -145,6 +145,16 @@ DEMO_PASSWORD = os.getenv("DEMO_PERSONA_PASSWORD")
 # Named after AGENT (TEKOS_FRONTEND_CLIENT_SECRET when unset, matching this
 # module's original single env var exactly).
 FRONTEND_CLIENT_SECRET = os.getenv(f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET")
+# WP-156: persona tokens come from the dedicated zuno-evaluations client
+# (EVAL_CLIENT_SECRET), which outlives agent-frontend. Until the per-agent
+# <agent>-frontend clients are deleted, a run given only their secret keeps
+# using them.
+EVAL_CLIENT_ID = os.getenv("EVAL_CLIENT_ID", "zuno-evaluations")
+EVAL_CLIENT_SECRET = os.getenv("EVAL_CLIENT_SECRET")
+if EVAL_CLIENT_SECRET:
+    TOKEN_CLIENT_ID, TOKEN_CLIENT_SECRET = EVAL_CLIENT_ID, EVAL_CLIENT_SECRET
+else:
+    TOKEN_CLIENT_ID, TOKEN_CLIENT_SECRET = f"{AGENT}-frontend", FRONTEND_CLIENT_SECRET
 
 
 def is_placeholder_agent_404(resp: httpx.Response) -> bool:
@@ -206,8 +216,8 @@ def get_token(persona: str) -> str:
     """
     if persona in _token_cache:
         return _token_cache[persona]
-    if not FRONTEND_CLIENT_SECRET:
-        raise RuntimeError(f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET is required to obtain persona tokens")
+    if not TOKEN_CLIENT_SECRET:
+        raise RuntimeError("EVAL_CLIENT_SECRET (zuno-evaluations) is required to obtain persona tokens")
     if not DEMO_PASSWORD:
         raise RuntimeError("DEMO_PERSONA_PASSWORD is required to obtain persona tokens")
 
@@ -215,8 +225,8 @@ def get_token(persona: str) -> str:
         f"{KEYCLOAK_URL}/realms/{REALM}/protocol/openid-connect/token",
         data={
             "grant_type": "password",
-            "client_id": f"{AGENT}-frontend",
-            "client_secret": FRONTEND_CLIENT_SECRET,
+            "client_id": TOKEN_CLIENT_ID,
+            "client_secret": TOKEN_CLIENT_SECRET,
             "username": persona,
             "password": DEMO_PASSWORD,
             "scope": "openid",

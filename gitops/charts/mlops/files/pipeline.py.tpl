@@ -116,8 +116,9 @@ def configure(task, *, agent):
     )
     # WP-087: the `evaluate` stage authenticates a demo persona against
     # Keycloak (evaluations/tekos/run_scenarios.py raises outright without
-    # this) and needs THE TARGET AGENT'S frontend client secret for the
-    # token exchange. The env var name is derived from the agent -
+    # this) and needs a client secret for the token exchange: since WP-156
+    # the dedicated zuno-evaluations client's. It used to be the target
+    # agent's own frontend client, whose env var name was derived from the agent -
     # run_scenarios.py reads f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET" -
     # so a hardcoded TEKOS_ name left a comage run raising
     # "COMAGE_FRONTEND_CLIENT_SECRET is required to obtain persona
@@ -130,7 +131,11 @@ def configure(task, *, agent):
         secret_name=GATE_SECRET,
         secret_key_to_env={
             "demo-persona-password": "DEMO_PERSONA_PASSWORD",
-            f"{agent}-frontend-client-secret": f"{agent.upper()}_FRONTEND_CLIENT_SECRET",
+            # WP-156: persona tokens come from the dedicated
+            # zuno-evaluations client, which outlives the per-agent
+            # <agent>-frontend clients (a key referenced here but absent
+            # from the Secret would keep the pod from starting).
+            "zuno-evaluations-client-secret": "EVAL_CLIENT_SECRET",
         },
     )
     # The platform's internal root CA, mirrored into this namespace by

@@ -41,6 +41,7 @@ _ENV = {
     "PGPASSWORD": "hunter2",
     "DEMO_PERSONA_PASSWORD": "persona-pw",
     "COMAGE_FRONTEND_CLIENT_SECRET": "client-secret",
+    "EVAL_CLIENT_SECRET": "eval-client-secret",
     # Unrelated: must not be swept in.
     "HOME": "/opt/app-root/src",
     "PATH": "/usr/bin",
@@ -77,6 +78,7 @@ class SecretHygiene(unittest.TestCase):
         names = {e["name"] for e in trainjob.build_env(_ENV)}
         self.assertNotIn("DEMO_PERSONA_PASSWORD", names)
         self.assertNotIn("COMAGE_FRONTEND_CLIENT_SECRET", names)
+        self.assertNotIn("EVAL_CLIENT_SECRET", names)
 
     def test_missing_secret_names_emit_no_dangling_refs(self):
         env = trainjob.build_env({k: v for k, v in _ENV.items()

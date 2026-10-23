@@ -104,14 +104,14 @@
   kubernetes.core.k8s_info:
     kind: Secret
     namespace: zuno-auth
-    name: "{{ _gate_agent }}-frontend-client-secret"
+    name: zuno-evaluations-client-secret
   register: _gate_client_secret_secret
   no_log: true
 
 - name: "acceptance-gate | fail if either Keycloak secret is missing"
   ansible.builtin.fail:
     msg: >-
-      demo-personas-password / {{ _gate_agent }}-frontend-client-secret not
+      demo-personas-password / zuno-evaluations-client-secret not
       found in zuno-auth - run `make d0 install keycloak` first (see
       ansible/roles/keycloak/README.md).
   when: >-
@@ -132,7 +132,7 @@
       type: Opaque
       data:
         demo-persona-password: "{{ _gate_demo_password_secret.resources[0].data.password }}"
-        frontend-client-secret: "{{ _gate_client_secret_secret.resources[0].data.client_secret }}"
+        eval-client-secret: "{{ _gate_client_secret_secret.resources[0].data.client_secret }}"
   no_log: true
 
 # disableNameSuffixHash keeps the ConfigMap name stable so the inline Job
@@ -299,12 +299,12 @@
                       secretKeyRef:
                         name: acceptance-gate-credentials
                         key: demo-persona-password
-                  # run_scenarios.py reads {AGENT.upper()}_FRONTEND_CLIENT_SECRET.
-                  - name: "{{ _gate_agent | upper }}_FRONTEND_CLIENT_SECRET"
+                  # WP-156: persona tokens from the zuno-evaluations client.
+                  - name: EVAL_CLIENT_SECRET
                     valueFrom:
                       secretKeyRef:
                         name: acceptance-gate-credentials
-                        key: frontend-client-secret
+                        key: eval-client-secret
                 volumeMounts:
                   - name: gate
                     mountPath: /gate
