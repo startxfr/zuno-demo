@@ -19,6 +19,11 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: mcp-gateway
+      {{- if .Values.okf.fetch.enabled }}
+      annotations:
+        # ADR-0580: a promoted release changes this, which rolls the pods.
+        zuno.startx.fr/okf-corp-reference: {{ .Values.okf.fetch.corpReference | quote }}
+      {{- end }}
     spec:
       serviceAccountName: mcp-gateway
       priorityClassName: zuno-workload-default
@@ -46,6 +51,39 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+      {{- if .Values.okf.fetch.enabled }}
+      {{- if not (contains "@sha256:" .Values.okf.fetch.corpReference) }}
+      {{- fail "okf.fetch.corpReference must be a @sha256: reference when okf.fetch.enabled is true" }}
+      {{- end }}
+      initContainers:
+        # ADR-0580/WP-161: pull, verify offline, extract. Non-zero exit on any
+        # verification failure keeps the pod in Init.
+        - name: okf-fetch
+          image: "{{ .Values.okf.fetch.image.repository }}:{{ .Values.okf.fetch.image.tag }}"
+          imagePullPolicy: {{ .Values.okf.fetch.image.pullPolicy }}
+          command:
+            - python3
+            - /app/platform/supply-chain/admit_okf_bundle.py
+            - extract
+            - {{ .Values.okf.fetch.corpReference | quote }}
+            - --out
+            - /okf
+          env:
+            - name: HOME
+              value: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: okf
+              mountPath: /okf
+            - name: okf-tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.okf.fetch.resources | nindent 12 }}
+      {{- end }}
       containers:
         - name: mcp-gateway
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -83,9 +121,20 @@ spec:
                   key: token
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
+{{- if .Values.okf.fetch.enabled }}
+            - name: AGENTS_DIR
+              value: /okf/agents
+            - name: TOOL_POLICY_PATH
+              value: /okf/policies/tools/tool-policy.yaml
+{{- end }}
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.okf.fetch.enabled }}
+            - name: okf
+              mountPath: /okf
+              readOnly: true
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -103,3 +152,9 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if .Values.okf.fetch.enabled }}
+        - name: okf
+          emptyDir: {}
+        - name: okf-tmp
+          emptyDir: {}
+        {{- end }}

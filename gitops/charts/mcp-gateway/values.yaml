@@ -113,3 +113,26 @@ lightspeed:
 # ADR-0560/0563 (WP-151): namespace of the UnifAI stack whose multi-agent
 # pods may call this gateway. Empty = no UnifAI peer in the NetworkPolicy.
 unifaiNamespace: zuno-unifai
+
+# ADR-0580/WP-161: read agent definitions from the admitted zuno-demo-agents
+# release instead of the copy baked into the image. When enabled, an
+# `okf-fetch` init container pulls the corp artifact at `corpReference`
+# (a @sha256 reference, from platform/okf/stack-config.generated.yaml via
+# ansible/roles/mcp), verifies it offline against the release identity, and
+# extracts it into an emptyDir; AGENTS_DIR and TOOL_POLICY_PATH then point
+# there. The data-classification policy and the tool bindings stay the
+# platform's own (baked). A failed verification keeps the pod in Init
+# (fail closed). The digest is a pod-template annotation, so promoting a
+# release rolls the pods. Off by default: the baked copy stays the fallback
+# until the cutover (WP-165).
+okf:
+  fetch:
+    enabled: false
+    corpReference: ""
+    image:
+      repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer
+      tag: latest
+      pullPolicy: Always
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits: {cpu: 500m, memory: 256Mi}

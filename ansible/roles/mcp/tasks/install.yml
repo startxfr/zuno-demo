@@ -8,12 +8,55 @@
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
 
+# ADR-0580/WP-161: with zuno_okf_fetch_enabled, mcp-gateway reads agents
+# from the admitted zuno-demo-agents release (an okf-fetch init container
+# verifies and extracts it) instead of its baked copy. The digest comes from
+# platform/okf/stack-config.generated.yaml, itself derived from
+# platform/okf/agents.lock, so promoting a release and re-running this role
+# rolls the pods. apply_gitops_app.yml REPLACES the Application's inline
+# helm values, so they are read back and merged (same pattern as
+# ansible/roles/mlops). Off by default: the baked copy stays until WP-165.
+- name: "mcp | read the admitted agents release"
+  ansible.builtin.set_fact:
+    _mcp_okf_reference: >-
+      {{ (lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/stack-config.generated.yaml')
+          | from_yaml)['reference'] | default('', true) }}
+  when: zuno_okf_fetch_enabled | default(false) | bool
+
+- name: "mcp | refuse to fetch agents when no release is pinned"
+  ansible.builtin.assert:
+    that: _mcp_okf_reference is search('@sha256:')
+    fail_msg: >-
+      zuno_okf_fetch_enabled is true but platform/okf/agents.lock pins no
+      release: admit one first (make d3 admit agents RELEASE=vX.Y.Z UPDATE_LOCK=1).
+  when: zuno_okf_fetch_enabled | default(false) | bool
+
 - name: "mcp | apply the MCP Gateway GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "mcp"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+  when: not (zuno_okf_fetch_enabled | default(false) | bool)
+
+# Same Application, with the release's digest merged into its inline values.
+# A separate task rather than an `omit` in vars: apply_gitops_app.yml tests
+# `gitops_app_extra_helm_values is defined`, which an omit placeholder passes.
+- name: "mcp | apply the MCP Gateway GitOps Application (d1, agents from the release)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "mcp"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/mcp/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+        | combine({'okf': {'fetch': {'enabled': true, 'corpReference': _mcp_okf_reference}}}, recursive=True)
+      }}
+    gitops_app_refresh: true
+  when: zuno_okf_fetch_enabled | default(false) | bool
 
 # ADR-0117: the confluence MCP server - also no Day0 prerequisite (no
 # schema/operator), same shape as the gateway itself above. Deployed under
