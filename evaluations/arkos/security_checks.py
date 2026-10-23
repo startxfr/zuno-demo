@@ -455,7 +455,7 @@ def arkos_chat_never_returns_photorealistic_images() -> CheckResult:
 # shared services (MCP gateway, ai-gateway, MCP servers) and run unchanged.
 _UNIFAI_REPLACEMENTS = {
     bff_forwards_identity_to_runtime: unifai_checks.identity_forwarded(
-        CheckResult, _unifai, "consultant-01", "Search our Confluence for the Satellite page and tell me its title.", ("confluence.page.search",)
+        CheckResult, _unifai, "consultant-01", "Use your Confluence search tool to find the page named Satellite and give me its title.", ("confluence.page.search",)
     ),
     runtime_ignores_mismatched_user_sub: unifai_checks.client_identity_header_refused(CheckResult, _unifai),
     business_role_without_entitlement_denied_by_bff: unifai_checks.entitlement_denied(

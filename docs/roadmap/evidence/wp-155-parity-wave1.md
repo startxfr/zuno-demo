@@ -178,3 +178,24 @@ soursage are not deployed, so no parity run exists for them.
 Scenario 11 passes because the expected page name is accepted as proof of retrieval
 (`2a272fe7`): with `retrieveFirst` no retriever tool event is emitted. UnifAI has no sales
 source for comage, so for that agent the scenario proves a grounded reply, not a sales citation.
+
+## arkos on operator 0.1.27 (2026-10-23, devel, demo333)
+
+arkos is served (bundle release v0.1.1, `plan_draft_write`, team `agent-arkos`, `retrieveFirst` on).
+Personas: consultant-01 sees the four arkos workflows, sale-01 sees none.
+
+| Check | Result |
+| --- | --- |
+| scenarios `--target unifai`, run 1 | 16/18 (89%): 8 first token 7.7 s, 19 (in-cluster client) |
+| scenarios inside the gate, run 2 | 14/18 (78%, threshold 75%): 8 first token 11.9 s, 10 (the agent read Confluence with `confluence.page.read`, the scenario expects `confluence.page.search`), 11 (`tool_calls=[]`, expected page named: `retrieveFirst`), 19 |
+| security `--target unifai` | 11/11 after a harness fix (below) |
+| gate `--target unifai` | OVERALL PASS: scenarios 78%, security 11/11, capability gates 4/4 |
+
+Harness fix: `unifai_forwards_identity_to_the_gateways` sent "Search our Confluence for the
+Satellite page...", which the arkos graph answers by drafting a DAT without calling the
+search tool (`tool_calls=[]`, a reply of 2199 characters). The probe now asks explicitly for the
+Confluence search tool; the tool call then reaches the MCP gateway with the caller's token.
+
+Margin is thin (78% against 75%) and varies between runs with the model's tool choice and
+the first-token latency under load. Scenarios 10 and 11 should accept a read or the expected
+page as proof, as the tekos scenario already does; not changed here.
