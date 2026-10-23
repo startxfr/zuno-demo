@@ -1839,6 +1839,66 @@
             ],
             "secret": "${vault.signer_client_secret}",
             "clientAuthenticatorType": "client-secret"
+        },
+        {
+            "clientId": "zuno-evaluations",
+            "name": "Automated evaluations (demo personas only)",
+            "description": "WP-156: confidential client for the evaluation harness, the stresstest and the Day 3 probes to obtain demo-persona tokens with the password grant. No browser flow, no redirect URI: it replaces the per-agent <agent>-frontend clients retired with agent-frontend.",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "standardFlowEnabled": false,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": true,
+            "serviceAccountsEnabled": false,
+            "redirectUris": [],
+            "webOrigins": [],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ],
+            "secret": "${vault.zuno_evaluations_client_secret}",
+            "clientAuthenticatorType": "client-secret",
+            "protocolMappers": [
+                {
+                    "name": "audience-self",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-evaluations",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                },
+                {
+                    "name": "maas-gateway-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-admin-api",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                },
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
+                    }
+                }
+            ]
         }
     ],
     "identityProviders": [{

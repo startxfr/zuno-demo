@@ -203,6 +203,15 @@ spec:
                     items:
                       - key: client_secret
                         path: zuno_signer__client__secret
+                - secret:
+                    # WP-156: zuno-evaluations, the evaluation harness's
+                    # persona-token client. ${vault.zuno_evaluations_client_secret}
+                    # resolves to file zuno_zuno__evaluations__client__secret.
+                    name: zuno-evaluations-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_zuno__evaluations__client__secret
         containers:
           - name: keycloak
             securityContext:
