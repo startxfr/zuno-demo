@@ -48,6 +48,24 @@ first promotion once v0.1.1 is published.
 it against its own contract, and receives every new release as a reviewed
 pull request it opened itself.
 
+## Admissions and promotions (2026-10-23)
+
+- **v0.1.1, first admission.** zuno-demo-agents v0.1.0 was tagged but
+  never published (nine tags in one push create no push event). `make d3
+  admit agents RELEASE=v0.1.1 UPDATE_LOCK=1` verified offline the corp
+  artifact and its eight agents against the release identity (publish.yml
+  on refs/tags/v0.1.1) and the contract-tests attestations, validated them
+  servable and pinned them (925f271b).
+- **v0.2.0, first end-to-end promotion.** `okf-promote.yml`, run by hand on
+  demo222, verified the release, opened PR #2 (`okf-promote/v0.2.0`) moving
+  `agents.lock` and regenerating `stack-config.generated.yaml`, with a
+  summary listing the two corp policies v0.2.0 adds; merged. The eight agent
+  digests are identical across v0.1.1 and v0.2.0 (reproducible builds).
+- **Default branch.** GitHub lists only workflows present on the default
+  branch, so a copy of `okf-promote.yml` without `schedule` was merged into
+  main (PR #1); the daily schedule comes back once main carries the
+  admission tooling.
+
 ## Steps
 
 1. **Trust material.** Commit `platform/okf/sigstore/trusted_root.json`
