@@ -50,6 +50,15 @@ the operator release carrying the `plan_draft_write` blueprint. Placeholder
 agents (advantage, finage, naveo, cognos, soursage) are out of scope: they
 are served by UnifAI once their OKF status becomes active.
 
+**Step-1 decisions (user, 2026-10-23):** mcp-gateway's
+`knowledge.tech.search` (`search_technical_docs`, used by Lightspeed) is
+redirected to UnifAI's RAG; the trustyai RAGAS job is redirected to UnifAI's
+retrieval; dashboards and SLO rules on BFF/RAG metrics are removed here and
+rebuilt in [WP-166](wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md);
+the Day 3 probes (demo personas, GPU failover drill, stresstest) are ported
+to UnifAI. Preparation runs on the branch `prep/wp156`, merged into devel
+when WP-156 starts (devel deploys on demo333).
+
 **Retirement order, from the inventory** (each step leaves the tree
 green before the next):
 
