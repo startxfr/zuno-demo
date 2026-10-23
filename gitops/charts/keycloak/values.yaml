@@ -128,3 +128,11 @@ operator:
     enabled: true
     name: rhbk-operator-group
     namespace: zuno-auth
+
+# ADR-0581/WP-164: the entitlement groups the admitted zuno-demo-agents
+# release declares (zuno.access.groups), from
+# platform/okf/stack-config.generated.yaml via ansible/roles/keycloak. The
+# client-reconcile Job creates any that are missing - never deletes one,
+# never touches membership. Empty: the Job reconciles clients only, as
+# before.
+agentGroups: []

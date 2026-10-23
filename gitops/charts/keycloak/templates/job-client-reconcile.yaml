@@ -88,11 +88,13 @@ spec:
             - |
               set -euo pipefail
 
-              echo "ADR-0530: reconciling CLIENTS only."
-              echo "  NOT reconciled: groups, users, realm roles, identity"
-              echo "  providers, client scopes, realm settings. Those remain"
-              echo "  create-only - editing them in realm-zuno.json still has"
-              echo "  no effect on a live realm. See ADR-0530 clause 4."
+              echo "ADR-0530: reconciling CLIENTS, plus (ADR-0581) the agent entitlement"
+              echo "  GROUPS the admitted agents release declares - created when"
+              echo "  missing, never deleted, membership never touched."
+              echo "  NOT reconciled: users, realm roles, identity providers,"
+              echo "  client scopes, realm settings, and any other group. Those"
+              echo "  remain create-only - editing them in realm-zuno.json still"
+              echo "  has no effect on a live realm. See ADR-0530 clause 4."
 
               # kcadm writes its session to $HOME/.keycloak by default, and
               # this pod runs with a read-only root filesystem under an
@@ -176,7 +178,33 @@ spec:
                 done < "$f"
               done
 
-              echo "reconcile complete: $created created, $updated updated, $mapped role mappings applied"
+              # ADR-0581/WP-164: agent entitlement groups from the admitted
+              # release. Create-only by design: deleting a group would drop
+              # its members' access, and membership is user administration,
+              # not agent definition. A live agent_* group the release no
+              # longer declares is reported, never removed.
+              groups_created=0
+              groups_present=0
+              if [ -e /realm/agent-groups.txt ]; then
+                live=$($KCADM get groups -r "$KC_REALM" $CFG --fields name \
+                         --format csv --noquotes 2>/dev/null | tr -d '\r"')
+                while read -r group; do
+                  [ -n "${group:-}" ] || continue
+                  if printf '%s\n' "$live" | grep -Fxq "$group"; then
+                    groups_present=$((groups_present + 1))
+                  else
+                    $KCADM create groups -r "$KC_REALM" $CFG -s "name=$group"
+                    echo "created group $group"
+                    groups_created=$((groups_created + 1))
+                  fi
+                done < /realm/agent-groups.txt
+                for g in $(printf '%s\n' "$live" | grep '^agent_' || true); do
+                  grep -Fxq "$g" /realm/agent-groups.txt \
+                    || echo "NOTE: group $g exists but the agents release does not declare it (kept)"
+                done
+              fi
+
+              echo "reconcile complete: $created created, $updated updated, $mapped role mappings applied, $groups_created groups created, $groups_present groups already present"
       volumes:
         - name: realm
           configMap:

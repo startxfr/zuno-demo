@@ -29,6 +29,14 @@ data:
   client-{{ $c.clientId }}.json: |
 {{ $c | toPrettyJson | indent 4 }}
 {{- end }}
+{{- with .Values.agentGroups }}
+  # ADR-0581/WP-164: one group name per line, consumed by the Job's read loop
+  # (flat text for the same no-jq reason).
+  agent-groups.txt: |
+{{- range $g := . }}
+    {{ $g }}
+{{- end }}
+{{- end }}
 {{- range $u := $realm.users }}
 {{- if $u.serviceAccountClientId }}
   # One "<role-container-client> <role-name>" per line, consumed by the Job's
