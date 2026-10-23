@@ -730,7 +730,11 @@ def test_task_system_prompt_is_the_body_not_the_frontmatter() -> None:
     sends. Without one the variant still calls tools correctly, so a probe
     set that dropped it would score green and measure nothing."""
     repo = pathlib.Path(__file__).resolve().parents[3]
-    body = mlops._task_system_prompt(_config(agents_dir=str(repo / "agents")), "check-deal-status")
+    # WP-165: agents come from the admitted release, as the image bakes them.
+    sys.path.insert(0, str(repo / "platform" / "okf"))
+    import release_cache
+
+    body = mlops._task_system_prompt(_config(agents_dir=str(release_cache.release_dir() / "agents")), "check-deal-status")
     assert body and "okf_version" not in body
 
 

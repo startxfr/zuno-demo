@@ -31,7 +31,12 @@ from app.routing import RoutingError, RoutingTable  # noqa: E402
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
 _PROVIDER_ROUTING_PATH = str(_REPO_ROOT / "platform" / "ai-gateway" / "provider-routing.yaml")
-_MODEL_ROUTING_POLICY_PATH = str(_REPO_ROOT / "policies" / "model-routing" / "model-routing-policy.yaml")
+# WP-165: the model-routing policy is a corp policy of the admitted agents
+# release (platform/okf/release_cache.py), the one this gateway's image bakes.
+sys.path.insert(0, str(_REPO_ROOT / "platform" / "okf"))
+import release_cache  # noqa: E402
+
+_MODEL_ROUTING_POLICY_PATH = str(release_cache.release_dir() / "policies" / "model-routing" / "model-routing-policy.yaml")
 
 
 def _candidates(agent: str, task: str, classification: str, header_local_only: bool = False):

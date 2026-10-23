@@ -360,7 +360,16 @@ def _unifai_placeholder_skip(s: Dict[str, Any]) -> bool:
 
 
 def _agent_status() -> str:
-    path = pathlib.Path(__file__).resolve().parents[2] / "agents" / AGENT / "agent.okf.md"
+    # WP-165: the bundle comes from the admitted agents release in a checkout
+    # (evaluations/common/okf_release.py), from the Job's mounts otherwise.
+    # Flattened into /gate in the Jobs, so both locations are searched.
+    _here = pathlib.Path(__file__).resolve().parent
+    for candidate in (_here, _here.parent / "common"):
+        if str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+    from okf_release import okf_root
+
+    path = okf_root(pathlib.Path(__file__).resolve().parents[2]) / "agents" / AGENT / "agent.okf.md"
     try:
         front = yaml.safe_load(path.read_text().split("---", 2)[1])
         return str((front.get("zuno") or {}).get("status", "")).strip()
