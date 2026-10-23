@@ -1,0 +1,230 @@
+#!/usr/bin/env python3
+"""WP-155 wave 0: offline tests for the shared UnifAI evaluation target and for the per-agent
+`--target unifai` selection. No network: HTTP is served by httpx.MockTransport, and each agent's
+scripts are imported in a subprocess (their modules share names, and AGENT is read at import).
+
+    cd evaluations && python3 -m pytest tests/test_unifai_target.py -q
+"""
+from __future__ import annotations
+
+import json
+import pathlib
+import subprocess
+import sys
+import textwrap
+
+import httpx
+
+EVAL = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(EVAL / "common"))
+
+import unifai_target as ut  # noqa: E402
+
+UI = "https://ui.test"
+KC = "https://kc.test/auth"
+
+
+def _ndjson(*chunks):
+    return "\n".join(json.dumps(c) for c in chunks) + "\n"
+
+
+class Recorder:
+    def __init__(self):
+        self.requests = []
+
+    def handler(self, request: httpx.Request) -> httpx.Response:
+        self.requests.append(request)
+        path = request.url.path
+        if request.url.host == "ui.test" and path == "/api3/auth/login":
+            return httpx.Response(200, text=f'<form id="kc-form-login" action="{KC}/login?x=1&amp;y=2">')
+        if request.url.host == "kc.test":
+            body = request.content.decode()
+            assert "username=consultant-01" in body and "password=pw" in body
+            return httpx.Response(302, headers={"location": f"{UI}/", "set-cookie": "session=abc; Path=/"})
+        if path == "/":
+            return httpx.Response(200, text="ui")
+        if path == "/api2/blueprints/available.blueprints.summary.get":
+            assert request.url.params.get("teamId") == "team-1"
+            return httpx.Response(200, json=[{"name": "other", "blueprint_id": "b0"}, {"name": "arkos", "blueprint_id": "b1"}])
+        if path == "/api2/sessions/user.session.create":
+            return httpx.Response(200, json="sess-1")
+        if path == "/api2/sessions/user.session.execute":
+            return httpx.Response(
+                200,
+                text=_ndjson(
+                    {"type": "heartbeat"},
+                    {"type": "tool_calling", "tool": "confluence.page.search"},
+                    {"type": "llm_token", "token": "x"},
+                    {"type": "complete", "state": {"output": "the answer"}},
+                ),
+            )
+        if path == "/api2/sessions/session.delete":
+            return httpx.Response(200, json=True)
+        return httpx.Response(404)
+
+
+def _target(monkeypatch, agent="arkos"):
+    rec = Recorder()
+    real_client = httpx.Client
+
+    def factory(*a, **kw):
+        kw.pop("verify", None)
+        return real_client(*a, transport=httpx.MockTransport(rec.handler), **kw)
+
+    monkeypatch.setattr(ut.httpx, "Client", factory)
+    return ut.UnifaiTarget("pw", ui_url=UI, agent=agent, team_id="team-1"), rec
+
+
+def test_login_session_stream_and_cleanup(monkeypatch):
+    t, rec = _target(monkeypatch)
+    r = t.run("consultant-01", "hello")
+    assert r.status == 200 and r.reply == "the answer" and r.session_id == "sess-1"
+    assert r.raw["tool_calls"] == ["confluence.page.search"]
+    create = next(q for q in rec.requests if q.url.path.endswith("user.session.create"))
+    body = json.loads(create.content)
+    assert body["blueprintId"] == "b1" and body["teamId"] == "team-1"  # the agent's workflow, in the team workspace
+    execute = next(q for q in rec.requests if q.url.path.endswith("user.session.execute"))
+    ebody = json.loads(execute.content)
+    assert ebody["sessionId"] == "sess-1" and ebody["stream"] is True and ebody["teamId"] == "team-1"
+    assert t.cleanup() == (1, 0)
+
+
+def test_workflow_defaults_to_agent_and_env_override(monkeypatch):
+    t, _ = _target(monkeypatch, agent="arkos")
+    assert t.workflow_id("consultant-01") == "b1"
+    monkeypatch.setenv("UNIFAI_WORKFLOW", "other")
+    assert t.workflow_id("consultant-01") == "b0"
+    try:
+        t.workflow_id("consultant-01", "missing")
+    except ut.UnifaiError:
+        pass
+    else:
+        raise AssertionError("an invisible workflow must raise")
+
+
+def test_collect_stops_on_wanted_tool_and_builds_summary(monkeypatch):
+    t, _ = _target(monkeypatch)
+    got = t.collect("consultant-01", "q", stop_on=ut.wanted_tools("search_confluence"))
+    assert got["tools"] == ["confluence.page.search"] and got["stopped"] and not got["timed_out"]
+    full = t.collect("consultant-01", "q")
+    assert full["reply"] == "the answer" and "llm_token" in full["blob"]
+
+
+def test_tool_aliases_accept_the_retriever():
+    assert "docs_rag_retriever_tool" in ut.wanted_tools("search_confluence")
+    assert ut.wanted_tools("something.else") == ("something.else",)
+
+
+def test_tekos_import_path_is_a_thin_reexport():
+    code = (
+        "import sys; sys.path.insert(0, %r); import unifai_target as u; "
+        "assert u.UnifaiTarget.__module__ == 'zuno_eval_common_unifai_target'; print('ok')" % str(EVAL / "tekos")
+    )
+    out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
+    assert out.stdout.strip() == "ok", out.stderr
+
+
+def test_skip_is_never_a_pass():
+    import unifai_checks
+    from dataclasses import dataclass
+
+    @dataclass
+    class CheckResult:
+        name: str
+        passed: bool
+        detail: str = ""
+        skipped: bool = False
+
+    r = unifai_checks.skip(CheckResult, "n", "because")()
+    assert r.skipped and not r.passed and "because" in r.detail
+
+
+AGENTS = ["tekos", "comage", "arkos", "advantage", "finage", "naveo"]
+PLACEHOLDERS = {"advantage", "finage", "naveo"}
+
+
+def _probe(agent: str, code: str) -> str:
+    script = textwrap.dedent(
+        f"""
+        import os, sys
+        sys.argv = ["x", "--target", "unifai"]
+        os.environ["AGENT"] = {agent!r}
+        sys.path.insert(0, {str(EVAL / "tekos")!r})
+        os.environ.setdefault("DEMO_PERSONA_PASSWORD", "pw")
+        import importlib.util
+        def load_security_checks():
+            # by path, as run_acceptance_gate.py does: several agents ship a module of that name
+            spec = importlib.util.spec_from_file_location("security_checks", {str(EVAL / agent / "security_checks.py")!r})
+            mod = importlib.util.module_from_spec(spec)
+            sys.modules[spec.name] = mod
+            spec.loader.exec_module(mod)
+            return mod
+        """
+    ) + textwrap.dedent(code)
+    out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, cwd=EVAL / agent)
+    assert out.returncode == 0, out.stderr
+    return out.stdout.strip()
+
+
+def test_every_agent_run_scenarios_selects_unifai_and_covers_every_scenario_type():
+    for agent in AGENTS:
+        out = _probe(
+            agent,
+            """
+            import yaml, pathlib
+            import run_scenarios as rs
+            assert rs.TARGET == "unifai" and rs.AGENT == os.environ["AGENT"]
+            types = {s["type"] for s in yaml.safe_load(pathlib.Path(rs.__file__).resolve().parent.parent.joinpath(rs.AGENT, "scenarios.yaml").read_text())["scenarios"]}
+            handlers = {**rs.HANDLERS, **rs.UNIFAI_HANDLERS}
+            missing = types - set(handlers)
+            # chat-shaped types must be served by the UnifAI transport, not the BFF one
+            for t in types & {"chat_basic_qa","chat_first_token_latency","chat_streaming_sse","chat_triggers_tool","chat_register_conformance","chat_blocked_for_placeholder_agent","rag_retrieval_has_citation"}:
+                assert handlers[t] is rs.UNIFAI_HANDLERS[t], t
+            print("missing=" + ",".join(sorted(missing)))
+            """,
+        )
+        assert out.endswith("missing="), (agent, out)
+
+
+def test_every_agent_security_checks_swaps_in_unifai_replacements():
+    for agent in AGENTS:
+        out = _probe(
+            agent,
+            """
+            sc = load_security_checks()
+            assert sc.TARGET == "unifai"
+            if hasattr(sc, "unifai_checks"):
+                names = [c.__name__ for c in sc.unifai_checks.select(sc.CHECKS, sc._UNIFAI_REPLACEMENTS, sc.TARGET)]
+            else:
+                names = [(sc._UNIFAI_REPLACEMENTS.get(c, c)).__name__ for c in sc.CHECKS]
+            assert "bff_forwards_identity_to_runtime" not in names
+            assert "business_role_without_entitlement_denied_by_bff" not in names
+            assert any("unifai" in n for n in names)
+            print("ok")
+            """,
+        )
+        assert out == "ok", (agent, out)
+
+
+def test_placeholder_agents_skip_chat_scenarios_and_identity_check():
+    for agent in PLACEHOLDERS:
+        out = _probe(
+            agent,
+            """
+            import run_scenarios as rs
+            sc = load_security_checks()
+            assert rs._agent_status() == "placeholder"
+            r = rs.u_chat_basic_qa({"id": 1, "title": "t", "persona": "p", "message": "m"})
+            assert r.skipped and not r.passed
+            c = sc._UNIFAI_REPLACEMENTS[sc.bff_forwards_identity_to_runtime]()
+            assert c.skipped and not c.passed and "placeholder" in c.detail
+            print("ok")
+            """,
+        )
+        assert out == "ok", (agent, out)
+
+
+def test_active_agents_do_not_skip():
+    for agent in ["tekos", "arkos", "comage"]:
+        out = _probe(agent, "import run_scenarios as rs\nassert rs._agent_status() == 'active'\nprint('ok')")
+        assert out == "ok", (agent, out)

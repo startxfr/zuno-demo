@@ -72,6 +72,12 @@ def main() -> int:
     security_results = security_checks.run()
     gate_results = gate_checks.run()
 
+    # `--target unifai` (WP-155): scenarios and checks that cannot apply to UnifAI are reported as
+    # skipped with their reason and left out of every count - never counted as passes.
+    skipped = [r for r in scenario_results + security_results if getattr(r, "skipped", False)]
+    scenario_results = [r for r in scenario_results if not getattr(r, "skipped", False)]
+    security_results = [r for r in security_results if not getattr(r, "skipped", False)]
+
     scenario_passed = sum(1 for r in scenario_results if r.passed)
     scenario_total = len(scenario_results)
     scenario_rate = scenario_passed / scenario_total if scenario_total else 0.0
@@ -110,6 +116,15 @@ def main() -> int:
         if not r.passed and r.detail:
             print(f"      -> {r.detail}")
     print(f"{gate_passed}/{gate_total} passed\n")
+
+    if skipped:
+        print(f"=== Skipped on target {run_scenarios.TARGET} (not applicable, not counted) ===")
+        for r in skipped:
+            print(f"-     {getattr(r, 'title', None) or r.name}\n      -> {r.detail}")
+        print()
+
+    if run_scenarios.TARGET == "unifai":
+        run_scenarios._unifai().cleanup()
 
     print(f"OVERALL RESULT: {'PASS' if overall_ok else 'FAIL'}")
 

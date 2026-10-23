@@ -119,8 +119,13 @@ DAY3_RUN_COMPONENTS := mlops
 # on-demand operator action against an already-installed platform, spends
 # real build+sign compute - same tier as sign/run, its own component list.
 DAY3_RELEASE_COMPONENTS := supply-chain
-DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS) $(DAY3_RELEASE_COMPONENTS))
-DAY3_VERBS := test stresstest backup restore check sign run release scenario-failover-node
+# ADR-0580/WP-160: admitting a zuno-demo-agents release verifies it offline
+# (keyless signatures + attestations, platform/okf/sigstore/) and checks this
+# platform can serve it; RELEASE=vX.Y.Z UPDATE_LOCK=1 also moves
+# platform/okf/agents.lock. Needs cosign and oras, no cluster.
+DAY3_ADMIT_COMPONENTS := agents
+DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS) $(DAY3_RELEASE_COMPONENTS) $(DAY3_ADMIT_COMPONENTS))
+DAY3_VERBS := test stresstest backup restore check sign admit run release scenario-failover-node
 
 # WP-136/ADR-0550 presenter tooling, regrouped as a `make demo <verb>`
 # verb group (originally flat demo-* targets). Unlike day0-3 there is no
@@ -235,6 +240,7 @@ help:
 	  '  make day3|d3 test [component]        Check availability only (ADR-0057)' \
 	  '  make day3|d3 stresstest [component]  Run every existing test layer per agent, plus a bulk-interaction load pass (ADR-0058)' \
 	  '  make day3|d3 sign [component]        Re-sign the OKF bundles and verify them (ADR-0420) - run after ANY change under agents/<name>/' \
+	  '  make day3|d3 admit [component]       Verify and validate the zuno-demo-agents release in platform/okf/agents.lock (ADR-0580)' \
 	  '  make day3|d3 run [component]         Trigger one real pipeline run (WP-126) - AGENT=<agent> overrides the default (comage)' \
 	  '' \
 	  '  make demo check       Read-only webinar presenter preflight (WP-136/ADR-0550) - app/project/model/failover-topology/training readiness (alias: all-check)' \
@@ -341,6 +347,7 @@ _complete-components:
 	  3) case "$(VERB)" in \
 	       backup|restore) echo "$(DAY3_BACKUP_COMPONENTS) all" ;; \
 	       sign) echo "$(DAY3_SIGN_COMPONENTS) all" ;; \
+	       admit) echo "$(DAY3_ADMIT_COMPONENTS) all" ;; \
 	       run) echo "$(DAY3_RUN_COMPONENTS) all" ;; \
 	       release) echo "$(DAY3_RELEASE_COMPONENTS) all" ;; \
 	       *) echo "$(DAY3_COMPONENTS) all" ;; \
@@ -618,6 +625,8 @@ if [[ -z "$$verb" ]]; then \
     '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
     '  sign         Re-sign every OKF bundle against the deployed agent-runtime image, then verify (ADR-0420)' \
     '               The signed digest covers every file under agents/<name>/, tasks/ included - not just agent.okf.md' \
+    '  admit        Verify offline and validate the zuno-demo-agents release pinned in platform/okf/agents.lock (ADR-0580)' \
+    '               RELEASE=vX.Y.Z admits that release instead; UPDATE_LOCK=1 also writes it to the lock' \
     '  run          Trigger one real KFP pipeline run (WP-126) - spends real GPU burst-node compute' \
     '  release      Cut a named, signed, in-cluster release (ADR-0549/WP-134) - builds+RHTAS-signs' \
     '               every component at TAG, records it in pinned-releases.yaml. Never touches' \
@@ -661,6 +670,7 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 backup postgresql' \
     'Example: make d3 restore postgresql' \
     'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything; also publishes the OCI bundles when zuno_okf_oci_repository_prefix is set (ADR-0564)' \
+    'Example: make d3 admit agents RELEASE=v0.1.1 UPDATE_LOCK=1   # admit a zuno-demo-agents release and pin it (ADR-0580)' \
     'Example: make d3 run mlops   # triggers one real LoRA training run (WP-126) - scales up zuno-gpu-burst-a' \
     'Example: git tag v0.2.0 && git push origin v0.2.0 && make d3 release TAG=v0.2.0   # named in-cluster release (ADR-0549)' \
     'Example: make d3 scenario-failover-node   # interactive - pauses for confirmation between cordon+kill and uncordon+restore'; \
@@ -720,6 +730,12 @@ case "$$verb" in \
     agent="$${AGENT:-comage}"; \
     aap_route job zuno-day3-run "{\"target_component\": \"$$component\", \"agent\": \"$$agent\"}"; rc=$$?; \
     if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_run.yml -e "target_component=$$component" -e "agent=$$agent" $(EXTRA_VARS); else exit $$rc; fi ;; \
+  admit) \
+    case " $(DAY3_ADMIT_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 admit component: '$$component' (expected one of: $(DAY3_ADMIT_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    admit_args=(); \
+    if [[ -n "$${RELEASE:-}" ]]; then admit_args+=(--release "$$RELEASE"); fi; \
+    case "$${UPDATE_LOCK:-0}" in 1|true|yes) admit_args+=(--update-lock) ;; esac; \
+    python3 platform/supply-chain/admit_okf_bundle.py admit "$${admit_args[@]}" ;; \
   release) \
     case " $(DAY3_RELEASE_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 release component: '$$component' (expected one of: $(DAY3_RELEASE_COMPONENTS) or all)" >&2; exit 2;; esac; \
     if [[ -z "$${TAG:-}" ]]; then echo "day3 release requires TAG=<release_tag>, e.g. TAG=v0.2.0 (must already be a real, pushed git tag)" >&2; exit 2; fi; \

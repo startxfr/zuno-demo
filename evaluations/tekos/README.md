@@ -81,7 +81,7 @@ Keycloak) run unchanged.
 | 1, 4 portal tiles | the persona sees the agent's workflows |
 | 5 tile disabled | no workflows listed for a non-member **and** the MCP gateway refuses the agent (403) |
 | 2, 16 login required | an anonymous API call gets 401 |
-| 7-10 chat | session create + streamed execute (`llm_token`, `tool_calling`, `complete` events) |
+| 7-10 chat | session create + streamed execute (`llm_token`, `tool_calling`, `complete` events); scenario 10 accepts the retriever (`docs_rag_retriever_tool`) as well as `confluence.page.search`, and every run has an overall deadline |
 | 11 RAG citation | a member of the source's groups asks about a known page; the answer must come through the retriever and name the page (`UNIFAI_RAG_QUESTION`, `UNIFAI_RAG_EXPECT`) |
 | 6, 17, 19 | reported as skipped, not counted: no placeholder tiles, no bearer-token API, in-cluster-only check |
 

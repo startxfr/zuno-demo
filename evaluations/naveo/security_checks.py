@@ -25,9 +25,12 @@ import httpx
 import yaml
 
 os.environ.setdefault("AGENT", "naveo")
+os.environ.setdefault("TASK_NAME", "answer-onboarding-question")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, auth_headers, is_placeholder_agent_404  # noqa: E402
+from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, auth_headers, is_placeholder_agent_404, MCP_GATEWAY_URL, TARGET, TASK_NAME, _unifai  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
+import unifai_checks  # noqa: E402
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -44,6 +47,7 @@ class CheckResult:
     name: str
     passed: bool
     detail: str = ""
+    skipped: bool = False
 
 
 def bff_forwards_identity_to_runtime() -> CheckResult:
@@ -173,6 +177,21 @@ def naveo_declares_only_scaffolded_knowledge_and_tools() -> CheckResult:
     )
 
 
+# --target unifai (WP-155 wave 0): see evaluations/common/unifai_checks.py.
+_UNIFAI_REPLACEMENTS = {
+    bff_forwards_identity_to_runtime: unifai_checks.skip(
+        CheckResult,
+        "unifai_forwards_identity_to_the_gateways",
+        "naveo is a placeholder agent (ADR-0007): it has no UnifAI workflow to chat with",
+    ),
+    runtime_ignores_mismatched_user_sub: unifai_checks.client_identity_header_refused(CheckResult, _unifai),
+    business_role_without_entitlement_denied_by_bff: unifai_checks.entitlement_denied(
+        CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="consultant-role-only-user-01",
+        mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
+    ),
+}
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
@@ -184,7 +203,7 @@ CHECKS = [
 
 def run() -> list:
     results = []
-    for check in CHECKS:
+    for check in unifai_checks.select(CHECKS, _UNIFAI_REPLACEMENTS, TARGET):
         try:
             result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
@@ -196,12 +215,15 @@ def run() -> list:
 
 def main() -> int:
     results = run()
+    print(f"target: {TARGET}")
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
-        print(f"{'✓' if r.passed else '✗':<6}{r.name}")
-        if not r.passed and r.detail:
+        print(f"{'-' if r.skipped else '✓' if r.passed else '✗':<6}{r.name}")
+        if (not r.passed or r.skipped) and r.detail:
             print(f"      -> {r.detail}")
-    if all(r.passed for r in results):
+    if TARGET == "unifai":
+        _unifai().cleanup()
+    if all(r.passed for r in results if not r.skipped):
         print("\nRESULT: PASS")
         return 0
     print("\nRESULT: FAIL")

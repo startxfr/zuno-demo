@@ -41,6 +41,7 @@ import yaml
 # has nothing else setting it; only run_acceptance_gate.py's wrapper
 # happens to set this first via its own os.environ.setdefault().
 os.environ.setdefault("AGENT", "comage")
+os.environ.setdefault("TASK_NAME", "check-deal-status")
 
 # run_scenarios.py is the canonical, AGENT-parameterized shared
 # implementation physically checked in under evaluations/tekos/ (see that
@@ -49,7 +50,9 @@ os.environ.setdefault("AGENT", "comage")
 # directory, not only when run_acceptance_gate.py's dynamic loader has
 # already put evaluations/tekos/ on sys.path for us.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers  # noqa: E402
+from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers, MCP_GATEWAY_URL, TARGET, TASK_NAME, _unifai  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
+import unifai_checks  # noqa: E402
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -78,6 +81,7 @@ class CheckResult:
     name: str
     passed: bool
     detail: str = ""
+    skipped: bool = False
 
 
 def bff_forwards_identity_to_runtime() -> CheckResult:
@@ -366,6 +370,26 @@ def comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests() 
     )
 
 
+# --target unifai (WP-155 wave 0): the checks tied to the BFF/agent-runtime are replaced by their
+# UnifAI equivalents (shared factories in evaluations/common/unifai_checks.py); the others reach
+# shared services (MCP gateway, ai-gateway, MCP servers) and run unchanged.
+_UNIFAI_REPLACEMENTS = {
+    bff_forwards_identity_to_runtime: unifai_checks.identity_forwarded(
+        CheckResult, _unifai, "sale-01", "What's the status of the Acme Renewal deal?", ("salesforce.opportunity.read",)
+    ),
+    runtime_ignores_mismatched_user_sub: unifai_checks.client_identity_header_refused(CheckResult, _unifai),
+    business_role_without_entitlement_denied_by_bff: unifai_checks.entitlement_denied(
+        CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="sales-role-only-user-01",
+        mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
+    ),
+    comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests: unifai_checks.marketing_image_boundary(
+        CheckResult, _unifai, name="unifai_comage_images_only_for_marketing_visual_requests", persona="sale-01",
+        chart_prompt="Show me a chart of this quarter's pipeline by stage.",
+        marketing_prompt="Generate a promotional marketing image of a modern sales team celebrating a big win.",
+    ),
+}
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
@@ -380,7 +404,7 @@ CHECKS = [
 
 def run() -> list:
     results = []
-    for check in CHECKS:
+    for check in unifai_checks.select(CHECKS, _UNIFAI_REPLACEMENTS, TARGET):
         try:
             result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
@@ -393,13 +417,16 @@ def run() -> list:
 def main() -> int:
     results = run()
 
+    print(f"target: {TARGET}")
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
-        print(f"{'✓' if r.passed else '✗':<6}{r.name}")
-        if not r.passed and r.detail:
+        print(f"{'-' if r.skipped else '✓' if r.passed else '✗':<6}{r.name}")
+        if (not r.passed or r.skipped) and r.detail:
             print(f"      -> {r.detail}")
 
-    if all(r.passed for r in results):
+    if TARGET == "unifai":
+        _unifai().cleanup()
+    if all(r.passed for r in results if not r.skipped):
         print("\nRESULT: PASS")
         return 0
     print("\nRESULT: FAIL")

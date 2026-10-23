@@ -1,6 +1,6 @@
 # WP-164: Generate stack configuration from the corp release
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0581](../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md)
 - **Depends on:** [WP-160](wp-160-admit-the-corp-okf-release-in-zuno-demo.md), [WP-163](wp-163-okf-v0-3-schema-and-consumers.md)
 - **Related:** [ADR-0530](../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md), [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [WP-157](wp-157-slim-the-ai-gateway-via-maas.md), [WP-162](wp-162-keyless-okf-verification-in-unifai-operator.md)
@@ -9,6 +9,36 @@
 
 > Every value copied by hand from a bundle today becomes generated or
 > disappears.
+
+## Progress (2026-10-23)
+
+Part 1 of 2, the generator, is built. `platform/okf/generate_stack_config.py`
+writes ONE file, `platform/okf/stack-config.generated.yaml`, from the
+release in `agents.lock` (verified first, through `admit_okf_bundle.extract`):
+`keycloak.groups`, `agents.<name>` (version, digest reference,
+classification, groups, tasks, tool and knowledge unions) and
+`unifai.bundles` (reference + ceilings per agent). `--check` runs in the
+`okf-release` job of `lint.yml`; `okf-promote.yml` regenerates it in the
+promotion PR. 3 unit tests; proven on the devel release. With the lock
+still empty, the committed file is empty.
+
+Part 2, the consumers, is under way and coordinated:
+
+- `unifai` role: done (zuno-demo-68). It reads the generated file, builds
+  `okf.bundles` from `unifai.bundles` merged BY NAME with the platform's own
+  `zuno_unifai_bundle_settings.<agent>` (groupTeam/teamId, entitlement,
+  overrides), and passes `unifai.verify.keyless` and the committed
+  `trusted_root.json` to the chart. While the generated list is empty,
+  `zuno_unifai_values.okf` stays the only source; the two lists are never
+  merged. Needs unifai-operator 0.1.25 (WP-162); first live use waits for a
+  pinned release;
+- Keycloak: extend the ADR-0530 reconcile Job to the generated groups
+  (create/update, never delete, never membership);
+- quotas, MaaS subscriptions, model routing and guardrail inputs wait for
+  WP-157 (ADR-0570), which reshapes the same files and has no owner yet;
+- per-agent chart values (arkos, naveo) are skipped: WP-156 deletes those
+  charts.
+
 
 ## Goal
 

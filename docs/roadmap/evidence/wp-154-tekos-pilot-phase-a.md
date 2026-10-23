@@ -186,10 +186,86 @@ from `/v1/routing-decisions/{request_id}`:
 C3 never reached a SaaS provider, which is the ADR-0021 rule. This check does not
 depend on UnifAI: it is the gateway UnifAI calls with the user's token.
 
+## Redeploy on `devel-e76c71cd0` (2026-10-23)
+
+The pilot was removed after phase A and redeployed on fork `devel` e76c71cd0 with
+a team bound to the directory group `agent_tekos` (identity teams API), the
+throwaway key and the digest-pinned `okf-test-tekos` artifact.
+
+| Check | Result |
+|---|---|
+| UnifaiAgentBundle `tekos` | Verified, Valid, WithinCeilings, Emitted; 4 tasks, 16 objects Ready |
+| Scenarios (`--target unifai`) | 16/17 (94 %), 3 skipped. Scenario 8 (first token) now passes on warm models |
+| Scenario 10 | failed at first: with the retriever attached the agent reads Confluence through `docs_rag_retriever_tool` (ten calls) and never calls `confluence.page.search`. The UnifAI handler now accepts either (the RAG sources are synced from Confluence) and bounds the run; it passes. Scenario 8 (first token) passed on the first run and missed the 6 s objective on the second, while the cluster was building a release: 16/17 both times |
+| Security checks | 9/9. The photorealistic-image check never ended because the agent keeps looping on `diagram.generation.create` and the stream's heartbeats defeat its per-read timeout; it now has a 150 s overall deadline (no `image.generation.create` call and no PNG in that time) |
+| Group-bound team | consultant-01/-02 (members through the group) see the workspace, sale-01 does not |
+
+### Browser check (Playwright, consultant-01)
+
+![The four tekos workflows in the tekos-pilot team workspace](wp-154-tekos-workflows.png)
+
+![The tekos chat opened from the Collaboration Hub, team tekos-pilot](wp-154-tekos-chat.png)
+
+A real Keycloak login as consultant-01 (member of the team through the group
+`agent_tekos`) lists the four workflows the bundle emitted, with their
+classification (C1/C2), and opens the tekos chat in the team workspace. The
+first capture showed "Validation Failed" on the workflow: the UI's MCP-provider
+validator did a real MCP handshake without the user's token, which an
+authenticating gateway refuses. Fixed in the fork (the validator now only checks
+reachability for `forward_user_token` providers, devel 86392d870); with that
+image the validation report has no error.
+
+### Other agents (WP-155 smoke test)
+
+advantage, comage, finage and naveo (graph shape `retrieve_reason_respond`) were
+signed with the throwaway key, published next to tekos in `okf-test-tekos` (one
+tag per bundle digest) and deployed, each in its own group-bound team
+(`agent_<name>`). For each, a member persona sees the workflow and gets a
+streamed answer (HTTP 200), and a persona outside the group does not see the
+workflow. They run on the shared `knowledge-<agent>` retrievers; no new RAG
+source exists for their sourceless domains. arkos (`plan_draft_write`, no
+blueprint template in the operator), cognos and soursage (no `graph_shape`)
+were signed and published but not deployed.
+
+## Released bundles, keyless (2026-10-23, WP-162)
+
+With unifai-operator 0.1.25 on `stable` in demo333, the throwaway-key pilot was
+removed (bundles, retrievers and the hand-made teams) and the stack was
+redeployed from the zuno-demo-agents release v0.1.1 pinned in
+`platform/okf/agents.lock`: `spec.verify.keyless` with the release workflow
+identity and `platform/okf/sigstore/trusted_root.json`, one bundle-owned team
+per agent (`groupTeam`) and one retriever per agent in that team (`teamRef`).
+
+| Check | Result |
+|---|---|
+| Verification | the five deployed bundles (advantage, comage, finage, naveo, tekos) are `verified: true` with `status.signer` = `https://github.com/startxfr/zuno-demo-agents/.github/workflows/publish.yml@refs/tags/v0.1.1`, offline, no key material in the cluster |
+| Teams | `agent-<name>` UnifaiTeams are Ready, created and owned by the bundles, members = `zuno.access.groups` |
+| Objects | all workflows, agents, LLMs, providers and retrievers Ready |
+| tekos scenarios | 16/17; scenario 8 (first token) took 124 s, the first run after the redeploy on cold models |
+| tekos security checks | 12/12 |
+| comage scenarios | 17/19 (3 skipped); scenario 11 still fails: the model calls `salesforce.opportunity.read` and never the retriever, with or without a retrieve-first sentence in the prompt, so the retriever step is made a node option (`retrieve_first`, WP-155) |
+
+arkos, cognos and soursage are excluded from the deployed list
+(`zuno_unifai_released_bundles_exclude`): the operator has no blueprint template
+for `plan_draft_write` and the other two declare no graph shape.
+
+## Operator 0.1.26 on demo333 (2026-10-23)
+
+unifai-operator 0.1.26 is on `stable` (stacks Ready, NetworkIsolated). zuno-unifai
+now serves only the active agents: advantage, finage and naveo are `placeholder`
+in their OKF, so their bundles stay Pending ("placeholder agent: not served"),
+emit nothing, and their teams were released once their retrievers left the
+GitOps values (an owned team stays Deleting while an object still references it).
+comage and tekos have `retrieveFirst: true`, on multiagent `devel-472339706`.
+
+| Check | Result |
+|---|---|
+| comage scenarios | 18/19 (95 %), best run so far; scenario 11 can only show that a reply came back: there is no sales knowledge source in UnifAI (the RAG sources are tekos Confluence trees), so it cannot be proven for comage |
+| tekos scenarios | 15/17: scenario 8 (first token 14 s on the shared 9B model) and scenario 11, which was a false failure (the answer names page S0R42, but retrieval now happens inside the node and emits no tool event); the scenario now takes the expected page as the proof |
+| Empty final answers | `Reasoning too short`: 0 occurrences over 40-60 min (59); the gateway recovered 7 empty model answers with its reasoning fallback |
+
 ## Not yet covered
 
-Scenario 8 on warm local models, the
-quota 429 and the routing badge in the UI
-(WP-148), the guardrails counter (WP-153, hook still disabled in the chart), the
-Playwright screenshot of the tekos chat, and the real-key bundle publication
-(waiting for the zuno-demo-agents repository, WP-158).
+The quota 429 and the routing badge in the UI (WP-148), the guardrails counter
+(WP-153, hook still disabled in the chart), and the agents without a blueprint
+template (arkos) or graph shape (cognos, soursage).

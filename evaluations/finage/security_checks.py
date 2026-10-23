@@ -37,6 +37,7 @@ import yaml
 # happens to set this first via its own os.environ.setdefault(). Same fix
 # every prior slice's own security_checks.py needed.
 os.environ.setdefault("AGENT", "finage")
+os.environ.setdefault("TASK_NAME", "answer-finance-question")
 
 # run_scenarios.py is the canonical, AGENT-parameterized shared
 # implementation physically checked in under evaluations/tekos/ (see that
@@ -45,7 +46,9 @@ os.environ.setdefault("AGENT", "finage")
 # directory, not only when run_acceptance_gate.py's dynamic loader has
 # already put evaluations/tekos/ on sys.path for us.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers, is_placeholder_agent_404  # noqa: E402
+from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers, is_placeholder_agent_404, MCP_GATEWAY_URL, TARGET, TASK_NAME, _unifai  # noqa: E402
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
+import unifai_checks  # noqa: E402
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -76,6 +79,7 @@ class CheckResult:
     name: str
     passed: bool
     detail: str = ""
+    skipped: bool = False
 
 
 def bff_forwards_identity_to_runtime() -> CheckResult:
@@ -143,6 +147,9 @@ def runtime_ignores_mismatched_user_sub() -> CheckResult:
     )
 
 
+PROJECT_BINDING_CAPABILITY = "salesforce.opportunity.read"
+
+
 def finage_never_declares_sales_or_adv_knowledge_domains() -> CheckResult:
     """ADR-0326 config-consistency check (no live cluster needed, same
     style as run_scenarios.py's model_router_fails_closed) - the
@@ -151,7 +158,9 @@ def finage_never_declares_sales_or_adv_knowledge_domains() -> CheckResult:
     allowed_tools declaration (the YAML frontmatter - never the Markdown
     body, which is free-form prose and may legitimately reference other
     agents' capabilities by name) may declare the sales or ADV knowledge
-    domains, or any salesforce.*/aramis.* capability. The runtime half (a
+    domains, or any salesforce.*/aramis.* capability - except
+    salesforce.opportunity.read on a project_required task (ADR-0512's
+    project-binding check, see below). The runtime half (a
     live attempt denied by the MCP Gateway) is scenarios 12/13/18 in
     scenarios.yaml, not repeated here.
     """
@@ -172,6 +181,14 @@ def finage_never_declares_sales_or_adv_knowledge_domains() -> CheckResult:
         if "knowledge.adv" in allowed_knowledge:
             offending.append(f"{task_path.name}: allowed_knowledge includes knowledge.adv")
         for tool in allowed_tools:
+            # ADR-0512 (WP-55), kept by ADR-0528: a project_required task
+            # declares salesforce.opportunity.read for the project-binding
+            # check only - a pre-graph call under the caller's identity
+            # whose record never reaches the model. That one capability, on
+            # those tasks only, is the documented exception; this check
+            # predates it (2026-08-15 vs 2026-08-21).
+            if tool == PROJECT_BINDING_CAPABILITY and zuno.get("project_required") is True:
+                continue
             if tool.startswith("salesforce.") or tool.startswith("aramis."):
                 offending.append(f"{task_path.name}: allowed_tools includes {tool}")
     ok = not offending
@@ -326,6 +343,23 @@ def direct_call_to_confluence_mcp_denied_without_gateway_token() -> CheckResult:
     )
 
 
+# --target unifai (WP-155 wave 0): the checks tied to the BFF/agent-runtime are replaced by their
+# UnifAI equivalents (shared factories in evaluations/common/unifai_checks.py); the others reach
+# shared services (MCP gateway, ai-gateway, MCP servers) and run unchanged.
+_UNIFAI_REPLACEMENTS = {
+    bff_forwards_identity_to_runtime: unifai_checks.skip(
+        CheckResult,
+        "unifai_forwards_identity_to_the_gateways",
+        "finage is a placeholder agent (ADR-0007): it has no UnifAI workflow to chat with",
+    ),
+    runtime_ignores_mismatched_user_sub: unifai_checks.client_identity_header_refused(CheckResult, _unifai),
+    business_role_without_entitlement_denied_by_bff: unifai_checks.entitlement_denied(
+        CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="finance-role-only-user-01",
+        mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
+    ),
+}
+
+
 CHECKS = [
     bff_forwards_identity_to_runtime,
     runtime_ignores_mismatched_user_sub,
@@ -339,7 +373,7 @@ CHECKS = [
 
 def run() -> list:
     results = []
-    for check in CHECKS:
+    for check in unifai_checks.select(CHECKS, _UNIFAI_REPLACEMENTS, TARGET):
         try:
             result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
@@ -352,13 +386,16 @@ def run() -> list:
 def main() -> int:
     results = run()
 
+    print(f"target: {TARGET}")
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
-        print(f"{'✓' if r.passed else '✗':<6}{r.name}")
-        if not r.passed and r.detail:
+        print(f"{'-' if r.skipped else '✓' if r.passed else '✗':<6}{r.name}")
+        if (not r.passed or r.skipped) and r.detail:
             print(f"      -> {r.detail}")
 
-    if all(r.passed for r in results):
+    if TARGET == "unifai":
+        _unifai().cleanup()
+    if all(r.passed for r in results if not r.skipped):
         print("\nRESULT: PASS")
         return 0
     print("\nRESULT: FAIL")

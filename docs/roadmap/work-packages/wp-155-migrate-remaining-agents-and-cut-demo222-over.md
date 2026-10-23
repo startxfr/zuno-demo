@@ -34,8 +34,10 @@ point a demo333 command at demo222 or the reverse. demo333 also runs
    - sign and publish the bundle (`make d3 sign agents`, OCI push);
    - enable its `UnifaiAgentBundle`, RAG sources and providers in
      `gitops/charts/unifai/values.yaml`;
-   - run `evaluations/<agent>/` with `--target unifai` (add the mode as in
-     WP-154). `cognos` and `soursage` have no `evaluations/` directory
+   - run `evaluations/<agent>/` with `--target unifai` (the mode exists for every
+     agent that has evaluations since wave 0: `run_scenarios.py`,
+     `security_checks.py` and `run_acceptance_gate.py`, see
+     `evaluations/README.md`). `cognos` and `soursage` have no `evaluations/` directory
      today: write a minimal scenario file for each before migrating them,
      and say so in the evidence.
 
@@ -67,6 +69,43 @@ point a demo333 command at demo222 or the reverse. demo333 also runs
    URLs) to the UnifAI UI. Keep the zuno agent stack running, unused, as
    the rollback path until WP-156.
 
+## Preparation (2026-10-23, read-only inventory)
+
+State: tekos is proven on UnifAI (94 % against 94 % for agent-runtime's baseline
+on the same pilot; evidence file of WP-154). A smoke test already deployed
+advantage, comage, finage and naveo with a group-bound team each: a member sees
+the workflow and gets a streamed answer, a non-member sees nothing. That does
+not prove parity: no evaluation was run on them. arkos, cognos and soursage are
+signed and published but not deployed.
+
+| Agent | Status | Tasks | Tools and knowledge | Ceiling | Needs UnifAI work |
+|---|---|---|---|---|---|
+| naveo | placeholder | 1 | Confluence search, web search, Drive; tech and project | C1 | none, simplest |
+| advantage | placeholder | 4 | web search, image generation, Drive, Gmail; `adv` has no source | C2 | no corpus: weak parity point |
+| finage | placeholder | 4 | web search, Salesforce read, Drive, Gmail | C2, `local_only` | `local_only` has no known equivalent in the chart |
+| comage | active | 4 | Salesforce read and update, web search, images, diagrams, Drive, Gmail | C2 | Salesforce MCP deferred, `comage-lora` routing |
+| arkos | active | 4 | Confluence, git including writes, diagrams, AAP audit | C3, project-derived (WP-137) | `plan_draft_write` shape has no blueprint template; project memory |
+| cognos, soursage | placeholder | 2, 1 | none | C3, C2 | no `graph_shape`: cannot be instantiated |
+
+Waves: 0 prerequisites (real signing key through WP-158 to WP-162, the
+evaluations' `--target unifai` extended to every agent, same-day agent-runtime
+baseline); 1 naveo, advantage, finage; 2 comage; 3 arkos last; 4 cognos and
+soursage.
+
+Cutover to demo222 (needs the user, a window outside any demo freeze, parallel
+sessions frozen first): same chart and role as demo333 next to the old stack,
+corpus ingested, execution chain proven (scenarios plus a browser login, never
+only custom resources), agents switched one at a time with tekos first, demo
+entry points redirected (`ansible/playbooks/demo_step_1..5.yml` open
+`https://<agent>.<domain>`). Rollback: the old stack stays deployed and unused
+until WP-156, so rollback re-enables its routes and applications.
+
+Gaps found: `min_reasoning_length` not exposed through `agentConfig`;
+scenarios 10 and 17; the parity-table rows still marked unverified
+(cross-user resume, citations, team rights); agent tiles and cross navigation
+(ADR-0515) have no UnifAI equivalent; images are held in demo333's internal
+registry, a reproducible path is needed for demo222.
+
 ## Acceptance
 
 Every agent's evaluations on demo333 pass at a rate not lower than its
@@ -74,9 +113,38 @@ agent-runtime baseline; on demo222 the step-6 runs pass and the demo
 playbooks open UnifAI; parallel sessions confirmed the window; no demo
 freeze was broken.
 
+## Decisions taken (2026-10-23)
+
+- **Placeholders (ADR-0007):** the operator skips a bundle whose OKF is
+  `zuno.status: placeholder` (phase `Pending`, "placeholder agent: not served")
+  and prunes what it emitted, unless `spec.servePlaceholder: true`. No placeholder
+  is served on demo333 for now. Implemented by the session owning the operator and
+  the unifai chart, shipped with operator 0.1.26. After it, advantage, finage and
+  naveo have no workflow, so the harness' placeholder logic (chat skipped, blocked
+  scenarios expected) becomes correct as it stands.
+- **Evaluation token budget:** budgets are per user (`sub`) and per day in
+  `policies/quotas/quota-policy.yaml` (`standard`: 3 000 000 tokens, 24 h).
+  A campaign that repeats the same persona exhausts it (consultant-01 did on
+  2026-10-23). No policy change: spread a campaign over personas holding the same
+  group (for tekos consultant-01 and consultant-02 both carry `agent_tekos`), or
+  run after the window resets. The evaluation scripts report `quota_exceeded` as
+  an environment failure, never as a pass.
+- **finage and Salesforce:** the check accepts `salesforce.opportunity.read` on
+  `project_required` tasks only (ADR-0512 exception); no bundle change.
+- **comage scenario 11:** the retriever is attached; the model chooses
+  Salesforce first. The lever is `retrieve_first` (operator 0.1.26,
+  `spec.retrieveFirst`, opt-in).
+
 ## Open questions
 
-- Rollback criterion on demo222: how long does the zuno agent stack stay
-  deployed after cutover before WP-156 may start? Ask the user.
-- Which demo scripts hard-code agent-frontend URLs? Grep
-  `ansible/playbooks/demo_*.yml` and `docs/` during step 7.
+- Salesforce: repair the Vault secret `salesforce/technical` (missing `url`)
+  so comage and finage are really testable, or accept those tasks out of
+  parity at cutover?
+- cognos and soursage: write minimal scenarios as this WP says, or accept
+  `Valid=False` as ADR-0573 does? Which agents must appear on demo222?
+- Cut over before or after WP-161, WP-163 and WP-165 (OKF delivery chain)?
+  Before means `okf.bundles[]` is filled by hand once more.
+- Window and soak: which date outside any freeze, and how long the old stack
+  stays before WP-156.
+- Accepted losses to confirm: classification per session instead of per turn,
+  no stars or hard delete, one UI instead of one Route per agent.

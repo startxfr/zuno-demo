@@ -61,6 +61,39 @@
              and (zuno_postgresql_backup_s3_region | default('xxxxxx')) != 'xxxxxx')
          else {} }}
 
+# ADR-0578/ADR-0581: once platform/okf/agents.lock pins a zuno-demo-agents
+# release, the bundles to deploy come from the file generated from it
+# (platform/okf/stack-config.generated.yaml), verified keyless against the
+# committed Sigstore trusted root. The platform-owned settings of each agent
+# (teamId/groupTeam, entitlement, classificationOverrides, retriever) stay in the
+# deployment: zuno_unifai_bundle_settings.<agent>. While the generated list is
+# empty nothing is added and zuno_unifai_values.okf stays the only source;
+# the two lists are never merged. The switch is explicit
+# (zuno_unifai_released_bundles, default false): released artifacts are v2 and
+# keyless, which unifai-operator reads from 0.1.25 on; an older operator leaves
+# every bundle Pending. Set it to true once the operator in the cluster is
+# >= 0.1.25. zuno_unifai_released_bundles_exclude lists agents to leave out
+# (graph shapes the operator has no template for yet: arkos, cognos, soursage).
+- name: "unifai | read the bundles of the pinned agents release"
+  ansible.builtin.set_fact:
+    _unifai_stack_config: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/stack-config.generated.yaml') | from_yaml }}"
+
+- name: "unifai | derive the okf values from the generated stack config"
+  ansible.builtin.set_fact:
+    _unifai_okf_values: >-
+      {%- set released = (_unifai_stack_config.unifai | default({})).bundles | default([]) -%}
+      {%- if (zuno_unifai_released_bundles | default(false) | bool) and released | length > 0 -%}
+      {%- set merged = [] -%}
+      {%- for b in released if b.name not in (zuno_unifai_released_bundles_exclude | default([])) -%}
+      {%- set _ = merged.append(b | combine((zuno_unifai_bundle_settings | default({}))[b.name] | default({}))) -%}
+      {%- endfor -%}
+      {{ {'okf': {'verify': _unifai_stack_config.unifai.verify,
+                  'trustedRoot': lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/sigstore/trusted_root.json'),
+                  'bundles': merged}} }}
+      {%- else -%}
+      {{ {} }}
+      {%- endif -%}
+
 - name: "unifai | apply the stack Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -72,7 +105,8 @@
           'stack': {'enabled': true},
           'okf': {'publicKey': lookup('ansible.builtin.file', zuno_repo_root + '/agents/zuno-platform-signer.pub')}}
          | combine(_unifai_backup_values, recursive=True)
-         | combine(zuno_unifai_values | default({}), recursive=True) }}
+         | combine(zuno_unifai_values | default({}), recursive=True)
+         | combine(_unifai_okf_values, recursive=True) }}
 
 # ArgoCD has no health check for UnifaiStack: zuno-unifai-d1 reports Healthy
 # while the stack is in Error (demo333, WP-151). Wait on the operator's phase.

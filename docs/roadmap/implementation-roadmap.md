@@ -34,7 +34,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.9 | 9 | 6 | 8 | WP-145 |
 | v0.10 | 5 | 1 | 6 | WP-51 |
 | v0.11 | 16 | 11 | 12 | WP-146, WP-147, WP-149, WP-150, WP-153, WP-154, WP-155, WP-156, WP-157 |
-| v0.12 | 9 | 9 | 8 | WP-158, WP-159, WP-160, WP-161, WP-162, WP-163, WP-164, WP-165 |
+| v0.12 | 9 | 9 | 8 | WP-158, WP-159, WP-160, WP-161, WP-163, WP-164, WP-165 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -943,11 +943,11 @@ frozen mirror.
 |---|---|---|---|---|---|
 | WP-158 | [wp-158](work-packages/wp-158-bootstrap-the-zuno-demo-agents-repository.md) | 0576 | none | Repo work in review | local repository ready, not pushed; user creates the GitHub App, rulesets, quay.io repositories and robot |
 | WP-159 | [wp-159](work-packages/wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md) | 0577, 0578 | WP-158 | Repo work in review | workflows built and simulated locally; user sets the secrets and variables, then a first release |
-| WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Not started | none until a live check |
-| WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Not started | demo333 must be powered on for the live steps |
-| WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Not started | operator release; demo333 live check |
-| WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Not started | none until a live check |
-| WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Not started | demo333 live promotion |
+| WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Repo work in review | tooling built and proven on devel artifacts; first promotion waits for v0.1.1; allow Actions to create PRs on zuno-demo |
+| WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Operator pending | live and durable on demo333 (cluster vars); left: main must carry the WP-161 Dockerfile, then back to the latest tag and delete the okf-fetch-wp161 BuildConfig |
+| WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Done | operator 0.1.25 on stable; five agents of release v0.1.1 verified keyless on demo333 |
+| WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Repo work in review | schemas, corp ceilings and the narrowing rule built (agents repo + admission); bundle migration waits for unifai-operator v0.3 and WP-156 |
+| WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator built (part 1); unifai role wired (part 2); Keycloak job pending; quotas/MaaS wait for WP-157 |
 | WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Not started | parity proof on the running cluster, outside any demo freeze |
 
 ### OKF stream phases

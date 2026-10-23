@@ -1,6 +1,6 @@
 # WP-160: Admit the corp OKF release in zuno-demo
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md), [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md)
 - **Depends on:** [WP-159](wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md)
 - **Related:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md), [WP-161](wp-161-fetch-okf-content-at-pod-start.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)
@@ -18,11 +18,57 @@ also checks that every reachable model name of the release's model catalog
 is bound in `provider-routing.yaml`. Step 1 drops `identity.yaml`'s
 dependency on a dispatch; the rest stands.
 
+## Progress (2026-10-23)
+
+Built, not yet run against a release (none is published: the first,
+v0.1.1, waits for its merge in zuno-demo-agents):
+
+- `platform/okf/sigstore/trusted_root.json` (the public Sigstore root, from
+  TUF) and `identity.yaml` (issuer, release and dev subjects, attestation
+  type, corp repository, Rekor and CT log).
+- `platform/supply-chain/admit_okf_bundle.py`: `verify`, `extract`,
+  `validate`, `diff`, `latest`, `admit`, with 14 unit tests. Verification is
+  offline: cosign 2.4 has no `--trusted-root`, so the script derives the
+  Fulcio chain, Rekor key and CT key from `trusted_root.json` and runs
+  `cosign verify --offline` with an empty HOME (no TUF cache). Proven on the
+  published devel artifacts: accepted with the dev identity, refused with
+  the release one; extract + validate pass; a ghost model and an unbound
+  tool are refused.
+- `platform/okf/agents.lock` (empty until the first admission),
+  `make d3 admit agents [RELEASE=vX.Y.Z UPDATE_LOCK=1]`.
+- `.github/workflows/okf-promote.yml` (schedule + manual) and the
+  `okf-release` job of `lint.yml`.
+
+Open: the user allows GitHub Actions to create pull requests on
+zuno-demo; the scheduled run only fires from the default branch (`main`);
+first promotion once v0.1.1 is published.
+
+
 ## Goal
 
 `zuno-demo` pins one corp digest, verifies it offline by identity, validates
 it against its own contract, and receives every new release as a reviewed
 pull request it opened itself.
+
+## Admissions and promotions (2026-10-23)
+
+- **v0.1.1, first admission.** zuno-demo-agents v0.1.0 was tagged but
+  never published (nine tags in one push create no push event). `make d3
+  admit agents RELEASE=v0.1.1 UPDATE_LOCK=1` verified offline the corp
+  artifact and its eight agents against the release identity (publish.yml
+  on refs/tags/v0.1.1) and the contract-tests attestations, validated them
+  servable and pinned them (925f271b).
+- **v0.2.0, first end-to-end promotion.** `okf-promote.yml`, run by hand on
+  demo222, verified the release, opened PR #2 (`okf-promote/v0.2.0`) moving
+  `agents.lock` and regenerating `stack-config.generated.yaml`, with a
+  summary listing the two corp policies v0.2.0 adds; merged. The eight agent
+  digests are identical across v0.1.1 and v0.2.0 (reproducible builds).
+- **Default branch.** GitHub lists only workflows present on the default
+  branch, so a copy of `okf-promote.yml` without `schedule` was merged into
+  main (PR #1). The schedule is back once demo222 reaches main: the
+  workflow now checks out and promotes a deployment branch (the `base`
+  input, else the `OKF_PROMOTE_BASE` variable, else demo222), never main,
+  which no cluster tracks.
 
 ## Steps
 
