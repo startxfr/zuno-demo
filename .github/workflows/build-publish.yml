@@ -172,6 +172,20 @@ jobs:
             context: .
             build_args: |
               BASE_IMAGE=docker.io/library/python:3.11-slim
+          # ADR-0324 inventory: both are built in-cluster by their own roles
+          # (ansible/roles/trustyai_eval_build, aap_execution_environment_build)
+          # from the repository root; listed here so the inventory is whole.
+          - name: trustyai-eval
+            dockerfile: components/trustyai-eval/Dockerfile
+            context: .
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.11-slim
+          # Its base is registry.redhat.io's supported EE: a CI build needs a
+          # Red Hat registry login, which this workflow (workflow_dispatch
+          # only, ADR-0115) does not hold today.
+          - name: aap-execution-environment
+            dockerfile: components/aap-execution-environment/Dockerfile
+            context: .
     steps:
       - uses: actions/checkout@v4
 

@@ -63,3 +63,5 @@ spec:
     - git.file.write
     - git.repository.private.read
     - git.repository.private.list
+    # WP-074/ADR-0355: AAP audit tools, declared by this agent's tasks since 2026-08-27.
+    - aap.platform.audit

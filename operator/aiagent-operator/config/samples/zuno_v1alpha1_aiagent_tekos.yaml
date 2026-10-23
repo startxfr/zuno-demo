@@ -58,3 +58,6 @@ spec:
     - diagram.generation.create
     - git.repository.read
     - git.repository.list
+    # WP-074/ADR-0355: AAP audit tools, declared by this agent's tasks since 2026-08-27.
+    - aap.cluster.audit
+    - aap.platform.audit
