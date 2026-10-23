@@ -9,16 +9,21 @@
 # approve pull requests" on this repository.
 name: Promote agents release
 
-# Run it from the Actions tab with "Use workflow from: demo222" (the branch
-# that carries platform/supply-chain/admit_okf_bundle.py). This copy on the
-# default branch exists so GitHub lists the workflow; it has no schedule,
-# because a scheduled run uses the default branch, which does not carry the
-# admission tooling yet. Add `schedule` back once it does.
+# The promotion targets a deployment branch, not the branch the workflow
+# runs from: a scheduled run always starts on the default branch, which no
+# cluster tracks. Target = the `base` input, else the OKF_PROMOTE_BASE
+# repository variable, else demo222. The lock, the tooling and the pull
+# request are all on that branch.
 on:
+  schedule:
+    - cron: "17 6 * * *"
   workflow_dispatch:
     inputs:
       release:
         description: "Release tag to promote (vX.Y.Z); empty = the newest"
+        required: false
+      base:
+        description: "Deployment branch whose platform/okf/agents.lock moves (default demo222)"
         required: false
 
 permissions:
@@ -32,8 +37,12 @@ concurrency:
 jobs:
   promote:
     runs-on: ubuntu-latest
+    env:
+      BASE: ${{ inputs.base || vars.OKF_PROMOTE_BASE || 'demo222' }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.BASE }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -106,3 +115,4 @@ jobs:
           title: "okf: promote zuno-demo-agents ${{ steps.candidate.outputs.tag }}"
           body-path: ${{ runner.temp }}/body.md
           labels: okf-promotion
+          base: ${{ env.BASE }}

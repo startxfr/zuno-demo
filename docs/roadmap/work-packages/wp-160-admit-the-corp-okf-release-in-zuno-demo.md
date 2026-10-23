@@ -65,8 +65,10 @@ pull request it opened itself.
   digests are identical across v0.1.1 and v0.2.0 (reproducible builds).
 - **Default branch.** GitHub lists only workflows present on the default
   branch, so a copy of `okf-promote.yml` without `schedule` was merged into
-  main (PR #1); the daily schedule comes back once main carries the
-  admission tooling.
+  main (PR #1). The schedule is back once demo222 reaches main: the
+  workflow now checks out and promotes a deployment branch (the `base`
+  input, else the `OKF_PROMOTE_BASE` variable, else demo222), never main,
+  which no cluster tracks.
 
 ## Steps
 
