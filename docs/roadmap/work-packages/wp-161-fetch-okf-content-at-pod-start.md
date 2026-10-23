@@ -1,6 +1,6 @@
 # WP-161: Fetch OKF content at pod start instead of baking it
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)
 - **Depends on:** [WP-160](wp-160-admit-the-corp-okf-release-in-zuno-demo.md)
 - **Related:** [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [WP-165](wp-165-cut-over-and-remove-agents-from-zuno-demo.md)
@@ -9,7 +9,47 @@
 
 > Fail-closed: a pod that cannot verify its agents does not start.
 
-## Goal
+## Progress (2026-10-23)
+
+Repo work for mcp-gateway is done and proven locally; nothing is deployed.
+
+- `components/supply-chain-signer` doubles as the `okf-fetch` image: oras
+  1.2.2, pyyaml, `admit_okf_bundle.py` and the Sigstore trust material laid
+  out as in the repository, made world-readable (an arbitrary OpenShift UID
+  could not read 0600 files: caught by the local test, it would have kept
+  every pod in Init).
+- `gitops/charts/mcp-gateway`: `okf.fetch.{enabled,corpReference,image}`.
+  Enabled, an init container verifies offline and extracts the release into
+  an emptyDir; `AGENTS_DIR` and `TOOL_POLICY_PATH` point there, the
+  data-classification policy and the tool bindings stay the platform's;
+  the reference is a pod-template annotation, so a promotion rolls the
+  pods; a non-digest reference fails the render. Disabled (the default),
+  the render is byte-identical to before.
+- `ansible/roles/mcp`: with `zuno_okf_fetch_enabled`, reads the reference
+  from `stack-config.generated.yaml` and merges it into the Application's
+  inline values (two exclusive tasks, not an `omit`, which
+  `apply_gitops_app.yml`'s `is defined` would accept).
+- Proven locally with podman (non-root, read-only root filesystem): v0.2.0
+  verified and extracted; a dev-signed corp artifact refused with exit 1;
+  mcp-gateway's `AgentDeclarationStore` loads the 8 agents from the
+  extracted release with declarations identical to the baked copy.
+- The baked `COPY agents` stays as the fallback until WP-165.
+
+Not done, on purpose:
+
+- **mlops** stays baked. It has no Deployment (KFP pipeline components and a
+  TrainingRuntime use the image), and its evaluation gates read platform
+  files (`platform/ai-gateway/provider-routing.yaml`, the data
+  classification) and other agents' bundles from the repository layout.
+  Fetching at start would mean an init step in every pipeline component;
+  the image is rebuilt per training run anyway. Revisit at WP-165.
+- **Live**: build the signer image in-cluster, set `zuno_okf_fetch_enabled`,
+  run `make d1 install mcp` on demo333 and watch the Init container and the
+  entitlement answers. Needs the user's go.
+- `platform/security/check_workload_hardening.py` passes for mcp-gateway;
+  its one failure (211/212) is ai-gateway's `MAAS_SA_TOKEN_PATH`, unrelated
+  to this work.
+
 
 mcp-gateway and mlops read agents and corp policies from an `emptyDir`
 filled and verified by an `okf-fetch` init container at the digest in their

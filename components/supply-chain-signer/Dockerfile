@@ -28,6 +28,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
     && chmod +x /usr/local/bin/cosign \
     && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
 
+# ADR-0580/WP-161: the same image is the `okf-fetch` init container of the
+# components that read agent definitions at start (mcp-gateway): it pulls the
+# zuno-demo-agents release pinned in platform/okf/agents.lock, verifies it
+# OFFLINE (keyless signatures of the release workflow, against the committed
+# Sigstore trust root) and extracts it into an emptyDir. It needs oras, the
+# admission script and its trust material, laid out as in the repository so
+# the script finds platform/okf/sigstore/ from its own location.
+ARG ORAS_VERSION=1.2.2
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && curl -sSL "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_amd64.tar.gz" \
+       | tar -xz -C /usr/local/bin oras \
+    && apt-get purge -y curl && apt-get autoremove -y && rm -rf /var/lib/apt/lists/* \
+    && pip install --no-cache-dir pyyaml==6.0.2
+COPY platform/supply-chain/admit_okf_bundle.py platform/supply-chain/okf_narrowing.py ./platform/supply-chain/
+COPY platform/okf/sigstore ./platform/okf/sigstore
+# OpenShift runs the container as an arbitrary non-root UID: the copied
+# files must be world-readable whatever their mode in the checkout.
+RUN chmod -R a+rX /app/platform
+
 COPY platform/supply-chain/sign_in_cluster.py ./sign_in_cluster.py
 COPY platform/supply-chain/sign_okf_bundle.py ./sign_okf_bundle.py
 COPY agents/zuno-platform-signer.pub ./zuno-platform-signer.pub
