@@ -58,10 +58,12 @@ AGENT = os.getenv("AGENT", "tekos")
 # Tekos's real task name keeps the unparameterized case unchanged.
 TASK_NAME = os.getenv("TASK_NAME", "answer-technical-question")
 
-# WP-154 (ADR-0573): "agent-runtime" (default, unchanged) or "unifai". Selected
-# by `--target unifai` on the command line or EVAL_TARGET in the environment;
-# the scenarios file is the same, only the transport of some handlers changes.
-TARGET = os.getenv("EVAL_TARGET", "agent-runtime")
+# WP-154 (ADR-0573): "unifai" or "agent-runtime". Selected by `--target` on the
+# command line or EVAL_TARGET in the environment; the scenarios file is the same,
+# only the transport of some handlers changes. WP-156: the default is unifai,
+# the platform that serves the agents; agent-runtime stays selectable until it
+# is retired, then this switch goes with it.
+TARGET = os.getenv("EVAL_TARGET", "unifai")
 if "--target" in sys.argv:
     _i = sys.argv.index("--target")
     if _i + 1 < len(sys.argv):
