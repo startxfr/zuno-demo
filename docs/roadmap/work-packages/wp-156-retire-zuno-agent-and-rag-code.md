@@ -56,7 +56,16 @@ redirected to UnifAI's RAG; the trustyai RAGAS job is redirected to UnifAI's
 retrieval; dashboards and SLO rules on BFF/RAG metrics are removed here and
 rebuilt in [WP-166](wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md);
 the Day 3 probes (demo personas, GPU failover drill, stresstest) are ported
-to UnifAI. Preparation runs on the branch `prep/wp156`, merged into devel
+to UnifAI. Redirecting to UnifAI's RAG needs a path UnifAI lacks today: its RAG
+server accepts a browser session cookie or an internal secret that can act
+as any user, and its NetworkPolicy admits nothing from zuno-ai-run. Agreed
+design (2026-10-23, fork side owned by the UnifAI operator session): a
+read-only RAG search endpoint authenticated only by the user's JWT
+(signature, issuer, allow-listed audiences, expiry; same group ACL), a
+stack NetworkPolicy option admitting named external clients to the RAG pod
+only, and a domain tag on the technical sources (`knowledge.tech`) so the
+mapping does not grow silently. The mcp-gateway handler and the RAGAS job
+wait for it. Preparation runs on the branch `prep/wp156`, merged into devel
 when WP-156 starts (devel deploys on demo333).
 
 **Retirement order, from the inventory** (each step leaves the tree
