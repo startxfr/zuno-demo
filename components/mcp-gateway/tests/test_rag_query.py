@@ -1,7 +1,6 @@
-"""WP-156: search_technical_docs answers a Keycloak JWT from UnifAI's bearer
-RAG endpoint (the caller's own token) and rag-service (the Red Hat product
-documentation, until WP-168), interleaved; any other token (OpenShift
-Lightspeed's) from rag-service alone."""
+"""WP-156: search_technical_docs answers from UnifAI's bearer RAG endpoint
+(with the caller's own token, Keycloak or OpenShift) and rag-service (the Red
+Hat product documentation, until WP-168), interleaved."""
 from __future__ import annotations
 
 import asyncio
@@ -101,17 +100,14 @@ def test_one_failed_source_leaves_the_other(monkeypatch):
     assert [r["id"] for r in result["results"]] == ["r1", "r2"]
 
 
-def test_an_openshift_token_stays_on_rag_service(monkeypatch):
-    def handler(request):
-        return httpx.Response(200, json={"results": [{"id": "r1"}]})
-
-    result, seen = _run(monkeypatch, OPENSHIFT_TOKEN, handler)
-
-    assert len(seen) == 1
-    assert seen[0].method == "POST"
-    assert seen[0].url.host == "rag-service.zuno-data.svc"
-    assert "authorization" not in seen[0].headers
-    assert result == {"results": [{"id": "r1"}]}
+def test_an_openshift_token_is_forwarded_to_unifai_too(monkeypatch):
+    result, seen = _run(monkeypatch, OPENSHIFT_TOKEN, _both(
+        httpx.Response(200, json={"matches": [UNIFAI_MATCH]}),
+        httpx.Response(200, json={"results": RAG_SERVICE_RESULTS[:1]}),
+    ))
+    unifai = [r for r in seen if r.url.host == "unifai-rag-server.zuno-unifai.svc"]
+    assert unifai[0].headers["authorization"] == f"Bearer {OPENSHIFT_TOKEN}"
+    assert [r["id"] for r in result["results"]] == ["c1", "r1"]
 
 
 def test_both_sources_failing_is_reported_not_raised(monkeypatch):
