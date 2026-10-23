@@ -20,6 +20,14 @@ reserved-structure shapes, ADR-0502) and a chart. Naveo is CR-managed
 but Stage-1 (no deployment/ directory) - deliberately skipped; its
 directory is born at promotion (PROMOTION.md step 4).
 
+WP-156: the per-agent charts this follows were retired with the agent
+frontends/BFF and aiagent-operator, so no agent has both a deployment/
+directory and a chart any more: regeneration and --check are vacuous (the
+committed snapshots under agents/ are the zuno-demo-agents mirror's, never
+rewritten here). Kept because the mirrored arkos contract test
+(agents/arkos/tests/contract/test_bundle_self_consistency.py) still runs
+`--check`; it leaves with agents/ in WP-165.
+
 Usage (from the repository root; needs `helm` on PATH):
 
     python3 platform/okf/generate_deployment_snapshot.py           # regenerate

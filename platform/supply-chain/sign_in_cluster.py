@@ -42,9 +42,8 @@ Operations:
     sign-okf-bundles - WP-069: sign every agents/<agent>/ bundle found under
                   --agents-root with sign_okf_bundle.py, then write every
                   {agent}.sig plus the shared public key into Vault KV
-                  (--kv-mount/--kv-path), where
-                  gitops/charts/agent-runtime/templates/
-                  externalsecret-okf-signatures.yaml picks them up.
+                  (--kv-mount/--kv-path), which agent-runtime read until
+                  WP-156 retired it (WP-165 removes this path).
     sign-image  - WP-111/ADR-0535: signs an OCI image by digest keyless via
                   RHTAS - exchanges the `zuno-signer` Keycloak
                   client-credentials token for a short-lived Fulcio

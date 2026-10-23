@@ -6,8 +6,8 @@
 #   2. one ExternalSecret per external provider, resolving
 #      zuno/providers/<name> from the vault-backend
 #      ClusterSecretStore (ADR-0024) into a same-named Kubernetes Secret
-#      consumed by components/agent-runtime's Deployment env (see
-#      gitops/charts/agent-runtime).
+#      consumed by components/ai-gateway's Deployment env (see
+#      gitops/charts/ai-gateway, providerSecrets).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 

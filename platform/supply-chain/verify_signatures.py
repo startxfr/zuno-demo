@@ -88,15 +88,10 @@ class Finding:
 
 
 def _walk(node: Any, path: str, refs: List[ImageRef], file_label: str) -> None:
-    """Same shape-agnostic walk as check_no_latest_tags.py, extended for a
-    second shape this repo actually uses: every per-agent chart (tekos,
-    comage, advantage, finage, arkos, naveo) shares one agent-bff/
-    agent-frontend build under `image: {registry, frontendRepository,
-    bffRepository, tag}` - separate `registry`/`*Repository` fields, not
-    one `repository` field - which the original `repository`/`tag`-only
-    match silently never saw at all (confirmed live: without this, the
-    scan finds 11 first-party images, not 13 - agent-bff/agent-frontend
-    invisible to every chart that deploys them)."""
+    """Same shape-agnostic walk as check_no_latest_tags.py: every
+    `{repository, tag}` pair under a first-party registry. (The second,
+    `{registry, frontendRepository, bffRepository, tag}` shape of the
+    per-agent charts left with them in WP-156.)"""
     if isinstance(node, dict):
         repository = node.get("repository")
         tag = node.get("tag")
@@ -104,14 +99,6 @@ def _walk(node: Any, path: str, refs: List[ImageRef], file_label: str) -> None:
             if repository.startswith(FIRST_PARTY_REGISTRY_PREFIX) and tag not in IGNORED_TAG_VALUES:
                 refs.append(ImageRef(file_label, path, f"{repository}:{tag}"))
 
-        registry = node.get("registry")
-        if isinstance(registry, str) and isinstance(tag, str) and tag not in IGNORED_TAG_VALUES:
-            for repo_key in ("frontendRepository", "bffRepository"):
-                repo_suffix = node.get(repo_key)
-                if isinstance(repo_suffix, str):
-                    full_repository = f"{registry}/{repo_suffix}"
-                    if full_repository.startswith(FIRST_PARTY_REGISTRY_PREFIX):
-                        refs.append(ImageRef(file_label, f"{path}.{repo_key}", f"{full_repository}:{tag}"))
 
         for key, value in node.items():
             _walk(value, f"{path}.{key}" if path else str(key), refs, file_label)
@@ -143,11 +130,10 @@ def _has_build_config(name: str) -> bool:
 
 
 def _collect_first_party_refs() -> List[ImageRef]:
-    """Deduplicates by `.image` (repository:tag) - agent-bff/agent-frontend
-    are each declared identically in every per-agent chart (tekos, comage,
-    advantage, finage, arkos, naveo all share the one build), so a naive
-    walk would report - and re-verify - the same underlying image once per
-    chart. The first chart alphabetically wins the `file`/`path` label."""
+    """Deduplicates by `.image` (repository:tag) - an image declared
+    identically in several charts would otherwise be reported - and
+    re-verified - once per chart. The first chart alphabetically wins the
+    `file`/`path` label."""
     refs: List[ImageRef] = []
     for values_path in sorted((REPO_ROOT / "gitops" / "charts").glob("*/values.yaml")):
         doc = yaml.safe_load(values_path.read_text()) or {}

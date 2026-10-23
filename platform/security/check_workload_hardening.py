@@ -32,8 +32,8 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 # Charts with a raw Deployment PodSpec this repo fully controls - every
 # container in every one of these must meet the full baseline.
 DEPLOYMENT_CHARTS = [
-    "tekos",
-    "agent-runtime",
+    # WP-156 retired the agent stack's charts that were listed here (tekos,
+    # agent-runtime, comage, advantage, finage, aiagent-operator).
     "ai-gateway",
     "mcp-gateway",
     # ADR-0117/WP-02 added this chart without updating this list - a real
@@ -42,31 +42,11 @@ DEPLOYMENT_CHARTS = [
     # list happened to be updated for at the time it was written.
     "mcp-confluence",
     "rag-service",
-    # ADR-0326/WP-33
-    "comage",
     "mcp-salesforce",
-    # ADR-0326/WP-35 - added proactively this time, learning from the gap
-    # above.
-    "advantage",
-    # ADR-0326/WP-36 - closes the four-agent generalization.
-    "finage",
-    # ADR-0327/ADR-0308 (WP-38): the operator's own manager Deployment -
-    # added proactively, same lesson as advantage/finage above.
-    "aiagent-operator",
-    # ADR-0120/WP-058 - added proactively, same lesson as advantage/finage.
+    # ADR-0120/WP-058 - added proactively, learning from the gap above.
     "mcp-git-forge",
     # ADR-0355/WP-074 - same.
     "mcp-aap",
-    # NOTE: "arkos" was here (WP-31/33) but was REMOVED at WP-38: Arkos's
-    # chart no longer renders a raw Deployment at all - it renders a
-    # single AIAgent CR (gitops/charts/arkos/templates/aiagent.yaml) that
-    # the aiagent-operator reconciles into the equivalent Deployment at
-    # runtime. That generated Deployment's hardening is proven by
-    # operator/aiagent-operator/internal/controller/resources_test.go's
-    # unit tests instead (e.g. TestDesiredFrontendDeployment_ImageAndEnv
-    # asserts ReadOnlyRootFilesystem/AllowPrivilegeEscalation), not by
-    # `helm template` here - there is no longer a rendered Deployment in
-    # this chart for this script to find.
 ]
 
 # Deployments where readOnlyRootFilesystem is not expected - none today;
@@ -79,11 +59,9 @@ READONLY_ROOTFS_EXEMPT_CONTAINERS: Dict[str, str] = {}
 # Deployments where automountServiceAccountToken: true is INTENTIONAL -
 # every workload above is a pure HTTP service with no Kubernetes API
 # calls of its own, so `false` is the correct baseline for all of them.
-# aiagent-operator (ADR-0327/ADR-0308) is the one deliberate exception in
-# this repo: reconciling AIAgent CRs into per-agent resources IS calling
-# the Kubernetes API, so its ServiceAccount token must be mounted - see
-# gitops/charts/aiagent-operator/templates/deployment.yaml's own comment.
-AUTOMOUNT_TOKEN_EXEMPT_DEPLOYMENTS = {"aiagent-operator/aiagent-operator"}
+# Empty since WP-156 retired aiagent-operator, the one deliberate exception
+# (reconciling AIAgent CRs called the Kubernetes API).
+AUTOMOUNT_TOKEN_EXEMPT_DEPLOYMENTS: set = set()
 
 
 @dataclass
@@ -208,15 +186,16 @@ def check_no_hardcoded_secret_values(chart: str, findings: Findings) -> None:
                 )
 
 
-# ADR-0101 (roadmap WP-12): the four charts with a raw Deployment PodSpec
+# ADR-0101 (roadmap WP-12): the charts with a raw Deployment PodSpec
 # whose availability shape (PodDisruptionBudget, topologySpreadConstraints,
 # probes) this repo directly authors and controls. Deliberately a
 # separate, narrower list than DEPLOYMENT_CHARTS above (which also covers
-# mcp-confluence/tekos/models) - WP-12's own authoritative
-# scope list names only these four as "runtime/gateways"; the others were
+# mcp-confluence/models) - WP-12's own authoritative
+# scope list names only these as "runtime/gateways" (agent-runtime, the
+# fourth, was retired in WP-156); the others were
 # never given the mechanism and checking them here would just be a
 # self-inflicted permanent failure, not a real regression.
-AVAILABILITY_CHARTS = ["agent-runtime", "ai-gateway", "mcp-gateway", "rag-service"]
+AVAILABILITY_CHARTS = ["ai-gateway", "mcp-gateway", "rag-service"]
 
 
 def check_availability(chart: str, findings: Findings) -> None:
@@ -368,7 +347,7 @@ def main() -> int:
     # ADR-0119: mcp-salesforce was missing here (a real gap the new
     # check_mcp_server_conformance.py checker caught) - same class of
     # omission as ADR-0111's own comment above for mcp-confluence.
-    for chart in ["agent-runtime", "ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "mcp-aap", "rag-service", "models"]:
+    for chart in ["ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "mcp-aap", "rag-service", "models"]:
         check_networkpolicies(chart, findings)
     check_networkpolicies("namespaces", findings, {"policy.enabled": "true"})
 

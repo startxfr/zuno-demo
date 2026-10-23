@@ -17,9 +17,7 @@ Rules:
   ACL/classification metadata is enforced independently by
   `components/rag-service/app/search.py`'s existing filter - this file only
   gates domain-level access.
-- Consumed by `components/agent-runtime/app/knowledge.py`
-  (`KnowledgePolicyStore` + `evaluate_knowledge()`), called from
-  `app/graph/nodes.py:retrieve_node` before every RAG search.
-
-The file ships inside the agent-runtime image (repo-root build context, see
-`components/agent-runtime/Dockerfile`).
+- Consumed by agent-runtime's `app/knowledge.py` (`KnowledgePolicyStore` +
+  `evaluate_knowledge()`, called before every RAG search) until WP-156
+  retired agent-runtime; `platform/supply-chain/validate_okf_bundle.py`
+  still reads it.

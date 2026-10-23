@@ -144,11 +144,11 @@
 # Written here because a real bug needed it: `qwen3.5-9b` (role `default`,
 # structurally always reachable as the terminal fallback per ADR-0531
 # decision 1's "additive, never removed" guarantee) serves 8192, while the
-# other three local models serve 32768, and nothing in agent-runtime knew
-# that before ADR-0544 - a prompt sized against the 32768 nominal path
+# other three local models serve 32768, and nothing in the (since retired)
+# agent-runtime knew that before ADR-0544 - a prompt sized against the 32768 nominal path
 # could silently overflow whenever a chain fell back to the narrower one.
-# Two consumers:
-#   - `components/agent-runtime/app/graph/prompt_budget.py` reads ONLY this
+# Two consumers until WP-156 retired the first:
+#   - agent-runtime's `app/graph/prompt_budget.py` read ONLY this
 #     key across `kind: local` providers (never `eligible_for`, `prefer`,
 #     file order, or anything else routing-shaped) to learn the fleet's
 #     narrowest reachable window, and clamps the assembled prompt against

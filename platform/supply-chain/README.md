@@ -166,13 +166,13 @@ CI; `verify` needs only the bundle, its signature, and the committed
 public key above - no Vault access, no network. The actual multi-bundle
 signing run is orchestrated by `sign_in_cluster.py sign-okf-bundles`
 (baked into the `supply-chain-signer` image), triggered by
-`ansible/tasks/run_okf_signing_job.yml` as an in-cluster Job right after
-the agent-runtime image builds (`ansible/roles/agent_build`, explicit
-`make d2 build agent` only). It writes every `{agent}.sig` plus the
-shared public key straight to Vault KV (`zuno/okf-signatures`), consumed
-by `gitops/charts/agent-runtime/templates/externalsecret-okf-signatures.yaml` -
-no GitHub Actions artifact, no manual "download and commit" step (the gap
-ADR-0106's 2026-08-21 note originally flagged).
+`ansible/tasks/run_okf_signing_job.yml` as an in-cluster Job
+(`make d3 sign agents`). It writes every `{agent}.sig` plus the
+shared public key straight to Vault KV (`zuno/okf-signatures`) - no
+GitHub Actions artifact, no manual "download and commit" step (the gap
+ADR-0106's 2026-08-21 note originally flagged). Its consumer, agent-runtime,
+was retired by WP-156; the zuno-demo-agents release chain and
+`make d3 admit agents` (ADR-0580) replace this path, removed in WP-165.
 
 `validate_okf_bundle.py` checks two other dimensions - schema validity
 (OKF structure) and policy validity (every declared tool resolves

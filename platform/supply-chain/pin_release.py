@@ -45,7 +45,7 @@ build-publish.yml run output):
 
     release_tag: v0.1.0
     pins:
-      - chart_values: gitops/charts/agent-runtime/values.yaml
+      - chart_values: gitops/charts/ai-gateway/values.yaml
         path: image.tag
         tag: v0.1.0
         digest: sha256:...          # optional, audit-only (see above)
@@ -101,7 +101,7 @@ TAG_LINE_RE = re.compile(r"^(\s*)tag:\s*(.*?)\s*$")
 
 @dataclass
 class TagFinding:
-    chart_values: str  # repo-relative path, e.g. "gitops/charts/agent-runtime/values.yaml"
+    chart_values: str  # repo-relative path, e.g. "gitops/charts/ai-gateway/values.yaml"
     path: str  # dotted YAML path, e.g. "image.tag" or "images.ingestion.tag"
     current_value: str
 

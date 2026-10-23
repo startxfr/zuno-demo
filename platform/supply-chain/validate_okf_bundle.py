@@ -2,10 +2,9 @@
 """ADR-0106 OKF bundle validation: schema/structure validity plus policy
 reference validity, independent of signature verification
 (sign_okf_bundle.py). Deliberately duplicates the small amount of OKF
-frontmatter parsing `components/agent-runtime/app/registry.py` and
-`components/mcp-gateway/app/agent_declarations.py` already do - this
-repository's established convention (see components/agent-bff/README.md's
-"Why standard library only") of duplicating small, well-specified parsing
+frontmatter parsing `components/mcp-gateway/app/agent_declarations.py`
+already does - this repository's established convention of duplicating
+small, well-specified parsing
 logic across independently deployed services/tools rather than sharing a
 module.
 

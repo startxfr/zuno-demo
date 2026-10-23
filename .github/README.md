@@ -6,11 +6,9 @@ ADRs referencing ".github/workflows/ doesn't exist yet" predate this):
 - **`workflows/lint.yml`** - static checks needing no live cluster,
   registry or credentials: the repository's policy-as-code scripts
   (`platform/security/check_workload_hardening.py`,
-  `platform/api/lint_openapi.py`,
-  `platform/supply-chain/check_no_latest_tags.py`), `helm lint` on every
-  chart, `go build`/`vet`/`gofmt`/`test` on the two Go components, the
-  standalone Python test suites (`components/agent-runtime/tests/`,
-  `components/rag-service/tests/`), and an `ansible-playbook --syntax-check`
+  `platform/supply-chain/check_build_matrix.py`, ...), `helm lint` on every
+  chart, the standalone Python test suites (`components/mcp-gateway/`,
+  `components/ai-gateway/`, `components/rag-service/tests/`, ...), and an `ansible-playbook --syntax-check`
   pass over every playbook. Runs on every pull request and every push to
   `main`.
 - **`workflows/build-publish.yml`** - builds every component

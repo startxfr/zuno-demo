@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pyyaml openapi-spec-validator
+      - run: pip install pyyaml
       - uses: sigstore/cosign-installer@v3
       # ADR-0111/ADR-0549 (2026-09-05): the "immutable image tags" check
       # that used to run here (check_no_latest_tags.py, non-blocking) is
@@ -37,8 +37,8 @@ jobs:
       # verify_signatures.py now resolves each component's live
       # ImageStreamTag digest via `oc get istag`, which a GitHub-hosted
       # runner has no route to (same reason build-publish.yml's own signing
-      # steps were removed). Runs instead as an in-cluster `make d1 check`
-      # gate - see ansible/roles/agent_build or the equivalent check task.
+      # steps were removed). Runs instead as an in-cluster gate
+      # (`make d2 check supply-chain`).
       - name: Reconcile CI build inventory (ADR-0324)
         run: python3 platform/supply-chain/check_build_matrix.py
       - name: MCP server conformance (ADR-0119)
@@ -48,10 +48,9 @@ jobs:
       # is a hard gate like check_build_matrix.py above - unlike signature
       # verification (dimension 1), which has nothing to check at PR time
       # (bundle signatures are release/CI artifacts, never committed to
-      # git) and is instead enforced at deployment time: the Day 1 agents
-      # check (ansible/roles/agents) and the Agent Runtime registry
-      # startup, gated by ZUNO_REQUIRE_SIGNED_BUNDLES once a real signed
-      # bundle exists (see platform/supply-chain/sign_okf_bundle.py).
+      # git) and is instead enforced at deployment time: the Day 2 agents
+      # check (ansible/roles/agents), and since ADR-0580 `make d3 admit
+      # agents` for the zuno-demo-agents release.
       - name: Validate OKF bundle schema and policy references (ADR-0106)
         run: python3 platform/supply-chain/validate_okf_bundle.py
       - name: Validate canonical platform documentation (ADR-0323)
@@ -64,14 +63,8 @@ jobs:
         run: python3 platform/okf/generate_quota_enforcement.py --check
       - name: Verify generated authorization matrices match regeneration (ADR-0503)
         run: python3 platform/okf/generate_authorization_matrix.py --check --all
-      - name: Verify deployment snapshots match their charts (ADR-0503)
-        run: python3 platform/okf/generate_deployment_snapshot.py --check
       - name: Run agent contract-test structure and suites (ADR-0504)
         run: python3 platform/okf/run_agent_contract_tests.py
-      - name: Validate AIAgent CRD contract (ADR-0327)
-        run: python3 operator/aiagent-operator/validate_contract.py
-      - name: Lint OpenAPI contracts (ADR-0054)
-        run: python3 platform/api/lint_openapi.py
       - name: Permitted SaaS fallback capability check (ADR-0053)
         run: python3 evaluations/tekos/gate_checks.py
       # ADR-0307 (WP-41): scaffolds a throwaway agent, runs the composed
@@ -96,47 +89,6 @@ jobs:
       - name: Workload hardening baseline (ADR-0052)
         run: python3 platform/security/check_workload_hardening.py
 
-  go:
-    runs-on: ubuntu-latest
-    # ADR-0042: internal/session/session_test.go exercises a real
-    # redis.Client against a real Redis, not a fake - a service container
-    # is the standard GitHub Actions way to give a job that.
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          # ADR-0043 bumped mcp-gateway off the old fastapi/
-          # starlette pins; ADR-0042 needs go-redis/v9, which requires Go
-          # 1.24 - both components/agent-frontend/go.mod and
-          # components/agent-bff/go.mod build under this version.
-          go-version: "1.24"
-      - name: agent-frontend (build/vet/fmt/test)
-        working-directory: components/agent-frontend
-        env:
-          TEST_REDIS_ADDR: localhost:6379
-        run: |
-          go build ./...
-          go vet ./...
-          test -z "$(gofmt -l .)"
-          go test ./...
-      - name: agent-bff (build/vet/fmt/test)
-        working-directory: components/agent-bff
-        run: |
-          go build ./...
-          go vet ./...
-          test -z "$(gofmt -l .)"
-          go test ./...
-
   python:
     runs-on: ubuntu-latest
     steps:
@@ -144,29 +96,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: agent-runtime tests
-        working-directory: components/agent-runtime
-        run: |
-          pip install -r requirements.txt
-          python3 tests/test_registry.py
-          python3 tests/test_retrieve_metadata.py
-          python3 tests/test_auth.py
-          python3 tests/test_bundle_signing.py
-          python3 tests/test_checkpointing.py
-          python3 tests/test_guardrails.py
-          # WP-112: the narration-retry trigger. Added to CI 2026-09-03
-          # after a real, permanently-failing test in this same family sat
-          # unnoticed for a day precisely because it was not wired here.
-          python3 tests/test_reason_node_narration_retry.py
-          # ADR-0544: the prompt-window clamp and the declarative
-          # max_tokens mechanism. test_history.py is added alongside them,
-          # not just the two new files - it predates ADR-0544 and was
-          # never wired here at all, the same "real failure sits unnoticed
-          # because nothing runs it" gap the narration-retry comment above
-          # already names once.
-          python3 tests/test_history.py
-          python3 tests/test_prompt_clamp.py
-          python3 tests/test_max_tokens.py
       - name: mcp-gateway tests
         working-directory: components/mcp-gateway
         run: |

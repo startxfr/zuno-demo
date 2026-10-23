@@ -30,11 +30,11 @@ sys.path.insert(0, str(SUPPLY_CHAIN_DIR))
 import pin_release  # noqa: E402
 
 FULL_PINS = [
-    {"chart_values": "gitops/charts/agent-runtime/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
+    {"chart_values": "gitops/charts/mcp-confluence/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/ai-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/mcp-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/rag-service/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/tekos/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
+    {"chart_values": "gitops/charts/diagram-render/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/rag-ingestion/values.yaml", "path": "images.ingestion.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/rag-ingestion/values.yaml", "path": "images.compiler.tag", "tag": "v0.1.0"},
 ]
@@ -82,11 +82,11 @@ def test_full_manifest_pins_everything_and_preserves_comments() -> None:
         _build_scratch_tree(tmp_root)
         module = _repoint_module_at(tmp_root)
 
-        before = (tmp_root / "gitops/charts/tekos/values.yaml").read_text()
+        before = (tmp_root / "gitops/charts/diagram-render/values.yaml").read_text()
         rc = _run(module, {"release_tag": "v0.1.0", "pins": FULL_PINS})
         assert rc == 0, "expected pin_release.py to succeed on a complete, correct manifest"
 
-        after = (tmp_root / "gitops/charts/tekos/values.yaml").read_text()
+        after = (tmp_root / "gitops/charts/diagram-render/values.yaml").read_text()
         assert "tag: latest" not in after
         assert "tag: v0.1.0" in after
         # Every line except the tag line itself must be byte-identical -
@@ -95,7 +95,7 @@ def test_full_manifest_pins_everything_and_preserves_comments() -> None:
         after_lines = after.splitlines()
         assert len(before_lines) == len(after_lines)
         changed = [i for i in range(len(before_lines)) if before_lines[i] != after_lines[i]]
-        assert changed == [14], f"expected only the tag line (index 14) to change, got {changed}"
+        assert changed == [11], f"expected only the tag line (index 11) to change, got {changed}"
 
         remaining = module._current_findings()
         assert remaining == [], f"expected no non-immutable tags left, found {remaining}"
@@ -111,11 +111,11 @@ def test_dry_run_writes_nothing() -> None:
         _build_scratch_tree(tmp_root)
         module = _repoint_module_at(tmp_root)
 
-        before = (tmp_root / "gitops/charts/agent-runtime/values.yaml").read_text()
+        before = (tmp_root / "gitops/charts/mcp-confluence/values.yaml").read_text()
         rc = _run(module, {"release_tag": "v0.1.0", "pins": FULL_PINS}, dry_run=True)
         assert rc == 0
 
-        after = (tmp_root / "gitops/charts/agent-runtime/values.yaml").read_text()
+        after = (tmp_root / "gitops/charts/mcp-confluence/values.yaml").read_text()
         assert before == after, "dry-run must not modify any file"
         ledger_path = tmp_root / "platform/supply-chain/pinned-releases.yaml"
         assert not ledger_path.exists(), "dry-run must not write the ledger"
@@ -127,15 +127,15 @@ def test_incomplete_manifest_is_rejected_and_changes_nothing() -> None:
         _build_scratch_tree(tmp_root)
         module = _repoint_module_at(tmp_root)
 
-        before = (tmp_root / "gitops/charts/agent-runtime/values.yaml").read_text()
-        partial = [p for p in FULL_PINS if p["chart_values"] != "gitops/charts/tekos/values.yaml"]
+        before = (tmp_root / "gitops/charts/mcp-confluence/values.yaml").read_text()
+        partial = [p for p in FULL_PINS if p["chart_values"] != "gitops/charts/diagram-render/values.yaml"]
         rc = _run(module, {"release_tag": "v0.1.0", "pins": partial})
         assert rc == 1, "expected failure when the manifest omits a currently non-immutable field"
 
-        after = (tmp_root / "gitops/charts/agent-runtime/values.yaml").read_text()
+        after = (tmp_root / "gitops/charts/mcp-confluence/values.yaml").read_text()
         assert before == after, "a rejected manifest must not partially apply"
-        tekos_after = (tmp_root / "gitops/charts/tekos/values.yaml").read_text()
-        assert "tag: latest" in tekos_after
+        render_after = (tmp_root / "gitops/charts/diagram-render/values.yaml").read_text()
+        assert "tag: latest" in render_after
 
 
 def test_manifest_with_unknown_path_is_rejected() -> None:

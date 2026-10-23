@@ -48,15 +48,15 @@ label on `zuno.guardrails_detections` and are queried by the
 
 ## Backends
 
-`gitops/charts/agent-runtime/values.yaml` `guardrails.backend` selects
-which observer answers:
+`gitops/charts/ai-gateway/values.yaml` `guardrails.backend` selects
+which observer answers (the ai-gateway hook, ADR-0567; the agent-runtime
+hook that preceded it was retired in WP-156):
 
 - `nemo` — the `NemoGuardrails` server, policy as data (above).
 - `builtin` — the `GuardrailsOrchestrator` built-in detector, whose
-  equivalent patterns are compiled into the agent-runtime image as
-  `DETECTOR_PARAMS`. Retained as the fallback until the nemo path is
-  live-proven; `components/agent-runtime/tests/test_guardrails.py`
-  (`PolicyParityWithRails`) fails if the two copies drift.
+  equivalent patterns are compiled into the ai-gateway image as
+  `DETECTOR_PARAMS`; `components/ai-gateway/tests/test_guardrails.py`
+  fails if the two copies drift.
 
 See [ADR-0534](../../docs/adr/0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md)
 and [ADR-0540](../../docs/adr/0540-express-guardrail-policy-as-nemo-rails-configuration.md).

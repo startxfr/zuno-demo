@@ -85,28 +85,9 @@ jobs:
           # every entry overrides its ARG(s) to the same real public image
           # the mirror itself points at (see
           # ansible/roles/image_mirrors/tasks/install.yml for the mapping).
-          - name: agent-bff
-            dockerfile: components/agent-bff/Dockerfile
-            context: components/agent-bff
-            build_args: |
-              GOLANG_BASE_IMAGE=docker.io/library/golang:1.26
-              RUNTIME_BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal@sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221
-          - name: agent-frontend
-            dockerfile: components/agent-frontend/Dockerfile
-            context: .
-            build_args: |
-              NODE_BASE_IMAGE=docker.io/library/node:20-alpine
-              GOLANG_BASE_IMAGE=docker.io/library/golang:1.26
-              RUNTIME_BASE_IMAGE=registry.access.redhat.com/ubi9/ubi-minimal@sha256:7c372902c8d211db2d25c8277ba534a73b92742a334874dced829a63b0f21221
-          - name: agent-runtime
-            dockerfile: components/agent-runtime/Dockerfile
-            context: .
-            build_args: |
-              BASE_IMAGE=docker.io/library/python:3.11-slim
           # ADR-0303/WP-39: context changed from "components/ai-gateway" to
           # "." - the image now bakes in policies/model-routing/, outside
-          # its own component directory (same reason agent-bff's sibling
-          # entries above already use ".").
+          # its own component directory.
           - name: ai-gateway
             dockerfile: components/ai-gateway/Dockerfile
             context: .
@@ -149,18 +130,6 @@ jobs:
             context: .
             build_args: |
               BASE_IMAGE=registry.access.redhat.com/ubi9/python-311:latest
-          # ADR-0327/ADR-0308/WP-38: first-party Go module, own go.mod
-          # (not part of the repo-root Python/Node build surface any other
-          # entry here belongs to) - context is its own directory since
-          # the Dockerfile only ever needs operator/aiagent-operator/'s
-          # own go.mod/go.sum/source, unlike the "context: ." entries
-          # above that bake in files outside their component directory.
-          - name: aiagent-operator
-            dockerfile: operator/aiagent-operator/Dockerfile
-            context: operator/aiagent-operator
-            build_args: |
-              GOLANG_BASE_IMAGE=docker.io/library/golang:1.26
-              RUNTIME_BASE_IMAGE=gcr.io/distroless/static:nonroot
           # ADR-0420/WP-068: the in-cluster signing identity's own image -
           # published here too so it has real SBOM/scan coverage like every
           # other first-party component, even though its actual deployment

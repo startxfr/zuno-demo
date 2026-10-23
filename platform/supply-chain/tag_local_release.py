@@ -43,10 +43,10 @@ now. `ansible/roles/mlops_build/tasks/build.yml` wires the identical
 2026-08-21 component list was written) also has a real BuildConfig, via
 `ansible/roles/mcp_build/tasks/build.yml`. Both are now in `COMPONENTS`.
 
-Six chart values.yaml files (advantage, arkos, comage, finage, naveo,
-tekos) share ONE `image.tag` field controlling both `frontendRepository`
-(agent-frontend) and `bffRepository` (agent-bff) - both components are
-retagged with the same release tag, and the single field is set once.
+WP-156 retired agent-bff, agent-frontend, agent-runtime and
+aiagent-operator, and with them the six per-agent charts whose single
+`image.tag` field drove both agent-frontend and agent-bff; earlier ledger
+entries still name them (the ledger is append-only history).
 
 Modes:
 
@@ -118,11 +118,7 @@ NAMESPACE = "zuno-ai-build"
 # `diagram-render` added 2026-09-05 (ADR-0549) - both were wrongly absent
 # (see the docstring's corrected note).
 COMPONENTS = [
-    "agent-bff",
-    "agent-frontend",
-    "agent-runtime",
     "ai-gateway",
-    "aiagent-operator",
     "diagram-render",
     "mcp-aap",
     "mcp-confluence",
@@ -135,12 +131,10 @@ COMPONENTS = [
 ]
 
 # (chart_values, path) -> component name, or a tuple of component names
-# when one field controls more than one image (the six agent-portal
-# charts sharing agent-frontend + agent-bff).
+# when one field controls more than one image (none since WP-156 retired
+# the six agent-portal charts sharing agent-frontend + agent-bff).
 CHART_FIELD_COMPONENT: Dict[Tuple[str, str], object] = {
-    ("gitops/charts/agent-runtime/values.yaml", "image.tag"): "agent-runtime",
     ("gitops/charts/ai-gateway/values.yaml", "image.tag"): "ai-gateway",
-    ("gitops/charts/aiagent-operator/values.yaml", "image.tag"): "aiagent-operator",
     ("gitops/charts/mcp-aap/values.yaml", "image.tag"): "mcp-aap",
     ("gitops/charts/mcp-confluence/values.yaml", "image.tag"): "mcp-confluence",
     ("gitops/charts/mcp-gateway/values.yaml", "image.tag"): "mcp-gateway",
@@ -150,12 +144,6 @@ CHART_FIELD_COMPONENT: Dict[Tuple[str, str], object] = {
     ("gitops/charts/mlops/values.yaml", "images.mlops.tag"): "mlops",
     ("gitops/charts/rag-service/values.yaml", "image.tag"): "rag-service",
     ("gitops/charts/rag-ingestion/values.yaml", "images.ingestion.tag"): "rag-ingestion",
-    ("gitops/charts/advantage/values.yaml", "image.tag"): ("agent-frontend", "agent-bff"),
-    ("gitops/charts/arkos/values.yaml", "image.tag"): ("agent-frontend", "agent-bff"),
-    ("gitops/charts/comage/values.yaml", "image.tag"): ("agent-frontend", "agent-bff"),
-    ("gitops/charts/finage/values.yaml", "image.tag"): ("agent-frontend", "agent-bff"),
-    ("gitops/charts/naveo/values.yaml", "image.tag"): ("agent-frontend", "agent-bff"),
-    ("gitops/charts/tekos/values.yaml", "image.tag"): ("agent-frontend", "agent-bff"),
 }
 
 # Deliberately out of scope - no BuildConfig exists for this one field.

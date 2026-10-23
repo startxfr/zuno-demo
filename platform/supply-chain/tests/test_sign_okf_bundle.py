@@ -2,8 +2,8 @@
 that needs no cosign binary or real signing credentials, and the actual
 mechanism that makes a tampered bundle detectable (a changed digest is
 what `cosign verify-blob` would refuse to match against a prior
-signature; `components/agent-runtime/tests/test_bundle_signing.py` covers
-the AgentRegistry-side wrapping of that refusal).
+signature; the AgentRegistry-side wrapping of that refusal left with
+agent-runtime in WP-156).
 
 Run from this directory:
 
