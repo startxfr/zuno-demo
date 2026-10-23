@@ -1,0 +1,56 @@
+# Fixed product questions for the Red Hat documentation comparison (WP-168). Each lists the URL fragments
+# of the book(s) whose pages should answer it: a hit is a result whose source URL contains one of them.
+- id: 1
+  query: How do I register a host to Red Hat Satellite 6.17?
+  expect: [red_hat_satellite/6.17]
+- id: 2
+  query: What is new in Satellite 6.17 release notes?
+  expect: [red_hat_satellite/6.17]
+- id: 3
+  query: How to configure a cluster-wide proxy in OpenShift 4.22
+  expect: [openshift_container_platform/4.22]
+- id: 4
+  query: How do I update an OpenShift cluster between minor versions?
+  expect: [openshift_container_platform/4.22, openshift_container_platform/4.21]
+- id: 5
+  query: What does a NetworkPolicy ingress rule look like in OpenShift?
+  expect: [openshift_container_platform/4.22, openshift_container_platform/4.21]
+- id: 6
+  query: How to configure an identity provider with OpenID Connect in OpenShift
+  expect: [openshift_container_platform/4.22, openshift_container_platform/4.21]
+- id: 7
+  query: How do I install the Red Hat OpenShift GitOps operator?
+  expect: [red_hat_openshift_gitops]
+- id: 8
+  query: How to set up a Keycloak realm with the Red Hat build of Keycloak operator
+  expect: [red_hat_build_of_keycloak]
+- id: 9
+  query: How to create an Ansible Automation Platform job template
+  expect: [red_hat_ansible_automation_platform]
+- id: 10
+  query: What are the hardware requirements for OpenShift Data Foundation?
+  expect: [red_hat_openshift_data_foundation]
+- id: 11
+  query: How does Advanced Cluster Security detect policy violations at deploy time?
+  expect: [red_hat_advanced_cluster_security]
+- id: 12
+  query: How do I mirror images for a disconnected Quay registry deployment?
+  expect: [red_hat_quay]
+- id: 13
+  query: How to migrate virtual machines from VMware with the Migration Toolkit for Virtualization
+  expect: [migration_toolkit_for_virtualization]
+- id: 14
+  query: How to create a virtual machine from a template in OpenShift Virtualization
+  expect: [4.22/html/virtualization, 4.21/html/virtualization]
+- id: 15
+  query: How do I deploy a model with OpenShift AI model serving?
+  expect: [red_hat_openshift_ai_self-managed]
+- id: 16
+  query: How to enable user workload monitoring in OpenShift
+  expect: [openshift_container_platform/4.22, openshift_container_platform/4.21]
+- id: 17
+  query: How does an Argo CD ApplicationSet generate applications?
+  expect: [argo-cd.readthedocs.io]
+- id: 18
+  query: How do I write a Helm chart template with named templates?
+  expect: [helm.sh/docs]
