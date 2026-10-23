@@ -80,11 +80,14 @@ single sync, revert plan ready).
   release path. `okf-fetch-wp161` is kept, relabelled and annotated as the
   source of that image.
 
-Operator action left: every zuno-ai-build BuildConfig builds from `main`,
-whose supply-chain-signer Dockerfile predates okf-fetch. Once main carries
-the WP-161 Dockerfile, rebuild `supply-chain-signer:latest`, drop
-`zuno_okf_fetch_image_tag` from demo333.yml (back to latest) and delete
-`okf-fetch-wp161`.
+Back to the normal image the same day. main was NOT moved: demo222's
+Applications follow it, so a fast-forward would have deployed 93 commits
+there. Instead the build branch became per cluster (`zuno_build_git_ref`,
+8cddd694/cfcebc59; demo333 builds from demo333), `supply-chain-signer:latest`
+was rebuilt from demo333 (build -13, cfcebc59), and a second coordinated
+rolling update moved okf-fetch to `latest` (exit 0, mcp-gateway image
+unchanged); `zuno_okf_fetch_image_tag` is gone from demo333.yml and the
+role still renders exactly the live values.
 
 ## Goal
 

@@ -43,14 +43,10 @@ zuno_mariadb_backup_s3_region: "eu-central-1"
 
 # ADR-0580/WP-161 (live-proven 2026-10-23): mcp-gateway reads its agents
 # from the zuno-demo-agents release pinned in platform/okf/agents.lock,
-# through the okf-fetch init container (ansible/roles/mcp). The image tag is
-# wp161 because every zuno-ai-build BuildConfig builds from main, and main's
-# supply-chain-signer Dockerfile predates okf-fetch: a normal rebuild of
-# :latest would drop oras. supply-chain-signer:wp161 comes from the
-# BuildConfig okf-fetch-wp161 (demo222 at 97fd352c). Back to latest once
-# main carries the WP-161 Dockerfile.
+# through the okf-fetch init container (ansible/roles/mcp), using
+# supply-chain-signer:latest - built from the demo333 branch, see
+# zuno_build_git_ref below.
 zuno_okf_fetch_enabled: true
-zuno_okf_fetch_image_tag: "wp161"
 
 # Images on demo333 are built from the demo333 branch (its GitOps branch),
 # not main: main stays at its 2026-09-14 snapshot because demo222's
