@@ -1,6 +1,6 @@
 # WP-156: Retire the zuno agent and RAG code
 
-- **State:** Not started
+- **State:** Repo work in review (phase 2 prepared on `prep/wp156-phase2`, 2026-10-23)
 - **ADRs:** [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0572](../../adr/0572-scope-the-zuno-operator-to-the-platform-foundation.md)
 - **Depends on:** [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md)
 - **Related:** [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md), [ADR-0556](../../adr/0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md), [WP-147](wp-147-unifai-opentelemetry-instrumentation.md), [WP-153](wp-153-guardrails-into-the-ai-gateway.md), [WP-157](wp-157-slim-the-ai-gateway-via-maas.md)
@@ -168,6 +168,75 @@ first.
    amendment of ADR-0556 in force. Run `python3 platform/docs/check_docs.py`.
    Update `components/README.md`.
 
+## Phase 2 done (2026-10-23)
+
+**Uninstalled live on demo333** (ArgoCD Applications deleted, before any
+code left): `agent-runtime` (from the `llm` role's loops only, ai-gateway
+stays), every per-agent agent-frontend + agent-bff Application (charts
+`tekos` - Application `zuno-api` -, `comage`, `advantage`, `finage`,
+`arkos`, `naveo`), `aiagent-operator` with its CRD, and
+`zuno-connectivity-link-quota-d1` (the Kuadrant quota demo route half).
+
+**Removed from the repository** (branch `prep/wp156-phase2`):
+
+- Steps 2-3: `components/{agent-runtime,agent-bff,agent-frontend}`,
+  `operator/aiagent-operator`; charts `agent-runtime`, `aiagent-operator`
+  and the six per-agent charts (read first: each rendered only the
+  frontend/BFF workloads, their ExternalSecrets/Route/NetworkPolicy, or an
+  AIAgent CR); their Applications and `gitops/apps/connectivity-link-quota`;
+  roles `agent_build`, `aiagent_operator`, `aiagent_operator_build`; the
+  Makefile lists with the AAP surveys and DAGs; the build-publish matrix
+  entries, the lint Go job (agent-bff, agent-frontend and its Redis
+  service), the agent-runtime tests, the AIAgent contract check,
+  `platform/api/lint_openapi.py` and the deployment-snapshot CI step; the
+  hardening and release-tooling lists; the agent-runtime NetworkPolicy
+  peers in ai-gateway, mcp-gateway and rag-service and the frontend peer
+  in redis; the per-agent frontend session Vault seeds.
+- The `agents` role stays for its check (the ADR-0053 acceptance gate,
+  run against UnifAI): install/uninstall apply nothing, precheck reads the
+  UnifaiAgentBundles. The `llm` role loses only agent-runtime.
+- connectivity-link: the Day 1 gateway half stays; `quotaEnforcement.routes`
+  keeps only `name`/`hostname`, nothing sets `route.enabled`, and the route
+  template requires an explicit backend. Quota in front of UnifAI is
+  WP-157's.
+- Step 3 (evaluations): UnifAI is the only target of
+  `evaluations/*/run_scenarios.py` and every `security_checks.py`
+  (`--target`/`EVAL_TARGET` accept only `unifai`); the runtime/BFF/frontend
+  handlers and constants are gone, check and scenario counts unchanged
+  (naveo's `entitlement_without_business_role_denied`, which still posted
+  to the BFF, is now reported skipped as a placeholder agent). The
+  runtime-only `stress_test.py` batteries of tekos, arkos and comage are
+  deleted (the stresstest reports that layer "not run"), and the
+  tool-calling conformance test no longer reads agent-runtime's source.
+  The `<AGENT>_FRONTEND_CLIENT_SECRET` fallback stays.
+- `platform/templates/agent/scaffold_agent.py` no longer emits the AIAgent
+  CR, chart, Applications, frontend client or frontend/BFF images; it
+  writes the OKF bundle draft (to move to zuno-demo-agents, ADR-0576) and
+  the evaluation skeleton.
+- Step 7: the planned supersessions are written (ADR index and
+  [CHANGELOG](../../adr/CHANGELOG.md), 2026-10-23), RAG ADRs excluded.
+
+**What remains:**
+
+- Step 5: the PGO `spec.users` entries and databases `agent-checkpoints`
+  and `agent-conversations` (and their credential ExternalSecrets and
+  Vault seeds) are kept on purpose; dropping them needs a reviewed live
+  step.
+- The eight `<agent>-frontend` Keycloak clients in `realm-zuno.json` and
+  their `<agent>-frontend-client-secret` ExternalSecrets in `zuno-auth`
+  stay (another team's harness and the mlops mirror read them), as does
+  the `<AGENT>_FRONTEND_CLIENT_SECRET` fallback of
+  `evaluations/tekos/run_scenarios.py`.
+- The `make d3 sign agents` verb signs the last agent-runtime image left in
+  `zuno-ai-build` and has no consumer: `make d3 admit agents` replaces it,
+  WP-165 removes it with the OKF Transit chain.
+- Step 4: dashboards and SLO rules on BFF/runtime metrics are WP-166's.
+- Step 6: the live chain on demo333 after the merge into devel.
+- Comments in kept components (ai-gateway, mcp-gateway, rag-service,
+  mlops, diagram-render) still name agent-runtime as their past caller.
+- ADR-0042, ADR-0214 and ADR-0411 concern only the retired frontend but
+  are in no planned supersession list: left for a decision.
+
 ## Decision of 2026-10-23: the Red Hat documentation keeps `rag-service` alive
 
 The knowledge corpus of `rag-service` is the Red Hat product documentation
@@ -190,7 +259,11 @@ stays Healthy throughout.
 
 ## Open questions
 
-- Do the per-agent charts (`gitops/charts/<agent>/`) carry anything besides
-  agent-frontend (routes, ConfigMaps used by UnifAI)? Read before deleting.
-- Does the zuno-okf extraction stream (ADR-0506..0510) need a status change
-  in the same pass, since its consumer was the aiagent-operator?
+- ~~Do the per-agent charts (`gitops/charts/<agent>/`) carry anything besides
+  agent-frontend?~~ No (read 2026-10-23): frontend/BFF Deployments,
+  Services, ServiceAccounts, ExternalSecrets, Route and NetworkPolicy, or a
+  single AIAgent CR for arkos/naveo.
+- ~~Does the zuno-okf extraction stream (ADR-0506..0510) need a status change
+  in the same pass?~~ No: ADR-0506, ADR-0507, ADR-0509 and ADR-0510 were
+  already retired by ADR-0576/ADR-0580 on 2026-10-22; ADR-0508 stays
+  `Proposed`.

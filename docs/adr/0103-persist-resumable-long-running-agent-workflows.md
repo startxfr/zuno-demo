@@ -1,6 +1,6 @@
 # ADR-0103: Persist resumable long-running agent workflows
 
-- **Status:** Implemented - see `components/agent-runtime/app/graph/`, `components/agent-runtime/app/main.py` (lifespan-managed checkpointer, `_resolve_run_id`), `gitops/charts/postgresql/` (`checkpointDatabase`).
+- **Status:** Superseded by [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) (2026-10-23, WP-156) - agent-runtime and its LangGraph Postgres checkpointer are retired; UnifAI holds run state. The agent-checkpoints PGO user and database stay until a reviewed live drop. Previously: Implemented - see `components/agent-runtime/app/graph/`, `components/agent-runtime/app/main.py` (lifespan-managed checkpointer, `_resolve_run_id`), `gitops/charts/postgresql/` (`checkpointDatabase`).
 - **Target:** v0.1
 - **Date:** 2026-08-14
 - **Decision owners:** Zuno Demo architecture team

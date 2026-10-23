@@ -1,6 +1,6 @@
 # ADR-0209: Introduce project-scoped agent memory
 
-- **Status:** Implemented - see `knowledge/project/`, `components/agent-runtime/app/`.
+- **Status:** Superseded by [ADR-0569](0569-close-unifai-parity-gaps-generically.md) (2026-10-23, WP-156) - agent-runtime's project memory is retired; the record shape, extraction rule, fail-closed membership and classification inheritance migrate into ADR-0569 clause 1. Previously: Implemented - see `knowledge/project/`, `components/agent-runtime/app/`.
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

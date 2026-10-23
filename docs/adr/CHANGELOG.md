@@ -9,6 +9,23 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Supersessions (2026-10-23) - WP-156 retires the zuno agent stack
+
+WP-156 removed agent-runtime, agent-bff, agent-frontend and the AIAgent
+operator from the repository (they were uninstalled on demo333 first), so
+the supersessions planned by ADR-0561, ADR-0564, ADR-0567 and ADR-0569 are
+written. Fourteen records move to Retired: ADR-0008, ADR-0039, ADR-0044,
+ADR-0045, ADR-0054, ADR-0103, ADR-0212, ADR-0342 and ADR-0515 (by ADR-0561);
+ADR-0308, ADR-0327 and ADR-0350 (by ADR-0564); ADR-0209 and ADR-0215 (by
+ADR-0569). Six are superseded in part and stay in their band: ADR-0322 and
+ADR-0544 (by ADR-0561), ADR-0106 (by ADR-0564), ADR-0527 (by ADR-0569),
+ADR-0534 and ADR-0540 (by ADR-0567). The RAG supersessions of ADR-0568 wait
+for WP-168, since rag-service and rag-ingestion stay for the Red Hat
+documentation. ADR-0507, ADR-0509 and ADR-0510 were already retired by
+ADR-0576/ADR-0580; ADR-0508 stays `Proposed`. ADR-0042, ADR-0214 and
+ADR-0411 concern only the retired frontend but are in no planned list and
+are left for a decision.
+
 ## Additions (2026-10-22) - ADR-0582 to ADR-0584 join v0.12
 
 Follow-up of the WP-148 review of per-agent landing pages: a per-agent entry

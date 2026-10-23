@@ -1,6 +1,6 @@
 # ADR-0039: Make Agent Runtime execute the OKF agent contract
 
-- **Status:** Implemented
+- **Status:** Superseded by [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) (2026-10-23, WP-156) - agent-runtime is retired; executing the OKF agent contract moves to unifai-operator, and these clauses migrate into ADR-0564. Previously: Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team

@@ -1,6 +1,6 @@
 # ADR-0540: Express guardrail policy as NeMo rails configuration, not in-image detector parameters
 
-- **Status:** Implemented (2026-09-04) - see [WP-120](../roadmap/work-packages/wp-120-guardrail-policy-as-nemo-rails.md)
+- **Status:** Superseded in part by [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) (2026-10-23, WP-156) - only Decision 3's "observe-only and stays that way" and Decision 4's backend selector in agent-runtime with its `builtin` fallback. Decisions 1 and 2 remain in force. Otherwise: Implemented (2026-09-04) - see [WP-120](../roadmap/work-packages/wp-120-guardrail-policy-as-nemo-rails.md)
   for the full evidence chain, including the residual claim closed the same day (see below).
 - **Target:** v0.7
 - **Date:** 2026-09-02 (amended 2026-09-03)

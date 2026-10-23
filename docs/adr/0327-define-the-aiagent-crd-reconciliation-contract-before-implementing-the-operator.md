@@ -1,6 +1,6 @@
 # ADR-0327: Define the AIAgent CRD reconciliation contract before implementing the operator
 
-- **Status:** Implemented - see `operator/aiagent-operator/config/crd/`, `operator/aiagent-operator/CONTRACT.md`.
+- **Status:** Superseded by [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) (2026-10-23, WP-156) - the AIAgent CRD contract is retired with the operator; its surviving rules migrate into ADR-0564 clause 3. Previously: Implemented - see `operator/aiagent-operator/config/crd/`, `operator/aiagent-operator/CONTRACT.md`.
 - **Target:** v0.3
 - **Date:** 2026-08-11
 - **Decision owners:** Zuno Demo architecture team

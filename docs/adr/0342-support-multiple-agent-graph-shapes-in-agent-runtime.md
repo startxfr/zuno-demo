@@ -1,6 +1,6 @@
 # ADR-0342: Support multiple agent graph shapes in Agent Runtime
 
-- **Status:** Implemented - see `components/agent-runtime/app/graph/`.
+- **Status:** Superseded by [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) (2026-10-23, WP-156) - agent-runtime's graph shapes are retired; the shapes migrate into ADR-0564's blueprint templates. Previously: Implemented - see `components/agent-runtime/app/graph/`.
 - **Target:** v0.3
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

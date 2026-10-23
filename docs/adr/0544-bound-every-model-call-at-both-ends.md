@@ -1,6 +1,6 @@
 # ADR-0544: Bound every model call at both ends - a prompt-window clamp and a declarative max_tokens
 
-- **Status:** Implemented
+- **Status:** Superseded in part by [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) (2026-10-23, WP-156) - clauses 2-4 only (the agent-runtime prompt-window clamp), retired with agent-runtime. Clauses 1 and 5-8 remain the gateway's. Otherwise: Implemented
 - **Target:** v0.4
 - **Date:** 2026-09-03
 - **Decision owners:** Zuno Demo architecture team

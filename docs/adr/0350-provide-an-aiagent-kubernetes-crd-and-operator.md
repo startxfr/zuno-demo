@@ -1,6 +1,6 @@
 # ADR-0350: Provide an AIAgent Kubernetes CRD and operator
 
-- **Status:** Implemented - see ADR-0327/ADR-0308 and `operator/aiagent-operator/`.
+- **Status:** Superseded by [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) (2026-10-23, WP-156) - declarative agent instances migrate into `UnifaiAgentBundle`; the AIAgent CRD and operator are retired. Previously: Implemented - see ADR-0327/ADR-0308 and `operator/aiagent-operator/`.
 - **Target:** v0.3
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

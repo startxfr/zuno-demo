@@ -916,7 +916,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-153 | [wp-153](work-packages/wp-153-guardrails-into-the-ai-gateway.md) | 0567 | none | Done | live-proven on demo333 2026-10-22; enabled in observe on devel 2026-10-23; C2 block waits for WP-156 |
 | WP-154 | [wp-154](work-packages/wp-154-tekos-pilot-on-demo333.md) | 0573, 0561 | WP-146 - WP-153 | Repo work in review | phase A and B started on demo333 (16/17 scenarios, 12/12 security); GPU-dependent checks, restore drill and real-key bundle remain |
 | WP-155 | [wp-155](work-packages/wp-155-migrate-remaining-agents-and-cut-demo222-over.md) | 0573, 0561 | WP-154 | Not started | demo333 is powered off - live steps wait for the user to power it on |
-| WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Not started | none until a live check; fork-side work runs offline |
+| WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Repo work in review | phase 2 (agent stack code removal) prepared on prep/wp156-phase2; PGO users drop and the live step-6 chain remain |
 | WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Not started | split out of WP-156 by user decision 2026-10-23 |
 | WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Repo work merged | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |

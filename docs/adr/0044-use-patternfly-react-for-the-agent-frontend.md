@@ -1,6 +1,6 @@
 # ADR-0044: Use PatternFly React for the agent frontend
 
-- **Status:** Implemented
+- **Status:** Superseded by [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) (2026-10-23, WP-156) - the PatternFly agent-frontend is retired; UnifAI provides the chat UI. Previously: Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team

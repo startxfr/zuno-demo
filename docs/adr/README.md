@@ -91,7 +91,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0005](0005-use-okf-v0-2-as-the-declarative-agent-definition-contract.md) | Implemented | Use OKF v0.2 as the declarative agent definition contract |
 | [ADR-0006](0006-extend-okf-with-zuno-agent-specific-metadata.md) | Implemented | Extend OKF with Zuno agent-specific metadata |
 | [ADR-0007](0007-separate-agent-instances-from-reusable-platform-components.md) | Implemented | Separate agent instances from reusable platform components |
-| [ADR-0008](0008-use-one-frontend-and-one-bff-deployment-per-agent.md) | Implemented | Use one frontend and one BFF deployment per agent |
 | [ADR-0009](0009-separate-agent-runtime-from-ai-inference-gateway.md) | Implemented | Separate Agent Runtime from AI Inference Gateway |
 | [ADR-0010](0010-introduce-a-central-mcp-gateway.md) | Implemented | Introduce a central MCP Gateway |
 | [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md) | Implemented | Define tool authorization as policy intersection |
@@ -118,17 +117,13 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md) | Implemented | Enforce the complete MCP authorization intersection in the gateway |
 | [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md) | Implemented | Protect MCP servers with network and workload identity boundaries |
 | [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md) | Implemented | Use standards-compliant OKF v0.2 Markdown bundles |
-| [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md) | Implemented | Make Agent Runtime execute the OKF agent contract |
 | [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md) | Implemented | Separate agent entitlement from business role authorization |
 | [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md) | Implemented | Remove nominative demo identities and static passwords from Git |
-| [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | Implemented | Use PatternFly React for the agent frontend |
-| [ADR-0045](0045-stream-responses-end-to-end-with-sse.md) | Implemented | Stream responses end to end with SSE |
 | [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | Implemented | Make RAG retrieval metadata-aware and bilingual |
 | [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) | Superseded in part by ADR-0317 | Manage the complete OpenShift AI prerequisite lifecycle |
 | [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md) | Implemented | Discover supported operator channels and serving runtimes at deployment time |
 | [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | Implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
 | [ADR-0053](0053-make-make-check-an-end-to-end-acceptance-and-security-gate.md) | Implemented | Make make check an end-to-end acceptance and security gate |
-| [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | Implemented | Define the BFF contract OpenAPI-first |
 | [ADR-0056](0056-restructure-deployment-into-day-0-day-1-sequencing.md) | Implemented | Restructure deployment into Day 0 / Day 1 sequencing |
 | [ADR-0057](0057-introduce-day-2-agent-availability-test-and-stresstest-operations.md) | Implemented | Introduce Day 2 agent availability-test and stresstest operations |
 | [ADR-0058](0058-aggregate-existing-test-content-into-a-bulk-interaction-stresstest.md) | Implemented | Aggregate existing test content into make d2 stresstest, with a bulk-interaction load mode |
@@ -162,9 +157,8 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0055](0055-repository-review-change-set-index.md) | Implemented | Repository review change-set index |
 | [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | Implemented | Provide HA for shared agent platform services |
 | [ADR-0102](0102-target-99-9-percent-platform-availability.md) | Implemented | Target 99.9 percent platform availability |
-| [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | Implemented | Persist resumable long-running agent workflows |
 | [ADR-0104](0104-introduce-controlled-semantic-caching.md) | Implemented | Introduce controlled semantic caching |
-| [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | Implemented | Enforce OKF bundle signing and validation |
+| [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | Superseded in part by ADR-0564 | Enforce OKF bundle signing and validation |
 | [ADR-0107](0107-introduce-automated-model-quality-gates.md) | Implemented | Introduce automated model quality gates |
 | [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | Implemented | Automate model evaluation with LM-Eval |
 | [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | Implemented | Implement source freshness and trust scoring |
@@ -176,7 +170,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0119](0119-introduce-mcp-server-scaffolding-and-conformance-tooling.md) | Implemented | Introduce MCP server scaffolding and conformance tooling |
 | [ADR-0120](0120-implement-a-multi-provider-git-forge-mcp-server-for-github-and-gitlab.md) | Implemented | Implement a multi-provider Git-forge MCP server for GitHub and GitLab |
 | [ADR-0121](0121-restrict-git-forge-write-and-private-access-by-visibility.md) | Implemented | Restrict git-forge write and private access by visibility |
-| [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | Implemented | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
+| [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | Superseded in part by ADR-0561 | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
 | [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | Implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
 | [ADR-0343](0343-complete-the-maas-and-ray-prerequisites-on-the-datasciencecluster.md) | Implemented | Complete the MaaS and Ray prerequisites on the DataScienceCluster |
 | [ADR-0344](0344-track-blocked-resources-and-add-a-day-0-reconcile-verb.md) | Implemented | Track blocked resources and add a Day 0 reconcile verb |
@@ -194,11 +188,8 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | Superseded in part by ADR-0218 | Generalize the RAG platform to multiple isolated knowledge domains |
 | [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | Implemented | Prefer indexed knowledge for read and live tools for freshness and write |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | Implemented | Standardize enterprise tool authentication and delegation |
-| [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | Implemented | Introduce project-scoped agent memory |
 | [ADR-0211](0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md) | Implemented | Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01 |
-| [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md) | Implemented | Introduce persistent, navigable chat conversations |
 | [ADR-0214](0214-refresh-agent-frontend-chrome-branding-footer-and-menu-icons.md) | Implemented | Refresh agent-frontend chrome: branding, footer and menu icons |
-| [ADR-0215](0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md) | Implemented | Carry conversation history into agent prompts with budgeted compaction |
 | [ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md) | Implemented | Serve SXA only as a pre-2021 historical RAG corpus |
 | [ADR-0354](0354-add-ansible-automation-platform-as-a-day-1-component.md) | Implemented | Add Ansible Automation Platform as a new Day 1 component |
 
@@ -210,13 +201,9 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0302](0302-build-dataset-to-model-mlops-pipelines.md) | Superseded in part by ADR-0526 | Build dataset-to-model MLOps pipelines |
 | [ADR-0304](0304-optimize-model-selection-using-quality-cost-and-latency.md) | Implemented | Optimize model selection using quality cost and latency |
 | [ADR-0305](0305-introduce-automated-model-benchmarking.md) | Implemented | Introduce automated model benchmarking |
-| [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | Implemented | Expand agent lifecycle management through the AIAgent Operator |
 | [ADR-0309](0309-introduce-policy-driven-autonomous-optimization.md) | Implemented | Introduce policy-driven autonomous optimization |
 | [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | Implemented | Generalize the Tekos vertical slice to the four remaining agents |
-| [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | Implemented | Define the AIAgent CRD reconciliation contract before implementing the operator |
 | [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) | Implemented | Extend business-role authorization with CDP and scoped capabilities |
-| [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | Implemented | Support multiple agent graph shapes in Agent Runtime |
-| [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md) | Implemented | Provide an AIAgent Kubernetes CRD and operator |
 | [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | Implemented | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
 | [ADR-0353](../roadmap/adr-decisions-v0.3.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) *(stub)* | Proposed | Support an optional external registry as the first-party runtime image source |
 | [ADR-0355](0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md) | Implemented | Expose AAP audits to agents through an mcp-aap server |
@@ -251,13 +238,13 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0524](0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md) | Implemented | Integrate OpenShift Lightspeed as a consumer of the Zuno AI platform |
 | [ADR-0525](0525-batch-index-pgvector-writes-and-size-ivfflat-from-real-rows.md) | Implemented | Batch index-pgvector writes and size the ivfflat index from real row counts |
 | [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) | Implemented | Fine-tune and serve a French urban-register model variant (`-wesh`) beside its base |
-| [ADR-0527](0527-introduce-the-project-as-the-sharing-and-context-boundary.md) | Implemented | Introduce the project as the sharing and context boundary |
+| [ADR-0527](0527-introduce-the-project-as-the-sharing-and-context-boundary.md) | Superseded in part by ADR-0569 | Introduce the project as the sharing and context boundary |
 | [ADR-0528](0528-rekey-project-binding-quota-and-telemetry-onto-the-zuno-project-id.md) | Implemented | Re-key project binding, quota and telemetry onto the Zuno project id |
 | [ADR-0529](0529-stop-the-pgo-external-secrets-write-loop-on-pguser-secrets.md) | Implemented | Stop the PGO/External-Secrets write loop on pguser secrets |
 | [ADR-0530](0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md) | Implemented | Reconcile Keycloak clients instead of relying on a create-only realm import |
 | [ADR-0531](0531-promote-qwen3-5-9b-as-the-fleet-wide-default-and-extend-ovhcloud-reasoning-access.md) | Implemented | Promote qwen3.5-9b to the fleet-wide default model, extend OVHcloud reasoning access from Arkos to Tekos/Comage |
 | [ADR-0536](0536-live-node-failover-drill-for-qwen-model-fallback.md) | Implemented | Live GPU-node failover drill for the qwen-normal/qwen-wesh fallback, and a reusable `make d3 scenario-failover-node` command |
-| [ADR-0544](0544-bound-every-model-call-at-both-ends.md) | Implemented | Bound every model call at both ends - a prompt-window clamp and a declarative max_tokens |
+| [ADR-0544](0544-bound-every-model-call-at-both-ends.md) | Superseded in part by ADR-0561 | Bound every model call at both ends - a prompt-window clamp and a declarative max_tokens |
 | [ADR-0550](0550-demonstrate-sovereign-ai-through-classification-specialization-and-resilience.md) | Implemented | Demonstrate sovereign AI through classification, specialization and resilience |
 
 ## v0.5
@@ -291,10 +278,10 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md) | Deferred | Use immutable and verifiable software supply chain artifacts |
-| [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | Implemented | Integrate TrustyAI for AI evaluation and guardrails |
+| [ADR-0534](0534-integrate-trustyai-for-ai-evaluation-and-guardrails.md) | Superseded in part by ADR-0567 | Integrate TrustyAI for AI evaluation and guardrails |
 | [ADR-0538](0538-adopt-rhoai-35-workload-surfaces-mlflow-kueue-trainingjobs.md) | Implemented | Adopt RHOAI 3.5 workload surfaces - MLflow tracking, queued workloads, training-jobs UI |
 | [ADR-0539](0539-delegate-lora-training-compute-to-a-kfp-submitted-trainjob.md) | Implemented | Delegate LoRA training compute to a KFP-submitted Kubeflow TrainJob |
-| [ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md) | Implemented | Express guardrail policy as NeMo rails configuration, not in-image detector parameters |
+| [ADR-0540](0540-express-guardrail-policy-as-nemo-rails-configuration.md) | Superseded in part by ADR-0567 | Express guardrail policy as NeMo rails configuration, not in-image detector parameters |
 | [ADR-0541](0541-integrate-mistral-and-gpt-oss-120b-as-maas-externalmodels.md) | Proposed | Integrate mistral and gpt-oss-120b as MaaS ExternalModels |
 | [ADR-0542](0542-autoscale-one-served-model-through-llminferenceservice-spec-scaling.md) | Implemented | Autoscale a served model through LLMInferenceService spec.scaling |
 | [ADR-0545](0545-scope-remaining-rhoai-kubeflow-component-adoption.md) | Implemented | Scope the remaining RHOAI/Kubeflow component adoption - finalize TrainJob, explore Kueue priority, evaluate InferenceGraph, exclude NIM |
@@ -374,7 +361,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0504](0504-define-the-agent-tests-directory-structure-and-promotion-gate.md) | Implemented | Define the agent tests directory structure and promotion gate |
 | [ADR-0513](0513-give-okf-rag-tools-and-policies-directories-a-real-schema.md) | Implemented | Give OKF rag/, tools/ and policies/ directories a real schema |
 | [ADR-0514](0514-generalize-arkos-plan-draft-write-for-multiple-document-kinds.md) | Implemented | Generalize Arkos's plan_draft_write shape for multiple document kinds |
-| [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md) | Implemented | Open per-conversation tabs with one browser tab per agent |
 
 ## Retired
 
@@ -384,17 +370,30 @@ part of its decision is still in force.
 
 | ADR | Target | Status | Decision |
 |---|---|---|---|
+| [ADR-0008](0008-use-one-frontend-and-one-bff-deployment-per-agent.md) | v0 | Superseded by ADR-0561 | Use one frontend and one BFF deployment per agent |
 | [ADR-0016](0016-migrate-the-legacy-sxa-schema-to-postgresql.md) | v0 | Superseded by ADR-0219 | Migrate the legacy SXA schema to PostgreSQL |
 | [ADR-0018](0018-use-ogx-with-langchain-and-langgraph-for-agentic-workflows.md) | v0 | Superseded by ADR-0322 | Use OGX with LangChain and LangGraph for agentic workflows |
 | [ADR-0023](0023-use-a-namespace-per-agent-isolation-model.md) | v0 | Superseded by ADR-0329 | Use a namespace-per-agent isolation model |
+| [ADR-0039](0039-make-agent-runtime-execute-the-okf-agent-contract.md) | v0 | Superseded by ADR-0561 | Make Agent Runtime execute the OKF agent contract |
+| [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | v0 | Superseded by ADR-0561 | Use PatternFly React for the agent frontend |
+| [ADR-0045](0045-stream-responses-end-to-end-with-sse.md) | v0 | Superseded by ADR-0561 | Stream responses end to end with SSE |
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v0.1 | Superseded by ADR-0322 | Abstract the RAG backend and integrate OpenShift AI OGX |
+| [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Superseded by ADR-0561 | Define the BFF contract OpenAPI-first |
+| [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Superseded by ADR-0561 | Persist resumable long-running agent workflows |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Superseded by ADR-0549 | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Superseded by ADR-0118 | Use Zuno as a policy router in front of OpenShift AI MaaS |
+| [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v0.2 | Superseded by ADR-0569 | Introduce project-scoped agent memory |
+| [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md) | v0.2 | Superseded by ADR-0561 | Introduce persistent, navigable chat conversations |
 | [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.6 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
+| [ADR-0215](0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md) | v0.2 | Superseded by ADR-0569 | Carry conversation history into agent prompts with budgeted compaction |
 | [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) | v0.2 | Superseded by ADR-0219 | Import real SXA content via S3 into MariaDB, served through MCP and RAG |
 | [ADR-0217](0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md) | v0.2 | Superseded by ADR-0219 | Ingest a weekly SXA corpus as a new RAG domain |
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Superseded by ADR-0526 | Support dynamic LoRA adapter loading |
+| [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v0.3 | Superseded by ADR-0564 | Expand agent lifecycle management through the AIAgent Operator |
+| [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v0.3 | Superseded by ADR-0564 | Define the AIAgent CRD reconciliation contract before implementing the operator |
 | [ADR-0332](0332-remove-console-favorites-provisioning.md) | v0 | Deprecated | Remove Console favorites provisioning |
+| [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v0.3 | Superseded by ADR-0561 | Support multiple agent graph shapes in Agent Runtime |
+| [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.3 | Superseded by ADR-0564 | Provide an AIAgent Kubernetes CRD and operator |
 | [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |
 | [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Superseded by ADR-0535 | Sign supply-chain artifacts in-cluster with Vault Transit |
 | [ADR-0505](0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) | OKF v0.1 | Superseded by ADR-0515 | Open OKF tasks as concurrent per-agent frontend tabs |
@@ -402,6 +401,7 @@ part of its decision is still in force.
 | [ADR-0507](0507-consume-the-zuno-okf-repository-through-a-single-pinned-reference.md) | v0.10 | Superseded by ADR-0576 | Consume the zuno-okf repository through a single pinned reference |
 | [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | v0.10 | Superseded by ADR-0580 | Deliver OKF content as mounted versioned artifacts |
 | [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | v0.10 | Superseded by ADR-0576 | Make the AIAgent operator watch the zuno-okf repository |
+| [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md) | OKF v0.1 | Superseded by ADR-0561 | Open per-conversation tabs with one browser tab per agent |
 
 ## Standard clauses
 

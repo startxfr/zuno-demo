@@ -1,6 +1,6 @@
 # ADR-0054: Define the BFF contract OpenAPI-first
 
-- **Status:** Implemented
+- **Status:** Superseded by [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) (2026-10-23, WP-156) - agent-bff and its OpenAPI contract (and platform/api/lint_openapi.py) are retired. Previously: Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team

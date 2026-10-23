@@ -1,6 +1,6 @@
 # ADR-0534: Integrate TrustyAI for AI evaluation and guardrails
 
-- **Status:** Implemented
+- **Status:** Superseded in part by [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) (2026-10-23, WP-156) - only the placement clause (hooking in front of Agent Runtime, alongside it) and the matching Non-goal: the hook now lives in the ai-gateway. Its phases, evaluation frameworks and blocking-needs-evidence rule remain in force. Otherwise: Implemented
 - **Target:** v0.7
 - **Date:** 2026-08-30
 - **Decision owners:** Zuno Demo architecture team
