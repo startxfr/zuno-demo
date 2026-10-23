@@ -52,6 +52,21 @@ liable to time out and fail `make day1 install` on a fresh cluster.
 Rollback for either half is the same pattern: flip its `.enabled` switch
 back to `false` and sync, ArgoCD's `selfHeal` removes just that half.
 
+**WP-156 (2026-10-23): the route half is retired.** The agent frontends it
+targeted were uninstalled, and with them the Day2
+`zuno-connectivity-link-quota-d1` Application (deleted live; its
+`gitops/apps/connectivity-link-quota/` directory and its apply in the
+`agents` role are gone). Nothing renders `quotaEnforcement.route.enabled`
+any more, and `quotaEnforcement.routes` entries carry only `name` and
+`hostname` (read by the Day1 gateway half, which stays):
+`templates/quota-demo-route.yaml` now requires an explicit
+`backendService`/`backendPort` per entry if the route half is ever
+re-enabled. The templates are kept because
+`platform/okf/generate_quota_enforcement.py --check` still validates the
+AuthPolicy identity filter against the generated RateLimitPolicy. The
+`quota_429` layer below is reported "not run" until WP-157 puts quota
+enforcement in front of UnifAI.
+
 **Why a Gateway is required at all:** confirmed directly against the
 installed CRD (`oc get crd ratelimitpolicies.kuadrant.io -o json` →
 `x-kubernetes-validations`), not assumed — `targetRef.group` must be

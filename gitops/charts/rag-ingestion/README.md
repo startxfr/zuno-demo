@@ -21,8 +21,7 @@ image-registry.openshift-image-registry.svc:5000/zuno-ai-build/rag-ingestion:lat
 
 The image is built imperatively by Ansible via the shared
 `ansible/tasks/apply_openshift_build.yml` task, same as every other
-component's image here (`rag-service`, `mcp-gateway`, `agent-runtime`,
-`ai-gateway`):
+component's image here (`rag-service`, `mcp-gateway`, `ai-gateway`):
 
 ```text
 make d1 build rag-ingestion

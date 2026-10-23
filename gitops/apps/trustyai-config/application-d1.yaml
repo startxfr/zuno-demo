@@ -25,10 +25,10 @@ spec:
         trustyaiConfig:
           enabled: true
         # ADR-0540/WP-120: deploy the NeMo rails server so its
-        # request/response contract can be established live. This does NOT
-        # switch agent-runtime over - gitops/charts/agent-runtime's
-        # guardrails.backend stays "builtin" until the discovery gate
-        # passes, so the observer in the request path is unchanged.
+        # request/response contract can be established live. The observer
+        # that calls it is ai-gateway's hook (gitops/charts/ai-gateway
+        # guardrails.backend, ADR-0567); the agent-runtime hook it first
+        # served was retired in WP-156.
         # DISABLED 2026-09-03: enabling it coincided with node
         # ip-10-18-31-92 hitting DiskPressure (the ~multi-GB NeMo server
         # image pull started 22:11:26Z, DiskPressure at 22:15:42Z, 43 pods

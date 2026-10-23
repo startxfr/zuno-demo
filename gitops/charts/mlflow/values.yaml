@@ -45,7 +45,7 @@ server:
     # entry ... no encryption" on sslmode=disable), and its server
     # certificate is signed by the PGO cluster CA, which this image does
     # not trust - so `require`: encrypted, no certificate verification.
-    # Same choice agent-runtime and mlops make. (An earlier sslmode=disable
+    # Same choice mlops makes. (An earlier sslmode=disable
     # attempt here was a wrong turn: a probe pod built from the MLflow
     # image proved TLS itself was fine and the real failure was a stale
     # SCRAM verifier on the pguser Secret.)

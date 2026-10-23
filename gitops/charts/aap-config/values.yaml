@@ -90,25 +90,25 @@ jobTemplates:
     playbook: ansible/playbooks/day1_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   - name: zuno-day1-build
     playbook: ansible/playbooks/day1_build.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [ai-gateway, supply-chain-signer, aiagent-operator, aap-execution-environment]
+    surveyComponents: [ai-gateway, supply-chain-signer, aap-execution-environment]
   # WP-103: gated (launch-RBAC) - aap_ops/aap_reader Controller Teams only,
   # see ansible/roles/aap_config/defaults/main.yml's `gated: true`.
   - name: zuno-day1-install
     playbook: ansible/playbooks/day1_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day1-reconcile
     playbook: ansible/playbooks/day1_reconcile.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed, aiagent-operator]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
 
   - name: zuno-day2-check
     playbook: ansible/playbooks/day2_check.yml
@@ -119,7 +119,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [mcp, rag, rag-ingestion, agent, mlops]
+    surveyComponents: [mcp, rag, rag-ingestion, mlops]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day2-install
     playbook: ansible/playbooks/day2_install.yml
@@ -306,9 +306,8 @@ workflowTemplates:
       # aiagent_operator) - added here too, from the start, to not repeat
       # the exact rhtas node omission documented above one component
       # later.
+      # WP-156: aiagent-operator, formerly the tail node, was retired.
       - id: rhtas-config
-        successNodes: [aiagent-operator]
-      - id: aiagent-operator
         successNodes: []
   - name: zuno-day1-check-workflow
     jobTemplate: zuno-day1-check
@@ -321,14 +320,11 @@ workflowTemplates:
   - name: zuno-day1-build-workflow
     jobTemplate: zuno-day1-build
     nodes:
-      # ai-gateway/aiagent-operator both only need supply-chain-signer
-      # built first (image-signing dependency) - no dependency on each
-      # other.
+      # ai-gateway only needs supply-chain-signer built first
+      # (image-signing dependency).
       - id: supply-chain-signer
-        successNodes: [ai-gateway, aiagent-operator]
+        successNodes: [ai-gateway]
       - id: ai-gateway
-        successNodes: []
-      - id: aiagent-operator
         successNodes: []
 
   # WP-103: gated (launch-RBAC)
@@ -409,12 +405,11 @@ workflowTemplates:
   - name: zuno-day2-build-workflow
     jobTemplate: zuno-day2-build
     nodes:
-      # 5 independent BuildConfigs, no ordering dependency between them -
+      # Independent BuildConfigs, no ordering dependency between them -
       # all launch in parallel as workflow roots.
       - {id: mcp, successNodes: []}
       - {id: rag, successNodes: []}
       - {id: rag-ingestion, successNodes: []}
-      - {id: agent, successNodes: []}
       - {id: mlops, successNodes: []}
 
   # WP-105/ADR-0536 Part B: the first Workflow Template that is NOT one

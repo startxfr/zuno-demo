@@ -1,9 +1,9 @@
 apiVersion: v2
 name: redis
 description: >-
-  ADR-0042: server-side session store backing agent-frontend's opaque
-  browser sessions (access/ID/refresh tokens, groups, expiry - never in
-  the browser cookie itself). Wraps the upstream bitnami/redis chart,
+  Redis for ai-gateway's semantic cache (ADR-0104); it was first the
+  ADR-0042 browser-session store of the agent frontends retired in
+  WP-156. Wraps the upstream bitnami/redis chart,
   same "vendor a public Helm chart, no operator" pattern
   gitops/charts/vault already established for a stateful backing service
   with no OLM operator commonly available on this platform.

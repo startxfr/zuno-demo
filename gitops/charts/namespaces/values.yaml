@@ -260,7 +260,7 @@ platformNamespaces:
     # but must NOT get the zuno-default-deny-other-namespaces NetworkPolicy
     # every other entry gets - that policy's "same-namespace traffic always
     # allowed" ingress rule has no port restriction, so it would silently
-    # grant every zuno-ai-run pod (agent-runtime, ai-gateway, ...) access to
+    # grant every zuno-ai-run pod (ai-gateway, mcp-gateway, ...) access to
     # every port of every other zuno-ai-run pod, additively overriding
     # mcp-confluence's own precise, port-8000-only, gateway-only
     # NetworkPolicy (ADR-0037) - exactly the risk this file's own comment

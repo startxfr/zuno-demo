@@ -26,9 +26,9 @@ Zuno Demo is an internal MVP demonstrating a reusable agentic AI platform on Red
 - **Advantage** - sales administration assistant.
 - **Finage** - finance assistant.
 
-Each agent has a dedicated frontend and BFF deployment while consuming shared platform services such as the agent runtime, AI/inference gateway, MCP gateway, RAG services, model serving, identity, secrets, observability, and data services.
+The agents are served by UnifAI (ADR-0561), deployed from the admitted zuno-demo-agents release (ADR-0580), and consume shared platform services such as the AI/inference gateway, MCP gateway, RAG services, model serving, identity, secrets, observability, and data services. The original per-agent frontend/BFF deployments, the agent runtime and the AIAgent operator were retired in WP-156.
 
-## v0 build status
+## v0 build status (historical)
 
 - **Tekos** is the sole mandatory end-to-end agent for v0 (ADR-0031): real
   frontend, BFF, Agent Runtime (LangGraph), MCP Gateway, RAG service,

@@ -13,9 +13,13 @@
 # ansible/roles/connectivity_link/tasks/install.yml liable to time out and
 # fail `make day1 install` outright on a fresh cluster.
 #
-# Rendered instead by the Day2 zuno-connectivity-link-quota-d1 Application
-# (ansible/roles/agents/tasks/install.yml), applied only once every agent's
-# own -frontend Service exists.
+# Rendered instead by the Day2 zuno-connectivity-link-quota-d1 Application,
+# applied only once every agent's own -frontend Service existed. WP-156
+# retired that Application with the agent frontends: nothing sets
+# quotaEnforcement.route.enabled any more, and an entry must now name its
+# backendService/backendPort explicitly (WP-157 owns quota enforcement in
+# front of UnifAI). platform/okf/generate_quota_enforcement.py --check still
+# reads this AuthPolicy's identity filter.
 #
 # Rollback: set quotaEnforcement.route.enabled back to false and sync -
 # ArgoCD's selfHeal removes every object below (and every RateLimitPolicy in
@@ -50,8 +54,8 @@ spec:
     - {{ .hostname }}
   rules:
     - backendRefs:
-        - name: {{ .backendService }}
-          port: {{ .backendPort }}
+        - name: {{ required "quotaEnforcement.routes[].backendService is required when quotaEnforcement.route.enabled is true" .backendService }}
+          port: {{ required "quotaEnforcement.routes[].backendPort is required when quotaEnforcement.route.enabled is true" .backendPort }}
 ---
 apiVersion: kuadrant.io/v1
 kind: AuthPolicy

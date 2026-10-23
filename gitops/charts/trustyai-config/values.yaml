@@ -75,11 +75,11 @@ guardrailsSmoke:
   enabled: true
   name: zuno-guardrails-smoke
 
-# ADR-0540/WP-120: the same guardrail policy the agent-runtime image
+# ADR-0540/WP-120: the guardrail policy the retired agent-runtime image
 # used to carry as a Python dict, expressed as NeMo rails config.
 # Disabled by default: flipping it on is a two-step change - deploy the
-# CR, prove the server answers, THEN point agent-runtime at it with
-# gitops/charts/agent-runtime/values.yaml guardrails.backend=nemo.
+# CR, prove the server answers, THEN point the observer at it with
+# gitops/charts/ai-gateway/values.yaml guardrails.backend=nemo.
 # The GuardrailsOrchestrator smoke instance above is unaffected and
 # remains the fallback backend.
 nemoGuardrails:

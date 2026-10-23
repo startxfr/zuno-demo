@@ -1955,7 +1955,7 @@ domains:
 # Runtime image is built imperatively by the day1-build Ansible role
 # (ansible/roles/rag_ingestion_build, ansible/tasks/apply_openshift_build.yml)
 # - the same mechanism as every other component's image (rag-service,
-# mcp-gateway, agent-runtime, ai-gateway), not an ArgoCD-managed
+# mcp-gateway, ai-gateway), not an ArgoCD-managed
 # BuildConfig. Tag is always "latest": apply_openshift_build.yml hardcodes
 # "<name>:latest" as its BuildConfig output, matching every other
 # component.

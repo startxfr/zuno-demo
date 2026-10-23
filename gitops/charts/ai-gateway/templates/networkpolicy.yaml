@@ -1,5 +1,5 @@
-# Precise ingress allow-list, not a namespace-wide baseline: Agent
-# Runtime, the acceptance-gate test Job, and MCP Gateway (ADR-0415's
+# Precise ingress allow-list, not a namespace-wide baseline: UnifAI (below),
+# the acceptance-gate test Job, and MCP Gateway (ADR-0415's
 # generate_image handler calls POST /v1/images/generations directly,
 # components/mcp-gateway/app/handlers/image_gen.py) may call this
 # service. mcp-gateway was missing here from ADR-0415's original
@@ -26,9 +26,6 @@ spec:
     - Ingress
   ingress:
     - from:
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: agent-runtime
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: acceptance-gate

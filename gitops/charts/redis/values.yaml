@@ -80,7 +80,7 @@ redis:
   # which would punch a hole through zuno-auth's existing default-deny-
   # other-namespaces baseline (gitops/charts/namespaces) rather than
   # respect it. Disabled here in favor of this chart's own
-  # templates/networkpolicy.yaml, scoped to agent-frontend pods
+  # templates/networkpolicy.yaml, scoped to ai-gateway pods
   # specifically - the same least-privilege bar
   # gitops/charts/mcp-confluence already sets for a comparable
   # security-relevant backing service.

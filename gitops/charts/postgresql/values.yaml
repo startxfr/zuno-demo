@@ -244,6 +244,10 @@ mlflowDatabase:
   owner: mlflow
   vaultPath: mlflow/postgresql-app
 
+# WP-156: agent-runtime, this database's only client, is retired. The PGO
+# user, its database and its credential ExternalSecret stay until a
+# reviewed live step drops them (removing the user here would make PGO
+# drop the role and error-loop; PGO never recreates a dropped database).
 # Dedicated database/role for the Agent Runtime's LangGraph checkpointer
 # (ADR-0103) - resumable workflow state, isolated from every other
 # database on this cluster for the same reason ragTechDatabase/
@@ -312,6 +316,10 @@ ragProjectDatabase:
   owner: ragproject
   vaultPath: rag-project/postgresql-app
 
+# WP-156: agent-runtime, this database's only client, is retired. The PGO
+# user, its database and its credential ExternalSecret stay until a
+# reviewed live step drops them (removing the user here would make PGO
+# drop the role and error-loop; PGO never recreates a dropped database).
 # Dedicated database/role for ADR-0212's persistent-conversation metadata
 # (conversations/conversation_stars tables). One shared database, not one
 # per agent unlike the ragXxxDatabase pattern above - conversation

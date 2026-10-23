@@ -13,7 +13,7 @@ that component now lives in (ADR-0060) - see
 `make day0|d0`/`day1|d1`/`day2|d2` uses to reconcile these Applications.
 
 Most components have real content on only one side - a component with no
-OLM operator (`vault`, `agent-runtime`, `ai-gateway`, `api`, `llm`, `mcp`,
+OLM operator (`vault`, `ai-gateway`, `llm`, `mcp`,
 `models`, `rag`) has an empty `-d0`, pointing at `gitops/charts/noop` (see
 that chart's README). `namespaces` has real content on *both* sides: its `-d0`
 (Namespace objects) and `-d1` (ResourceQuota/NetworkPolicy) also span the
@@ -157,9 +157,7 @@ Directories present:
 | `rag` | local chart, `gitops/charts/rag-service` - no operator, `-d0` is a no-op |
 | `mlops` | local chart, `gitops/charts/mlops` - no operator, `-d0` is a no-op |
 | `ai-gateway` | local chart, `gitops/charts/ai-gateway` (applied by the `llm` role, see its README; ADR-0009) - no operator, `-d0` is a no-op |
-| `agent-runtime` | local chart, `gitops/charts/agent-runtime` (applied by the `llm` role, see its README) - no operator, `-d0` is a no-op |
 | `namespaces` | local chart, `gitops/charts/namespaces` (`-d0`: Namespace objects, `namespace.enabled`; `-d1`: ResourceQuota/NetworkPolicy scaffolding, `policy.enabled` - spans the macro Day 0/Day 2 split (ADR-0060), not just this component's own internal ordering) |
-| `api` | local chart, `gitops/charts/tekos` - no operator, `-d0` is a no-op |
 | `llm` | native Kustomize app, `platform/ai-gateway/` (provider routing ConfigMap + provider `ExternalSecret`s) - no operator, `-d0` is a no-op |
 | `machines` | local chart, `gitops/charts/machines` (ADR-0351 - `-d0`: startx `cluster-machine` dependency for the GPU MachineSets/MachineAutoscaler/ClusterAutoscaler, all cluster-scoped, no operator; `-d1` is a no-op - see that chart's README for the scale-from-zero and AZ-failover design) |
 | `nfd` | local chart, `gitops/charts/nfd` (ADR-0312 - `-d0`: startx `cluster-nfd` dependency, entirely - Namespace/OperatorGroup/Subscription; `-d1`: `cluster-nfd`'s own NodeFeatureDiscovery CR) |

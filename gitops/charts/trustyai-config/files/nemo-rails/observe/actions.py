@@ -7,7 +7,7 @@ touches this code, and never rebuilds an image.
 
 The action returns the list of matched detection names. It cannot block:
 the calling flow in rails.co only records, and the client
-(components/agent-runtime/app/clients/guardrails_client.py) is
+(ai-gateway's guardrails hook, components/ai-gateway/app/guardrails.py) is
 fire-and-forget after the response has already been delivered. Observe-only
 is enforced in three independent places on purpose - ADR-0534 makes the
 observe-to-block transition a separate, later decision.

@@ -1,6 +1,6 @@
 ---
-# ADR-0042: server-side session store backing agent-frontend's opaque
-# browser sessions. Demo-grade: standalone (no replication), 1Gi
+# Redis for ai-gateway's semantic cache (ADR-0104; first the ADR-0042
+# session store of the agent frontends retired in WP-156). Demo-grade: standalone (no replication), 1Gi
 # persistence - see gitops/charts/redis/values.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application

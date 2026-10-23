@@ -50,9 +50,11 @@
 # zuno-connectivity-link-d1's Synced+Healthy wait in
 # ansible/roles/connectivity_link/tasks/install.yml liable to time out and
 # hard-fail `make day1 install` on every fresh cluster. route defaults false
-# so only the Day2 zuno-connectivity-link-quota-d1 Application
-# (ansible/roles/agents/tasks/install.yml, applied after every agent's own
-# `-frontend` Service exists) renders it.
+# and, since WP-156, NOTHING renders it: the Day2
+# zuno-connectivity-link-quota-d1 Application that set it was retired with
+# the agent frontends it targeted, and `routes` entries no longer carry a
+# backendService/backendPort (the route template requires both). Quota
+# enforcement in front of UnifAI is WP-157's.
 #
 # `routes` is a list, not the single-route scalar set this used to be
 # (ADR-0511/WP-54 was Tekos-only) - every entry needs a unique `name`
@@ -75,16 +77,10 @@ quotaEnforcement:
   routes:
     - name: tekos-quota-demo
       hostname: tekos-quota-demo.apps.mycluster.example.com
-      backendService: tekos-frontend
-      backendPort: 8080
     - name: arkos-quota-demo
       hostname: arkos-quota-demo.apps.mycluster.example.com
-      backendService: arkos-frontend
-      backendPort: 8080
     - name: comage-quota-demo
       hostname: comage-quota-demo.apps.mycluster.example.com
-      backendService: comage-frontend
-      backendPort: 8080
   # jwksUrl, not issuerUrl (OIDC discovery) - Authorino runs in-cluster and
   # doesn't trust the CA signing the external Keycloak route's cert; the
   # internal Service endpoint is plain HTTP, sidestepping TLS trust

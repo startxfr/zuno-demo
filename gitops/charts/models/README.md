@@ -10,9 +10,7 @@ and `gpt-oss-20b` (the local reasoning model, ADR-0414), plus
 `LLMInferenceService`s; embeddings remain a classic
 `ServingRuntime`/`InferenceService` pair. `platform/ai-gateway/provider-routing.yaml`'s
 `role` key is the authority for which model plays which architectural role. Serves an OpenAI-compatible `/v1` API, which is
-what `components/agent-runtime`'s model router expects at
-`agent-runtime.localModelEndpoint` / `localModelName`
-(`gitops/charts/agent-runtime/values.yaml`).
+what `ai-gateway`'s provider routing expects (`platform/ai-gateway/provider-routing.yaml`).
 
 ## Serving runtime image discovery
 

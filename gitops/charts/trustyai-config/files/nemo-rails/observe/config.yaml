@@ -1,10 +1,10 @@
 # ADR-0540/WP-120: the guardrail POLICY, as data.
 #
 # These patterns are the whole of what used to be DETECTOR_PARAMS, a dict
-# literal in components/agent-runtime/app/clients/guardrails_client.py.
+# literal in the guardrails client of the agent runtime retired in WP-156.
 # Moving them here is the point of this work package: policy that a
 # reviewer can read and change without touching, rebuilding and
-# redeploying the agent-runtime image.
+# redeploying any image.
 #
 # DELIBERATELY NO `models:` BLOCK. NeMo Guardrails only needs an LLM for
 # rails that reason (self-check, fact-checking, topical rails). Every rail

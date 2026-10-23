@@ -146,14 +146,11 @@ unifaiNamespace: zuno-unifai
 
 # ADR-0567/WP-153: TrustyAI guardrails evaluated on every
 # /v1/chat/completions exchange. Same detector Services and backend switch
-# agent-runtime's hook uses (gitops/charts/agent-runtime/values.yaml).
+# the retired agent-runtime hook used.
 guardrails:
-  # false = hook off. Keep false on a cluster where agent-runtime's own
-  # observe hook is still enabled (double counting of the same exchange).
-  # On this branch (demo333) the gateway hook is live-proven (WP-153 step 7,
-  # 2026-10-22) and agent-runtime's detectorUrl/nemoUrl are emptied, so the
-  # gateway is the single observer. WP-156 removes the agent-runtime hook for
-  # good.
+  # false = hook off. The gateway hook is live-proven (WP-153 step 7,
+  # 2026-10-22) and, since WP-156 retired the agent-runtime hook, the
+  # gateway is the single observer.
   enabled: true
   backend: nemo
   detectorUrl: http://zuno-guardrails-smoke-service.zuno-ai-run.svc:8080

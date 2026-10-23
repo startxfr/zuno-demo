@@ -1,5 +1,7 @@
-# Documents and enforces rag-service's actual caller at the workload level,
-# on top of the namespace-wide baseline that already permits it.
+# Documents and enforces rag-service's actual callers at the workload level,
+# on top of the namespace-wide baseline. Its first caller, agent-runtime,
+# was retired in WP-156; rag-service stays for the Red Hat documentation
+# until WP-168.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -16,16 +18,6 @@ spec:
   policyTypes:
     - Ingress
   ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: zuno-ai-run
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: agent-runtime
-      ports:
-        - protocol: TCP
-          port: 8080
     # ADR-0534/WP-109: admits the eval-class Jobs from
     # gitops/charts/trustyai-config (RAGAS retrieval-quality evaluation
     # needs the REAL /v1/search path - evaluating a copy would measure

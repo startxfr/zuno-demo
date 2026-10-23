@@ -30,7 +30,7 @@ spec:
         # bootstrap before kubelet killed it, well short of how long Envoy
         # can actually take to complete cert issuance + its first xDS sync
         # under real control-plane load: every freshly admitted pod's
-        # istio-proxy (tekos-frontend and, independently, agent-runtime)
+        # istio-proxy (two agent workloads, independently)
         # crash-looped on this probe for 20+ minutes. 600 is Istio's own
         # stock default for this field (~10min ceiling, only actually
         # consumed if boot is unusually slow) - restores the intended
@@ -49,7 +49,7 @@ spec:
         # entire overage was sidecar tax, not real usage), on a
         # 5-node/~69.5-core cluster that can never satisfy the stock
         # default at this pod count. Still generous for this demo's
-        # actual per-service traffic (compare agent-bff/agent-runtime/
+        # actual per-service traffic (compare ai-gateway/mcp-gateway/
         # etc.'s own much smaller requests/limits in their respective
         # charts).
         resources:

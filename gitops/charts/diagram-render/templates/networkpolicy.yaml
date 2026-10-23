@@ -1,5 +1,5 @@
 # diagram-render must accept traffic ONLY from mcp-gateway, not other
-# same-namespace pods (e.g. agent-runtime) - same reasoning as
+# same-namespace pods (e.g. ai-gateway) - same reasoning as
 # gitops/charts/mcp-confluence's own NetworkPolicy. The app also validates
 # the X-Zuno-Gateway-Token shared secret as defense in depth (server.js).
 #

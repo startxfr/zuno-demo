@@ -1,6 +1,0 @@
-apiVersion: v2
-name: agent-runtime
-description: Shared LangGraph orchestration service; v0 implements the Tekos technical-consultant workflow.
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

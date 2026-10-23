@@ -1,6 +1,6 @@
 ---
-# AI Inference Gateway. Applied before agent-runtime, which only needs
-# this gateway's URL, not the routing config or provider secrets directly.
+# AI Inference Gateway. Its callers (UnifAI, mcp-gateway) only need this
+# gateway's URL, not the routing config or provider secrets directly.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

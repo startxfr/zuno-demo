@@ -1,6 +1,6 @@
 {{- /*
 ADR-0540/WP-120: guardrail policy expressed as NeMo rails instead of a
-dict literal in the agent-runtime image.
+dict literal in the (since retired) agent-runtime image.
 
 This does NOT replace the GuardrailsOrchestrator beside it
 (templates/guardrailsorchestrator.yaml): that instance stays as ADR-0534's
