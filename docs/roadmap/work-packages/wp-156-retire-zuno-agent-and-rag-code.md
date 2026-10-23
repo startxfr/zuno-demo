@@ -185,8 +185,8 @@ No file references the removed components (`grep -rn` returns only ADR
 history and CHANGELOG); `check_docs.py` green; CI lint and build workflows
 green; on demo333 the step-6 chain passes and no orphan Deployment,
 ExternalSecret or Keycloak client of the four retired components remains;
-`search_technical_docs` still answers (Keycloak callers from UnifAI, OpenShift
-tokens from rag-service); the PostgreSQL cluster
+`search_technical_docs` still answers (Keycloak callers from UnifAI and
+rag-service, OpenShift tokens from rag-service); the PostgreSQL cluster
 stays Healthy throughout.
 
 ## Open questions

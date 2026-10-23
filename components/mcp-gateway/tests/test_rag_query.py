@@ -1,6 +1,7 @@
-"""WP-156: search_technical_docs routes a Keycloak JWT to UnifAI's bearer RAG
-endpoint with the caller's own token, and keeps any other token (OpenShift
-Lightspeed's) on rag-service until UnifAI reviews Kubernetes tokens."""
+"""WP-156: search_technical_docs answers a Keycloak JWT from UnifAI's bearer
+RAG endpoint (the caller's own token) and rag-service (the Red Hat product
+documentation, until WP-168), interleaved; any other token (OpenShift
+Lightspeed's) from rag-service alone."""
 from __future__ import annotations
 
 import asyncio
@@ -43,34 +44,61 @@ def _run(monkeypatch, bearer_token, handler):
     return result, seen
 
 
-def test_a_keycloak_jwt_goes_to_unifai_with_the_callers_token(monkeypatch):
+UNIFAI_MATCH = {
+    "id": "c1",
+    "score": 0.7,
+    "content": "# S0R42 : Schedule Satellite",
+    "metadata": {"title": "S0R42 : Schedule Satellite", "url": "https://wiki/S0R42"},
+}
+RAG_SERVICE_RESULTS = [
+    {"id": "r1", "source": "https://docs.redhat.com/a", "title": "A", "snippet": "a", "score": 3.1},
+    {"id": "r2", "source": "https://docs.redhat.com/b", "title": "B", "snippet": "b", "score": 2.0},
+]
+
+
+def _both(unifai_response, rag_service_response):
     def handler(request):
-        return httpx.Response(200, json={"matches": [{
-            "id": "c1",
-            "score": 0.7,
-            "content": "# S0R42 : Schedule Satellite",
-            "metadata": {"title": "S0R42 : Schedule Satellite", "url": "https://wiki/S0R42"},
-        }]})
+        if request.url.host == "unifai-rag-server.zuno-unifai.svc":
+            return unifai_response
+        return rag_service_response
+    return handler
 
-    result, seen = _run(monkeypatch, JWT, handler)
 
-    assert len(seen) == 1
-    request = seen[0]
+def test_a_keycloak_jwt_queries_unifai_with_the_callers_token_and_rag_service(monkeypatch):
+    result, seen = _run(monkeypatch, JWT, _both(
+        httpx.Response(200, json={"matches": [UNIFAI_MATCH]}),
+        httpx.Response(200, json={"results": RAG_SERVICE_RESULTS}),
+    ))
+
+    unifai = [r for r in seen if r.url.host == "unifai-rag-server.zuno-unifai.svc"]
+    rag_service = [r for r in seen if r.url.host == "rag-service.zuno-data.svc"]
+    assert len(unifai) == 1 and len(rag_service) == 1
+    request = unifai[0]
     assert request.method == "GET"
-    assert request.url.host == "unifai-rag-server.zuno-unifai.svc"
     assert request.url.path == "/api/sources/query.bearer"
     assert request.url.params["tags"] == "knowledge.tech"
     assert request.url.params["sourceType"] == "CONFLUENCE"
     assert request.url.params["top_k_results"] == "3"
     assert request.headers["authorization"] == f"Bearer {JWT}"
-    assert result == {"results": [{
+    assert "authorization" not in rag_service[0].headers
+    # Interleaved, UnifAI first, capped at top_k=3.
+    assert [r["id"] for r in result["results"]] == ["c1", "r1", "r2"]
+    assert result["results"][0] == {
         "id": "c1",
         "source": "https://wiki/S0R42",
         "title": "S0R42 : Schedule Satellite",
         "snippet": "# S0R42 : Schedule Satellite",
         "score": 0.7,
         "classification": "C1",
-    }]}
+    }
+
+
+def test_one_failed_source_leaves_the_other(monkeypatch):
+    result, _ = _run(monkeypatch, JWT, _both(
+        httpx.Response(401, json={"detail": "invalid bearer token"}),
+        httpx.Response(200, json={"results": RAG_SERVICE_RESULTS}),
+    ))
+    assert [r["id"] for r in result["results"]] == ["r1", "r2"]
 
 
 def test_an_openshift_token_stays_on_rag_service(monkeypatch):
@@ -86,10 +114,10 @@ def test_an_openshift_token_stays_on_rag_service(monkeypatch):
     assert result == {"results": [{"id": "r1"}]}
 
 
-def test_a_unifai_refusal_is_reported_not_raised(monkeypatch):
-    result, _ = _run(monkeypatch, JWT, lambda request: httpx.Response(401, json={"detail": "invalid bearer token"}))
+def test_both_sources_failing_is_reported_not_raised(monkeypatch):
+    result, _ = _run(monkeypatch, JWT, lambda request: httpx.Response(503))
     assert "error" in result
-    assert "401" in result["error"]
+    assert "503" in result["error"]
 
 
 def test_an_empty_query_contacts_no_backend(monkeypatch):

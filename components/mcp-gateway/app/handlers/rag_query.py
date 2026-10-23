@@ -7,17 +7,20 @@ UnifAI agents already answer from, through its bearer endpoint
 forwarded, so UnifAI resolves the user and applies its own group ACL
 (``metadata.acl_groups``) server-side; ``caller_groups`` is not sent.
 
-An OpenShift access token (OpenShift Lightspeed forwards the console user's
-own token to the /mcp front-door, ADR-0524) is answered by
-``components/rag-service`` (``POST /v1/search``), keyed on the
-``caller_groups`` the gateway's TokenReview resolved. rag-service keeps the
-Red Hat product documentation, which UnifAI does not serve yet (decision of
-2026-10-23 in the WP-156 brief); WP-168 migrates it to UnifAI and removes
-this branch together with rag-service and rag-ingestion.
+``components/rag-service`` (``POST /v1/search``, keyed on the
+``caller_groups`` the gateway resolved) keeps the Red Hat product
+documentation, which UnifAI does not serve yet (decision of 2026-10-23 in
+the WP-156 brief). So a Keycloak caller gets both sources, interleaved, and
+an OpenShift access token (OpenShift Lightspeed forwards the console user's
+own token to the /mcp front-door, ADR-0524), which UnifAI does not accept,
+gets rag-service alone. WP-168 migrates the documentation to UnifAI and
+removes rag-service from this handler together with rag-service and
+rag-ingestion.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Any, Dict, List, Optional
@@ -114,5 +117,32 @@ async def handle(
     top_k = int(arguments.get("top_k", 5) or 5)
 
     if bearer_token and _is_keycloak_jwt(bearer_token):
-        return await _search_unifai(query, top_k, bearer_token)
+        unifai, rag_service = await asyncio.gather(
+            _search_unifai(query, top_k, bearer_token),
+            _search_rag_service(query, top_k, caller_sub, caller_groups),
+        )
+        return _merge(unifai, rag_service, top_k)
     return await _search_rag_service(query, top_k, caller_sub, caller_groups)
+
+
+def _merge(first: Dict[str, Any], second: Dict[str, Any], top_k: int) -> Dict[str, Any]:
+    """Interleave two sources' results, without identical passages, capped
+    at top_k. Interleaved rather than sorted: the two engines' scores are not on
+    the same scale. One failed source still leaves the other's results; both
+    failed reports the first error."""
+    lists = [r.get("results", []) for r in (first, second) if "error" not in r]
+    if not lists:
+        return first
+    merged: List[Dict[str, Any]] = []
+    seen = set()
+    for row in range(max(len(results) for results in lists)):
+        for results in lists:
+            if row >= len(results):
+                continue
+            item = results[row]
+            key = (item.get("source"), item.get("snippet"))
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(item)
+    return {"results": merged[:top_k]}
