@@ -2,8 +2,8 @@
 
 - **State:** Not started
 - **ADRs:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
-- **Depends on:** [WP-156](wp-156-retire-the-old-agent-stack-and-rag-stack-from-zuno-demo.md)
-- **Related:** [WP-149](wp-149-unifai-rag-qdrant-hybrid-search.md), [ADR-0330](../../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md)
+- **Depends on:** [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
+- **Related:** [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md), [ADR-0330](../../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md)
 - **Target:** v0.11
 - **Estimated files touched:** ~8 in the fork (`fork/unifai-operator` source type and controller, a RAG source adapter for web pages, tests) and ~4 in `zuno-demo` (`gitops/charts/unifai` sources, `rag-ingestion` removal, evidence).
 
