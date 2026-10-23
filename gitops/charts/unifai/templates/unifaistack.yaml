@@ -98,6 +98,12 @@ spec:
       model: {{ $s.rag.embeddingModel }}
       dimension: {{ $s.rag.embeddingDimension }}
     hybrid: {{ $s.rag.hybrid }}
+    {{- if $s.rag.tokenReview }}
+    # The RAG search accepts OpenShift console tokens (Lightspeed users) after a Kubernetes TokenReview.
+    # unifai-operator >= 0.1.29 gives the rag-server its own ServiceAccount and binds it to
+    # system:auth-delegator (cluster-wide tokenreviews and subjectaccessreviews, nothing else).
+    tokenReview: true
+    {{- end }}
     {{- with $s.rag.sharedPublishers }}
     sharedPublishers:
       {{- toYaml . | nindent 6 }}

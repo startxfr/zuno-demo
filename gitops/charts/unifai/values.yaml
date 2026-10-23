@@ -72,6 +72,9 @@ stack:
     embeddingModel: qwen3-embedding-0.6b
     embeddingDimension: 1024
     hybrid: true
+    # Let the RAG search authenticate OpenShift console tokens through the Kubernetes TokenReview API
+    # (needs unifai-operator >= 0.1.29; grants the rag-server ServiceAccount system:auth-delegator).
+    tokenReview: false
     # UnifAI users allowed to publish shared sources (ADR-0568). The
     # UnifaiRAGSource objects below are owned by the first one.
     sharedPublishers: [ai-ops-01]
