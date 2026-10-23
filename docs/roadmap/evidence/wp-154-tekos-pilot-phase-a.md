@@ -249,6 +249,21 @@ arkos, cognos and soursage are excluded from the deployed list
 (`zuno_unifai_released_bundles_exclude`): the operator has no blueprint template
 for `plan_draft_write` and the other two declare no graph shape.
 
+## Operator 0.1.26 on demo333 (2026-10-23)
+
+unifai-operator 0.1.26 is on `stable` (stacks Ready, NetworkIsolated). zuno-unifai
+now serves only the active agents: advantage, finage and naveo are `placeholder`
+in their OKF, so their bundles stay Pending ("placeholder agent: not served"),
+emit nothing, and their teams were released once their retrievers left the
+GitOps values (an owned team stays Deleting while an object still references it).
+comage and tekos have `retrieveFirst: true`, on multiagent `devel-472339706`.
+
+| Check | Result |
+|---|---|
+| comage scenarios | 18/19 (95 %), best run so far; scenario 11 can only show that a reply came back: there is no sales knowledge source in UnifAI (the RAG sources are tekos Confluence trees), so it cannot be proven for comage |
+| tekos scenarios | 15/17: scenario 8 (first token 14 s on the shared 9B model) and scenario 11, which was a false failure (the answer names page S0R42, but retrieval now happens inside the node and emits no tool event); the scenario now takes the expected page as the proof |
+| Empty final answers | `Reasoning too short`: 0 occurrences over 40-60 min (59); the gateway recovered 7 empty model answers with its reasoning fallback |
+
 ## Not yet covered
 
 The quota 429 and the routing badge in the UI (WP-148), the guardrails counter
