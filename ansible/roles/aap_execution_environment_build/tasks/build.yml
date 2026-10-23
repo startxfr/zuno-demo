@@ -14,7 +14,7 @@
 
 # Registers the credential/execution_environment objects in Controller and
 # assigns the EE to the Job Templates that need it (zuno-day2-check,
-# zuno-day2-install, zuno-day1-build, zuno-day2-build, zuno-day3-sign) -
+# zuno-day2-install, zuno-day1-build, zuno-day2-build) -
 # lives in aap_config, not here, purely to reuse that role's existing
 # Gateway URL/admin-password resolution and GET-then-POST idiom
 # (ansible/roles/aap_config/tasks/install.yml) rather than duplicating it.

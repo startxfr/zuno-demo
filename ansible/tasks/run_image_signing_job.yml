@@ -44,9 +44,10 @@
 # where RHTAS predates the signing wiring (WP-070). Callers that
 # legitimately run before RHTAS exists (the routine day1 build path,
 # apply_openshift_build.yml) set sign_skip_when_unavailable: true to turn
-# that dead end into a loud skip - those images are then signed by the
-# day3 signing pass (`make d3 sign`, the exact rebuild-then-resign flow
-# ADR-0544 documents) once RHTAS is up. Callers for whom signing IS the
+# that dead end into a loud skip - those images are then signed by
+# rebuilding them once RHTAS is up (the rebuild-then-resign flow ADR-0544
+# documents; `make d3 sign`, which this comment used to name, only ever
+# signed OKF bundles and left with them in WP-165). Callers for whom signing IS the
 # point (day3_release.yml) keep the default false and still fail hard.
 - name: "image-signing | check the RHTAS signer client secret exists"
   kubernetes.core.k8s_info:
@@ -70,7 +71,8 @@
       first day1 build, which runs before the Day 1 install phase).
       SKIPPING the signing of
       {{ sign_image_name }}:{{ _image_signing_tag }} - after Day 1
-      completes, sign every unsigned image with: make d3 sign all
+      completes, rebuild it to sign it: make d1 build <component> (or
+      make d2 build <component> for a Day 2 image)
   when: _image_signing_skip | bool
 
 - name: "image-signing | sign {{ sign_image_name }} via RHTAS"

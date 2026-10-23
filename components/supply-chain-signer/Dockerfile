@@ -3,15 +3,16 @@
 #
 #   docker build -f components/supply-chain-signer/Dockerfile -t zuno/supply-chain-signer:local .
 #
-# ADR-0420/WP-068/WP-069/WP-070: this image is cosign + platform/supply-chain/
-# sign_in_cluster.py + sign_okf_bundle.py + the committed Vault Transit
-# public key, nothing else. Signing (sign-image, sign-okf-bundles)
-# authenticates to Vault's platform-signer identity via Kubernetes auth
-# and drives cosign's hashivault:// KMS mode; verifying (verify-images)
-# needs the committed public key baked in below, never Vault access -
-# the whole point of a verifier under ADR-0420. Backs one-off debug pods,
-# the OKF/image signing Jobs, and the supply-chain check gate; never a
-# long-running Deployment of its own.
+# ADR-0420/WP-068/WP-070/ADR-0535: this image is cosign + platform/
+# supply-chain/sign_in_cluster.py, plus the okf-fetch admission files
+# below. Image signing (sign-image) and verification (verify-images) run
+# keyless through RHTAS; sign-blob/verify-blob keep the Vault Transit
+# platform-signer identity (Kubernetes auth, cosign's hashivault:// KMS
+# mode). Backs one-off debug pods, the image signing Jobs, the
+# supply-chain check gate and the okf-fetch init container; never a
+# long-running Deployment of its own. WP-165 removed the OKF Transit
+# signing (sign-okf-bundles) and the public key it shipped: OKF releases
+# are signed keyless by zuno-demo-agents (ADR-0578).
 ARG BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/python:3.11-slim
 FROM ${BASE_IMAGE} AS base
 
@@ -48,8 +49,6 @@ COPY platform/okf/sigstore ./platform/okf/sigstore
 RUN chmod -R a+rX /app/platform
 
 COPY platform/supply-chain/sign_in_cluster.py ./sign_in_cluster.py
-COPY platform/supply-chain/sign_okf_bundle.py ./sign_okf_bundle.py
-COPY agents/zuno-platform-signer.pub ./zuno-platform-signer.pub
 
 ENTRYPOINT ["python3", "/app/sign_in_cluster.py"]
 CMD ["dry-run"]

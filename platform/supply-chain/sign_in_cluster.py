@@ -11,14 +11,15 @@ Vault Transit was insufficient (it remains valid, sufficient, and live for
 every other operation below), but because demonstrating RHTAS is this
 ADR's actual point (see ADR-0535's Context).
 
-Every OTHER operation (`sign-blob`/`verify-blob`/`sign-okf-bundles`/
+Every OTHER operation (`sign-blob`/`verify-blob`/
 `public-key`/`login`/`dry-run`) is untouched and still uses Vault's
 Transit-backed platform-signer identity via Kubernetes auth, driving
 cosign's native `hashivault://` KMS mode - the GitHub-OIDC/Fulcio/Rekor
-keyless model platform/supply-chain/sign_okf_bundle.py and
-verify_signatures.py's own historical mode is what WP-069/070 replaced
-with this, before RHTAS existed. OKF bundle signing is explicitly out of
-ADR-0535's scope (Non-goals - blocked on ADR-0506/ADR-0507).
+keyless model verify_signatures.py's own historical mode is what
+WP-069/070 replaced with this, before RHTAS existed. OKF bundles are no
+longer signed here at all: WP-165 removed `sign-okf-bundles` (and
+sign_okf_bundle.py) once the zuno-demo-agents release workflow signs them
+keyless (ADR-0578).
 
 Operations:
 
@@ -39,11 +40,6 @@ Operations:
                   tampered copy is rejected. Touches no real bundle or
                   image - see docs/roadmap/work-packages/
                   wp-068-vault-transit-signing-backend.md.
-    sign-okf-bundles - WP-069: sign every agents/<agent>/ bundle found under
-                  --agents-root with sign_okf_bundle.py, then write every
-                  {agent}.sig plus the shared public key into Vault KV
-                  (--kv-mount/--kv-path), which agent-runtime read until
-                  WP-156 retired it (WP-165 removes this path).
     sign-image  - WP-111/ADR-0535: signs an OCI image by digest keyless via
                   RHTAS - exchanges the `zuno-signer` Keycloak
                   client-credentials token for a short-lived Fulcio
@@ -95,18 +91,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-import sign_okf_bundle
-
 DEFAULT_VAULT_ADDR = "http://zuno-vault.zuno-vault.svc:8200"
 DEFAULT_ROLE = "platform-signer"
 DEFAULT_KEY_NAME = "zuno-platform-signer"
 DEFAULT_JWT_PATH = "/var/run/secrets/kubernetes.io/serviceaccount/token"
-DEFAULT_KV_MOUNT = "zuno"
-DEFAULT_KV_PATH = "okf-signatures"
-# Baked into components/supply-chain-signer/Dockerfile at build time - a
-# verifier reads this local file, never Vault, matching ADR-0420's core
-# principle.
-DEFAULT_LOCAL_PUBLIC_KEY_PATH = pathlib.Path("/app/zuno-platform-signer.pub")
 
 # WP-111/ADR-0535: RHTAS keyless signing/verification defaults. All
 # overridable via env (set by ansible/tasks/run_image_signing_job.yml and
@@ -270,7 +258,7 @@ def sign_image(
     """WP-111/ADR-0535: signs an OCI image by digest keyless via RHTAS
     (image_ref must already be `<repository>@sha256:<digest>` - the caller
     resolves the live ImageStreamTag digest, this function never does,
-    matching run_okf_signing_job.yml's own "resolve outside, sign inside"
+    matching run_image_signing_job.yml's own "resolve outside, sign inside"
     split). Unlike sign-blob, plain `cosign sign` gates transparency-log
     upload behind an opt-in COSIGN_EXPERIMENTAL env var rather than a
     flag - not setting it (never set anywhere in this repo) is the whole
@@ -427,72 +415,6 @@ def verify_blob(public_key: pathlib.Path, blob: pathlib.Path, signature: pathlib
     print(f"verified {blob}")
 
 
-def kv_put(vault_addr: str, vault_token: str, mount: str, path: str, data: dict) -> None:
-    """Writes a full KV v2 secret version (overwrites, not merges - matches
-    Vault's own `kv put` semantics). Used instead of the idempotent
-    seed-if-missing pattern `ansible/tasks/vault_seed_if_missing.yml` uses
-    for operator-supplied credentials: a signature must update whenever
-    bundle content changes, so this always writes the current value."""
-    payload = json.dumps({"data": data}).encode("utf-8")
-    req = urllib.request.Request(
-        f"{vault_addr}/v1/{mount}/data/{path}",
-        data=payload,
-        headers={"Content-Type": "application/json", "X-Vault-Token": vault_token},
-        method="POST",
-    )
-    try:
-        urllib.request.urlopen(req, timeout=10)
-    except urllib.error.HTTPError as exc:
-        raise SignerError(f"Vault KV write to {mount}/data/{path} failed ({exc.code}): {exc.read().decode()}") from exc
-    except urllib.error.URLError as exc:
-        raise SignerError(f"cannot reach Vault at {vault_addr}: {exc.reason}") from exc
-
-
-def sign_all_okf_bundles(
-    vault_addr: str,
-    role: str,
-    key_name: str,
-    jwt_path: str,
-    agents_root: pathlib.Path,
-    kv_mount: str,
-    kv_path: str,
-) -> None:
-    """WP-069: signs every agents/<agent>/ bundle found under agents_root
-    and writes the results to Vault KV in one call - {agent}.sig per agent
-    plus the shared cosign.pub, all under one KV path so
-    externalsecret-okf-signatures.yaml materializes them as a single
-    Secret."""
-    token = vault_login(vault_addr, role, jwt_path)
-    print("Vault Kubernetes-auth login: OK")
-
-    # sign_okf_bundle.sign_bundle() shells out to cosign, which reads
-    # VAULT_ADDR/VAULT_TOKEN from the process environment for its
-    # hashivault:// KMS calls - set once here rather than threading env
-    # through every call.
-    os.environ["VAULT_ADDR"] = vault_addr
-    os.environ["VAULT_TOKEN"] = token
-
-    bundle_dirs = sorted(p for p in agents_root.iterdir() if (p / "agent.okf.md").is_file())
-    if not bundle_dirs:
-        raise SignerError(f"no agent bundles found under {agents_root}")
-
-    kv_data: dict = {}
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_dir = pathlib.Path(tmp)
-
-        pubkey_path = tmp_dir / "cosign.pub"
-        export_public_key(vault_addr, token, key_name, pubkey_path)
-        kv_data["cosign.pub"] = pubkey_path.read_text()
-
-        for bundle_dir in bundle_dirs:
-            sign_okf_bundle.sign_bundle(bundle_dir, tmp_dir, kms_key=f"hashivault://{key_name}")
-            sig_path = tmp_dir / f"{bundle_dir.name}.sig"
-            kv_data[f"{bundle_dir.name}.sig"] = sig_path.read_text()
-
-    kv_put(vault_addr, token, kv_mount, kv_path, kv_data)
-    print(f"signed {len(bundle_dirs)} bundle(s), wrote {kv_mount}/data/{kv_path}: {', '.join(sorted(kv_data))}")
-
-
 def dry_run(vault_addr: str, role: str, key_name: str, jwt_path: str) -> None:
     token = vault_login(vault_addr, role, jwt_path)
     print("Vault Kubernetes-auth login: OK")
@@ -558,11 +480,6 @@ def main() -> int:
 
     sub.add_parser("dry-run", help="WP-068 acceptance check: sign+verify a scratch blob end-to-end")
 
-    p_okf = sub.add_parser("sign-okf-bundles", help="sign every agents/<agent>/ bundle and write results to Vault KV")
-    p_okf.add_argument("--agents-root", required=True, type=pathlib.Path)
-    p_okf.add_argument("--kv-mount", default=DEFAULT_KV_MOUNT)
-    p_okf.add_argument("--kv-path", default=DEFAULT_KV_PATH)
-
     p_verify_images = sub.add_parser("verify-images", help="verify every image in a JSON refs file keyless via RHTAS (ADR-0535/WP-111)")
     p_verify_images.add_argument("--refs-file", required=True, type=pathlib.Path)
     p_verify_images.add_argument("--cert-identity", default=DEFAULT_CERT_IDENTITY)
@@ -594,17 +511,12 @@ def main() -> int:
             verify_blob(args.public_key, args.blob, args.signature)
         elif args.command == "dry-run":
             dry_run(args.vault_addr, args.role, args.key_name, args.jwt_path)
-        elif args.command == "sign-okf-bundles":
-            sign_all_okf_bundles(
-                args.vault_addr, args.role, args.key_name, args.jwt_path,
-                args.agents_root, args.kv_mount, args.kv_path,
-            )
         elif args.command == "verify-images":
             verify_images_from_file(
                 args.refs_file, args.jwt_path,
                 args.cert_identity, args.cert_oidc_issuer, args.rekor_url, args.tuf_url,
             )
-    except (SignerError, sign_okf_bundle.BundleError) as exc:
+    except SignerError as exc:
         print(f"RESULT: FAIL - {exc}")
         return 1
     return 0

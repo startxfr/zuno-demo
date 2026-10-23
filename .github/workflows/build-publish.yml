@@ -7,9 +7,10 @@
 # Transit key that replaces them, so CI can no longer sign anything.
 # Signing now runs in-cluster instead: images built via the OpenShift
 # BuildConfig/ImageStream path get signed by
-# ansible/tasks/run_okf_signing_job.yml's image-signing counterpart
-# (WP-070), and OKF bundles by run_okf_signing_job.yml itself (WP-069) -
-# see docs/adr/0420-*.md. This workflow still builds/publishes/SBOMs/scans
+# ansible/tasks/run_image_signing_job.yml (WP-070, RHTAS since ADR-0535) -
+# see docs/adr/0420-*.md. OKF bundles are no longer signed by this
+# platform at all: the zuno-demo-agents release workflow signs them
+# keyless (ADR-0578) and this platform verifies them at admission. This workflow still builds/publishes/SBOMs/scans
 # for the optional Quay release path (RELEASING.md); it just doesn't sign
 # anymore.
 #

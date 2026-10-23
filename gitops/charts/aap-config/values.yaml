@@ -156,11 +156,6 @@ jobTemplates:
     askVariablesOnLaunch: true
     surveyComponents: [postgresql, unifai, lightspeed, lightspeed-config, agents, platform]
   # WP-103: gated (launch-RBAC)
-  - name: zuno-day3-sign
-    playbook: ansible/playbooks/day3_sign.yml
-    credential: zuno-aap-installer
-    askVariablesOnLaunch: true
-    surveyComponents: [agents]
   # WP-126: triggers a real GPU burst-node scale-up and training compute,
   # same tier as backup/restore/sign. WP-103: gated (launch-RBAC)
   - name: zuno-day3-run

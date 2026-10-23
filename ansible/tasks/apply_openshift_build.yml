@@ -271,8 +271,8 @@
     sign_image_name: "{{ build_image_name }}"
     # ADR-0517: the routine build path tolerates a not-yet-installed
     # RHTAS (fresh cluster: day1 build precedes day1 install) - the
-    # signing task loudly skips and `make d3 sign` covers those images
-    # later. Release signing (day3_release.yml) does NOT set this and
+    # signing task loudly skips and a rebuild once RHTAS is up signs
+    # those images. Release signing (day3_release.yml) does NOT set this and
     # keeps failing hard when RHTAS is absent.
     sign_skip_when_unavailable: true
   when: >-

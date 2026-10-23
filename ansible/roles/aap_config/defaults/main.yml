@@ -41,7 +41,6 @@ aap_config_ee_job_templates:
   - zuno-day2-install
   - zuno-day1-build
   - zuno-day2-build
-  - zuno-day3-sign
   - zuno-day3-stresstest
   # WP-126: `oc whoami -t` shells out directly, same criterion as the
   # entries above.
@@ -101,10 +100,6 @@ aap_config_job_templates:
   - name: zuno-day3-check
     credential: zuno-cluster-reader
     survey_components: [postgresql, lightspeed, lightspeed-config, agents, platform]
-  - name: zuno-day3-sign
-    credential: zuno-aap-installer
-    gated: true
-    survey_components: [agents]
   - name: zuno-day3-run
     credential: zuno-aap-installer
     gated: true

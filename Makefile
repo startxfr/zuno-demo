@@ -90,8 +90,9 @@ DAY2_VERBS := check install build uninstall all reinstall
 # UnifAI bundle, shared platform services' /healthz+/readyz) or run
 # the full per-agent test layer; component granularity matches Day 2's
 # "agents" (every agent bundle, collectively) plus "platform" for the
-# shared services - which agents/services actually exist is resolved
-# dynamically from agents/*/agent.okf.md at Ansible run time, never a list
+# shared services - which agents actually exist is resolved dynamically
+# from the admitted agents release (platform/okf/stack-config.generated.yaml,
+# derived from platform/okf/agents.lock) at Ansible run time, never a list
 # here. "backup"/"restore" are per-component pgBackRest-style operations
 # (see ansible/roles/postgresql/tasks/{backup,restore}.yml); "check" spans
 # every Day 3 component regardless of verb group, delegating to the same
@@ -99,13 +100,6 @@ DAY2_VERBS := check install build uninstall all reinstall
 # precheck.yml otherwise (ansible/playbooks/day3_check.yml).
 DAY3_TEST_COMPONENTS := agents platform
 DAY3_BACKUP_COMPONENTS := postgresql unifai
-# ADR-0420/WP-069: re-signing the OKF bundles acts on already-installed
-# agent bundles - it builds nothing - so it belongs in this tier by the
-# definition above, not inside a build verb. Its own component
-# list, same per-verb split as backup/restore. Since WP-156 retired the
-# agent-runtime image it signs from, the verb is replaced by `make d3 admit
-# agents` (ADR-0580) and removed with the OKF Transit chain in WP-165.
-DAY3_SIGN_COMPONENTS := agents
 # Components that support "check" but neither test/stresstest nor
 # backup/restore - they contribute only their own precheck.yml
 # (ansible/playbooks/day3_check.yml). ADR-0524/WP-085: "lightspeed" and
@@ -115,21 +109,22 @@ DAY3_SIGN_COMPONENTS := agents
 DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow
 # WP-126: triggering a real pipeline run spends real, costly compute (a GPU
 # burst-node scale-up, several minutes of training) against an
-# already-installed platform - the same tier as backup/restore/sign, never
+# already-installed platform - the same tier as backup/restore, never
 # a side effect of `make d2 install mlops`. Its own component list, same
 # per-verb split as backup/restore.
 DAY3_RUN_COMPONENTS := mlops
 # ADR-0549/WP-134: cutting a named, signed, in-cluster release is an
 # on-demand operator action against an already-installed platform, spends
-# real build+sign compute - same tier as sign/run, its own component list.
+# real build+sign compute - same tier as run, its own component list.
 DAY3_RELEASE_COMPONENTS := supply-chain
 # ADR-0580/WP-160: admitting a zuno-demo-agents release verifies it offline
 # (keyless signatures + attestations, platform/okf/sigstore/) and checks this
 # platform can serve it; RELEASE=vX.Y.Z UPDATE_LOCK=1 also moves
-# platform/okf/agents.lock. Needs cosign and oras, no cluster.
+# platform/okf/agents.lock. Needs cosign and oras, no cluster. It replaced
+# `make d3 sign agents` and the OKF Vault Transit chain (ADR-0578, WP-165).
 DAY3_ADMIT_COMPONENTS := agents
-DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS) $(DAY3_RELEASE_COMPONENTS) $(DAY3_ADMIT_COMPONENTS))
-DAY3_VERBS := test stresstest backup restore check sign admit run release scenario-failover-node
+DAY3_COMPONENTS := $(sort $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DAY3_RUN_COMPONENTS) $(DAY3_RELEASE_COMPONENTS) $(DAY3_ADMIT_COMPONENTS))
+DAY3_VERBS := test stresstest backup restore check admit run release scenario-failover-node
 
 # WP-136/ADR-0550 presenter tooling, regrouped as a `make demo <verb>`
 # verb group (originally flat demo-* targets). Unlike day0-3 there is no
@@ -243,7 +238,6 @@ help:
 	  '' \
 	  '  make day3|d3 test [component]        Check availability only (ADR-0057)' \
 	  '  make day3|d3 stresstest [component]  Run every existing test layer per agent, plus a bulk-interaction load pass (ADR-0058)' \
-	  '  make day3|d3 sign [component]        Re-sign the OKF bundles and verify them (ADR-0420) - run after ANY change under agents/<name>/' \
 	  '  make day3|d3 admit [component]       Verify and validate the zuno-demo-agents release in platform/okf/agents.lock (ADR-0580)' \
 	  '  make day3|d3 run [component]         Trigger one real pipeline run (WP-126) - AGENT=<agent> overrides the default (comage)' \
 	  '' \
@@ -350,7 +344,6 @@ _complete-components:
 	     esac ;; \
 	  3) case "$(VERB)" in \
 	       backup|restore) echo "$(DAY3_BACKUP_COMPONENTS) all" ;; \
-	       sign) echo "$(DAY3_SIGN_COMPONENTS) all" ;; \
 	       admit) echo "$(DAY3_ADMIT_COMPONENTS) all" ;; \
 	       run) echo "$(DAY3_RUN_COMPONENTS) all" ;; \
 	       release) echo "$(DAY3_RELEASE_COMPONENTS) all" ;; \
@@ -627,8 +620,6 @@ if [[ -z "$$verb" ]]; then \
     '  backup       Trigger an on-demand backup' \
     '  restore      Restore from the most recent backup (fails if none exists)' \
     '  check        Check state/health across every Day 3 component (test for agents/platform, precheck otherwise)' \
-    '  sign         Re-sign every OKF bundle (ADR-0420; superseded by admit, removed in WP-165)' \
-    '               The signed digest covers every file under agents/<name>/, tasks/ included - not just agent.okf.md' \
     '  admit        Verify offline and validate the zuno-demo-agents release pinned in platform/okf/agents.lock (ADR-0580)' \
     '               RELEASE=vX.Y.Z admits that release instead; UPDATE_LOCK=1 also writes it to the lock' \
     '  run          Trigger one real KFP pipeline run (WP-126) - spends real GPU burst-node compute' \
@@ -648,8 +639,8 @@ if [[ -z "$$verb" ]]; then \
     'Components (backup/restore; optional, default: all):' \
     '  $(DAY3_BACKUP_COMPONENTS)' \
     '' \
-    'Components (sign; optional, default: all):' \
-    '  $(DAY3_SIGN_COMPONENTS)' \
+    'Components (admit; optional, default: all):' \
+    '  $(DAY3_ADMIT_COMPONENTS)' \
     '' \
     'Components (run; optional, default: all):' \
     '  $(DAY3_RUN_COMPONENTS)' \
@@ -673,7 +664,6 @@ if [[ -z "$$verb" ]]; then \
     'Example: make d3 stresstest SEQUENTIAL=1   # one agent at a time, like every run before ADR-0561' \
     'Example: make d3 backup postgresql' \
     'Example: make d3 restore postgresql' \
-    'Example: make d3 sign agents   # after editing ANY file under agents/<name>/ - agent.okf.md, tasks/*.md, anything; also publishes the OCI bundles when zuno_okf_oci_repository_prefix is set (ADR-0564)' \
     'Example: make d3 admit agents RELEASE=v0.1.1 UPDATE_LOCK=1   # admit a zuno-demo-agents release and pin it (ADR-0580)' \
     'Example: make d3 run mlops   # triggers one real LoRA training run (WP-126) - scales up zuno-gpu-burst-a' \
     'Example: git tag v0.2.0 && git push origin v0.2.0 && make d3 release TAG=v0.2.0   # named in-cluster release (ADR-0549)' \
@@ -725,10 +715,6 @@ case "$$verb" in \
     case " $(DAY3_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 check component: '$$component' (expected one of: $(DAY3_COMPONENTS) or all)" >&2; exit 2;; esac; \
     aap_route job zuno-day3-check "{\"target_component\": \"$$component\", \"report_format\": \"$$report_format\"}"; rc=$$?; \
     if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_check.yml -e "target_component=$$component" -e "report_format=$$report_format" $(EXTRA_VARS); else exit $$rc; fi ;; \
-  sign) \
-    case " $(DAY3_SIGN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 sign component: '$$component' (expected one of: $(DAY3_SIGN_COMPONENTS) or all)" >&2; exit 2;; esac; \
-    aap_route job zuno-day3-sign "{\"target_component\": \"$$component\"}"; rc=$$?; \
-    if [[ $$rc -eq 99 ]]; then $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day3_sign.yml -e "target_component=$$component" $(EXTRA_VARS); else exit $$rc; fi ;; \
   run) \
     case " $(DAY3_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day3 run component: '$$component' (expected one of: $(DAY3_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
     agent="$${AGENT:-comage}"; \
@@ -773,5 +759,5 @@ d3: $(if $(DAY_VERB),credentials-check)
 # directly, so e.g. `make d0 check postgresql` or `make demo step-1`
 # needs "check"/"postgresql"/"step-1" to resolve to *something* as Make
 # goals without erroring as unknown targets.
-$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_SIGN_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DEMO_VERBS)):
+$(sort $(DAY0_VERBS) $(DAY0_COMPONENTS) $(DAY1_VERBS) $(DAY1_RUN_COMPONENTS) $(DAY1_BUILD_COMPONENTS) $(DAY2_VERBS) $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) $(DAY2_BUILD_COMPONENTS) $(DAY3_VERBS) $(DAY3_COMPONENTS) $(DAY3_TEST_COMPONENTS) $(DAY3_BACKUP_COMPONENTS) $(DAY3_CHECK_ONLY_COMPONENTS) $(DEMO_VERBS)):
 	@:

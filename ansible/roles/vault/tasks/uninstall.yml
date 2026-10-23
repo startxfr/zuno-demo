@@ -34,17 +34,3 @@
     kind: Secret
     namespace: zuno-vault
     name: vault-bootstrap-credentials
-
-- name: "vault | check whether the committed trust anchor exists"
-  ansible.builtin.stat:
-    path: "{{ zuno_repo_root }}/agents/zuno-platform-signer.pub"
-  register: _vault_pubkey_file_stat
-
-- name: "vault | remove the trust anchor and commit the deletion (pathspec-limited - never touches any other pending change in the working tree, local commit only, no push)"
-  ansible.builtin.shell:
-    cmd: >-
-      set -o pipefail;
-      git rm -f -- agents/zuno-platform-signer.pub &&
-      git commit -m "vault: remove zuno-platform-signer.pub (vault uninstalled)" -- agents/zuno-platform-signer.pub
-    chdir: "{{ zuno_repo_root }}"
-  when: _vault_pubkey_file_stat.stat.exists

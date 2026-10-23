@@ -153,12 +153,6 @@ jobs:
         run: |
           pip install pyyaml
           python3 tests/test_pin_release.py
-      - name: supply-chain sign_okf_bundle.py tests (ADR-0106)
-        working-directory: platform/supply-chain
-        run: python3 tests/test_sign_okf_bundle.py
-      - name: supply-chain publish_okf_bundle.py tests (ADR-0564)
-        working-directory: platform/supply-chain
-        run: python3 tests/test_publish_okf_bundle.py
       - name: supply-chain admit_okf_bundle.py tests (ADR-0580)
         working-directory: platform/supply-chain
         run: python3 tests/test_admit_okf_bundle.py
