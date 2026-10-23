@@ -947,7 +947,7 @@ frozen mirror.
 | WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Operator pending | live and durable on demo333 since 2026-10-23 (okf-fetch on supply-chain-signer:latest built from devel); mlops stays baked until WP-165 |
 | WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Done | operator 0.1.25 on stable; five agents of release v0.1.1 verified keyless on demo333 |
 | WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Repo work in review | schemas, corp ceilings and the narrowing rule built (agents repo + admission); bundle migration waits for unifai-operator v0.3 and WP-156 |
-| WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator built (part 1); unifai role wired (part 2); Keycloak job pending; quotas/MaaS wait for WP-157 |
+| WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator (part 1); unifai role and Keycloak groups Job wired and live on demo333 (part 2); quotas/MaaS/routing wait for WP-157 |
 | WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Not started | parity proof on the running cluster, outside any demo freeze |
 
 ### OKF stream phases

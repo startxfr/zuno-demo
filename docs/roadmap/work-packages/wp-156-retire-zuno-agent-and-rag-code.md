@@ -22,6 +22,28 @@ or tests them; the RAG tables leave pgvector without disturbing the shared
 PostgreSQL cluster; dashboards read UnifAI telemetry; the ADRs that described
 the removed code are Superseded; `check_docs.py` is green.
 
+## Inventory (2026-10-23)
+
+The full read-only inventory is in
+[evidence/wp-156-retirement-inventory.md](../evidence/wp-156-retirement-inventory.md).
+Three findings change the steps below:
+
+- agent-runtime is installed and removed by the `llm` role, with ai-gateway:
+  edit that role's loops; never `make d2 uninstall llm`;
+- the `zuno-admin-api` Keycloak client stays (MaaS `externalOIDC.clientId`,
+  the audience mapper of every client, unifai included); only the BFF
+  ExternalSecrets go;
+- the OKF sign/publish verb (`day3_sign.yml`, `run_okf_signing_job.yml`)
+  reads bundles from the agent-runtime image: it is retired with it, the
+  zuno-demo-agents release chain and `make d3 admit agents` (ADR-0580)
+  replace it.
+
+Cutover criteria are the user's call. On demo333 today: comage and tekos are
+served by UnifAI; advantage, finage and naveo are `placeholder` and
+deliberately not served (ADR-0007); arkos waits for the `plan_draft_write`
+blueprint in an operator release; cognos and soursage are `placeholder`
+(no graph shape needed until one becomes active).
+
 ## Steps
 
 **Live prerequisites.** Steps 1 and 6 act on clusters. demo333 is powered

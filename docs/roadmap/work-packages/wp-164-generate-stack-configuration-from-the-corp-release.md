@@ -32,8 +32,14 @@ Part 2, the consumers, is under way and coordinated:
   `zuno_unifai_values.okf` stays the only source; the two lists are never
   merged. Needs unifai-operator 0.1.25 (WP-162); first live use waits for a
   pinned release;
-- Keycloak: extend the ADR-0530 reconcile Job to the generated groups
-  (create/update, never delete, never membership);
+- Keycloak: done and live on demo333 (f60942a9, 2026-10-23). The
+  ADR-0530 client-reconcile Job also creates the `agent_*` groups of
+  `keycloak.groups` the realm lacks; it never deletes, never touches
+  membership, and reports a live `agent_*` group the release no longer
+  declares. `ansible/roles/keycloak` passes `agentGroups`. Proven offline
+  (bash -n, fake kcadm) and live: one coordinated sync, the Job logged
+  `0 groups created, 8 groups already present`, a consultant-01 token
+  probe returned 200 with its groups intact;
 - quotas, MaaS subscriptions, model routing and guardrail inputs wait for
   WP-157 (ADR-0570), which reshapes the same files and has no owner yet;
 - per-agent chart values (arkos, naveo) are skipped: WP-156 deletes those
