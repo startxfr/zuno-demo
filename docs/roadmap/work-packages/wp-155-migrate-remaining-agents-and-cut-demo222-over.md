@@ -1,6 +1,6 @@
 # WP-155: Migrate the remaining agents, then cut demo222 over
 
-- **State:** Not started
+- **State:** Done
 - **ADRs:** [ADR-0573](../../adr/0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md), [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md)
 - **Depends on:** [WP-154](wp-154-tekos-pilot-on-demo333.md)
 - **Related:** [ADR-0342](../../adr/0342-support-multiple-agent-graph-shapes-in-agent-runtime.md), [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md), [WP-137](wp-137-arkos-dat-classification-routing.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [WP-157](wp-157-slim-the-ai-gateway-via-maas.md)
@@ -165,3 +165,22 @@ freeze was broken.
   3.7-4.2 s when run alone (3 runs, sign-in included), under the 6 s objective.
   Suspected cause: load from the preceding scenarios; not yet proven.
 
+
+## Closure (2026-10-23)
+
+demo222 is retired, so the acceptance reads on demo333 only. Evidence is in
+`docs/roadmap/evidence/wp-155-parity-wave1.md`:
+
+| Agent | Result on UnifAI (demo333, eval-* personas, operator 0.1.30) |
+| --- | --- |
+| comage | acceptance gate PASS: scenarios 17/20 (85%), security 8/8, capability 4/4 |
+| tekos | gate PASS: scenarios 17/18 (94%), security 12/12, capability 4/4 |
+| arkos | gate PASS: scenarios 17/18 (94%), security 11/11, capability 4/4 |
+| advantage, finage, naveo | placeholders by design (ADR-0007): the operator serves none, nothing to prove |
+| cognos, soursage | not migrated in this wave: accepted gap, stay out of UnifAI until they get a graph shape |
+
+The agent-runtime baseline no longer exists (WP-156), so "not lower than the baseline" is replaced
+by the 75% threshold of ADR-0028 plus the mandatory security and capability layers, all met.
+Known, accepted misses: scenario 19 needs the in-cluster Kubernetes client (not reproducible from
+a workstation), and the first-token latency of comage and arkos sits above the 6 s objective under
+load (6.7 to 9.7 s; 3.7 to 4.2 s measured alone).
