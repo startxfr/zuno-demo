@@ -336,7 +336,9 @@ def arkos_can_read_aap_platform_status() -> CheckResult:
 # evaluations/common/unifai_checks.py. The checks above reach shared services (MCP gateway,
 # ai-gateway, MCP servers) directly.
 unifai_forwards_identity_to_the_gateways = unifai_checks.identity_forwarded(
-    CheckResult, _unifai, "consultant-01", "Use your Confluence search tool to find the page named Satellite and give me its title.", ("confluence.page.search",)
+    CheckResult, _unifai, "consultant-01", "Draft a Design & Architecture Testimonial for the Satellite scheduling project S0R42, using the Confluence documentation.",
+        # Any call through the MCP gateway proves the caller's token reached it; the model may read a page or list a repository.
+        ("confluence.page.search", "confluence.page.read", "git.repository.list")
 )
 unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
 business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
