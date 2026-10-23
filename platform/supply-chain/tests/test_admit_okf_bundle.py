@@ -154,10 +154,13 @@ class DiffTest(AdmitTestCase):
               "preferences:\n  - {agent: demo, task: ask, preferred: [spare, local]}\n")
         self.assertIn("order now spare, local", admit.diff(self.release, new))
 
-    def test_corp_policy_change(self) -> None:
+    def test_corp_policy_added_and_changed(self) -> None:
         new = self.copy()
         write(new / "policies/quotas/quota-policy.yaml", "classes: {}\n")
-        self.assertIn("corp policy `quotas/quota-policy.yaml` changed", admit.diff(self.release, new))
+        write(new / "policies/tools/tool-policy.yaml", "tools: []\n")
+        text = admit.diff(self.release, new)
+        self.assertIn("corp policy `quotas/quota-policy.yaml` added", text)
+        self.assertIn("corp policy `tools/tool-policy.yaml` changed", text)
 
 
 class LockAndArchiveTest(unittest.TestCase):

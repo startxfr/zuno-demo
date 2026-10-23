@@ -372,10 +372,19 @@ def diff(old: Optional[pathlib.Path], new: pathlib.Path) -> str:
         if before != after:
             changes = _set_change("models", before, after) or [f"order now {', '.join(after)}"]
             lines.append(f"- model routing `{key[0]}/{key[1]}`: " + "; ".join(changes))
-    for rel in ("tools/tool-policy.yaml", "knowledge/knowledge-policy.yaml", "quotas/quota-policy.yaml",
-                "models/model-catalog.yaml", "guardrails"):
-        po, pn = (old / "policies" / rel) if old else None, new / "policies" / rel
-        if _digest_path(po) != _digest_path(pn):
+    # Every corp policy file, whatever the release adds (limits, skills, ...).
+    def policy_files(root: Optional[pathlib.Path]) -> Dict[str, str]:
+        base = root / "policies" if root else None
+        if base is None or not base.is_dir():
+            return {}
+        return {p.relative_to(base).as_posix(): _digest_path(p) for p in sorted(base.rglob("*")) if p.is_file()}
+    po, pn = policy_files(old), policy_files(new)
+    for rel in sorted(set(po) | set(pn)):
+        if rel not in po:
+            lines.append(f"- corp policy `{rel}` added")
+        elif rel not in pn:
+            lines.append(f"- corp policy `{rel}` removed")
+        elif po[rel] != pn[rel]:
             lines.append(f"- corp policy `{rel}` changed")
     return "\n".join(lines) if lines else "- no change in agents, routing or corp policies"
 
