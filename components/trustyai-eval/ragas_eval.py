@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
-"""ADR-0534/WP-109: RAGAS evaluation against the REAL rag-service.
+"""ADR-0534/WP-109: RAGAS evaluation against the REAL retrieval path.
+
+WP-156: that path is UnifAI's RAG server, the corpus the UnifAI agents
+answer from. Retrieval goes through its bearer endpoint as a real demo
+persona: the Job signs in through the `zuno-evaluations` Keycloak client
+(password grant) and UnifAI applies the persona's own group ACL.
 
 For each configured question this script:
-  1. calls rag-service's /v1/search (the live pgvector retrieval path -
-     the same endpoint Agent Runtime's retrieve node uses), keeping the
-     actually-retrieved contexts;
+  1. calls UnifAI's GET /api/sources/query.bearer over the knowledge.tech
+     sources, keeping the actually-retrieved contexts;
   2. generates an answer from those contexts with the in-cluster judge
      model (plain http through the mesh - the sidecar originates TLS, see
      the lmevaljob-mesh-double-tls finding);
@@ -19,12 +23,20 @@ design - the report carries scores, not verdicts; thresholds and pass/
 fail policy are explicitly deferred by ADR-0534's Non-goals.
 
 Env (all have working in-cluster defaults):
-  RAG_SERVICE_URL   default http://rag-service.zuno-data.svc:8080
+  UNIFAI_RAG_URL    default http://unifai-rag-server.zuno-unifai.svc:13456
+  UNIFAI_RAG_TAG    default knowledge.tech
+  KEYCLOAK_TOKEN_URL
+                    default the in-cluster Keycloak Service's zuno realm
+                    token endpoint (the issuer stays the public hostname,
+                    Keycloak runs with a strict hostname)
+  EVAL_CLIENT_ID    default zuno-evaluations
+  EVAL_CLIENT_SECRET  required, the client's secret
+  EVAL_PERSONA      default consultant-01 - retrieval quality must be
+                    measured as a realistic caller, not an entitlement-less
+                    one that only ever sees ACL-unrestricted documents
+  DEMO_PERSONA_PASSWORD  required, the demo personas' shared password
   JUDGE_BASE_URL    default http://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1
   JUDGE_MODEL       default qwen3.6-27b-instruct
-  CALLER_GROUPS     comma-separated, default "consultant" - rag-service
-                    fails closed on empty groups (ADR-0046), so retrieval
-                    quality must be measured with a realistic caller
   QUESTIONS         "||"-separated override of the built-in question set
   TOP_K             default 4
   REPORT_PATH       default /tmp/ragas-report.json
@@ -43,23 +55,34 @@ import time
 
 import httpx
 
-RAG_SERVICE_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc:8080")
+UNIFAI_RAG_URL = os.getenv("UNIFAI_RAG_URL", "http://unifai-rag-server.zuno-unifai.svc:13456")
+UNIFAI_RAG_TAG = os.getenv("UNIFAI_RAG_TAG", "knowledge.tech")
+KEYCLOAK_TOKEN_URL = os.getenv(
+    "KEYCLOAK_TOKEN_URL",
+    "http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/token",
+)
+EVAL_CLIENT_ID = os.getenv("EVAL_CLIENT_ID", "zuno-evaluations")
+EVAL_CLIENT_SECRET = os.getenv("EVAL_CLIENT_SECRET", "")
+EVAL_PERSONA = os.getenv("EVAL_PERSONA", "consultant-01")
+DEMO_PERSONA_PASSWORD = os.getenv("DEMO_PERSONA_PASSWORD", "")
 JUDGE_BASE_URL = os.getenv(
     "JUDGE_BASE_URL",
     "http://qwen36-27b-instruct-kserve-workload-svc.zuno-ai-run.svc:8000/v1",
 )
 JUDGE_MODEL = os.getenv("JUDGE_MODEL", "qwen3.6-27b-instruct")
-CALLER_GROUPS = [g for g in os.getenv("CALLER_GROUPS", "consultant").split(",") if g]
 TOP_K = int(os.getenv("TOP_K", "4"))
 REPORT_PATH = os.getenv("REPORT_PATH", "/tmp/ragas-report.json")
 
 # Real questions against the real corpus (French Confluence/tech content -
 # see the real-confluence-content-for-tests note: queries must match the
-# actual indexed material, not invented topics).
+# actual indexed material, not invented topics). WP-156: UnifAI's
+# knowledge.tech sources are the OpenShift and Satellite spaces, so the
+# questions follow them; the PostgreSQL one only ever retrieved off-topic
+# pages there.
 DEFAULT_QUESTIONS = [
     "Comment configurer un cluster OpenShift ?",
-    "Quelles sont les bonnes pratiques de sauvegarde PostgreSQL ?",
-    "Comment fonctionne l'authentification Keycloak ?",
+    "Comment planifier les évolutions d'un Satellite ?",
+    "Comment simuler la charge d'une mise à jour mineure Satellite ?",
 ]
 QUESTIONS = [q for q in os.getenv("QUESTIONS", "").split("||") if q.strip()] or DEFAULT_QUESTIONS
 
@@ -102,20 +125,42 @@ def push_gauges_otlp(gauge_name: str, points: list[tuple[float, dict[str, str]]]
         print(f"WARNING: OTLP metric push failed (run unaffected): {exc}")
 
 
-def retrieve(client: httpx.Client, question: str) -> list[str]:
+def persona_token(client: httpx.Client) -> str:
+    """A fresh access token for EVAL_PERSONA. Fetched per question: a run
+    outlives Keycloak's short access-token lifespan."""
     resp = client.post(
-        f"{RAG_SERVICE_URL}/v1/search",
-        json={"query": question, "top_k": TOP_K, "caller_groups": CALLER_GROUPS},
+        KEYCLOAK_TOKEN_URL,
+        data={
+            "grant_type": "password",
+            "client_id": EVAL_CLIENT_ID,
+            "client_secret": EVAL_CLIENT_SECRET,
+            "username": EVAL_PERSONA,
+            "password": DEMO_PERSONA_PASSWORD,
+        },
     )
     resp.raise_for_status()
-    results = resp.json().get("results", [])
-    # SearchResult carries title+snippet (components/rag-service/app/
-    # schemas.py) - NOT content/text; the wrong field names here were
-    # live-diagnosed 2026-09-02 (every context came back "" and every
-    # ragas score was NaN in consequence - garbage in, NaN out).
+    return resp.json()["access_token"]
+
+
+def retrieve(client: httpx.Client, question: str) -> list[str]:
+    resp = client.get(
+        f"{UNIFAI_RAG_URL}/api/sources/query.bearer",
+        params={
+            "query": question,
+            "sourceType": "CONFLUENCE",
+            "tags": UNIFAI_RAG_TAG,
+            "top_k_results": TOP_K,
+        },
+        headers={"Authorization": f"Bearer {persona_token(client)}"},
+    )
+    resp.raise_for_status()
+    matches = resp.json().get("matches", [])
+    # The chunk text is `content`, the page title `metadata.title`. Wrong
+    # field names here once made every context "" and every ragas score
+    # NaN (live-diagnosed 2026-09-02 on the rag-service shape).
     contexts = [
-        f"{r.get('title', '')}\n{r.get('snippet', '')}".strip()
-        for r in results
+        f"{(m.get('metadata') or {}).get('title', '')}\n{m.get('content', '')}".strip()
+        for m in matches
     ]
     return [c for c in contexts if c]
 
@@ -147,6 +192,10 @@ def answer(client: httpx.Client, question: str, contexts: list[str]) -> str:
 
 
 def main() -> int:
+    if not EVAL_CLIENT_SECRET or not DEMO_PERSONA_PASSWORD:
+        print("ERROR: EVAL_CLIENT_SECRET and DEMO_PERSONA_PASSWORD are required "
+              "to sign in as the evaluation persona")
+        return 1
     # Imported here so a pure-connectivity failure is reported before the
     # heavyweight ragas import machinery ever loads.
     with httpx.Client(timeout=120) as client:
@@ -164,8 +213,9 @@ def main() -> int:
             print(f"retrieved {len(contexts)} contexts + answered: {q!r}")
 
     if not samples:
-        print("ERROR: no sample could be built - rag-service returned nothing "
-              "for every question; check the corpus and CALLER_GROUPS")
+        print("ERROR: no sample could be built - UnifAI RAG returned nothing "
+              f"for every question; check the {UNIFAI_RAG_TAG} sources and "
+              f"{EVAL_PERSONA}'s groups")
         return 1
 
     from langchain_openai import ChatOpenAI
@@ -205,7 +255,7 @@ def main() -> int:
     report = {
         "framework": "ragas",
         "judge_model": JUDGE_MODEL,
-        "caller_groups": CALLER_GROUPS,
+        "persona": EVAL_PERSONA,
         "samples": [
             {"question": s["question"], "n_contexts": len(s["contexts"]),
              "scores": {k: v for k, v in row.items()

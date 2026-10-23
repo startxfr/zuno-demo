@@ -19,6 +19,9 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: mcp-gateway
+        # WP-156: the pod label UnifAI's RAG server admits
+        # (UnifaiStack spec.exposure.ragClients), for search_technical_docs.
+        zuno.io/rag-client: "true"
       {{- if .Values.okf.fetch.enabled }}
       annotations:
         # ADR-0580: a promoted release changes this, which rolls the pods.
