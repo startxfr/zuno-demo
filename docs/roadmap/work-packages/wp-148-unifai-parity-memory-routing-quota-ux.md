@@ -173,7 +173,12 @@ in the Collaboration Hub:
   of a team workspace (the team is not resolved yet) and that stale request's
   error was shown after the second request had succeeded. Fixed in the fork (UI
   hook ignores a cancelled run, devel `777cccde4`, `vite build` and the type
-  check pass); it needs a UI image to be seen fixed on the cluster.
+  check pass). Deployed on demo333 as `unifai-ui:devel-777cccde4`: the notice is
+  gone and the page makes no failing request any more, and the response badge
+  now reads `ovhcloud-gpt-oss-120b · gpt-oss-120b` (provider from the routing
+  explanation):
+
+  ![The tekos chat with the routing badge under the answer](../evidence/wp-148-chat-routing-badge.png)
 
 ## Not verified
 
