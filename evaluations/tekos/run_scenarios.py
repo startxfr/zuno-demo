@@ -99,22 +99,10 @@ REALM = "zuno"
 # ansible/roles/keycloak/README.md's "Two integration fixes" note explains
 # why every fixture user's credential is non-temporary.
 DEMO_PASSWORD = os.getenv("DEMO_PERSONA_PASSWORD")
-# Confidential client's own secret - never hardcoded; read from the same
-# place `make configure keycloak` puts it (an operator running this script
-# fetches it once, e.g. `vault kv get -field=client_secret secret/zuno/keycloak/<agent>-frontend`).
-# Named after AGENT (TEKOS_FRONTEND_CLIENT_SECRET when unset, matching this
-# module's original single env var exactly).
-FRONTEND_CLIENT_SECRET = os.getenv(f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET")
-# WP-156: persona tokens come from the dedicated zuno-evaluations client
-# (EVAL_CLIENT_SECRET), which outlives agent-frontend. Until the per-agent
-# <agent>-frontend clients are deleted, a run given only their secret keeps
-# using them.
-EVAL_CLIENT_ID = os.getenv("EVAL_CLIENT_ID", "zuno-evaluations")
-EVAL_CLIENT_SECRET = os.getenv("EVAL_CLIENT_SECRET")
-if EVAL_CLIENT_SECRET:
-    TOKEN_CLIENT_ID, TOKEN_CLIENT_SECRET = EVAL_CLIENT_ID, EVAL_CLIENT_SECRET
-else:
-    TOKEN_CLIENT_ID, TOKEN_CLIENT_SECRET = f"{AGENT}-frontend", FRONTEND_CLIENT_SECRET
+# Persona tokens come from the dedicated zuno-evaluations client (WP-156); its secret is never hardcoded:
+# `oc -n zuno-auth get secret zuno-evaluations-client-secret -o jsonpath='{.data.client_secret}'`.
+TOKEN_CLIENT_ID = os.getenv("EVAL_CLIENT_ID", "zuno-evaluations")
+TOKEN_CLIENT_SECRET = os.getenv("EVAL_CLIENT_SECRET")
 
 
 @dataclass

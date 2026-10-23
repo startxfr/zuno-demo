@@ -250,15 +250,10 @@
   register: _mlops_demo_password_secret
   no_log: true
 
-# EVERY agent's frontend client secret, not tekos's. The evaluate stage
-# authenticates as the TARGET agent's persona and
-# evaluations/tekos/run_scenarios.py reads
-# f"{AGENT.upper()}_FRONTEND_CLIENT_SECRET", so mirroring only tekos's
-# left a comage pipeline run raising "COMAGE_FRONTEND_CLIENT_SECRET is
-# required to obtain persona tokens" on half its scenarios and on all its
-# security checks. Listing the namespace instead of naming one agent
-# keeps this correct when another agent is enabled in values.yaml.
-- name: "mlops | read every agent's frontend client secret from zuno-auth"
+# The evaluate stage mints persona tokens on the zuno-evaluations client
+# (evaluations/tekos/run_scenarios.py reads EVAL_CLIENT_SECRET), so only that
+# secret is mirrored. The per-agent <agent>-frontend clients are gone (WP-156).
+- name: "mlops | read the zuno-auth secrets"
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Secret
@@ -266,11 +261,11 @@
   register: _mlops_all_auth_secrets
   no_log: true
 
-- name: "mlops | keep only the <agent>-frontend-client-secret entries"
+- name: "mlops | keep only the zuno-evaluations client secret"
   ansible.builtin.set_fact:
     _mlops_client_secrets: >-
       {{ _mlops_all_auth_secrets.resources | default([])
-         | selectattr('metadata.name', 'search', '(-frontend-client-secret|^zuno-evaluations-client-secret)$')
+         | selectattr('metadata.name', 'equalto', 'zuno-evaluations-client-secret')
          | list }}
   no_log: true
 
@@ -383,7 +378,7 @@
 - name: "mlops | warn if the acceptance-gate credentials could not be copied"
   ansible.builtin.debug:
     msg: >-
-      demo-personas-password / <agent>-frontend-client-secret not found in
+      demo-personas-password / zuno-evaluations-client-secret not found in
       zuno-auth, so zuno-mlops has no acceptance-gate-credentials Secret.
       Every pipeline stage will fail to start (the KFP task references that
       Secret by name). Re-run `make d0 install keycloak` first, then re-run this.
