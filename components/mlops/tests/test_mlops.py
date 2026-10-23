@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Unit tests for the mlops pipeline CLI (ADR-0301/ADR-0302, WP-34).
 
-Same plain-script convention as components/rag-ingestion/tests/*.py: a
+Same plain-script convention as the retired rag-ingestion component: a
 flat TESTS list of bare-assert functions, no pytest, no live S3/Postgres/
 Model Registry/GPU - every stage function is exercised against fakes/
 mocks. torch/transformers/peft/datasets are never imported by these
@@ -215,6 +215,16 @@ def test_load_scenario_seed_texts_filters_to_chat_shaped_scenarios(tmp_path=None
 def test_load_scenario_seed_texts_missing_file_returns_empty_not_an_error() -> None:
     config = _config(evaluations_dir="/definitely/does/not/exist")
     assert mlops._load_scenario_seed_texts(config) == []
+
+
+def test_domain_grounding_without_a_database_fails_loudly_since_rag_service_is_retired() -> None:
+    config = _config(pg_host="", pg_database="")
+    try:
+        mlops._fetch_domain_grounding_rows(config)
+    except RuntimeError as exc:
+        assert "PGHOST" in str(exc) and "style corpus" in str(exc)
+    else:
+        raise AssertionError("a grounding run without PGHOST must not train on nothing")
 
 
 def test_stage_prepare_dataset_escalates_classification_and_writes_manifest() -> None:
@@ -1028,6 +1038,7 @@ TESTS = [
     test_load_config_reads_the_real_process_environment,
     test_load_scenario_seed_texts_filters_to_chat_shaped_scenarios,
     test_load_scenario_seed_texts_missing_file_returns_empty_not_an_error,
+    test_domain_grounding_without_a_database_fails_loudly_since_rag_service_is_retired,
     test_stage_prepare_dataset_escalates_classification_and_writes_manifest,
     test_stage_train_lora_requires_a_dataset_manifest_first,
     test_stage_train_lora_uploads_adapter_and_writes_train_manifest,

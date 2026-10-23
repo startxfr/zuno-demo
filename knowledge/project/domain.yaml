@@ -6,9 +6,9 @@
 # sense `knowledge.adv` has none since ADR-0218, but for a different
 # reason: here it is by design, because content is written directly by Agent
 # Runtime's memory-extraction step (components/agent-runtime/app/memory.py,
-# WP-28), never by components/rag-ingestion. NO physical database names,
+# WP-28), never by the retired rag-ingestion component. NO physical database names,
 # service endpoints, secrets or credentials belong in this file - see
-# platform/bindings/knowledge/bindings.yaml (ADR-0204, WP-21/WP-28) for
+# the retired rag-service bindings registry (ADR-0204, WP-21/WP-28) for
 # the physical binding.
 
 id: knowledge.project
@@ -41,7 +41,7 @@ freshness:
   # staleness window the way an externally-ingested domain has one.
   # indexed_at is still stamped at extraction time (so this domain's
   # chunks are never wrongly flagged freshness_untrusted by
-  # components/rag-service/app/search.py's trust scoring), but no
+  # the retired rag-service component's trust scoring), but no
   # stale_after decay applies.
   objective: on-write
   rationale: >-

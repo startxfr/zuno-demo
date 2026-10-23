@@ -441,13 +441,13 @@ spec:
         },
         {
           "id": 6,
-          "title": "RAGAS scores (real rag-service retrievals)",
+          "title": "RAGAS scores (real UnifAI retrievals)",
           "type": "table",
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "faithfulness = answer grounded in retrieved contexts; llm_context_precision = retrieved contexts relevant to the question. Judged by the local qwen3.6 model against live pgvector retrievals. Pushed once per ragas-eval run; last_over_time keeps the latest run visible.",
+          "description": "faithfulness = answer grounded in retrieved contexts; llm_context_precision = retrieved contexts relevant to the question. Judged by the local qwen3.6 model against live UnifAI (Qdrant) retrievals. Pushed once per ragas-eval run; last_over_time keeps the latest run visible.",
           "gridPos": {
             "h": 9,
             "w": 12,

@@ -23,7 +23,7 @@
 
 # Mirrored third-party images (vault, bitnami-kubectl - matched by
 # registry-hostname prefix alone but never built by this pipeline) and
-# never-built components (rag-ingestion's images.compiler) are already
+# never-built components (the retired rag-ingestion's images.compiler) are already
 # excluded upstream by _has_build_config() - so anything landing in
 # "unresolved" here is a genuinely first-party image (a real BuildConfig
 # exists) with no resolvable ImageStreamTag, a real gap worth failing on.

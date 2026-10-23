@@ -188,7 +188,7 @@ def _resolve_ref_dict(ref: "ImageRef") -> dict:
 def list_refs() -> int:
     """Prints `{"resolved": [...], "unresolved": [...]}`. A ref that can't
     resolve to a live ImageStreamTag (no BuildConfig ever produced one -
-    e.g. rag-ingestion's images.compiler, a documented pre-existing gap
+    e.g. an image tag no BuildConfig ever produced, a documented pre-existing gap
     unrelated to signing, same one check_no_latest_tags.py's own docstring
     already calls out) is reported separately, not treated as a script
     failure - there is nothing to sign or verify for an image that was

@@ -118,7 +118,7 @@ spec:
       enabled: false
     # WP-06/ADR-0322 parity run (2026-08-21): the operator-generated
     # NetworkPolicy only allows ingress from within redhat-ods-applications
-    # and the ingress-router namespace by default - rag-service (zuno-data)
+    # and the ingress-router namespace by default - the retired rag-service (zuno-data)
     # had never called into zuno-ogx before the provider-parity test and
     # was silently blocked. Namespace-wide, not pod-specific, matching the
     # embeddings NetworkPolicy fix earlier this WP (RHOAI's own operator

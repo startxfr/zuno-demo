@@ -83,7 +83,7 @@ platformNamespaces:
     description: >-
       PostgreSQL and pgvector, the platform's persistent data and RAG vector
       store.
-    # postgresql: rag-service (cross-ns). vault: ESO's ClusterSecretStore
+    # vault: ESO's ClusterSecretStore
     # controller. keycloak: dedicated postgres database, ADR-0315.
     # redhat-ods-applications: maas-api's dedicated maas database on
     # zuno-postgresql (MaaS prerequisite - see

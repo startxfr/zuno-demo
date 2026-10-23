@@ -9,7 +9,7 @@ No `precheck.yml`/`install.yml` - this is a build-only role, distinct
 from the `mlops` Day 1 `run` component (`ansible/roles/mlops`), which
 deploys the already-built image.
 
-Unlike `rag_ingestion_build` (the role this mirrors), the `mlops` image
+The `mlops` image
 is also published through `.github/workflows/build-publish.yml`'s build
 matrix (WP-34's own explicit instruction) - the OpenShift `BuildConfig`
 this role drives and the GitHub Actions workflow both build from the same

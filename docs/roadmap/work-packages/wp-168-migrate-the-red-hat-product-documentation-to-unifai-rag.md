@@ -105,8 +105,26 @@ Confluence pages, with the caller's group rules, and `rag-service`,
 
 Ingested on demo333 (38 sources, 1079 pages) and compared: UnifAI answers 16 of 18 fixed
 questions against 13 for rag-service; a caller outside the groups finds the public pages and no
-Confluence page. Details in [the evidence](../evidence/wp-168-red-hat-docs-on-unifai.md). Left: the
-mcp-gateway switch and the retirement of rag-service and rag-ingestion (user go).
+Confluence page. Details in [the evidence](../evidence/wp-168-red-hat-docs-on-unifai.md).
+
+## Retirement (2026-10-24, user go: complete retirement, dependencies rewired)
+
+- **Repository:** `components/rag-service`, `components/rag-ingestion`, their charts and
+  Applications, the `rag`, `rag_build`, `rag_ingestion` and `rag_ingestion_build` roles, `data/rag`,
+  `platform/bindings/knowledge`, the build/lint/CI entries, the catalogue generator (the Red Hat list
+  in `gitops/charts/unifai/files/redhat-docs.yaml` is now maintained by hand), the five RAG
+  PostgreSQL databases and users (`rag-tech`, `rag-sales`, `rag-sxa-legacy`, `rag-adv`,
+  `rag-project`), the `mlpipeline` MariaDB database of the rag-ingestion KFP pipeline, the SXA and
+  RAG corpus settings, and the model NetworkPolicy peers.
+- **Rewired:** mcp-gateway `search_technical_docs` queries UnifAI (`CONFLUENCE` and `WEB`); the
+  RAGAS job already used `query.bearer`; mlops no longer reads `document_embeddings` (Postgres is
+  off, a run that still declares knowledge domains fails loudly; every agent trains on a style
+  corpus).
+- **Kept on purpose:** the Vault `rag/s3` credential and `zuno_rag_s3_*` variables (model weights,
+  mlops and mlflow still use them), the `knowledge/` logical domain descriptors (ADR-0202), the
+  OGX server prototype (disabled by default, its database `ogx`).
+- **ADRs:** the supersessions planned by ADR-0568 are written (see the ADR changelog).
+- **Live:** see the evidence file for what was uninstalled on demo333 and what was purged.
 
 ## Open questions
 

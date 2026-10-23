@@ -16,8 +16,7 @@ Gateway's binding registry maps the logical capability ID to whichever
 Authentication mode is `service-identity` (ADR-0208): every call uses the
 same technical Confluence identity (email + API token, HTTP Basic Auth -
 the standard Atlassian Cloud REST API convention, matching
-`components/rag-ingestion/src/rag_ingestion.py`'s own `_confluence_auth`
-for consistency), sourced from an `ExternalSecret` resolving
+UnifAI's Confluence source for consistency), sourced from an `ExternalSecret` resolving
 `zuno/confluence/technical` (seeded by
 `ansible/roles/vault/tasks/install.yml`, keys `url`/`email`/`token`) -
 never hardcoded, per ADR-0024. The MCP Gateway's `policy.evaluate()`

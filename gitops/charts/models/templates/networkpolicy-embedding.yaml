@@ -1,6 +1,5 @@
-# Precise ingress allow-list, not a namespace-wide baseline. rag-service
-# (query-time embedding), rag-ingestion's KFP pipeline pods (fetch-time
-# embedding, zuno-ai-build) and the whole redhat-ods-applications
+# Precise ingress allow-list, not a namespace-wide baseline. The UnifAI RAG
+# pods (below) and the whole redhat-ods-applications
 # namespace (zuno-ogx's OGX Operator data-plane server, ADR-0322 -
 # whole-namespace rather than a podSelector since RHOAI's own operator
 # manages that namespace's pod labels, not this chart) are allowed - see
@@ -22,12 +21,6 @@ spec:
     - Ingress
   ingress:
     - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: zuno-data
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: rag-service
         {{- with .Values.unifaiNamespace }}
         # ADR-0568 (WP-151): the UnifAI RAG server and Celery workers embed
         # through this model (UnifaiStack spec.rag.embedding mode remote).
@@ -43,12 +36,6 @@ spec:
                 operator: In
                 values: [rag, unifai-rag-celery, multiagent]
         {{- end }}
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: zuno-ai-build
-          podSelector:
-            matchLabels:
-              pipelines.kubeflow.org/v2_component: "true"
         # ADR-0322 (WP-06, 2026-08-21 live finding): zuno-ogx's zuno-vllm
         # inference provider calls this Service for embeddings and was
         # silently timing out - redhat-ods-applications wasn't allowed.

@@ -32,7 +32,7 @@ Does NOT probe the three local models - live-caught 2026-09-05 running
 unresolvable there) and then from the in-cluster Job (DNS resolves,
 but the connection is reset: gitops/charts/models's own NetworkPolicies
 (networkpolicy-gptoss.yaml/networkpolicy-qwen35.yaml) allow ingress on
-port 8000 only from ai-gateway/rag-service/the MaaS gateway/lightspeed/
+port 8000 only from ai-gateway/the MaaS gateway/lightspeed/
 monitoring/lm-eval - never from this acceptance-gate-labeled pod, and
 widening that allow-list for a presenter preflight tool is a real
 security-boundary change, not this WP's call to make unilaterally).

@@ -1,7 +1,7 @@
 # One ConfigMap per enabled candidate agent (values.yaml's agents: map) -
 # MLOPS_AGENT and its training parameters are baked in at chart-render
 # time, same "one env contract per run-target" pattern
-# gitops/charts/rag-ingestion/templates/domain-configmaps.yaml uses for
+# the retired rag-ingestion chart uses for
 # its own per-domain ConfigMaps. MLOPS_RUN_ID is deliberately NOT here -
 # it varies per pipeline run, passed as a CLI argument instead (see
 # files/pipeline.py.tpl).

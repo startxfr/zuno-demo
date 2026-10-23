@@ -4,7 +4,7 @@
 # pipeline: ADR-0218 (2026-08-26) dropped the only adapter that ever
 # targeted it, and no replacement source has been decided. NO physical
 # database names, service endpoints, secrets or credentials belong in this
-# file - see platform/bindings/knowledge/bindings.yaml (ADR-0204, WP-21)
+# file - see the retired rag-service bindings registry (ADR-0204, WP-21)
 # for the physical binding, which is retained.
 
 id: knowledge.adv

@@ -186,8 +186,8 @@ evalHub:
     - lm-evaluation-harness
     - garak
 
-# WP-109: RAGAS retrieval-quality evaluation against the REAL rag-service
-# /v1/search path, judged by the local qwen3.6 model. Image built
+# WP-109: RAGAS retrieval-quality evaluation against UnifAI's RAG
+# (/api/sources/query.bearer), judged by the local qwen3.6 model. Image built
 # in-cluster (`make d2 build trustyai-eval`, components/trustyai-eval) -
 # no vendor RAGAS image exists in this release train (WP-108 finding).
 ragasEval:

@@ -17,6 +17,16 @@ removed from `zuno-demo`, ADR-0578 now also supersedes ADR-0106 in part
 its remaining decision, that no unsigned or invalid OKF content runs.
 ADR-0580 is amended: ai-gateway and mlops read the release at build time.
 
+## Supersessions (2026-10-24) - WP-168 retires rag-service and rag-ingestion
+
+The Red Hat product documentation now lives in UnifAI's RAG as public `web`
+sources, so rag-service, rag-ingestion, their charts, roles, databases and the
+PostgreSQL RAG schema are removed and the supersessions planned by ADR-0568 are
+written. Six records move to Retired: ADR-0046, ADR-0105 (with ADR-0218),
+ADR-0204 (with ADR-0218), ADR-0519, ADR-0520 and ADR-0525. Three are superseded
+in part and stay in their band: ADR-0015, ADR-0330 and ADR-0322 (also by
+ADR-0561).
+
 ## Supersessions (2026-10-23) - WP-156 retires the zuno agent stack
 
 WP-156 removed agent-runtime, agent-bff, agent-frontend and the AIAgent

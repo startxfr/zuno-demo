@@ -5,8 +5,8 @@
 # runs `ansible_connection: local` everywhere, so any `command`/`shell`
 # task executes INSIDE the EE container itself, never inside a target
 # pod): `kustomize` (ansible/tasks/apply_kustomize.yml), `oc`
-# (ansible/tasks/apply_openshift_build.yml's `oc start-build`, mlops/
-# rag_ingestion's `oc whoami -t`), `cosign` and `oras` (admission of the
+# (ansible/tasks/apply_openshift_build.yml's `oc start-build`, mlops's
+# `oc whoami -t`), `cosign` and `oras` (admission of the
 # agents release, platform/okf/release_cache.py, WP-165). `vault`/`helm` were investigated and do NOT need bundling -
 # see wp-102-aap-execution-environment-kustomize.md.
 #

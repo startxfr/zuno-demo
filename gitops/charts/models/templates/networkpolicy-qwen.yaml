@@ -33,12 +33,6 @@ spec:
               app.kubernetes.io/name: ai-gateway
         - namespaceSelector:
             matchLabels:
-              kubernetes.io/metadata.name: zuno-data
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: rag-service
-        - namespaceSelector:
-            matchLabels:
               kubernetes.io/metadata.name: openshift-ingress
           podSelector:
             matchLabels:

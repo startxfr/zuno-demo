@@ -1,22 +1,18 @@
 # mlops
 
 OpenShift AI dataset-to-model MLOps pipeline (ADR-0301/ADR-0302, WP-34).
-Reuses the exact `DataSciencePipelinesApplication`/KFP mechanism
-`gitops/charts/rag-ingestion` established (ADR-0330) - this chart's
-templates are that chart's direct structural template, with the
-per-domain map replaced by a per-candidate-agent one (`values.yaml`'s
-`agents:`), since every mlops run already takes an agent identity as its
-run-target the same way rag-ingestion's domain does.
+Uses the `DataSciencePipelinesApplication`/KFP mechanism (ADR-0330, since
+retired with the retired rag-ingestion) with a per-candidate-agent map (`values.yaml`'s
+`agents:`), since every mlops run takes an agent identity as its run-target.
 
 ## Runtime image / CLI stages
 
 `components/mlops/src/mlops.py` implements four stages, one command
-contract, single image for every KFP task (same principle
-`components/rag-ingestion` established):
+contract, single image for every KFP task (one image for every task):
 
-- `prepare-dataset` - reads `document_embeddings` rows for the target
-  agent's declared knowledge domain(s) (continued-pretraining-style
-  grounding text, no new data-collection surface, ADR-0302 point 2) plus
+- `prepare-dataset` - trains on a style corpus (ADR-0526); the former
+  domain-grounding read of `document_embeddings` left with rag-service
+  (WP-168) and fails loudly if a run still declares knowledge domains. Also reads
   the target agent's own `evaluations/<agent>/scenarios.yaml` chat-shaped
   scenario messages (a stand-in for "real usage logs" until this demo
   environment has live traffic). Writes `examples.jsonl` +
@@ -60,7 +56,7 @@ that file's own module docstring.
   ADR-0301 point 5's own starting candidate), each chaining
   prepare-dataset -> train-lora -> evaluate -> push-registry via
   `.after()`. **Not yet compiled/uploaded by anything in this repo** -
-  same currently-unfinished gap `rag-ingestion`'s own chart documents
+  same currently-unfinished gap `the retired rag-ingestion`'s own chart documents
   (`values.yaml`'s `images.compiler` comment there); a future compile-time
   step is required before an actual KFP run can be submitted from this
   source. Until then, the ConfigMap serves as the checked-in,
@@ -80,14 +76,13 @@ that file's own module docstring.
     varies per pipeline run (passed as a `--run-id` CLI argument instead,
     a KFP pipeline parameter substituted at run-submission time).
 - `ExternalSecret`s for S3 (`s3.externalSecret`, same bucket/credential
-  `rag-ingestion` uses per ADR-0302 point 3 - not a new storage system)
-  and read-only Postgres access (`postgres.externalSecret` - reuses
-  rag-ingestion's own tech-domain database credential; this pipeline
-  never writes to Postgres).
+  as the platform's data bucket, ADR-0302 point 3) and, only when
+  `postgres.enabled` (off), read-only Postgres access
+  (`postgres.externalSecret`; this pipeline never writes to Postgres).
 - `ServiceAccount`/`Role`/`RoleBinding` (no Kubernetes API access needed
   - `kfp-kubernetes` injects Secrets/ConfigMaps directly) and
   `NetworkPolicy` (default-deny ingress on every KFP component pod, same
-  as `rag-ingestion`'s own).
+  as the other KFP charts).
 
 ## Not covered by this chart
 

@@ -9,12 +9,12 @@
 # (see its __main__ block), which emits a real PipelineVersion CR
 # (pipelines.kubeflow.org/v2beta1) rather than needing a kfp.Client() REST
 # upload - so `oc apply`-ing that manifest is the whole missing operation.
-# Transposed from ansible/roles/rag_ingestion/tasks/compile_pipeline_version.yml,
+# Transposed from the retired rag_ingestion role,
 # which has been doing exactly this for its own domains all along.
 #
 # TWO THINGS DIFFER FROM THE RAG-INGESTION ORIGINAL and both matter:
 #   - the ConfigMap lives in zuno-mlops, not zuno-ai-build;
-#   - every compile target is suffixed in the version name (rag-ingestion
+#   - every compile target is suffixed in the version name (the retired rag-ingestion
 #     leaves "tech" unsuffixed as its first-in-place target; mlops has no
 #     such privileged target, so there is no special case).
 #
@@ -35,7 +35,7 @@
 
 - name: "mlops | read the rendered pipeline source ConfigMap"
   # zuno-mlops, NOT zuno-ai-build - the mlops chart deploys into its own
-  # namespace (values.yaml's platform.namespace). Copying rag-ingestion's
+  # namespace (values.yaml's platform.namespace). Copying the retired rag-ingestion's
   # namespace here would silently find nothing and skip forever.
   kubernetes.core.k8s_info:
     api_version: v1
@@ -60,7 +60,7 @@
   when: (_mlops_pipeline_source_cm.resources | default([]) | length) > 0
 
 # The per-target rescue above is deliberately non-fatal (one agent's
-# compile error must not block another's, and rag-ingestion's own task is
+# compile error must not block another's, and the retired rag-ingestion's own task is
 # shaped the same way) - but "non-fatal" printed mid-play is exactly how a
 # real failure hides behind `failed=0`. This WP exists because the
 # pipeline had zero versions for months; the one thing that must never

@@ -1,6 +1,6 @@
 # ADR-0519: Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa)
 
-- **Status:** Implemented (live-verified 2026-08-25 via WP-57 - the SXA fetch stage went from
+- **Status:** Superseded by [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) (2026-10-24, WP-168) - fetch-stage optimizations of the retired `rag_ingestion.py`. Previously: Implemented (live-verified 2026-08-25 via WP-57 - the SXA fetch stage went from
   127min+ and incomplete to 35m27s, with CPU utilization rising from 4.3% to 89%+)
 - **Target:** v0.4
 - **Date:** 2026-08-25

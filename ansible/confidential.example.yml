@@ -117,11 +117,11 @@ zuno_mariadb_backup_s3_prefix: "mariadb"
 # Consequence when external and any required key below is left at the
 # sentinel: the install fails fast, before any apply, naming the key.
 # The external DBA must pre-create the three databases and their users
-# (defaults: mlpipeline/mlpipeline, mlops/mlops, trillian/trillian - a
+# (defaults: mlops/mlops, trillian/trillian - a
 # different username is supported via the _username keys, which flow to the
 # consumer charts as non-secret Helm values). Passwords are seeded by the
 # mariadb role into the same Vault paths the consumer ExternalSecrets
-# already read (rag/pipeline-db, mlops/dspa-mysql, rhtas/trillian-mysql),
+# already read (mlops/dspa-mysql, rhtas/trillian-mysql),
 # overwriting the internally-generated ones. The five backup fields above
 # and the mysqld-exporter metrics are internal-only and do not apply.
 # zuno_mariadb_external_ca_bundle: "" means a PLAINTEXT endpoint - the DSPA
@@ -133,8 +133,6 @@ zuno_mariadb_mode: internal
 zuno_mariadb_external_host: "xxxxxx"
 zuno_mariadb_external_port: "3306"
 zuno_mariadb_external_ca_bundle: ""
-zuno_mariadb_external_db_mlpipeline_username: "mlpipeline"
-zuno_mariadb_external_db_mlpipeline_password: "xxxxxx"
 zuno_mariadb_external_db_mlops_username: "mlops"
 zuno_mariadb_external_db_mlops_password: "xxxxxx"
 zuno_mariadb_external_db_trillian_username: "trillian"
@@ -185,23 +183,14 @@ zuno_gitlab_enabled: false
 zuno_gitlab_url: "xxxxxx"               # e.g. https://gitlab.your-company.com (optional - defaults to gitlab.com)
 zuno_gitlab_token: "xxxxxx"
 
-# --- RAG corpus S3 bucket (rag-ingestion's raw/normalized/manifest storage -
-# bucket/region/endpoint are chart config, not secret: see
-# gitops/charts/rag-ingestion/values.yaml's s3: block) -----------------------
+# --- Platform data bucket credential (Vault zuno/rag/s3: model weights, mlops,
+# mlflow - bucket/region/endpoint are chart config, not secret) -----------
 zuno_rag_s3_access_key_id: "xxxxxx"
 zuno_rag_s3_secret_access_key: "xxxxxx"
 
-# --- SXA corpus S3 bucket (ADR-0219: load-sxa-dump's dedicated bucket, holding
-# the pre-2021 schema.sql/data.sql export - bucket/region are chart config, not
-# secret: see gitops/charts/rag-ingestion/values.yaml's
-# domains.sxa-legacy.sxaDump.s3 block. Use a dedicated, bucket-scoped IAM user,
-# never the account's admin credentials.) --------------------------------
-zuno_sxa_corpus_s3_access_key_id: "xxxxxx"
-zuno_sxa_corpus_s3_secret_access_key: "xxxxxx"
-
 # --- AAP Hub S3 bucket (WP-075: Automation Hub's file_storage replacement -
 # WP-072's RWO EBS PVC deadlocked api against content/worker across 2 nodes.
-# Unlike rag/s3 and sxa-corpus/s3 above, bucket name and region are also
+# Unlike rag/s3 above, bucket name and region are also
 # sourced here and pushed to Vault alongside the credentials, not committed
 # as plain chart values - see
 # gitops/charts/aap/templates/externalsecret-hub-s3.yaml. Use a dedicated,
@@ -230,7 +219,7 @@ zuno_rhoai_traces_s3_secret_access_key: "xxxxxx"
 # zuno_models_s3_bucket/_prefix: which bucket and directory contain the
 # model weights, layout s3://<bucket>/<prefix>/<servedModelName>/ - every
 # local model (both LLMInferenceServices, ADR-0521) reads straight from
-# S3 (same rag/s3 Vault credential as the RAG corpus - reuses
+# S3 (same rag/s3 Vault credential - reuses
 # zuno_rag_s3_* above, no extra secret). ADR-0521 removed the legacy Day 1
 # HF->PVC predownload Job this bucket/prefix pair used to be an
 # alternative to (zuno_models_download_enabled, qwen-only, gone with the
@@ -255,32 +244,6 @@ zuno_models_s3_prefix: "models"
 # once a pipeline run has produced the artifact at that URI. The chart
 # default stays an invalid placeholder (ADR-0547 clause 3).
 # zuno_models_tekos_lora_source_s3_uri: "s3://zuno-mycluster-mlops/mlops/models/tekos/<run-id>/adapter"
-
-# --- RAG corpus and SXA dump (ADR-0546/WP-131) -----------------------------
-# Two buckets with opposite natures. zuno_rag_corpus_s3_* is this cluster's
-# ingestion OUTPUT and belongs in zuno-<cluster>-data; the outputs are NOT
-# migrated between clusters, each cluster re-ingests through its own pipeline
-# (ADR-0546 clause 1), so pointing a new cluster here costs nothing.
-# zuno_sxa_dump_* is a cross-cluster INPUT - the authoritative legacy export
-# that seeds any cluster - and belongs in zuno-demo-sources under sxa-dump/.
-#
-# The dump's bucket and its two KEYS move together: the objects moved from the
-# bucket root into an sxa-dump/ prefix, so changing only the bucket gives
-# ingestion a 404 that reads as a missing dump rather than a misconfiguration.
-# Omitting any of these keeps the chart default.
-zuno_rag_corpus_s3_bucket: "zuno-mycluster-data"
-zuno_rag_corpus_s3_region: "eu-west-2"
-zuno_sxa_dump_s3_bucket: "zuno-demo-sources"
-zuno_sxa_dump_s3_region: "eu-west-2"
-zuno_sxa_dump_schema_s3_key: "sxa-dump/sxa.schema.sql"
-zuno_sxa_dump_data_s3_key: "sxa-dump/sxa.data.sql"
-# ADR-0546/WP-131: leave unset (chart default true) on a settled cluster. Set
-# to false for the FIRST ingestion run after moving the corpus bucket: raw/ is
-# empty in the new bucket, and detect-changes treats "in the manifest but not
-# under raw/" as deleted - so one unreachable source would drop its documents
-# from the pgvector index. Restore to true once a full run has repopulated
-# raw/ and its object count matches the old bucket's.
-zuno_rag_corpus_delete_orphans: true
 
 # --- MLOps pipeline artifacts and training corpus (ADR-0546/WP-131) ---------
 # Two DIFFERENT buckets on purpose, and the split is the whole point of

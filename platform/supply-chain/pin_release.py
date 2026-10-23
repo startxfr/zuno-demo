@@ -26,7 +26,7 @@ Deliberately narrow in scope, on purpose:
   EXACTLY the set of fields `check_no_latest_tags.py` currently reports (no
   more, no less) - a stale/incomplete manifest is a loud error, not a
   partial, silent fix. `skipped` exists for fields a given release
-  genuinely cannot pin (e.g. `rag-ingestion` is built exclusively by the
+  genuinely cannot pin (e.g. an image built exclusively by the
   in-cluster OpenShift BuildConfig, never by `build-publish.yml` - no real
   Quay artifact for it exists from a GitHub Actions release) - each entry
   requires a `reason`, is written to the audit ledger alongside the real
@@ -50,11 +50,11 @@ build-publish.yml run output):
         tag: v0.1.0
         digest: sha256:...          # optional, audit-only (see above)
     skipped:                        # optional - see above
-      - chart_values: gitops/charts/rag-ingestion/values.yaml
-        path: images.ingestion.tag
+      - chart_values: gitops/charts/example/values.yaml
+        path: image.tag
         reason: >-
           built exclusively by the in-cluster OpenShift BuildConfig
-          (ansible/roles/rag_ingestion_build), never by build-publish.yml -
+          (an ansible/roles/*_build role), never by build-publish.yml -
           no real Quay artifact from this release to pin to
 
 Run from the repository root:
@@ -160,7 +160,7 @@ def _apply_pins_to_file(
 
     `all_paths_in_order` is that same file's FULL document-order path
     list, including paths this manifest chose to `skip` rather than pin
-    (e.g. rag-ingestion's `images.compiler.tag` sits between other
+    (e.g. a chart's second image tag sitting between other
     charts' single `image.tag` line and would otherwise be miscounted) -
     needed to correlate each literal `tag:` line to its YAML path so a
     skipped line in the middle of a file doesn't shift every pin below it

@@ -7,7 +7,7 @@ platform:
   # Lease when sharing a namespace (see the dspa-shared-namespace-
   # leader-election-bug memory). createNamespace stays false: ownership
   # is centralized in gitops/charts/namespaces (platformNamespaces'
-  # zuno-mlops entry), same convention rag-ingestion already uses for
+  # zuno-mlops entry), same convention the retired rag-ingestion already uses for
   # zuno-ai-build. images.mlops.repository below deliberately still
   # points at zuno-ai-build - the image BUILD stays there
   # (ansible/roles/mlops_build), only the pipeline RUN namespace moved.
@@ -34,7 +34,7 @@ images:
     # Nothing else in this chart reads either path, so the mistake was
     # invisible to helm lint, helm template and every unit test - it could
     # only ever surface by actually compiling the pipeline, which nothing
-    # did until now. gitops/charts/rag-ingestion nests it correctly under
+    # did until now. the retired rag-ingestion chart nests it correctly under
     # images.ingestion, which is why its own compile has always worked.
     pullPolicy: Always
 
@@ -45,7 +45,7 @@ externalSecrets:
     kind: ClusterSecretStore
     name: vault-backend
 
-# Same bucket/credential convention components/rag-ingestion already
+# Same bucket/credential convention the retired rag-ingestion component already
 # established (ADR-0330) - not a new storage system (ADR-0302 point 3).
 s3:
   type: aws
@@ -63,7 +63,7 @@ s3:
   pathStyle: false
   secretName: mlops-s3-credentials
   externalSecret:
-    remoteKey: rag/s3 # ADR-0302 point 3: same bucket/credential rag-ingestion uses
+    remoteKey: rag/s3 # ADR-0302 point 3: same bucket/credential the retired rag-ingestion uses
     accessKeyProperty: accessKeyId
     secretKeyProperty: secretAccessKey
 
@@ -102,37 +102,20 @@ artifacts:
   evalPrefix: mlops/evaluations
   registryPrefix: mlops/registrations
 
-# Read-only access to document_embeddings (rag-service's own table,
-# ADR-0015) - this pipeline never writes to Postgres (ADR-0302 point 2).
+# Read-only access to a document_embeddings table for domain-grounding runs
+# (ADR-0302 point 2). The table belonged to the retired rag-service (WP-168), so
+# this is off: every agent trains on a style corpus (ADR-0526). Enable it only
+# with a database that holds the table; the pipeline never writes to Postgres.
 postgres:
-  # WP-133 (live, 2026-09-04): zuno-postgresql-rw does not exist - no
-  # service in zuno-data has ever been named that (confirmed: `oc get svc
-  # -n zuno-data` lists zuno-postgresql-{ha,ha-config,pgbouncer,pods,
-  # primary,replicas} only). Fixed to the exact host rag-ingestion's own
-  # top-level postgres: block already uses successfully in production for
-  # this same rag-tech database/knowledge.tech domain
-  # (gitops/charts/rag-ingestion/values.yaml) - pgBouncer's transaction
-  # pooling is safe here because mlops.py's SET search_path and the SELECT
-  # it guards run inside one uncommitted connection (autocommit=False),
-  # never split across a commit boundary. Unreachable on the WP-087 style
-  # objective (never opens a PG connection at all), so this stayed wrong
-  # until this WP's tekos run was the first to actually try.
+  enabled: false
   host: zuno-postgresql-pgbouncer.zuno-data.svc.cluster.local
   port: 5432
-  database: rag-tech
-  # rag, not public. document_embeddings lives in the `rag` schema
-  # (rag-ingestion creates it there), and mlops.py issues
-  # `SET search_path TO <schema>, public` - with `public` here that
-  # resolves to "public, public" and every query fails with
-  # "relation document_embeddings does not exist". Unreachable on the
-  # WP-087 style objective (that branch never opens a PG connection at
-  # all), but wrong for any grounding-domain run, which is how it stayed
-  # wrong: the pipeline has never executed.
-  schema: rag
+  database: ""
+  schema: public
   sslmode: require
   secretName: mlops-postgres-credentials
   externalSecret:
-    remoteKey: rag/postgresql-app # read-only reuse of rag-ingestion's own tech-domain credential (same path as rag-service/rag-ingestion's tech domain)
+    remoteKey: ""
     usernameProperty: username
     passwordProperty: password
 
@@ -200,7 +183,7 @@ pipelineServer:
       port: "3306"
       username: mlops
       database: mlops
-      # ADR-0352/WP-143: same TLS-ness contract as rag-ingestion's
+      # ADR-0352/WP-143: same TLS-ness contract as the retired rag-ingestion's
       # externalMySQL.tls - "true" (default, internal TLS-serving
       # MariaDB), "false" = plaintext external endpoint.
       tls: "true"
@@ -214,8 +197,8 @@ pipeline:
   # BUMP THIS ON EVERY CHANGE TO THE COMPILED DAG. A KFP PipelineVersion's
   # spec is immutable: re-applying a changed spec under a name that already
   # exists is REJECTED, and the old spec silently stays in force. That is
-  # exactly the trap rag-ingestion hit live (see its own values.yaml
-  # comment and ansible/roles/rag_ingestion/tasks/
+  # exactly the trap the retired rag-ingestion hit live (see its own values.yaml
+  # comment and the retired rag_ingestion role
   # compile_one_pipeline_version.yml's fatal rescue branch, mirrored here).
   # v1 was never actually applied - the pipeline has 0 versions and 0 runs -
   # so this rename is free today, and the convention now exists before the
@@ -230,7 +213,7 @@ pipeline:
 
 # One entry per candidate agent (ADR-0301 point 5: Comage is the starting
 # candidate). Deliberately a flat map, not per-agent Pipeline CR variants
-# the way rag-ingestion's domains: map is (each mlops run already takes
+# the way the retired rag-ingestion's domains: map is (each mlops run already takes
 # --agent as a runtime parameter to the SAME pipeline DAG, not a
 # structurally different DAG per agent - prepare-dataset/train-lora/
 # evaluate/push-registry never change shape per agent, only their
@@ -305,8 +288,8 @@ agents:
   # objective never ran (see comage's own knowledgeDomains comment above).
   tekos:
     enabled: true
-    # Literal metadata->>'domain' value rag-ingestion writes for tech
-    # content (components/rag-ingestion/src/rag_ingestion.py) - "tech"
+    # Literal metadata->>'domain' value the retired rag-ingestion writes for tech
+    # content (the retired rag-ingestion component) - "tech"
     # alone matches zero rows, a silent-empty-dataset trap this comment
     # exists to stop from recurring.
     knowledgeDomains: ["knowledge.tech"]

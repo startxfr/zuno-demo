@@ -2,7 +2,7 @@
 #
 # Current sales knowledge asynchronously ingested from Salesforce. NO
 # physical database names, service endpoints, secrets or credentials belong
-# in this file - see platform/bindings/knowledge/bindings.yaml (ADR-0204,
+# in this file - see the retired rag-service bindings registry (ADR-0204,
 # WP-21) for the physical binding.
 
 id: knowledge.sales

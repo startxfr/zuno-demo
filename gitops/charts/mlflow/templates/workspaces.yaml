@@ -4,7 +4,7 @@ Per-workspace artifact wiring. Two objects per namespace:
   * the artifact-connection Secret - MLflowConfig's CRD CEL-validates the
     name, so it must stay `mlflow-artifact-connection`; keys are the AWS_*
     set the operand expects, filled from the same Vault S3 credential mlops
-    and rag-ingestion use;
+    uses;
   * the MLflowConfig itself - NOTE the API group is mlflow.kubeflow.org,
     NOT mlflow.opendatahub.io like the server CR above. Verified live; an
     assumed group renders an unappliable manifest.

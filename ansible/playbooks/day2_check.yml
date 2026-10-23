@@ -21,8 +21,6 @@
       - namespaces
       - llm
       - models
-      - rag
-      - rag_ingestion
       - mcp
       - agents
       - mlops

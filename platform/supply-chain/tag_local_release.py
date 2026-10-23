@@ -27,8 +27,7 @@ How each component is retagged, in order, per component:
        operation, so live pods pulling `:latest` are undisturbed the
        entire time, even if a restart happens mid-run.
 
-The only field with genuinely no in-cluster BuildConfig
-(`rag-pipeline-compiler`, the chart's `images.compiler` field) is out of
+A field with genuinely no in-cluster BuildConfig (none today) is out of
 scope - this script does not invent a build path for it; it stays on
 `pin_release.py`'s (mothballed, see its own dated note) `skipped`
 mechanism, and on `check_release_ledger.py`'s equivalent for the current
@@ -126,8 +125,6 @@ COMPONENTS = [
     "mcp-git-forge",
     "mcp-salesforce",
     "mlops",
-    "rag-ingestion",
-    "rag-service",
 ]
 
 # (chart_values, path) -> component name, or a tuple of component names
@@ -142,17 +139,12 @@ CHART_FIELD_COMPONENT: Dict[Tuple[str, str], object] = {
     ("gitops/charts/mcp-salesforce/values.yaml", "image.tag"): "mcp-salesforce",
     ("gitops/charts/diagram-render/values.yaml", "image.tag"): "diagram-render",
     ("gitops/charts/mlops/values.yaml", "images.mlops.tag"): "mlops",
-    ("gitops/charts/rag-service/values.yaml", "image.tag"): "rag-service",
-    ("gitops/charts/rag-ingestion/values.yaml", "images.ingestion.tag"): "rag-ingestion",
 }
 
 # Deliberately out of scope - no BuildConfig exists for this one field.
 # (mlops was wrongly listed here until 2026-09-05 - see the docstring's
 # corrected note; it's a real COMPONENTS entry now.)
-NOT_LOCALLY_BUILDABLE = [
-    ("gitops/charts/rag-ingestion/values.yaml", "images.compiler.tag",
-     "rag-pipeline-compiler has no BuildConfig - unused by any template today per the chart's own comment"),
-]
+NOT_LOCALLY_BUILDABLE: List[Tuple[str, str, str]] = []
 
 
 def _oc(args: List[str]) -> subprocess.CompletedProcess:

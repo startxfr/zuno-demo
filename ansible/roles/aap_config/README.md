@@ -82,8 +82,7 @@ Job Template's Survey component list exactly) but **not yet exercised
 against a real Controller**. Two edges are flagged in `values.yaml`'s own
 comments as needing live re-verification before being trusted: whether
 `kiali`/`grafana` truly have no install-order dependency on each other
-(only a runtime config reference is confirmed), and Day 2's `rag`/
-`rag-ingestion`/`mcp` parallel group (less documented than Day 1's).
+(only a runtime config reference is confirmed), and Day 2's `models` -> `mcp` -> `agents` chain (less documented than Day 1's).
 
 ## What is a CR vs an API call
 

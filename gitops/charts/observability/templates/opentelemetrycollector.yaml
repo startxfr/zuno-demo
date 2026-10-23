@@ -39,7 +39,7 @@ spec:
         tls:
           insecure: true
       # ADR-0102 (roadmap WP-12): before this, every metric any service in
-      # this repo emits (rag-service's zuno.rag_searches, ai-gateway's
+      # this repo emits (ai-gateway's
       # cache-outcome counters, etc.) reached only `debug` (stdout
       # logging) - never a Prometheus-queryable backend, independent of
       # the BFF-level SLO metric docs/platform/slo.md describes. Standard

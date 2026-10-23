@@ -129,7 +129,7 @@ jobs:
           python3 tests/test_bindings.py
           python3 tests/test_auth_mode_enforcement.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
-          # handler, UnifAI + rag-service merge (WP-156).
+          # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
           python3 -m pytest -q tests/test_rag_query.py
       - name: ai-gateway tests
@@ -179,28 +179,6 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_mcp_protocol.py
-      - name: rag-service tests
-        working-directory: components/rag-service
-        run: |
-          pip install -r requirements.txt
-          python3 tests/test_search_filters.py
-          python3 tests/test_ogx_provider.py
-          python3 tests/test_provider_parity.py
-      - name: rag-ingestion tooling tests (ADR-0330)
-        working-directory: components/rag-ingestion/tooling
-        run: |
-          pip install -r requirements.txt
-          python3 tests/test_verify_catalog.py
-      - name: rag-ingestion source-adapter tests (ADR-0204/ADR-0105)
-        working-directory: components/rag-ingestion
-        run: |
-          pip install -r requirements.txt
-          python3 tests/test_source_adapters.py
-      - name: rag-ingestion ACL reconciliation tests (ADR-0110)
-        working-directory: components/rag-ingestion
-        run: |
-          pip install -r requirements.txt
-          python3 tests/test_reconcile_acls.py
       - name: evaluations quality gate tests (ADR-0107)
         working-directory: evaluations
         run: |

@@ -1,6 +1,6 @@
 # ADR-0015: Use PostgreSQL and pgvector as the persistent data platform
 
-- **Status:** Implemented
+- **Status:** Superseded in part by [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) (2026-10-24, WP-168) - pgvector hybrid search left PostgreSQL with rag-service; PostgreSQL as shared persistent state stays. Previously: Implemented
 - **Target:** v0
 - **Date:** 2026-08-04
 - **Decision owners:** Zuno Demo architecture team

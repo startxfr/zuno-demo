@@ -103,7 +103,7 @@ hardwareProfiles:
 # templates/servicemonitor-vllm.yaml and the extra openshift-monitoring/UWM
 # ingress rule templates/networkpolicy-embedding.yaml adds - without that
 # rule the ServiceMonitor renders but the scrape is dead on arrival (that
-# policy's existing allow-list is scoped to ai-gateway/rag-service only).
+# policy's existing allow-list is scoped to ai-gateway only).
 # ADR-0521 (WP-076): this now only covers the ONE remaining classic
 # InferenceService this chart owns directly (embeddings) - qwen joined
 # gpt-oss-20b as an LLMInferenceService, scraped independently by RHOAI's
@@ -401,9 +401,8 @@ modelStorage:
 # this chart: the classic predictor's storageUri when
 # modelStorage.downloadJob.enabled is false, and the MaaS
 # LLMInferenceService's model.uri + credential annotations (maas.yaml).
-# Same bucket/credential (Vault "rag/s3") as rag-ingestion's corpus
-# (gitops/charts/rag-ingestion/values.yaml's s3: block) - the models/
-# prefix keeps weights and corpus objects apart. Layout is
+# Same bucket/credential (Vault "rag/s3") as the platform's data bucket - the
+# models/ prefix keeps weights apart from other objects. Layout is
 # <prefix>/<servedModelName>/: models/qwen3.6-27b-instruct/ and
 # models/qwen3-embedding-0.6b/ (ADR-0518, streamed HF->S3
 # out-of-cluster - in-cluster hf:// downloads hang unreliably here, see
@@ -447,19 +446,15 @@ sourcesS3:
   endpoint: s3.eu-west-2.amazonaws.com
   region: eu-west-2
 
-# Additive second model: text embeddings for rag-ingestion (see
-# gitops/charts/rag-ingestion's embedding.endpoint/dimensions) and
-# rag-service's query-side embedding calls. inferenceServiceName is
+# Additive second model: text embeddings for UnifAI's RAG (UnifaiStack
+# spec.rag.embedding, remote mode). inferenceServiceName is
 # "embeddings", not "embeddings-predictor": KServe RawDeployment appends
 # "-predictor" to a classic InferenceService's own name to build its
 # Service name (this is still the last classic InferenceService this
 # chart owns - qwen joined gpt-oss-20b as an LLMInferenceService under
 # ADR-0521, which names its Service <name>-kserve-workload-svc instead),
-# and gitops/charts/rag-service/values.yaml's embeddingServiceUrl /
-# components/rag-service/app/config.py's EMBEDDING_SERVICE_URL default
-# already hardcode http://embeddings-predictor.zuno-ai-run.svc:8080 -
-# this closes that previously-dangling reference rather than inventing a
-# third, inconsistent embedding endpoint. Kept as its own
+# and the UnifAI stack's embedding endpoint is
+# http://embeddings-predictor.zuno-ai-run.svc:8080. Kept as its own
 # servingRuntime/inferenceService pair rather than folding into a
 # models: [] list, since only these two models exist and a list-based
 # rewrite would be a breaking change to every consumer of this chart's
@@ -468,11 +463,11 @@ embeddingModel:
   servingRuntimeName: vllm-embedding-runtime
   # Kept as "embeddings" across the ADR-0518 model swap on purpose: the
   # generated Service name embeddings-predictor.zuno-ai-run.svc is
-  # hardcoded by rag-service/rag-ingestion consumers - a neutral name
+  # hardcoded by the UnifAI RAG consumers - a neutral name
   # means swapping the model never renames the endpoint.
   inferenceServiceName: embeddings
   # Same modelId (HF download) / servedModelName (API id) split as the
-  # chat model above - rag-service's EMBEDDING_MODEL_NAME expects the
+  # chat model above - the RAG embedding client expects the
   # short canonical id.
   servedModelName: qwen3-embedding-0.6b
   # ADR-0546/WP-131: which bucket this model's weights are read from -
@@ -492,8 +487,7 @@ embeddingModel:
   # BAAI/bge-small-en-v1.5 (384-dim, English-only) - the live corpus is
   # French Confluence content, so an MTEB-multilingual-topping model is
   # a correctness fix, not a nicety. Any dimension change here MUST land
-  # together with the matching pgvector column migration
-  # (gitops/charts/rag-service/files/sql) and a full re-ingestion: old
+  # together with a full re-ingestion of the Qdrant collections: old
   # vectors are unreadable in the new space. Served via vLLM's pooling
   # runner (--runner=pooling --convert=embed), not chat.
   modelId: Qwen/Qwen3-Embedding-0.6B
@@ -1306,7 +1300,7 @@ lmEval:
   enabled: true
   # Benchmarks the one model actually deployed by this chart (see
   # inferenceServiceName/modelId above), same base_url convention as
-  # components/rag-service/app/config.py's EMBEDDING_SERVICE_URL.
+  # the UnifAI stack's embedding endpoint.
   cache:
     # pvc-lmeval-cache.yaml's size - real payload is tiny (~11MB tokenizer
     # + one MMLU subject config), generous headroom still costs nothing on

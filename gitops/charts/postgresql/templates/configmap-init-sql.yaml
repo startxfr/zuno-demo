@@ -1,13 +1,12 @@
 {{- if .Values.postgresCluster.enabled }}
 # Referenced by templates/postgrescluster.yaml's spec.databaseInitSQL; PGO
 # runs this once at cluster bootstrap. Databases added to spec.users after
-# that first bootstrap (ragTechDatabase, maasDatabase, checkpointDatabase,
-# ogxDatabase) do NOT get this script re-run - maas-api hit "permission
+# that first bootstrap (maasDatabase, ogxDatabase) do NOT get this script re-run - maas-api hit "permission
 # denied for schema public" because the grant below didn't exist yet when
 # maasDatabase was added; the GRANT had to be applied by hand once against
 # the already-running cluster. Adding a new dedicated database to an
 # existing cluster always needs that same one-time manual GRANT
-# (checkpointDatabase/ogxDatabase needed it too - see
+# (ogxDatabase needed it too - see
 # docs/adr/0101-provide-ha-for-shared-agent-platform-services.md).
 # \connect is required: databaseInitSQL runs against the "postgres"
 # database regardless of spec.users[].databases, not the app database.
@@ -39,17 +38,9 @@ data:
     \connect {{ .Values.keycloakDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.keycloakDatabase.owner }};
 
-    -- CREATE EXTENSION needs superuser; every embeddings-bearing database
-    -- must get it here, NOT in the per-domain schema-apply Jobs (those run
-    -- as the unprivileged domain owner role - VERIFIED live 2026-08-15:
-    -- zuno-rag-schema-apply-tech failed with "permission denied to create
-    -- extension \"vector\"" / "Must be superuser"). Same once-at-bootstrap
-    -- caveat as the GRANTs above: on an existing cluster these statements
-    -- must be applied by hand once for each database added after bootstrap.
-    \connect {{ .Values.ragTechDatabase.name }}
-    CREATE EXTENSION IF NOT EXISTS vector;
-    GRANT ALL ON SCHEMA public TO {{ .Values.ragTechDatabase.owner }};
-
+    -- CREATE EXTENSION needs superuser: an embeddings-bearing database gets
+    -- it here, not from an unprivileged owner role. Same once-at-bootstrap
+    -- caveat as the GRANTs above.
     \connect {{ .Values.maasDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.maasDatabase.owner }};
 
@@ -63,22 +54,6 @@ data:
     \connect {{ .Values.ogxDatabase.name }}
     CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ogxDatabase.owner }};
-
-    \connect {{ .Values.ragSalesDatabase.name }}
-    CREATE EXTENSION IF NOT EXISTS vector;
-    GRANT ALL ON SCHEMA public TO {{ .Values.ragSalesDatabase.owner }};
-
-    \connect {{ .Values.ragSxaLegacyDatabase.name }}
-    CREATE EXTENSION IF NOT EXISTS vector;
-    GRANT ALL ON SCHEMA public TO {{ .Values.ragSxaLegacyDatabase.owner }};
-
-    \connect {{ .Values.ragAdvDatabase.name }}
-    CREATE EXTENSION IF NOT EXISTS vector;
-    GRANT ALL ON SCHEMA public TO {{ .Values.ragAdvDatabase.owner }};
-
-    \connect {{ .Values.ragProjectDatabase.name }}
-    CREATE EXTENSION IF NOT EXISTS vector;
-    GRANT ALL ON SCHEMA public TO {{ .Values.ragProjectDatabase.owner }};
 
     -- AAP 2.7 Automation Metrics service (Django) - plain relational.
     \connect {{ .Values.aapMetricsDatabase.name }}

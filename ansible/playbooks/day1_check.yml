@@ -1,7 +1,7 @@
 ---
 # Day 1 state check (`make day1 check`) - the remainder of the
 # AI-platform-operator stack. `namespaces`, `llm`,
-# `models`, and content-ingestion (rag/rag_ingestion/mcp/agents/mlops) all
+# `models`, and content-ingestion (mcp/agents/mlops) all
 # moved to Day 2 - see day2_check.yml. ADR-0421 moved postgresql/keycloak/
 # aap/aap_config out to Day 0 and smtp/nfd/nvidia_gpu/
 # custom_metrics_autoscaler in from Day 0 - see day1_install.yml.

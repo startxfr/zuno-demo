@@ -42,7 +42,7 @@
     - name: "demo-check | run the agents' availability check (UnifAI bundles)"
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/day2_availability_check.yml"
 
-    - name: "demo-check | run the shared platform services' health check (ai-gateway/mcp-gateway/rag-service/UnifAI)"
+    - name: "demo-check | run the shared platform services' health check (ai-gateway/mcp-gateway/UnifAI)"
       ansible.builtin.include_role:
         name: day3
         tasks_from: platform_health_check
@@ -124,7 +124,7 @@
     # SAME call from inside the acceptance-gate Job (which does resolve it)
     # gets "Connection reset by peer" - gitops/charts/models's own
     # NetworkPolicies (networkpolicy-gptoss.yaml/networkpolicy-qwen35.yaml)
-    # allow port 8000 only from ai-gateway/rag-service/the MaaS gateway/
+    # allow port 8000 only from ai-gateway/the MaaS gateway/
     # lightspeed/monitoring/lm-eval, never from acceptance-gate. Widening
     # that allow-list for a presenter preflight tool would be a real
     # security-boundary change this WP does not make unilaterally. The

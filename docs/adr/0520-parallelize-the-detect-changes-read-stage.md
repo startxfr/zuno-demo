@@ -1,6 +1,6 @@
 # ADR-0520: Parallelize the detect-changes read stage
 
-- **Status:** Implemented (live-verified 2026-08-25 via WP-58 - `detect-changes` went from
+- **Status:** Superseded by [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) (2026-10-24, WP-168) - detect-changes optimization of the retired pipeline. Previously: Implemented (live-verified 2026-08-25 via WP-58 - `detect-changes` went from
   3h48m17s to 13m25s on the same domain, a ~17x speedup; the full pipeline reached SUCCEEDED
   end-to-end in 16m51s)
 - **Target:** v0.4

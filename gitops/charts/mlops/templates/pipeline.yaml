@@ -8,14 +8,14 @@ CR named "mlops", so the compiled version referenced a Pipeline that was
 never created. That is one of the two reasons the mlops Pipeline still
 carries 0 versions and 0 runs.
 
-The fix mirrors gitops/charts/rag-ingestion/templates/pipeline.yaml: keep
+The fix mirrors the retired rag-ingestion chart: keep
 the base CR (ansible/roles/mlops's own install/precheck tasks look it up
 by that name) and add one per enabled candidate agent. The compile side
 then needs no change at all.
 
 The alternative - compiling under the base name - was rejected: it would
 still need per-agent PipelineVersion name suffixing (names are unique per
-NAMESPACE, not per pipeline - rag-ingestion hit exactly that live on
+NAMESPACE, not per pipeline - the retired rag-ingestion hit exactly that live on
 2026-08-21), it would let two enabled agents push conflicting specs into
 one immutable Pipeline, and it would orphan the "mlops" CR the role
 already queries.

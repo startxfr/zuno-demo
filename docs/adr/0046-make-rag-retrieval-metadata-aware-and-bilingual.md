@@ -1,6 +1,6 @@
 # ADR-0046: Make RAG retrieval metadata-aware and bilingual
 
-- **Status:** Implemented
+- **Status:** Superseded by [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) (2026-10-24, WP-168) - metadata fields, filters, bilingual ranking and hybrid search live in UnifAI's RAG payload and hybrid search. Previously: Implemented
 - **Target:** v0
 - **Date:** 2026-08-05
 - **Decision owners:** Zuno Demo architecture team

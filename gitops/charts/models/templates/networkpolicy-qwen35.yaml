@@ -3,10 +3,9 @@
 # kserve.io/component labels (not serving.kserve.io/inferenceservice) and
 # serves its OpenAI-compatible API on 8000, not 8080.
 #
-# THREE callers, and the third is the one that is easy to forget:
-# ai-gateway (this model's direct `local-*` provider entry), rag-service
-# (kept for symmetry with the other model policies - this chart cannot
-# know which role an instance plays), and maas-default-gateway. Omitting
+# TWO callers, and the second is the one that is easy to forget:
+# ai-gateway (this model's direct `local-*` provider entry) and
+# maas-default-gateway. Omitting
 # the gateway peer does NOT fail loudly: the MaaS data path routes
 # gateway -> (EPP-selected) workload pod :8000 directly, so the request
 # 504s at the outer HAProxy AFTER auth, subscription selection and the
@@ -42,12 +41,6 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: ai-gateway
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: zuno-data
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: rag-service
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: openshift-ingress

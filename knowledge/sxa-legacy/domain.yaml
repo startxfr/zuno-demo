@@ -2,7 +2,7 @@
 #
 # Historical SXA schema/data imported from a legacy SQL dump snapshot. NO
 # physical database names, service endpoints, secrets or credentials belong
-# in this file - see platform/bindings/knowledge/bindings.yaml (ADR-0204,
+# in this file - see the retired rag-service bindings registry (ADR-0204,
 # WP-21) for the physical binding.
 
 id: knowledge.sxa-legacy
@@ -43,7 +43,7 @@ freshness:
     is nothing to poll on a schedule.
   # "none" (WP-24 / ADR-0109): a chunk here never carries a computed
   # stale_after and never trips the "freshness untrusted" trust-scoring
-  # penalty (components/rag-service/app/search.py) - exempt_from_
+  # penalty (the retired rag-service component) - exempt_from_
   # freshness_enforcement above states the same rule for the ingestion
   # metadata-enforcement side of WP-24.
   operation_classes:

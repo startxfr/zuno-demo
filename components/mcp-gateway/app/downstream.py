@@ -70,8 +70,8 @@ IN_PROCESS_HANDLERS = {
     # ADR-0516: same posture - calls the real, in-cluster diagram-render
     # service (never an external SaaS call, unlike image_gen above).
     "diagram_gen": diagram_gen.handle,
-    # ADR-0524 clause 3 extension (2026-09-09): calls the real, in-cluster
-    # rag-service over the existing knowledge.tech/rag-tech corpus - see
+    # ADR-0524 clause 3 extension (2026-09-09): calls UnifAI's RAG server over
+    # the knowledge.tech sources with the caller's own token - see
     # app/handlers/rag_query.py's own docstring.
     "rag_query": rag_query.handle,
 }
@@ -116,8 +116,8 @@ async def invoke(
         # the caller's own identity to reach it - every other handler
         # ignores it, same as delegated_token above. caller_groups follows
         # the identical pattern, added for rag_query (ADR-0524 clause 3
-        # extension): rag-service enforces its ACL on caller_groups, not on
-        # a bearer token, so this is the one handler that actually reads it.
+        # extension); rag_query now forwards the bearer token to UnifAI,
+        # which resolves the groups itself, and ignores caller_groups.
         return await handler(
             arguments,
             caller_sub,

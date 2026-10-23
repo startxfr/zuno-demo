@@ -25,4 +25,3 @@ shared across independently-deployed images):
 | Service | Span | What it records |
 |---|---|---|
 | `mcp-gateway` | `tool_invoke` | tool, classification, latency, precise outcome (allowed/denied/unknown_tool/...) |
-| `rag-service` | `rag_search` | query length, `top_k`, latency, result count |

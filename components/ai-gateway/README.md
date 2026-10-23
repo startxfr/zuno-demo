@@ -164,7 +164,7 @@ The cache key binds to model identity, caller subject, effective
 classification, `X-Zuno-Local-Only`, and task identity (`X-Zuno-Task`) -
 change any one of these and it's a guaranteed miss, never a cross-boundary
 hit. "Semantic" means the prompt is embedded (via the same shared
-embedding `InferenceService` `components/rag-service` uses,
+embedding `InferenceService` UnifAI's RAG uses,
 `EMBEDDING_SERVICE_URL`) and bucketed with a small, fixed set of random
 hyperplanes (SimHash-style locality-sensitive hashing) rather than
 matched on exact prompt text - cosine-similar prompts land in the same

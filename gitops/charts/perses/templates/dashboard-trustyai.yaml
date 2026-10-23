@@ -230,8 +230,8 @@ spec:
         kind: Panel
         spec:
           display:
-            name: "RAGAS scores (real rag-service retrievals)"
-            description: "faithfulness = answer grounded in retrieved contexts; llm_context_precision = retrieved contexts relevant to the question. Judged by the local qwen3.6 model against live pgvector retrievals. last_over_time keeps the latest run visible."
+            name: "RAGAS scores (real UnifAI retrievals)"
+            description: "faithfulness = answer grounded in retrieved contexts; llm_context_precision = retrieved contexts relevant to the question. Judged by the local qwen3.6 model against live UnifAI (Qdrant) retrievals. last_over_time keeps the latest run visible."
           plugin:
             kind: Table
             spec: {}

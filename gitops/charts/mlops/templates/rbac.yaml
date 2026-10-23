@@ -1,7 +1,7 @@
 # The pipeline workload does not require Kubernetes API access to read
 # credentials: kfp-kubernetes injects the Secrets/ConfigMap into
 # component Pods directly. Keep this Role intentionally minimal, same
-# reasoning as gitops/charts/rag-ingestion/templates/rbac.yaml.
+# reasoning as the retired rag-ingestion chart
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:

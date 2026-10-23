@@ -6,7 +6,7 @@ tasks.
 
 "Semantic" here means bucketed by embedding similarity, not exact prompt
 text: the prompt is embedded via the same shared embedding InferenceService
-`components/rag-service` already calls
+UnifAI's RAG already calls
 (`EMBEDDING_SERVICE_URL`, default `embeddings-predictor.zuno-ai-run.svc`),
 then bucketed with a small, fixed set of random hyperplanes (SimHash-style
 locality-sensitive hashing) - cosine-similar prompts land in the same

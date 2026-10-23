@@ -2,7 +2,7 @@
 """Runtime entrypoint for the MLOps LoRA/PEFT pipeline (ADR-0301/ADR-0302,
 WP-34).
 
-The command contract mirrors components/rag-ingestion's exactly, for the
+The command contract mirrors the retired rag-ingestion component's exactly, for the
 same reason (see that module's own docstring): a single image serves
 every KFP stage, and each stage round-trips its state through S3 - KFP
 runs each stage in its own pod, so there is no shared local disk between
@@ -57,7 +57,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 import boto3
-import psycopg
 import requests
 import yaml
 from botocore.exceptions import ClientError
@@ -239,8 +238,9 @@ class MlopsConfig:
     eval_prefix: str
     registry_prefix: str
 
-    # Postgres (document_embeddings is rag-service's own table - mlops
-    # only ever reads it, never writes, per ADR-0302 point 2).
+    # Postgres, read-only (ADR-0302 point 2). Unset since the RAG databases left
+    # with rag-service (WP-168): only a domain-grounding run needs it, and none
+    # is configured (every agent trains on a style corpus, ADR-0526).
     pg_host: str
     pg_port: int
     pg_database: str
@@ -362,9 +362,9 @@ def load_config() -> MlopsConfig:
         model_prefix=_env("S3_MODEL_PREFIX", "mlops/models"),
         eval_prefix=_env("S3_EVAL_PREFIX", "mlops/evaluations"),
         registry_prefix=_env("S3_REGISTRY_PREFIX", "mlops/registrations"),
-        pg_host=_env("PGHOST", required=True),
+        pg_host=os.environ.get("PGHOST", ""),
         pg_port=_env_int("PGPORT", 5432),
-        pg_database=_env("PGDATABASE", required=True),
+        pg_database=os.environ.get("PGDATABASE", ""),
         pg_schema=os.environ.get("PGSCHEMA", "public"),
         pg_sslmode=os.environ.get("PGSSLMODE", "require"),
         pg_user=os.environ.get("PGUSER"),
@@ -404,7 +404,7 @@ def load_config() -> MlopsConfig:
 
 
 # --------------------------------------------------------------------------
-# S3 state store - same four-method shape as components/rag-ingestion's
+# S3 state store - same four-method shape as the retired rag-ingestion component's
 # own CorpusStore, plus put_bytes (adapter files are binary, not JSON).
 # --------------------------------------------------------------------------
 
@@ -755,6 +755,8 @@ def _load_chat_tokenizer(config: MlopsConfig, store: ArtifactStore, workdir: Pat
 
 
 def _pg_connect(config: MlopsConfig):
+    import psycopg  # only a domain-grounding run needs it
+
     conninfo = (
         f"host={config.pg_host} port={config.pg_port} dbname={config.pg_database} "
         f"user={config.pg_user} password={config.pg_password} sslmode={config.pg_sslmode}"
@@ -768,11 +770,19 @@ def _pg_connect(config: MlopsConfig):
 def _fetch_domain_grounding_rows(config: MlopsConfig) -> List[Dict[str, Any]]:
     """Reads document_embeddings rows for the agent's declared knowledge
     domain(s) - the "domain/jargon grounding" half of ADR-0302 point 2.
-    Never writes to this table; rag-ingestion (ADR-0330) remains its only
-    writer."""
+    Never writes to this table. The table belonged to the retired rag-service
+    (WP-168): a run that still declares knowledge domains must point PGHOST at
+    a database that holds it, otherwise it fails here instead of training on
+    nothing."""
     if not config.knowledge_domains:
         logger.warning("MLOPS_KNOWLEDGE_DOMAINS is empty; dataset will have no domain-grounding rows")
         return []
+    if not config.pg_host:
+        raise RuntimeError(
+            "MLOPS_KNOWLEDGE_DOMAINS is set but PGHOST is not: domain grounding read rag-service's "
+            "document_embeddings table, which was retired with it (WP-168); train on a style corpus "
+            "(MLOPS_STYLE_CORPUS_S3URI) instead"
+        )
     conn = _pg_connect(config)
     try:
         with conn.cursor() as cur:

@@ -72,7 +72,7 @@
 # gitops/charts/grafana/values.yaml's prometheusReaderBearer comment. This
 # is a platform-issued ServiceAccount session token (minted by the cluster
 # itself once serviceaccount-prometheus-reader.yaml lands), the same class
-# of live OpenShift bearer credential ansible/roles/{mlops,rag_ingestion}
+# of live OpenShift bearer credential ansible/roles/{mlops,the retired rag_ingestion}
 # already read directly - not an application-generated secret subject to
 # ADR-0024's Vault-only rule, and never written to git (gitops_app_extra_helm_values
 # patches the live Application object only).

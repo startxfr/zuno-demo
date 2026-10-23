@@ -97,7 +97,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0012](0012-use-keycloak-as-the-central-identity-provider.md) | Implemented | Use Keycloak as the central identity provider |
 | [ADR-0013](0013-propagate-end-user-identity-through-agent-calls.md) | Implemented | Propagate end-user identity through agent calls |
 | [ADR-0014](0014-use-delegated-google-oauth-for-google-workspace-access.md) | Implemented | Use delegated Google OAuth for Google Workspace access |
-| [ADR-0015](0015-use-postgresql-and-pgvector-as-the-persistent-data-platform.md) | Implemented | Use PostgreSQL and pgvector as the persistent data platform |
+| [ADR-0015](0015-use-postgresql-and-pgvector-as-the-persistent-data-platform.md) | Superseded in part by ADR-0568 | Use PostgreSQL and pgvector as the persistent data platform |
 | [ADR-0017](0017-access-sales-data-through-controlled-mcp-tools.md) | Implemented | Access sales data through controlled MCP tools |
 | [ADR-0019](0019-use-openshift-ai-model-serving-for-local-inference.md) | Implemented | Use OpenShift AI model serving for local inference |
 | [ADR-0020](0020-support-both-local-and-external-llm-providers.md) | Implemented | Support both local and external LLM providers |
@@ -119,7 +119,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0038](0038-use-standards-compliant-okf-v0-2-markdown-bundles.md) | Implemented | Use standards-compliant OKF v0.2 Markdown bundles |
 | [ADR-0040](0040-separate-agent-entitlement-from-business-role-authorization.md) | Implemented | Separate agent entitlement from business role authorization |
 | [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md) | Implemented | Remove nominative demo identities and static passwords from Git |
-| [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | Implemented | Make RAG retrieval metadata-aware and bilingual |
 | [ADR-0047](0047-manage-the-complete-openshift-ai-prerequisite-lifecycle.md) | Superseded in part by ADR-0317 | Manage the complete OpenShift AI prerequisite lifecycle |
 | [ADR-0048](0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md) | Implemented | Discover supported operator channels and serving runtimes at deployment time |
 | [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md) | Implemented | Harden all workloads for OpenShift restricted security and SecNumCloud objectives |
@@ -169,8 +168,8 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0119](0119-introduce-mcp-server-scaffolding-and-conformance-tooling.md) | Implemented | Introduce MCP server scaffolding and conformance tooling |
 | [ADR-0120](0120-implement-a-multi-provider-git-forge-mcp-server-for-github-and-gitlab.md) | Implemented | Implement a multi-provider Git-forge MCP server for GitHub and GitLab |
 | [ADR-0121](0121-restrict-git-forge-write-and-private-access-by-visibility.md) | Implemented | Restrict git-forge write and private access by visibility |
-| [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | Superseded in part by ADR-0561 | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
-| [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | Implemented | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
+| [ADR-0322](0322-migrate-from-llama-stack-configuration-to-the-openshift-ai-ogx-operator.md) | Superseded in part by ADR-0561 and ADR-0568 | Migrate from Llama Stack configuration to the OpenShift AI OGX Operator |
+| [ADR-0330](0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md) | Superseded in part by ADR-0568 | Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access |
 | [ADR-0343](0343-complete-the-maas-and-ray-prerequisites-on-the-datasciencecluster.md) | Implemented | Complete the MaaS and Ray prerequisites on the DataScienceCluster |
 | [ADR-0344](0344-track-blocked-resources-and-add-a-day-0-reconcile-verb.md) | Implemented | Track blocked resources and add a Day 0 reconcile verb |
 | [ADR-0345](0345-make-self-generated-vault-credentials-idempotent.md) | Implemented | Make self-generated Vault credentials idempotent across ansible re-runs |
@@ -184,7 +183,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0202](0202-introduce-logical-knowledge-domains.md) | Implemented | Introduce logical knowledge domains |
 | [ADR-0203](0203-enforce-knowledge-authorization-as-policy-intersection.md) | Implemented | Enforce knowledge authorization as policy intersection |
-| [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | Superseded in part by ADR-0218 | Generalize the RAG platform to multiple isolated knowledge domains |
 | [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | Implemented | Prefer indexed knowledge for read and live tools for freshness and write |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | Implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0211](0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md) | Implemented | Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01 |
@@ -230,10 +228,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0421](0421-reshape-day-0-day-1-boundaries-around-always-on-infra.md) | Implemented | Reshape Day 0/Day 1 boundaries around an "always-on infra" core |
 | [ADR-0516](0516-generate-diagrams-with-self-hosted-mermaid-rendering.md) | Implemented | Generate diagrams with self-hosted Mermaid rendering, alongside SDXL image generation |
 | [ADR-0518](0518-modernize-local-models-qwen36-chat-qwen3-embeddings-qwen35-training.md) | Implemented | Modernize the local model fleet: Qwen3.6-27B chat, Qwen3-Embedding-0.6B RAG, Qwen3.5-9B training base |
-| [ADR-0519](0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) | Implemented | Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa) |
-| [ADR-0520](0520-parallelize-the-detect-changes-read-stage.md) | Implemented | Parallelize the detect-changes read stage's per-document S3 GETs |
 | [ADR-0524](0524-integrate-openshift-lightspeed-with-the-zuno-ai-platform.md) | Implemented | Integrate OpenShift Lightspeed as a consumer of the Zuno AI platform |
-| [ADR-0525](0525-batch-index-pgvector-writes-and-size-ivfflat-from-real-rows.md) | Implemented | Batch index-pgvector writes and size the ivfflat index from real row counts |
 | [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) | Implemented | Fine-tune and serve a French urban-register model variant (`-wesh`) beside its base |
 | [ADR-0527](0527-introduce-the-project-as-the-sharing-and-context-boundary.md) | Superseded in part by ADR-0569 | Introduce the project as the sharing and context boundary |
 | [ADR-0528](0528-rekey-project-binding-quota-and-telemetry-onto-the-zuno-project-id.md) | Implemented | Re-key project binding, quota and telemetry onto the Zuno project id |
@@ -266,7 +261,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | Superseded in part by ADR-0218 | Automate source-specific knowledge ingestion |
 | [ADR-0206](0206-separate-current-salesforce-knowledge-from-legacy-sxa.md) | Implemented | Separate current Salesforce knowledge from legacy SXA |
 | [ADR-0218](0218-drop-aramis-adapter-and-defer-salesforce-ingestion-cadence.md) | Implemented | Drop the Aramis ingestion adapter and defer the Salesforce ingestion cadence |
 
@@ -375,11 +369,14 @@ part of its decision is still in force.
 | [ADR-0042](0042-use-opaque-browser-sessions-with-server-side-token-storage.md) | v0.1 | Superseded by ADR-0561 | Use opaque browser sessions with server-side token storage |
 | [ADR-0044](0044-use-patternfly-react-for-the-agent-frontend.md) | v0 | Superseded by ADR-0561 | Use PatternFly React for the agent frontend |
 | [ADR-0045](0045-stream-responses-end-to-end-with-sse.md) | v0 | Superseded by ADR-0561 | Stream responses end to end with SSE |
+| [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | v0 | Superseded by ADR-0568 | Make RAG retrieval metadata-aware and bilingual |
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v0.1 | Superseded by ADR-0322 | Abstract the RAG backend and integrate OpenShift AI OGX |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Superseded by ADR-0561 | Define the BFF contract OpenAPI-first |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Superseded by ADR-0561 | Persist resumable long-running agent workflows |
+| [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.6 | Superseded by ADR-0218 and ADR-0568 | Automate source-specific knowledge ingestion |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Superseded by ADR-0549 | Strengthen SecNumCloud-oriented security controls |
 | [ADR-0114](0114-use-zuno-as-a-policy-router-in-front-of-openshift-ai-maas.md) | v0.1 | Superseded by ADR-0118 | Use Zuno as a policy router in front of OpenShift AI MaaS |
+| [ADR-0204](0204-generalize-the-rag-platform-to-multiple-isolated-knowledge-domains.md) | v0.2 | Superseded by ADR-0218 and ADR-0568 | Generalize the RAG platform to multiple isolated knowledge domains |
 | [ADR-0209](0209-introduce-project-scoped-agent-memory.md) | v0.2 | Superseded by ADR-0569 | Introduce project-scoped agent memory |
 | [ADR-0212](0212-introduce-persistent-navigable-chat-conversations.md) | v0.2 | Superseded by ADR-0561 | Introduce persistent, navigable chat conversations |
 | [ADR-0213](0213-introduce-role-based-conversation-sharing.md) | v0.6 | Superseded by ADR-0527 | Introduce role-based conversation sharing between colleagues |
@@ -402,6 +399,9 @@ part of its decision is still in force.
 | [ADR-0509](0509-deliver-okf-content-as-mounted-versioned-artifacts.md) | v0.10 | Superseded by ADR-0580 | Deliver OKF content as mounted versioned artifacts |
 | [ADR-0510](0510-make-the-aiagent-operator-watch-the-zuno-okf-repository.md) | v0.10 | Superseded by ADR-0576 | Make the AIAgent operator watch the zuno-okf repository |
 | [ADR-0515](0515-per-conversation-tabs-one-browser-tab-per-agent.md) | OKF v0.1 | Superseded by ADR-0561 | Open per-conversation tabs with one browser tab per agent |
+| [ADR-0519](0519-parallelize-and-shortcut-the-rag-ingestion-fetch-stages.md) | v0.4 | Superseded by ADR-0568 | Parallelize and short-circuit the RAG ingestion fetch stages (fetch-redhat, fetch-sxa) |
+| [ADR-0520](0520-parallelize-the-detect-changes-read-stage.md) | v0.4 | Superseded by ADR-0568 | Parallelize the detect-changes read stage |
+| [ADR-0525](0525-batch-index-pgvector-writes-and-size-ivfflat-from-real-rows.md) | v0.4 | Superseded by ADR-0568 | Batch index-pgvector writes and size ivfflat from real row counts |
 
 ## Standard clauses
 

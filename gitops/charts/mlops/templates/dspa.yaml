@@ -12,7 +12,7 @@ spec:
   # DSPO defaults podToPodTLS to true, demanding TLS on MySQL connections
   # the external MariaDB (gitops/charts/mariadb, no spec.tls) doesn't
   # serve - same class of issue as rag-dspa's fix, see
-  # gitops/charts/rag-ingestion/templates/dspa.yaml for the full mechanism.
+  # the retired rag-ingestion chart for the full mechanism.
   podToPodTLS: false
   apiServer:
     deploy: true
@@ -62,7 +62,7 @@ spec:
     disableHealthCheck: true
 {{- if eq (.Values.pipelineServer.metadataDatabase.externalMySQL.tls | default "true" | toString) "false" }}
     # ADR-0352/WP-143 live finding - same DSN tls=true default as
-    # rag-ingestion's dspa.yaml (see the comment there): an external
+    # the retired rag-ingestion's dspa.yaml (see the comment there): an external
     # plaintext endpoint needs this override, the internal TLS-serving
     # MariaDB emits nothing and renders byte-identical.
     customExtraParams: '{"tls":"false"}'

@@ -1,6 +1,6 @@
 # ADR-0525: Batch index-pgvector writes and size ivfflat from real row counts
 
-- **Status:** Implemented (live-verified 2026-08-30) - a real one-off `knowledge.tech`
+- **Status:** Superseded by [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) (2026-10-24, WP-168) - pgvector batch writes and ivfflat sizing; no pgvector index remains. Previously: Implemented (live-verified 2026-08-30) - a real one-off `knowledge.tech`
   domain run (`index-pgvector`, run `5e751c12`) confirmed the batched `executemany()`
   write path live: `943/943 documents processed, upserted 65926 chunk rows, deleted 0
   orphaned rows`, no errors. The live `ix_document_embeddings_embedding_cosine` index

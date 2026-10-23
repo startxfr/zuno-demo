@@ -2,7 +2,7 @@
 # Runs evaluations/<agent>/run_acceptance_gate.py (the canonical
 # evaluations/tekos/ implementation, AGENT-parameterized - ADR-0342/WP-31)
 # as a one-shot in-cluster Job rather than from the control node: most
-# services it calls (UnifAI, mcp-gateway, ai-gateway, rag-service)
+# services it calls (UnifAI, mcp-gateway, ai-gateway)
 # have no OpenShift Route and are only reachable over in-cluster Service
 # DNS.
 #

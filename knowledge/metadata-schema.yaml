@@ -4,8 +4,8 @@
 # This file is declarative documentation + validation input for
 # `platform/docs/check_knowledge_refs.py` - it does not itself enforce
 # anything at query time. Field names here are the vocabulary ingestion
-# writers (components/rag-ingestion) and retrieval readers
-# (components/rag-service) must agree on; see WP-22 for where the writers
+# writers (the retired rag-ingestion component) and retrieval readers
+# (the retired rag-service component) must agree on; see WP-22 for where the writers
 # land and WP-24 for where `stale_after`/`source_modified_at`/`indexed_at`
 # become load-bearing for ranking.
 #
@@ -58,7 +58,7 @@ common:
     description: >-
       Keycloak business-role groups authorized to see this chunk. An empty
       or absent value means the chunk is unrestricted within its domain's
-      policy-allowed groups (components/rag-service/app/search.py's `?|`
+      policy-allowed groups (the retired rag-service component's `?|`
       filter).
 
   - name: provenance
@@ -96,7 +96,7 @@ common:
       owning domain's freshness objective
       (`knowledge/<domain>/domain.yaml`'s `freshness.operation_classes.
       semantic-read.max_staleness`). A full ISO 8601 datetime (with an
-      offset or "Z"), not a bare date - components/rag-service/app/
+      offset or "Z"), not a bare date - the retired rag-service component
       search.py:_parse_stale_after accepts a bare date too (pre-WP-24
       fixtures, treated as midnight UTC) but every value WP-24's ingestion
       writes carries real sub-day precision, since knowledge.sales'

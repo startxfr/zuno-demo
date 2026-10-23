@@ -13,8 +13,8 @@
 # to (right before `connectivity_link`) - it needs Keycloak's Ingress/TLS
 # Secret, now provided by Day 0's keycloak instead of a Day 1 one.
 # `aiagent_operator`, which ran last, was retired with the zuno agent
-# stack (WP-156). `namespaces`, `llm`, `models`, and content-ingestion (rag/
-# rag_ingestion/mcp/agents/mlops) all moved to Day 2 - see
+# stack (WP-156). `namespaces`, `llm`, `models`, and content-ingestion (mcp/
+# agents/mlops) all moved to Day 2 - see
 # day2_install.yml.
 - name: "Day 1: install components"
   hosts: localhost

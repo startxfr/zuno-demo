@@ -1,6 +1,6 @@
 # ADR-0330: Integrate the rag-ingestion pipeline as a Day 1 component with persona-scoped Confluence access
 
-- **Status:** Implemented - see `gitops/charts/rag-ingestion/values.yaml`
+- **Status:** Superseded in part by [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) (2026-10-24, WP-168) - Clauses 1-4 (KFP component, build, `rag-tech` database, serving-side ACL in rag-service) are retired with rag-service and rag-ingestion; clause 5 (the `confluence-*` persona groups in realm `zuno`) and clause 6 (the KServe embedding InferenceService) stay in force. Previously: Implemented - see `gitops/charts/rag-ingestion/values.yaml`
   (real space keys), `ansible/roles/rag_ingestion/tasks/recurring_run.yml`
   (live-verified KFP activation). Closed 2026-08-18 (roadmap WP-07): real
   Confluence space keys/directories supplied (satellite/openshift mapped

@@ -1,7 +1,7 @@
 ---
 # No OLM operator of its own - the DataSciencePipelinesApplication/Pipeline
 # CRDs this chart uses come from openshift_ai's aipipelines component, same
-# pattern as gitops/apps/rag-ingestion/application-d0.yaml.
+# pattern as the retired rag-ingestion application.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

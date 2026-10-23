@@ -7,8 +7,7 @@ below become that directory's contents verbatim.
 
 Canonical source is files/nemo-rails/observe/ in this chart, NOT
 policies/guardrails/. Helm's .Files.Get is chart-root-relative and cannot
-traverse out of the chart (the same constraint rag-service's
-configmap-schema.yaml documents), and rendering from the chart keeps the
+traverse out of the chart (a Helm constraint), and rendering from the chart keeps the
 policy under ArgoCD rather than applied out-of-band by Ansible
 (ADR-0311/ADR-0312). policies/guardrails/README.md, the human-readable
 specification, moved to zuno-demo-agents with the corp guardrails policy

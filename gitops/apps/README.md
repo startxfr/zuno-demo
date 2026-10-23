@@ -50,16 +50,7 @@ this since Day 0 now runs `argocd` first - see `admin-context` in the
 table below. `vault`'s imperative unseal is a one-shot action, not a
 standing component.
 
-`rag`'s one-shot SQL `Job` (schema/fixtures applied against PostgreSQL) is
-covered here too, unlike `vault`'s unseal: it is an ArgoCD `Sync` hook Job
-templated into the consuming chart (`gitops/charts/rag-service`'s own `-d1`
-Application), with `hook-delete-policy: BeforeHookCreation` (Jobs are
-immutable). The static SQL/fixtures `ConfigMap` it mounts used to be
-Ansible-applied (a plain `configMapGenerator` reading `data/rag/`), entirely
-outside GitOps; it is now rendered by the chart itself instead
-(`gitops/charts/rag-service/templates/configmap-schema.yaml`, `.Files.Get`
-on a copy of the same SQL under that chart's own `files/sql/`), so it's part
-of the same ArgoCD-tracked flow as the Job that consumes it. ADR-0219
+ADR-0219
 retired the last remaining Ansible-applied schema ConfigMap
 (`zuno-sxa-schema`, owned by the deleted `sql_schema` role).
 
@@ -154,7 +145,6 @@ Directories present:
 | `mariadb` | local chart, `gitops/charts/mariadb` (`-d0`: startx `operator` dependency for the open-source `mariadb-operator` `Subscription` into the shared `openshift-operators` namespace - no dedicated `OperatorGroup`, same Pattern B as `postgresql`, not the paid `mariadb-enterprise-operator` certified listing; `-d1`: `MariadbOperator` activation CR plus MariaDB/PhysicalBackup CRs and their ExternalSecrets, see the `mariadb` role's README) |
 | `models` | local chart, `gitops/charts/models` (KServe ServingRuntime + InferenceService) - no operator, `-d0` is a no-op |
 | `mcp` | local chart, `gitops/charts/mcp-gateway` - no operator, `-d0` is a no-op |
-| `rag` | local chart, `gitops/charts/rag-service` - no operator, `-d0` is a no-op |
 | `mlops` | local chart, `gitops/charts/mlops` - no operator, `-d0` is a no-op |
 | `ai-gateway` | local chart, `gitops/charts/ai-gateway` (applied by the `llm` role, see its README; ADR-0009) - no operator, `-d0` is a no-op |
 | `namespaces` | local chart, `gitops/charts/namespaces` (`-d0`: Namespace objects, `namespace.enabled`; `-d1`: ResourceQuota/NetworkPolicy scaffolding, `policy.enabled` - spans the macro Day 0/Day 2 split (ADR-0060), not just this component's own internal ordering) |

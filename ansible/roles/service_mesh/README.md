@@ -32,7 +32,7 @@ component's sidecar-injection webhook exists. That means:
   `postgres-operator.crunchydata.com/cluster=zuno-postgresql`) once the
   mesh control plane is Ready, so they pick one up retroactively.
 - **keycloak** and every AI workload (`ai-gateway`, `mcp-gateway`,
-  `rag-service`, `models`) are
+  `models`) are
   created after this component installs and auto-inject on first deploy.
 
 `zuno-vault` is deliberately **not** labeled for injection - meshing it

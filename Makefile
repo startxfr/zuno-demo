@@ -46,15 +46,15 @@ DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aap-execution-environmen
 DAY1_VERBS := check install build uninstall reconcile all reinstall
 
 # Day 2 is namespace policy overlay, AI infrastructure (llm, models), and
-# content ingestion (rag, rag-ingestion, mcp, agents, mlops) -
+# content ingestion (mcp, agents, mlops) -
 # moved here from Day 1 (ADR-0060). "namespaces" is here despite being a
 # Day 0 component everywhere else in this Makefile - only its
 # quota/network-policy overlay is Day 2 now, see
 # ansible/roles/namespaces/README.md (internal task/Application naming
 # stays "_d1"/"-d1", an implementation detail, not renamed with the macro
 # tier). "build" only knows how to build the named image groups (mcp,
-# rag, rag-ingestion, mlops, trustyai-eval - see
-# ansible/roles/{mcp,rag,rag_ingestion,mlops,trustyai_eval}_build; the
+# mlops, trustyai-eval - see
+# ansible/roles/{mcp,mlops,trustyai_eval}_build; the
 # "agent" image group was retired with the zuno agent stack, WP-156);
 # "agents" no longer deploys anything (UnifAI serves the agents) and stays
 # for its "check", the ADR-0053 acceptance gate against UnifAI; "check"/
@@ -74,9 +74,9 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (DAY3_CHECK_ONLY_COMPONENTS): "check" accepts it, every mutating verb
 # rejects it cleanly instead of dying inside Ansible on a missing
 # tasks/install.yml.
-DAY2_RUN_COMPONENTS := namespaces llm models rag rag-ingestion mcp agents mlops trustyai-config mlflow lightspeed-config unifai
+DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
-DAY2_BUILD_COMPONENTS := mcp rag rag-ingestion mlops trustyai-eval
+DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval
 DAY2_VERBS := check install build uninstall all reinstall
 
 # ADR-0057/ADR-0058: Day 3 was originally agent test/stresstest operations
@@ -540,7 +540,7 @@ if [[ -z "$$verb" ]]; then \
     'Components (build; optional, default: all):' \
     '  $(DAY2_BUILD_COMPONENTS)' \
     '' \
-    'Example: make d2 install rag'; \
+    'Example: make d2 install mcp'; \
   exit 0; \
 fi; \
 if [[ -z "$$component" ]]; then component=all; fi; \

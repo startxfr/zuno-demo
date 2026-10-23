@@ -163,7 +163,7 @@ def retrieve(client: httpx.Client, question: str) -> list[str]:
     matches = resp.json().get("matches", [])
     # The chunk text is `content`, the page title `metadata.title`. Wrong
     # field names here once made every context "" and every ragas score
-    # NaN (live-diagnosed 2026-09-02 on the rag-service shape).
+    # NaN (live-diagnosed 2026-09-02).
     contexts = [
         f"{(m.get('metadata') or {}).get('title', '')}\n{m.get('content', '')}".strip()
         for m in matches

@@ -237,7 +237,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: "RAG trace (rag-service)"
+            name: "RAG trace (rag_search spans)"
           plugin:
             kind: Table
             spec: {}

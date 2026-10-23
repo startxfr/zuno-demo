@@ -40,7 +40,7 @@
           {{ compile_pipeline_target }} pipeline version compiled and applied
           ({{ 'changed' if _mlops_pipeline_version_apply.changed else 'already up to date' }}).
   rescue:
-    # Kept VERBATIM from rag-ingestion's own rescue, because the
+    # Kept VERBATIM from the retired rag-ingestion's own rescue, because the
     # distinction it draws is hard-won and applies identically here. An
     # immutable-spec rejection is not in the same class as the failures
     # below: it means the compiled pipeline genuinely CHANGED while the

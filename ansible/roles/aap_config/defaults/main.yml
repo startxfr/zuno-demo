@@ -74,14 +74,14 @@ aap_config_job_templates:
     survey_components: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   - name: zuno-day2-check
     credential: zuno-cluster-reader
-    survey_components: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config, supply-chain]
+    survey_components: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, supply-chain]
   - name: zuno-day2-build
     credential: zuno-aap-installer
-    survey_components: [mcp, rag, rag-ingestion, mlops]
+    survey_components: [mcp, mlops]
   - name: zuno-day2-install
     credential: zuno-aap-installer
     gated: true
-    survey_components: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config]
+    survey_components: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config]
   - name: zuno-day3-test
     credential: zuno-cluster-reader
     survey_components: [agents, platform]

@@ -2,7 +2,7 @@
 # No OLM operator of its own - the DataSciencePipelinesApplication/Pipeline
 # CRDs this chart uses come from openshift_ai's aipipelines component
 # (day0), so -d0 is a documented no-op, same pattern as
-# ansible/roles/rag_ingestion/tasks/install.yml (ADR-0302 point 1 reuses
+# the retired rag_ingestion role (ADR-0302 point 1 reuses
 # that exact mechanism).
 - name: "mlops | apply the mlops GitOps Application (d0, no-op)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -75,10 +75,10 @@
         # the escape processing at the YAML layer, before Jinja runs.
         #
         # A latent defect nobody can see is still a defect: this one sat here
-        # from the moment rag_ingestion's twin was fixed until the next command
+        # from the moment the retired rag_ingestion's twin was fixed until the next command
         # that happened to touch it. Keep this a double-quoted scalar.
         # ADR-0517 live finding (demo333, 2026-09-07), same as
-        # rag_ingestion's twin: user-ca-bundle is OPTIONAL (it only exists
+        # the retired rag_ingestion's twin: user-ca-bundle is OPTIONAL (it only exists
         # on clusters with a private PKI root, per openshift_oauth's own
         # contract); only service-ca stays required.
         ca-bundle.crt: "{{ ((_mlops_vault_ca.resources | default([{}]) | first | default({})).get('data', {}).get('ca-bundle.crt', '')) ~ '\n' ~ (_mlops_service_ca.resources[0].data['service-ca.crt'] | default('')) }}"
@@ -200,13 +200,13 @@
               # WP-133 (live, 2026-09-04): ansible_date_time is unset here
               # (day2_install.yml runs with gather_facts: false and nothing
               # gathers it) - exactly the same latent bug WP-129 fixed in
-              # rag_ingestion's own copy of this task and predicted would
+              # the retired rag_ingestion's own copy of this task and predicted would
               # also hit this one. now() is Ansible's fact-free equivalent.
               zuno.io/ca-bundle-restarted-at: "{{ now(utc=true, fmt='%Y-%m-%dT%H:%M:%SZ') }}"
   when: _mlops_ca_bundle_apply is defined and _mlops_ca_bundle_apply.changed | default(false)
 
 # UNVERIFIED against a live cluster - same caveat
-# ansible/roles/rag_ingestion/tasks/install.yml documents for its own
+# the retired rag_ingestion role documents for its own
 # rag-dspa wait: assumes a standard status.conditions entry of type
 # "Ready". Re-check with `oc get dspa mlops-dspa -n zuno-mlops -o yaml`
 # against the target cluster and adjust if the operator uses a different
@@ -228,7 +228,7 @@
 
 # ADR-0526 (WP-087): compile and upload the PipelineVersion. Placed right
 # after the DSPA reports Ready, mirroring
-# ansible/roles/rag_ingestion/tasks/install.yml - KFP must be up before a
+# the retired rag_ingestion role - KFP must be up before a
 # PipelineVersion can be applied against it.
 - name: "mlops | compile and apply the KFP PipelineVersion(s)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/mlops/tasks/compile_pipeline_version.yml"
@@ -393,11 +393,11 @@
       zuno-mlops. The pipeline itself is triggered manually by the
       operator (`oc create -f <run-spec>` against the DSPA's KFP API, or
       the OpenShift AI dashboard) once per candidate agent/base-model
-      combination - unlike rag-ingestion, MLOps training runs are not
+      combination - unlike the retired rag-ingestion, MLOps training runs are not
       continuously recurring (ADR-0302's own scope: one pipeline run
       produces one candidate adapter for human-reviewed promotion), so
       this role does not attempt recurring-run activation the way
-      ansible/roles/rag_ingestion does.
+      the retired rag_ingestion role does.
 
 # --- KFP pipeline-upload confirmation (best-effort, UNVERIFIED against a
 # live cluster) -------------------------------------------------------
@@ -421,7 +421,7 @@
     # ds-pipeline-<dspa-name> is the DSPA operator's own Route-naming
     # convention (unverified against a live cluster - confirm with `oc
     # get route -n zuno-mlops`, same assumption
-    # ansible/roles/rag_ingestion/tasks/install.yml documents).
+    # the retired rag_ingestion role documents).
     name: "ds-pipeline-mlops-dspa"
   register: _mlops_dspa_route
   ignore_errors: true

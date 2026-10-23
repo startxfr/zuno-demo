@@ -481,18 +481,13 @@ prometheusK8s:
 # installs the operator/controller: `oc get svc -n redhat-ods-applications`
 # shows only ogx-k8s-operator-controller-manager-metrics-service/-webhook-
 # service, no API-serving Service, and `oc get ogxserver -A` returns no
-# resources) so
-# components/rag-service/app/ogx_provider.py has something real to call
-# once an operator opts in. False by default (same two-gate shape as
-# maasGateway/maasDb above): rag-service's own RAG_PROVIDER stays
-# "pgvector" regardless of this flag - ADR-0322 requires provider-parity
-# tests to pass before any default-provider switch, and those need a live
-# OGXServer to run against, which is exactly what enabling this value
-# stands up, nothing more.
+# resources) so an OGX client (the retired rag-service's provider was the
+# only one) has something real to call once an operator opts in. False by
+# default (same two-gate shape as maasGateway/maasDb above).
 #
 # Namespace: redhat-ods-applications, alongside every other
 # DataScienceCluster-adjacent operand per ADR-0331 (not zuno-ai-run or
-# zuno-data, where rag-service itself and its database live) - revisit if
+# zuno-data) - revisit if
 # OGX's own product docs establish a different convention once this
 # build's OGX sub-capability lifecycle status is confirmed (ADR-0322
 # Operational considerations).
@@ -513,9 +508,7 @@ prometheusK8s:
 # PostgresCluster's dedicated ogx database (gitops/charts/postgresql
 # values.yaml ogxDatabase) - the same "existing PostgreSQL/pgvector
 # platform as the preferred durable remote vector store" ADR-0322's
-# Context section calls for, deliberately a fresh database rather than the
-# document_embeddings table rag-service's own provider reads (see that
-# values file's ogxDatabase comment for why).
+# Context section calls for, deliberately a fresh database.
 # Additive RBAC for RHOAI 3.5.0's kserve-module-controller-manager, whose own
 # bundle grants patch but not update on networkpolicies - see
 # templates/rbac-kserve-module-networkpolicy.yaml for the full diagnosis.
@@ -586,9 +579,7 @@ ogxServer:
     database: ogx
     user: ogxserver
   # Embedding/chat endpoint OGX's remote::vllm inference provider proxies
-  # to - the same in-cluster KServe/vLLM InferenceService URL shape
-  # components/rag-service/app/config.py's EMBEDDING_SERVICE_URL already
-  # assumes. Placeholder: confirm the real Service name/namespace for the
+  # to - an in-cluster KServe/vLLM InferenceService URL. Placeholder: confirm the real Service name/namespace for the
   # target model before enabling (`oc get inferenceservice -A`).
   # WP-06 (2026-08-21 live finding): needs the /v1 suffix - OGX's internal
   # OpenAI-compatible client (openai/resources/embeddings.py) appends

@@ -24,7 +24,7 @@ pattern as salesforce).
 **Authentication mode: `service-identity`.** Every call to
 Confluence uses one shared technical identity - email + API token, HTTP
 Basic Auth (the standard Atlassian Cloud REST API convention, matching
-`components/rag-ingestion`'s own `_confluence_auth`) - sourced from an
+the convention UnifAI's Confluence source uses) - sourced from an
 `ExternalSecret` resolving `zuno/confluence/technical` (`url`/`email`/
 `token` keys, seeded by `ansible/roles/vault/tasks/install.yml`). This
 server has no per-user Confluence identity to check; the MCP Gateway's

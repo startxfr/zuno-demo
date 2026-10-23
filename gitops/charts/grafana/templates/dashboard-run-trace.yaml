@@ -427,7 +427,7 @@ spec:
             },
             {
               "id": 7,
-              "title": "RAG trace (rag-service)",
+              "title": "RAG trace (rag_search spans)",
               "type": "table",
               "datasource": {
                 "type": "tempo",

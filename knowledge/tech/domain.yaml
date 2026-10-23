@@ -2,7 +2,7 @@
 #
 # Technical product knowledge from official web documentation and internal
 # Confluence. NO physical database names, service endpoints, secrets or
-# credentials belong in this file - see platform/bindings/knowledge/bindings.yaml
+# credentials belong in this file - see the retired rag-service bindings registry
 # (ADR-0204, WP-21) for the physical binding.
 
 id: knowledge.tech
@@ -33,7 +33,7 @@ taxonomy:
 
 freshness:
   # Realized as per-source KFP recurring-run schedules in
-  # gitops/charts/rag-ingestion/values.yaml (WP-22 / ADR-0105); this is the
+  # the retired rag-ingestion chart (WP-22 / ADR-0105); this is the
   # objective the schedule must satisfy, not the schedule itself.
   # WP-100 (ADR-0105 amendment): this is now the domain-wide
   # aggregate/fallback objective (the loosest guarantee any of this
@@ -44,7 +44,7 @@ freshness:
     Product documentation and Confluence architecture/build/run content
     change on a documentation-release cadence, not continuously.
   # WP-100: knowledge.tech's two source systems no longer share one
-  # schedule (gitops/charts/rag-ingestion/values.yaml's techSources.redhat/
+  # schedule (the retired rag-ingestion chart's techSources.redhat/
   # techSources.confluence) - each source_class states its own objective.
   by_source_class:
     product-doc:
@@ -59,8 +59,8 @@ freshness:
   # say right now" ask) tolerates only a day - still indexed-first, since
   # there is no live "current state" concept for documentation the way
   # there is for a Salesforce field. Mirrored operationally as
-  # gitops/charts/rag-ingestion's STALE_AFTER chart value for this domain
-  # (components/rag-ingestion/src/rag_ingestion.py computes stale_after
+  # the retired rag-ingestion chart's STALE_AFTER chart value for this domain
+  # (the retired rag-ingestion component computes stale_after
   # from semantic-read's window - the two are kept in sync manually, the
   # same pattern schedule.cron/objective already established).
   operation_classes:

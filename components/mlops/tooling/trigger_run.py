@@ -7,7 +7,7 @@ list (`ps aux`) on the Ansible control node.
 
 Resolves the per-agent Pipeline, its latest PipelineVersion, and the
 "Default" Experiment by display name - the same three lookups
-ansible/roles/rag_ingestion/tasks/recurring_run.yml does over the raw
+the retired rag_ingestion role does over the raw
 v2beta1 REST API for recurring runs, done here with the `kfp` SDK instead
 since `run_pipeline()` (unlike `recurringruns`) has no REST-body precedent
 already proven in this repo. This exact sequence (list_pipelines ->

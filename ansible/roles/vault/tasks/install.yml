@@ -375,15 +375,6 @@
         username: keycloak
         password: "{{ zuno_admin_keycloak_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
-      rag/postgresql-app:
-        # Dedicated database/role for the rag-ingestion pipeline's rag-tech
-        # corpus/index database - keeps its schema/lifecycle isolated from
-        # the unrelated app-data database, same rationale as
-        # keycloak/postgresql-app above. Same naming constraint as
-        # postgresql/app above.
-        username: ragtech
-        password: "{{ zuno_admin_rag_postgresql_root_password |
-          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       maas/postgresql-app:
         # Dedicated database/role for RHOAI's Models-as-a-Service API
         # (maas-api API-key/subscription store - the DataScienceCluster's
@@ -415,36 +406,6 @@
         # postgresql/app above.
         username: ogxserver
         password: "{{ zuno_admin_ogx_postgresql_root_password |
-          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
-      rag-sales/postgresql-app:
-        # Dedicated database/role per additional logical knowledge domain
-        # (ADR-0204, WP-21) - cross-domain isolation is credential-enforced,
-        # so each domain gets its own role owning only its own database,
-        # never a shared credential. Same rationale and naming constraint
-        # as rag/postgresql-app (knowledge.tech's rag-tech) above.
-        username: ragsales
-        password: "{{ zuno_admin_rag_sales_postgresql_root_password |
-          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
-      rag-sxa-legacy/postgresql-app:
-        # knowledge.sxa-legacy's rag-sxa-legacy database - see
-        # rag-sales/postgresql-app above.
-        username: ragsxalegacy
-        password: "{{ zuno_admin_rag_sxa_legacy_postgresql_root_password |
-          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
-      rag-adv/postgresql-app:
-        # knowledge.adv's rag-adv database - see rag-sales/postgresql-app
-        # above.
-        username: ragadv
-        password: "{{ zuno_admin_rag_adv_postgresql_root_password |
-          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
-      rag-project/postgresql-app:
-        # knowledge.project's rag-project database (ADR-0209/WP-28) - see
-        # rag-sales/postgresql-app above. Unlike the other four domain
-        # databases, this one has no rag-ingestion source adapter to seed
-        # credentials for elsewhere - only rag-service and Agent Runtime
-        # ever connect to it.
-        username: ragproject
-        password: "{{ zuno_admin_rag_project_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       aap/admin:
         # AAP's own bootstrap admin password (ADR-0354/WP-072), consumed by
@@ -631,22 +592,7 @@
       password: "{{ zuno_admin_mariadb_root_password |
         default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
-# Internal service credential (the rag-ingestion KFP pipeline's "mlpipeline"
-# MariaDB user, gitops/charts/rag-ingestion's
-# pipelineServer.metadataDatabase.externalMySQL), not a third-party one -
-# self-generated same as mariadb/root above, not sourced from
-# ansible/confidential.yml. username is static ("mlpipeline") in that
-# chart's own values.yaml, so only password needs to live here.
-- name: "vault | generate and seed the rag-ingestion pipeline metadata DB password (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: rag/pipeline-db
-    vault_seed_fields:
-      password: "{{ zuno_admin_rag_pipeline_db_password |
-        default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
-
-# Same pattern as rag-ingestion's pipeline DB password above - mlops-dspa's
+# Internal service credential, not a third-party one: mlops-dspa's
 # own MariaDB user (gitops/charts/mariadb's mlopsDatabase, gitops/charts/
 # mlops's pipelineServer.metadataDatabase.externalMySQL), self-generated,
 # not from confidential.yml. Exists to move mlops-dspa off DSPO's broken
@@ -853,25 +799,10 @@
     zuno_gitlab_token | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-# ADR-0204/ADR-0105 (WP-22): the knowledge.sales ingestion adapter
-# (gitops/charts/rag-ingestion's domains.sales.salesforce ExternalSecret)
-# reads this same zuno/salesforce/technical path - it does NOT get a seed
-# task of its own.
-#
-# It used to. A second task here wrote instance_url/token to this path while
-# the task above writes url/access_token, and `vault kv put` REPLACES the
-# whole secret rather than merging, so the two could never coexist. It stayed
-# harmless only because its variables (zuno_salesforce_instance_url /
-# zuno_salesforce_token) were never documented in confidential.example.yml,
-# so its guard never passed and it never ran. Documenting them - the obvious
-# reading of WP-118's B7 - would have started it and wiped the url/
-# access_token keys that mcp-salesforce serves Comage from today.
-#
-# Removed 2026-09-02 (WP-118 step 4). url/access_token is the canonical
-# schema; rag-ingestion's values.yaml now points its instanceUrlProperty/
-# tokenProperty at it, keeping its own SALESFORCE_INSTANCE_URL/
-# SALESFORCE_TOKEN env names. ADR-0218 defers the Salesforce batch cadence to
-# v0.7 and the domain ships enabled: false, so nothing consumes it yet.
+# zuno/salesforce/technical carries url/access_token (the canonical schema,
+# WP-118 step 4): a second seed task writing instance_url/token to this path
+# would REPLACE the whole secret (`vault kv put` does not merge), so none may
+# be added.
 
 # ADR-0201 (WP-27): the ai-gateway MaaS adapter's programmatic-client API
 # key (components/ai-gateway/app/maas_adapter.py,
@@ -935,11 +866,11 @@
     and zuno_mariadb_backup_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
-# rag-ingestion's corpus S3 bucket (gitops/charts/rag-ingestion's s3: block -
-# bucket/region/endpoint are chart config there, not secret). Property names
-# (accessKeyId/secretAccessKey) match that chart's
-# s3.externalSecret.accessKeyProperty/secretKeyProperty defaults, same
-# camelCase convention as mariadb/s3 above.
+# The platform's data bucket credential, read by the models, mlops and mlflow
+# charts (the name rag/s3 predates the retirement of the retired rag-ingestion, which was
+# its first consumer; bucket/region/endpoint are chart config, not secret).
+# Property names (accessKeyId/secretAccessKey), same camelCase convention as
+# mariadb/s3 above.
 - name: "vault | seed the RAG corpus S3 credentials from ansible/confidential.yml"
   kubernetes.core.k8s_exec:
     namespace: zuno-vault
@@ -952,24 +883,6 @@
   when: >-
     zuno_rag_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
     and zuno_rag_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
-  no_log: true
-
-# The SXA corpus bucket - the single source knowledge.sxa-legacy's
-# load-sxa-dump stage reads (ADR-0219), distinct from rag/s3 above, which
-# holds unrelated corpus content. Same camelCase property convention as
-# rag/s3 above.
-- name: "vault | seed the SXA corpus S3 credentials from ansible/confidential.yml"
-  kubernetes.core.k8s_exec:
-    namespace: zuno-vault
-    pod: "{{ _vault_pod.resources[0].metadata.name }}"
-    container: vault
-    command: >-
-      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/sxa-corpus/s3
-      accessKeyId={{ zuno_sxa_corpus_s3_access_key_id | quote }}
-      secretAccessKey={{ zuno_sxa_corpus_s3_secret_access_key | quote }}"
-  when: >-
-    zuno_sxa_corpus_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
-    and zuno_sxa_corpus_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
 # AAP Hub's file_storage replacement (WP-075, gitops/charts/aap's hub.s3

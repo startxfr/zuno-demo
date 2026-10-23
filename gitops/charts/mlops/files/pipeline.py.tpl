@@ -6,12 +6,14 @@ from kfp.compiler.compiler_utils import KubernetesManifestOptions
 IMAGE = "{{ include "mlops.image" . }}"
 BASE_CONFIGMAP = "{{ include "mlops.fullname" . }}-config"
 S3_SECRET = "{{ .Values.s3.secretName }}"
+{{- if .Values.postgres.enabled }}
 PG_SECRET = "{{ .Values.postgres.secretName }}"
+{{- end }}
 
 # One ConfigMap per enabled candidate agent
 # (templates/agent-configmaps.yaml) - MLOPS_AGENT and its training
 # parameters are baked in per agent, the same "one env contract per
-# run-target" pattern rag-ingestion's own per-domain ConfigMaps use
+# run-target" pattern the retired rag-ingestion's own per-domain ConfigMaps use
 # (files/pipeline.py.tpl there is this file's direct template).
 AGENT_CONFIGMAPS = {
 {{- range $name, $agent := .Values.agents }}
@@ -30,11 +32,13 @@ BASE_CONFIG_KEYS = {
     "S3_MODEL_PREFIX": "S3_MODEL_PREFIX",
     "S3_EVAL_PREFIX": "S3_EVAL_PREFIX",
     "S3_REGISTRY_PREFIX": "S3_REGISTRY_PREFIX",
+{{- if .Values.postgres.enabled }}
     "PGHOST": "PGHOST",
     "PGPORT": "PGPORT",
     "PGDATABASE": "PGDATABASE",
     "PGSCHEMA": "PGSCHEMA",
     "PGSSLMODE": "PGSSLMODE",
+{{- end }}
     "MLOPS_EVALUATIONS_DIR": "MLOPS_EVALUATIONS_DIR",
     # ADR-0538/WP-116. A key absent from this map never reaches the step
     # pod, so tracking would silently no-op. MLFLOW_WORKSPACE is explicit
@@ -51,7 +55,9 @@ BASE_CONFIG_KEYS = {
     "MLOPS_TRAINJOB_TIMEOUT_SECONDS": "MLOPS_TRAINJOB_TIMEOUT_SECONDS",
     "MLOPS_TRAINJOB_POLL_SECONDS": "MLOPS_TRAINJOB_POLL_SECONDS",
     "MLOPS_TRAINJOB_S3_SECRET": "MLOPS_TRAINJOB_S3_SECRET",
+{{- if .Values.postgres.enabled }}
     "MLOPS_TRAINJOB_PG_SECRET": "MLOPS_TRAINJOB_PG_SECRET",
+{{- end }}
     "MODEL_REGISTRY_NAMESPACE": "MODEL_REGISTRY_NAMESPACE",
     "MODEL_REGISTRY_URL": "MODEL_REGISTRY_URL",
     # ADR-0526 (WP-087). A key absent from this map is NOT a compile
@@ -109,11 +115,13 @@ def configure(task, *, agent):
             "AWS_SECRET_ACCESS_KEY": "AWS_SECRET_ACCESS_KEY",
         },
     )
+{{- if .Values.postgres.enabled }}
     kubernetes.use_secret_as_env(
         task,
         secret_name=PG_SECRET,
         secret_key_to_env={"PGUSER": "PGUSER", "PGPASSWORD": "PGPASSWORD"},
     )
+{{- end }}
     # WP-087: the `evaluate` stage authenticates a demo persona against
     # Keycloak (evaluations/tekos/run_scenarios.py raises outright without
     # this) and needs a client secret for the token exchange: since WP-156
@@ -292,7 +300,7 @@ if __name__ == "__main__":
         kubernetes_manifest_options=KubernetesManifestOptions(
             pipeline_name=pipeline_name,
             # ALWAYS suffixed by target. PipelineVersion names are unique
-            # per NAMESPACE, not per pipeline - rag-ingestion proved this
+            # per NAMESPACE, not per pipeline - the retired rag-ingestion proved this
             # live on 2026-08-21, where compiling a second domain produced
             # an object literally named the chart's single version value
             # and was rejected "Pipeline spec is immutable". mlops has no

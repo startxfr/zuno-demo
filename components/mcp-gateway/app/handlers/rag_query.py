@@ -33,12 +33,12 @@ SOURCE_TYPES = [t for t in os.getenv("UNIFAI_RAG_SOURCE_TYPES", "CONFLUENCE,WEB"
 RAG_QUERY_TIMEOUT_SECONDS = float(os.getenv("RAG_QUERY_TIMEOUT_SECONDS", "15"))
 
 # The `technical-docs` classification (policies/data-classification/
-# classification.yaml), the value rag-service reported for this domain.
+# classification.yaml), the value the retired rag-service reported for this domain.
 _CLASSIFICATION = "C1"
 
 
 def _from_unifai(match: Dict[str, Any]) -> Dict[str, Any]:
-    """One UnifAI match in the result shape rag-service returned, so callers
+    """One UnifAI match in the result shape the retired rag-service returned, so callers
     of the tool see no change of contract."""
     metadata = match.get("metadata") or {}
     return {

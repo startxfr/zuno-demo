@@ -5,8 +5,7 @@
 # listens on port 8000, not 8080. ai-gateway is this model's only
 # intended local caller today (the local-gpt-oss provider entry, now
 # pointed at this LLMInferenceService's own -kserve-workload-svc
-# Service); rag-service is kept in the allow-list for symmetry with the
-# qwen policy - this chart can't know which role a given instance plays.
+# Service).
 # ADR-0201 (WP-27), 2026-08-25: maas-default-gateway is the third caller.
 # The MaaS data path routes gateway -> (EPP-selected) workload pod :8000
 # directly; with the gateway absent from this allow-list the connection
@@ -44,12 +43,6 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: ai-gateway
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: zuno-data
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: rag-service
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: openshift-ingress

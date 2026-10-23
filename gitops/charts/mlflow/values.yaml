@@ -99,7 +99,7 @@ artifact:
   bucket: ZUNO_S3_BUCKET_NOT_SET
   endpoint: https://s3.eu-west-2.amazonaws.com
   region: eu-west-2
-  # The same S3 credential mlops and rag-ingestion already use.
+  # The same S3 credential mlops already uses.
   vaultPath: rag/s3
   rootPath: mlflow-artifacts
 

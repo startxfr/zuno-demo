@@ -203,7 +203,7 @@
                         key: demo-persona-password
                   # WP-156: persona tokens from the zuno-evaluations client;
                   # the rag_ingestion layer and its confluence-technical-
-                  # credentials env are gone with rag-ingestion.
+                  # credentials env are gone with the retired rag-ingestion.
                   - name: EVAL_CLIENT_SECRET
                     valueFrom:
                       secretKeyRef:

@@ -19,8 +19,6 @@
       - mlops
       - agents
       - mcp
-      - rag_ingestion
-      - rag
       - models
       - llm
       - namespaces

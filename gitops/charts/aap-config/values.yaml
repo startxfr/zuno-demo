@@ -114,18 +114,18 @@ jobTemplates:
     playbook: ansible/playbooks/day2_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config, unifai, supply-chain]
+    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, supply-chain]
   - name: zuno-day2-build
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [mcp, rag, rag-ingestion, mlops]
+    surveyComponents: [mcp, mlops]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day2-install
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, rag, rag-ingestion, mcp, agents, mlops, lightspeed-config, unifai]
+    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai]
 
   - name: zuno-day3-test
     playbook: ansible/playbooks/day3_test.yml
@@ -330,16 +330,9 @@ workflowTemplates:
         successNodes: [llm]
       - id: llm
         successNodes: [models]
-      # rag/rag-ingestion/mcp each only need models (ADR-0060: "models...
-      # since agents/rag in this same tier need models available") - no
-      # confirmed dependency on each other; re-verify live before
-      # trusting this edge (less documented than Day 1's, per WP-095).
+      # mcp only needs models (ADR-0060).
       - id: models
-        successNodes: [rag, rag-ingestion, mcp]
-      - id: rag
-        successNodes: [agents]
-      - id: rag-ingestion
-        successNodes: [agents]
+        successNodes: [mcp]
       - id: mcp
         successNodes: [agents]
       - id: agents
@@ -371,11 +364,7 @@ workflowTemplates:
       - id: llm
         successNodes: [models]
       - id: models
-        successNodes: [rag, rag-ingestion, mcp]
-      - id: rag
-        successNodes: [agents]
-      - id: rag-ingestion
-        successNodes: [agents]
+        successNodes: [mcp]
       - id: mcp
         successNodes: [agents]
       - id: agents
@@ -403,8 +392,6 @@ workflowTemplates:
       # Independent BuildConfigs, no ordering dependency between them -
       # all launch in parallel as workflow roots.
       - {id: mcp, successNodes: []}
-      - {id: rag, successNodes: []}
-      - {id: rag-ingestion, successNodes: []}
       - {id: mlops, successNodes: []}
 
   # WP-105/ADR-0536 Part B: the first Workflow Template that is NOT one

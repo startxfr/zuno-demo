@@ -117,7 +117,7 @@
                     "path": "/consultant/confluence-build-satellite",
                     "attributes": {
                         "description": [
-                            "rag-ingestion ACL group \u2014 grants build-consultant-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
+                            "RAG ACL group \u2014 grants build-consultant-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -126,7 +126,7 @@
                     "path": "/consultant/confluence-build-openshift",
                     "attributes": {
                         "description": [
-                            "rag-ingestion ACL group \u2014 grants build-consultant-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
+                            "RAG ACL group \u2014 grants build-consultant-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -135,7 +135,7 @@
                     "path": "/consultant/confluence-build-openshift-ai",
                     "attributes": {
                         "description": [
-                            "rag-ingestion ACL group \u2014 grants build-consultant-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
+                            "RAG ACL group \u2014 grants build-consultant-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -144,7 +144,7 @@
                     "path": "/consultant/confluence-build-keycloak",
                     "attributes": {
                         "description": [
-                            "rag-ingestion ACL group \u2014 grants build-consultant-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
+                            "RAG ACL group \u2014 grants build-consultant-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -153,7 +153,7 @@
                     "path": "/consultant/confluence-run-satellite",
                     "attributes": {
                         "description": [
-                            "rag-ingestion ACL group \u2014 grants run-consultant-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
+                            "RAG ACL group \u2014 grants run-consultant-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -162,7 +162,7 @@
                     "path": "/consultant/confluence-run-openshift",
                     "attributes": {
                         "description": [
-                            "rag-ingestion ACL group \u2014 grants run-consultant-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
+                            "RAG ACL group \u2014 grants run-consultant-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -171,7 +171,7 @@
                     "path": "/consultant/confluence-run-openshift-ai",
                     "attributes": {
                         "description": [
-                            "rag-ingestion ACL group \u2014 grants run-consultant-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
+                            "RAG ACL group \u2014 grants run-consultant-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -180,7 +180,7 @@
                     "path": "/consultant/confluence-run-keycloak",
                     "attributes": {
                         "description": [
-                            "rag-ingestion ACL group \u2014 grants run-consultant-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
+                            "RAG ACL group \u2014 grants run-consultant-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -189,7 +189,7 @@
                     "path": "/consultant/confluence-archi-satellite",
                     "attributes": {
                         "description": [
-                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - rag-ingestion ACL group, grants architect-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
+                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - RAG ACL group, grants architect-tier access to Red Hat Satellite Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -198,7 +198,7 @@
                     "path": "/consultant/confluence-archi-openshift",
                     "attributes": {
                         "description": [
-                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - rag-ingestion ACL group, grants architect-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
+                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - RAG ACL group, grants architect-tier access to OpenShift Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -207,7 +207,7 @@
                     "path": "/consultant/confluence-archi-openshift-ai",
                     "attributes": {
                         "description": [
-                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - rag-ingestion ACL group, grants architect-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
+                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - RAG ACL group, grants architect-tier access to OpenShift AI Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 },
@@ -216,7 +216,7 @@
                     "path": "/consultant/confluence-archi-keycloak",
                     "attributes": {
                         "description": [
-                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - rag-ingestion ACL group, grants architect-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
+                            "ADR-0340/WP-32: relocated from /board (ADR-0330's transitional architect container) - RAG ACL group, grants architect-tier access to Keycloak Confluence content (acl_groups metadata, ADR-0046)"
                         ]
                     }
                 }

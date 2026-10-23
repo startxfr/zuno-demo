@@ -58,7 +58,7 @@ Two things about a new model's file set are load-bearing and neither is
 caught by CI:
 
 - **The NetworkPolicy must admit `maas-default-gateway`**, not just
-  ai-gateway and rag-service. Without it MaaS requests 504 at the outer
+  ai-gateway. Without it MaaS requests 504 at the outer
   HAProxy *after* auth, subscription selection and rate limiting have all
   passed. `platform/security/check_workload_hardening.py` only asserts
   that this chart renders at least one NetworkPolicy.
@@ -90,7 +90,7 @@ before `models` (a Day 1 component) in `ansible/playbooks/day0_install.yml`.
 Since 2026-08-18 the chat model's weights are staged in S3
 (`s3://<modelsS3.bucket>/<modelsS3.prefix>/<servedModelName>/`, see
 `values.yaml`'s `modelsS3` block - same bucket/credential as
-rag-ingestion's corpus, `models/` prefix). `templates/llminferenceservice-
+the platform's data bucket, `models/` prefix). `templates/llminferenceservice-
 qwen.yaml`'s `spec.model.uri` reads straight from there, authenticated via
 the `ServiceAccount` + `serving.kserve.io/s3-*`-annotated Secret from
 `templates/s3-serving-credentials.yaml` - the same mechanism (and Vault
@@ -127,10 +127,8 @@ land on whichever MIG-partitioned node has a free 24GB slice - by design
 the same permanent node as the chat model (the old full-GPU-era hard
 anti-affinity between the two was removed by ADR-0351).
 
-Consumed by `gitops/charts/rag-ingestion`'s `embedding.endpoint`
-(fetch-time chunk embedding, from `zuno-ai-build`) and available to
-`rag-service` for query-time embedding (from `zuno-data`) - both allowed
-by `templates/networkpolicy-embedding.yaml`.
+Consumed by UnifAI's RAG pods and multi-agent pods (`unifaiNamespace`),
+allowed by `templates/networkpolicy-embedding.yaml`.
 
 ## LoRA adapter serving (ADR-0301, WP-34 Part B)
 

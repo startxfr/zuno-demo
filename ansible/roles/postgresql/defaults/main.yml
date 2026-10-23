@@ -14,18 +14,13 @@
 # than as a silently divergent credential months later.
 #
 # `postgres` (the superuser) is deliberately absent: PGO generates it and no
-# ExternalSecret manages it - it is the 18th pguser Secret on the cluster.
+# ExternalSecret manages it - it is an extra pguser Secret on the cluster.
 postgresql_pguser_bootstrap_secrets:
   - {owner: zunoapp, vault_path: postgresql/app}
   - {owner: keycloak, vault_path: keycloak/postgresql-app}
-  - {owner: ragtech, vault_path: rag/postgresql-app}
   - {owner: maas, vault_path: maas/postgresql-app}
   - {owner: mlflow, vault_path: mlflow/postgresql-app}
   - {owner: ogxserver, vault_path: ogx/postgresql-app}
-  - {owner: ragsales, vault_path: rag-sales/postgresql-app}
-  - {owner: ragsxalegacy, vault_path: rag-sxa-legacy/postgresql-app}
-  - {owner: ragadv, vault_path: rag-adv/postgresql-app}
-  - {owner: ragproject, vault_path: rag-project/postgresql-app}
   - {owner: aapgateway, vault_path: aap/postgresql-app}
   - {owner: aapcontroller, vault_path: aap-controller/postgresql-app}
   - {owner: aaphub, vault_path: aap-hub/postgresql-app}

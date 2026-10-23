@@ -57,7 +57,7 @@ spec:
             summary: "RAGAS {{`{{ $labels.metric }}`}} at {{`{{ $value | humanizePercentage }}`}} on a real-retrieval question"
             description: >-
               The latest ragas-eval run scored below 0.7 for this
-              metric/question against the real rag-service retrieval
+              metric/question against the real UnifAI retrieval
               path - retrieval quality or answer grounding degraded.
               See the zuno-trustyai Grafana dashboard.
         - alert: TrustyAIEvalJobFailed

@@ -243,8 +243,8 @@ The realm defines **two independent group dimensions**, matching
    `allowed_groups`, evaluated by the MCP Gateway. `consultant` and
    `board` also carry `confluence-{build,run}-<tech>` /
    `confluence-archi-<tech>` subgroups (tech ∈ satellite, openshift,
-   openshift-ai, keycloak), consumed by `rag-ingestion`/`rag-service`
-   (`document_embeddings.metadata.acl_groups`), not by the MCP Gateway's
+   openshift-ai, keycloak), consumed by UnifAI's RAG
+   (the `acl_groups` of shared sources), not by the MCP Gateway's
    tool policy.
 
 A user typically holds one of each (e.g. `consultant-user-01` holds both

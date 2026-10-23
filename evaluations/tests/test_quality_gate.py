@@ -5,7 +5,7 @@ run_scenarios.py/security_checks.py, which need a live cluster - see
 those scripts' own docstrings) to prove the config-driven threshold
 comparison and fail-closed unknown-agent behavior in isolation.
 
-Same plain-function/no-pytest style as components/rag-service/tests/
+Same plain-function/no-pytest style as the retired rag-service component
 test_search_filters.py, still pytest-collectible (the WP-10 brief's
 acceptance check runs `python3 -m pytest evaluations/ -q`).
 

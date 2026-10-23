@@ -43,14 +43,14 @@ ingestion), and Day 3 (agent test/stresstest/operational actions):
 3. `make day2 check` / `build` / `install` / `uninstall` (or the `d2`
    alias) walk `DAY2_RUN_COMPONENTS` - `namespaces`' ResourceQuota/
    NetworkPolicy overlay, then AI infrastructure and content ingestion
-   (`llm`, `models`, `rag`, `rag-ingestion`, `mcp`,
+   (`llm`, `models`, `mcp`,
    `agents`, `mlops`). Every scope applies its own child ArgoCD
    `Application` under `gitops/apps/<scope>/` via the shared task
    `ansible/tasks/apply_gitops_app.yml`, rather than configuring anything
    inline - ArgoCD reconciles the referenced Helm chart or local manifest.
    `make day2 check agents` runs the acceptance/security gate instead of a
    lightweight state check - see `ansible/playbooks/day2_check.yml`'s
-   header comment. `make day2 build [mcp|rag|rag-ingestion|agent|mlops]`
+   header comment. `make day2 build [mcp|mlops|trustyai-eval]`
    builds the platform's own component images via OpenShift
    `BuildConfig`/`ImageStream` in `zuno-ai-build`.
 4. `make day3 test` / `stresstest` (or the `d3` alias) - agent

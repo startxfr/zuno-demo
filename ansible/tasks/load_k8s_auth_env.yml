@@ -49,7 +49,7 @@
 # WP-102: K8S_AUTH_HOST/K8S_AUTH_API_KEY are read natively by the
 # kubernetes.core Python modules (the whole point of the block above),
 # but the raw `oc` CLI (apply_openshift_build.yml's `oc start-build`,
-# mlops/rag_ingestion's `oc whoami -t`) understands neither - it needs an
+# mlops/the retired rag_ingestion's `oc whoami -t`) understands neither - it needs an
 # actual kubeconfig, which an AAP Job Template's injected environment
 # never provides (confirmed live 2026-08-30: `oc start-build` failed
 # "Missing or incomplete configuration info" the first time any raw `oc`

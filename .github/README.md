@@ -8,7 +8,7 @@ ADRs referencing ".github/workflows/ doesn't exist yet" predate this):
   (`platform/security/check_workload_hardening.py`,
   `platform/supply-chain/check_build_matrix.py`, ...), `helm lint` on every
   chart, the standalone Python test suites (`components/mcp-gateway/`,
-  `components/ai-gateway/`, `components/rag-service/tests/`, ...), and an `ansible-playbook --syntax-check`
+  `components/ai-gateway/`, `the retired rag-service component`, ...), and an `ansible-playbook --syntax-check`
   pass over every playbook. Runs on every pull request and every push to
   `main`. Agent definitions and the corp policies are not in this
   repository (ADR-0576, WP-165): the jobs that read them (policy-as-code,

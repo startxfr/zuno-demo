@@ -1,6 +1,6 @@
 ---
-# ADR-0057 decision 5 ("platform" component): ai-gateway,
-# mcp-gateway and rag-service have no OpenShift Route - only in-cluster
+# ADR-0057 decision 5 ("platform" component): ai-gateway and
+# mcp-gateway have no OpenShift Route - only in-cluster
 # Service DNS - so this runs as a lightweight in-cluster Job, modeled on
 # ansible/roles/vault/tasks/install.yml's unseal-configure Job
 # (delete-then-recreate, inline spec, simple succeeded/failed polling)
@@ -28,8 +28,8 @@
 #
 # Reuses the acceptance-gate Job's own ServiceAccount name and
 # app.kubernetes.io/name: acceptance-gate pod label rather than a new
-# identity: that label is what ai-gateway/mcp-gateway/
-# rag-service's own NetworkPolicies already allow-list (see
+# identity: that label is what ai-gateway/mcp-gateway's
+# own NetworkPolicies already allow-list (see
 # run_acceptance_gate.yml's own header comment - "explicitly allow-listed
 # in the relevant NetworkPolicies, never a namespace-wide baseline",
 # live-confirmed for these four); a differently-labeled pod would be

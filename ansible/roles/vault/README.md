@@ -26,9 +26,8 @@ admin-only namespace (`zuno-vault`) rather than requiring any
 external input.
 
 `install.yml` also generates and seeds the secrets that can be
-self-generated (Keycloak admin, PostgreSQL app credentials, MariaDB root,
-and the rag-ingestion pipeline's internal `mlpipeline` metadata-DB
-password). The rest require external input: the Google Workspace OAuth
+self-generated (Keycloak admin, PostgreSQL app credentials, MariaDB root
+and the mlops pipeline's metadata-DB password). The rest require external input: the Google Workspace OAuth
 client, the SMTP technical-mail credentials, the Atlassian Confluence
 technical token, the Quay registry credentials (stored for future
 cluster-side use - separate from the GitHub Actions

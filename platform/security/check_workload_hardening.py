@@ -41,7 +41,6 @@ DEPLOYMENT_CHARTS = [
     # this repo directly controls must be checked, not just the ones this
     # list happened to be updated for at the time it was written.
     "mcp-confluence",
-    "rag-service",
     "mcp-salesforce",
     # ADR-0120/WP-058 - added proactively, learning from the gap above.
     "mcp-git-forge",
@@ -195,7 +194,7 @@ def check_no_hardcoded_secret_values(chart: str, findings: Findings) -> None:
 # fourth, was retired in WP-156); the others were
 # never given the mechanism and checking them here would just be a
 # self-inflicted permanent failure, not a real regression.
-AVAILABILITY_CHARTS = ["ai-gateway", "mcp-gateway", "rag-service"]
+AVAILABILITY_CHARTS = ["ai-gateway", "mcp-gateway"]
 
 
 def check_availability(chart: str, findings: Findings) -> None:
@@ -343,11 +342,11 @@ def main() -> int:
 
     # NetworkPolicy coverage: every zuno-ai-run workload chart (no namespace
     # baseline covers them - ADR-0037) plus the platform-namespace-baseline
-    # owner and rag-service's precise cross-namespace policy.
+    # owner.
     # ADR-0119: mcp-salesforce was missing here (a real gap the new
     # check_mcp_server_conformance.py checker caught) - same class of
     # omission as ADR-0111's own comment above for mcp-confluence.
-    for chart in ["ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "mcp-aap", "rag-service", "models"]:
+    for chart in ["ai-gateway", "mcp-gateway", "mcp-confluence", "mcp-salesforce", "mcp-git-forge", "mcp-aap", "models"]:
         check_networkpolicies(chart, findings)
     check_networkpolicies("namespaces", findings, {"policy.enabled": "true"})
 

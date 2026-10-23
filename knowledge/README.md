@@ -17,7 +17,7 @@ never **how** or **where** that knowledge is physically stored.
 
 - A domain descriptor **must never** contain a physical database name,
   service endpoint, secret or credential. Physical backend bindings are
-  `platform/bindings/knowledge/bindings.yaml` (ADR-0204, WP-21) — a domain
+  the retired rag-service bindings registry (ADR-0204, WP-21) — a domain
   descriptor stays valid even if the domain is re-bound to a different
   backend.
 - The logical domain ID (`knowledge.tech`, `knowledge.sales`,

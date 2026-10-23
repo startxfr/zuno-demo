@@ -1,8 +1,0 @@
-apiVersion: v2
-name: rag-service
-description: >-
-  Zuno RAG service: pgvector + PostgreSQL full-text hybrid search over the
-  document_embeddings table, backing the Agent Runtime's retrieve node.
-type: application
-version: 0.1.0
-appVersion: "0.1.0"

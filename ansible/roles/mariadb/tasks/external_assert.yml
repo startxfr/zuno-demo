@@ -29,8 +29,6 @@
       stringData:
         MARIADB_HOST: "{{ zuno_mariadb_external_host }}"
         MARIADB_PORT: "{{ zuno_mariadb_external_port | default('3306') }}"
-        DB_MLPIPELINE_USER: "{{ zuno_mariadb_external_db_mlpipeline_username | default('mlpipeline') }}"
-        DB_MLPIPELINE_PASS: "{{ zuno_mariadb_external_db_mlpipeline_password }}"
         DB_MLOPS_USER: "{{ zuno_mariadb_external_db_mlops_username | default('mlops') }}"
         DB_MLOPS_PASS: "{{ zuno_mariadb_external_db_mlops_password }}"
         DB_TRILLIAN_USER: "{{ zuno_mariadb_external_db_trillian_username | default('trillian') }}"
@@ -83,9 +81,8 @@
                   - |
                     set -e
                     rc=0
-                    for db in mlpipeline mlops trillian; do
+                    for db in mlops trillian; do
                       case "$db" in
-                        mlpipeline) u="$DB_MLPIPELINE_USER"; p="$DB_MLPIPELINE_PASS" ;;
                         mlops)      u="$DB_MLOPS_USER";      p="$DB_MLOPS_PASS" ;;
                         trillian)   u="$DB_TRILLIAN_USER";   p="$DB_TRILLIAN_PASS" ;;
                       esac

@@ -22,11 +22,13 @@ data:
   MLOPS_MODELS_S3_ENDPOINT: {{ .Values.modelsS3.endpoint | quote }}
   MLOPS_MERGED_MODEL_S3URI: {{ .Values.mergedModel.s3Uri | quote }}
   MLOPS_MERGED_OVERWRITE: {{ .Values.mergedModel.overwrite | quote }}
+{{- if .Values.postgres.enabled }}
   PGHOST: {{ .Values.postgres.host | quote }}
   PGPORT: {{ .Values.postgres.port | quote }}
   PGDATABASE: {{ .Values.postgres.database | quote }}
   PGSCHEMA: {{ .Values.postgres.schema | quote }}
   PGSSLMODE: {{ .Values.postgres.sslmode | quote }}
+{{- end }}
   MLOPS_EVALUATIONS_DIR: {{ .Values.evaluations.dir | quote }}
   # ADR-0538/WP-116: MLflow experiment tracking. An empty trackingUri
   # disables it entirely (components/mlops/src/mlflow_tracking.py no-ops),
@@ -43,7 +45,9 @@ data:
   MLOPS_TRAINJOB_TIMEOUT_SECONDS: {{ .Values.training.trainJob.timeoutSeconds | quote }}
   MLOPS_TRAINJOB_POLL_SECONDS: {{ .Values.training.trainJob.pollSeconds | quote }}
   MLOPS_TRAINJOB_S3_SECRET: {{ .Values.s3.secretName | quote }}
+{{- if .Values.postgres.enabled }}
   MLOPS_TRAINJOB_PG_SECRET: {{ .Values.postgres.secretName | quote }}
+{{- end }}
   # WP-087: the `evaluate` stage runs the agent's real acceptance suite
   # against the live platform - see values.yaml's acceptanceGate block.
   KEYCLOAK_URL: {{ .Values.acceptanceGate.keycloakUrl | quote }}
