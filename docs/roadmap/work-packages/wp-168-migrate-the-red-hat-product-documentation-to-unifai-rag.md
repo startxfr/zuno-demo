@@ -77,7 +77,7 @@ Confluence pages, with the caller's group rules, and `rag-service`,
 ## Decisions (2026-10-23, user)
 
 - **Source model:** `UnifaiRAGSource` `type: web`, one source per product and
-  version (the 34 `redhat[]` entries of the chart), a seed `documentationUrl`
+  version (the 112 `redhat[]` entries of the rag-ingestion chart are grouped into 38 sources; each entry is a seed book), a seed `documentationUrl`
   with `include`/`exclude`, and link discovery in the RAG as `rag-ingestion` does
   today. Same sync loop and status fields as Confluence.
 - **Metadata:** one source per version, common tag `knowledge.tech` plus
@@ -85,6 +85,18 @@ Confluence pages, with the caller's group rules, and `rag-service`,
   filter in `query.bearer`.
 - **Raw S3 copy:** not kept. The pages are public and can be fetched again; the
   raw prefix is purged at retirement, under the WP-156 procedure.
+- **Visibility:** a new `public` visibility (every authenticated caller, whatever their groups), subject
+  to the same publisher right as `shared` (`stack.rag.sharedPublishers`); the Red Hat pages are public
+  and a user outside any group must still find them.
+- **Fetch guard:** a web source is fetched from the RAG pod, so every URL and redirect must resolve to
+  global addresses (no loopback, private, link-local, cluster or metadata address); `RAG_WEB_ALLOWED_HOSTS`
+  optionally restricts hosts. Text extraction reuses the Confluence HTML-to-text converter, not docling:
+  the pages are already structured HTML.
+- **Search:** `query.bearer` takes one `sourceType`, so the mcp-gateway handler queries `CONFLUENCE` and
+  `WEB` and merges (replacing the rag-service merge).
+- **Generation:** `platform/knowledge/generate_redhat_web_sources.py` writes
+  `gitops/charts/unifai/files/redhat-docs.yaml` from the rag-ingestion catalogue; the chart renders it when
+  `redhatDocs.enabled`.
 - **Ownership:** zuno-demo-68 codes the fork RAG side on `feat/rag-web-source`
   (from `main`, in a worktree, merged `--no-ff` into fork `devel`, pushed by a9
   with a release) and the operator side (`ragsource_*`).

@@ -214,4 +214,27 @@ spec:
   {{- end }}
 ---
 {{- end }}
+{{- if .Values.redhatDocs.enabled }}
+{{- /* WP-168: the Red Hat product documentation, one public web source per product and version. The list is
+generated from gitops/charts/rag-ingestion/values.yaml by platform/knowledge/generate_redhat_web_sources.py. */}}
+{{- range (.Files.Get "files/redhat-docs.yaml" | fromYaml).sources }}
+apiVersion: unifai.startx.fr/v1alpha1
+kind: UnifaiRAGSource
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+spec:
+  owner: {{ $owner }}
+  type: web
+  visibility: public
+  tags:
+    {{- toYaml .tags | nindent 4 }}
+  web:
+    {{- toYaml .web | nindent 4 }}
+  syncInterval: {{ $.Values.redhatDocs.syncInterval }}
+---
+{{- end }}
+{{- end }}
 {{- end }}
