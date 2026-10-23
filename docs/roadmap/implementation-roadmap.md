@@ -26,7 +26,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.1 | 29 | — | 18 | — |
 | v0.2 | 14 | — | 17 | WP-098 |
 | v0.3 | 16 | 1 | 19 | — |
-| v0.4 | 35 | 9 | 30 | WP-55, WP-101 |
+| v0.4 | 35 | 9 | 31 | WP-55, WP-101, WP-169 |
 | v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
@@ -952,6 +952,7 @@ frozen mirror.
 | WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator (part 1); unifai role and Keycloak groups Job wired and live on demo333 (part 2); quotas/MaaS/routing wait for WP-157 |
 | WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Not started | parity proof on the running cluster, outside any demo freeze |
 | WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Not started | split out of WP-156 by user decision 2026-10-23: rag-service and rag-ingestion stay for the Red Hat docs until this lands |
+| WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Repo work in review | user decision 2026-10-23: evaluations stop spending the demo personas' budget; harness switch owned by the evaluation harness work |
 
 ### OKF stream phases
 

@@ -186,3 +186,15 @@ the retries exhaust (about 25 minutes here), but the shape is worth knowing:
 `status.sync.revision` can already show the new commit while
 `operationState.operation.sync.revision` is still the old one, and the second
 is the one that decides what gets applied.
+
+### 2026-10-23 - evaluation personas, a narrow user exception (WP-169)
+
+Decision 4 keeps users out of the reconcile, and that stands for every realm
+user. [WP-169](../roadmap/work-packages/wp-169-dedicated-evaluation-personas.md)
+adds a separate Job, `job-eval-personas.yaml`, that owns only the `eval-*`
+personas declared in the chart's `evalPersonas`: it creates them, sets the
+shared demo password and adds the groups of the persona each one copies. It
+never deletes a user or a membership, never touches a demo persona, and is
+not part of the client reconcile, so a fault in it cannot block clients.
+The same day, the `zuno-evaluations` client hit the `varchar(255)` description
+trap recorded above: its test existed but no workflow ran `platform/keycloak/tests`.

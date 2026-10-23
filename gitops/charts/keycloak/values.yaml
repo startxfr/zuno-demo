@@ -136,3 +136,23 @@ operator:
 # never touches membership. Empty: the Job reconciles clients only, as
 # before.
 agentGroups: []
+
+# WP-169: dedicated evaluation personas. The evaluation harnesses, probes and
+# eval Jobs sign in as these instead of the demo personas, so their token
+# spend lands on its own per-user ai-gateway budget and never exhausts the
+# budget of a persona a presenter uses live. Each copies the groups of the
+# realm-zuno.json user named in copyOf (resolved at render time, so the two
+# never drift) and shares the demo personas' password (Secret
+# demo-personas-password). Created by templates/job-eval-personas.yaml:
+# create-only users, missing memberships added, nothing ever removed.
+evalPersonas:
+  - username: eval-consultant-01
+    copyOf: consultant-01
+  - username: eval-sale-01
+    copyOf: sale-01
+  - username: eval-adv-01
+    copyOf: adv-01
+  - username: eval-finance-01
+    copyOf: finance-01
+  - username: eval-board-01
+    copyOf: board-01

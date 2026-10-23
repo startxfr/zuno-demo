@@ -1,0 +1,152 @@
+{{- /*
+WP-169: creates the evaluation personas (values evalPersonas) in the zuno
+realm. The realm import is create-only and the client reconcile Job handles
+clients and agent groups only, so users added to the realm file never reach
+a live realm; this Job is the users' path, kept separate from the client
+reconcile so a fault here never blocks client reconciliation.
+
+Per persona: created when missing (enabled, email verified), password set to
+the demo personas' shared one on every run (so a rotated Secret follows), and
+every group of its source persona added if missing. Nothing is ever deleted:
+a persona dropped from the values, or a group dropped from its source, is
+reported and left alone.
+
+Runs after job-client-reconcile.yaml (wave -5), which creates the agent_*
+groups the personas join.
+*/ -}}
+{{- if and .Values.keycloak.enabled .Values.evalPersonas }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zuno-keycloak-eval-personas
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: keycloak
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "-4"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak-eval-personas
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kcadm
+          image: {{ .Values.clientReconcile.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          env:
+            - name: KC_SERVER
+              value: {{ .Values.clientReconcile.serverUrl | quote }}
+            - name: KC_REALM
+              value: zuno
+            - name: KC_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.adminSecretName }}
+                  key: username
+            - name: KC_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.adminSecretName }}
+                  key: password
+            - name: PERSONA_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: demo-personas-password
+                  key: password
+          volumeMounts:
+            - name: personas
+              mountPath: /personas
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              # Same pinning as the client reconcile Job: read-only root
+              # filesystem, arbitrary UID, no writable home.
+              KCADM="/opt/keycloak/bin/kcadm.sh"
+              CFG="--config /tmp/kcadm.config"
+
+              ready=""
+              for attempt in $(seq 1 60); do
+                if $KCADM config credentials $CFG --server "$KC_SERVER" \
+                     --realm master --user "$KC_ADMIN_USER" \
+                     --password "$KC_ADMIN_PASSWORD" >/dev/null 2>&1 \
+                   && $KCADM get "realms/$KC_REALM" $CFG --fields realm >/dev/null 2>&1; then
+                  ready="yes"
+                  break
+                fi
+                echo "waiting for keycloak and realm '$KC_REALM' (attempt $attempt)"
+                sleep 5
+              done
+              if [ -z "$ready" ]; then
+                echo "ERROR: keycloak or realm '$KC_REALM' never became reachable" >&2
+                exit 1
+              fi
+
+              created=0
+              present=0
+              joined=0
+              while read -r username groups; do
+                [ -n "${username:-}" ] || continue
+                uid=$($KCADM get users -r "$KC_REALM" $CFG \
+                        -q "username=$username" -q exact=true --fields id \
+                        --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+                if [ -z "$uid" ]; then
+                  $KCADM create users -r "$KC_REALM" $CFG \
+                    -s "username=$username" -s enabled=true -s emailVerified=true \
+                    -s "email=dev+zuno-$username@startx.fr" \
+                    -s firstName=Evaluation -s "lastName=$username"
+                  uid=$($KCADM get users -r "$KC_REALM" $CFG \
+                          -q "username=$username" -q exact=true --fields id \
+                          --format csv --noquotes | head -1 | tr -d '\r" ')
+                  echo "created user $username"
+                  created=$((created + 1))
+                else
+                  present=$((present + 1))
+                fi
+                $KCADM set-password -r "$KC_REALM" $CFG \
+                  --username "$username" --new-password "$PERSONA_PASSWORD"
+
+                for path in $groups; do
+                  gid=$($KCADM get "group-by-path$path" -r "$KC_REALM" $CFG \
+                          --fields id --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+                  if [ -z "$gid" ]; then
+                    echo "WARNING: group $path does not exist; $username not added to it"
+                    continue
+                  fi
+                  # PUT is idempotent: an existing membership is a no-op.
+                  $KCADM update "users/$uid/groups/$gid" -r "$KC_REALM" $CFG \
+                    -s "realm=$KC_REALM" -s "userId=$uid" -s "groupId=$gid" -n
+                  joined=$((joined + 1))
+                done
+              done < /personas/personas.txt
+
+              echo "eval personas: $created created, $present already present, $joined memberships ensured"
+      volumes:
+        - name: personas
+          configMap:
+            name: zuno-keycloak-eval-personas
+        - name: tmp
+          emptyDir: {}
+{{- end }}

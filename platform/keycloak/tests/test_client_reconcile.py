@@ -319,3 +319,48 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+# --- WP-169: evaluation personas ---------------------------------------------
+
+
+def test_each_eval_persona_copies_its_source_users_groups() -> None:
+    cm = _by_kind("ConfigMap", "zuno-keycloak-eval-personas")
+    if cm is None:
+        return
+    import yaml
+
+    values = yaml.safe_load((CHART / "values.yaml").read_text())
+    users = {u["username"]: u for u in _load_realm()["users"]}
+    lines = {
+        line.split()[0]: line.split()[1:]
+        for line in cm["data"]["personas.txt"].splitlines()
+        if line.strip()
+    }
+    assert values["evalPersonas"], "no evaluation persona declared"
+    for p in values["evalPersonas"]:
+        assert p["username"].startswith("eval-"), (
+            f"{p['username']}: evaluation personas carry the eval- prefix, "
+            "so a quota policy can key on them"
+        )
+        assert p["username"] not in users, (
+            f"{p['username']} is also a realm-file user: the Job owns eval personas"
+        )
+        assert lines[p["username"]] == users[p["copyOf"]]["groups"]
+
+
+def test_the_eval_personas_job_runs_after_the_client_reconcile() -> None:
+    job = _by_kind("Job", "zuno-keycloak-eval-personas")
+    reconcile = _by_kind("Job", "zuno-keycloak-client-reconcile")
+    if job is None or reconcile is None:
+        return
+    ann = job["metadata"]["annotations"]
+    assert ann["argocd.argoproj.io/hook"] == "Sync"
+    assert ann["argocd.argoproj.io/hook-delete-policy"] == "BeforeHookCreation"
+    assert int(ann["argocd.argoproj.io/sync-wave"]) > int(
+        reconcile["metadata"]["annotations"]["argocd.argoproj.io/sync-wave"]
+    ), "the reconcile Job creates the agent_* groups the personas join"
+    assert job["spec"]["activeDeadlineSeconds"] > 0
+    spec = job["spec"]["template"]["spec"]
+    volumes = {v["name"]: v for v in spec["volumes"]}
+    assert volumes["personas"]["configMap"]["name"] == "zuno-keycloak-eval-personas"

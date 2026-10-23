@@ -1,0 +1,31 @@
+{{- /*
+WP-169: one line per evaluation persona for job-eval-personas.yaml:
+"<username> <group path> <group path> ...", the groups copied from the
+realm-zuno.json user named in copyOf. A copyOf that names no realm user fails
+the render rather than creating a persona without groups.
+*/ -}}
+{{- if and .Values.keycloak.enabled .Values.evalPersonas }}
+{{- $realm := .Files.Get "files/realm-zuno.json" | fromJson }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zuno-keycloak-eval-personas
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: keycloak
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-6"
+data:
+  personas.txt: |
+{{- range $p := .Values.evalPersonas }}
+{{- $source := dict }}
+{{- range $u := $realm.users }}
+{{- if eq $u.username $p.copyOf }}{{ $source = $u }}{{ end }}
+{{- end }}
+{{- if not $source.username }}
+{{- fail (printf "evalPersonas: %s copies %s, which is not a user of files/realm-zuno.json" $p.username $p.copyOf) }}
+{{- end }}
+    {{ $p.username }} {{ join " " $source.groups }}
+{{- end }}
+{{- end }}
