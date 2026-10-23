@@ -262,6 +262,7 @@ def agents_view(release: pathlib.Path) -> Dict[str, dict]:
             }
         view[agent_md.parent.name] = {
             "version": versions.get(agent_md.parent.name, "?"),
+            "status": z.get("status", "active"),
             "groups": sorted((z.get("access") or {}).get("groups") or []),
             "classification": (z.get("model") or {}).get("preferred_classification"),
             "tasks": tasks,

@@ -22,71 +22,51 @@
 - name: "day2-availability | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 
-- name: "day2-availability | discover agents/*/agent.okf.md bundles"
-  ansible.builtin.find:
-    paths: "{{ zuno_repo_root }}/agents"
-    patterns: "agent.okf.md"
-    recurse: true
-    depth: 2
-  register: _day2_agent_bundles
-
-# Not every agent bundle has a deployed frontend to check: soursage/cognos
-# (ADR-0349 §6) are "identity footprint + coming-soon bundle only, no
-# runtime/chart at all" - their /healthz would never exist, by design, not
-# because anything is broken. Intersecting with gitops/charts/<agent>/
-# existing (same "intersect two find results" pattern
-# ansible/roles/day3/tasks/stresstest_job.yml already uses for its own
-# agent discovery) filters them out today and automatically includes
-# either one the moment a real chart lands for it - no further code
-# change, same auto-coverage principle as the bundle discovery itself.
-- name: "day2-availability | discover gitops/charts/*/ (agents with a real deployment)"
-  ansible.builtin.find:
-    paths: "{{ zuno_repo_root }}/gitops/charts"
-    file_type: directory
-    recurse: false
-  register: _day2_agent_charts
-
-- name: "day2-availability | resolve the agents that actually have a deployed frontend"
+# WP-156: agents are served by UnifAI (ADR-0561), one UnifaiAgentBundle per
+# agent in zuno-unifai (ADR-0564), so an agent is available when its bundle
+# is Ready. The agents are the admitted release's
+# (platform/okf/stack-config.generated.yaml), not agents/ in this tree. A
+# placeholder agent (ADR-0007) is deliberately not served: its row passes
+# with that reason, since "not served" is its expected state.
+- name: "day2-availability | read the admitted agents release"
   ansible.builtin.set_fact:
-    _day2_deployed_agents: >-
-      {{
-        (_day2_agent_bundles.files | map(attribute='path') | map('dirname') | map('basename') | list)
-        | intersect(_day2_agent_charts.files | map(attribute='path') | map('basename') | list)
-        | sort
-      }}
+    _day2_release_agents: >-
+      {{ (lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/stack-config.generated.yaml')
+          | from_yaml)['agents'] | default({}, true) }}
 
-- name: "day2-availability | GET each deployed agent frontend's /healthz"
-  ansible.builtin.uri:
-    url: "https://{{ item }}.{{ cluster_base_domain }}/healthz"
-    method: GET
-    status_code: 200
-    validate_certs: false
-    timeout: 10
-  register: _day2_agent_health
-  failed_when: false
-  loop: "{{ _day2_deployed_agents }}"
-  loop_control:
-    label: "{{ item }}"
+- name: "day2-availability | read the UnifaiAgentBundle objects"
+  kubernetes.core.k8s_info:
+    api_version: unifai.startx.fr/v1alpha1
+    kind: UnifaiAgentBundle
+    namespace: zuno-unifai
+  register: _day2_bundles
 
-# Builds one platform/testing/day2_report.py::Day2Result-shaped dict per
-# agent - "item.item" is the uri task's own looped-over element (each a
-# plain agent-name string from _day2_deployed_agents, Ansible's standard
-# per-iteration registration shape), not a typo.
 - name: "day2-availability | build the Day2Result list"
   ansible.builtin.set_fact:
     _day2_availability_results: "{{ _day2_availability_results | default([]) + [_day2_row] }}"
-  loop: "{{ _day2_agent_health.results }}"
+  loop: "{{ _day2_release_agents | dict2items | sort(attribute='key') }}"
   loop_control:
-    label: "{{ item.item }}"
+    label: "{{ item.key }}"
   vars:
+    _day2_bundle: >-
+      {{ (_day2_bundles.resources | default([])
+          | selectattr('metadata.name', 'equalto', item.key) | list | first) | default({}, true) }}
+    _day2_ready: >-
+      {{ (_day2_bundle.status.conditions | default([])
+          | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first) | default('missing') }}
+    _day2_placeholder: "{{ item.value.status | default('active') == 'placeholder' }}"
     _day2_row:
-      agent: "{{ item.item }}"
+      agent: "{{ item.key }}"
       layer: availability
-      id: healthz
-      category: frontend
-      passed: "{{ (item.status | default(0)) == 200 }}"
-      detail: "status={{ item.status | default('no response') }}"
-      duration_ms: "{{ ((item.elapsed | default(0)) | float) * 1000 }}"
+      id: unifai-bundle-ready
+      category: unifai
+      passed: "{{ _day2_placeholder or _day2_ready == 'True' }}"
+      detail: >-
+        {{ 'placeholder (ADR-0007): not served by design'
+           if _day2_placeholder else
+           ('no UnifaiAgentBundle ' + item.key if _day2_bundle == {} else
+            'Ready=' + _day2_ready + ' phase=' + (_day2_bundle.status.phase | default('?'))) }}
+      duration_ms: 0
 
 # Pure fact-producer, deliberately no rendering/failing here: this file
 # is reused both by ansible/roles/agents/tasks/check.yml (Day 2's own

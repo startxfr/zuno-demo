@@ -93,6 +93,7 @@ def build(release_dir: Optional[pathlib.Path], reference: Optional[str]) -> dict
         v03 = okf_v03_fields(release_dir / "agents" / name)
         agents[name] = {
             "version": a["version"],
+            "status": a["status"],
             "reference": refs.get(name),
             "classification": a["classification"],
             "groups": a["groups"],

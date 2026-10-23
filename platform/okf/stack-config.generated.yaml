@@ -16,6 +16,7 @@ keycloak:
 agents:
   advantage:
     version: 0.1.0
+    status: placeholder
     reference: quay.io/zuno/okf-advantage@sha256:127c9c77e00129f999b26f19a82546058ed2197c3780a0f5282530d7e7000b28
     classification: C2
     groups:
@@ -36,6 +37,7 @@ agents:
     - knowledge.sxa-legacy
   arkos:
     version: 0.1.0
+    status: active
     reference: quay.io/zuno/okf-arkos@sha256:343ca298bf125ce617be80028828dd4b2ec9fc19ba239722e9c10eb65ab839d8
     classification: C3
     groups:
@@ -67,6 +69,7 @@ agents:
           token_budget: 6000
   cognos:
     version: 0.1.0
+    status: placeholder
     reference: quay.io/zuno/okf-cognos@sha256:f8fbd52a40f3186279e80c2716ad5b965018d2a9b6d744e658a1c81f9ee603d5
     classification: C3
     groups:
@@ -79,6 +82,7 @@ agents:
     - knowledge.sxa-legacy
   comage:
     version: 0.1.0
+    status: active
     reference: quay.io/zuno/okf-comage@sha256:c68133454d6d8f48e6bffeea2977893ea9465d8ec865dcfdabfa71cf21239d23
     classification: C2
     groups:
@@ -102,6 +106,7 @@ agents:
     - knowledge.sxa-legacy
   finage:
     version: 0.1.0
+    status: placeholder
     reference: quay.io/zuno/okf-finage@sha256:f6438b4062e3d32d1b1c99988b40b8d01185f20bda3de25bbe5514cb5ba926df
     classification: C2
     groups:
@@ -121,6 +126,7 @@ agents:
     - knowledge.sxa-legacy
   naveo:
     version: 0.1.0
+    status: placeholder
     reference: quay.io/zuno/okf-naveo@sha256:69b9ff36d31ad7bf7565e7eaaa1f869d98379e5bc307d91e06d215ed44a28dfe
     classification: C1
     groups:
@@ -136,6 +142,7 @@ agents:
     - knowledge.tech
   soursage:
     version: 0.1.0
+    status: placeholder
     reference: quay.io/zuno/okf-soursage@sha256:10cb9ccd36edfa5e204dc150088880960de92e06a87da953219c3eafd7af2a73
     classification: C2
     groups:
@@ -146,6 +153,7 @@ agents:
     knowledgeDomains: []
   tekos:
     version: 0.1.0
+    status: active
     reference: quay.io/zuno/okf-tekos@sha256:bf429d3e6173781f10c858ed81a7f7c23073d9b0ba7ddd1044651d3868fcadba
     classification: C1
     groups:
