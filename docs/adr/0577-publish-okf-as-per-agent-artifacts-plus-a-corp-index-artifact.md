@@ -1,6 +1,6 @@
 # ADR-0577: Publish OKF as per-agent artifacts plus a corp index artifact
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-10-23, WP-159) - see the implementation note below
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -96,6 +96,16 @@ for the release chain. Clauses 1, 2, 4 and 6 stand.
   what keeps an unchanged agent's manifest digest stable across releases.
   The corp manifest carries the release commit, `zuno.okf.release` and
   `zuno.okf.channel`.
+
+## Implementation note (2026-10-23)
+
+Release v0.2.0 of `zuno-demo-agents` is published as eight
+`quay.io/zuno/okf-<agent>` artifacts plus `quay.io/zuno/okf-corp`, whose
+index names each agent by digest; `zuno-demo` pins the corp digest
+(`platform/okf/agents.lock`), admits it (WP-160) and serves it on demo333
+(mcp-gateway's `okf-fetch`, WP-161). Agent content reaches the platform
+only through the corp index; since WP-165 no copy of it remains in
+`zuno-demo`.
 
 ## Consequences
 

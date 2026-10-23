@@ -26,10 +26,12 @@ classification, latency, and a precise outcome - `allowed`, `denied`,
 - **Header:** `X-Zuno-Data-Classification: C1|C2|C3` (optional, default
   `C1`) - the caller's declared classification ceiling for this request.
   Compared against the tool's `min_classification` from
-  `policies/tools/tool-policy.yaml`.
+  the corp `policies/tools/tool-policy.yaml` (from the admitted
+  zuno-demo-agents release, `/okf/policies/...`, WP-165).
 - **Headers:** `X-Zuno-Agent`, `X-Zuno-Task` (both required) - which
   OKF-defined agent and task (`agents/<agent>/agent.okf.md` /
-  `tasks/<task>.md`) is making this call. Missing, unknown, or a
+  `tasks/<task>.md` of the admitted release, extracted at pod start by the
+  `okf-fetch` init container into `/okf/agents`) is making this call. Missing, unknown, or a
   tool absent from that agent/task's declaration all deny the call - the
   gateway fails closed on any invalid policy input.
 - **Body:** a flat JSON object of tool arguments (tool-specific, e.g.

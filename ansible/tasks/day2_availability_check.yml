@@ -1,5 +1,5 @@
 ---
-# ADR-0057 decisions 3 and 5: discovers agents/*/agent.okf.md the same way
+# ADR-0057 decisions 3 and 5: discovers the admitted release's agents the same way
 # ansible/roles/mcp_build/tasks/build.yml discovers
 # components/mcp-servers/*/Dockerfile (ADR-0119/WP-057) - one loop, not a
 # hand-maintained list, so a new agent bundle is checked automatically

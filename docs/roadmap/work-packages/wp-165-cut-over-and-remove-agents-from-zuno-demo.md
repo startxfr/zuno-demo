@@ -1,6 +1,6 @@
 # WP-165: Cut over and remove agents from zuno-demo
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md), [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md), [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)
 - **Depends on:** [WP-161](wp-161-fetch-okf-content-at-pod-start.md), [WP-162](wp-162-keyless-okf-verification-in-unifai-operator.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
 - **Related:** [ADR-0106](../../adr/0106-enforce-okf-bundle-signing-and-validation.md), [ADR-0535](../../adr/0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md), [WP-51](wp-51-adaptation-hooks-conformance.md)
@@ -9,6 +9,54 @@
 
 > The payoff, and the only irreversible step. It starts only after WP-156
 > (no baked consumer left) and a live parity proof.
+
+## Progress (2026-10-23)
+
+Step 1 is done: on 2026-10-23 the runtime files, frontmatter and corp
+policies of release v0.2.0 were byte-identical to the `agents/` mirror
+(only the generated authorization-matrix body of `agent.okf.md` differed,
+documentation only). Steps 2 to 4 are done on branch
+`prep/wp165-cutover`, nothing deployed:
+
+- **Readers switched.** One helper, `platform/okf/release_cache.py`,
+  verifies the locked digest offline (through `admit_okf_bundle.extract`)
+  and extracts it once into the gitignored `.cache/okf-release/<digest>/`
+  (`current` link for kustomize; `ZUNO_OKF_RELEASE_DIR` override).
+  `check_docs.py`, `check_knowledge_refs.py`, `generate_quota_enforcement.py`
+  (`--release-dir`), `generate_stack_config.py`, `evaluations/*` (through
+  `evaluations/common/okf_release.py`), the mcp-gateway tests, the
+  acceptance-gate and stresstest `configMapGenerator`s (refreshed by
+  `ansible/tasks/okf_release_cache.yml`), the Day 2 agents check
+  (admission plus the catalog check against the release), the stresstest
+  contract layer (the release's contract-tests attestation) and the
+  scaffold (evaluation half only) read the release. The AAP execution
+  environment gains `oras`; `lint.yml` jobs install `cosign`/`oras`;
+  `okf-promote.yml` also regenerates the quota files.
+- **Images.** mcp-gateway bakes neither agents nor the tool policy;
+  `okf-fetch` is unconditional in `ansible/roles/mcp`. ai-gateway (the
+  model-routing policy) and mlops (agents, corp policies) read the release
+  at build time in an `okf-release` stage (ADR-0580 amendment of
+  2026-10-23), proven with podman on public bases: the baked routing
+  policy is byte-identical to the release's and to the old copy.
+- **Deleted.** `agents/`, `policies/{tools,knowledge,quotas,model-routing,
+  guardrails}/`, `platform/okf/schema/`, the moved OKF scripts,
+  `generate_deployment_snapshot.py`, the mirror check, and the Transit
+  chain (`make d3 sign agents`, `day3_sign.yml`, the signing Job and
+  `sign-okf-bundles`, `verify_okf_signatures.yml`,
+  `publish_okf_bundles.yml`, `sign_okf_bundle.py`, `publish_okf_bundle.py`,
+  the `zuno/okf-signatures` Vault policy path, the vault role's key
+  export, the `zuno-day3-sign` AAP Job Template).
+- **Kept on purpose.** The Transit public key, frozen in
+  `ansible/roles/unifai/files/`, for the pre-release bundles the `unifai`
+  role still verifies with `publicKeyRef` until WP-164 makes released
+  bundles the only path.
+
+Left for the operator: rebuild the AAP execution environment (oras;
+`make d1 build aap-execution-environment`), supply-chain-signer, ai-gateway
+(`make d1 build`) and mlops (`make d2 build mlops`); re-run
+`make d0 install aap-config` and delete the live `zuno-day3-sign` Job
+Template, which the role no longer declares; a full promotion cycle
+(acceptance below).
 
 ## Goal
 

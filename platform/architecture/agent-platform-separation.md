@@ -30,7 +30,9 @@ Each agent is the same four ingredients, filled in differently:
 
 1. **OKF definition** - `agents/<name>/agent.okf.md`, an OKF v0.2 Markdown
    bundle (ADR-0038) conforming to
-   `platform/okf/schema/zuno-okf-v0.2.schema.json` (ADR-0005, ADR-0006),
+   `platform/okf/schema/zuno-okf-v0.2.schema.json` (ADR-0005, ADR-0006) -
+   since WP-165 both live in startxfr/zuno-demo-agents (ADR-0576) and reach
+   this platform as the release pinned in `platform/okf/agents.lock`,
    with tasks as individually linked Markdown documents under
    `agents/<name>/tasks/*.md` (`zuno-okf-task-v0.2.schema.json`). Declares
    the agent's tasks, allowed tools per task, model/classification hint,

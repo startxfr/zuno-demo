@@ -76,7 +76,7 @@ credentials:
 # creation, mirroring the existing credential-attachment pattern (the
 # JobTemplate CRD documents neither field - WP-073). Entries with no
 # `surveyComponents` (day3 test/stresstest, whose component is resolved
-# dynamically from agents/*/agent.okf.md, never a fixed list - see
+# dynamically from the admitted agents release, never a fixed list - see
 # Makefile's DAY3_TEST_COMPONENTS comment) still get
 # `ask_variables_on_launch: true` with a free-text survey field instead of
 # a choice list.

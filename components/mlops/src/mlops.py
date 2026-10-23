@@ -320,7 +320,8 @@ class MlopsConfig:
     evaluations_dir: str
     # WP-087 phase 2: the tool-probe half reads the target task's own
     # prompt body from agents/<agent>/tasks/<task>.md, which the image
-    # already carries (Containerfile COPY agents).
+    # carries from the verified agents release (Containerfile okf-release
+    # stage, WP-165).
     agents_dir: str
 
     # ADR-0301 point 3 / D5 (docs/adr/0301, 0302 dated progress notes):
@@ -1251,7 +1252,7 @@ def _load_tool_probes(config: MlopsConfig) -> Optional[Dict[str, Any]]:
     Absent is legitimate: only agents whose tasks bind model-facing tools
     have a probe set, and a grounding-domain run has none at all. The file
     carries the tool SCHEMAS as well as the probes, because the mlops image
-    ships evaluations/ and agents/ but not components/agent-runtime - a
+    ships evaluations/ and the released agents/ but not components/agent-runtime - a
     drift test in evaluations/tests/ is what keeps the copy honest.
     """
     path = Path(config.evaluations_dir) / config.agent / "tool_probes.yaml"

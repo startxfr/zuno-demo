@@ -34,7 +34,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.9 | 9 | 6 | 8 | WP-145 |
 | v0.10 | 5 | 1 | 6 | WP-51 |
 | v0.11 | 16 | 11 | 14 | WP-146, WP-147, WP-149, WP-150, WP-154, WP-156, WP-157, WP-166, WP-168 |
-| v0.12 | 9 | 9 | 9 | WP-161, WP-163, WP-164, WP-165, WP-167 |
+| v0.12 | 9 | 6 | 9 | WP-161, WP-163, WP-164, WP-165, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -946,11 +946,11 @@ frozen mirror.
 | WP-158 | [wp-158](work-packages/wp-158-bootstrap-the-zuno-demo-agents-repository.md) | 0576 | none | Done | repository, rulesets, quay.io repositories and robot, release GitHub App in place; releases v0.1.0, v0.1.1, v0.2.0 cut from it |
 | WP-159 | [wp-159](work-packages/wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md) | 0577, 0578 | WP-158 | Done | publish.yml published and signed keyless v0.1.1 and v0.2.0 (per-agent and corp artifacts on quay.io) |
 | WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Done | v0.2.0 admitted offline and pinned in platform/okf/agents.lock by okf-promote (target branch devel) |
-| WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Operator pending | live and durable on demo333 since 2026-10-23 (okf-fetch on supply-chain-signer:latest built from devel); mlops stays baked until WP-165 |
+| WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Operator pending | live and durable on demo333 since 2026-10-23 (okf-fetch on supply-chain-signer:latest built from devel); mlops and ai-gateway read the release at build time since WP-165 (ADR-0580 amendment) |
 | WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Done | operator 0.1.25 on stable; five agents of release v0.1.1 verified keyless on demo333 |
 | WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Repo work in review | schemas, corp ceilings and the narrowing rule built (agents repo + admission); bundle migration waits for unifai-operator v0.3 and WP-156 |
 | WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator (part 1); unifai role and Keycloak groups Job wired and live on demo333 (part 2); quotas/MaaS/routing wait for WP-157 |
-| WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Not started | parity proof on the running cluster, outside any demo freeze |
+| WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Repo work in review | parity proven 2026-10-23; readers switched to the admitted release (`platform/okf/release_cache.py`), `agents/`, moved policies and the OKF Transit chain deleted; rebuild ai-gateway/mlops/EE/signer and a full promotion cycle pending |
 | WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Not started | split out of WP-156 by user decision 2026-10-23: rag-service and rag-ingestion stay for the Red Hat docs until this lands |
 | WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Done | live on demo333 2026-10-23 (89ec9fba): five eval-* personas; harnesses switched (86ef03e4); platform/keycloak/tests now run in CI |
 
@@ -999,7 +999,7 @@ WP-50's.
 | WP-48 | [wp-48](work-packages/wp-48-okf-repo-bootstrap.md) | 0506 (start) | WP-44, WP-45, WP-46 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-158) |
 | WP-49 | [wp-49](work-packages/wp-49-pinned-ref-builds.md) | 0507 | WP-48 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-160) |
 | WP-50 | [wp-50](work-packages/wp-50-okf-extraction-cutover.md) | 0506+0507 (close) | WP-49 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-165) |
-| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-160 (was WP-49, abandoned) | Not started | none (deploys ride the next rollout) |
+| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-160 (was WP-49, abandoned) | Not started | none (re-scoped 2026-10-23 to mcp-gateway, the ADR-0581 generator and mlops; fixtures from the admitted release) |
 
 ### Phase 35 — OKF: live reconciliation
 

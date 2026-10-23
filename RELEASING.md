@@ -1,6 +1,8 @@
-# Releasing (ADR-0115, ADR-0549)
+# Releasing (ADR-0115, ADR-0549, ADR-0580)
 
 **Three independent, parallel image paths exist — don't conflate them.**
+Agent definitions are released separately again, outside this repository —
+see [Agents release](#agents-release-adr-0576-adr-0580) at the end.
 
 Deploying to a live cluster (`make day0|d0`, `make day1|d1`) only uses the
 first path and never needs anything below this note.
@@ -124,3 +126,43 @@ Subsequent releases repeat steps 1-7 with the next tag.
 chart version (`targetRevision: "0.28.1"`, a third-party chart release,
 not this repository's own) — the same pattern this process brings to
 every other Application.
+
+## Agents release (ADR-0576, ADR-0580)
+
+Agent bundles and the corp policies that bound them (tools, knowledge,
+quotas, model routing, guardrails, limits, the model catalog) are not in
+this repository. They are released by
+[startxfr/zuno-demo-agents](https://github.com/startxfr/zuno-demo-agents)
+(its own `RELEASING.md`): a `v*` tag publishes one OCI artifact per agent
+plus a corp index artifact to `quay.io/zuno`, signed keyless by that
+repository's release workflow (ADR-0577, ADR-0578).
+
+This platform runs exactly one release, pinned by digest in
+`platform/okf/agents.lock` — the only file here that names an agents
+version. A release reaches a cluster in four steps:
+
+1. **Promotion PR.** `.github/workflows/okf-promote.yml` (scheduled, or run
+   by hand with a tag) finds a release newer than the lock, verifies it
+   offline (`platform/supply-chain/admit_okf_bundle.py`: keyless
+   signatures of the release workflow, contract-tests attestations, the
+   committed Sigstore trust root), checks this platform can serve it, moves
+   the lock, regenerates `platform/okf/stack-config.generated.yaml` and the
+   quota files, and opens a PR with a semantic diff. By hand:
+   `make d3 admit agents RELEASE=vX.Y.Z UPDATE_LOCK=1`, then
+   `python3 platform/okf/generate_stack_config.py` and
+   `python3 platform/okf/generate_quota_enforcement.py`.
+2. **Review and merge.** CI re-verifies the locked release
+   (`lint.yml`, `okf-release` job) and checks every generated file.
+3. **Roll.** Re-run the consumers: `make d2 install mcp` (the okf-fetch
+   init container of mcp-gateway pulls the new digest at pod start),
+   `make d2 install unifai` (UnifaiAgentBundles), `make d0 install
+   keycloak` (the group reconcile Job). ai-gateway (model-routing policy) and mlops
+   (agents, corp policies) read the release at build time: rebuild them
+   (`make d1 build ai-gateway`, `make d2 build mlops`).
+4. **Check.** `make d2 check agents` admits the lock again and runs the
+   acceptance gate against the release's bundles.
+
+Nothing under `agents/` is ever edited here: there is no such directory.
+Locally, `python3 platform/okf/release_cache.py` extracts the locked release
+once into `.cache/okf-release/<digest>/` (gitignored) for any reader that
+needs it; it needs `cosign` and `oras`.

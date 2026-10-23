@@ -1,6 +1,6 @@
 # ADR-0576: Extract agent definitions and corp policies into the zuno-demo-agents repository
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-10-23, WP-158 and WP-165) - see `platform/okf/agents.lock`, `platform/okf/release_cache.py` and the implementation note below
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -136,6 +136,29 @@ only link is that `zuno-demo` consumes a release. Every other clause stands.
   `/home/cl/ClaudeCode/zuno-demo-agents` (WP-158). The extraction also
   regenerated the authorization matrices, which in `zuno-demo` had not
   picked up the `ocp-ai-ops` group `tool-policy.yaml` already allowed.
+
+## Implementation note (2026-10-23) - the cutover (WP-165)
+
+- **Clause 1.** `startxfr/zuno-demo-agents` is the only source: `agents/`,
+  `policies/{tools,knowledge,quotas,model-routing,guardrails}/`,
+  `platform/okf/schema/`, `generate_authorization_matrix.py`,
+  `validate_quota_policy.py`, `run_agent_contract_tests.py` and
+  `platform/supply-chain/validate_okf_bundle.py` are deleted from
+  `zuno-demo` (each present in the agents repository). `scaffold_agent.py`
+  keeps only its platform half, the evaluation skeleton.
+- **Clause 2.** `policies/{data-classification,optimization,database}/`,
+  the model catalog, the bindings and `evaluations/` stay.
+- **Clause 3.** `agents/*/deployment/` is dropped rather than kept: the
+  per-agent charts it mirrored were retired by WP-156, and with them
+  `generate_deployment_snapshot.py`. The Transit public key left the OKF
+  path; a frozen copy serves only the pre-release bundles the `unifai`
+  role still verifies with `publicKeyRef` (`ansible/roles/unifai/files/`)
+  until WP-164 makes released bundles the only path.
+- **Clause 6.** The frozen mirror and its check
+  (`platform/okf/check_agents_mirror.py`) are gone: every reader takes the
+  admitted release instead, through one helper,
+  `platform/okf/release_cache.py`, which verifies and extracts the locked
+  digest once into the gitignored `.cache/okf-release/`.
 
 ## Consequences
 

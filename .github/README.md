@@ -1,6 +1,6 @@
 # .github
 
-This repository's CI implementation - two workflows now exist (earlier
+This repository's CI implementation - three workflows now exist (earlier
 ADRs referencing ".github/workflows/ doesn't exist yet" predate this):
 
 - **`workflows/lint.yml`** - static checks needing no live cluster,
@@ -10,7 +10,17 @@ ADRs referencing ".github/workflows/ doesn't exist yet" predate this):
   chart, the standalone Python test suites (`components/mcp-gateway/`,
   `components/ai-gateway/`, `components/rag-service/tests/`, ...), and an `ansible-playbook --syntax-check`
   pass over every playbook. Runs on every pull request and every push to
-  `main`.
+  `main`. Agent definitions and the corp policies are not in this
+  repository (ADR-0576, WP-165): the jobs that read them (policy-as-code,
+  python, quality-gate) install `cosign` and `oras` and extract the release
+  pinned in `platform/okf/agents.lock` with
+  `platform/okf/release_cache.py`, and the `okf-release` job re-verifies
+  that release offline and checks the files generated from it.
+- **`workflows/okf-promote.yml`** - promotes a zuno-demo-agents release
+  (ADR-0580): verifies it, moves `platform/okf/agents.lock`, regenerates
+  the stack configuration and quota files, and opens a pull request with
+  a semantic diff. Scheduled, and runnable by hand with a release tag. See
+  `RELEASING.md`'s "Agents release".
 - **`workflows/build-publish.yml`** - builds every component
   image, publishes to Quay with an immutable `sha-<commit>` tag (plus the
   semantic version tag on an actual `v*` release tag push), generates an

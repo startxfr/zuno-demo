@@ -36,7 +36,9 @@ never **how** or **where** that knowledge is physically stored.
 
 `platform/docs/check_knowledge_refs.py` (run from the repository root)
 validates every descriptor against `metadata-schema.yaml`'s shape and scans
-`agents/**` + `policies/**` for `knowledge.*` references, failing on any
+the admitted agents release's `agents/**` and `policies/**` (WP-165:
+`platform/okf/release_cache.py`) plus this repository's `policies/**` for
+`knowledge.*` references, failing on any
 reference to a domain not declared here. It is wired as a blocking CI check
 (`.github/workflows/lint.yml`), mirroring `platform/docs/check_docs.py`.
 

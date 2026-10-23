@@ -10,10 +10,46 @@
   names is now `startxfr/zuno-demo-agents` (ADR-0576) and the consumers
   left after WP-156 are mcp-gateway, mlops, `unifai-operator` and the
   ADR-0581 generator. Re-scope Parts A-C to those before starting.
-- **Estimated files touched:** ~8 (A, in zuno-okf) + ~10 (B) + ~12 (C)
+- **Re-scoped (2026-10-23, WP-165):** done below. agent-frontend,
+  agent-bff and agent-runtime are retired (WP-156); `zuno-okf` was never
+  created; the fixtures and the schema version come from the agents
+  repository and reach this platform inside the admitted release. The
+  original parts are kept below as history, superseded by this re-scope.
+- **Estimated files touched:** ~6 (A, in zuno-demo-agents) + ~8 (B, in
+  zuno-demo); the `unifai-operator` hook (`internal/okf/`, ADR-0575) is
+  that fork's own work.
 
-> Execute this brief as a standalone task. Parts are independently
-> committable; Part A lands in zuno-okf, Parts B/C in zuno-demo.
+## Re-scoped plan (2026-10-23)
+
+The OKF readers left in `zuno-demo` after the cutover (WP-165):
+
+| Reader | Hook | Reads |
+|---|---|---|
+| mcp-gateway | `components/mcp-gateway/app/agent_declarations.py` | agents, tasks (entitlement factors) |
+| ADR-0581 generator and admission | `platform/supply-chain/admit_okf_bundle.py` (`agents_view`, `frontmatter`), `platform/okf/generate_stack_config.py` | agents, tasks, corp policies |
+| mlops | `components/mlops/src/mlops.py` (task prompts) and the evaluation gates | agents, corp policies |
+| evaluations | `evaluations/common/okf_release.py` (path only), the per-agent `security_checks.py` | agents, corp policies |
+
+- **Part A (zuno-demo-agents):** a `conformance/` fixture set (valid
+  bundles of each graph shape, invalid and security-negative bundles, each
+  with its expected parse result), published inside the release or as its
+  own attested artifact, and the OKF schema versions the release declares
+  (`okfVersion` in `okf-index.json`).
+- **Part B (zuno-demo):** each reader above confines its OKF reads to its
+  hook; a fixture-driven test per hook against the fixtures of the
+  admitted release (through `platform/okf/release_cache.py`); a startup
+  version check against the schema versions the hook supports (mcp-gateway
+  at load, the generator and admission at run); a grep-level CI lint that
+  OKF file reads appear only under the hook paths. No shared parsing
+  library (ADR-0508 clause 4).
+
+Acceptance: every hook's fixture test green against the locked release;
+flipping one expected result fails the right hook only; an unsupported
+`okfVersion` fails each reader fast with a named error; `check_docs.py`
+passes.
+
+The sections below are the original 2026-08-18 plan, superseded by this
+re-scope.
 
 ## Goal
 

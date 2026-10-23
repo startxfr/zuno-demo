@@ -23,16 +23,20 @@ or task prefers which one.
 classification permits) and their default fallback order (top-to-bottom
 list order). It has no notion of any particular agent or task.
 
-`policies/model-routing/model-routing-policy.yaml` (see its own README)
-is the layer above it: per-`(agent, task)` **preference** (`preferences:`,
+`policies/model-routing/model-routing-policy.yaml`, a corp policy of the
+zuno-demo-agents release pinned in `platform/okf/agents.lock` (ADR-0576,
+ADR-0580), is the layer above it: per-`(agent, task)` **preference** (`preferences:`,
 ADR-0412) — an ordered reorder of the already-eligible candidates, never
 able to add one eligibility filtered out — and per-`(agent, task)`
 **adapter** (`adapters:`, ADR-0303). It ships baked into the gateway
-image, a deliberately separate lifecycle from this ConfigMap.
+image - read from the verified release at build time by the Dockerfile's
+`okf-release` stage since WP-165 - a deliberately separate lifecycle from
+this ConfigMap.
 
-An agent's OKF bundle (`agents/<agent>/agent.okf.md`) never names a
-specific model — its `zuno.model.preferred_classification` only sets the
-eligibility ceiling (schema: `platform/okf/schema/zuno-okf-v0.2.schema.json`,
+An agent's OKF bundle (`agents/<agent>/agent.okf.md` in the release) never
+names a specific model — its `zuno.model.preferred_classification` only
+sets the eligibility ceiling (schema: zuno-demo-agents'
+`platform/okf/schema/zuno-okf-v0.2.schema.json`,
 `model` property — *"the data-classification ceiling... not a specific
 model name"*). This mirrors `knowledge/README.md`'s domain-descriptor
 pattern deliberately: ADR-0038's Evolution note and ADR-0202 both reject a
@@ -42,4 +46,5 @@ agents reference by name/classification, not by duplicating entries.
 The effective per-task model chain (reference model + fallback,
 resolved from both files together) is rendered — generated, never
 hand-authored — into each agent's `agent.okf.md` "Model routing" section
-by `platform/okf/generate_authorization_matrix.py` (ADR-0503).
+by zuno-demo-agents' `platform/okf/generate_authorization_matrix.py`
+(ADR-0503).

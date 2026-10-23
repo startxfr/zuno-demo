@@ -141,59 +141,32 @@ See [RELEASING.md](../../RELEASING.md)'s path 3 and
 [docs/adr/0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md](../../docs/adr/0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md)
 for the full design.
 
-## sign_okf_bundle.py / validate_okf_bundle.py (WP-05, mechanism replaced by WP-069/ADR-0420)
+## admit_okf_bundle.py / okf_narrowing.py (ADR-0578, ADR-0580)
 
-OKF agent bundle signing and validation (`agents/<agent>/`), applied to a
-directory of Markdown/YAML instead of an OCI image.
-
-`sign_okf_bundle.py` computes a canonical sha256 digest over a bundle
-tree (sorted `relative_path:content_hash` pairs) and signs/verifies it
-with `cosign sign-blob`/`verify-blob`, backed by the in-cluster Vault
-Transit key `sign_in_cluster.py` authenticates to (ADR-0420), not keyless
-GitHub OIDC/Fulcio/Rekor:
-
-```bash
-python3 platform/supply-chain/sign_okf_bundle.py digest agents/tekos
-python3 platform/supply-chain/sign_okf_bundle.py sign agents/tekos --output-dir /tmp/sigs
-python3 platform/supply-chain/sign_okf_bundle.py verify agents/tekos \
-    --signature /tmp/sigs/tekos.sig \
-    --public-key agents/zuno-platform-signer.pub
-```
-
-`sign` needs `VAULT_ADDR`/`VAULT_TOKEN` in the environment and can only
-succeed against a reachable in-cluster Vault, not in a local sandbox or
-CI; `verify` needs only the bundle, its signature, and the committed
-public key above - no Vault access, no network. The actual multi-bundle
-signing run is orchestrated by `sign_in_cluster.py sign-okf-bundles`
-(baked into the `supply-chain-signer` image), triggered by
-`ansible/tasks/run_okf_signing_job.yml` as an in-cluster Job
-(`make d3 sign agents`). It writes every `{agent}.sig` plus the
-shared public key straight to Vault KV (`zuno/okf-signatures`) - no
-GitHub Actions artifact, no manual "download and commit" step (the gap
-ADR-0106's 2026-08-21 note originally flagged). Its consumer, agent-runtime,
-was retired by WP-156; the zuno-demo-agents release chain and
-`make d3 admit agents` (ADR-0580) replace this path, removed in WP-165.
-
-`validate_okf_bundle.py` checks two other dimensions - schema validity
-(OKF structure) and policy validity (every declared tool resolves
-against `policies/tools/tool-policy.yaml`, feature-detecting
-`policies/knowledge/knowledge-policy.yaml` once it exists) - entirely
-from the checked-out repo, no signature needed:
+Agent definitions and the corp policies are not in this repository: they
+are the startxfr/zuno-demo-agents release pinned by digest in
+`platform/okf/agents.lock` (ADR-0576, ADR-0580). `admit_okf_bundle.py`
+verifies that release offline - the keyless signatures of the agents
+repository's release workflow and its contract-tests attestation, against
+the committed Sigstore trust root in `platform/okf/sigstore/` (ADR-0578) -
+extracts it, and checks this platform can serve it (`okf_narrowing.py`
+re-checks the OKF v0.3 narrowing rule):
 
 ```bash
-python3 platform/supply-chain/validate_okf_bundle.py [agents/<name> ...]
+make d3 admit agents                                   # the locked release
+make d3 admit agents RELEASE=vX.Y.Z UPDATE_LOCK=1      # admit and pin another
+python3 platform/okf/release_cache.py                  # extract the locked release once into .cache/okf-release/
 ```
 
-Wired into `.github/workflows/lint.yml` as a **hard gate** (unlike the two
-signature-related checks above). Also run by `ansible/roles/agents`' Day
-2 check (`make d2 check agents`).
-
-The Agent Runtime (`components/agent-runtime/app/registry.py`) enforces
-signature verification at startup when `ZUNO_REQUIRE_SIGNED_BUNDLES=true`
-(default `false` - no bundle has a real signature yet), importing
-`sign_okf_bundle.py`'s digest/verify logic directly (baked into the image
-at `app/_sign_okf_bundle.py` by `components/agent-runtime/Dockerfile`,
-which also installs the `cosign` binary).
+Needs `cosign` (v2) and `oras`. Every repository-side reader of agent
+content (check_docs.py, the evaluations, the Ansible checks, the
+acceptance-gate and stresstest ConfigMaps) goes through
+`platform/okf/release_cache.py`; the `okf-fetch` init container of
+mcp-gateway and the `okf-release` build stage of ai-gateway and mlops run
+the same verification. The former Vault Transit chain
+(`sign_okf_bundle.py`, `publish_okf_bundle.py`, `validate_okf_bundle.py`,
+`make d3 sign agents`) was removed in WP-165; schema validation and the
+contract suites run in the agents repository's CI.
 
 Regression-tested (`tests/test_pin_release.py`, run against a throwaway
 copy of the real chart files - never the repository's own state), since

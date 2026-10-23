@@ -15,10 +15,12 @@ the `unifai` Day 2 component from the admitted zuno-demo-agents release
 acceptance and security gate - `day2_check.yml` runs it *instead of*
 `precheck.yml` for this role. It:
 
-1. validates every `agents/*/` OKF bundle's schema and policy references
-   (`platform/supply-chain/validate_okf_bundle.py`) and verifies each
-   bundle's current signature (`ansible/tasks/verify_okf_signatures.yml`);
-2. structurally checks every catalog agent's `agent.okf.md` against its
+1. admits the zuno-demo-agents release pinned in `platform/okf/agents.lock`
+   (`admit_okf_bundle.py admit`: keyless signatures and contract-tests
+   attestations verified offline, every model, tool and knowledge domain
+   bound here - ADR-0578, ADR-0580) and extracts it
+   (`ansible/tasks/okf_release_cache.yml`);
+2. structurally checks every catalog agent's `agent.okf.md` of that release against its
    expected `zuno.status` (`active` for comage/arkos, `placeholder` for
    advantage, finage, naveo, soursage and cognos);
 3. runs the availability check (`ansible/tasks/day2_availability_check.yml`):

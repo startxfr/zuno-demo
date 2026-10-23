@@ -9,6 +9,14 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Supersession (2026-10-23) - WP-165 cuts agents over to zuno-demo-agents
+
+With `agents/`, the moved corp policies and the OKF Vault Transit chain
+removed from `zuno-demo`, ADR-0578 now also supersedes ADR-0106 in part
+(its signing mechanism and verification points); ADR-0106 stays in v0.1 for
+its remaining decision, that no unsigned or invalid OKF content runs.
+ADR-0580 is amended: ai-gateway and mlops read the release at build time.
+
 ## Supersessions (2026-10-23) - WP-156 retires the zuno agent stack
 
 WP-156 removed agent-runtime, agent-bff, agent-frontend and the AIAgent

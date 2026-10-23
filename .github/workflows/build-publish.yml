@@ -74,7 +74,7 @@ jobs:
       matrix:
         include:
           # context: "." means the Dockerfile bakes in files outside its
-          # own component directory (e.g. agents/) and needs the
+          # own component directory (e.g. platform/okf/) and needs the
           # repository root as build context - see each Dockerfile's own
           # header comment for exactly why.
           #
@@ -87,7 +87,8 @@ jobs:
           # the mirror itself points at (see
           # ansible/roles/image_mirrors/tasks/install.yml for the mapping).
           # ADR-0303/WP-39: context changed from "components/ai-gateway" to
-          # "." - the image now bakes in policies/model-routing/, outside
+          # "." - the image bakes in the model-routing policy (from the
+          # verified agents release, WP-165) and policies/optimization/, outside
           # its own component directory.
           - name: ai-gateway
             dockerfile: components/ai-gateway/Dockerfile

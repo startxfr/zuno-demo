@@ -1,6 +1,6 @@
 # ADR-0580: Consume the corp OKF bundle by a single digest pin, promoted by pull request
 
-- **Status:** Accepted
+- **Status:** Partially implemented (2026-10-23, WP-160, WP-161 and WP-165) - see the amendment and implementation note below
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -103,6 +103,36 @@ two life cycles independent: the agents repository must not know
   release's `policies/models/model-catalog.yaml` that its agents may reach
   is bound in `platform/ai-gateway/provider-routing.yaml` (ADR-0576
   amendment).
+
+## Amendment (2026-10-23) - two images read the release at build time
+
+Corrected while `Accepted`, at the cutover (WP-165), when `COPY agents` and
+`COPY policies` had to leave the last two Dockerfiles that still baked
+them. Clauses 1, 2, 3 and 6 stand; clause 4 stands for mcp-gateway.
+
+- **Clauses 4 and 5, ai-gateway and mlops.** Both read the release at
+  build time instead of fetching it at start: an `okf-release` stage
+  installs pinned `cosign` and `oras`
+  (`platform/okf/install_release_tools.py`) and runs
+  `platform/okf/release_cache.py`, which verifies the locked digest offline
+  exactly as admission does and extracts it; a release that does not
+  verify fails the build. mlops has no Deployment to carry an init
+  container (KFP pipeline components and a TrainingRuntime run the image)
+  and is rebuilt per training run. ai-gateway bakes only the model-routing
+  policy, and sits in front of every model call: a pod start should not
+  depend on the agents registry. The cost is that a promotion is followed
+  by a rebuild of these two images; ADR-0581's generated, mounted routing
+  file replaces the ai-gateway case once WP-157 reshapes routing.
+
+## Implementation note (2026-10-23)
+
+Live: the lock (clause 1), the first end-to-end promotion PR of v0.2.0
+(clause 2, WP-160), admission (clause 3) and mcp-gateway's `okf-fetch` on
+demo333 (clause 4, WP-161). Repository-side readers, CI and the Ansible
+checks read the admitted release through `platform/okf/release_cache.py`
+(WP-165). Outstanding before `Implemented`: ai-gateway and mlops rebuilt
+from the release on a cluster, and a full promotion cycle (tag, PR, merge,
+roll) with no agent copy left in `zuno-demo`.
 
 ## Consequences
 

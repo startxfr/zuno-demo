@@ -113,10 +113,9 @@ the correct way to add a newly-introduced one. The stale warning survived a
 year of re-reads and actively discouraged a safe operation.
 
 Real residual risks of a `make d0 install vault` re-run, which are not about
-secret rotation: `ansible/roles/vault/tasks/install.yml:335-341` runs
-`git add` + `git commit` in the operator's working tree when the live Transit
-public key differs from `agents/zuno-platform-signer.pub` - on a repository
-several sessions share, that is the one to watch. It also deletes and
+secret rotation (the role's `git add` + `git commit` of the Transit public
+key into the operator's working tree left with the OKF Transit chain in
+WP-165): it deletes and
 recreates the `vault-unseal-configure` Job on every run (idempotent, but it
 re-runs the whole PKI/policy configuration), and hard-fails if
 `ansible/confidential.yml` is absent.

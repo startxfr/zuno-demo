@@ -5,9 +5,10 @@ per-agent declared tools and per-task allowed tools - to enforce the
 agent_declaration and task_rights factors of the ADR-0011 intersection.
 
 Deliberately a separate, smaller module rather than importing Agent
-Runtime's registry: the two services are independently deployed/versioned
-and each bakes its own copy of agents/ into its own image (see Dockerfile),
-matching this repo's established convention of duplicating small
+Runtime's registry (retired in WP-156): the bundles are read from
+AGENTS_DIR, which since WP-165 is the admitted zuno-demo-agents release the
+okf-fetch init container extracts at pod start (/okf/agents, see the
+Dockerfile and gitops/charts/mcp-gateway), matching this repo's established convention of duplicating small
 well-specified parsing code across services rather than sharing a module
 (see components/agent-bff/README.md's "Why standard library only" for the
 same reasoning applied to JWKS parsing).

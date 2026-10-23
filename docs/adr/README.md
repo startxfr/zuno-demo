@@ -157,7 +157,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0101](0101-provide-ha-for-shared-agent-platform-services.md) | Implemented | Provide HA for shared agent platform services |
 | [ADR-0102](0102-target-99-9-percent-platform-availability.md) | Implemented | Target 99.9 percent platform availability |
 | [ADR-0104](0104-introduce-controlled-semantic-caching.md) | Implemented | Introduce controlled semantic caching |
-| [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | Superseded in part by ADR-0564 | Enforce OKF bundle signing and validation |
+| [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | Superseded in part by ADR-0564 and ADR-0578 | Enforce OKF bundle signing and validation |
 | [ADR-0107](0107-introduce-automated-model-quality-gates.md) | Implemented | Introduce automated model quality gates |
 | [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | Implemented | Automate model evaluation with LM-Eval |
 | [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | Implemented | Implement source freshness and trust scoring |
@@ -338,11 +338,11 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md) | Accepted | Extract agent definitions and corp policies into the zuno-demo-agents repository |
-| [ADR-0577](0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md) | Accepted | Publish OKF as per-agent artifacts plus a corp index artifact |
-| [ADR-0578](0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md) | Accepted | Sign OKF artifacts keyless with GitHub OIDC and verify them offline by identity |
+| [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md) | Implemented | Extract agent definitions and corp policies into the zuno-demo-agents repository |
+| [ADR-0577](0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md) | Implemented | Publish OKF as per-agent artifacts plus a corp index artifact |
+| [ADR-0578](0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md) | Implemented | Sign OKF artifacts keyless with GitHub OIDC and verify them offline by identity |
 | [ADR-0579](0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md) | Accepted | Extend OKF to v0.3 with skills, model roles, guardrails and limits |
-| [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Accepted | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
+| [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Partially implemented | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
 | [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Accepted | Derive stack configuration from the admitted corp bundle |
 | [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Accepted | Serve a per-agent entry and descriptive sheet from the admitted bundle |
 | [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Accepted | Require group visibility and object-level authorisation before per-agent entries |

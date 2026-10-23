@@ -1,10 +1,10 @@
 # ADR-0578: Sign OKF artifacts keyless with GitHub OIDC and verify them offline by identity
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-10-23, WP-159, WP-160, WP-162 and WP-165) - see the implementation note below
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
-- **Supersedes:** [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) in part (the Transit signature of clause 1 as amended on 2026-10-17, and `spec.verify.publicKeyRef` as the only verification mode of clause 2)
+- **Supersedes:** [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) in part (the Transit signature of clause 1 as amended on 2026-10-17, and `spec.verify.publicKeyRef` as the only verification mode of clause 2), [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) in part (the signing mechanism and where verification runs; recorded 2026-10-23, WP-165)
 - **Related:** [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md), [ADR-0115](0115-use-immutable-and-verifiable-software-supply-chain-artifacts.md), [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md), [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md), [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md), [ADR-0577](0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md), [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)
 
 ## Context
@@ -107,6 +107,30 @@ and 7 stand.
   (`zuno-release-bot`), enforced by a tag ruleset on `v*` and `*-v*` that
   also forbids moving or deleting them; `stable` likewise. This replaces
   "maintainers only" in the security considerations.
+
+## Implementation note (2026-10-23)
+
+- **Clauses 1 to 4.** The release workflow of `zuno-demo-agents` signs
+  every artifact keyless and attaches the contract-tests attestation
+  (WP-159); `platform/supply-chain/admit_okf_bundle.py` verifies both
+  offline by identity against `platform/okf/sigstore/` (WP-160), in CI, in
+  `make d3 admit agents`, in mcp-gateway's `okf-fetch` init container and,
+  since WP-165, in the build stage of the ai-gateway and mlops images.
+- **Clause 5.** Removed in WP-165: `make d3 sign agents`, `day3_sign.yml`,
+  the signing Job and its `sign-okf-bundles` operation, the
+  `zuno/okf-signatures` Vault policy path, `sign_okf_bundle.py`,
+  `publish_okf_bundle.py`, `verify_okf_signatures.yml` and the vault
+  role's export of the public key. The Transit key stays for
+  `sign-blob`/`verify-blob` (ADR-0535).
+- **Clause 6.** `unifai-operator` verifies keyless bundles (WP-162). The
+  `unifai` role still passes `publicKeyRef` for pre-release bundles pinned
+  by hand, from a frozen copy of the Transit public key
+  (`ansible/roles/unifai/files/`), until WP-164 makes the released,
+  keyless bundles the only path.
+- **ADR-0106.** Its signing mechanism (keyless CI signing of bundle
+  directories, later Transit) and its verification points are replaced by
+  this record; its requirement that nothing unsigned or invalid runs
+  stands, now met by admission.
 
 ## Consequences
 

@@ -89,8 +89,8 @@ lightspeed:
   # It exists because a standard MCP client carries no OKF bundle and so cannot
   # satisfy ADR-0011's agent_declaration/task_rights factors. This replaces them,
   # and is deliberately harder to widen than a bundle would be: changing it is a
-  # values change visible in the Deployment spec, not a Markdown edit under
-  # agents/.
+  # values change visible in the Deployment spec, not a Markdown edit in an
+  # agent bundle (zuno-demo-agents).
   #
   # Keep it read-only. ADR-0524 clause 4's read-only guarantee rests on this
   # list, NOT on the caller's groups - a consultant is entitled to
