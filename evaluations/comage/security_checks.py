@@ -29,7 +29,6 @@ from __future__ import annotations
 import os
 import pathlib
 import sys
-import uuid
 from dataclasses import dataclass
 
 import httpx
@@ -50,7 +49,7 @@ os.environ.setdefault("TASK_NAME", "check-deal-status")
 # directory, not only when run_acceptance_gate.py's dynamic loader has
 # already put evaluations/tekos/ on sys.path for us.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers, MCP_GATEWAY_URL, TARGET, TASK_NAME, _unifai  # noqa: E402
+from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _invoke_tool, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
 try:
@@ -62,7 +61,7 @@ except ImportError:
 _LOG_AGENT = AGENT
 
 # Not part of run_scenarios.py's URL set since none of the 20 fixed
-# scenarios call ai-gateway directly (only agent-runtime does, internally).
+# scenarios call ai-gateway directly (only the agents do, internally).
 AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080")
 
 # Same reasoning: only the MCP Gateway calls this directly in normal
@@ -82,55 +81,6 @@ class CheckResult:
     passed: bool
     detail: str = ""
     skipped: bool = False
-
-
-def bff_forwards_identity_to_runtime() -> CheckResult:
-    """ADR-0032: the BFF must forward the validated end-user bearer token to
-    the Agent Runtime, which requires one (app/auth.py:validate_token) and
-    rejects calls without it. Before this ADR's fix, every BFF -> Runtime
-    call was unauthenticated and the Runtime would have rejected it with
-    401, surfaced to the client as a 502 from the BFF - so a 200 here with a
-    real reply is direct evidence the token now reaches the Runtime.
-    """
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers("sale-01"),
-        json={"session_id": "sec-check-1", "message": "What's the status of the Acme Renewal deal?"},
-        timeout=30,
-    )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult(
-        "bff_forwards_identity_to_runtime",
-        ok,
-        f"status={resp.status_code} body={resp.text[:200]}",
-    )
-
-
-def runtime_ignores_mismatched_user_sub() -> CheckResult:
-    """ADR-0033: a request body's user_sub is informational only - the
-    Runtime must derive the authoritative subject from the validated token,
-    not this field. Submitting a token for a real persona (sale-01)
-    with a body user_sub claiming to be an unrelated, nonexistent identity
-    must not be rejected or otherwise change the outcome (impersonation via
-    the body field is impossible because the field is never trusted).
-    """
-    forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
-    resp = httpx.post(
-        f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-        headers=auth_headers("sale-01"),
-        json={
-            "session_id": "sec-check-2",
-            "user_sub": forged_sub,
-            "message": "What's the status of the Acme Renewal deal?",
-        },
-        timeout=30,
-    )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult(
-        "runtime_ignores_mismatched_user_sub",
-        ok,
-        f"status={resp.status_code} forged_sub={forged_sub} body={resp.text[:200]}",
-    )
 
 
 def salesforce_policy_is_c2() -> CheckResult:
@@ -249,28 +199,6 @@ def entitlement_without_business_role_denied_salesforce() -> CheckResult:
     )
 
 
-def business_role_without_entitlement_denied_by_bff() -> CheckResult:
-    """ADR-0040: the converse case. sales-role-only-user-01 holds the
-    sales business role (would pass the MCP Gateway's group check for
-    salesforce.opportunity.read) but lacks agent_comage entitlement. The
-    BFF's server-side entitlement check (components/agent-bff/main.go)
-    must deny the call with 403 before it ever reaches the Agent Runtime,
-    proving business role alone never substitutes for agent entitlement.
-    """
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers("sales-role-only-user-01"),
-        json={"session_id": "sec-check-3", "message": "What's the status of the Acme Renewal deal?"},
-        timeout=30,
-    )
-    ok = resp.status_code == 403
-    return CheckResult(
-        "business_role_without_entitlement_denied_by_bff",
-        ok,
-        f"status={resp.status_code} body={resp.text[:200]}",
-    )
-
-
 def direct_call_to_salesforce_mcp_denied_without_gateway_token() -> CheckResult:
     """ADR-0037's mandatory acceptance test, exercised against Comage's own
     new MCP server this time (components/mcp-servers/salesforce): a call
@@ -301,110 +229,44 @@ def direct_call_to_salesforce_mcp_denied_without_gateway_token() -> CheckResult:
     )
 
 
-def comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests() -> CheckResult:
-    """Policy update (post-ADR-0516): Comage is the only agent still
-    declaring `image.generation.create` (SDXL/photorealistic), and even
-    here it's scoped to genuine marketing-visual requests only -
-    agents/comage/prompts/check-deal-status.md's system prompt is where
-    that scope is actually enforced (Comage has only the one live-routed
-    task, so there's no OKF task-declaration boundary to check the way
-    Arkos/Tekos have - see evaluations/tekos/gate_checks.py's
-    arkos_declares_no_photorealistic_image_generation_capability for that
-    pattern). This is a live/behavioral check only, no static
-    counterpart: a plain deal-status/chart ask must never return a
-    photorealistic (image/png) result, while an explicit marketing-visual
-    ask is allowed to.
-    """
-    chart_resp = httpx.post(
-        f"{RUNTIME_URL}/v1/agents/comage/chat",
-        headers=auth_headers("sale-01"),
-        json={
-            "session_id": "sec-check-8",
-            "user_sub": "sale-01",
-            "message": "Show me a chart of this quarter's pipeline by stage.",
-        },
-        # 120s, not 30s: this turn round-trips a real image generation
-        # (ADR-0415 routes it to SDXL on OVHcloud), and the platform's own
-        # BFF timeout for the chat path is already 110s. A 30s client
-        # timeout could therefore never observe a successful generation -
-        # it reported "timed out" as a MANDATORY security failure while
-        # the platform was behaving exactly as designed. Raised to sit
-        # just above the BFF's own ceiling, so a turn that still exceeds
-        # it is a genuine problem rather than this check's impatience.
-        timeout=120,
-    )
-    chart_images = chart_resp.json().get("images", []) if chart_resp.status_code == 200 else []
-    chart_ok = chart_resp.status_code == 200 and all(
-        img.get("mime_type") != "image/png" for img in chart_images
-    )
-
-    marketing_resp = httpx.post(
-        f"{RUNTIME_URL}/v1/agents/comage/chat",
-        headers=auth_headers("sale-01"),
-        json={
-            "session_id": "sec-check-9",
-            "user_sub": "sale-01",
-            "message": "Generate a promotional marketing image of a modern sales team celebrating a big win.",
-        },
-        # 120s, not 30s: this turn round-trips a real image generation
-        # (ADR-0415 routes it to SDXL on OVHcloud), and the platform's own
-        # BFF timeout for the chat path is already 110s. A 30s client
-        # timeout could therefore never observe a successful generation -
-        # it reported "timed out" as a MANDATORY security failure while
-        # the platform was behaving exactly as designed. Raised to sit
-        # just above the BFF's own ceiling, so a turn that still exceeds
-        # it is a genuine problem rather than this check's impatience.
-        timeout=120,
-    )
-    marketing_images = marketing_resp.json().get("images", []) if marketing_resp.status_code == 200 else []
-    marketing_ok = marketing_resp.status_code == 200 and any(
-        img.get("mime_type") == "image/png" for img in marketing_images
-    )
-
-    ok = chart_ok and marketing_ok
-    return CheckResult(
-        "comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests",
-        ok,
-        f"chart_status={chart_resp.status_code} chart_images={[img.get('mime_type') for img in chart_images]} "
-        f"marketing_status={marketing_resp.status_code} marketing_images={[img.get('mime_type') for img in marketing_images]}",
-    )
-
-
-# --target unifai (WP-155 wave 0): the checks tied to the BFF/agent-runtime are replaced by their
-# UnifAI equivalents (shared factories in evaluations/common/unifai_checks.py); the others reach
-# shared services (MCP gateway, ai-gateway, MCP servers) and run unchanged.
-_UNIFAI_REPLACEMENTS = {
-    bff_forwards_identity_to_runtime: unifai_checks.identity_forwarded(
-        CheckResult, _unifai, "sale-01", "What's the status of the Acme Renewal deal?", ("salesforce.opportunity.read",)
-    ),
-    runtime_ignores_mismatched_user_sub: unifai_checks.client_identity_header_refused(CheckResult, _unifai),
-    business_role_without_entitlement_denied_by_bff: unifai_checks.entitlement_denied(
-        CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="sales-role-only-user-01",
-        mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
-    ),
-    comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests: unifai_checks.marketing_image_boundary(
-        CheckResult, _unifai, name="unifai_comage_images_only_for_marketing_visual_requests", persona="sale-01",
-        chart_prompt="Show me a chart of this quarter's pipeline by stage.",
-        marketing_prompt="Generate a promotional marketing image of a modern sales team celebrating a big win.",
-    ),
-}
+# Checks about the agent itself (WP-155 wave 0; UnifAI is the only target since WP-156):
+# ADR-0032/0033/0040 proven through UnifAI's session API, built from the shared factories in
+# evaluations/common/unifai_checks.py. The checks above reach shared services (MCP gateway,
+# ai-gateway, MCP servers) directly.
+unifai_forwards_identity_to_the_gateways = unifai_checks.identity_forwarded(
+    CheckResult, _unifai, "sale-01", "What's the status of the Acme Renewal deal?", ("salesforce.opportunity.read",)
+)
+unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
+business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
+    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="sales-role-only-user-01",
+    mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
+)
+# Policy update (post-ADR-0516): Comage is the only agent still declaring
+# `image.generation.create` (SDXL/photorealistic), scoped by its system prompt
+# (agents/comage/prompts/check-deal-status.md) to genuine marketing-visual requests: a
+# plain chart ask must never produce a photorealistic image, an explicit marketing ask may.
+unifai_comage_images_only_for_marketing_visual_requests = unifai_checks.marketing_image_boundary(
+    CheckResult, _unifai, name="unifai_comage_images_only_for_marketing_visual_requests", persona="sale-01",
+    chart_prompt="Show me a chart of this quarter's pipeline by stage.",
+    marketing_prompt="Generate a promotional marketing image of a modern sales team celebrating a big win.",
+)
 
 
 CHECKS = [
-    bff_forwards_identity_to_runtime,
-    runtime_ignores_mismatched_user_sub,
+    unifai_forwards_identity_to_the_gateways,
+    unifai_ignores_a_client_supplied_identity_header,
     salesforce_policy_is_c2,
     ai_gateway_local_only_forces_local_provider,
     entitlement_without_business_role_denied_salesforce,
-    business_role_without_entitlement_denied_by_bff,
+    business_role_without_entitlement_denied_by_unifai,
     direct_call_to_salesforce_mcp_denied_without_gateway_token,
-    comage_chat_uses_photorealistic_images_only_for_marketing_visual_requests,
+    unifai_comage_images_only_for_marketing_visual_requests,
 ]
 
 
 def run() -> list:
     results = []
-    for check in unifai_checks.select(CHECKS, _UNIFAI_REPLACEMENTS, TARGET):
+    for check in CHECKS:
         try:
             result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
@@ -417,15 +279,13 @@ def run() -> list:
 def main() -> int:
     results = run()
 
-    print(f"target: {TARGET}")
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
         print(f"{'-' if r.skipped else '✓' if r.passed else '✗':<6}{r.name}")
         if (not r.passed or r.skipped) and r.detail:
             print(f"      -> {r.detail}")
 
-    if TARGET == "unifai":
-        _unifai().cleanup()
+    _unifai().cleanup()
     if all(r.passed for r in results if not r.skipped):
         print("\nRESULT: PASS")
         return 0

@@ -17,9 +17,10 @@ runs it explicitly:
 ```bash
 cd evaluations/naveo
 pip install -r requirements.txt
+export UNIFAI_URL=https://unifai-ui-zuno-unifai.apps.<cluster-domain>
+export UNIFAI_TEAM_NAME=agent-naveo
 export KEYCLOAK_URL=https://keycloak.apps.<cluster-domain>
-export FRONTEND_URL=https://naveo.apps.<cluster-domain>
-export NAVEO_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/naveo-frontend)
+export EVAL_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/zuno-evaluations)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)
 python3 run_acceptance_gate.py     # scenarios + security_checks + gate_checks, one exit code
 python3 run_scenarios.py           # just the 20 scenarios
@@ -28,3 +29,10 @@ python3 security_checks.py         # just the security-negative checks
 
 `AGENT=naveo`/`TASK_NAME=answer-onboarding-question` are set by the
 wrapper scripts automatically.
+
+UnifAI serves the agents and is the only evaluation target (WP-156) - see
+`evaluations/tekos/README.md` for how each scenario runs on it. Naveo is a
+`status: placeholder` agent with no UnifAI workflow: its chat scenarios and
+its chat-based security checks (identity propagation, entitlement without
+a business role) are reported as skipped and left out of every count; its
+blocked-chat scenarios pass when no workflow is exposed.

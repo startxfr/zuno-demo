@@ -7,9 +7,9 @@ through the UnifAI UI route - the only door from outside UnifAI's pods
 (NetworkPolicy unifai-internal-apis). The persona signs in as a browser does
 (evaluations/common/unifai_target.py) and drives AGENT's workflow in its
 group-bound team workspace `agent-<agent>`; credentials are
-DEMO_PERSONA_PASSWORD and UNIFAI_URL, no <agent>-frontend client secret.
+DEMO_PERSONA_PASSWORD and UNIFAI_URL, no OIDC client secret.
 
-Unlike the agent-runtime version, this probe CAN now report which provider
+Unlike its pre-UnifAI version, this probe CAN report which provider
 answered: UnifAI's LLM element asks the ai-gateway why it answered
 (`GET /v1/routing-decisions/{request_id}`, WP-148, chart
 `gatewayLLM.routingLookup`) and carries the decision on the assistant

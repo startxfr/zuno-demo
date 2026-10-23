@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """WP-155 wave 0: offline tests for the shared UnifAI evaluation target and for the per-agent
-`--target unifai` selection. No network: HTTP is served by httpx.MockTransport, and each agent's
+scripts that use it (UnifAI is the only target since WP-156). No network: HTTP is served by httpx.MockTransport, and each agent's
 scripts are imported in a subprocess (their modules share names, and AGENT is read at import).
 
     cd evaluations && python3 -m pytest tests/test_unifai_target.py -q
@@ -246,31 +246,46 @@ def test_every_agent_run_scenarios_selects_unifai_and_covers_every_scenario_type
             import run_scenarios as rs
             assert rs.TARGET == "unifai" and rs.AGENT == os.environ["AGENT"]
             types = {s["type"] for s in yaml.safe_load(pathlib.Path(rs.__file__).resolve().parent.parent.joinpath(rs.AGENT, "scenarios.yaml").read_text())["scenarios"]}
-            handlers = {**rs.HANDLERS, **rs.UNIFAI_HANDLERS}
-            missing = types - set(handlers)
-            # chat-shaped types must be served by the UnifAI transport, not the BFF one
-            for t in types & {"chat_basic_qa","chat_first_token_latency","chat_streaming_sse","chat_triggers_tool","chat_register_conformance","chat_blocked_for_placeholder_agent","rag_retrieval_has_citation"}:
-                assert handlers[t] is rs.UNIFAI_HANDLERS[t], t
+            missing = types - set(rs.HANDLERS)
+            # chat-shaped types must be served by the UnifAI transport (the u_ handlers)
+            for t in types & {"chat_basic_qa","chat_first_token_latency","chat_streaming_sse","chat_triggers_tool","chat_register_conformance","chat_blocked_for_placeholder_agent","rag_retrieval_has_citation","health_endpoints_all_ok"}:
+                assert rs.HANDLERS[t].__name__.startswith("u_"), t
+            # every `services:` list names a service the health handler knows
+            known = {"unifai-ui", "mcp-gateway", "ai-gateway"}
+            for s in yaml.safe_load(pathlib.Path(rs.__file__).resolve().parent.parent.joinpath(rs.AGENT, "scenarios.yaml").read_text())["scenarios"]:
+                assert set(s.get("services", [])) <= known, s.get("services")
+                assert "via" not in s, s["id"]
             print("missing=" + ",".join(sorted(missing)))
             """,
         )
         assert out.endswith("missing="), (agent, out)
 
 
-def test_every_agent_security_checks_swaps_in_unifai_replacements():
+def test_any_other_target_is_refused():
+    script = textwrap.dedent(
+        f"""
+        import os, sys
+        os.environ["EVAL_TARGET"] = "legacy"
+        sys.path.insert(0, {str(EVAL / "tekos")!r})
+        import run_scenarios
+        """
+    )
+    out = subprocess.run([sys.executable, "-c", script], capture_output=True, text=True, cwd=EVAL / "tekos")
+    assert out.returncode != 0 and "only target" in out.stderr, out.stderr
+
+
+def test_every_agent_security_checks_run_only_unifai_checks():
     for agent in AGENTS:
         out = _probe(
             agent,
             """
             sc = load_security_checks()
-            assert sc.TARGET == "unifai"
-            if hasattr(sc, "unifai_checks"):
-                names = [c.__name__ for c in sc.unifai_checks.select(sc.CHECKS, sc._UNIFAI_REPLACEMENTS, sc.TARGET)]
-            else:
-                names = [(sc._UNIFAI_REPLACEMENTS.get(c, c)).__name__ for c in sc.CHECKS]
-            assert "bff_forwards_identity_to_runtime" not in names
-            assert "business_role_without_entitlement_denied_by_bff" not in names
-            assert any("unifai" in n for n in names)
+            names = [c.__name__ for c in sc.CHECKS]
+            assert not any("bff" in n or "runtime" in n for n in names), names
+            assert "unifai_forwards_identity_to_the_gateways" in names
+            assert "unifai_ignores_a_client_supplied_identity_header" in names
+            assert "business_role_without_entitlement_denied_by_unifai" in names
+            assert not hasattr(sc, "_UNIFAI_REPLACEMENTS")
             print("ok")
             """,
         )
@@ -287,7 +302,7 @@ def test_placeholder_agents_skip_chat_scenarios_and_identity_check():
             assert rs._agent_status() == "placeholder"
             r = rs.u_chat_basic_qa({"id": 1, "title": "t", "persona": "p", "message": "m"})
             assert r.skipped and not r.passed
-            c = sc._UNIFAI_REPLACEMENTS[sc.bff_forwards_identity_to_runtime]()
+            c = sc.unifai_forwards_identity_to_the_gateways()
             assert c.skipped and not c.passed and "placeholder" in c.detail
             print("ok")
             """,

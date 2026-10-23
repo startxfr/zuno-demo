@@ -185,4 +185,4 @@ scenarios:
     # gate always times out by design, not by fault - mcp-gateway's own
     # health, still checked below, is the honest proxy for "can this
     # agent's traffic reach it".
-    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]
+    services: [unifai-ui, mcp-gateway, ai-gateway]

@@ -46,8 +46,8 @@ configMapGenerator:
       # Job (day2_stresstest.py puts this directory on sys.path).
       - unifai_target.py=../../../../../evaluations/common/unifai_target.py
       - unifai_checks.py=../../../../../evaluations/common/unifai_checks.py
-      # Repo policy/routing files security_checks.py, gate_checks.py and
-      # stress_test.py each read relative to their own resolved location
+      # Repo policy/routing files security_checks.py and gate_checks.py
+      # each read relative to their own resolved location
       # once mounted (same ConfigMap-symlink-indirection arithmetic
       # ansible/roles/agents/tasks/run_acceptance_gate.yml's own comments
       # already document) - projected into the exact paths
@@ -62,30 +62,10 @@ configMapGenerator:
       # "security_checks.py".
       - tekos-scenarios.yaml=../../../../../evaluations/tekos/scenarios.yaml
       - tekos-security_checks.py=../../../../../evaluations/tekos/security_checks.py
-      # Live-cluster-confirmed 2026-08-23: this key was previously only
-      # sourced as the plain, unprefixed "stress_test.py" (in the
-      # canonical-shared-files block above), but _load_stress_test()
-      # (platform/testing/day2_stresstest.py) always looks for
-      # /gate/<agent>/stress_test.py regardless of agent - so for
-      # AGENT=tekos it was always looking in the wrong place. The
-      # now-fixed conditional gate-agent volume item (see
-      # stresstest_job_run_one.yml) needs the per-agent-prefixed key,
-      # same convention as arkos/comage below, to actually find it.
-      - tekos-stress_test.py=../../../../../evaluations/tekos/stress_test.py
       - arkos-scenarios.yaml=../../../../../evaluations/arkos/scenarios.yaml
       - arkos-security_checks.py=../../../../../evaluations/arkos/security_checks.py
-      # ADR-0415 image-generation coverage (day2_stresstest.py's
-      # _load_stress_test() loads it dynamically per agent, same pattern
-      # as *-security_checks.py above). Not every agent has one - see
-      # stresstest_job_run_one.yml's own stat-based conditional on this
-      # projection.
-      - arkos-stress_test.py=../../../../../evaluations/arkos/stress_test.py
       - comage-scenarios.yaml=../../../../../evaluations/comage/scenarios.yaml
       - comage-security_checks.py=../../../../../evaluations/comage/security_checks.py
-      # ADR-0216/WP-065's SXA-visualization boundary probe - see that
-      # file's own module docstring for why this is a degradation check
-      # rather than a positive one (unlike arkos-stress_test.py above).
-      - comage-stress_test.py=../../../../../evaluations/comage/stress_test.py
       - advantage-scenarios.yaml=../../../../../evaluations/advantage/scenarios.yaml
       - advantage-security_checks.py=../../../../../evaluations/advantage/security_checks.py
       - finage-scenarios.yaml=../../../../../evaluations/finage/scenarios.yaml

@@ -72,8 +72,8 @@ def main() -> int:
     security_results = security_checks.run()
     gate_results = gate_checks.run()
 
-    # `--target unifai` (WP-155): scenarios and checks that cannot apply to UnifAI are reported as
-    # skipped with their reason and left out of every count - never counted as passes.
+    # WP-155: scenarios and checks that cannot apply to UnifAI (the only target since WP-156) are
+    # reported as skipped with their reason and left out of every count - never counted as passes.
     skipped = [r for r in scenario_results + security_results if getattr(r, "skipped", False)]
     scenario_results = [r for r in scenario_results if not getattr(r, "skipped", False)]
     security_results = [r for r in security_results if not getattr(r, "skipped", False)]
@@ -123,8 +123,10 @@ def main() -> int:
             print(f"-     {getattr(r, 'title', None) or r.name}\n      -> {r.detail}")
         print()
 
-    if run_scenarios.TARGET == "unifai":
-        run_scenarios._unifai().cleanup()
+    # Deletes exactly the UnifAI sessions this gate run created (scenarios and
+    # security checks share run_scenarios' one UnifaiTarget).
+    if run_scenarios._unifai_target is not None:
+        run_scenarios._unifai_target.cleanup()
 
     print(f"OVERALL RESULT: {'PASS' if overall_ok else 'FAIL'}")
 

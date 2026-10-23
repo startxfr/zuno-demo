@@ -146,7 +146,7 @@ def test_thresholds_come_from_gate_config_not_code():
 
 def test_the_shipped_probe_fixture_is_two_sided_and_uses_real_tools():
     """Guards the fixture itself: a probe set that drifts one-sided, or
-    starts naming tools the runtime never offers, silently stops testing
+    starts naming tools the model is never offered, silently stops testing
     what it claims to."""
     import yaml
 
@@ -161,31 +161,22 @@ def test_the_shipped_probe_fixture_is_two_sided_and_uses_real_tools():
     assert {p["expects_tool"] for p in positive} <= set(doc["offered_tools"])
 
 
-def test_probe_schemas_have_not_drifted_from_the_runtime():
-    """The mlops image carries evaluations/ but not
-    components/agent-runtime, so the probe fixture duplicates the two tool
-    schemas the runtime sends. Duplication without a drift check is how a
-    gate ends up confidently scoring a schema nobody sends any more."""
-    import ast
-
+def test_probe_schemas_match_the_offered_tools():
+    """The fixture's rendered schemas and its `offered_tools` list must name
+    the same tools, each schema well-formed with its required arguments
+    declared. (WP-156: the cross-check against the retired agent runtime's
+    own schema constants went with that source.)"""
     import yaml
 
-    root = pathlib.Path(__file__).resolve().parents[2]
-    src = (root / "components/agent-runtime/app/graph/nodes.py").read_text(encoding="utf-8")
-    live = {}
-    for node in ast.parse(src).body:
-        if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name):
-            name = node.targets[0].id
-            if name in ("_GENERATE_IMAGE_TOOL_SCHEMA", "_GENERATE_DIAGRAM_TOOL_SCHEMA"):
-                schema = ast.literal_eval(node.value)
-                live[schema["function"]["name"]] = schema
-
-    doc = yaml.safe_load((root / "evaluations/comage/tool_probes.yaml").read_text(encoding="utf-8"))
+    root = pathlib.Path(__file__).resolve().parents[1]
+    doc = yaml.safe_load((root / "comage" / "tool_probes.yaml").read_text(encoding="utf-8"))
     fixture = {s["function"]["name"]: s for s in doc["tool_schemas"]}
 
-    assert set(fixture) == set(live), "probe fixture and runtime disagree on which tools exist"
+    assert set(fixture) == set(doc["offered_tools"]), "schemas and offered_tools disagree on which tools exist"
     for name, schema in fixture.items():
-        assert schema == live[name], f"{name} schema drifted from components/agent-runtime"
+        params = schema["function"]["parameters"]
+        assert schema["type"] == "function" and params["type"] == "object", name
+        assert params["required"] and set(params["required"]) <= set(params["properties"]), name
 
 
 def test_a_call_to_a_tool_that_was_never_offered_is_not_a_false_fire():

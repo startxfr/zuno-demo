@@ -3,12 +3,12 @@
 and can see the three named demo projects, as `make demo check`'s "Zuno
 application"/"Projects" sections require.
 
-WP-156: ported from agent-runtime to UnifAI, which serves the agents
-(ADR-0561). The persona signs in through the UnifAI UI route exactly as a
-browser does (evaluations/common/unifai_target.py: identity service ->
-Keycloak form -> session cookie), so this needs DEMO_PERSONA_PASSWORD and
-UNIFAI_URL only - no <agent>-frontend client secret, no in-cluster
-agent-runtime URL. UnifAI's internal APIs only admit UnifAI pods
+WP-156: ported from the retired legacy agent stack to UnifAI, which serves
+the agents (ADR-0561). The persona signs in through the UnifAI UI route
+exactly as a browser does (evaluations/common/unifai_target.py: identity
+service -> Keycloak form -> session cookie), so this needs
+DEMO_PERSONA_PASSWORD and UNIFAI_URL only - no OIDC client secret, no
+in-cluster agent URL. UnifAI's internal APIs only admit UnifAI pods
 (NetworkPolicy unifai-internal-apis), so the UI route is the only way in.
 
 "Authenticated" now means: the sign-in succeeded AND the agent's workflow

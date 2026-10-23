@@ -10,19 +10,20 @@ shared code lives there rather than being copied per agent);
 Advantage's own, real content.
 
 **Not yet wired into `make day2|d2 check agents`'s automatic path**
-(`ansible/roles/agents/tasks/check.yml` only smoke-tests Advantage's
-frontend `/healthz` today) - running this gate against a live cluster
+(`ansible/roles/agents/tasks/check.yml` only checks Advantage's agent
+definition structurally today) - running this gate against a live cluster
 requires the human scenario-review checkpoint WP-35's own brief gates on
 first. Once that review has happened, the operator runs it explicitly:
 
 ```bash
 cd evaluations/advantage
 pip install -r requirements.txt
+export UNIFAI_URL=https://unifai-ui-zuno-unifai.apps.<cluster-domain>
+export UNIFAI_TEAM_NAME=agent-advantage
 export KEYCLOAK_URL=https://keycloak.apps.<cluster-domain>
-export FRONTEND_URL=https://advantage.apps.<cluster-domain>
-export ADVANTAGE_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/advantage-frontend)
+export EVAL_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/zuno-evaluations)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)
-# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / AI_GATEWAY_URL
+# MCP_GATEWAY_URL / AI_GATEWAY_URL / CONFLUENCE_MCP_URL
 # default to their in-cluster Service DNS names - override if running this
 # from outside the cluster via a port-forward instead. Reaching those
 # in-cluster names at all requires running from a network location the
@@ -41,9 +42,14 @@ directly against this directory's `scenarios.yaml` for some other reason.
 Scenarios are defined in `scenarios.yaml` (id, title, `type`, and
 type-specific parameters) - the exact same `type` vocabulary
 `evaluations/tekos/scenarios.yaml` uses, since `run_scenarios.py`'s
-handlers are generic HTTP call patterns, not Tekos-specific code.
+handlers are generic call patterns, not Tekos-specific code. UnifAI serves
+the agents and is the only evaluation target (WP-156) - see
+`evaluations/tekos/README.md` for how each scenario runs on it. Advantage is a
+`status: placeholder` agent with no UnifAI workflow: its chat scenarios
+are reported as skipped (not counted), and its blocked-chat scenarios pass
+when no workflow is exposed.
 
-Coverage: portal/tile access gating (scenarios 1, 2, 4-6), authentication
+Coverage: agent visibility and access gating (scenarios 1, 2, 4-6), authentication
 (3), the chat contract synchronous and streaming (7-9), RAG retrieval
 over `knowledge.adv` (10), MCP Gateway policy enforcement (11-13, 18 -
 **12/13 are this slice's signature proof**: a live Salesforce capability
@@ -54,10 +60,8 @@ omission rather than a runtime filter; 18 mirrors the generic
 agent_declaration proof every prior slice's own scenario 18 makes, here
 against `confluence.page.search`), model routing/classification
 fail-closed behavior (14-15, config-consistency checks that don't need a
-live cluster), BFF JWT validation (16-17), namespace isolation for the
-one still-genuinely-placeholder agent (19, Finage - Arkos/Comage/Advantage
-have all now dropped off this list once their own frontend/BFF workloads
-deployed), and service health (20).
+live cluster), unauthenticated access refused (16-17), namespace
+isolation for the placeholder agents (19), and service health (20).
 
 This cannot be executed in the sandbox this repo was built in (no live
 OpenShift cluster) - see the top-level feasibility plan for what a full
@@ -67,18 +71,18 @@ evaluation run requires.
 
 `security_checks.py` (same setup as above, run from this directory)
 checks identity-propagation and entitlement behavior that isn't part of
-the fixed 20-scenario acceptance count: the BFF actually forwards the
-caller's token to the Agent Runtime, the Runtime ignores a forged
-`user_sub` in the request body rather than treating it as authoritative,
-`X-Zuno-Local-Only: true` actually forces `components/ai-gateway` to pick
+the fixed 20-scenario acceptance count: the identity-propagation check
+(ADR-0032) is reported as skipped while Advantage is a placeholder with no
+UnifAI workflow, an outside `X-Authenticated-User` header without a
+session is refused (ADR-0033), `X-Zuno-Local-Only: true` actually forces `components/ai-gateway` to pick
 the local provider even for a C2 request that would otherwise be
 SaaS-eligible, the two-dimension group model is enforced server-side in
 both directions using two new fixture personas mirroring the prior
 slices' own (`advantage-entitlement-only-user-01`: `agent_advantage`
 entitlement but no business role, denied `list_drive_files` by the MCP
 Gateway with 403; `adv-role-only-user-01`: `adv` business role but no
-`agent_advantage` entitlement, denied by the BFF itself with 403 before
-the request ever reaches the Agent Runtime), and a direct call to
+`agent_advantage` entitlement, which neither sees the agent's workflow
+nor gets past the MCP gateway's agent declaration), and a direct call to
 `confluence-mcp` that bypasses the MCP Gateway entirely is denied by the
 server itself (401) - a platform-wide (ADR-0037), not Advantage-specific,
 boundary this gate still verifies.

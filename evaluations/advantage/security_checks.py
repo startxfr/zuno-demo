@@ -47,7 +47,7 @@ os.environ.setdefault("TASK_NAME", "answer-project-question")
 # directory, not only when run_acceptance_gate.py's dynamic loader has
 # already put evaluations/tekos/ on sys.path for us.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, _invoke_tool, auth_headers, is_placeholder_agent_404, MCP_GATEWAY_URL, TARGET, TASK_NAME, _unifai  # noqa: E402
+from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _invoke_tool, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
 try:
@@ -59,7 +59,7 @@ except ImportError:
 _LOG_AGENT = AGENT
 
 # Not part of run_scenarios.py's URL set since none of the 20 fixed
-# scenarios call ai-gateway directly (only agent-runtime does, internally).
+# scenarios call ai-gateway directly (only the agents do, internally).
 AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080")
 
 # Same reasoning as Arkos's own equivalent check: only the MCP Gateway
@@ -79,71 +79,6 @@ class CheckResult:
     passed: bool
     detail: str = ""
     skipped: bool = False
-
-
-def bff_forwards_identity_to_runtime() -> CheckResult:
-    """ADR-0032: the BFF must forward the validated end-user bearer token to
-    the Agent Runtime, which requires one (app/auth.py:validate_token) and
-    rejects calls without it. Before this ADR's fix, every BFF -> Runtime
-    call was unauthenticated and the Runtime would have rejected it with
-    401, surfaced to the client as a 502 from the BFF - so a 200 here with a
-    real reply is direct evidence the token now reaches the Runtime.
-    """
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers("adv-01"),
-        json={"session_id": "sec-check-1", "message": "What's the status of the Acme delivery project?"},
-        timeout=30,
-    )
-    if is_placeholder_agent_404(resp):
-        return CheckResult(
-            "bff_forwards_identity_to_runtime", True,
-            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design; flip this back to a "
-            "real assertion once the agent goes active",
-        )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult(
-        "bff_forwards_identity_to_runtime",
-        ok,
-        f"status={resp.status_code} body={resp.text[:200]}",
-    )
-
-
-def runtime_ignores_mismatched_user_sub() -> CheckResult:
-    """ADR-0033: a request body's user_sub is informational only - the
-    Runtime must derive the authoritative subject from the validated token,
-    not this field. Submitting a token for a real persona (adv-01)
-    with a body user_sub claiming to be an unrelated, nonexistent identity
-    must not be rejected or otherwise change the outcome (impersonation via
-    the body field is impossible because the field is never trusted).
-    """
-    import uuid
-
-    forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
-    resp = httpx.post(
-        f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-        headers=auth_headers("adv-01"),
-        json={
-            "session_id": "sec-check-2",
-            "user_sub": forged_sub,
-            "message": "What's the status of the Acme delivery project?",
-        },
-        timeout=30,
-    )
-    if is_placeholder_agent_404(resp):
-        return CheckResult(
-            "runtime_ignores_mismatched_user_sub", True,
-            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design; flip this back to a "
-            "real assertion once the agent goes active",
-        )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult(
-        "runtime_ignores_mismatched_user_sub",
-        ok,
-        f"status={resp.status_code} forged_sub={forged_sub} body={resp.text[:200]}",
-    )
 
 
 def advantage_never_declares_the_sales_knowledge_domain() -> CheckResult:
@@ -285,28 +220,6 @@ def entitlement_without_business_role_denied_drive() -> CheckResult:
     )
 
 
-def business_role_without_entitlement_denied_by_bff() -> CheckResult:
-    """ADR-0040: the converse case. adv-role-only-user-01 holds the adv
-    business role (would pass the MCP Gateway's group check for
-    list_drive_files) but lacks agent_advantage entitlement. The BFF's
-    server-side entitlement check (components/agent-bff/main.go) must
-    deny the call with 403 before it ever reaches the Agent Runtime,
-    proving business role alone never substitutes for agent entitlement.
-    """
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers("adv-role-only-user-01"),
-        json={"session_id": "sec-check-3", "message": "What's the status of the Acme delivery project?"},
-        timeout=30,
-    )
-    ok = resp.status_code == 403
-    return CheckResult(
-        "business_role_without_entitlement_denied_by_bff",
-        ok,
-        f"status={resp.status_code} body={resp.text[:200]}",
-    )
-
-
 def direct_call_to_confluence_mcp_denied_without_gateway_token() -> CheckResult:
     """ADR-0037's mandatory acceptance test (platform-wide boundary, not
     Advantage-specific - see this module's own docstring for why it's
@@ -338,37 +251,36 @@ def direct_call_to_confluence_mcp_denied_without_gateway_token() -> CheckResult:
     )
 
 
-# --target unifai (WP-155 wave 0): the checks tied to the BFF/agent-runtime are replaced by their
-# UnifAI equivalents (shared factories in evaluations/common/unifai_checks.py); the others reach
-# shared services (MCP gateway, ai-gateway, MCP servers) and run unchanged.
-_UNIFAI_REPLACEMENTS = {
-    bff_forwards_identity_to_runtime: unifai_checks.skip(
-        CheckResult,
-        "unifai_forwards_identity_to_the_gateways",
-        "advantage is a placeholder agent (ADR-0007): it has no UnifAI workflow to chat with",
-    ),
-    runtime_ignores_mismatched_user_sub: unifai_checks.client_identity_header_refused(CheckResult, _unifai),
-    business_role_without_entitlement_denied_by_bff: unifai_checks.entitlement_denied(
-        CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="adv-role-only-user-01",
-        mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
-    ),
-}
+# Checks about the agent itself (WP-155 wave 0; UnifAI is the only target since WP-156):
+# ADR-0032/0033/0040 proven through UnifAI's session API, built from the shared factories in
+# evaluations/common/unifai_checks.py. The checks above reach shared services (MCP gateway,
+# ai-gateway, MCP servers) directly.
+unifai_forwards_identity_to_the_gateways = unifai_checks.skip(
+    CheckResult,
+    "unifai_forwards_identity_to_the_gateways",
+    "advantage is a placeholder agent (ADR-0007): it has no UnifAI workflow to chat with",
+)
+unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
+business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
+    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="adv-role-only-user-01",
+    mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
+)
 
 
 CHECKS = [
-    bff_forwards_identity_to_runtime,
-    runtime_ignores_mismatched_user_sub,
+    unifai_forwards_identity_to_the_gateways,
+    unifai_ignores_a_client_supplied_identity_header,
     advantage_never_declares_the_sales_knowledge_domain,
     ai_gateway_local_only_forces_local_provider,
     entitlement_without_business_role_denied_drive,
-    business_role_without_entitlement_denied_by_bff,
+    business_role_without_entitlement_denied_by_unifai,
     direct_call_to_confluence_mcp_denied_without_gateway_token,
 ]
 
 
 def run() -> list:
     results = []
-    for check in unifai_checks.select(CHECKS, _UNIFAI_REPLACEMENTS, TARGET):
+    for check in CHECKS:
         try:
             result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
@@ -381,15 +293,13 @@ def run() -> list:
 def main() -> int:
     results = run()
 
-    print(f"target: {TARGET}")
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
         print(f"{'-' if r.skipped else '✓' if r.passed else '✗':<6}{r.name}")
         if (not r.passed or r.skipped) and r.detail:
             print(f"      -> {r.detail}")
 
-    if TARGET == "unifai":
-        _unifai().cleanup()
+    _unifai().cleanup()
     if all(r.passed for r in results if not r.skipped):
         print("\nRESULT: PASS")
         return 0

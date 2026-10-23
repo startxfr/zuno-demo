@@ -21,14 +21,13 @@ import pathlib
 import sys
 from dataclasses import dataclass
 
-import httpx
 import yaml
 
 os.environ.setdefault("AGENT", "naveo")
 os.environ.setdefault("TASK_NAME", "answer-onboarding-question")
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos"))
-from run_scenarios import AGENT, BFF_URL, RUNTIME_URL, auth_headers, is_placeholder_agent_404, MCP_GATEWAY_URL, TARGET, TASK_NAME, _unifai  # noqa: E402
+from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
 try:
@@ -48,100 +47,6 @@ class CheckResult:
     passed: bool
     detail: str = ""
     skipped: bool = False
-
-
-def bff_forwards_identity_to_runtime() -> CheckResult:
-    """ADR-0032: the BFF must forward the validated end-user bearer token
-    to the Agent Runtime, which requires one and rejects calls without it.
-    """
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers("consultant-01"),
-        json={"session_id": "sec-check-1", "message": "Where do I find the onboarding checklist?"},
-        timeout=30,
-    )
-    if is_placeholder_agent_404(resp):
-        return CheckResult(
-            "bff_forwards_identity_to_runtime", True,
-            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design; flip this back to a "
-            "real assertion once the agent goes active",
-        )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult("bff_forwards_identity_to_runtime", ok, f"status={resp.status_code} body={resp.text[:200]}")
-
-
-def runtime_ignores_mismatched_user_sub() -> CheckResult:
-    """ADR-0033: a request body's user_sub is informational only - the
-    Runtime must derive the authoritative subject from the validated
-    token, never this field.
-    """
-    import uuid
-
-    forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
-    resp = httpx.post(
-        f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-        headers=auth_headers("consultant-01"),
-        json={"session_id": "sec-check-2", "user_sub": forged_sub, "message": "Where do I find the onboarding checklist?"},
-        timeout=30,
-    )
-    if is_placeholder_agent_404(resp):
-        return CheckResult(
-            "runtime_ignores_mismatched_user_sub", True,
-            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design; flip this back to a "
-            "real assertion once the agent goes active",
-        )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult("runtime_ignores_mismatched_user_sub", ok, f"status={resp.status_code} forged_sub={forged_sub} body={resp.text[:200]}")
-
-
-def entitlement_without_business_role_denied() -> CheckResult:
-    """ADR-0040: agent_naveo entitlement without any
-    business role must still be denied by the BFF/Runtime chat path
-    (the agent entitlement alone never substitutes for the business-role
-    check the MCP Gateway/policy layer performs).
-    """
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers("naveo-entitlement-only-user-01"),
-        json={"session_id": "sec-check-3", "message": "Where do I find the onboarding checklist?"},
-        timeout=30,
-    )
-    if is_placeholder_agent_404(resp):
-        return CheckResult(
-            "entitlement_without_business_role_denied", True,
-            f"skipped (coverage): {AGENT} is not yet zuno.status=active - agent-runtime's "
-            "_active_agent_or_404 404s every chat call by design (outside the (200,403) "
-            "this check otherwise accepts); flip this back to a real assertion once the "
-            "agent goes active",
-        )
-    # A business-role-less caller can still authenticate and chat (the
-    # entitlement/role separation this scaffold's tools rely on is
-    # enforced per-tool-call by the MCP Gateway, not by the chat route
-    # itself) - this check instead proves the *tool* boundary: no tool
-    # call reachable from this chat turn should succeed silently without
-    # the business role. Left as a documented scaffold seam: fill in a
-    # concrete tool-call assertion once Naveo's real persona is
-    # reviewed (see NEXT_STEPS.md).
-    ok = resp.status_code in (200, 403)
-    return CheckResult("entitlement_without_business_role_denied", ok, f"status={resp.status_code} body={resp.text[:200]}")
-
-
-def business_role_without_entitlement_denied_by_bff() -> CheckResult:
-    """ADR-0040: the converse case. consultant-role-only-user-01 holds the
-    consultant business role but lacks agent_naveo
-    entitlement - the BFF's own entitlement check must deny with 403
-    before the request ever reaches the Agent Runtime.
-    """
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers("consultant-role-only-user-01"),
-        json={"session_id": "sec-check-4", "message": "Where do I find the onboarding checklist?"},
-        timeout=30,
-    )
-    ok = resp.status_code == 403
-    return CheckResult("business_role_without_entitlement_denied_by_bff", ok, f"status={resp.status_code} body={resp.text[:200]}")
 
 
 def naveo_declares_only_scaffolded_knowledge_and_tools() -> CheckResult:
@@ -177,33 +82,43 @@ def naveo_declares_only_scaffolded_knowledge_and_tools() -> CheckResult:
     )
 
 
-# --target unifai (WP-155 wave 0): see evaluations/common/unifai_checks.py.
-_UNIFAI_REPLACEMENTS = {
-    bff_forwards_identity_to_runtime: unifai_checks.skip(
-        CheckResult,
-        "unifai_forwards_identity_to_the_gateways",
-        "naveo is a placeholder agent (ADR-0007): it has no UnifAI workflow to chat with",
-    ),
-    runtime_ignores_mismatched_user_sub: unifai_checks.client_identity_header_refused(CheckResult, _unifai),
-    business_role_without_entitlement_denied_by_bff: unifai_checks.entitlement_denied(
-        CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="consultant-role-only-user-01",
-        mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
-    ),
-}
+# Checks about the agent itself (WP-155 wave 0; UnifAI is the only target since WP-156):
+# ADR-0032/0033/0040 proven through UnifAI's session API, built from the shared factories in
+# evaluations/common/unifai_checks.py. The checks above reach shared services (MCP gateway,
+# ai-gateway, MCP servers) directly.
+unifai_forwards_identity_to_the_gateways = unifai_checks.skip(
+    CheckResult,
+    "unifai_forwards_identity_to_the_gateways",
+    "naveo is a placeholder agent (ADR-0007): it has no UnifAI workflow to chat with",
+)
+unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
+business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
+    CheckResult, _unifai, agent=AGENT, task=TASK_NAME, persona="consultant-role-only-user-01",
+    mcp_gateway_url=MCP_GATEWAY_URL, auth_headers=auth_headers,
+)
+# ADR-0040, entitlement without any business role: the legacy check only proved a chat turn
+# was answered or refused (a documented scaffold seam, see NEXT_STEPS.md). Naveo has no
+# UnifAI workflow to chat with, so it is reported as skipped until a concrete tool-call
+# assertion replaces it.
+entitlement_without_business_role_denied = unifai_checks.skip(
+    CheckResult,
+    "entitlement_without_business_role_denied",
+    "naveo is a placeholder agent (ADR-0007): it has no UnifAI workflow to chat with",
+)
 
 
 CHECKS = [
-    bff_forwards_identity_to_runtime,
-    runtime_ignores_mismatched_user_sub,
+    unifai_forwards_identity_to_the_gateways,
+    unifai_ignores_a_client_supplied_identity_header,
     entitlement_without_business_role_denied,
-    business_role_without_entitlement_denied_by_bff,
+    business_role_without_entitlement_denied_by_unifai,
     naveo_declares_only_scaffolded_knowledge_and_tools,
 ]
 
 
 def run() -> list:
     results = []
-    for check in unifai_checks.select(CHECKS, _UNIFAI_REPLACEMENTS, TARGET):
+    for check in CHECKS:
         try:
             result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
@@ -215,14 +130,14 @@ def run() -> list:
 
 def main() -> int:
     results = run()
-    print(f"target: {TARGET}")
+
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
         print(f"{'-' if r.skipped else '✓' if r.passed else '✗':<6}{r.name}")
         if (not r.passed or r.skipped) and r.detail:
             print(f"      -> {r.detail}")
-    if TARGET == "unifai":
-        _unifai().cleanup()
+
+    _unifai().cleanup()
     if all(r.passed for r in results if not r.skipped):
         print("\nRESULT: PASS")
         return 0

@@ -62,13 +62,11 @@ scenarios:
     expect_placeholder: true
 
   - id: 7
-    # Advantage is status:placeholder - agent-runtime's ADR-0007 gate
-    # (_active_agent_or_404) rejects real chat before any reply is ever
-    # generated. See chat_blocked_for_placeholder_agent's own docstring
-    # for why the BFF path only asserts != 200 rather than an exact code.
-    title: A project/delivery question via the BFF is correctly blocked (agent is placeholder-status)
+    # Advantage is status:placeholder (ADR-0007): it has no UnifAI workflow,
+    # so no chat turn may produce a reply (run_scenarios.py's
+    # u_chat_blocked_for_placeholder_agent).
+    title: A project/delivery question is correctly blocked (agent is placeholder-status)
     type: chat_blocked_for_placeholder_agent
-    via: bff
     persona: adv-01
     message: "What's the current status of the Acme delivery project?"
 
@@ -80,10 +78,8 @@ scenarios:
     max_seconds: 6
 
   - id: 9
-    # Same ADR-0007 boundary as scenario 7, proven directly against
-    # agent-runtime instead of via the BFF - deterministic 404, unaffected
-    # by agent-bff's own separate JWKS-trust bug.
-    title: Streaming chat direct to agent-runtime is correctly blocked (agent is placeholder-status)
+    # Same ADR-0007 boundary as scenario 7, with another question.
+    title: Streaming chat is correctly blocked (agent is placeholder-status)
     type: chat_blocked_for_placeholder_agent
     persona: adv-01
     message: "Summarize the Acme delivery project in one sentence."
@@ -161,4 +157,4 @@ scenarios:
   - id: 20
     title: Every service's health endpoint returns 200
     type: health_endpoints_all_ok
-    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]
+    services: [unifai-ui, mcp-gateway, ai-gateway]

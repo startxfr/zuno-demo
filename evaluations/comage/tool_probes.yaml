@@ -4,7 +4,7 @@
 # WHY THESE TWO TOOLS AND NO OTHERS. Only tools the MODEL chooses can
 # regress the way the `-wesh` variant did; a tool a graph node calls
 # deterministically is unaffected by the model's preference. Checked
-# against components/agent-runtime/app/graph/nodes.py: the only
+# against the (since retired, WP-156) agent runtime's graph: the only
 # model-facing schemas Comage ever receives are generate_image and
 # generate_diagram, both from check-deal-status (the one task declaring
 # image.generation.create / diagram.generation.create).
@@ -40,13 +40,10 @@ task: check-deal-status
 # exercises what the runtime actually sends, not a paraphrase.
 offered_tools: [generate_image, generate_diagram]
 
-# The exact schemas the runtime sends, copied verbatim from
-# components/agent-runtime/app/graph/nodes.py. They are duplicated here on
-# purpose: the mlops image carries evaluations/ and agents/ but NOT
-# components/agent-runtime, so the gate cannot import them at run time.
-# evaluations/tests/test_tool_calling_conformance.py re-extracts them from
-# nodes.py with ast.literal_eval and fails if these drift - without that
-# check the gate would keep scoring a schema the runtime no longer sends.
+# The exact schemas the agent runtime sent, copied verbatim from its graph
+# before WP-156 retired it; this file is now their only copy.
+# evaluations/tests/test_tool_calling_conformance.py checks they stay
+# consistent with offered_tools.
 tool_schemas:
 - type: function
   function:

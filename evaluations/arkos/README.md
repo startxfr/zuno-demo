@@ -9,20 +9,21 @@ code lives there rather than being copied per agent); `scenarios.yaml`,
 `gate_config.yaml` and `security_checks.py` are Arkos's own, real content.
 
 **Not yet wired into `make day2|d2 check agents`'s automatic path**
-(`ansible/roles/agents/tasks/check.yml` only smoke-tests Arkos's frontend
-`/healthz` today) - running this gate against a live cluster requires the
+(`ansible/roles/agents/tasks/check.yml` only checks Arkos's agent
+definition structurally today) - running this gate against a live cluster requires the
 human scenario-review checkpoint WP-31's own brief gates on first. Once
 that review has happened, the operator runs it explicitly:
 
 ```bash
 cd evaluations/arkos
 pip install -r requirements.txt
+export UNIFAI_URL=https://unifai-ui-zuno-unifai.apps.<cluster-domain>
+export UNIFAI_TEAM_NAME=agent-arkos
 export KEYCLOAK_URL=https://keycloak.apps.<cluster-domain>
-export FRONTEND_URL=https://arkos.apps.<cluster-domain>
-export ARKOS_FRONTEND_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/arkos-frontend)
+export EVAL_CLIENT_SECRET=$(vault kv get -field=client_secret zuno/keycloak/zuno-evaluations)
 export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-personas)
-# BFF_URL / RUNTIME_URL / MCP_GATEWAY_URL / RAG_SERVICE_URL / CONFLUENCE_MCP_URL /
-# AI_GATEWAY_URL default to their in-cluster Service DNS names - override if
+# MCP_GATEWAY_URL / AI_GATEWAY_URL / CONFLUENCE_MCP_URL default to their
+# in-cluster Service DNS names - override if
 # running this from outside the cluster via a port-forward instead. Reaching
 # those in-cluster names at all requires running from a network location the
 # ADR-0037/ADR-0052 NetworkPolicies actually allow, same constraint
@@ -40,9 +41,11 @@ directly against this directory's `scenarios.yaml` for some other reason.
 Scenarios are defined in `scenarios.yaml` (id, title, `type`, and
 type-specific parameters) - the exact same `type` vocabulary
 `evaluations/tekos/scenarios.yaml` uses, since `run_scenarios.py`'s
-handlers are generic HTTP call patterns, not Tekos-specific code.
+handlers are generic call patterns, not Tekos-specific code. UnifAI serves
+the agents and is the only evaluation target (WP-156) - see
+`evaluations/tekos/README.md` for how each scenario runs on it.
 
-Coverage: portal/tile access gating (scenarios 1, 2, 4-6), authentication
+Coverage: agent visibility and access gating (scenarios 1, 2, 4-6), authentication
 (3), the chat contract synchronous and streaming (7-9 - 7 is DAT
 drafting, 8 is workshop-presentation's latency, ADR-0514's kind-aware
 draft path via the same shape, 9 is structure-demo's early-exit branch
@@ -52,8 +55,8 @@ concrete proof of ADR-0326's "live Jira/Confluence actions without
 physical endpoint coupling" bullet - Jira itself waits on its own MCP
 server, not yet scheduled), MCP Gateway policy enforcement (12-13, 18),
 model routing/classification fail-closed behavior (14-15,
-config-consistency checks that don't need a live cluster), BFF JWT
-validation (16-17), namespace isolation for the three still-genuinely-
+config-consistency checks that don't need a live cluster),
+unauthenticated access refused (16-17), namespace isolation for the three still-genuinely-
 placeholder agents (19), and service health (20).
 
 This cannot be executed in the sandbox this repo was built in (no live
@@ -64,10 +67,10 @@ evaluation run requires.
 
 `security_checks.py` (same setup as above, run from this directory) checks
 identity-propagation, classification and entitlement behavior that isn't
-part of the fixed 20-scenario acceptance count: the BFF actually forwards
-the caller's token to the Agent Runtime, the Runtime ignores a forged
-`user_sub` in the request body rather than treating it as authoritative,
-Confluence's canonical `confluence.page.search`/`.read` capabilities are
+part of the fixed 20-scenario acceptance count: the caller's own token
+reaches the MCP gateway through UnifAI (a Confluence tool call succeeds,
+ADR-0032), an outside `X-Authenticated-User` header without a session is
+refused (ADR-0033), Confluence's canonical `confluence.page.search`/`.read` capabilities are
 correctly classified C2 with `external_model_policy.allow_context: false`
 (a config-only check, no live cluster needed), `X-Zuno-Local-Only: true`
 actually forces `components/ai-gateway` to pick the local provider even
@@ -76,8 +79,8 @@ group model is enforced server-side in both directions using two new
 fixture personas mirroring Tekos's own (`arkos-entitlement-only-user-01`:
 `agent_arkos` entitlement but no business role, denied `confluence.page.search`
 by the MCP Gateway with 403; `consultant-role-only-user-01`: `consultant`
-business role but no `agent_arkos` entitlement, denied by the BFF itself
-with 403 before the request ever reaches the Agent Runtime - ADR-0349
+business role but no `agent_arkos` entitlement, which neither sees the
+agent's workflow nor gets past the MCP gateway's agent declaration - ADR-0349
 moved Arkos's audience from board to the consultant tier, so the shared
 consultant fixture now carries this converse case), and a direct call to
 `confluence-mcp` that bypasses the MCP Gateway entirely is denied by the

@@ -11,6 +11,12 @@ every later agent slice) reuses this exact file via a thin wrapper that
 sets AGENT before delegating to main() - see that directory's own
 run_scenarios.py for the two-line pattern.
 
+WP-156: the agents are served by UnifAI (ADR-0561), the only evaluation
+target. Chat-shaped scenarios run through UnifAI's own session API
+(evaluations/common/unifai_target.py); scenarios about shared platform
+services (Keycloak, MCP gateway, model routing, namespace isolation) call
+those services directly.
+
 This cannot be executed in the sandbox this repo was built in (no live
 cluster) - it is written to be genuinely runnable once one exists, not a
 mock. Each `type` in scenarios.yaml maps to exactly one handler function
@@ -19,15 +25,13 @@ a handler.
 """
 from __future__ import annotations
 
-import html
 import json
 import os
 import pathlib
-import re
 import sys
 import time
-from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, Optional
 
 import httpx
 import yaml
@@ -45,12 +49,12 @@ except ImportError:
     def log_test_line(*_args, **_kwargs) -> None:
         pass
 
-# ADR-0342/WP-31: which agent this run evaluates - drives the frontend/BFF
-# hostnames, the OIDC client id, and (via TASK_NAME below) which OKF task
-# name is declared to the MCP Gateway. Defaults to "tekos" so every
-# existing direct invocation of this file (`cd evaluations/tekos &&
-# python3 run_scenarios.py`, with no AGENT set) behaves exactly as before
-# this parameterization.
+
+# ADR-0342/WP-31: which agent this run evaluates - drives the UnifAI
+# workflow/team names and (via TASK_NAME below) which OKF task name is
+# declared to the MCP Gateway. Defaults to "tekos" so every existing direct
+# invocation of this file (`cd evaluations/tekos && python3 run_scenarios.py`,
+# with no AGENT set) behaves exactly as before this parameterization.
 AGENT = os.getenv("AGENT", "tekos")
 # The OKF task this agent's evaluation exercises (app/registry.py's
 # TaskDefinition.name) - required by _invoke_tool's X-Zuno-Task header
@@ -58,78 +62,34 @@ AGENT = os.getenv("AGENT", "tekos")
 # Tekos's real task name keeps the unparameterized case unchanged.
 TASK_NAME = os.getenv("TASK_NAME", "answer-technical-question")
 
-# WP-154 (ADR-0573): "unifai" or "agent-runtime". Selected by `--target` on the
-# command line or EVAL_TARGET in the environment; the scenarios file is the same,
-# only the transport of some handlers changes. WP-156: the default is unifai,
-# the platform that serves the agents; agent-runtime stays selectable until it
-# is retired, then this switch goes with it.
-TARGET = os.getenv("EVAL_TARGET", "unifai")
+# WP-154 (ADR-0573) introduced a `--target`/EVAL_TARGET switch between UnifAI
+# and the legacy agent stack; WP-156 retired the latter, so "unifai" is the
+# only value left. The switch is still accepted (the acceptance-gate and
+# stresstest Jobs set EVAL_TARGET=unifai) so an explicit request for anything
+# else fails loudly instead of silently evaluating UnifAI.
+TARGET = "unifai"
+_requested_target = os.getenv("EVAL_TARGET") or TARGET
 if "--target" in sys.argv:
     _i = sys.argv.index("--target")
     if _i + 1 < len(sys.argv):
-        TARGET = sys.argv[_i + 1]
+        _requested_target = sys.argv[_i + 1]
+if _requested_target != TARGET:
+    raise SystemExit(
+        f"run_scenarios.py: unsupported evaluation target {_requested_target!r} - "
+        f"{TARGET!r} is the only target since WP-156 retired the legacy agent stack"
+    )
 
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "https://keycloak.apps.mycluster.example.com")
+# No scenario calls it any more: kept only as the base-domain hint
+# platform/testing/quota_429.py derives the quota-demo route from
+# (https://<agent>.apps.<base-domain>) when neither QUOTA_DEMO_URL nor
+# CLUSTER_BASE_DOMAIN is set.
 FRONTEND_URL = os.getenv("FRONTEND_URL", f"https://{AGENT}.apps.mycluster.example.com")
-BFF_URL = os.getenv("BFF_URL", f"http://{AGENT}-bff.zuno-ai-run.svc.cluster.local:8080")
-# Agent Runtime and every platform service below are shared across every
-# agent (ADR-0342's generic dispatch, ADR-0009's split services) - never
-# agent-specific, unlike FRONTEND_URL/BFF_URL above.
-RUNTIME_URL = os.getenv("RUNTIME_URL", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080")
+# Shared across every agent (ADR-0342's generic dispatch) - never
+# agent-specific.
 MCP_GATEWAY_URL = os.getenv("MCP_GATEWAY_URL", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080")
-RAG_URL = os.getenv("RAG_SERVICE_URL", "http://rag-service.zuno-data.svc.cluster.local:8080")
-# ADR-0326/WP-33: Comage's own live MCP server (evaluations/comage's
-# scenario 20 includes it in `services:`; harmless to resolve unconditionally
-# for every agent).
-SALESFORCE_MCP_URL = os.getenv("SALESFORCE_MCP_URL", "http://salesforce-mcp.zuno-ai-run.svc.cluster.local:8000")
-# ADR-0540/WP-120: the NeMo Guardrails server agent-runtime's own
-# guardrails_client._evaluate_nemo talks to. Shared across every agent
-# (same service, same config_id) - not agent-specific like FRONTEND_URL.
-GUARDRAILS_URL = os.getenv("GUARDRAILS_URL", "http://zuno-guardrails.zuno-ai-run.svc:80")
-GUARDRAILS_CONFIG_ID = os.getenv("GUARDRAILS_CONFIG_ID", "zuno-observe")
+AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080")
 
-
-def query_guardrails_detections(message: str) -> List[str]:
-    """Hits the NeMo Guardrails server directly with `message`, returning the
-    detection names its input rail matched (e.g. "injection-ignore-
-    instructions", "credit-card") - empty if the message is clean.
-
-    Mirrors the exact request shape and response parsing of
-    components/agent-runtime/app/clients/guardrails_client.py's
-    _evaluate_nemo/_detection_names: `config_id`/`options` MUST nest under
-    `guardrails` (a flat top-level shape is silently dropped by the server,
-    not rejected - see that module's own docstring for the live-caught
-    HTTP-200-with-"Internal server error" trap), and `model` is required by
-    the schema even though no rail ever resolves it (422 without it).
-
-    Synchronous and immediate - no OTel/Prometheus scrape lag - because it
-    talks to the rails server itself rather than waiting on agent-runtime's
-    fire-and-forget observe_exchange() to report a metric.
-    """
-    resp = httpx.post(
-        f"{GUARDRAILS_URL}/v1/chat/completions",
-        json={
-            "model": GUARDRAILS_CONFIG_ID,
-            "messages": [{"role": "user", "content": message}],
-            "guardrails": {
-                "config_id": GUARDRAILS_CONFIG_ID,
-                "options": {"rails": ["input"], "log": {"activated_rails": True}},
-            },
-        },
-        timeout=15,
-    )
-    resp.raise_for_status()
-    payload = resp.json()
-    names: List[str] = []
-    log_block = ((payload or {}).get("guardrails") or {}).get("log") or {}
-    for rail in log_block.get("activated_rails") or []:
-        for executed in (rail or {}).get("executed_actions") or []:
-            if (executed or {}).get("action_name") != "zuno_scan":
-                continue
-            result = executed.get("return_value")
-            if isinstance(result, list):
-                names.extend(str(item) for item in result)
-    return names
 
 REALM = "zuno"
 # Shared demo-persona password (ADR-0041) - never hardcoded; read from the
@@ -157,50 +117,14 @@ else:
     TOKEN_CLIENT_ID, TOKEN_CLIENT_SECRET = f"{AGENT}-frontend", FRONTEND_CLIENT_SECRET
 
 
-def is_placeholder_agent_404(resp: httpx.Response) -> bool:
-    """True if `resp` is agent-runtime's `_active_agent_or_404` (app/main.py)
-    denying a chat call because the agent is not yet zuno.status=active.
-
-    A bare status-code check, deliberately not matched against agent-
-    runtime's exact 404 body (`{"detail": "unknown agent '<agent>'"}`):
-    a call routed through the BFF instead of straight to RUNTIME_URL sees
-    that rejection re-wrapped into the BFF's own generic error shape
-    (`{"error": "agent runtime rejected the request"}`,
-    components/agent-bff/main.go's writeError) with the status code
-    preserved but the original body text gone. Safe to key on status
-    alone: every call site this helper is used from has no other reason
-    to see a 404 on this endpoint for a validly-shaped request.
-
-    Deliberately response-shape-based, not a pre-flight read of
-    agents/<agent>/agent.okf.md's own frontmatter (an earlier version of
-    this check did that) - live-caught 2026-09-09 (ADR-0555): the Day 3
-    stresstest Job these scripts actually run in
-    (ansible/roles/day3/kustomize/stresstest-scripts) mounts a flat
-    ConfigMap that never projects agents/<agent>/agent.okf.md for
-    advantage/finage/naveo at all (only tekos/arkos, for gate_checks.py's
-    own unrelated needs), so a filesystem read always raised
-    FileNotFoundError in the one context this actually needs to work in.
-    """
-    return resp.status_code == 404
-
-SERVICE_HEALTH_URLS = {
-    "frontend": f"{FRONTEND_URL}/healthz",
-    "bff": f"{BFF_URL}/healthz",
-    "agent-runtime": f"{RUNTIME_URL}/healthz",
-    "mcp-gateway": f"{MCP_GATEWAY_URL}/healthz",
-    "rag-service": f"{RAG_URL}/healthz",
-    "salesforce-mcp": f"{SALESFORCE_MCP_URL}/healthz",
-}
-
-
 @dataclass
 class ScenarioResult:
     id: int
     title: str
     passed: bool
     detail: str = ""
-    # WP-154: a scenario that cannot apply to the chosen target (e.g. a portal
-    # tile on UnifAI) is reported and excluded from the pass rate, never
+    # WP-154: a scenario that cannot apply to UnifAI (e.g. a placeholder
+    # agent's chat turn) is reported and excluded from the pass rate, never
     # counted as a pass.
     skipped: bool = False
 
@@ -215,10 +139,12 @@ def _login_name(persona: str) -> str:
 
 
 def get_token(persona: str) -> str:
-    """Resource Owner Password Credentials grant against AGENT's own
-    confidential frontend client - appropriate for an automated evaluation
-    harness acting on behalf of fixture personas, not for real user login
-    (which uses the authorization-code flow, see components/agent-frontend).
+    """Resource Owner Password Credentials grant against the evaluation
+    client - appropriate for an automated evaluation harness acting on
+    behalf of fixture personas, not for real user login (which goes through
+    the UnifAI UI's own browser OIDC flow, see unifai_target.py). The token
+    is for the platform services called directly below (MCP gateway,
+    ai-gateway); UnifAI itself is driven through a session cookie.
     """
     if persona in _token_cache:
         return _token_cache[persona]
@@ -250,146 +176,10 @@ def auth_headers(persona: str) -> Dict[str, str]:
 
 
 # --------------------------------------------------------------------------
-# Test-generated conversation cleanup. Every chat call below creates a
-# brand-new, permanently-persisted conversation (agent-runtime's
-# _resolve_run_id mints a fresh run_id whenever the caller doesn't already
-# have one to resume - there is no way to pre-tag a new conversation's
-# identity, and session_id is never written to any database column, only
-# carried into AgentState.session_id for tracing). Since these scripts
-# authenticate as real demo personas that are also used for live human
-# demos, an uncleaned run leaves synthetic conversations
-# ("Can you generate a mockup image...", etc.) sitting in that persona's
-# real conversation list.
-#
-# Rather than a heuristic sweep (by time window or persona, both of which
-# risk deleting a real demo's conversation happening concurrently), this
-# records the exact run_id every call creates and hard-deletes exactly
-# those at the end of the run via DELETE .../runs/{run_id}/hard-delete
-# (ADR-0515, already live - WP-066) - the same ownership check (owner_sub
-# must match the caller) that endpoint already enforces, so this can never
-# touch a conversation it didn't itself just create.
+# Shared platform-service handlers: these scenarios exercise Keycloak, the
+# MCP gateway and the model-routing config directly, whatever serves the
+# agents.
 # --------------------------------------------------------------------------
-
-_CREATED_RUN_IDS: List[Tuple[str, str]] = []  # (persona, run_id)
-
-
-def record_run_id(persona: str, body: Dict[str, Any]) -> None:
-    run_id = body.get("run_id")
-    if run_id:
-        _CREATED_RUN_IDS.append((persona, run_id))
-
-
-def cleanup_created_runs() -> Tuple[int, int]:
-    """Best-effort: a 404 (already gone) or any transport error is counted
-    as failed but never raised - cleanup must never fail an otherwise-
-    passing test run. Always targets RUNTIME_URL directly regardless of
-    whether the conversation was created via BFF_URL or RUNTIME_URL - the
-    backing conversations/checkpoint store is the same either way, and
-    hard-delete is agent-runtime's own endpoint."""
-    deleted = failed = 0
-    for persona, run_id in _CREATED_RUN_IDS:
-        try:
-            resp = httpx.delete(
-                f"{RUNTIME_URL}/v1/agents/{AGENT}/runs/{run_id}/hard-delete",
-                headers=auth_headers(persona),
-                timeout=15,
-            )
-            if resp.status_code in (200, 404):
-                deleted += 1
-            else:
-                failed += 1
-        except Exception:
-            failed += 1
-    _CREATED_RUN_IDS.clear()
-    return deleted, failed
-
-
-# ADR-0042: agent-frontend's `/` is a thin, always-200 HTML shell
-# (internal/portal/portal.go) - it never redirects server-side and never
-# reads an Authorization header. Sign-in state lives entirely in the
-# server-rendered `#zuno-config` JSON blob (`signedIn`, and each tile's
-# `clickable`), which the React SPA reads client-side. Both scenario
-# handlers below that need to know sign-in state parse this blob instead
-# of relying on HTTP status/headers or a Bearer token the frontend would
-# never look at.
-_ZUNO_CONFIG_RE = re.compile(r'<script id="zuno-config"[^>]*>(.*?)</script>', re.DOTALL)
-
-
-def _zuno_config(body: str) -> Dict[str, Any]:
-    match = _ZUNO_CONFIG_RE.search(body)
-    if not match:
-        raise RuntimeError("portal HTML has no #zuno-config script block")
-    return json.loads(match.group(1))
-
-
-_session_clients: Dict[str, httpx.Client] = {}
-
-
-def get_session_client(persona: str) -> httpx.Client:
-    """Completes the real browser OIDC flow - GET {FRONTEND_URL}/login
-    (redirects to Keycloak's authorize endpoint), parse and submit
-    Keycloak's own login form, follow the redirect back through
-    /callback - and returns an httpx.Client whose cookie jar now carries
-    the resulting `zuno_session` cookie, the only credential
-    agent-frontend's `/` ever reads (ADR-0042). Distinct from
-    get_token()/auth_headers() above, which mint a Bearer JWT for calling
-    the BFF/Agent Runtime/MCP Gateway APIs directly - agent-frontend's
-    browser-facing routes are cookie-only and never accept that token.
-    """
-    if persona in _session_clients:
-        return _session_clients[persona]
-    if not DEMO_PASSWORD:
-        raise RuntimeError("DEMO_PERSONA_PASSWORD is required to obtain a session cookie")
-
-    client = httpx.Client(follow_redirects=True, timeout=15)
-    login_page = client.get(f"{FRONTEND_URL}/login")
-    login_page.raise_for_status()
-
-    match = re.search(r'<form[^>]*id="kc-form-login"[^>]*action="([^"]+)"', login_page.text)
-    if not match:
-        client.close()
-        raise RuntimeError("could not find Keycloak's kc-form-login action URL")
-    action_url = html.unescape(match.group(1))
-
-    result = client.post(action_url, data={"username": _login_name(persona), "password": DEMO_PASSWORD, "credentialId": ""})
-    result.raise_for_status()
-    if "zuno_session" not in client.cookies:
-        client.close()
-        raise RuntimeError(f"OIDC login for {persona!r} did not yield a zuno_session cookie (landed on {result.url})")
-
-    _session_clients[persona] = client
-    return client
-
-
-# --------------------------------------------------------------------------
-# Scenario handlers - one per `type` in scenarios.yaml
-# --------------------------------------------------------------------------
-
-
-def portal_lists_all_agents(s: Dict[str, Any]) -> ScenarioResult:
-    resp = httpx.get(FRONTEND_URL, headers=auth_headers(s["persona"]), timeout=10, follow_redirects=True)
-    body = resp.text
-    # naveo: sixth agent (ADR-0410/WP-41b); soursage/cognos: ADR-0349 §6
-    # placeholder tiles - the portal auto-discovers tiles from the OKF
-    # bundles baked into the frontend image, so this list only needs each
-    # agent slug, no frontend code change.
-    agents = ["comage", "tekos", "advantage", "finage", "arkos", "naveo", "soursage", "cognos"]
-    missing = [a for a in agents if a not in body.lower()]
-    return ScenarioResult(s["id"], s["title"], resp.status_code == 200 and not missing,
-                           f"status={resp.status_code} missing_tiles={missing}")
-
-
-def portal_requires_login(s: Dict[str, Any]) -> ScenarioResult:
-    resp = httpx.get(FRONTEND_URL, timeout=10, follow_redirects=True)
-    if resp.status_code != 200:
-        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
-    try:
-        cfg = _zuno_config(resp.text)
-    except Exception as exc:
-        return ScenarioResult(s["id"], s["title"], False, str(exc))
-    any_clickable = any(t.get("clickable") for t in cfg.get("tiles", []))
-    ok = cfg.get("signedIn") is False and not any_clickable
-    return ScenarioResult(s["id"], s["title"], ok, f"signedIn={cfg.get('signedIn')} any_clickable={any_clickable}")
 
 
 def _decode_claims_without_verifying(token: str) -> Dict[str, Any]:
@@ -410,7 +200,7 @@ def keycloak_login(s: Dict[str, Any]) -> ScenarioResult:
     """ADR-0053 "Keycloak login/claims": proves both that the persona can
     authenticate at all, and that the resulting token actually carries the
     group claims (ADR-0040's business-role/agent-entitlement groups) every
-    downstream authorization decision (BFF, MCP Gateway) depends on -
+    downstream authorization decision (MCP and AI gateways) depends on -
     login succeeding with an empty/wrong claim set would pass a
     "login"-only check while still breaking every scenario after it.
     """
@@ -424,229 +214,6 @@ def keycloak_login(s: Dict[str, Any]) -> ScenarioResult:
         return ScenarioResult(s["id"], s["title"], ok, f"groups={groups} missing={missing}")
     except Exception as exc:
         return ScenarioResult(s["id"], s["title"], False, str(exc))
-
-
-def portal_tile_state(s: Dict[str, Any]) -> ScenarioResult:
-    # Uses a real zuno_session cookie (get_session_client), not a Bearer
-    # header - agent-frontend's `/` only ever reads the cookie (ADR-0042),
-    # and reads the tile's own `clickable` field from #zuno-config rather
-    # than sniffing "disabled"/"coming soon" text near the agent's name in
-    # the HTML (fragile, and no longer even meaningful now the tile grid
-    # is a client-side-rendered React component, not server-templated).
-    try:
-        client = get_session_client(s["persona"])
-    except Exception as exc:
-        return ScenarioResult(s["id"], s["title"], False, str(exc))
-    resp = client.get(FRONTEND_URL, timeout=10)
-    if resp.status_code != 200:
-        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
-    try:
-        cfg = _zuno_config(resp.text)
-    except Exception as exc:
-        return ScenarioResult(s["id"], s["title"], False, str(exc))
-    agent = s["agent"]
-    tile = next((t for t in cfg.get("tiles", []) if t.get("name") == agent), None)
-    if tile is None:
-        return ScenarioResult(s["id"], s["title"], False, f"tile for {agent} not found")
-    enabled = bool(tile.get("clickable"))
-    ok = enabled == s["expect_enabled"]
-    return ScenarioResult(s["id"], s["title"], ok, f"enabled={enabled} expected={s['expect_enabled']}")
-
-
-def chat_basic_qa(s: Dict[str, Any]) -> ScenarioResult:
-    # timeout_seconds: most chat scenarios are interactive lookups (30s is
-    # ample), but a handful (e.g. arkos's DAT drafting) structurally chain
-    # multiple full-document LLM calls, `draft` forced onto a local model
-    # with its own 60s-per-candidate timeout in ai-gateway - MEMORY.md
-    # documents "long document workflows may take up to 10 minutes" as the
-    # accepted SLO for exactly that shape. Per-scenario override, not a
-    # blanket bump, so a genuinely-slow interactive reply still fails loud
-    # at the default.
-    timeout = s.get("timeout_seconds", 30)
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers(s["persona"]),
-        json={"session_id": "eval-7", "message": s["message"]},
-        timeout=timeout,
-    )
-    if resp.status_code != 200:
-        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
-    body = resp.json()
-    record_run_id(s["persona"], body)
-    ok = bool(body.get("reply")) and isinstance(body.get("citations", []), list)
-    detail = f"reply_len={len(body.get('reply', ''))} citations={len(body.get('citations', []))}"
-
-    # ADR-0215: a second turn on the SAME run_id must still succeed - the
-    # live-path proof that resume + history-carrying actually works end to
-    # end (components/agent-runtime/tests/test_history.py already covers
-    # the exact prompt content this produces; a scripted smoke check with
-    # no LLM judge can only assert the resumed turn completes with a
-    # non-empty reply, not that it semantically recalled turn 1).
-    follow_up = s.get("follow_up")
-    run_id = body.get("run_id")
-    if ok and follow_up and run_id:
-        resp2 = httpx.post(
-            f"{BFF_URL}/api/chat",
-            headers=auth_headers(s["persona"]),
-            json={"session_id": "eval-7", "message": follow_up, "run_id": run_id},
-            timeout=timeout,
-        )
-        follow_up_ok = resp2.status_code == 200 and bool(resp2.json().get("reply"))
-        ok = ok and follow_up_ok
-        detail += f" follow_up_status={resp2.status_code} follow_up_ok={follow_up_ok}"
-
-    return ScenarioResult(s["id"], s["title"], ok, detail)
-
-
-def chat_first_token_latency(s: Dict[str, Any]) -> ScenarioResult:
-    # Known, accepted gap in cleanup_created_runs()'s coverage: unlike
-    # chat_streaming_sse below, this deliberately breaks on the very first
-    # raw byte chunk to measure genuine first-byte latency - reading
-    # further (or switching to iter_lines()) to extract the "start"
-    # event's run_id would risk perturbing exactly the timing this
-    # scenario exists to measure. Leaves at most one uncleaned test
-    # conversation per run (this scenario, eval-9) rather than touch a
-    # latency-sensitive SLO check.
-    start = time.monotonic()
-    first_byte_at: Optional[float] = None
-    try:
-        with httpx.stream(
-            "POST",
-            f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-            headers={**auth_headers(s["persona"]), "Accept": "text/event-stream"},
-            json={"session_id": "eval-9", "user_sub": s["persona"], "message": s["message"]},
-            timeout=30,
-        ) as resp:
-            for chunk in resp.iter_bytes():
-                if chunk:
-                    first_byte_at = time.monotonic()
-                    break
-    except Exception as exc:
-        return ScenarioResult(s["id"], s["title"], False, str(exc))
-
-    if first_byte_at is None:
-        return ScenarioResult(s["id"], s["title"], False, "no data received")
-    elapsed = first_byte_at - start
-    ok = elapsed <= s["max_seconds"]
-    return ScenarioResult(s["id"], s["title"], ok, f"first_token_seconds={elapsed:.2f} max={s['max_seconds']}")
-
-
-def chat_streaming_sse(s: Dict[str, Any]) -> ScenarioResult:
-    saw_token, saw_done = False, False
-    # main.py's _stream_chat always yields event "start" (carrying run_id)
-    # first, before any "token"/"done" event - captured here purely for
-    # cleanup_created_runs(), never used for this scenario's own pass/fail.
-    expect_start_data = False
-    # Same per-scenario override as chat_basic_qa's own timeout - was
-    # hardcoded to 30 here regardless of the scenario's declared
-    # timeout_seconds, so arkos's structure-demo streaming scenario (which
-    # declares 180s for exactly this reason) always raced a client-side
-    # timeout well before the BFF's own 180s streaming budget, surfacing as
-    # a false "timed out" instead of exercising the real behavior.
-    try:
-        with httpx.stream(
-            "POST",
-            f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-            headers={**auth_headers(s["persona"]), "Accept": "text/event-stream"},
-            json={"session_id": "eval-10", "user_sub": s["persona"], "message": s["message"]},
-            timeout=s.get("timeout_seconds", 30),
-        ) as resp:
-            for line in resp.iter_lines():
-                if expect_start_data and line.startswith("data:"):
-                    try:
-                        record_run_id(s["persona"], json.loads(line[len("data:"):].strip()))
-                    except Exception:
-                        pass
-                    expect_start_data = False
-                elif line.startswith("event: start"):
-                    expect_start_data = True
-                elif line.startswith("event: token"):
-                    saw_token = True
-                elif line.startswith("event: done"):
-                    saw_done = True
-                    break
-    except Exception as exc:
-        return ScenarioResult(s["id"], s["title"], False, str(exc))
-    ok = saw_token and saw_done
-    return ScenarioResult(s["id"], s["title"], ok, f"saw_token={saw_token} saw_done={saw_done}")
-
-
-def chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
-    # timeout_seconds: see chat_basic_qa's own comment - same per-scenario
-    # override for structurally-slow workflows (e.g. arkos's DAT drafting).
-    resp = httpx.post(
-        f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-        headers=auth_headers(s["persona"]),
-        json={"session_id": "eval-11", "user_sub": s["persona"], "message": s["message"]},
-        timeout=s.get("timeout_seconds", 30),
-    )
-    if resp.status_code != 200:
-        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
-    body = resp.json()
-    record_run_id(s["persona"], body)
-    # Citation.source is the raw result URL
-    # (app/graph/nodes.py's respond_node: `item.get("url") or "live-read"`),
-    # not a fixed marker string for the tool that produced it - Tekos's real
-    # Confluence instance, for instance, is hosted at startxfr.atlassian.net,
-    # which never contains the word "confluence". source_mode ("live"/"both"
-    # only when a live tool call's results actually contributed - ADR-0205's
-    # _compute_source_mode, agent-agnostic) is the correct, hosting-domain-
-    # independent signal that THIS task's one declared live_read_tool
-    # (Confluence for Tekos, Salesforce for Comage, ADR-0326/WP-33 - each
-    # task has exactly one, so no ambiguity) fired and contributed, so check
-    # that instead of pattern-matching the citation URL against a per-agent
-    # marker string.
-    ok = body.get("source_mode") in ("live", "both")
-    return ScenarioResult(s["id"], s["title"], ok, f"source_mode={body.get('source_mode')} citations={body.get('citations', [])}")
-
-
-def chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:
-    """ADR-0007: agent-runtime's `_active_agent_or_404` (components/agent-runtime/app/main.py)
-    rejects any agent whose OKF status isn't "active" before GraphFactory
-    is ever consulted - by design, not a bug. For a placeholder-status
-    agent, real chat can never succeed, so this proves the boundary holds
-    rather than asserting a reply that will never come.
-
-    via: "runtime" (default) calls RUNTIME_URL directly, unaffected by
-    anything BFF-side, and gets a deterministic 404. via: "bff" calls
-    BFF_URL instead, which independently forwards agent-runtime's 404
-    once the caller's JWT clears agent-bff's own verification - but
-    live-cluster-confirmed 2026-08-21: agent-bff's JWKS-fetch http.Client
-    (components/agent-bff/internal/jwks/jwks.go) trusts only the default
-    system CA store, not the cluster-internal CA that signs Keycloak's
-    Route certificate, so a freshly-rolled agent-bff pod's first
-    verification attempt can independently fail with its own 401 before
-    ever reaching agent-runtime's check - a second, real, unrelated bug.
-    Either response proves the same thing a real caller cares about (no
-    chat reply was produced), so the "bff" path only asserts != 200
-    rather than pinning the exact code.
-    """
-    via = s.get("via", "runtime")
-    if via == "bff":
-        resp = httpx.post(
-            f"{BFF_URL}/api/chat",
-            headers=auth_headers(s["persona"]),
-            json={"session_id": "eval-7", "message": s["message"]},
-            timeout=30,
-        )
-        ok = resp.status_code != 200
-    else:
-        resp = httpx.post(
-            f"{RUNTIME_URL}/v1/agents/{AGENT}/chat",
-            headers=auth_headers(s["persona"]),
-            json={"session_id": "eval-11", "user_sub": s["persona"], "message": s["message"]},
-            timeout=30,
-        )
-        ok = resp.status_code == 404
-    return ScenarioResult(s["id"], s["title"], ok, f"status={resp.status_code} via={via}")
-
-
-def rag_retrieval_has_citation(s: Dict[str, Any]) -> ScenarioResult:
-    resp = httpx.post(f"{RAG_URL}/v1/search", json={"query": s["query"], "top_k": 5}, timeout=15)
-    if resp.status_code != 200:
-        return ScenarioResult(s["id"], s["title"], False, f"status={resp.status_code}")
-    results = resp.json().get("results", [])
-    return ScenarioResult(s["id"], s["title"], len(results) > 0, f"result_count={len(results)}")
 
 
 def _invoke_tool(persona: str, tool: str, arguments: Dict[str, Any], classification: str = "C1") -> httpx.Response:
@@ -682,9 +249,7 @@ def mcp_gateway_unknown_tool(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def model_router_fails_closed(s: Dict[str, Any]) -> ScenarioResult:
-    # No HTTP surface exposes ModelRouter directly; exercised indirectly via
-    # a chat request declared at the target classification once agent-runtime
-    # accepts a classification override, or verified by code review of
+    # No HTTP surface exposes ModelRouter directly; verified against
     # policies/data-classification/classification.yaml + provider-routing.yaml
     # (every C3 domain must map to a provider list where only "local" is
     # eligible). This is a config-consistency check, runnable without a
@@ -725,28 +290,6 @@ def model_router_prefers_local(s: Dict[str, Any]) -> ScenarioResult:
     )
 
 
-def bff_rejects_missing_jwt(s: Dict[str, Any]) -> ScenarioResult:
-    resp = httpx.post(f"{BFF_URL}/api/chat", json={"message": "hello"}, timeout=10)
-    ok = resp.status_code == 401
-    return ScenarioResult(s["id"], s["title"], ok, f"status={resp.status_code}")
-
-
-def bff_rejects_wrong_audience(s: Dict[str, Any]) -> ScenarioResult:
-    # Any non-AGENT-frontend-audience token would do; this evaluation
-    # harness only ever authenticates through AGENT's own confidential
-    # client (see get_token() above), so this exercises the audience check
-    # with a deliberately malformed/foreign token instead of a same-realm
-    # token carrying a different agent's audience.
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers={"Authorization": "Bearer not-a-real-jwt"},
-        json={"message": "hello"},
-        timeout=10,
-    )
-    ok = resp.status_code == 401
-    return ScenarioResult(s["id"], s["title"], ok, f"status={resp.status_code}")
-
-
 def agent_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
     # Requires the Kubernetes Python client and in-cluster config (the gate
     # Job's own ServiceAccount token) - the one scenario that inspects
@@ -785,119 +328,13 @@ def agent_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], all_empty, "; ".join(details))
 
 
-def health_endpoints_all_ok(s: Dict[str, Any]) -> ScenarioResult:
-    statuses = {}
-    for svc in s["services"]:
-        url = SERVICE_HEALTH_URLS[svc]
-        try:
-            resp = httpx.get(url, timeout=10)
-            statuses[svc] = resp.status_code
-        except Exception as exc:
-            statuses[svc] = str(exc)
-    ok = all(v == 200 for v in statuses.values())
-    return ScenarioResult(s["id"], s["title"], ok, json.dumps(statuses))
-
-
-def chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
-    """ADR-0526 (WP-087): asserts HOW an answer is written, not what it says.
-
-    The one tone-aware check in this file. Every other scenario here is
-    deliberately tone-blind (status codes, JSON shape, non-emptiness,
-    latency, SSE framing), which is what makes the acceptance suite a clean
-    substance control for the register variant - see
-    evaluations/register_conformance.py's module docstring.
-
-    This is the POST-PROMOTION live check. It is NOT what gates the
-    pipeline: components/mlops's evaluate stage scores train-lora's
-    held-out completions offline, because the merged model is deployed
-    nowhere at gate time. Two checks, one scorer, no duplicated thresholds.
-
-    `expect_register: false` inverts it, which is how rules 11-13 get
-    asserted live: a technical question whose answer must NOT be slangified.
-
-    Optional `samples` (default 1, so every existing scenario keeps its
-    exact prior single-call behavior): live-verified 2026-09-01 that a
-    single call is a noisy assertion against the reference corpus's own
-    ~86% marker rate (register_conformance.py's module docstring) - Comage's
-    scenario#21 failed a real day2-stresstest run on one unlucky 0-marker
-    reply, confirmed via live Prometheus telemetry to have actually been
-    served by qwen3.5-9b-wesh (not a routing fallback to the untuned base
-    model). `samples > 1` fires the prompt that many times over distinct
-    sessions and requires only ONE of them to clear the floor - still fails
-    outright the instant any sample trips rules 11-13 (that check stays
-    mandatory-on-any-sample, mirroring register_conformance.score_corpus's
-    own non-negotiable violation check), and for the `expect_register: false`
-    ceiling case uses the MEAN density across samples rather than an OR,
-    since one clean sample can't excuse an over-slangified one when the
-    assertion is a ceiling rather than a floor.
-    """
-    # Imported here, not at module scope, and with an explicit path setup:
-    # this file runs under TWO different layouts. In the repo it sits at
-    # evaluations/tekos/, with register_conformance.py one level up; in the
-    # acceptance-gate Job every script is flattened into /gate as sibling
-    # files. Covering both is two sys.path entries, and getting it wrong is
-    # an ImportError inside a live gate run.
-    _here = pathlib.Path(__file__).resolve().parent
-    for candidate in (_here, _here.parent):
-        if str(candidate) not in sys.path:
-            sys.path.insert(0, str(candidate))
-    import register_conformance
-
-    timeout = s.get("timeout_seconds", 30)
-    num_samples = int(s.get("samples", 1))
-    scored_samples: List[Dict[str, Any]] = []
-    for i in range(num_samples):
-        session_id = "eval-register" if num_samples == 1 else f"eval-register-{s['id']}-{i}"
-        resp = httpx.post(
-            f"{BFF_URL}/api/chat",
-            headers=auth_headers(s["persona"]),
-            json={"session_id": session_id, "message": s["message"]},
-            timeout=timeout,
-        )
-        if resp.status_code != 200:
-            return ScenarioResult(
-                s["id"], s["title"], False,
-                f"status={resp.status_code} (sample {i + 1}/{num_samples})",
-            )
-        body = resp.json()
-        record_run_id(s["persona"], body)
-        scored_samples.append(register_conformance.score_text(body.get("reply") or ""))
-
-    # Rules 11-13 are asserted on EVERY register scenario and EVERY sample,
-    # not only the negative one: slangified syntax is a failure whatever the
-    # question, and one clean sample never excuses another's violation.
-    for scored in scored_samples:
-        if scored["violations"]:
-            return ScenarioResult(
-                s["id"], s["title"], False,
-                "rules 11-13: " + "; ".join(f"{v['marker']} in {v['kind']}" for v in scored["violations"][:3]),
-            )
-    if s.get("expect_register", True):
-        min_markers = int(s.get("min_markers", 1))
-        best = max(scored_samples, key=lambda sc: sc["marker_count"])
-        hits = sum(1 for sc in scored_samples if sc["marker_count"] >= min_markers)
-        ok = hits > 0
-        detail = (
-            f"samples={num_samples} hits={hits}/{num_samples} best_markers={best['marker_count']} "
-            f"found={','.join(best['markers'][:6])}"
-        )
-    else:
-        # A technical answer may still carry register - rule 18 says
-        # professional topics use MEDIUM familiarity, not none - so this
-        # asserts a ceiling, never zero.
-        max_density = float(s.get("max_density", 0.25))
-        mean_density = sum(sc["density"] for sc in scored_samples) / num_samples
-        ok = mean_density <= max_density
-        detail = f"samples={num_samples} mean_density={mean_density:.3f}"
-    return ScenarioResult(s["id"], s["title"], ok, detail)
-
-
 # --------------------------------------------------------------------------
-# UnifAI target (WP-154). The same scenarios, served by UnifAI's own session
-# API (evaluations/common/unifai_target.py). Scenarios that exercise shared
-# platform services (MCP gateway, model router, Keycloak) keep their
-# agent-runtime-era handlers; the ones tied to components UnifAI replaces
-# (portal tiles, BFF, agent-runtime health) get an equivalent or are skipped.
+# UnifAI handlers (WP-154, the only target since WP-156): the scenarios about
+# the agents themselves, served by UnifAI's own session API
+# (evaluations/common/unifai_target.py). The `u_` prefix marks them. A
+# scenario type kept from the legacy stack (portal tiles, BFF JWT checks)
+# gets its UnifAI equivalent, or is reported as skipped with its reason when
+# none exists.
 # --------------------------------------------------------------------------
 
 _unifai_target = None
@@ -1037,8 +474,8 @@ _UNIFAI_LIVE_READ_TOOLS = {"comage": "salesforce.opportunity.read"}
 def u_chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     if _unifai_placeholder_skip(s):
         return _skip(s, _PLACEHOLDER_WHY)
-    # comage's scenario 10 has no `expect_tool` (agent-runtime checks source_mode); on
-    # UnifAI the live read is the tool call itself.
+    # comage's scenario 10 has no `expect_tool` (it predates UnifAI, which proves the live
+    # read by the tool call itself).
     want = _unifai_wanted_tools(s.get("expect_tool") or _UNIFAI_LIVE_READ_TOOLS.get(AGENT, ""))
     try:
         # Overall deadline: heartbeats keep a looping agent from tripping the per-read timeout.
@@ -1070,9 +507,8 @@ _UNIFAI_RAG_PERSONAS = {
 
 def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
     """The RAG scenario through UnifAI: a member of the source's groups gets an answer that
-    went through the retriever (and names the page when one is expected). The agent-runtime
-    scenario queries the rag-service directly; here the whole path (retriever, forwarded
-    token, ACL) is exercised."""
+    went through the retriever (and names the page when one is expected). The whole path
+    (retriever, forwarded token, ACL) is exercised, not just the search service."""
     persona = os.getenv("UNIFAI_RAG_PERSONA") or _UNIFAI_RAG_PERSONAS.get(AGENT) or s.get("persona", "consultant-01")
     question = _UNIFAI_RAG_QUESTION or s.get("query", "")
     try:
@@ -1107,10 +543,18 @@ def u_chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:
 
 
 def u_chat_register_conformance(s: Dict[str, Any]) -> ScenarioResult:
-    """ADR-0526 on UnifAI: same scoring as the BFF handler (register_conformance.score_text), the
-    turns go through a UnifAI session instead."""
+    """ADR-0526 (WP-087): asserts HOW an answer is written, not what it says - the one
+    tone-aware scenario (see evaluations/register_conformance.py's module docstring), scored
+    by register_conformance.score_text over UnifAI turns.
+
+    `expect_register: false` inverts it (rules 11-13: a technical answer must NOT be
+    slangified). `samples` (default 1) fires the prompt that many times: rules 11-13 must
+    hold on EVERY sample, the marker floor on at least one, and the `expect_register: false`
+    ceiling on the mean density."""
     if _unifai_placeholder_skip(s):
         return _skip(s, _PLACEHOLDER_WHY)
+    # This file runs under two layouts: evaluations/tekos/ in the repo (register_conformance.py
+    # one level up) and flattened into /gate in the Jobs; cover both.
     _here = pathlib.Path(__file__).resolve().parent
     for candidate in (_here, _here.parent):
         if str(candidate) not in sys.path:
@@ -1165,22 +609,34 @@ def u_bff_rejects_wrong_audience(s: Dict[str, Any]) -> ScenarioResult:
     return _skip(s, "UnifAI authenticates a server-side session cookie, it accepts no bearer token")
 
 
-def u_health_endpoints_all_ok(s: Dict[str, Any]) -> ScenarioResult:
-    urls = {
+# The services a health_endpoints_all_ok scenario may name in its `services:`
+# list; without one, every entry is checked.
+def _health_urls() -> Dict[str, str]:
+    return {
         "unifai-ui": f"{_unifai().ui_url}/",
         "mcp-gateway": f"{MCP_GATEWAY_URL}/healthz",
-        "ai-gateway": f"{os.getenv('AI_GATEWAY_URL', 'http://ai-gateway.zuno-ai-run.svc.cluster.local:8080')}/healthz",
+        "ai-gateway": f"{AI_GATEWAY_URL}/healthz",
     }
+
+
+def u_health_endpoints_all_ok(s: Dict[str, Any]) -> ScenarioResult:
+    urls = _health_urls()
+    wanted = s.get("services") or list(urls)
+    unknown = [svc for svc in wanted if svc not in urls]
+    if unknown:
+        return ScenarioResult(s["id"], s["title"], False, f"unknown services {unknown} (known: {sorted(urls)})")
     statuses: Dict[str, Any] = {}
-    for name, url in urls.items():
+    for name in wanted:
         try:
-            statuses[name] = httpx.get(url, timeout=10, verify=False).status_code
+            statuses[name] = httpx.get(urls[name], timeout=10, verify=False).status_code
         except Exception as exc:  # noqa: BLE001
             statuses[name] = str(exc)
     return ScenarioResult(s["id"], s["title"], all(v == 200 for v in statuses.values()), json.dumps(statuses))
 
 
-UNIFAI_HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
+HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
+    # Served by UnifAI (the `portal_*`/`bff_*` type names predate it and are
+    # kept so every agent's scenarios.yaml stays unchanged).
     "portal_lists_all_agents": u_portal_lists_all_agents,
     "portal_requires_login": u_portal_requires_login,
     "portal_tile_state": u_portal_tile_state,
@@ -1190,37 +646,19 @@ UNIFAI_HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "chat_triggers_tool": u_chat_triggers_tool,
     "rag_retrieval_has_citation": u_rag_retrieval,
     "chat_blocked_for_placeholder_agent": u_chat_blocked_for_placeholder_agent,
+    # ADR-0526 (WP-087): only the agents whose scenarios.yaml declares the
+    # type actually run it.
     "chat_register_conformance": u_chat_register_conformance,
     "bff_rejects_missing_jwt": u_bff_rejects_missing_jwt,
     "bff_rejects_wrong_audience": u_bff_rejects_wrong_audience,
     "agent_isolation_placeholder_empty": u_agent_isolation,
     "health_endpoints_all_ok": u_health_endpoints_all_ok,
-}
-
-
-HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
-    "portal_lists_all_agents": portal_lists_all_agents,
-    "portal_requires_login": portal_requires_login,
+    # Shared platform services, called directly.
     "keycloak_login": keycloak_login,
-    "portal_tile_state": portal_tile_state,
-    "chat_basic_qa": chat_basic_qa,
-    "chat_first_token_latency": chat_first_token_latency,
-    "chat_streaming_sse": chat_streaming_sse,
-    "chat_triggers_tool": chat_triggers_tool,
-    # ADR-0526 (WP-087). Added to the SHARED dict, so all six agents get it
-    # from this one entry - only the agents whose scenarios.yaml declares
-    # the type actually run it.
-    "chat_register_conformance": chat_register_conformance,
-    "chat_blocked_for_placeholder_agent": chat_blocked_for_placeholder_agent,
-    "rag_retrieval_has_citation": rag_retrieval_has_citation,
     "mcp_gateway_denied": mcp_gateway_denied,
     "mcp_gateway_unknown_tool": mcp_gateway_unknown_tool,
     "model_router_fails_closed": model_router_fails_closed,
     "model_router_prefers_local": model_router_prefers_local,
-    "bff_rejects_missing_jwt": bff_rejects_missing_jwt,
-    "bff_rejects_wrong_audience": bff_rejects_wrong_audience,
-    "agent_isolation_placeholder_empty": agent_isolation_placeholder_empty,
-    "health_endpoints_all_ok": health_endpoints_all_ok,
 }
 
 
@@ -1233,10 +671,9 @@ def run() -> List[ScenarioResult]:
     scenarios_path = pathlib.Path(__file__).resolve().parent.parent / AGENT / "scenarios.yaml"
     scenarios = yaml.safe_load(scenarios_path.read_text())["scenarios"]
 
-    handlers = {**HANDLERS, **UNIFAI_HANDLERS} if TARGET == "unifai" else HANDLERS
     results: List[ScenarioResult] = []
     for s in scenarios:
-        handler = handlers.get(s["type"])
+        handler = HANDLERS.get(s["type"])
         if handler is None:
             result = ScenarioResult(s["id"], s["title"], False, f"no handler for type '{s['type']}'")
         else:
@@ -1269,19 +706,21 @@ def main() -> int:
 
     threshold = 0.75
     print(f"\n{passed}/{total} passed ({rate:.0%}) - threshold {threshold:.0%} (ADR-0028)"
-          + (f", {len(skipped)} skipped (not applicable on this target)" if skipped else ""))
+          + (f", {len(skipped)} skipped (not applicable on UnifAI)" if skipped else ""))
 
     # Only reached for a standalone `python3 run_scenarios.py` invocation -
     # when imported by platform/testing/day2_stresstest.py (the Job's real
-    # entrypoint), this main() never runs; that orchestrator calls
-    # cleanup_created_runs() itself once, after every layer (scenario,
-    # security, stress_test) has had a chance to add to the same shared
-    # _CREATED_RUN_IDS list.
-    if os.getenv("CLEANUP_TEST_DATA", "1") != "0":
-        deleted, failed = _unifai().cleanup() if TARGET == "unifai" else cleanup_created_runs()
+    # entrypoint), this main() never runs; that orchestrator cleans up the
+    # shared UnifaiTarget's sessions itself, once, after every layer has run.
+    # Deletes exactly the UnifAI sessions this run created, never a sweep of
+    # the persona's sessions (the personas also serve live human demos).
+    if _unifai_target is None:
+        print("cleanup: no UnifAI session was created")
+    elif os.getenv("CLEANUP_TEST_DATA", "1") != "0":
+        deleted, failed = _unifai_target.cleanup()
         print(f"cleanup: {deleted} conversation(s) removed, {failed} failed")
     else:
-        print(f"cleanup: skipped (CLEANUP_TEST_DATA=0), {len(_CREATED_RUN_IDS)} conversation(s) left in place")
+        print("cleanup: skipped (CLEANUP_TEST_DATA=0), the UnifAI sessions this run created are left in place")
 
     if rate >= threshold:
         print("RESULT: PASS")
@@ -1292,3 +731,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

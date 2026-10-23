@@ -27,7 +27,7 @@ the answer (`metadata.llm_response.routing`, fetched by its LLM element from
 the ai-gateway, WP-148) - exact, per request, immune to concurrent traffic.
 When the answer carries none (the lookup is best effort), fall back to the
 before/after delta of `zuno_model_calls_total{agent, provider, outcome}`,
-the only signal agent-runtime ever offered. The `agent` label is set from
+the only signal the retired agent stack ever offered. The `agent` label is set from
 the X-Zuno-Agent header that unifai-operator puts on every bundle LLM, so
 the counter still moves per agent. `source` in the output says which one
 decided.

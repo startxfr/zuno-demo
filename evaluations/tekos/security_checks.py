@@ -4,11 +4,15 @@ ADR-0034/0035 (classification aggregation and source-level external-model
 restrictions), ADR-0040 (agent entitlement vs. business-role separation),
 ADR-0037 (MCP server network/workload-identity boundary), and ADR-0415/
 ADR-0036 (image-generation entitlement vs. Tekos's own agent_declaration -
-see the two checks appended at the bottom for the live/behavioral half of
-the DAT/image-generation capability-boundary probe stress_test.py's
-module docstring describes; gate_checks.py's
+mcp_gateway_denies_generate_image_for_tekos_agent_declaration and
+unifai_tekos_never_generates_photorealistic_images are the live/behavioral
+half of that capability boundary; gate_checks.py's
 tekos_declares_no_dat_or_image_generation_capability is its static
 config-only counterpart).
+
+WP-156: the agents are served by UnifAI (ADR-0561), the only target; the
+checks about the agent itself go through UnifAI's session API, the others
+call the shared services (MCP gateway, ai-gateway, MCP servers) directly.
 
 Kept separate from scenarios.yaml/run_scenarios.py rather than added as
 scenarios 21+: ADR-0027 fixes Tekos's acceptance suite at exactly 20
@@ -32,13 +36,12 @@ import os
 import pathlib
 import sys
 import time
-import uuid
 from dataclasses import dataclass
 
 import httpx
 import yaml
 
-from run_scenarios import BFF_URL, MCP_GATEWAY_URL, RUNTIME_URL, TARGET, _invoke_tool, _unifai, auth_headers
+from run_scenarios import MCP_GATEWAY_URL, _invoke_tool, _unifai, auth_headers
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -47,8 +50,8 @@ except ImportError:
 
 _LOG_AGENT = "tekos"
 
-# Not part of run_scenarios.py's URL set since none of the 20 fixed
-# scenarios call ai-gateway directly (only agent-runtime does, internally).
+# None of the 20 fixed scenarios send a chat completion to ai-gateway
+# directly (the agents do, internally); ADR-0035's check below does.
 AI_GATEWAY_URL = os.getenv("AI_GATEWAY_URL", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080")
 
 # Same reasoning: only the MCP Gateway calls this directly in normal
@@ -72,55 +75,6 @@ class CheckResult:
     name: str
     passed: bool
     detail: str = ""
-
-
-def bff_forwards_identity_to_runtime() -> CheckResult:
-    """ADR-0032: the BFF must forward the validated end-user bearer token to
-    the Agent Runtime, which requires one (app/auth.py:validate_token) and
-    rejects calls without it. Before this ADR's fix, every BFF -> Runtime
-    call was unauthenticated and the Runtime would have rejected it with
-    401, surfaced to the client as a 502 from the BFF - so a 200 here with a
-    real reply is direct evidence the token now reaches the Runtime.
-    """
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers("consultant-01"),
-        json={"session_id": "sec-check-1", "message": "What GPU does the local model run on?"},
-        timeout=30,
-    )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult(
-        "bff_forwards_identity_to_runtime",
-        ok,
-        f"status={resp.status_code} body={resp.text[:200]}",
-    )
-
-
-def runtime_ignores_mismatched_user_sub() -> CheckResult:
-    """ADR-0033: a request body's user_sub is informational only - the
-    Runtime must derive the authoritative subject from the validated token,
-    not this field. Submitting a token for a real persona (consultant-01)
-    with a body user_sub claiming to be an unrelated, nonexistent identity
-    must not be rejected or otherwise change the outcome (impersonation via
-    the body field is impossible because the field is never trusted).
-    """
-    forged_sub = f"not-a-real-user-{uuid.uuid4().hex[:8]}"
-    resp = httpx.post(
-        f"{RUNTIME_URL}/v1/agents/tekos/chat",
-        headers=auth_headers("consultant-01"),
-        json={
-            "session_id": "sec-check-2",
-            "user_sub": forged_sub,
-            "message": "What GPU does the local model run on?",
-        },
-        timeout=30,
-    )
-    ok = resp.status_code == 200 and bool(resp.json().get("reply")) if resp.status_code == 200 else False
-    return CheckResult(
-        "runtime_ignores_mismatched_user_sub",
-        ok,
-        f"status={resp.status_code} forged_sub={forged_sub} body={resp.text[:200]}",
-    )
 
 
 def confluence_policy_is_c2_and_local_only() -> CheckResult:
@@ -232,28 +186,6 @@ def entitlement_without_business_role_denied_confluence() -> CheckResult:
     )
 
 
-def business_role_without_entitlement_denied_by_bff() -> CheckResult:
-    """ADR-0040: the converse case. consultant-role-only-user-01 holds the
-    consultant business role (would pass the MCP Gateway's group check for
-    search_confluence) but lacks agent_tekos entitlement. The BFF's
-    server-side entitlement check (components/agent-bff/main.go) must deny
-    the call with 403 before it ever reaches the Agent Runtime, proving
-    business role alone never substitutes for agent entitlement.
-    """
-    resp = httpx.post(
-        f"{BFF_URL}/api/chat",
-        headers=auth_headers("consultant-role-only-user-01"),
-        json={"session_id": "sec-check-3", "message": "What GPU does the local model run on?"},
-        timeout=30,
-    )
-    ok = resp.status_code == 403
-    return CheckResult(
-        "business_role_without_entitlement_denied_by_bff",
-        ok,
-        f"status={resp.status_code} body={resp.text[:200]}",
-    )
-
-
 def direct_call_to_confluence_mcp_denied_without_gateway_token() -> CheckResult:
     """ADR-0037's mandatory acceptance test: a call to confluence-mcp that
     bypasses the MCP Gateway entirely (no X-Zuno-Gateway-Token, the shared
@@ -328,8 +260,8 @@ def mcp_gateway_denies_aap_cluster_audit_for_unauthorized_group() -> CheckResult
     cluster automation, so an unauthorized caller must be stopped by the
     platform's own policy layer - not merely by AAP-side RBAC further down.
 
-    tekos-entitlement-only-user-01 holds agent_tekos (so the BFF/runtime let
-    it through) but no business role at all, while Tekos's
+    tekos-entitlement-only-user-01 holds agent_tekos (so it can reach the
+    agent) but no business role at all, while Tekos's
     answer-technical-question task DOES declare this capability - so the
     agent_declaration factor passes and a 403 here can only come from the
     user_group_rights factor (policies/tools/tool-policy.yaml:
@@ -411,47 +343,11 @@ def aap_platform_audit_succeeds_for_an_authorized_caller() -> CheckResult:
     )
 
 
-def tekos_chat_never_returns_photorealistic_images() -> CheckResult:
-    """ADR-0415/ADR-0516: Tekos's task never lists
-    `image.generation.create` (SDXL/photorealistic), only
-    `diagram.generation.create` (ADR-0516's Mermaid rendering) as of the
-    latter's deliberate carve-out - app/graph/nodes.py's reason_node never
-    even offers the generate_image tool schema to the model for Tekos, so
-    NO entry in `ChatResponse.images` can structurally be a
-    generate_image/SDXL result. This used to assert `images == []`
-    unconditionally (renamed from tekos_chat_never_returns_image_
-    artifacts) - that broke the moment Tekos legitimately started
-    returning diagram images, so the check now asserts the structural
-    fact that actually matters: every image entry's mime_type is
-    image/svg+xml (a rendered diagram), never image/png (what SDXL always
-    returns - see components/mcp-gateway/app/handlers/image_gen.py's own
-    hardcoded "mime_type": "image/png"). The prompt below deliberately
-    asks for a diagram (not a photorealistic image) specifically to prove
-    the positive path doesn't accidentally produce a PNG.
-    """
-    resp = httpx.post(
-        f"{RUNTIME_URL}/v1/agents/tekos/chat",
-        headers=auth_headers("consultant-01"),
-        json={
-            "session_id": "sec-check-8",
-            "user_sub": "consultant-01",
-            "message": "Generate a diagram illustrating a Kubernetes Deployment rolling update.",
-        },
-        timeout=30,
-    )
-    images = resp.json().get("images", []) if resp.status_code == 200 else []
-    ok = resp.status_code == 200 and all(img.get("mime_type") == "image/svg+xml" for img in images)
-    return CheckResult(
-        "tekos_chat_never_returns_photorealistic_images",
-        ok,
-        f"status={resp.status_code} images={[img.get('mime_type') for img in images]}",
-    )
-
-
 # --------------------------------------------------------------------------
-# UnifAI target (WP-154, `--target unifai`). The same ADRs, proven through
-# UnifAI's session API instead of the BFF/agent-runtime. Checks about shared
-# services (MCP gateway, ai-gateway, confluence-mcp) are reused unchanged.
+# Checks about the agent itself (WP-154; UnifAI is the only target since
+# WP-156): ADR-0032/0033/0040/0415, proven through UnifAI's session API.
+# The checks above reach shared services (MCP gateway, ai-gateway,
+# confluence-mcp) directly.
 # --------------------------------------------------------------------------
 
 _DIAGRAM_PROMPT = "Generate a diagram illustrating a Kubernetes Deployment rolling update."
@@ -533,24 +429,16 @@ def unifai_tekos_never_generates_photorealistic_images() -> CheckResult:
     return CheckResult("unifai_tekos_never_generates_photorealistic_images", ok, f"tool_calls={tools}")
 
 
-_UNIFAI_REPLACEMENTS = {
-    bff_forwards_identity_to_runtime: unifai_forwards_identity_to_the_gateways,
-    runtime_ignores_mismatched_user_sub: unifai_ignores_a_client_supplied_identity_header,
-    business_role_without_entitlement_denied_by_bff: business_role_without_entitlement_denied_by_unifai,
-    tekos_chat_never_returns_photorealistic_images: unifai_tekos_never_generates_photorealistic_images,
-}
-
-
 CHECKS = [
-    bff_forwards_identity_to_runtime,
-    runtime_ignores_mismatched_user_sub,
+    unifai_forwards_identity_to_the_gateways,
+    unifai_ignores_a_client_supplied_identity_header,
     confluence_policy_is_c2_and_local_only,
     ai_gateway_local_only_forces_local_provider,
     entitlement_without_business_role_denied_confluence,
-    business_role_without_entitlement_denied_by_bff,
+    business_role_without_entitlement_denied_by_unifai,
     direct_call_to_confluence_mcp_denied_without_gateway_token,
     mcp_gateway_denies_generate_image_for_tekos_agent_declaration,
-    tekos_chat_never_returns_photorealistic_images,
+    unifai_tekos_never_generates_photorealistic_images,
     mcp_gateway_denies_aap_cluster_audit_for_unauthorized_group,
     mcp_gateway_denies_aap_platform_audit_for_unauthorized_group,
     aap_platform_audit_succeeds_for_an_authorized_caller,
@@ -559,8 +447,7 @@ CHECKS = [
 
 def run() -> list:
     results = []
-    checks = [_UNIFAI_REPLACEMENTS.get(c, c) for c in CHECKS] if TARGET == "unifai" else CHECKS
-    for check in checks:
+    for check in CHECKS:
         try:
             result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
@@ -573,15 +460,13 @@ def run() -> list:
 def main() -> int:
     results = run()
 
-    print(f"target: {TARGET}")
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
         print(f"{'✓' if r.passed else '✗':<6}{r.name}")
         if not r.passed and r.detail:
             print(f"      -> {r.detail}")
 
-    if TARGET == "unifai":
-        _unifai().cleanup()
+    _unifai().cleanup()
     if all(r.passed for r in results):
         print("\nRESULT: PASS")
         return 0

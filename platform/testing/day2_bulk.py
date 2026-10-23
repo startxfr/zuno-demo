@@ -4,10 +4,10 @@ the same way day2_stresstest.py's Job iteration sets it) and
 BULK_INTERACTIONS (a positive integer), replays the chat prompts already
 defined in this agent's own scenarios.yaml - every `message:`-bearing
 entry, regardless of scenario `type`; that field is common to every
-agent's scenarios.yaml per ADR-0027 - and, for Tekos specifically, also
-evaluations/tekos/stress_test.py's own per-category prompt lists (a
-richer corpus, but Tekos-only since those lists are hardcoded Tekos
-content) - cycling through the corpus to reach the requested count. No
+agent's scenarios.yaml per ADR-0027 - cycling through the corpus to reach
+the requested count. (The extra Tekos prompt lists of
+evaluations/tekos/stress_test.py left with that runtime-only battery in
+WP-156.) No
 new prompt content is authored here (ADR-0058's own scope boundary:
 aggregation and execution, not new test-content authoring).
 
@@ -88,23 +88,6 @@ def _scenario_prompts() -> List[str]:
     return [s["message"] for s in data.get("scenarios", []) if s.get("message")]
 
 
-def _tekos_stress_test_prompts() -> List[str]:
-    if AGENT != "tekos":
-        return []
-    try:
-        import stress_test
-    except Exception:  # noqa: BLE001 - missing/broken stress_test.py just yields no extra prompts
-        return []
-    prompts: List[str] = []
-    for group in (
-        stress_test.TECHNICAL_QA_PROMPTS,
-        stress_test.CONFLUENCE_TRIGGER_PROMPTS,
-        stress_test.CODE_GENERATION_PROMPTS,
-    ):
-        prompts += [message for _, message in group]
-    return prompts
-
-
 _TARGET = None
 
 
@@ -177,7 +160,7 @@ def run() -> List[Day2Result]:
             "no workflow for it by design, not a backend failure",
         )]
 
-    corpus = _scenario_prompts() + _tekos_stress_test_prompts()
+    corpus = _scenario_prompts()
     if not corpus:
         return [Day2Result(
             AGENT, "bulk_load", "n/a", "coverage", True,

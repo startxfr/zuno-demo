@@ -55,13 +55,12 @@ scenarios:
     type: chat_basic_qa
     persona: consultant-01
     message: "How do I size a KServe InferenceService for a single NVIDIA L4 GPU?"
-    # ADR-0215: extends this existing scenario with a second turn on the
-    # same run_id rather than adding a 21st scenario - ADR-0027 fixes the
+    # ADR-0215: extends this existing scenario with a second turn in the
+    # same session rather than adding a 21st scenario - ADR-0027 fixes the
     # suite at exactly twenty scenarios per agent, so a genuinely new
     # scenario id is not available; this deterministically proves resume
-    # +history-carrying succeeds live, complementing the exhaustive prompt-
-    # content assertions in components/agent-runtime/tests/test_history.py
-    # (which a live E2E smoke check, with no LLM judge, cannot itself make).
+    # +history-carrying succeeds live (a live E2E smoke check, with no LLM
+    # judge, cannot assert that turn 1 was semantically recalled).
     follow_up: "Can you repeat that guidance in one short sentence?"
 
   - id: 8
@@ -172,4 +171,4 @@ scenarios:
     # gate always times out by design, not by fault - mcp-gateway's own
     # health, still checked below, is the honest proxy for "can this
     # agent's traffic reach it".
-    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]
+    services: [unifai-ui, mcp-gateway, ai-gateway]

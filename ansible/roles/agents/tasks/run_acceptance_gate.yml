@@ -279,8 +279,6 @@
                     value: "{{ _gate_task_name }}"
                   - name: KEYCLOAK_URL
                     value: "https://keycloak.{{ cluster_base_domain }}"
-                  - name: FRONTEND_URL
-                    value: "https://{{ _gate_agent }}.{{ cluster_base_domain }}"
                   # WP-156: the gate drives the agent on UnifAI, as its
                   # scenario's persona, in the agent's team workspace
                   # agent-<agent> (id resolved at sign-in). EVAL_TARGET is

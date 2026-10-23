@@ -1,11 +1,13 @@
-"""Security-check building blocks for `security_checks.py --target unifai` (WP-155 wave 0).
+"""Security-check building blocks for the agents' `security_checks.py` (WP-155 wave 0; UnifAI
+is the only evaluation target since WP-156).
 
 Each factory returns a zero-argument check, parametrised by agent, so the five
 agents that have security checks share one implementation instead of copies.
 `CheckResult` is each agent's own dataclass (passed in): it must accept
 `name, passed, detail` and `skipped`.
 
-A check that cannot apply to UnifAI is replaced with `skip(...)`: it is
+A check that cannot apply to UnifAI (e.g. a placeholder agent's chat turn)
+is declared with `skip(...)`: it is
 reported as skipped with its reason and excluded from the pass count, never
 counted as a pass.
 """
@@ -23,13 +25,6 @@ def skip(CheckResult: Any, name: str, why: str) -> Callable[[], Any]:
 
     check.__name__ = name
     return check
-
-
-def select(checks: Sequence[Callable], replacements: Dict[Callable, Callable], target: str) -> list:
-    """The checks to run: the originals, or their UnifAI replacements under `--target unifai`."""
-    if target != "unifai":
-        return list(checks)
-    return [replacements.get(c, c) for c in checks]
 
 
 def _reaches(tools: Sequence[str], expect: Sequence[str]) -> bool:

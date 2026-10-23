@@ -13,9 +13,8 @@ model_router_prefers_local: proving a live SaaS *fallback* would require
 deliberately breaking the local model's availability, which a `make check`
 gate has no safe way to do and shouldn't attempt.
 
-Two further checks close gaps a stress-testing pass over Tekos surfaced
-(see stress_test.py's module docstring for the live/behavioral counterparts
-of these same two guarantees): `write-code` (ADR-0417, Tekos's newest
+Two further checks close gaps a stress-testing pass over Tekos surfaced:
+`write-code` (ADR-0417, Tekos's newest
 declared task) never had a task-specific model-routing check - scenarios
 14/15 only assert the generic C1/C3 provider-kind invariant - and nothing
 anywhere asserted Tekos's OKF bundle stays free of the DAT-drafting/
@@ -112,13 +111,11 @@ def tekos_declares_no_dat_or_image_generation_capability() -> CheckResult:
     """The boundary this whole exercise probes, statically: Tekos's OKF
     bundle must never declare Arkos's `draft-architecture-testimonial` task,
     and none of Tekos's own declared tasks may list `image.generation.create`
-    (or its legacy alias `generate_image`) in `allowed_tools` - mirroring
-    components/agent-runtime/app/graph/nodes.py's own alias-tolerant check
-    for whether a task is entitled to the generate_image tool. A pure
-    config-consistency check, no live cluster needed - the live/behavioral
-    counterpart (no photorealistic image ever appears on a real chat turn)
-    lives in security_checks.py's
-    tekos_chat_never_returns_photorealistic_images.
+    (or its legacy alias `generate_image`) in `allowed_tools` - both names
+    entitle a task to the image tool. A pure config-consistency check, no
+    live cluster needed - the live/behavioral counterpart (no photorealistic
+    image ever appears on a real chat turn) lives in security_checks.py's
+    unifai_tekos_never_generates_photorealistic_images.
 
     ADR-0516: deliberately does NOT check `diagram.generation.create` -
     Tekos's answer-technical-question task legitimately declares that one
@@ -159,7 +156,7 @@ def arkos_declares_no_photorealistic_image_generation_capability() -> CheckResul
     by `generate_diagram`. Pure config-consistency check, mirroring
     tekos_declares_no_dat_or_image_generation_capability's own shape - the
     live/behavioral counterpart lives in evaluations/arkos/
-    security_checks.py's arkos_chat_never_returns_photorealistic_images.
+    security_checks.py's unifai_arkos_never_generates_photorealistic_images.
 
     Deliberately does NOT check `diagram.generation.create` - Arkos
     legitimately declares that one on both its tasks.

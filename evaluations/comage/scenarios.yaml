@@ -66,7 +66,7 @@ scenarios:
     max_seconds: 6
 
   - id: 9
-    title: Streaming chat direct to agent-runtime delivers token and done events
+    title: Streaming chat delivers token and done events
     type: chat_streaming_sse
     persona: sale-01
     message: "Summarize the Acme Renewal deal in one sentence."
@@ -76,14 +76,13 @@ scenarios:
     # salesforce.opportunity.read, but salesforce-mcp has no deployment
     # in-cluster and its Vault-sourced credentials (salesforce/technical)
     # are still unresolved (standing operator gap, tracked separately -
-    # see agents/comage/README.md's "Known live-read gap"). agent-runtime's
-    # tool_call_node (components/agent-runtime/app/graph/nodes.py)
-    # catches the McpClientError and degrades gracefully to indexed-only
-    # context, so chat still returns 200 - it just never reaches
-    # source_mode: live/both, so this assertion fails until salesforce-mcp
-    # is deployed and the Vault secret is fixed. Left failing on purpose
-    # rather than weakened, so the gate keeps surfacing the real gap.
-    title: A current-value question direct to agent-runtime triggers the live Salesforce read
+    # see agents/comage/README.md's "Known live-read gap"). On UnifAI the
+    # live read is the salesforce.opportunity.read tool call itself
+    # (run_scenarios.py's u_chat_triggers_tool), so this assertion fails
+    # until salesforce-mcp is deployed and the Vault secret is fixed. Left
+    # failing on purpose rather than weakened, so the gate keeps surfacing
+    # the real gap.
+    title: A current-value question triggers the live Salesforce read
     type: chat_triggers_tool
     persona: sale-01
     message: "What is the CURRENT stage of the Acme Renewal opportunity right now?"
@@ -168,7 +167,7 @@ scenarios:
     # direct probe from this gate always times out by design, not by
     # fault - mcp-gateway's own health, still checked below, is the honest
     # proxy for "can this agent's traffic reach it".
-    services: [frontend, bff, agent-runtime, mcp-gateway, rag-service]
+    services: [unifai-ui, mcp-gateway, ai-gateway]
 
   # ADR-0526 (WP-087) decision 8, POST-PROMOTION live half.
   #

@@ -5,8 +5,8 @@ One transport, parametrised by agent name: `UnifaiTarget(password, agent=...)`.
 `evaluations/tekos/unifai_target.py` re-exports this module so the original
 import path keeps working.
 
-`run_scenarios.py --target unifai` swaps the transport of the chat scenarios:
-instead of agent-runtime's `/v1/agents/<agent>/chat` or the BFF, a persona
+The chat scenarios of `run_scenarios.py` (UnifAI is the only evaluation target
+since WP-156 retired the legacy agent stack) go through this transport: a persona
 signs in to the UnifAI UI through realm `zuno` (the real browser OIDC flow:
 identity service -> Keycloak form -> session cookie) and drives MAS through the
 UI's own nginx path, exactly as a browser does:
@@ -15,11 +15,11 @@ UI's own nginx path, exactly as a browser does:
     POST /api2/sessions/user.session.execute   {sessionId, inputs, stream}
     GET  /api2/blueprints/available.blueprints.summary.get
 
-The scenarios file is not forked: the same `scenarios.yaml` entries are served
-by this module's handlers, so the pass rates are comparable with agent-runtime's.
+The scenarios file was not forked when UnifAI took over: the same
+`scenarios.yaml` entries are served by run_scenarios.py's UnifAI handlers.
 
-Environment: UNIFAI_URL (the UI route), DEMO_PERSONA_PASSWORD (same as the
-agent-runtime target), optional UNIFAI_WORKFLOW (workflow name; default is the
+Environment: UNIFAI_URL (the UI route), DEMO_PERSONA_PASSWORD (the shared
+demo-persona password, ADR-0041), optional UNIFAI_WORKFLOW (workflow name; default is the
 agent name, the operator's name for an OKF bundle's primary task) and
 UNIFAI_TEAM_ID (the team workspace that owns the agent's workflows; a persona
 only sees them by selecting that workspace, ``teamId`` on every request).
