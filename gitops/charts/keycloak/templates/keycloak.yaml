@@ -100,12 +100,6 @@ spec:
                       - key: client_secret
                         path: zuno_google__client__secret
                 - secret:
-                    name: tekos-frontend-client-secret
-                    optional: true
-                    items:
-                      - key: client_secret
-                        path: zuno_tekos__frontend__client__secret
-                - secret:
                     # ADR-0562 (WP-151): the UnifAI identity service's
                     # confidential client, ${vault.unifai_client_secret}.
                     name: unifai-client-secret
@@ -113,52 +107,6 @@ spec:
                     items:
                       - key: client_secret
                         path: zuno_unifai__client__secret
-                - secret:
-                    # ADR-0326 (WP-31): arkos-frontend flipped to a
-                    # confidential client, same shape as tekos-frontend
-                    # above.
-                    name: arkos-frontend-client-secret
-                    optional: true
-                    items:
-                      - key: client_secret
-                        path: zuno_arkos__frontend__client__secret
-                - secret:
-                    # ADR-0326 (WP-33): comage-frontend flipped to a
-                    # confidential client, same shape as tekos/arkos-frontend
-                    # above.
-                    name: comage-frontend-client-secret
-                    optional: true
-                    items:
-                      - key: client_secret
-                        path: zuno_comage__frontend__client__secret
-                - secret:
-                    # ADR-0326 (WP-35): advantage-frontend flipped to a
-                    # confidential client, same shape as tekos/arkos/
-                    # comage-frontend above.
-                    name: advantage-frontend-client-secret
-                    optional: true
-                    items:
-                      - key: client_secret
-                        path: zuno_advantage__frontend__client__secret
-                - secret:
-                    # ADR-0326 (WP-36): finage-frontend flipped to a
-                    # confidential client, same shape as every other
-                    # agent's own frontend above.
-                    name: finage-frontend-client-secret
-                    optional: true
-                    items:
-                      - key: client_secret
-                        path: zuno_finage__frontend__client__secret
-                - secret:
-                    # ADR-0410/ADR-0307 (WP-41): naveo-frontend, the sixth
-                    # demo agent (scaffolded from platform/templates/agent/)
-                    # - same confidential-client shape as every other
-                    # agent's own frontend above.
-                    name: naveo-frontend-client-secret
-                    optional: true
-                    items:
-                      - key: client_secret
-                        path: zuno_naveo__frontend__client__secret
                 - secret:
                     name: demo-personas-password
                     optional: true
@@ -174,7 +122,7 @@ spec:
                         path: zuno_openshift__client__secret
                 - secret:
                     # ADR-0354/WP-072: AAP Gateway's OIDC client, same
-                    # confidential-client shape as openshift/tekos-frontend
+                    # confidential-client shape as openshift
                     # above.
                     name: aap-client-secret
                     optional: true

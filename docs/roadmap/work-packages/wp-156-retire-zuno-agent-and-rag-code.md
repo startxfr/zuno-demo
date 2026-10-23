@@ -222,11 +222,12 @@ stays), every per-agent agent-frontend + agent-bff Application (charts
   and `agent-conversations` (and their credential ExternalSecrets and
   Vault seeds) are kept on purpose; dropping them needs a reviewed live
   step.
-- The eight `<agent>-frontend` Keycloak clients in `realm-zuno.json` and
-  their `<agent>-frontend-client-secret` ExternalSecrets in `zuno-auth`
-  stay (another team's harness and the mlops mirror read them), as does
-  the `<AGENT>_FRONTEND_CLIENT_SECRET` fallback of
-  `evaluations/tekos/run_scenarios.py`.
+- The eight `<agent>-frontend` Keycloak clients, their `access` roles and
+  group mappings, their `<agent>-frontend-client-secret` ExternalSecrets,
+  `KC_VAULT` items and Vault seeds were removed on 2026-10-23 once the
+  harnesses and the mlops mirror had moved to `zuno-evaluations` (WP-169).
+  The live clients were deleted by hand: the reconcile Job never deletes
+  one. Their Vault paths `keycloak/<agent>-frontend` stay as inert data.
 - The `make d3 sign agents` verb signs the last agent-runtime image left in
   `zuno-ai-build` and has no consumer: `make d3 admit agents` replaces it,
   WP-165 removes it with the OKF Transit chain.

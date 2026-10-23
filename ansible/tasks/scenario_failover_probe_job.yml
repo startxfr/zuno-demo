@@ -9,7 +9,7 @@
 #
 # WP-156: the chat turns run on UnifAI (ADR-0561) through its UI route,
 # signed in as each agent's demo persona with the demo-persona password -
-# the comage-frontend/tekos-frontend client secrets are no longer read. The provider that answered comes from the routing
+# the per-agent frontend client secrets are no longer read. The provider that answered comes from the routing
 # decision UnifAI carries on the answer; the Prometheus counter delta stays
 # as the fallback, and Thanos Querier has no external Route, so the Job
 # still runs in-cluster with the existing grafana-prometheus-reader token

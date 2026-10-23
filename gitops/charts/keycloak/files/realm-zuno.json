@@ -12,40 +12,7 @@
     "ssoSessionIdleTimeout": 28800,
     "ssoSessionMaxLifespan": 36000,
     "roles": {
-        "client": {
-            "comage-frontend": [{
-                "name": "access",
-                "description": "Grants sign-in access to the Comage (sales) agent frontend"
-            }],
-            "tekos-frontend": [{
-                "name": "access",
-                "description": "Grants sign-in access to the Tekos (technical consultant) agent frontend"
-            }],
-            "advantage-frontend": [{
-                "name": "access",
-                "description": "Grants sign-in access to the Advantage (sales admin) agent frontend"
-            }],
-            "finage-frontend": [{
-                "name": "access",
-                "description": "Grants sign-in access to the Finage (finance) agent frontend"
-            }],
-            "arkos-frontend": [{
-                "name": "access",
-                "description": "Grants sign-in access to the Arkos (architects) agent frontend"
-            }],
-            "naveo-frontend": [{
-                "name": "access",
-                "description": "Grants sign-in access to the Naveo (onboarding) agent frontend"
-            }],
-            "soursage-frontend": [{
-                "name": "access",
-                "description": "Grants sign-in access to the Soursage (recruiting) agent frontend"
-            }],
-            "cognos-frontend": [{
-                "name": "access",
-                "description": "Grants sign-in access to the Cognos (board financial/strategic) agent frontend"
-            }]
-        }
+        "client": {}
     },
     "groups": [{
             "name": "agent_comage",
@@ -53,11 +20,6 @@
             "attributes": {
                 "description": [
                     "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Comage frontend, independent of business role"
-                ]
-            },
-            "clientRoles": {
-                "comage-frontend": [
-                    "access"
                 ]
             }
         },
@@ -68,11 +30,6 @@
                 "description": [
                     "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Tekos frontend, independent of business role"
                 ]
-            },
-            "clientRoles": {
-                "tekos-frontend": [
-                    "access"
-                ]
             }
         },
         {
@@ -81,11 +38,6 @@
             "attributes": {
                 "description": [
                     "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Advantage frontend, independent of business role"
-                ]
-            },
-            "clientRoles": {
-                "advantage-frontend": [
-                    "access"
                 ]
             }
         },
@@ -96,11 +48,6 @@
                 "description": [
                     "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Finage frontend, independent of business role"
                 ]
-            },
-            "clientRoles": {
-                "finage-frontend": [
-                    "access"
-                ]
             }
         },
         {
@@ -109,11 +56,6 @@
             "attributes": {
                 "description": [
                     "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Arkos frontend, independent of business role"
-                ]
-            },
-            "clientRoles": {
-                "arkos-frontend": [
-                    "access"
                 ]
             }
         },
@@ -124,11 +66,6 @@
                 "description": [
                     "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Naveo frontend, independent of business role"
                 ]
-            },
-            "clientRoles": {
-                "naveo-frontend": [
-                    "access"
-                ]
             }
         },
         {
@@ -138,11 +75,6 @@
                 "description": [
                     "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Soursage frontend, independent of business role (ADR-0349 §6 placeholder agent)"
                 ]
-            },
-            "clientRoles": {
-                "soursage-frontend": [
-                    "access"
-                ]
             }
         },
         {
@@ -151,11 +83,6 @@
             "attributes": {
                 "description": [
                     "ADR-0040 agent entitlement group \u2014 grants sign-in access to the Cognos frontend, independent of business role (ADR-0349 §6 placeholder agent)"
-                ]
-            },
-            "clientRoles": {
-                "cognos-frontend": [
-                    "access"
                 ]
             }
         },
@@ -1150,522 +1077,6 @@
                 "post.logout.redirect.uris": "https://unifai-ui-zuno-unifai.apps.mycluster.example.com/*"
             }
         }, {
-            "clientId": "comage-frontend",
-            "name": "Comage frontend (sales)",
-            "description": "Confidential client for the Comage sales agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-33; agent-frontend requires OIDC_CLIENT_SECRET, no public/PKCE-only code path)",
-            "enabled": true,
-            "protocol": "openid-connect",
-            "publicClient": false,
-            "standardFlowEnabled": true,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": true,
-            "serviceAccountsEnabled": false,
-            "rootUrl": "https://comage.apps.mycluster.example.com",
-            "redirectUris": [
-                "https://comage.apps.mycluster.example.com/*"
-            ],
-            "webOrigins": [
-                "https://comage.apps.mycluster.example.com"
-            ],
-            "attributes": {
-                "agent.namespace": "zuno-ai-run",
-                "post.logout.redirect.uris": "https://comage.apps.mycluster.example.com/*"
-            },
-            "defaultClientScopes": [
-                "basic",
-                "web-origins",
-                "profile",
-                "roles",
-                "email"
-            ],
-            "protocolMappers": [{
-                "name": "audience-self",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "comage-frontend",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "maas-gateway-audience",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "zuno-admin-api",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": false,
-                "config": {
-                    "full.path": "true",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "claim.name": "groups"
-                }
-            }],
-            "secret": "${vault.comage_frontend_client_secret}",
-            "clientAuthenticatorType": "client-secret"
-        },
-        {
-            "clientId": "tekos-frontend",
-            "name": "Tekos frontend (technical consultants)",
-            "description": "Public SPA client for the Tekos technical-consultant agent \u2014 namespace zuno-ai-run",
-            "enabled": true,
-            "protocol": "openid-connect",
-            "publicClient": false,
-            "standardFlowEnabled": true,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": true,
-            "serviceAccountsEnabled": false,
-            "rootUrl": "https://tekos.apps.mycluster.example.com",
-            "redirectUris": [
-                "https://tekos.apps.mycluster.example.com/*"
-            ],
-            "webOrigins": [
-                "https://tekos.apps.mycluster.example.com"
-            ],
-            "attributes": {
-                "agent.namespace": "zuno-ai-run",
-                "post.logout.redirect.uris": "https://tekos.apps.mycluster.example.com/*"
-            },
-            "defaultClientScopes": [
-                "basic",
-                "web-origins",
-                "profile",
-                "roles",
-                "email"
-            ],
-            "protocolMappers": [{
-                "name": "audience-self",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "tekos-frontend",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "maas-gateway-audience",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "zuno-admin-api",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": false,
-                "config": {
-                    "full.path": "true",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "claim.name": "groups"
-                }
-            }],
-            "secret": "${vault.tekos_frontend_client_secret}",
-            "clientAuthenticatorType": "client-secret"
-        },
-        {
-            "clientId": "advantage-frontend",
-            "name": "Advantage frontend (sales admin)",
-            "description": "Confidential client for the Advantage sales-admin agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-35; agent-frontend requires OIDC_CLIENT_SECRET, no public/PKCE-only code path)",
-            "enabled": true,
-            "protocol": "openid-connect",
-            "publicClient": false,
-            "standardFlowEnabled": true,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": true,
-            "serviceAccountsEnabled": false,
-            "rootUrl": "https://advantage.apps.mycluster.example.com",
-            "redirectUris": [
-                "https://advantage.apps.mycluster.example.com/*"
-            ],
-            "webOrigins": [
-                "https://advantage.apps.mycluster.example.com"
-            ],
-            "attributes": {
-                "agent.namespace": "zuno-ai-run",
-                "post.logout.redirect.uris": "https://advantage.apps.mycluster.example.com/*"
-            },
-            "defaultClientScopes": [
-                "basic",
-                "web-origins",
-                "profile",
-                "roles",
-                "email"
-            ],
-            "protocolMappers": [{
-                "name": "audience-self",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "advantage-frontend",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "maas-gateway-audience",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "zuno-admin-api",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": false,
-                "config": {
-                    "full.path": "true",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "claim.name": "groups"
-                }
-            }],
-            "secret": "${vault.advantage_frontend_client_secret}",
-            "clientAuthenticatorType": "client-secret"
-        },
-        {
-            "clientId": "finage-frontend",
-            "name": "Finage frontend (finance)",
-            "description": "Confidential client for the Finage finance agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-36; agent-frontend requires OIDC_CLIENT_SECRET, no public/PKCE-only code path)",
-            "enabled": true,
-            "protocol": "openid-connect",
-            "publicClient": false,
-            "standardFlowEnabled": true,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": true,
-            "serviceAccountsEnabled": false,
-            "rootUrl": "https://finage.apps.mycluster.example.com",
-            "redirectUris": [
-                "https://finage.apps.mycluster.example.com/*"
-            ],
-            "webOrigins": [
-                "https://finage.apps.mycluster.example.com"
-            ],
-            "attributes": {
-                "agent.namespace": "zuno-ai-run",
-                "post.logout.redirect.uris": "https://finage.apps.mycluster.example.com/*"
-            },
-            "defaultClientScopes": [
-                "basic",
-                "web-origins",
-                "profile",
-                "roles",
-                "email"
-            ],
-            "protocolMappers": [{
-                "name": "audience-self",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "finage-frontend",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "maas-gateway-audience",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "zuno-admin-api",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": false,
-                "config": {
-                    "full.path": "true",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "claim.name": "groups"
-                }
-            }],
-            "secret": "${vault.finage_frontend_client_secret}",
-            "clientAuthenticatorType": "client-secret"
-        },
-        {
-            "clientId": "arkos-frontend",
-            "name": "Arkos frontend (architects)",
-            "description": "Confidential client for the Arkos architects agent \u2014 server-side OIDC code exchange, namespace zuno-ai-run (ADR-0326/WP-31; agent-frontend requires OIDC_CLIENT_SECRET, no public/PKCE-only code path)",
-            "enabled": true,
-            "protocol": "openid-connect",
-            "publicClient": false,
-            "standardFlowEnabled": true,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": true,
-            "serviceAccountsEnabled": false,
-            "rootUrl": "https://arkos.apps.mycluster.example.com",
-            "redirectUris": [
-                "https://arkos.apps.mycluster.example.com/*"
-            ],
-            "webOrigins": [
-                "https://arkos.apps.mycluster.example.com"
-            ],
-            "attributes": {
-                "agent.namespace": "zuno-ai-run",
-                "post.logout.redirect.uris": "https://arkos.apps.mycluster.example.com/*"
-            },
-            "defaultClientScopes": [
-                "basic",
-                "web-origins",
-                "profile",
-                "roles",
-                "email"
-            ],
-            "protocolMappers": [{
-                "name": "audience-self",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "arkos-frontend",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "maas-gateway-audience",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "zuno-admin-api",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": false,
-                "config": {
-                    "full.path": "true",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "claim.name": "groups"
-                }
-            }],
-            "secret": "${vault.arkos_frontend_client_secret}",
-            "clientAuthenticatorType": "client-secret"
-        },
-        {
-            "clientId": "naveo-frontend",
-            "name": "Naveo frontend (onboarding)",
-            "description": "Confidential client for the Naveo onboarding-assistant agent \u2014 sixth demo agent scaffolded from platform/templates/agent/ (ADR-0410/ADR-0307/WP-41), server-side OIDC code exchange, namespace zuno-ai-run",
-            "enabled": true,
-            "protocol": "openid-connect",
-            "publicClient": false,
-            "standardFlowEnabled": true,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": true,
-            "serviceAccountsEnabled": false,
-            "rootUrl": "https://naveo.apps.mycluster.example.com",
-            "redirectUris": [
-                "https://naveo.apps.mycluster.example.com/*"
-            ],
-            "webOrigins": [
-                "https://naveo.apps.mycluster.example.com"
-            ],
-            "attributes": {
-                "agent.namespace": "zuno-ai-run",
-                "post.logout.redirect.uris": "https://naveo.apps.mycluster.example.com/*"
-            },
-            "defaultClientScopes": [
-                "basic",
-                "web-origins",
-                "profile",
-                "roles",
-                "email"
-            ],
-            "protocolMappers": [{
-                "name": "audience-self",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "naveo-frontend",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "maas-gateway-audience",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "zuno-admin-api",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": false,
-                "config": {
-                    "full.path": "true",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "claim.name": "groups"
-                }
-            }],
-            "secret": "${vault.naveo_frontend_client_secret}",
-            "clientAuthenticatorType": "client-secret"
-        },
-        {
-            "clientId": "soursage-frontend",
-            "name": "Soursage frontend (recruiting)",
-            "description": "Public SPA client for the Soursage recruiting agent \u2014 namespace zuno-ai-run (ADR-0349 §6 placeholder pattern: identity footprint only, no runtime; flipped to a confidential client like every active agent's own frontend once Soursage is actually built)",
-            "enabled": true,
-            "protocol": "openid-connect",
-            "publicClient": true,
-            "standardFlowEnabled": true,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
-            "serviceAccountsEnabled": false,
-            "rootUrl": "https://soursage.apps.mycluster.example.com",
-            "redirectUris": [
-                "https://soursage.apps.mycluster.example.com/*"
-            ],
-            "webOrigins": [
-                "https://soursage.apps.mycluster.example.com"
-            ],
-            "attributes": {
-                "agent.namespace": "zuno-ai-run",
-                "post.logout.redirect.uris": "https://soursage.apps.mycluster.example.com/*"
-            },
-            "defaultClientScopes": [
-                "basic",
-                "web-origins",
-                "profile",
-                "roles",
-                "email"
-            ],
-            "protocolMappers": [{
-                "name": "audience-self",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "soursage-frontend",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "maas-gateway-audience",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "zuno-admin-api",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": false,
-                "config": {
-                    "full.path": "true",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "claim.name": "groups"
-                }
-            }]
-        },
-        {
-            "clientId": "cognos-frontend",
-            "name": "Cognos frontend (board financial/strategic)",
-            "description": "Public SPA client for the Cognos board-only agent \u2014 identity footprint only, no runtime (ADR-0349 §6 placeholder; becomes confidential once Cognos is built), namespace zuno-ai-run",
-            "enabled": true,
-            "protocol": "openid-connect",
-            "publicClient": true,
-            "standardFlowEnabled": true,
-            "implicitFlowEnabled": false,
-            "directAccessGrantsEnabled": false,
-            "serviceAccountsEnabled": false,
-            "rootUrl": "https://cognos.apps.mycluster.example.com",
-            "redirectUris": [
-                "https://cognos.apps.mycluster.example.com/*"
-            ],
-            "webOrigins": [
-                "https://cognos.apps.mycluster.example.com"
-            ],
-            "attributes": {
-                "agent.namespace": "zuno-ai-run",
-                "post.logout.redirect.uris": "https://cognos.apps.mycluster.example.com/*"
-            },
-            "defaultClientScopes": [
-                "basic",
-                "web-origins",
-                "profile",
-                "roles",
-                "email"
-            ],
-            "protocolMappers": [{
-                "name": "audience-self",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "cognos-frontend",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "maas-gateway-audience",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-audience-mapper",
-                "consentRequired": false,
-                "config": {
-                    "included.client.audience": "zuno-admin-api",
-                    "id.token.claim": "false",
-                    "access.token.claim": "true"
-                }
-            }, {
-                "name": "groups",
-                "protocol": "openid-connect",
-                "protocolMapper": "oidc-group-membership-mapper",
-                "consentRequired": false,
-                "config": {
-                    "full.path": "true",
-                    "id.token.claim": "true",
-                    "access.token.claim": "true",
-                    "userinfo.token.claim": "true",
-                    "claim.name": "groups"
-                }
-            }]
-        },
-        {
             "clientId": "openshift",
             "name": "OpenShift Console/oc OIDC identity provider client (ADR-0320)",
             "description": "Confidential client backing the cluster OAuth OpenID identity provider - server-side code exchange, same shape as tekos-frontend, not a browser SPA",
