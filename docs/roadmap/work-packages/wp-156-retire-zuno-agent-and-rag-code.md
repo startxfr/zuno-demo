@@ -44,6 +44,35 @@ deliberately not served (ADR-0007); arkos waits for the `plan_draft_write`
 blueprint in an operator release; cognos and soursage are `placeholder`
 (no graph shape needed until one becomes active).
 
+**Cutover criterion (user decision, 2026-10-23):** retire when comage, tekos
+and arkos are served by UnifAI on demo333 with parity checked; arkos needs
+the operator release carrying the `plan_draft_write` blueprint. Placeholder
+agents (advantage, finage, naveo, cognos, soursage) are out of scope: they
+are served by UnifAI once their OKF status becomes active.
+
+**Retirement order, from the inventory** (each step leaves the tree
+green before the next):
+
+1. Point what must survive away from the six: evaluations and Day 3
+   probes to the UnifAI target; mlops acceptance gate target; mcp-gateway
+   `knowledge.tech.search` removed or retargeted; trustyai RAGAS job
+   retargeted or removed; dashboards and SLO rules rebuilt on ai-gateway and
+   UnifAI metrics; the onboarding scaffold rewritten to emit an OKF bundle
+   only.
+2. Uninstall live (demo333), while the roles still exist: the `agents` role's
+   Applications, `rag`, `rag-ingestion`, `aiagent-operator`, and the
+   agent-runtime Applications from the `llm` role's loops only (ai-gateway
+   stays).
+3. Delete the code and its machinery together: components, charts,
+   Applications, roles and build roles, Makefile lists with the AAP DAGs in
+   the same change, build-publish matrix, lint steps, hardening entries,
+   release tooling lists, the Transit OKF sign path.
+4. Data: drop the RAG and agent PostgreSQL databases deliberately (never by
+   removing PGO users and letting PGO error-loop), after mlops no longer
+   reads `rag-tech`; keep `zuno-admin-api`, Redis and the persona groups.
+5. ADR statuses: the supersessions listed in the inventory, written with
+   their reciprocal Status lines; `check_docs.py` green.
+
 ## Steps
 
 **Live prerequisites.** Steps 1 and 6 act on clusters. demo333 is powered
