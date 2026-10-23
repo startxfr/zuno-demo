@@ -162,3 +162,19 @@ Commands: `run_scenarios.py --target unifai` (twice), `security_checks.py --targ
 `run_acceptance_gate.py --target unifai` in `evaluations/comage` (setup as above); then
 `oc -n zuno-unifai logs deploy/unifai-multiagent-temporal-worker --since=40m | grep -c 'Reasoning too short'`
 and an instant query on `zuno_model_empty_responses_total` against the thanos-querier route.
+
+## Re-run on operator 0.1.26 (2026-10-23, devel, demo333)
+
+Operator 0.1.26 with `retrieveFirst` on comage and tekos. Served on UnifAI: comage and tekos;
+advantage, finage and naveo are placeholders ("not served", ADR-0007); arkos, cognos and
+soursage are not deployed, so no parity run exists for them.
+
+| Check | Result |
+| --- | --- |
+| comage scenarios `--target unifai` | 18/20 (90%), PASS. Scenario 11 now passes. Failures: 8 first token 9.4 s (objective 6 s), 19 (needs the in-cluster Kubernetes client) |
+| comage security `--target unifai` | 8/8, including `unifai_forwards_identity_to_the_gateways` |
+| tekos scenarios `--target unifai` | 17/18 (94%), PASS. Only 19 fails (in-cluster client) |
+
+Scenario 11 passes because the expected page name is accepted as proof of retrieval
+(`2a272fe7`): with `retrieveFirst` no retriever tool event is emitted. UnifAI has no sales
+source for comage, so for that agent the scenario proves a grounded reply, not a sales citation.
