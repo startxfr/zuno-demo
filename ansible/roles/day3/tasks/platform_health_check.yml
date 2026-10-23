@@ -93,15 +93,21 @@
                     import urllib.error
                     import urllib.request
 
+                    # WP-156: the agents and RAG are served by UnifAI (ADR-0561,
+                    # ADR-0568), not agent-runtime/rag-service. Its internal APIs
+                    # only admit UnifAI pods (NetworkPolicy unifai-internal-apis),
+                    # so they are probed through the UI route, which proxies
+                    # /api2 to multiagent and /api1 to the RAG server. That route
+                    # answers its SPA page with 200 for unknown paths, so a
+                    # UnifAI check passes only on a JSON {"status": "ok"} body.
+                    UNIFAI = "https://unifai-ui-zuno-unifai.{{ cluster_base_domain }}"
                     TARGETS = [
-                        ("agent-runtime", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080/healthz"),
-                        ("agent-runtime", "http://agent-runtime.zuno-ai-run.svc.cluster.local:8080/readyz"),
-                        ("ai-gateway", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080/healthz"),
-                        ("ai-gateway", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080/readyz"),
-                        ("mcp-gateway", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/healthz"),
-                        ("mcp-gateway", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/readyz"),
-                        ("rag-service", "http://rag-service.zuno-data.svc.cluster.local:8080/healthz"),
-                        ("rag-service", "http://rag-service.zuno-data.svc.cluster.local:8080/readyz"),
+                        ("ai-gateway", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080/healthz", False),
+                        ("ai-gateway", "http://ai-gateway.zuno-ai-run.svc.cluster.local:8080/readyz", False),
+                        ("mcp-gateway", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/healthz", False),
+                        ("mcp-gateway", "http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/readyz", False),
+                        ("unifai-multiagent", UNIFAI + "/api2/health/", True),
+                        ("unifai-rag", UNIFAI + "/api1/health/", True),
                         # The four MCP servers are deliberately NOT probed
                         # here - see this file's own header comment for
                         # why (NetworkPolicy restricts their ingress to
@@ -109,13 +115,19 @@
                     ]
 
                     results = []
-                    for service, url in TARGETS:
-                        check_id = url.rsplit("/", 1)[-1]
+                    for service, url, json_ok in TARGETS:
+                        check_id = url.rstrip("/").rsplit("/", 1)[-1]
                         start = time.monotonic()
                         try:
                             with urllib.request.urlopen(url, timeout=10) as resp:
                                 passed = resp.status == 200
                                 detail = "" if passed else "status=" + str(resp.status)
+                                if passed and json_ok:
+                                    try:
+                                        passed = json.loads(resp.read().decode()).get("status") == "ok"
+                                    except ValueError:
+                                        passed = False
+                                    detail = "" if passed else "not a JSON status=ok health body"
                         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
                             passed = False
                             detail = str(exc)
