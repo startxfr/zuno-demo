@@ -19,10 +19,10 @@ zuno_ID: "{{ zuno_orgID }}{{ zuno_envID }}"
 #
 # "everywhere" is narrower than it reads, and deliberately so. Only the four
 # overrides below are wired: zunoapp, keycloak (Keycloak's own admin), the
-# keycloak PostgreSQL role, and ragtech. The other 14 PostgreSQL roles listed
+# keycloak PostgreSQL role, and ragtech. The other 12 PostgreSQL roles listed
 # in ansible/roles/postgresql/defaults/main.yml (aapgateway, aapcontroller,
 # aapeda, aaphub, maas, ogxserver, ragadv, ragproject, ragsales, ragsxalegacy,
-# agentcheckpoints, agentconversations, metricsservice, msawxreadonly) have no
+# metricsservice, msawxreadonly) have no
 # override here and keep the role's per-path
 # `lookup('ansible.builtin.password', '/dev/null', ...)`, so each gets its own
 # distinct random password.

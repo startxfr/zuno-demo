@@ -21,8 +21,6 @@ postgresql_pguser_bootstrap_secrets:
   - {owner: ragtech, vault_path: rag/postgresql-app}
   - {owner: maas, vault_path: maas/postgresql-app}
   - {owner: mlflow, vault_path: mlflow/postgresql-app}
-  - {owner: agentcheckpoints, vault_path: agent-runtime/postgresql-app}
-  - {owner: agentconversations, vault_path: agent-runtime/conversations-postgresql-app}
   - {owner: ogxserver, vault_path: ogx/postgresql-app}
   - {owner: ragsales, vault_path: rag-sales/postgresql-app}
   - {owner: ragsxalegacy, vault_path: rag-sxa-legacy/postgresql-app}

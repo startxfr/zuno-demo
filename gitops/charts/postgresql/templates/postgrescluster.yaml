@@ -276,9 +276,6 @@ no backup by itself - PGO waits for the annotation's value to change.
     - name: {{ .Values.mlflowDatabase.owner }}
       databases:
         - {{ .Values.mlflowDatabase.name }}
-    - name: {{ .Values.checkpointDatabase.owner }}
-      databases:
-        - {{ .Values.checkpointDatabase.name }}
     - name: {{ .Values.ogxDatabase.owner }}
       databases:
         - {{ .Values.ogxDatabase.name }}
@@ -294,9 +291,6 @@ no backup by itself - PGO waits for the annotation's value to change.
     - name: {{ .Values.ragProjectDatabase.owner }}
       databases:
         - {{ .Values.ragProjectDatabase.name }}
-    - name: {{ .Values.conversationsDatabase.owner }}
-      databases:
-        - {{ .Values.conversationsDatabase.name }}
     - name: {{ .Values.aapDatabase.owner }}
       databases:
         - {{ .Values.aapDatabase.name }}

@@ -60,9 +60,6 @@ data:
     \connect {{ .Values.mlflowDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.mlflowDatabase.owner }};
 
-    \connect {{ .Values.checkpointDatabase.name }}
-    GRANT ALL ON SCHEMA public TO {{ .Values.checkpointDatabase.owner }};
-
     \connect {{ .Values.ogxDatabase.name }}
     CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ogxDatabase.owner }};
@@ -82,11 +79,6 @@ data:
     \connect {{ .Values.ragProjectDatabase.name }}
     CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ragProjectDatabase.owner }};
-
-    -- Plain relational conversation metadata (ADR-0212) - no pgvector
-    -- needed, unlike the embeddings-bearing databases above.
-    \connect {{ .Values.conversationsDatabase.name }}
-    GRANT ALL ON SCHEMA public TO {{ .Values.conversationsDatabase.owner }};
 
     -- AAP 2.7 Automation Metrics service (Django) - plain relational.
     \connect {{ .Values.aapMetricsDatabase.name }}

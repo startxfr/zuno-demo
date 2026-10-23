@@ -244,24 +244,10 @@ mlflowDatabase:
   owner: mlflow
   vaultPath: mlflow/postgresql-app
 
-# WP-156: agent-runtime, this database's only client, is retired. The PGO
-# user, its database and its credential ExternalSecret stay until a
-# reviewed live step drops them (removing the user here would make PGO
-# drop the role and error-loop; PGO never recreates a dropped database).
-# Dedicated database/role for the Agent Runtime's LangGraph checkpointer
-# (ADR-0103) - resumable workflow state, isolated from every other
-# database on this cluster for the same reason ragTechDatabase/
-# maasDatabase are. The hyphenated database name mirrors ragTechDatabase's
-# "rag-tech".
-checkpointDatabase:
-  name: agent-checkpoints
-  owner: agentcheckpoints
-  vaultPath: agent-runtime/postgresql-app
-
 # Dedicated database/role for the OGX-backed RAG provider prototype's
 # remote::pgvector vector I/O provider (ADR-0322 v0.1 integration scope) -
 # isolated from every other database on this cluster for the same reason
-# checkpointDatabase/ragTechDatabase are, and deliberately separate from
+# ragTechDatabase is, and deliberately separate from
 # the document_embeddings table rag-service's own pgvector provider reads
 # (app/search.py) rather than a shared credential onto the same schema:
 # ADR-0322's acceptance criteria call for OGX to *index* a controlled test
@@ -315,24 +301,6 @@ ragProjectDatabase:
   name: rag-project
   owner: ragproject
   vaultPath: rag-project/postgresql-app
-
-# WP-156: agent-runtime, this database's only client, is retired. The PGO
-# user, its database and its credential ExternalSecret stay until a
-# reviewed live step drops them (removing the user here would make PGO
-# drop the role and error-loop; PGO never recreates a dropped database).
-# Dedicated database/role for ADR-0212's persistent-conversation metadata
-# (conversations/conversation_stars tables). One shared database, not one
-# per agent unlike the ragXxxDatabase pattern above - conversation
-# metadata is operationally a single, cross-agent concern, not a
-# knowledge domain. Isolated from checkpointDatabase's agentcheckpoints
-# role and every rag-* role (ADR-0212's own Security considerations:
-# never share credentials between them). Same "bring your own password"
-# mechanism as checkpointDatabase above, via
-# templates/externalsecret-conversations.yaml.
-conversationsDatabase:
-  name: agent-conversations
-  owner: agentconversations
-  vaultPath: agent-runtime/conversations-postgresql-app
 
 # Ansible Automation Platform (ADR-0354, WP-072) - four dedicated
 # databases/roles, one per sub-component, same "bring your own password"

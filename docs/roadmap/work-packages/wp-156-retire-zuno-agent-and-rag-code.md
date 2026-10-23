@@ -218,10 +218,16 @@ stays), every per-agent agent-frontend + agent-bff Application (charts
 
 **What remains:**
 
-- Step 5: the PGO `spec.users` entries and databases `agent-checkpoints`
-  and `agent-conversations` (and their credential ExternalSecrets and
-  Vault seeds) are kept on purpose; dropping them needs a reviewed live
-  step.
+- Step 5, done 2026-10-23 after a review approved by the user: the
+  databases `agent-checkpoints` (89 MB, 4 tables) and `agent-conversations`
+  (8.5 MB, 6 tables) had no connection and no grant beyond their own roles,
+  and rag-service does not read them (its project-membership projection
+  was pushed by agent-runtime). Removed from `spec.users`, the init and
+  schema-grants SQL, the values, the two credential ExternalSecrets, the
+  postgresql role's bootstrap list and the vault seeds; once PGO had
+  reconciled, both databases and the roles `agentcheckpoints` and
+  `agentconversations` were dropped by hand, after a `pg_dump` of each
+  (kept outside the repository) and on top of the pgBackRest backups.
 - The eight `<agent>-frontend` Keycloak clients, their `access` roles and
   group mappings, their `<agent>-frontend-client-secret` ExternalSecrets,
   `KC_VAULT` items and Vault seeds were removed on 2026-10-23 once the
