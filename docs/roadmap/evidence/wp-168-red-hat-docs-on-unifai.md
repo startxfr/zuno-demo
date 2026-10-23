@@ -54,7 +54,26 @@ A source whose spec hash changed was registered again and synced: `2 pages (0 ch
 0 deleted)`, nothing re-embedded. A changed page alone, and a vanished page, are covered
 by unit tests (`rag/tests/unit/test_web_source.py`); they were not replayed live.
 
-## Left
+## Retirement of rag-service and rag-ingestion (2026-10-24, user go)
 
-mcp-gateway still merges `rag-service`; retiring `rag-service`, `rag-ingestion` and their
-raw S3 prefix waits for the switch and the user's go.
+Done on demo333, after mcp-gateway had been rolled onto the UnifAI-only handler (verified inside
+the pod: a consultant gets Confluence and Red Hat pages, sale-01 Red Hat pages only):
+
+- The four ArgoCD Applications (`zuno-rag-d0/d1`, `zuno-rag-ingestion-d0/d1`) were deleted with
+  cascade; `rag-service`, the schema Jobs, the rag-ingestion ConfigMaps and the KFP application are gone.
+- The `rag-service` and `rag-ingestion` BuildConfigs, ImageStreams, builds, signing Jobs and build
+  ConfigMaps in `zuno-ai-build` were deleted.
+- `pg_dump` of the five databases kept outside the repository (`rag-tech` 181 MB, the others a few
+  KB), then `DROP DATABASE` and `DROP ROLE` for `rag-tech`, `rag-sales`, `rag-sxa-legacy`, `rag-adv`,
+  `rag-project` and their roles, after the repository commit removed them from `spec.users`. PGO stayed
+  healthy and the schema-grants Job completed.
+- Vault: the five `*/postgresql-app` paths, `rag/pipeline-db` and `sxa-corpus/s3` were deleted;
+  `rag/s3` stays (model weights, mlops, mlflow).
+- S3: every object of `s3://zuno-demo333-data` (4493 objects, 3.2 GB: `raw-tech-*`,
+  `normalized-tech-*`, `manifests-tech-*`, `rag-corpus-ingestion-tech-*`) was deleted.
+- The repository commit `877d8c83` removes 244 files; `check_docs.py`, the mlops tests, the
+  mcp-gateway tests, `helm template` of the changed charts and the playbook syntax checks pass.
+
+Not done: the `mlpipeline` database of the external MariaDB endpoint belongs to the DBA, who can drop
+it; the OGX server prototype and its `ogx` database stay (disabled by default); dashboards still carry
+the rag-service era panel queries until WP-166 rebuilds them.
