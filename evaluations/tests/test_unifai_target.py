@@ -332,3 +332,15 @@ def test_login_name_can_be_switched_off(monkeypatch):
 
     monkeypatch.setenv("EVAL_PERSONAS", "0")
     assert login_name("consultant-01") == "consultant-01"
+
+
+def test_tekos_reexport_exposes_login_name():
+    """evaluations/tekos puts its own directory first on sys.path, so its shim is what the gate imports."""
+    import importlib.util
+    import pathlib
+
+    shim = pathlib.Path(__file__).resolve().parents[1] / "tekos" / "unifai_target.py"
+    spec = importlib.util.spec_from_file_location("tekos_unifai_target_shim", shim)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    assert mod.login_name("sale-01") == "eval-sale-01"

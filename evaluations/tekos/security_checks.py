@@ -360,7 +360,7 @@ def unifai_forwards_identity_to_the_gateways() -> CheckResult:
     direct evidence the token travelled UnifAI -> mcp-gateway."""
     tools, reply = [], ""
     for chunk in _unifai().stream(
-        "consultant-01", "Search our Confluence for the Satellite page and tell me its title.", timeout=120
+        "consultant-01", "Use your Confluence search tool to find the page named Satellite and give me its title.", timeout=120
     ):
         if chunk.get("type") == "tool_calling" and chunk.get("tool"):
             tools.append(chunk["tool"])
