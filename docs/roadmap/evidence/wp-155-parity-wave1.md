@@ -87,3 +87,42 @@ python3 security_checks.py --target unifai
 python3 run_acceptance_gate.py --target unifai
 python3 run_scenarios.py ; python3 security_checks.py     # agent-runtime baseline
 ```
+
+## Re-run on operator 0.1.25 (2026-10-23, later)
+
+Operator 0.1.25 (retrieve-first directive for agents with a retriever, `teamOf`, keyless)
+recreated the teams as `agent-<name>` (new team ids). Check done first:
+`oc -n zuno-unifai get unifaiagent comage-check-deal-status -o jsonpath='{.spec.config.system_message}'`
+now ends with "Before you answer, always search the knowledge base with your knowledge
+retrieval tool and ground the answer in what it returns, citing the pages you used. Use your
+other tools only after that." The harness is `origin/demo222` (16154c3c), which carries the
+wave 1 fixes and the ADR-0512 exception for finage.
+
+| Run | Before (operator 0.1.20..22) | After (0.1.25) |
+|---|---|---|
+| comage scenarios `--target unifai` | 18/20 (90%) | 17/20 (85%), run twice with the same result |
+| comage scenario 10 | pass | pass, then fail on the second run (`tool_calls=[]`) |
+| comage scenario 11 | fail (`salesforce.opportunity.read`) | **fail**, both runs: `tool_calls=['salesforce.opportunity.read']` |
+| comage scenario 8 (first token) | pass | fail once (`no token received`), pass otherwise: model latency, not stable |
+| comage security `--target unifai` | 8/8 | 7/8: `unifai_forwards_identity_to_the_gateways` got `tool_calls=[] reply_len=137` |
+| finage security `--target unifai` | 5/6, 1 skipped | **6/6 with 1 skipped** (`finage_never_declares_sales_or_adv_knowledge_domains` passes) |
+| tekos scenarios `--target unifai` | 17/18 (94%) | 14/18 (78%): environment, see below |
+
+Scenario 11, probed by hand with the scenario's query as `sale-01`: the model does call
+`docs_rag_retriever_tool` on some turns (so the directive works), calls
+`salesforce.opportunity.read` first on others, and in both cases the turn ends with the
+ReAct error `Reasoning too short (0 chars, min 10)`: after a tool call the model produces an
+empty final message and the turn fails. The retrieve-first directive is followed
+non-deterministically by the local model; the empty-final-answer failure (also noted in
+phase A) is a second, independent defect, and also explains the 137-character reply of the
+identity check.
+
+Tekos regressions (scenarios 8, 10, 11) are environmental: `consultant-01` has exhausted its
+daily token budget (`Rate limit reached: quota_exceeded (quota_class=standard,
+dimension=user, budget_tokens=3000000, window=24h)`), so every turn returns that message with
+no tool call. The evaluations of this wave consume that budget; tekos has to be re-run after
+the window resets or with a persona-specific budget.
+
+Commands: as above, with `UNIFAI_TEAM_ID` taken from `teams.list` (names `agent-<name>`):
+`run_scenarios.py --target unifai` (comage twice, tekos), `security_checks.py --target unifai`
+(comage, finage). advantage and naveo were not re-run (placeholders, ADR-0007 decision pending).
