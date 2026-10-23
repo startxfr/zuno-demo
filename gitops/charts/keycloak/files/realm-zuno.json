@@ -1843,7 +1843,7 @@
         {
             "clientId": "zuno-evaluations",
             "name": "Automated evaluations (demo personas only)",
-            "description": "WP-156: confidential client for the evaluation harness, the stresstest and the Day 3 probes to obtain demo-persona tokens with the password grant. No browser flow, no redirect URI: it replaces the per-agent <agent>-frontend clients retired with agent-frontend.",
+            "description": "WP-156: confidential password-grant client for the evaluation harness, the stresstest and the Day 3 probes. No browser flow, no redirect URI; replaces the retired <agent>-frontend clients.",
             "enabled": true,
             "protocol": "openid-connect",
             "publicClient": false,
