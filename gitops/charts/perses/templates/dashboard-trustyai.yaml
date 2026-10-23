@@ -147,7 +147,7 @@ spec:
         spec:
           display:
             name: "Coverage: exchanges observed vs agent traffic"
-            description: "The observer disables itself silently when misconfigured - the two lines diverging is the signal, not their absolute equality. Traffic read from the BFF request-duration histogram count, not zuno_bff_requests_total (which double-counts per Keycloak group)."
+            description: "The observer disables itself silently when misconfigured - the two lines diverging is the signal, not their absolute equality. Traffic is read from UnifAI's session counter, mas_session_duration_seconds_count (ok outcomes): one point per finished agent session, so it is the true turn count. Observed evaluations should follow it with a lag of the exchange length; traffic continuing while evaluations flatline means the hook stopped running."
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -171,8 +171,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum(rate(zuno_bff_request_duration_ms_milliseconds_count{code!~"5.."}[$__rate_interval]))
-                    seriesNameFormat: "agent traffic (non-5xx BFF)"
+                      sum(rate(mas_session_duration_seconds_count{mas_outcome="ok"}[$__rate_interval]))
+                    seriesNameFormat: "agent traffic (finished UnifAI sessions)"
       garakRagasJobOutcomes:
         kind: Panel
         spec:

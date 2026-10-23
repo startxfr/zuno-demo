@@ -1,7 +1,7 @@
 {{- if and .Values.grafana.enabled .Values.prometheusReaderBearer }}
 # ADR-0029's model-usage metrics: zuno.model_calls/zuno.model_tokens/
 # zuno.model_cost_usd (components/ai-gateway/app/telemetry.py) and
-# zuno_bff_requests_total (components/agent-bff), scraped by prometheus-k8s
+# mas_session_duration_seconds_count (UnifAI multiagent) and zuno_model_calls_total (ai-gateway), scraped by prometheus-k8s
 # via gitops/charts/observability's ServiceMonitor (see docs/platform/slo.md).
 # Queried through thanos-querier in-cluster (not its external Route, for
 # the same 100%-in-cluster style

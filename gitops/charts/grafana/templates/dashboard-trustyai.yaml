@@ -284,7 +284,7 @@ spec:
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "description": "The observer is fire-and-forget and disables itself SILENTLY when its backend URL is unset or half-configured - observe_exchange returns before making any call, so nothing errors and nothing is recorded. That failure produces no unavailable outcome and no log line: the evaluations series simply flatlines while agent traffic continues. The two lines diverging IS the signal. They are not expected to be equal - most BFF requests are not chat turns, and evaluations lag by the length of the exchange - but observed traffic falling to zero while BFF traffic continues means the hook stopped running. Traffic is read from zuno_bff_request_duration_ms_milliseconds_count, NOT zuno_bff_requests_total: the latter deliberately records one point PER KEYCLOAK GROUP (see agent-bff RecordRequest), so a user in twelve groups counts as twelve requests. The histogram count is not broken out that way and is the only true request count on this platform - live, arkos reads 777 against a true 755.",
+          "description": "The observer is fire-and-forget and disables itself SILENTLY when its backend URL is unset or half-configured - observe_exchange returns before making any call, so nothing errors and nothing is recorded. That failure produces no unavailable outcome and no log line: the evaluations series simply flatlines while agent traffic continues. The two lines diverging IS the signal. They are not expected to be equal - evaluations lag by the length of the exchange - but observed traffic falling to zero while agent traffic continues means the hook stopped running. Traffic is read from UnifAI's session counter, mas_session_duration_seconds_count (ok outcomes): one point per finished agent session, so it is the true turn count. Observed evaluations should follow it with a lag of the exchange length; traffic continuing while evaluations flatline means the hook stopped running.",
           "gridPos": {
             "h": 8,
             "w": 16,
@@ -313,8 +313,8 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum(rate(zuno_bff_request_duration_ms_milliseconds_count{code!~\"5..\"}[$__rate_interval]))",
-              "legendFormat": "agent traffic (non-5xx BFF)"
+              "expr": "sum(rate(mas_session_duration_seconds_count{mas_outcome=\"ok\"}[$__rate_interval]))",
+              "legendFormat": "agent traffic (finished UnifAI sessions)"
             }
           ]
         },

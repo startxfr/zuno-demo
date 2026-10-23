@@ -2,7 +2,7 @@
 # WP-139: typed-schema translation of
 # gitops/charts/grafana/templates/dashboard-agents-tools-rag.yaml (ADR-0102/
 # ADR-0011/ADR-0036/ADR-0050/ADR-0109/ADR-0413/ADR-0551). Same panels, same
-# PromQL/TraceQL, same variables - see that file's own header for the
+# PromQL/TraceQL, same variables (WP-166: rebuilt on UnifAI and ai-gateway signals) - see that file's own header for the
 # row-vs-schema-version rationale (classic "row" panel type, not v2 Dashboard
 # schema), not repeated here.
 #
@@ -37,21 +37,12 @@
 #   - fieldConfig unit/thresholds/min/max on every timeseries-typed panel
 #     (percentunit, short, s, reqps, etc.) are dropped: TimeSeriesChart's
 #     plugin.spec must stay {} - format/thresholds there is a confirmed
-#     live schema rejection (WP-138). Only the four `stat`-typed panels
-#     (Non-allowed ratio, Freshness alerts firing, RAG search error ratio)
+#     live schema rejection (WP-138). Only the `stat`-typed panels
+#     (Non-allowed ratio, RAG search error ratio)
 #     keep format+thresholds, translated onto StatChart, where both fields
 #     are allowed; a Grafana `value: null` first threshold step is mapped to
 #     `value: 0`, matching both pilot files' own first-step convention.
-#   - "Answer grounding (zuno.source_mode)" was a Grafana `piechart` over a
-#     Tempo TraceQL query with a groupBy transformation aggregating span
-#     counts into a donut. Perses has no confirmed piechart+TraceQuery
-#     combination on this cluster, so it is simplified to the same
-#     Table/TraceQuery shape used for this dashboard's other three trace
-#     panels: the identical TraceQL span selection, but rendered as a raw
-#     span table rather than an aggregated donut - the groupBy aggregation
-#     itself is dropped. Same kind of simplification dashboard-trustyai.yaml
-#     already documents for its own table transformations.
-#   - The four templating variables (agent/tool/mcp_server/domain) are all
+#   - The three templating variables (agent/tool/mcp_server) are all
 #     clean label_values() queries against the `prometheus` datasource and
 #     translate 1:1 onto ListVariable/PrometheusLabelValuesVariable, same
 #     shape as dashboard-mesh-gateway.yaml's three variables - still
@@ -89,7 +80,7 @@ spec:
             spec:
               labelName: agent
               matchers:
-                - "zuno_bff_requests_total"
+                - "zuno_model_calls_total"
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
@@ -125,28 +116,12 @@ spec:
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
-      - kind: ListVariable
-        spec:
-          name: domain
-          display:
-            name: domain
-          allowAllValue: true
-          allowMultiple: true
-          plugin:
-            kind: PrometheusLabelValuesVariable
-            spec:
-              labelName: domain
-              matchers:
-                - "zuno_rag_freshness_lag_seconds_count"
-              datasource:
-                kind: PrometheusDatasource
-                name: prometheus
     panels:
-      bffRequestsByAgentCode:
+      modelCallsByAgentOutcome:
         kind: Panel
         spec:
           display:
-            name: "BFF requests by agent/code (rate)"
+            name: "Model calls by agent/outcome (rate)"
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -160,14 +135,14 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (agent, code)
-                      (rate(zuno_bff_requests_total{agent=~"$agent"}[5m]))
-                    seriesNameFormat: "{{`{{agent}}`}} ({{`{{code}}`}})"
+                      sum by (agent, outcome)
+                      (rate(zuno_model_calls_total{agent=~"$agent"}[5m]))
+                    seriesNameFormat: "{{`{{agent}}`}} ({{`{{outcome}}`}})"
       perAgentSuccessRatio:
         kind: Panel
         spec:
           display:
-            name: "Per-agent success ratio (ADR-0102 shape)"
+            name: "Per-agent model-call success ratio (includes provider fallbacks)"
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -181,9 +156,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (agent) (rate(zuno_bff_requests_total{agent=~"$agent",
-                      code!~"5.."}[5m])) / sum by (agent)
-                      (rate(zuno_bff_requests_total{agent=~"$agent"}[5m]))
+                      sum by (agent) (rate(zuno_model_calls_total{agent=~"$agent", outcome="success"}[5m])) / sum by (agent) (rate(zuno_model_calls_total{agent=~"$agent"}[5m]))
                     seriesNameFormat: "{{`{{agent}}`}}"
       errorBudgetBurnRate:
         kind: Panel
@@ -203,9 +176,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      (1 - (sum(rate(zuno_bff_requests_total{agent=~"$agent",
-                      code!~"5.."}[1h])) /
-                      sum(rate(zuno_bff_requests_total{agent=~"$agent"}[1h])))) / 0.001
+                      (1 - (sum(rate(mas_session_duration_seconds_count{mas_outcome="ok"}[1h])) /
+                      sum(rate(mas_session_duration_seconds_count[1h])))) / 0.001
                     seriesNameFormat: "burn rate (1h, fast)"
             - kind: TimeSeriesQuery
               spec:
@@ -216,9 +188,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      (1 - (sum(rate(zuno_bff_requests_total{agent=~"$agent",
-                      code!~"5.."}[6h])) /
-                      sum(rate(zuno_bff_requests_total{agent=~"$agent"}[6h])))) / 0.001
+                      (1 - (sum(rate(mas_session_duration_seconds_count{mas_outcome="ok"}[6h])) /
+                      sum(rate(mas_session_duration_seconds_count[6h])))) / 0.001
                     seriesNameFormat: "burn rate (6h, slow)"
       mcpToolInvocations:
         kind: Panel
@@ -317,11 +288,11 @@ spec:
                       sum by (mcp_server)
                       (rate(zuno_tool_invocations_total{mcp_server=~"$mcp_server"}[5m]))
                     seriesNameFormat: "{{`{{mcp_server}}`}}"
-      ragSearchesByOutcomeProvider:
+      ragSearchesByOutcomeSource:
         kind: Panel
         spec:
           display:
-            name: "RAG searches (rate, by outcome/provider)"
+            name: "RAG searches (rate, by outcome/source type)"
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -334,13 +305,13 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "sum by (outcome, provider) (rate(zuno_rag_searches_total[5m]))"
-                    seriesNameFormat: "{{`{{outcome}}`}} ({{`{{provider}}`}})"
-      ragResultCount:
+                    query: "sum by (rag_outcome, rag_source_type) (rate(rag_search_duration_seconds_count[5m]))"
+                    seriesNameFormat: "{{`{{rag_outcome}}`}} ({{`{{rag_source_type}}`}})"
+      ragSearchLatency:
         kind: Panel
         spec:
           display:
-            name: "RAG result count (p50/p95)"
+            name: "RAG search latency (p50/p95, seconds)"
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -355,7 +326,7 @@ spec:
                       name: prometheus
                     query: >-
                       histogram_quantile(0.50, sum by (le)
-                      (rate(zuno_rag_result_count_bucket[5m])))
+                      (rate(rag_search_duration_seconds_bucket[5m])))
                     seriesNameFormat: "p50"
             - kind: TimeSeriesQuery
               spec:
@@ -367,59 +338,8 @@ spec:
                       name: prometheus
                     query: >-
                       histogram_quantile(0.95, sum by (le)
-                      (rate(zuno_rag_result_count_bucket[5m])))
+                      (rate(rag_search_duration_seconds_bucket[5m])))
                     seriesNameFormat: "p95"
-      ragFreshnessLagByDomain:
-        kind: Panel
-        spec:
-          display:
-            name: "RAG freshness lag by domain"
-            description: "Same shape as prometheusrule-freshness-lag.yaml's RagFreshnessLagExceeded<Domain> alerts. Per-domain objectives: tech 604800s (7d), sales 14400s (4h), adv 86400s (1d) - sxa-legacy is deliberately exempt."
-          plugin:
-            kind: TimeSeriesChart
-            spec: {}
-          queries:
-            - kind: TimeSeriesQuery
-              spec:
-                plugin:
-                  kind: PrometheusTimeSeriesQuery
-                  spec:
-                    datasource:
-                      kind: PrometheusDatasource
-                      name: prometheus
-                    query: >-
-                      sum by (domain) (rate(zuno_rag_freshness_lag_seconds_sum{domain=~"$domain"}[30m]))
-                      / sum by (domain)
-                      (rate(zuno_rag_freshness_lag_seconds_count{domain=~"$domain"}[30m]))
-                    seriesNameFormat: "{{`{{domain}}`}}"
-      freshnessAlertsFiring:
-        kind: Panel
-        spec:
-          display:
-            name: "Freshness alerts firing"
-          plugin:
-            kind: StatChart
-            spec:
-              format:
-                unit: decimal
-              thresholds:
-                steps:
-                  - value: 0
-                    color: green
-                  - value: 1
-                    color: red
-          queries:
-            - kind: TimeSeriesQuery
-              spec:
-                plugin:
-                  kind: PrometheusTimeSeriesQuery
-                  spec:
-                    datasource:
-                      kind: PrometheusDatasource
-                      name: prometheus
-                    query: >-
-                      sum(ALERTS{alertname=~"RagFreshnessLagExceeded.*",
-                      alertstate="firing"}) or vector(0)
       ragSearchErrorRatio:
         kind: Panel
         spec:
@@ -448,37 +368,13 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum(rate(zuno_rag_searches_total{outcome="error"}[5m])) /
-                      sum(rate(zuno_rag_searches_total[5m]))
-      ragEmptySearchesByDomainSet:
+                      sum(rate(rag_search_duration_seconds_count{rag_outcome="error"}[5m])) /
+                      sum(rate(rag_search_duration_seconds_count[5m]))
+      tracesSlowAgentTurns:
         kind: Panel
         spec:
           display:
-            name: "Searches returning NOTHING (share, by domain set)"
-            description: "Share of RAG searches that came back with zero rows, BY THE DOMAIN SET SEARCHED. A search that finds nothing is outcome=ok, not an error - so the error-ratio stat beside this one stays green while retrieval is silently dead, and the p50/p95 panel above shows a low number rather than an alarming one. One series pegged at 1.0 is not automatically wrong: knowledge.sales is deliberately empty until Salesforce ingestion lands (ADR-0218). What matters is a series MOVING UP: a domain that was serving content stopped. `domains` is the requested set joined by commas, one label rather than one point per domain."
-          plugin:
-            kind: TimeSeriesChart
-            spec: {}
-          queries:
-            - kind: TimeSeriesQuery
-              spec:
-                plugin:
-                  kind: PrometheusTimeSeriesQuery
-                  spec:
-                    datasource:
-                      kind: PrometheusDatasource
-                      name: prometheus
-                    query: >-
-                      (sum by (domains) (rate(zuno_rag_result_count_bucket{le="0.0"}[$__rate_interval]))
-                      or vector(0)) / clamp_min(sum by (domains)
-                      (rate(zuno_rag_result_count_count[$__rate_interval])), 0.0001)
-                    seriesNameFormat: "{{`{{domains}}`}}"
-      answerGroundingSourceMode:
-        kind: Panel
-        spec:
-          display:
-            name: "Answer grounding (zuno.source_mode)"
-            description: "ADR-0205's acceptance signal - how every agent answer was grounded (indexed/live/both/none), from agent_graph_run spans. Simplified from Grafana's donut+groupBy transformation: raw per-span rows from the same TraceQL selection, not an aggregated pie - see this file's header."
+            name: "Traces: slow agent turns (RunWorkflow >10s)"
           plugin:
             kind: Table
             spec: {}
@@ -491,25 +387,7 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{name=\"agent_graph_run\" && span.zuno.agent=~\"$agent\"} | select(span.zuno.source_mode, span.zuno.latency_ms)"
-      tracesSlowAgentGraphRun:
-        kind: Panel
-        spec:
-          display:
-            name: "Traces: slow agent_graph_run (>10s)"
-          plugin:
-            kind: Table
-            spec: {}
-          queries:
-            - kind: TraceQuery
-              spec:
-                plugin:
-                  kind: TempoTraceQuery
-                  spec:
-                    datasource:
-                      kind: TempoDatasource
-                      name: tempo
-                    query: "{name=\"agent_graph_run\" && duration > 10s}"
+                    query: "{name=\"RunWorkflow:GraphTraversalWorkflow\" && duration > 10s}"
       tracesToolInvokeErrors:
         kind: Panel
         spec:
@@ -532,7 +410,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: "Traces: slow rag_search (>2s)"
+            name: "Traces: slow rag.search (>2s)"
           plugin:
             kind: Table
             spec: {}
@@ -545,7 +423,7 @@ spec:
                     datasource:
                       kind: TempoDatasource
                       name: tempo
-                    query: "{name=\"rag_search\" && duration > 2s}"
+                    query: "{name=\"rag.search\" && duration > 2s}"
     layouts:
       - kind: Grid
         spec:
@@ -559,7 +437,7 @@ spec:
               width: 12
               height: 8
               content:
-                $ref: "#/spec/panels/bffRequestsByAgentCode"
+                $ref: "#/spec/panels/modelCallsByAgentOutcome"
             - x: 12
               y: 0
               width: 12
@@ -615,43 +493,19 @@ spec:
               width: 12
               height: 8
               content:
-                $ref: "#/spec/panels/ragSearchesByOutcomeProvider"
+                $ref: "#/spec/panels/ragSearchesByOutcomeSource"
             - x: 12
               y: 0
               width: 12
               height: 8
               content:
-                $ref: "#/spec/panels/ragResultCount"
-            - x: 0
-              y: 8
-              width: 12
-              height: 8
-              content:
-                $ref: "#/spec/panels/ragFreshnessLagByDomain"
-            - x: 12
-              y: 8
-              width: 6
-              height: 4
-              content:
-                $ref: "#/spec/panels/freshnessAlertsFiring"
+                $ref: "#/spec/panels/ragSearchLatency"
             - x: 18
               y: 8
               width: 6
               height: 4
               content:
                 $ref: "#/spec/panels/ragSearchErrorRatio"
-            - x: 0
-              y: 16
-              width: 12
-              height: 8
-              content:
-                $ref: "#/spec/panels/ragEmptySearchesByDomainSet"
-            - x: 12
-              y: 16
-              width: 12
-              height: 8
-              content:
-                $ref: "#/spec/panels/answerGroundingSourceMode"
       - kind: Grid
         spec:
           display:
@@ -664,7 +518,7 @@ spec:
               width: 12
               height: 8
               content:
-                $ref: "#/spec/panels/tracesSlowAgentGraphRun"
+                $ref: "#/spec/panels/tracesSlowAgentTurns"
             - x: 12
               y: 0
               width: 12

@@ -1,6 +1,6 @@
 {{- if .Values.perses.enabled }}
 # Same backend as gitops/charts/grafana/templates/datasource-prometheus.yaml
-# (thanos-querier, ADR-0029's zuno_*/zuno_bff_* series), cluster-scoped
+# (thanos-querier, ADR-0029's zuno_* and UnifAI series), cluster-scoped
 # (PersesGlobalDatasource) per ADR-0551 decision 3 so every PersesDashboard
 # references it by name regardless of its own namespace.
 #

@@ -128,7 +128,7 @@ spec:
             spec:
               labelName: agent
               matchers:
-                - "zuno_bff_requests_total"
+                - "zuno_model_calls_total"
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
@@ -158,7 +158,7 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))"
+                    query: "sum(rate(zuno_model_calls_total{agent=~\"$agent\"}[5m]))"
                     seriesNameFormat: "requests/s"
       spanTimeline:
         kind: Panel

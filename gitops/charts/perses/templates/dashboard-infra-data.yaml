@@ -175,7 +175,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: "Component status (pod-health + BFF error-rate approximation)"
+            name: "Component status (pod-health + model-call error rate)"
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -188,8 +188,8 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: 'sum by (agent) (rate(zuno_bff_requests_total{code=~"5.."}[5m]))'
-                    seriesNameFormat: "bff errors: {{`{{agent}}`}}"
+                    query: 'sum by (agent) (rate(zuno_model_calls_total{outcome="error"}[5m]))'
+                    seriesNameFormat: "model-call errors: {{`{{agent}}`}}"
             - kind: TimeSeriesQuery
               spec:
                 plugin:

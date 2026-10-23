@@ -98,13 +98,13 @@ spec:
               "type": "prometheus",
               "uid": "prometheus"
             },
-            "definition": "label_values(zuno_bff_requests_total, agent)",
+            "definition": "label_values(zuno_model_calls_total, agent)",
             "hide": 0,
             "includeAll": false,
             "multi": false,
             "name": "agent",
             "options": [],
-            "query": "label_values(zuno_bff_requests_total, agent)",
+            "query": "label_values(zuno_model_calls_total, agent)",
             "refresh": 2,
             "regex": "",
             "sort": 1,
@@ -159,7 +159,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))"
+              "expr": "sum(rate(zuno_model_calls_total{agent=~\"$agent\"}[5m]))"
             }
           ]
         },

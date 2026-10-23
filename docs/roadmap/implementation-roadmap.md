@@ -918,7 +918,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-155 | [wp-155](work-packages/wp-155-migrate-remaining-agents-and-cut-demo222-over.md) | 0573, 0561 | WP-154 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Repo work merged | phase 2 landed on devel 2026-10-23 (1c845c92; frontend Keycloak clients 8f6935d4), agent stack uninstalled on demo333; left: step-6 live chain, reviewed drop of the agent-checkpoints/agent-conversations PGO users, decision on ADR-0042/0214/0411; rag stack moved to WP-168 |
 | WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Not started | demo333 is powered off - live steps wait for the user to power it on |
-| WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Not started | split out of WP-156 by user decision 2026-10-23 |
+| WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Repo work in review | split out of WP-156 by user decision 2026-10-23 |
 | WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Repo work merged | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |
 
 ### Phase 45 — agents in their own repository, delivered as signed OCI releases (added 2026-10-22)

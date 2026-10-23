@@ -1,12 +1,12 @@
 {{- if .Values.grafana.enabled }}
-# ADR-0413: NEW dashboard - the agent-path SLO at per-agent granularity
-# (ADR-0102), MCP tool authorization outcomes (ADR-0011/ADR-0036 - denied
-# calls included, not just successes) and RAG search/freshness health
-# (ADR-0050/ADR-0109). zuno_tool_invocations_total, zuno_rag_searches_total,
-# zuno_rag_result_count_bucket and zuno_rag_freshness_lag_seconds_{sum,count}
-# are all already flowing with real series - unlike the model-call duration
-# histogram, these were simply never put on a dashboard before, not blocked
-# on a redeploy.
+# ADR-0413 dashboard, rebuilt for UnifAI (WP-166): the agent-path SLO from
+# UnifAI sessions (mas_session_duration_seconds_count, no agent label) and
+# per-agent model calls from the ai-gateway (zuno_model_calls_total), MCP tool
+# authorization outcomes (zuno_tool_invocations_total, ADR-0011/ADR-0036 -
+# denied calls included) and RAG search health from UnifAI
+# (rag_search_duration_seconds_*, labels rag_outcome and rag_source_type).
+# The old freshness-lag and result-count panels and the answer-grounding panel
+# are gone with rag-service and agent-runtime; UnifAI exposes no equivalent.
 #
 # Layout reworked 2026-09-02 into rows using the CLASSIC schema's native
 # "row" panel type (type: row, collapsed: true/false), NOT Grafana's v2
@@ -79,14 +79,14 @@ spec:
               "type": "prometheus",
               "uid": "prometheus"
             },
-            "definition": "label_values(zuno_bff_requests_total, agent)",
+            "definition": "label_values(zuno_model_calls_total, agent)",
             "hide": 0,
             "includeAll": true,
             "allValue": ".*",
             "multi": true,
             "name": "agent",
             "options": [],
-            "query": "label_values(zuno_bff_requests_total, agent)",
+            "query": "label_values(zuno_model_calls_total, agent)",
             "refresh": 2,
             "regex": "",
             "sort": 1,
@@ -135,28 +135,6 @@ spec:
             "regex": "",
             "sort": 1,
             "type": "query"
-          },
-          {
-            "current": {
-              "text": "All",
-              "value": "$__all"
-            },
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
-            },
-            "definition": "label_values(zuno_rag_freshness_lag_seconds_count, domain)",
-            "hide": 0,
-            "includeAll": true,
-            "allValue": ".*",
-            "multi": true,
-            "name": "domain",
-            "options": [],
-            "query": "label_values(zuno_rag_freshness_lag_seconds_count, domain)",
-            "refresh": 2,
-            "regex": "",
-            "sort": 1,
-            "type": "query"
           }
         ]
       },
@@ -176,7 +154,7 @@ spec:
         },
         {
           "id": 1,
-          "title": "BFF requests by agent/code (rate)",
+          "title": "Model calls by agent/outcome (rate)",
           "type": "timeseries",
           "datasource": {
             "type": "prometheus",
@@ -194,14 +172,14 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (agent, code) (rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))",
-              "legendFormat": "{{`{{agent}}`}} ({{`{{code}}`}})"
+              "expr": "sum by (agent, outcome) (rate(zuno_model_calls_total{agent=~\"$agent\"}[5m]))",
+              "legendFormat": "{{`{{agent}}`}} ({{`{{outcome}}`}})"
             }
           ]
         },
         {
           "id": 2,
-          "title": "Per-agent success ratio (ADR-0102 shape)",
+          "title": "Per-agent model-call success ratio (includes provider fallbacks)",
           "type": "timeseries",
           "datasource": {
             "type": "prometheus",
@@ -235,8 +213,8 @@ spec:
               },
               "links": [
                 {
-                  "title": "View slow agent_graph_run traces in Tempo",
-                  "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22agent_graph_run%5C%22%20%26%26%20duration%20%3E%2010s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D",
+                  "title": "View slow agent turns in Tempo",
+                  "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22RunWorkflow%3AGraphTraversalWorkflow%5C%22%20%26%26%20duration%20%3E%2010s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D",
                   "targetBlank": true
                 }
               ]
@@ -248,14 +226,14 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (agent) (rate(zuno_bff_requests_total{agent=~\"$agent\", code!~\"5..\"}[5m])) / sum by (agent) (rate(zuno_bff_requests_total{agent=~\"$agent\"}[5m]))",
+              "expr": "sum by (agent) (rate(zuno_model_calls_total{agent=~\"$agent\", outcome=\"success\"}[5m])) / sum by (agent) (rate(zuno_model_calls_total{agent=~\"$agent\"}[5m]))",
               "legendFormat": "{{`{{agent}}`}}"
             }
           ]
         },
         {
           "id": 3,
-          "title": "Error budget burn rate (1h vs 6h windows, filtered by agent)",
+          "title": "Error budget burn rate (1h vs 6h windows, UnifAI sessions, all agents)",
           "type": "timeseries",
           "datasource": {
             "type": "prometheus",
@@ -299,7 +277,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "(1 - (sum(rate(zuno_bff_requests_total{agent=~\"$agent\", code!~\"5..\"}[1h])) / sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[1h])))) / 0.001",
+              "expr": "(1 - (sum(rate(mas_session_duration_seconds_count{mas_outcome=\"ok\"}[1h])) / sum(rate(mas_session_duration_seconds_count[1h])))) / 0.001",
               "legendFormat": "burn rate (1h, fast)"
             },
             {
@@ -307,7 +285,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "(1 - (sum(rate(zuno_bff_requests_total{agent=~\"$agent\", code!~\"5..\"}[6h])) / sum(rate(zuno_bff_requests_total{agent=~\"$agent\"}[6h])))) / 0.001",
+              "expr": "(1 - (sum(rate(mas_session_duration_seconds_count{mas_outcome=\"ok\"}[6h])) / sum(rate(mas_session_duration_seconds_count[6h])))) / 0.001",
               "legendFormat": "burn rate (6h, slow)"
             }
           ]
@@ -471,7 +449,7 @@ spec:
           "panels": [
             {
               "id": 8,
-              "title": "RAG searches (rate, by outcome/provider)",
+              "title": "RAG searches (rate, by outcome/source type)",
               "type": "timeseries",
               "datasource": {
                 "type": "prometheus",
@@ -488,8 +466,8 @@ spec:
                   "unit": "reqps",
                   "links": [
                     {
-                      "title": "View slow rag_search traces in Tempo",
-                      "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22rag_search%5C%22%20%26%26%20duration%20%3E%202s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D",
+                      "title": "View slow rag.search traces in Tempo",
+                      "url": "/explore?left=%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bname%3D%5C%22rag.search%5C%22%20%26%26%20duration%20%3E%202s%7D%22%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22%24%7B__from%7D%22%2C%22to%22%3A%22%24%7B__to%7D%22%7D%7D",
                       "targetBlank": true
                     }
                   ]
@@ -501,14 +479,14 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "sum by (outcome, provider) (rate(zuno_rag_searches_total[5m]))",
-                  "legendFormat": "{{`{{outcome}}`}} ({{`{{provider}}`}})"
+                  "expr": "sum by (rag_outcome, rag_source_type) (rate(rag_search_duration_seconds_count[5m]))",
+                  "legendFormat": "{{`{{rag_outcome}}`}} ({{`{{rag_source_type}}`}})"
                 }
               ]
             },
             {
               "id": 9,
-              "title": "RAG result count (p50/p95)",
+              "title": "RAG search latency (p50/p95, seconds)",
               "type": "timeseries",
               "datasource": {
                 "type": "prometheus",
@@ -526,7 +504,7 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "histogram_quantile(0.50, sum by (le) (rate(zuno_rag_result_count_bucket[5m])))",
+                  "expr": "histogram_quantile(0.50, sum by (le) (rate(rag_search_duration_seconds_bucket[5m])))",
                   "legendFormat": "p50"
                 },
                 {
@@ -534,80 +512,8 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "histogram_quantile(0.95, sum by (le) (rate(zuno_rag_result_count_bucket[5m])))",
+                  "expr": "histogram_quantile(0.95, sum by (le) (rate(rag_search_duration_seconds_bucket[5m])))",
                   "legendFormat": "p95"
-                }
-              ]
-            },
-            {
-              "id": 10,
-              "title": "RAG freshness lag by domain",
-              "type": "timeseries",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "description": "Same shape as prometheusrule-freshness-lag.yaml's RagFreshnessLagExceeded<Domain> alerts. Per-domain objectives: tech 604800s (7d), sales 14400s (4h), adv 86400s (1d) - sxa-legacy is deliberately exempt.",
-              "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 8
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "s"
-                }
-              },
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "prometheus"
-                  },
-                  "expr": "sum by (domain) (rate(zuno_rag_freshness_lag_seconds_sum{domain=~\"$domain\"}[30m])) / sum by (domain) (rate(zuno_rag_freshness_lag_seconds_count{domain=~\"$domain\"}[30m]))",
-                  "legendFormat": "{{`{{domain}}`}}"
-                }
-              ]
-            },
-            {
-              "id": 11,
-              "title": "Freshness alerts firing",
-              "type": "stat",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "gridPos": {
-                "h": 4,
-                "w": 6,
-                "x": 12,
-                "y": 8
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "short",
-                  "thresholds": {
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": null
-                      },
-                      {
-                        "color": "red",
-                        "value": 1
-                      }
-                    ]
-                  }
-                }
-              },
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "prometheus"
-                  },
-                  "expr": "sum(ALERTS{alertname=~\"RagFreshnessLagExceeded.*\", alertstate=\"firing\"}) or vector(0)"
                 }
               ]
             },
@@ -652,119 +558,7 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "sum(rate(zuno_rag_searches_total{outcome=\"error\"}[5m])) / sum(rate(zuno_rag_searches_total[5m]))"
-                }
-              ]
-            },
-            {
-              "id": 16,
-              "title": "Searches returning NOTHING (share, by domain set)",
-              "type": "timeseries",
-              "datasource": {
-                "type": "prometheus",
-                "uid": "prometheus"
-              },
-              "description": "Share of RAG searches that came back with zero rows, BY THE DOMAIN SET SEARCHED. A search that finds nothing is outcome=ok, not an error - so the error-ratio stat beside this one stays green while retrieval is silently dead, and the p50/p95 panel above shows a low number rather than an alarming one. This is the shape of failure the repo has hit twice: an ingestion run reporting success while indexing nothing, and an embedding batch dropped behind a 503 that a green validate never noticed. One series pegged at 1.0 is not automatically wrong: knowledge.sales is deliberately empty until Salesforce ingestion lands in v0.7 (ADR-0218), so it reads 1.00 and should - verified 2026-09-03 against 0 rows, while sxa-legacy (319841 rows) and tech (68962) read 0.00. What matters is a series MOVING UP: a domain that was serving content stopped. The unlabeled series from before 2026-09-03 is the old fleet-wide aggregate that could not tell those cases apart, and is not comparable to any of them. `domains` is the requested set joined by commas, one label rather than one point per domain - the fan-out that would inflate the metric the way zuno_bff_requests_total was inflated by Keycloak group.",
-              "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 0,
-                "y": 16
-              },
-              "fieldConfig": {
-                "defaults": {
-                  "unit": "percentunit",
-                  "min": 0,
-                  "max": 1,
-                  "thresholds": {
-                    "steps": [
-                      {
-                        "color": "green",
-                        "value": null
-                      },
-                      {
-                        "color": "green",
-                        "value": null
-                      },
-                      {
-                        "color": "orange",
-                        "value": 0.25
-                      },
-                      {
-                        "color": "red",
-                        "value": 0.9
-                      }
-                    ]
-                  }
-                }
-              },
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "prometheus",
-                    "uid": "prometheus"
-                  },
-                  "expr": "(sum by (domains) (rate(zuno_rag_result_count_bucket{le=\"0.0\"}[$__rate_interval])) or vector(0)) / clamp_min(sum by (domains) (rate(zuno_rag_result_count_count[$__rate_interval])), 0.0001)",
-                  "legendFormat": "{{`{{domains}}`}}"
-                }
-              ]
-            },
-            {
-              "id": 17,
-              "title": "Answer grounding (zuno.source_mode)",
-              "type": "piechart",
-              "datasource": {
-                "type": "tempo",
-                "uid": "tempo"
-              },
-              "description": "How every agent answer was grounded: indexed (RAG corpus), live (fresh verification), both, or none. This is ADR-0205's acceptance signal - 'traces show whether a response used indexed knowledge, live verification, or both' - and until now no dashboard read it, even though agent-runtime has been setting it on every agent_graph_run span since WP-24. Read it against the empty-retrieval stat beside it: they are independent measurements of the same thing from opposite ends of the pipeline, rag-service counting rows returned and agent-runtime recording what the graph actually used. Agreement is reassuring; a large 'none' slice while retrieval looks healthy, or the reverse, means one of the two is lying.",
-              "gridPos": {
-                "h": 8,
-                "w": 12,
-                "x": 12,
-                "y": 16
-              },
-              "transformations": [
-                {
-                  "id": "groupBy",
-                  "options": {
-                    "fields": {
-                      "zuno.source_mode": {
-                        "aggregations": [],
-                        "operation": "groupby"
-                      },
-                      "zuno.latency_ms": {
-                        "aggregations": [
-                          "count"
-                        ],
-                        "operation": "aggregate"
-                      }
-                    }
-                  }
-                }
-              ],
-              "options": {
-                "legend": {
-                  "displayMode": "table",
-                  "placement": "right",
-                  "values": [
-                    "value",
-                    "percent"
-                  ]
-                },
-                "pieType": "donut"
-              },
-              "targets": [
-                {
-                  "datasource": {
-                    "type": "tempo",
-                    "uid": "tempo"
-                  },
-                  "queryType": "traceql",
-                  "query": "{name=\"agent_graph_run\" && span.zuno.agent=~\"$agent\"} | select(span.zuno.source_mode, span.zuno.latency_ms)",
-                  "limit": 200,
-                  "tableType": "traces",
-                  "refId": "A"
+                  "expr": "sum(rate(rag_search_duration_seconds_count{rag_outcome=\"error\"}[5m])) / sum(rate(rag_search_duration_seconds_count[5m]))"
                 }
               ]
             }
@@ -784,7 +578,7 @@ spec:
           "panels": [
             {
               "id": 13,
-              "title": "Traces: slow agent_graph_run (>10s)",
+              "title": "Traces: slow agent turns (RunWorkflow >10s)",
               "type": "table",
               "datasource": {
                 "type": "tempo",
@@ -803,7 +597,7 @@ spec:
                     "uid": "tempo"
                   },
                   "queryType": "traceql",
-                  "query": "{name=\"agent_graph_run\" && duration > 10s}",
+                  "query": "{name=\"RunWorkflow:GraphTraversalWorkflow\" && duration > 10s}",
                   "limit": 20,
                   "tableType": "traces",
                   "refId": "A"
@@ -840,7 +634,7 @@ spec:
             },
             {
               "id": 15,
-              "title": "Traces: slow rag_search (>2s)",
+              "title": "Traces: slow rag.search (>2s)",
               "type": "table",
               "datasource": {
                 "type": "tempo",
@@ -859,7 +653,7 @@ spec:
                     "uid": "tempo"
                   },
                   "queryType": "traceql",
-                  "query": "{name=\"rag_search\" && duration > 2s}",
+                  "query": "{name=\"rag.search\" && duration > 2s}",
                   "limit": 20,
                   "tableType": "traces",
                   "refId": "A"

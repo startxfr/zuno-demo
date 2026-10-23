@@ -112,7 +112,7 @@ spec:
             spec:
               labelName: agent
               matchers:
-                - "zuno_bff_requests_total"
+                - "zuno_model_calls_total"
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
@@ -210,7 +210,7 @@ spec:
                       name: prometheus
                     query: >-
                       topk(20, sum by (user)
-                      (increase(zuno_bff_requests_total{user=~"$user", agent=~"$agent"}[$__range])))
+                      (increase(zuno_model_calls_total{user=~"$user", agent=~"$agent"}[$__range])))
                     seriesNameFormat: "{{`{{user}}`}}"
       topTokenConsumers:
         kind: Panel
@@ -293,7 +293,7 @@ spec:
                       name: prometheus
                     query: >-
                       sum by (group, agent)
-                      (increase(zuno_bff_requests_total{group=~"$group", agent=~"$agent"}[$__range]))
+                      (increase(zuno_model_calls_total{group=~"$group", agent=~"$agent"}[$__range]))
                     seriesNameFormat: "{{`{{group}}`}} / {{`{{agent}}`}}"
       modelCostByUserAgent:
         kind: Panel

@@ -73,7 +73,7 @@ spec:
         spec:
           display:
             name: "Agent-path availability (5m)"
-            description: "docs/platform/slo.md measurement query - successful (non-5xx) ratio at the BFF boundary."
+            description: "docs/platform/slo.md measurement query - share of UnifAI agent sessions that finish with outcome ok."
           plugin:
             kind: StatChart
             spec:
@@ -95,8 +95,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum(rate(zuno_bff_requests_total{code!~"5.."}[5m])) /
-                      sum(rate(zuno_bff_requests_total[5m]))
+                      sum(rate(mas_session_duration_seconds_count{mas_outcome="ok"}[5m])) /
+                      sum(rate(mas_session_duration_seconds_count[5m]))
       agentPathAvailability30d:
         kind: Panel
         spec:
@@ -124,8 +124,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum(increase(zuno_bff_requests_total{code!~"5.."}[30d])) /
-                      sum(increase(zuno_bff_requests_total[30d]))
+                      sum(increase(mas_session_duration_seconds_count{mas_outcome="ok"}[30d])) /
+                      sum(increase(mas_session_duration_seconds_count[30d]))
       errorBudgetRemaining30d:
         kind: Panel
         spec:
@@ -153,8 +153,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      1 - ((1 - (sum(increase(zuno_bff_requests_total{code!~"5.."}[30d]))
-                      / sum(increase(zuno_bff_requests_total[30d])))) / 0.001)
+                      1 - ((1 - (sum(increase(mas_session_duration_seconds_count{mas_outcome="ok"}[30d]))
+                      / sum(increase(mas_session_duration_seconds_count[30d])))) / 0.001)
       firingZunoAlerts:
         kind: Panel
         spec:
@@ -181,7 +181,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum(ALERTS{alertname=~"AgentPathErrorBudgetBurn.*|RagFreshnessLagExceeded.*",
+                      sum(ALERTS{alertname=~"AgentPathErrorBudgetBurn.*",
                       alertstate="firing"}) or vector(0)
       errorBudgetBurnRate:
         kind: Panel
@@ -202,8 +202,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      (1 - (sum(rate(zuno_bff_requests_total{code!~"5.."}[1h]))
-                      / sum(rate(zuno_bff_requests_total[1h])))) / 0.001
+                      (1 - (sum(rate(mas_session_duration_seconds_count{mas_outcome="ok"}[1h]))
+                      / sum(rate(mas_session_duration_seconds_count[1h])))) / 0.001
                     seriesNameFormat: "burn rate (1h, fast)"
             - kind: TimeSeriesQuery
               spec:
@@ -214,8 +214,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      (1 - (sum(rate(zuno_bff_requests_total{code!~"5.."}[6h]))
-                      / sum(rate(zuno_bff_requests_total[6h])))) / 0.001
+                      (1 - (sum(rate(mas_session_duration_seconds_count{mas_outcome="ok"}[6h]))
+                      / sum(rate(mas_session_duration_seconds_count[6h])))) / 0.001
                     seriesNameFormat: "burn rate (6h, slow)"
       deploymentAvailability:
         kind: Panel
@@ -382,12 +382,12 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: "sum(rate(zuno_tool_invocations_total{outcome=\"denied\"}[5m])) or vector(0)"
-      bffRequestsByAgent:
+      modelCallsByAgent:
         kind: Panel
         spec:
           display:
-            name: "BFF requests by agent (rate)"
-            description: "EXPECT A STEP DOWN ON 2026-09-03, with no drop in real traffic behind it. Until then zuno_bff_requests_total recorded one point per Keycloak GROUP, so a caller in twelve groups counted as twelve requests. It now counts exactly one point per response. The group breakdown moved to zuno_bff_requests_by_identity_total, which must never be used for volume or SLO."
+            name: "Model calls by agent (rate)"
+            description: "Model calls per agent at the ai-gateway (zuno_model_calls_total): one point per model call, provider fallbacks included, so this is not the number of user turns. The turn count is the UnifAI session counter behind the SLO panels. Rates before and after the migration to UnifAI (2026-10) are not comparable."
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -400,7 +400,7 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "sum by (agent) (rate(zuno_bff_requests_total[5m]))"
+                    query: "sum by (agent) (rate(zuno_model_calls_total[5m]))"
                     seriesNameFormat: "{{`{{agent}}`}}"
       ragSearchErrorsRate:
         kind: Panel
@@ -421,7 +421,7 @@ spec:
                     datasource:
                       kind: PrometheusDatasource
                       name: prometheus
-                    query: "sum(rate(zuno_rag_searches_total{outcome=\"error\"}[5m])) or vector(0)"
+                    query: "sum(rate(rag_search_duration_seconds_count{rag_outcome=\"error\"}[5m])) or vector(0)"
     layouts:
       - kind: Grid
         spec:
@@ -521,7 +521,7 @@ spec:
               width: 16
               height: 8
               content:
-                $ref: "#/spec/panels/bffRequestsByAgent"
+                $ref: "#/spec/panels/modelCallsByAgent"
             - x: 16
               y: 4
               width: 8

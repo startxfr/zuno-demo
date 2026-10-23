@@ -241,7 +241,7 @@ spec:
         },
         {
           "id": 4,
-          "title": "Component status (pod-health + BFF error-rate approximation)",
+          "title": "Component status (pod-health + model-call error rate)",
           "type": "timeseries",
           "datasource": {
             "type": "prometheus",
@@ -259,8 +259,8 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (agent) (rate(zuno_bff_requests_total{code=~\"5..\"}[5m]))",
-              "legendFormat": "bff errors: {{`{{agent}}`}}"
+              "expr": "sum by (agent) (rate(zuno_model_calls_total{outcome=\"error\"}[5m]))",
+              "legendFormat": "model-call errors: {{`{{agent}}`}}"
             },
             {
               "datasource": {

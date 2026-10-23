@@ -1,10 +1,31 @@
 # Platform SLO (ADR-0102)
 
 99.9% monthly availability is the industrialized objective for the
-user-facing agent path:
+user-facing agent path.
+
+> **Since WP-166 (2026-10-23) the path and the SLI changed.** The agent stack
+> described below (frontend, BFF, Agent Runtime) was retired with WP-156. The
+> path is now `UnifAI UI -> UnifAI multiagent -> AI Gateway -> model (and MCP
+> tools)`, and the SLI is the share of UnifAI agent sessions that finish with
+> `mas_outcome="ok"`:
+>
+> ```promql
+> sum(rate(mas_session_duration_seconds_count{mas_outcome="ok"}[5m]))
+> /
+> sum(rate(mas_session_duration_seconds_count[5m]))
+> ```
+>
+> The burn-rate alerts (`AgentPathErrorBudgetBurnFast` and `...Slow`, in
+> `gitops/charts/observability/templates/prometheusrule-slo.yaml`) and the
+> overview and "Agents, tools & RAG" dashboards use it. Sessions carry no agent
+> label, so the SLO is fleet-wide; per-agent volumes come from the ai-gateway's
+> `zuno_model_calls_total{agent}` (one point per model call, provider fallbacks
+> included, so not a turn count). The RAG freshness-lag alerts were removed:
+> UnifAI's incremental sync exposes no lag metric. The BFF-specific sections
+> that follow are kept as history.
 
 ```text
-frontend -> BFF -> Agent Runtime -> AI Gateway -> model
+frontend -> BFF -> Agent Runtime -> AI Gateway -> model   (until WP-156)
 ```
 
 This document defines the SLO, its measurement query, and the

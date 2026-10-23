@@ -135,14 +135,14 @@ spec:
               "type": "prometheus",
               "uid": "prometheus"
             },
-            "definition": "label_values(zuno_bff_requests_total, agent)",
+            "definition": "label_values(zuno_model_calls_total, agent)",
             "hide": 0,
             "includeAll": true,
             "allValue": ".*",
             "multi": true,
             "name": "agent",
             "options": [],
-            "query": "label_values(zuno_bff_requests_total, agent)",
+            "query": "label_values(zuno_model_calls_total, agent)",
             "refresh": 2,
             "regex": "",
             "sort": 1,
@@ -283,7 +283,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "topk(20, sum by (user) (increase(zuno_bff_requests_total{user=~\"$user\", agent=~\"$agent\"}[$__range])))",
+              "expr": "topk(20, sum by (user) (increase(zuno_model_calls_total{user=~\"$user\", agent=~\"$agent\"}[$__range])))",
               "legendFormat": "{{`{{user}}`}}"
             }
           ]
@@ -396,7 +396,7 @@ spec:
                     "type": "prometheus",
                     "uid": "prometheus"
                   },
-                  "expr": "sum by (group, agent) (increase(zuno_bff_requests_total{group=~\"$group\", agent=~\"$agent\"}[$__range]))",
+                  "expr": "sum by (group, agent) (increase(zuno_model_calls_total{group=~\"$group\", agent=~\"$agent\"}[$__range]))",
                   "legendFormat": "{{`{{group}}`}} / {{`{{agent}}`}}"
                 }
               ]

@@ -1,19 +1,19 @@
 {{- /*
-ADR-0102 (roadmap WP-12). See docs/platform/slo.md for the full SLO
-definition, the metric this depends on (zuno_bff_requests_total, not yet
-emitted - see that doc's "Current gap" section), and the burn-rate
-multiplier derivation. Schema confirmed via `oc explain
-prometheusrule.spec.groups.rules` against the live test cluster
-(monitoring.coreos.com/v1, already installed - part of OpenShift's
-built-in Prometheus Operator, not something this chart installs).
-Referencing an absent metric evaluates to "no series", not an error, so
-this is safe to enable ahead of the metric existing.
+ADR-0102 (roadmap WP-12), rebuilt on UnifAI by WP-166. The SLI is the share of
+UnifAI agent sessions that finish with an outcome other than "ok":
+mas_session_duration_seconds_count{mas_outcome} from the multiagent backend
+(exported through the zuno collector, ADR-0566). It replaces the BFF request
+counter that disappeared with agent-bff; sessions carry no agent label, so the
+SLO is fleet-wide (per-agent volumes come from the ai-gateway's
+zuno_model_calls_total). See docs/platform/slo.md for the burn-rate multiplier
+derivation. Referencing an absent metric evaluates to "no series", not an
+error. Schema confirmed via `oc explain prometheusrule.spec.groups.rules`
+(monitoring.coreos.com/v1, part of OpenShift's built-in Prometheus Operator).
 
 Also gated on collector.enabled (true only for the d1 Application), not
 just alerting.enabled: this keeps the rule owned by zuno-observability-d1
 alone, so it isn't rendered by both d0 and d1 into the same zuno-monitoring
-namespace (ArgoCD was reporting PrometheusRule/zuno-agent-path-slo as
-shared between the two Applications before this guard was added).
+namespace.
 */ -}}
 {{- if and .Values.collector.enabled .Values.alerting.enabled }}
 apiVersion: monitoring.coreos.com/v1
@@ -35,16 +35,16 @@ spec:
         - alert: AgentPathErrorBudgetBurnFast
           expr: >-
             (
-              sum(rate(zuno_bff_requests_total{code=~"5.."}[1h]))
+              sum(rate(mas_session_duration_seconds_count{mas_outcome!="ok"}[1h]))
               /
-              sum(rate(zuno_bff_requests_total[1h]))
+              sum(rate(mas_session_duration_seconds_count[1h]))
               > (14.4 * 0.001)
             )
             and
             (
-              sum(rate(zuno_bff_requests_total{code=~"5.."}[5m]))
+              sum(rate(mas_session_duration_seconds_count{mas_outcome!="ok"}[5m]))
               /
-              sum(rate(zuno_bff_requests_total[5m]))
+              sum(rate(mas_session_duration_seconds_count[5m]))
               > (14.4 * 0.001)
             )
           for: 2m
@@ -54,23 +54,23 @@ spec:
           annotations:
             summary: "Agent path error budget burning fast (>14.4x sustainable rate)"
             description: >-
-              The user-facing agent path (frontend -> BFF -> Agent Runtime
-              -> AI Gateway -> model) is burning its 99.9% monthly error
+              The user-facing agent path (UnifAI session -> ai-gateway -> model
+              and tools) is burning its 99.9% monthly error
               budget fast enough to exhaust it in ~2 days if sustained.
               See docs/platform/slo.md.
         - alert: AgentPathErrorBudgetBurnSlow
           expr: >-
             (
-              sum(rate(zuno_bff_requests_total{code=~"5.."}[6h]))
+              sum(rate(mas_session_duration_seconds_count{mas_outcome!="ok"}[6h]))
               /
-              sum(rate(zuno_bff_requests_total[6h]))
+              sum(rate(mas_session_duration_seconds_count[6h]))
               > (6 * 0.001)
             )
             and
             (
-              sum(rate(zuno_bff_requests_total{code=~"5.."}[30m]))
+              sum(rate(mas_session_duration_seconds_count{mas_outcome!="ok"}[30m]))
               /
-              sum(rate(zuno_bff_requests_total[30m]))
+              sum(rate(mas_session_duration_seconds_count[30m]))
               > (6 * 0.001)
             )
           for: 15m
