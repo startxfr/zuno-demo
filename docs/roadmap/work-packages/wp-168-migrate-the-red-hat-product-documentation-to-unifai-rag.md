@@ -1,6 +1,6 @@
 # WP-168: Migrate the Red Hat product documentation to UnifAI's RAG
 
-- **State:** Not started
+- **State:** Design decided, code not started
 - **ADRs:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
 - **Depends on:** [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
 - **Related:** [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md), [ADR-0330](../../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md)
@@ -74,11 +74,22 @@ Confluence pages, with the caller's group rules, and `rag-service`,
   of the shared Confluence ones.
 - `rag-service` and `rag-ingestion` are uninstalled and `check_docs.py` is green.
 
+## Decisions (2026-10-23, user)
+
+- **Source model:** `UnifaiRAGSource` `type: web`, one source per product and
+  version (the 34 `redhat[]` entries of the chart), a seed `documentationUrl`
+  with `include`/`exclude`, and link discovery in the RAG as `rag-ingestion` does
+  today. Same sync loop and status fields as Confluence.
+- **Metadata:** one source per version, common tag `knowledge.tech` plus
+  `product:<slug>` and `version:<n>` tags; searches filter on tags, no new
+  filter in `query.bearer`.
+- **Raw S3 copy:** not kept. The pages are public and can be fetched again; the
+  raw prefix is purged at retirement, under the WP-156 procedure.
+- **Ownership:** zuno-demo-68 codes the fork RAG side on `feat/rag-web-source`
+  (from `main`, in a worktree, merged `--no-ff` into fork `devel`, pushed by a9
+  with a release) and the operator side (`ragsource_*`).
+
 ## Open questions
 
-- Is the raw S3 copy of the pages still needed once UnifAI holds the text
-  (ADR-0546 treats S3 as the store for model weights and raw corpora)?
-- Language and version handling: one tag per product version, or one source per
-  version with a `product` metadata field the search can filter on?
 - The embedding model and chunk size of `rag-service` differ from UnifAI's
   hybrid setup: do the comparison questions need re-tuning (threshold, top k)?
