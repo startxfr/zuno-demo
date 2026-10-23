@@ -63,8 +63,10 @@ Security: `unifai_forwards_identity_to_the_gateways` is skipped (placeholder). F
 | Class | Defect |
 |---|---|
 | (a) real | ADR-0007 is not enforced on UnifAI: advantage, finage and naveo (placeholder) answer chat for entitled users and their workflows are visible. Either their status flips (and the scenarios become chat/RAG/latency scenarios) or the pilot must not expose them. |
-| (a) real | comage on UnifAI has no RAG retriever attached (scenario 11). |
+| (a) real | comage scenario 11: the retriever IS attached (checked on the cluster: the primary workflow `comage` is the agent `comage-check-deal-status`, config `retriever: $ref:retriever/knowledge-comage`, the retriever `knowledge-comage` is Ready) but the model does not call it; it calls `salesforce.opportunity.read` instead. In agent-runtime the `retrieve_reason_respond` shape always retrieves before reasoning, in UnifAI retrieval is an optional tool the model chooses. A behavioural parity gap, not a wiring defect. Options: strengthen the task prompt, or add a forced-retrieval step to the blueprint template. |
 | (a) real, repo | finage tasks declare `salesforce.opportunity.read` (both targets). |
+| (a) bundle | finage: two tasks declare `salesforce.opportunity.read`; `finage_never_declares_sales_or_adv_knowledge_domains` fails on both targets. Defect of the agent definitions (zuno-demo-agents), forwarded to its owner. |
+| (a) decision | advantage, finage, naveo are `zuno.status: placeholder` but are served and answer 200 on UnifAI (ADR-0007). Proposed: the operator skips placeholder bundles unless `spec.servePlaceholder: true`; waiting for the user. |
 | (b) environment | scenario 19 needs the in-cluster Kubernetes client; salesforce-mcp is not deployed (comage scenario 10 on agent-runtime). |
 | (c) harness, fixed | comage scenario 10 had no `expect_tool` (KeyError); the tekos re-export lacked `wanted_tools` (ImportError for every `expect_tool` scenario run from an agent directory): `f07f4a79`. |
 | (c) harness, fixed | advantage/finage RAG scenario used `consultant-01`, not in their team (HTTP 403 on the workflow listing): `40605665`. |
