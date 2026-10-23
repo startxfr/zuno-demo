@@ -94,6 +94,10 @@ gatewayLLM:
   enabled: true
   name: zuno-gateway
   baseUrl: http://ai-gateway.zuno-ai-run.svc:8080/v1
+  # Attach the gateway's routing decision to every answer (class, provider,
+  # model, fallback) for the UI's "why this model" panel (WP-148). Needs the
+  # multiagent image of fork devel e76c71cd0 or later.
+  routingLookup: true
 
 # MCP tools through mcp-gateway's MCP endpoint, with the user's own token
 # (ADR-0571 path B until the RHOAI MCP gateway evaluation concludes).

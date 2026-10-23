@@ -20,6 +20,13 @@ spec:
     forward_user_token: true
     default_headers:
       X-Zuno-Run-Id: "{session_id}"
+    {{- if .Values.gatewayLLM.routingLookup }}
+    # The message carries why this model answered (class, provider, model,
+    # fallback): the multiagent backend asks the gateway after the call, with
+    # the caller's identity (WP-148). Needs a multiagent image with the option.
+    request_id_header: X-Zuno-Request-Id
+    metadata_lookup_url: {{ .Values.gatewayLLM.baseUrl }}/routing-decisions/{request_id}
+    {{- end }}
 ---
 {{- end }}
 {{- if .Values.mcpGateway.enabled }}
@@ -126,6 +133,10 @@ spec:
       base_url: {{ $.Values.gatewayLLM.baseUrl }}
       api_key: EMPTY
       forward_user_token: true
+      {{- if $.Values.gatewayLLM.routingLookup }}
+      request_id_header: X-Zuno-Request-Id
+      metadata_lookup_url: {{ $.Values.gatewayLLM.baseUrl }}/routing-decisions/{request_id}
+      {{- end }}
   {{- if and $.Values.mcpGateway.enabled $.Values.mcpGateway.perTask }}
   # ADR-0571: one provider per task, carrying X-Zuno-Agent/X-Zuno-Task so the
   # mcp-gateway applies that task's own tool declaration (ADR-0571).
