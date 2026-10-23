@@ -112,7 +112,11 @@ def chat_model_for(
 
             http_async_client = httpx.AsyncClient(verify=ca_bundle)
 
-        return ChatOpenAI(
+        from app.reasoning import with_reasoning
+
+        # vLLM --reasoning-parser: keep reasoning text so main.py can fold it
+        # into an otherwise-empty answer (app/reasoning.py).
+        return with_reasoning(ChatOpenAI)(
             base_url=cfg.get(
                 "endpoint",
                 os.getenv(
