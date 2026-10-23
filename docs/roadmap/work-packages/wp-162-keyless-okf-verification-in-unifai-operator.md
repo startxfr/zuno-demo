@@ -1,6 +1,6 @@
 # WP-162: Keyless OKF verification in unifai-operator
 
-- **State:** Repo work in review
+- **State:** Done
 - **ADRs:** [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md), [ADR-0577](../../adr/0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md)
 - **Depends on:** [WP-159](wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md), [WP-150](wp-150-unifai-operator-okf-agent-bundles.md)
 - **Related:** [ADR-0564](../../adr/0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)
@@ -41,8 +41,11 @@ another digest and a tampered payload.
 
 Chart side done in zuno-demo: `okf.verify.keyless` + `okf.trustedRoot` render
 the `spec.verify.keyless` block and the trusted-root Secret, and
-`okf.bundles[].groupTeam` renders the bundle-owned team. Still open: the live
-check on demo333 once 0.1.25 is on `stable`.
+`okf.bundles[].groupTeam` renders the bundle-owned team. Live on demo333 (2026-10-23)
+with unifai-operator 0.1.25 on `stable`: the five deployed agents of release
+v0.1.1 are verified keyless, `status.signer` is the release workflow identity
+(`publish.yml@refs/tags/v0.1.1`); evidence in
+[wp-154-tekos-pilot-phase-a.md](../evidence/wp-154-tekos-pilot-phase-a.md).
 
 ## Steps
 

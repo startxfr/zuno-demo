@@ -227,10 +227,30 @@ source exists for their sourceless domains. arkos (`plan_draft_write`, no
 blueprint template in the operator), cognos and soursage (no `graph_shape`)
 were signed and published but not deployed.
 
+## Released bundles, keyless (2026-10-23, WP-162)
+
+With unifai-operator 0.1.25 on `stable` in demo333, the throwaway-key pilot was
+removed (bundles, retrievers and the hand-made teams) and the stack was
+redeployed from the zuno-demo-agents release v0.1.1 pinned in
+`platform/okf/agents.lock`: `spec.verify.keyless` with the release workflow
+identity and `platform/okf/sigstore/trusted_root.json`, one bundle-owned team
+per agent (`groupTeam`) and one retriever per agent in that team (`teamRef`).
+
+| Check | Result |
+|---|---|
+| Verification | the five deployed bundles (advantage, comage, finage, naveo, tekos) are `verified: true` with `status.signer` = `https://github.com/startxfr/zuno-demo-agents/.github/workflows/publish.yml@refs/tags/v0.1.1`, offline, no key material in the cluster |
+| Teams | `agent-<name>` UnifaiTeams are Ready, created and owned by the bundles, members = `zuno.access.groups` |
+| Objects | all workflows, agents, LLMs, providers and retrievers Ready |
+| tekos scenarios | 16/17; scenario 8 (first token) took 124 s, the first run after the redeploy on cold models |
+| tekos security checks | 12/12 |
+| comage scenarios | 17/19 (3 skipped); scenario 11 still fails: the model calls `salesforce.opportunity.read` and never the retriever, with or without a retrieve-first sentence in the prompt, so the retriever step is made a node option (`retrieve_first`, WP-155) |
+
+arkos, cognos and soursage are excluded from the deployed list
+(`zuno_unifai_released_bundles_exclude`): the operator has no blueprint template
+for `plan_draft_write` and the other two declare no graph shape.
+
 ## Not yet covered
 
 The quota 429 and the routing badge in the UI (WP-148), the guardrails counter
-(WP-153, hook still disabled in the chart), and the run of the pilot against the
-released, keyless-signed bundles (zuno-demo-agents v0.1.1): it needs
-unifai-operator 0.1.25, and the unifai role only switches to the released list
-with `zuno_unifai_released_bundles: true`.
+(WP-153, hook still disabled in the chart), and the agents without a blueprint
+template (arkos) or graph shape (cognos, soursage).
