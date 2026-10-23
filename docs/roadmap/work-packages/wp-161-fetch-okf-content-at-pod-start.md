@@ -89,6 +89,15 @@ rolling update moved okf-fetch to `latest` (exit 0, mcp-gateway image
 unchanged); `zuno_okf_fetch_image_tag` is gone from demo333.yml and the
 role still renders exactly the live values.
 
+Closed out the same day, after the branch consolidation (demo222 retired,
+`devel` is the working branch): entitlement re-run on the new pod green
+(tekos 12/13/18, `/mcp` 200/403/403, the three `mcp_gateway_denies_*`;
+security checks unchanged except one arkos chat check timing out on the
+shared model, an environment flake, not the gateway). The temporary
+BuildConfig `okf-fetch-wp161` and `supply-chain-signer:wp161` are deleted;
+`supply-chain-signer` builds from `devel` (build -14, de7c36a4), matching
+`zuno_build_git_ref: devel`.
+
 ## Goal
 
 mcp-gateway and mlops read agents and corp policies from an `emptyDir`
