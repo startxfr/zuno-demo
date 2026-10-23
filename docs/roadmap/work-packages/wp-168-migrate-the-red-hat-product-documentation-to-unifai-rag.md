@@ -1,6 +1,6 @@
 # WP-168: Migrate the Red Hat product documentation to UnifAI's RAG
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
 - **Depends on:** [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
 - **Related:** [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md), [ADR-0330](../../adr/0330-integrate-the-rag-ingestion-pipeline-as-a-day1-component.md)
@@ -100,6 +100,13 @@ Confluence pages, with the caller's group rules, and `rag-service`,
 - **Ownership:** zuno-demo-68 codes the fork RAG side on `feat/rag-web-source`
   (from `main`, in a worktree, merged `--no-ff` into fork `devel`, pushed by a9
   with a release) and the operator side (`ragsource_*`).
+
+## Result (2026-10-23)
+
+Ingested on demo333 (38 sources, 1079 pages) and compared: UnifAI answers 16 of 18 fixed
+questions against 13 for rag-service; a caller outside the groups finds the public pages and no
+Confluence page. Details in [the evidence](../evidence/wp-168-red-hat-docs-on-unifai.md). Left: the
+mcp-gateway switch and the retirement of rag-service and rag-ingestion (user go).
 
 ## Open questions
 
