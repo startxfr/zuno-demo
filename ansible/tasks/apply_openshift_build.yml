@@ -17,6 +17,23 @@
       - build_context_dir is defined
     fail_msg: "apply_openshift_build.yml requires build_image_name, build_dockerfile_path and build_context_dir"
 
+# zuno_build_git_ref lives in ansible/clusters/<cluster>.yml, which the build
+# roles never load (load_cluster_vars.yml is included by a few install roles
+# only), so every build fell back to main. Read just that key here - not the
+# whole file, which would override confidential.yml's values loaded earlier.
+- name: "openshift-build | resolve this cluster's short name"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_name.yml"
+  when: zuno_build_git_ref is not defined and cluster_name is not defined
+
+- name: "openshift-build | read zuno_build_git_ref from ansible/clusters/{{ cluster_name }}.yml"
+  ansible.builtin.set_fact:
+    zuno_build_git_ref: "{{ (lookup('ansible.builtin.file', _build_cluster_file) | from_yaml).zuno_build_git_ref | default('main') }}"
+  vars:
+    _build_cluster_file: "{{ zuno_repo_root }}/ansible/clusters/{{ cluster_name }}.yml"
+  when:
+    - zuno_build_git_ref is not defined
+    - (_build_cluster_file is file)
+
 # Build pods only pull source and push images out; nothing needs inbound
 # access, so a full default-deny-all-ingress baseline is safe here.
 - name: "openshift-build | ensure the zuno-ai-build namespace and its default-deny-ingress NetworkPolicy baseline"
