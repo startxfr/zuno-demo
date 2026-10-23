@@ -65,7 +65,18 @@ read-only RAG search endpoint authenticated only by the user's JWT
 stack NetworkPolicy option admitting named external clients to the RAG pod
 only, and a domain tag on the technical sources (`knowledge.tech`) so the
 mapping does not grow silently. The mcp-gateway handler and the RAGAS job
-wait for it. Preparation runs on the branch `prep/wp156`, merged into devel
+wait for it.
+
+More user decisions (2026-10-23), from porting the Day 3 probes: persona
+tokens for evaluations, the stresstest and mlops come from a new dedicated
+Keycloak client `zuno-evaluations` (password grant only), not the retiring
+`<agent>-frontend` clients; a demo "project" is a UnifAI team (`webinar-*`,
+ADR-0569), with per-team classification reported "not checked" (ADR-0565
+clause 3 not implemented); the quota tests (`quota_429`, which target the
+per-agent quota-demo routes) move to WP-157 and are reported "not run"
+until then. Prepared on `prep/wp156`: evaluations default to UnifAI, Day 3
+health and availability checks, the three probes, the acceptance gate's
+UnifAI files, and the `zuno-evaluations` client with every consumer. Preparation runs on the branch `prep/wp156`, merged into devel
 when WP-156 starts (devel deploys on demo333).
 
 **Retirement order, from the inventory** (each step leaves the tree
