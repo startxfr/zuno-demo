@@ -9,9 +9,12 @@
 # approve pull requests" on this repository.
 name: Promote agents release
 
+# Run it from the Actions tab with "Use workflow from: demo222" (the branch
+# that carries platform/supply-chain/admit_okf_bundle.py). This copy on the
+# default branch exists so GitHub lists the workflow; it has no schedule,
+# because a scheduled run uses the default branch, which does not carry the
+# admission tooling yet. Add `schedule` back once it does.
 on:
-  schedule:
-    - cron: "17 6 * * *"
   workflow_dispatch:
     inputs:
       release:
