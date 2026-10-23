@@ -208,6 +208,12 @@ class ScenarioResult:
 _token_cache: Dict[str, str] = {}
 
 
+def _login_name(persona: str) -> str:
+    from unifai_target import login_name  # shared transport (evaluations/common)
+
+    return login_name(persona)
+
+
 def get_token(persona: str) -> str:
     """Resource Owner Password Credentials grant against AGENT's own
     confidential frontend client - appropriate for an automated evaluation
@@ -227,7 +233,7 @@ def get_token(persona: str) -> str:
             "grant_type": "password",
             "client_id": TOKEN_CLIENT_ID,
             "client_secret": TOKEN_CLIENT_SECRET,
-            "username": persona,
+            "username": _login_name(persona),
             "password": DEMO_PASSWORD,
             "scope": "openid",
         },
@@ -345,7 +351,7 @@ def get_session_client(persona: str) -> httpx.Client:
         raise RuntimeError("could not find Keycloak's kc-form-login action URL")
     action_url = html.unescape(match.group(1))
 
-    result = client.post(action_url, data={"username": persona, "password": DEMO_PASSWORD, "credentialId": ""})
+    result = client.post(action_url, data={"username": _login_name(persona), "password": DEMO_PASSWORD, "credentialId": ""})
     result.raise_for_status()
     if "zuno_session" not in client.cookies:
         client.close()

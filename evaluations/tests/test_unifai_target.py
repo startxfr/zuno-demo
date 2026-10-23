@@ -39,7 +39,7 @@ class Recorder:
             return httpx.Response(200, text=f'<form id="kc-form-login" action="{KC}/login?x=1&amp;y=2">')
         if request.url.host == "kc.test":
             body = request.content.decode()
-            assert "username=consultant-01" in body and "password=pw" in body
+            assert "username=eval-consultant-01" in body and "password=pw" in body
             return httpx.Response(302, headers={"location": f"{UI}/", "set-cookie": "session=abc; Path=/"})
         if path == "/":
             return httpx.Response(200, text="ui")
@@ -299,3 +299,21 @@ def test_active_agents_do_not_skip():
     for agent in ["tekos", "arkos", "comage"]:
         out = _probe(agent, "import run_scenarios as rs\nassert rs._agent_status() == 'active'\nprint('ok')")
         assert out == "ok", (agent, out)
+
+
+def test_login_name_uses_the_evaluation_twin_for_business_personas(monkeypatch):
+    from common.unifai_target import login_name
+
+    monkeypatch.delenv("EVAL_PERSONAS", raising=False)
+    for p in ("consultant-01", "sale-01", "adv-01", "finance-01", "board-01"):
+        assert login_name(p) == f"eval-{p}"
+    # negative personas and other users keep their own account
+    assert login_name("consultant-role-only-user-01") == "consultant-role-only-user-01"
+    assert login_name("consultant-02") == "consultant-02"
+
+
+def test_login_name_can_be_switched_off(monkeypatch):
+    from common.unifai_target import login_name
+
+    monkeypatch.setenv("EVAL_PERSONAS", "0")
+    assert login_name("consultant-01") == "consultant-01"

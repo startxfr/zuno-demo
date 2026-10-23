@@ -69,6 +69,20 @@ def wanted_tools(expect_tool: str) -> tuple:
     return TOOL_ALIASES.get(expect_tool, (expect_tool,))
 
 
+# Personas with a dedicated evaluation twin (WP-169): same groups, own ai-gateway token budget, so a campaign
+# cannot exhaust the budget real demos and manual tests use. Scenarios keep the logical name (consultant-01);
+# only the Keycloak sign-in uses the twin. The negative personas (no business role, no entitlement...) keep
+# their own users. EVAL_PERSONAS=0 signs in as the logical persona (a cluster without the twins).
+EVAL_TWINS = frozenset({"consultant-01", "sale-01", "adv-01", "finance-01", "board-01"})
+
+
+def login_name(persona: str) -> str:
+    """The Keycloak username a harness signs in with for the logical `persona`."""
+    if persona in EVAL_TWINS and os.getenv("EVAL_PERSONAS", "1") != "0":
+        return f"eval-{persona}"
+    return persona
+
+
 class UnifaiError(RuntimeError):
     pass
 
@@ -148,7 +162,7 @@ class UnifaiTarget:
             raise UnifaiError("UnifAI login did not reach Keycloak's kc-form-login")
         result = c.post(
             html.unescape(match.group(1)),
-            data={"username": persona, "password": self._password, "credentialId": ""},
+            data={"username": login_name(persona), "password": self._password, "credentialId": ""},
         )
         if "session" not in c.cookies or not str(result.url).startswith(self.ui_url):
             c.close()
