@@ -1063,7 +1063,11 @@ def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
         return ScenarioResult(s["id"], s["title"], False, str(exc))
     tools, reply = run_["tools"], run_["reply"]
     names_page = (_UNIFAI_RAG_EXPECT in reply) if _UNIFAI_RAG_EXPECT else bool(reply)
-    ok = any("retriever" in t for t in tools) and names_page
+    # With retrieve_first the node retrieves before the model reasons: no tool event is emitted, so a page
+    # only the sources can name (UNIFAI_RAG_EXPECT) is the proof of retrieval. Without an expected page,
+    # the retriever tool call is still required.
+    used_retriever = any("retriever" in t for t in tools)
+    ok = names_page if _UNIFAI_RAG_EXPECT else (used_retriever and names_page)
     return ScenarioResult(s["id"], s["title"], ok, f"tool_calls={tools} names_page={names_page}")
 
 
