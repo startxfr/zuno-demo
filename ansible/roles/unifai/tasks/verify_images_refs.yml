@@ -1,0 +1,19 @@
+---
+# ADR-0586: derive the image references to verify into `_unifai_image_refs`, for
+# the scope in `_unifai_verify_scope` (catalog | stack). Shared by verify_images.yml
+# (before applying) and verify_running_compare.yml (what runs).
+- name: "unifai | image refs | derive the references, scope {{ _unifai_verify_scope }}"
+  ansible.builtin.set_fact:
+    _unifai_image_refs: >-
+      {%- if _unifai_verify_scope == 'catalog' -%}
+      {%- set chart = lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/unifai/values.yaml') | from_yaml -%}
+      {{ [chart.operator.catalogImage] }}
+      {%- else -%}
+      {%- set stack = (zuno_unifai_values | default({})).stack | default({}) -%}
+      {%- set pinned = stack.images | default({}) -%}
+      {%- set out = [] -%}
+      {%- for c in ['backend', 'identity', 'multiagent', 'rag', 'ui'] -%}
+      {%- set _ = out.append(pinned.get(c) or ('quay.io/zuno/unifai-' ~ c ~ ':' ~ (stack.version | default('unset')))) -%}
+      {%- endfor -%}
+      {{ out }}
+      {%- endif -%}

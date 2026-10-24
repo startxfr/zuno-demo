@@ -1,0 +1,33 @@
+# Who may sign the UnifAI runtime images this platform deploys (ADR-0586). Read
+# by platform/supply-chain/verify_unifai_images.py; the only place these
+# identities are written in zuno-demo. Same shape and same trust root as the OKF
+# identities (platform/okf/sigstore/identity.yaml, ADR-0578): keyless
+# signatures from GitHub Actions, checked offline against
+# platform/okf/sigstore/trusted_root.json.
+
+# GitHub Actions' OIDC issuer: the fork signs from CI.
+issuer: https://token.actions.githubusercontent.com
+
+# The five application images (quay.io/zuno/unifai-{rag,multiagent,backend,
+# identity,ui}), built and signed by the fork's publish-images workflow.
+images:
+  # A release: the workflow run on a vX.Y.Z tag. The only identity a cluster
+  # without an explicit opt-in accepts.
+  release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/publish-images\.yml@refs/tags/v'
+  # A development build (devel-<sha>): the same workflow run on the devel branch.
+  # Accepted only by a cluster that says so (zuno_unifai_accept_dev_signatures).
+  dev_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/publish-images\.yml@refs/heads/devel$'
+
+# The operator, its bundle and its catalog (quay.io/zuno/unifai-operator,
+# -operator-bundle, -operator-catalog), signed by the fork's operator release
+# workflow on an operator-vX.Y.Z tag. No development identity: the operator is
+# never run from a branch build.
+operator:
+  release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/unifai-operator-release\.yml@refs/tags/operator-v'
+
+# What every image carries besides its signature (cosign attest). Both are
+# required: the provenance says which workflow built it from which commit, the
+# SBOM lists what is in it.
+attestations:
+  provenance: https://slsa.dev/provenance/v1
+  sbom: https://spdx.dev/Document

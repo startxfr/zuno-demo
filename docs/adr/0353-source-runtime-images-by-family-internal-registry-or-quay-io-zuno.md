@@ -97,6 +97,11 @@ decision that says so, and that says what is *not* decided.
   they are pinned by reference (ADR-0574) but only the OKF artifacts are
   verified by identity. That gap is stated here, not closed.
 
+> **Update (2026-10-24):** the gap above is treated by
+> [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md):
+> the fork builds and signs the UnifAI images in CI and zuno verifies them, by digest, before deploying and on what runs.
+> This record's decisions are unchanged.
+
 ## Security considerations
 
 External images are a supply-chain dependency on the registry and on the

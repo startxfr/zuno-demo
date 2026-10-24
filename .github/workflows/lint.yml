@@ -179,6 +179,12 @@ jobs:
       - name: supply-chain admit_okf_bundle.py tests (ADR-0580)
         working-directory: platform/supply-chain
         run: python3 tests/test_admit_okf_bundle.py
+      - name: supply-chain UnifAI image verification and pins (ADR-0586)
+        working-directory: platform/supply-chain
+        run: |
+          python3 tests/test_verify_unifai_images.py
+          python3 tests/test_check_unifai_pins.py
+          python3 check_unifai_pins.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence
         run: |

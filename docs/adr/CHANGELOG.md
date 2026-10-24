@@ -9,6 +9,12 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## New record (2026-10-24) - ADR-0586 verifies the UnifAI runtime images
+
+ADR-0586 (Proposed, v0.11) treats the gap ADR-0353 stated: the UnifAI runtime images are built and signed by the fork's CI and
+verified by zuno, by digest, before deploying and on what runs. ADR-0353 and ADR-0574 get dated notes pointing to it; their decisions
+are unchanged. WP-176 carries the work.
+
 ## Acceptance (2026-10-24) - the agent delegation contract
 
 ADR-0401, ADR-0403, ADR-0406 and ADR-0409 move from `Proposed` to `Accepted` with the user's decisions recorded in each

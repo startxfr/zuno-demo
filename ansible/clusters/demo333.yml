@@ -45,6 +45,17 @@ zuno_build_git_ref: "devel"
 # role defaults by ansible/roles/unifai (zuno_unifai_values); bundle settings
 # are per agent (zuno_unifai_bundle_settings). Image tags are immutable
 # devel-<sha> builds of this cluster's registry. No secret belongs here.
+# Verification of the UnifAI images (ADR-0586, WP-176). OFF here until the first
+# CI-built, signed images exist and the operator renders digests explicitly: then
+# the stack images below are pinned by digest and these two lines flip together
+# (verify true, accept dev signatures true, because demo333 runs the devel
+# branch). While it is off, check_unifai_pins.py reports it and does not fail.
+zuno_unifai_verify_images: false
+zuno_unifai_accept_dev_signatures: true
+# The catalog and the operator images (d0) are verified only once the operator
+# release workflow signs them (WP-176 step 6); until then this stays false.
+zuno_unifai_verify_catalog: false
+
 zuno_unifai_bundle_settings:
   advantage:
     entitlement: Enforced

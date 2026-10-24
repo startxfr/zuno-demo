@@ -1,0 +1,19 @@
+---
+# ADR-0586 / WP-176 drift check: what RUNS must be what was verified. Reads the pods
+# of the stack (and of the operator once its images are verified); the comparison is
+# in verify_running_compare.yml.
+- name: "unifai | verify running | read the pods of the stack"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-unifai
+  register: _unifai_stack_pods
+
+- name: "unifai | verify running | read the pods of the operator"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: openshift-operators
+  register: _unifai_operator_pods
+  when: zuno_unifai_verify_catalog | default(false) | bool
+
+- name: "unifai | verify running | compare and verify what runs"
+  ansible.builtin.include_tasks: verify_running_compare.yml

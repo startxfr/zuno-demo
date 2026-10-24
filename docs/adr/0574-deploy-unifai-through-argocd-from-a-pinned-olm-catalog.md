@@ -159,3 +159,12 @@ live object.
 `demo333` is powered off at the time of writing; WP-151's live steps start by
 asking the user to power it on. `demo222` receives this chart only at its
 own cutover (ADR-0573). Every `oc` command passes `--context`.
+
+## Update (2026-10-24) - images pinned and verified
+
+[ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) turns the intent
+above into a procedure. The five application images are signed by the fork's own CI workflow with GitHub OIDC (not by RHTAS,
+which signs images built inside the cluster), verified offline by the `unifai` role before the stack is applied, pinned by digest
+per cluster, and checked again by `make d1 check unifai`. A cluster may accept the `devel` branch identity (demo333); a release
+takes tags only. The catalog image is verified once the operator release workflow signs it.
+

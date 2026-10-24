@@ -1,0 +1,56 @@
+---
+# ADR-0586 / WP-176: before applying UnifAI images, require of each one a digest
+# pin, a keyless signature of the fork's publish workflow, and the provenance and
+# SBOM attestations (platform/supply-chain/verify_unifai_images.py, offline, same
+# trust root as the OKF releases). Fails closed: an image that does not verify stops
+# the run, nothing is applied.
+#
+# Caller sets `_unifai_verify_scope`:
+#   catalog - the operator catalog image of the d0 chart (gated by
+#             zuno_unifai_verify_catalog: false until the operator release
+#             workflow signs its images, WP-176 step 6);
+#   stack   - the five application images of zuno_unifai_values.stack (gated by
+#             zuno_unifai_verify_images, default true).
+# zuno_unifai_accept_dev_signatures (default false) also accepts builds of the
+# fork's devel branch: demo333 says true, a production cluster never does.
+- name: "unifai | verify images | derive the references"
+  ansible.builtin.include_tasks: verify_images_refs.yml
+
+- name: "unifai | verify images | write the references for the verifier"
+  ansible.builtin.tempfile:
+    state: file
+    suffix: ".unifai-refs.json"
+  register: _unifai_refs_file
+
+- name: "unifai | verify images | run the verifier"
+  block:
+    - name: "unifai | verify images | write the references"
+      ansible.builtin.copy:
+        content: "{{ _unifai_image_refs | to_json }}"
+        dest: "{{ _unifai_refs_file.path }}"
+        mode: "0600"
+    - name: "unifai | verify images | verify the images, count {{ _unifai_image_refs | length }}"
+      ansible.builtin.command:
+        argv: >-
+          {{ ['python3', zuno_repo_root ~ '/platform/supply-chain/verify_unifai_images.py',
+              '--refs-json', _unifai_refs_file.path]
+             + (['--accept-dev'] if (zuno_unifai_accept_dev_signatures | default(false) | bool) else []) }}
+      register: _unifai_verify
+      changed_when: false
+      failed_when: false
+    - name: "unifai | verify images | refuse to go on with an image that does not verify"
+      ansible.builtin.fail:
+        msg: >-
+          The {{ _unifai_verify_scope }} images do not verify (ADR-0586), nothing was applied:
+          {% for r in ((_unifai_verify.stdout | default('{}') | from_json).results | default([])) if not r.ok %}
+          {{ r.reference }}: {{ r.reason | truncate(300) }}
+          {% endfor %}
+          {{ (_unifai_verify.stdout | default('{}') | from_json).error | default('') }}
+          Pin each image by digest (repo@sha256:...) from a CI-built signed build, or switch verification off
+          explicitly in ansible/clusters/<cluster>.yml with its reason.
+      when: _unifai_verify.rc != 0
+  always:
+    - name: "unifai | verify images | remove the references file"
+      ansible.builtin.file:
+        path: "{{ _unifai_refs_file.path }}"
+        state: absent

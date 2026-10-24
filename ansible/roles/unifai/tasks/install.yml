@@ -42,6 +42,15 @@
          if _unifai_install_operator | bool else
          'A unifai-operator Subscription already exists and is not ours: zuno-unifai-d0 renders nothing.' }}
 
+# ADR-0586 / WP-176: the catalog image is verified (digest, signature, provenance, SBOM)
+# before the operator is installed from it. Off until the operator release workflow
+# signs its images (zuno_unifai_verify_catalog, default false).
+- name: "unifai | verify the operator catalog image"
+  ansible.builtin.include_tasks: verify_images.yml
+  vars:
+    _unifai_verify_scope: catalog
+  when: zuno_unifai_verify_catalog | default(false) | bool
+
 - name: "unifai | apply the operator Application (d0)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -100,6 +109,16 @@
       {%- else -%}
       {{ {} }}
       {%- endif -%}
+
+# ADR-0586 / WP-176: the five application images are verified before the stack is
+# applied; a failure stops the run with nothing applied (zuno_unifai_verify_images,
+# default true; a cluster that must switch it off says so, with its reason, in its
+# ansible/clusters/<cluster>.yml, where check_unifai_pins.py reports it).
+- name: "unifai | verify the stack images"
+  ansible.builtin.include_tasks: verify_images.yml
+  vars:
+    _unifai_verify_scope: stack
+  when: zuno_unifai_verify_images | default(true) | bool
 
 - name: "unifai | apply the stack Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

@@ -1,0 +1,37 @@
+---
+# Needs `_unifai_stack_pods` (and `_unifai_operator_pods` when
+# zuno_unifai_verify_catalog is true). Compares every running UnifAI application
+# image to the pinned digests and verifies the signature and attestations of every
+# running UnifAI image, operator included. A pod started by hand with another image,
+# or an image replaced behind a tag, fails here.
+- name: "unifai | verify running | derive the pinned references"
+  ansible.builtin.include_tasks: verify_images_refs.yml
+  vars:
+    _unifai_verify_scope: stack
+
+- name: "unifai | verify running | run the verifier on the pods"
+  ansible.builtin.command:
+    argv: >-
+      {{ ['python3', zuno_repo_root ~ '/platform/supply-chain/verify_unifai_images.py']
+         + (_unifai_image_refs | map('regex_replace', '^', '--ref=') | list)
+         + ['--pods', '-']
+         + (['--accept-dev'] if (zuno_unifai_accept_dev_signatures | default(false) | bool) else []) }}
+    stdin: >-
+      {{ {'items': (_unifai_stack_pods.resources | default([]))
+                    + ((_unifai_operator_pods.resources | default([])) if (zuno_unifai_verify_catalog | default(false) | bool) else [])} | to_json }}
+  register: _unifai_running
+  changed_when: false
+  failed_when: false
+
+- name: "unifai | verify running | fail on drift or on an image that does not verify"
+  ansible.builtin.fail:
+    msg: >-
+      What runs does not match what was verified (ADR-0586):
+      {% for f in ((_unifai_running.stdout | default('{}') | from_json).pod_findings | default([])) %}
+      {{ f | truncate(300) }}
+      {% endfor %}
+      {% for r in ((_unifai_running.stdout | default('{}') | from_json).results | default([])) if not r.ok %}
+      {{ r.reference }}: {{ r.reason | truncate(300) }}
+      {% endfor %}
+      {{ (_unifai_running.stdout | default('{}') | from_json).error | default('') }}
+  when: _unifai_running.rc != 0

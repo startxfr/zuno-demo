@@ -171,3 +171,18 @@ contract suites run in the agents repository's CI.
 Regression-tested (`tests/test_pin_release.py`, run against a throwaway
 copy of the real chart files - never the repository's own state), since
 this script mutates chart files unlike its read-only siblings above.
+
+## verify_unifai_images.py / check_unifai_pins.py (ADR-0586, WP-176)
+
+The UnifAI runtime images (`quay.io/zuno/unifai-*`) are built and signed by the fork's CI, not in this cluster. Before the `unifai`
+role applies them, `verify_unifai_images.py` requires of each one a reference **pinned by digest** (a tag is refused), a keyless
+**signature** by the identity written in `image-identities.yaml`, and a **provenance** and an **SBOM** attestation by the same identity,
+all checked offline against `platform/okf/sigstore/trusted_root.json` (the OKF machinery of `admit_okf_bundle.py`). `--pods` reads
+`oc get pods -o json` and compares what runs to the pinned digests, then verifies every running UnifAI image. A development build
+(the `devel` branch workflow) is accepted only with `--accept-dev` (`zuno_unifai_accept_dev_signatures`). Exit code 1 and a JSON
+list of every failure otherwise.
+
+`check_unifai_pins.py` (in CI) fails a cluster file that verifies its images without pinning them by digest, and reports a cluster
+that switched verification off (`zuno_unifai_verify_images: false`). Needs cosign v2 on PATH for the real verification; the
+tests use a stand-in.
+
