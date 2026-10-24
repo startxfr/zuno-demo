@@ -348,6 +348,12 @@ total outside the gateway, so `app/quota.py` and its budgets can go.
 - Once fixed, re-run the order check (both gateway limits and every
   per-subscription limit counting), then V8 for a cross-model total
   (a policy whose counter spans routes, or another design).
+- Platform context: since 2f981d17 the gateway honours the quota class
+  and project id headers only from Keycloak clients listed in
+  `trustedPlatformClients` (none on demo333). `platform/testing`'s
+  stresstest and quota-429 runners cannot select a class until their client
+  is declared there, and the project dimension stays unused until a
+  server-resolved project id from a verified grant exists (ADR-0528).
 - Only then, on proven equivalence: remove `app/quota.py`,
   `quota_budgets.yaml`, `tests/test_quota_budgets.py`, the ledger calls and
   `_render_budgets`.
