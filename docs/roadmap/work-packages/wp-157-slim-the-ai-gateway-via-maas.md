@@ -241,7 +241,19 @@ each verified by a second session before the next:
   the caller, and the fail-open path during a Limitador outage.
 - **Step C** (`maas.saasSubscriptions.gatewayOnly`): turned on after step B.
   The rendered change removes only the four persona MaaSSubscriptions of
-  the SaaS models and the persona groups of their auth policies.
+  the SaaS models and the persona groups of their auth policies. Green on
+  what can be exercised: only the ai-gateway subscriptions remain, the
+  entitlement policies list only its ServiceAccount, a persona token sent
+  directly to the MaaS routes is refused (401), the ServiceAccount still
+  passes authorization, and persona chats through qwen36 still answer.
+  Not proven: a SaaS chat through MaaS. No provider in `provider-routing.yaml`
+  sends mistral or gpt-oss-120b via MaaS yet (they stay direct, which this
+  step does not touch), and MaaS external egress is off on demo333, so a
+  SaaS route answers 500 past authorization.
+
+Open after the sequence: the per-user ceiling defect; routing the SaaS
+providers through MaaS (with external egress) before the direct SaaS
+branches and keys can go; the V0-V14 equivalence checks.
 
 ## Acceptance
 
