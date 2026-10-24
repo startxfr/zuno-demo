@@ -29,12 +29,24 @@ logger = logging.getLogger("mcp_gateway.agent_declarations")
 AGENTS_DIR = os.getenv("AGENTS_DIR", "/app/agents")
 
 
+# ADR-0508 clause 3 / ADR-0579 clause 6: the OKF schema versions this reader
+# understands. A document declaring anything else (or nothing) is refused, so a
+# bundle written for a newer schema is never read with older rules.
+SUPPORTED_OKF_VERSIONS = ("v0.2", "v0.3")
+
+
 def _split_frontmatter(path: Path) -> Dict:
     text = path.read_text(encoding="utf-8")
     parts = text.split("---", 2)
     if len(parts) < 3:
         raise ValueError(f"{path}: expected a leading '---' YAML frontmatter block")
-    return yaml.safe_load(parts[1]) or {}
+    frontmatter = yaml.safe_load(parts[1]) or {}
+    version = frontmatter.get("okf_version")
+    if version is None:
+        raise ValueError(f"{path}: missing okf_version (supported: {', '.join(SUPPORTED_OKF_VERSIONS)})")
+    if version not in SUPPORTED_OKF_VERSIONS:
+        raise ValueError(f"{path}: unsupported okf_version {version!r} (supported: {', '.join(SUPPORTED_OKF_VERSIONS)})")
+    return frontmatter
 
 
 @dataclass

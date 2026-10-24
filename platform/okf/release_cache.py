@@ -112,5 +112,29 @@ def main() -> int:
     return 0
 
 
+
+CONFORMANCE_ENV_VAR = "ZUNO_OKF_CONFORMANCE_DIR"
+
+
+def conformance_dir() -> Optional[pathlib.Path]:
+    """The OKF conformance cases (ADR-0508), or None when none are available.
+
+    ZUNO_OKF_CONFORMANCE_DIR first (the `cases/` directory, e.g. a checkout of
+    zuno-demo-agents/conformance/cases), then `conformance/cases/` inside the
+    admitted release once a release carries it. Readers' fixture tests skip
+    loudly on None rather than pass on nothing.
+    """
+    override = os.environ.get(CONFORMANCE_ENV_VAR)
+    if override:
+        path = pathlib.Path(override)
+        if not path.is_dir():
+            raise ReleaseUnavailable(f"{CONFORMANCE_ENV_VAR}={override} is not a directory")
+        return path
+    try:
+        candidate = release_dir() / "conformance" / "cases"
+    except ReleaseUnavailable:
+        return None
+    return candidate if candidate.is_dir() else None
+
 if __name__ == "__main__":
     sys.exit(main())
