@@ -210,3 +210,14 @@ Migration/evolution and Review evidence.
 - [ADR-0503](0503-make-each-okf-bundle-state-its-complete-authorization-contract.md)
 - [ADR-0506](0506-extract-okf-content-into-a-standalone-zuno-okf-repository.md)
 - [ADR-0512](0512-introduce-project-bound-tasks-with-salesforce-verified-context.md)
+
+## Amendment (2026-10-24, WP-157)
+
+**Clause 2's precedence** (the project budget first, then the user's) becomes
+stacked ceilings: once the token budgets are enforced by Kuadrant's
+`TokenRateLimitPolicy` (ADR-0570 as amended), every applicable ceiling -
+user, group and, when it is attested, project - is checked and the first one
+exhausted denies. Limitador has no "try the project, else the user"
+fallback. Until ADR-0563 clause 5 is settled only the `standard` class is
+enforced at MaaS; `intensive` and the project dimension are recorded as not
+enforced, never dropped silently.

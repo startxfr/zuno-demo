@@ -89,6 +89,42 @@ generation are gone; routing behaviour and metrics are unchanged.
    unchanged versus before. demo222 follows only outside a demo freeze,
    with parallel sessions informed.
 
+## Decisions of 2026-10-24 (user)
+
+Taken on the inventory in
+[wp-157-inventory.md](../evidence/wp-157-inventory.md) (its D1-D11):
+
+- **D5 - identity to MaaS.** The ai-gateway authenticates to MaaS with its
+  own ServiceAccount and attaches gateway-attested user, groups, quota class
+  and project, trusted only when the caller is that ServiceAccount (to
+  confirm live, verification V1). This reverses the 2026-09-01 caller-token
+  choice for Zuno traffic, makes every ADR-0511 dimension expressible, and
+  removes the per-persona SaaS subscriptions (which today grant
+  `/agent_tekos` and `/sales` on SaaS models, against ADR-0570's C1-only
+  rule).
+- **D1 + D2 - where budgets live.** The ADR-0511 budgets become a
+  gateway-level Kuadrant `TokenRateLimitPolicy` generated from the release's
+  quota policy; `MaaSSubscription`s carry entitlement plus a coarse
+  generated ceiling. Precedence becomes stacked ceilings: Limitador cannot
+  express the project-then-user fallback. ADR-0570 clause 2 and ADR-0511
+  clause 2 carry dated amendments.
+- **D3 + D4 - classes and project.** Only `standard` is enforced at MaaS for
+  now; `intensive` and the project dimension stay recorded as not enforced
+  until ADR-0563 clause 5 is settled, then ride the attested headers of D5.
+- **D7 + D8 - providers MaaS cannot front natively.** Anthropic and Gemini go
+  through their OpenAI-compatible endpoints (`provider: openai-compatible`)
+  if the live test passes, otherwise they stay direct as named exceptions;
+  the image provider `ovhcloud-sdxl` stays direct unless MaaS proves image
+  generation.
+- **D6, D9, D10, D11 - per the inventory's recommendations:** a small
+  generated `quota_fail_modes.yaml` keeps the policy the only source of
+  fail modes; the request-rate `RateLimitPolicy` is re-targeted onto the MaaS
+  gateway after D5; ExternalModels stay in the `maas.opendatahub.io` group;
+  provider credentials stay in `zuno-ai-run`.
+
+Nothing is applied on a cluster before step 1 (the MaaS front fixed and a
+forwarded-identity call proven for one local and one external model).
+
 ## Acceptance
 
 Both MaaS defects closed with live evidence; the ai-gateway image contains

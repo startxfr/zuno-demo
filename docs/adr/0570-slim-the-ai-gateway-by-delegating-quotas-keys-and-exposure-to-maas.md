@@ -181,3 +181,17 @@ demo222 outside demo freezes, with `--context` passed explicitly to every `oc`
 command (ADR-0559). Verifying the generated `TokenRateLimitPolicy` objects
 exist (`oc --context <ctx> get tokenratelimitpolicy -A`) is the first check,
 since defect 2 may mean they do not.
+
+## Amendment (2026-10-24, user decision on the WP-157 inventory)
+
+**Clause 2** is amended: MaaS `MaaSSubscription` limits are per model and
+MaaS selects one subscription per request, so they cannot carry ADR-0511's
+cross-model budgets. Those budgets become a gateway-level Kuadrant
+`TokenRateLimitPolicy` generated from the release's quota policy by
+`platform/okf/generate_quota_enforcement.py`; subscriptions carry entitlement
+and a coarse generated ceiling. The ai-gateway presents its own
+ServiceAccount to MaaS with gateway-attested user, groups, quota class and
+project (WP-157 decision D5), which also ends the per-persona SaaS
+subscriptions. Details and the live verifications that gate each removal:
+[WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md),
+[inventory](../roadmap/evidence/wp-157-inventory.md).
