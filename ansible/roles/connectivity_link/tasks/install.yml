@@ -91,6 +91,8 @@
 # Read-and-combine (the shape check_docs.py's gitops_values_clobber check
 # recommends): extra values REPLACE the manifest's inline values, so the
 # static ones are read back first and the token quota block merged in.
+# helm['values'], not .values: Jinja would resolve the latter to the
+# dict's values() method.
 # The policy template exists from devel on: the cluster's
 # zuno_gitops_target_revision must name devel (or a later release branch).
 - name: "connectivity_link | read the d1 manifest's static values (token quota policy on)"
@@ -99,7 +101,7 @@
     _connectivity_link_d1_static_values: >-
       {{ ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/connectivity-link/application-d1.yaml')
             | replace('apps.mycluster.example.com', cluster_base_domain)
-            | from_yaml).spec.source.helm.values | from_yaml) }}
+            | from_yaml).spec.source.helm['values'] | from_yaml) }}
 
 - name: "connectivity_link | apply the connectivity-link GitOps Application (d1, token quota policy on)"
   when: zuno_connectivity_link_token_rate_limits.enabled | default(false) | bool
