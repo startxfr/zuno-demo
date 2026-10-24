@@ -309,6 +309,15 @@ on; user go given directly for each), 2026-10-24:
   of the MaaS limit that tripped. A fix is for the gateway: bound the value by the window of the limit that
   produced the 429, which MaaS does not report.
 
+- Computed `Retry-After` redone on `ai-gateway-22` (image from devel 3f996d8c, which carries 80e9733b: `maas_quota_window` of 1 h
+  on each `-maas` routing entry; user go given directly). Same drill: limit of `qwen36-27b-instruct-ai-gateway` lowered
+  to 50 tokens per 1 h at 09:02:52 UTC for 5 s, restored to 1,000,000 at 09:02:57 (TRLP back, `zuno-models-d1`
+  Synced/Healthy). The first persona chat through the gateway got HTTP 429, `application/json`, body
+  `{"error":"quota_exceeded","quota_class":"standard","dimension":"maas","provider":"local-maas"}` and `Retry-After: 3466`;
+  the gateway log reads `provider 'local-maas' (via MaaS) answered 429 ... quota exceeded, not falling back`. 3466 s is
+  consistent with the 1 h window that opened at the gateway's first call to the model after its roll (about 09:00:40, so
+  about 3476 s left at 09:02:56), and below the 3600 s bound: the previous value (86026 s) is fixed.
+
 - V14 answered (user go, 2026-10-24 08:52 UTC): the Limitador pod was deleted while a loop sent one
   ServiceAccount call to MaaS (qwen36) every 1.5 s; the operator recreated the pod within about a minute.
   Over the roughly 45 s of the outage, 17 of the 21 calls returned 200 (0.3 s, the gateway admits when
