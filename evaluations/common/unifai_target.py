@@ -73,13 +73,15 @@ def wanted_tools(expect_tool: str) -> tuple:
 # cannot exhaust the budget real demos and manual tests use. Scenarios keep the logical name (consultant-01);
 # only the Keycloak sign-in uses the twin. The negative personas (no business role, no entitlement...) keep
 # their own users. EVAL_PERSONAS=0 signs in as the logical persona (a cluster without the twins).
+# EVAL_TWIN_PREFIX picks the twin family: `eval-` (default: RAGAS, probes, the acceptance gate) or
+# `stress-` (the day-3 stresstest Jobs), each family on its own per-user budget.
 EVAL_TWINS = frozenset({"consultant-01", "sale-01", "adv-01", "finance-01", "board-01"})
 
 
 def login_name(persona: str) -> str:
     """The Keycloak username a harness signs in with for the logical `persona`."""
     if persona in EVAL_TWINS and os.getenv("EVAL_PERSONAS", "1") != "0":
-        return f"eval-{persona}"
+        return f"{os.getenv('EVAL_TWIN_PREFIX', 'eval-')}{persona}"
     return persona
 
 

@@ -160,6 +160,10 @@
                   # hostname" for every scenario/check needing a token.
                   # run_acceptance_gate.yml's own Job already sets this;
                   # this generalization had dropped it.
+                  # The stresstest twins (stress-*), on their own per-user budget
+                  # (gitops/charts/keycloak values evalPersonas).
+                  - name: EVAL_TWIN_PREFIX
+                    value: "stress-"
                   - name: KEYCLOAK_URL
                     value: "https://keycloak.{{ cluster_base_domain }}"
                   # WP-156: run_scenarios.py/security_checks.py/day2_bulk.py

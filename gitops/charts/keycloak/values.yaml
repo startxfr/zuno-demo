@@ -156,3 +156,18 @@ evalPersonas:
     copyOf: finance-01
   - username: eval-board-01
     copyOf: board-01
+  # Stresstest twins: the day-3 stresstest Jobs sign in as these
+  # (EVAL_TWIN_PREFIX=stress-), so one stresstest run - about 160 model
+  # calls, close to a whole 3M-token daily user budget since the Red Hat
+  # documentation joined the Tekos retriever - never exhausts the budget the
+  # RAGAS CronJob and manual probes use on the eval-* twins.
+  - username: stress-consultant-01
+    copyOf: consultant-01
+  - username: stress-sale-01
+    copyOf: sale-01
+  - username: stress-adv-01
+    copyOf: adv-01
+  - username: stress-finance-01
+    copyOf: finance-01
+  - username: stress-board-01
+    copyOf: board-01
