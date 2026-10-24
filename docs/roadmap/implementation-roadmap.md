@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 22 | 17 | 14 | WP-146, WP-157, WP-166 |
+| v0.11 | 22 | 17 | 19 | WP-146, WP-157, WP-166, WP-170, WP-171, WP-172, WP-173, WP-174 |
 | v0.12 | 9 | 5 | 9 | WP-161, WP-163, WP-164, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -953,6 +953,11 @@ frozen mirror.
 | WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Done | agents/ removed, readers on the admitted release, Transit OKF chain gone (dc931dec); full promotion cycle live 2026-10-24 (release 0.3.0, PR #3, "— Tekos" answer on demo333) |
 | WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Done (2026-10-24) | Red Hat docs on UnifAI (38 web sources, 16/18 vs 13/18), rag-service and rag-ingestion retired on demo333 and in the repository |
 | WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Done | live on demo333 2026-10-23 (89ec9fba): five eval-* personas; harnesses switched (86ef03e4); platform/keycloak/tests now run in CI |
+| WP-170 | [wp-170](work-packages/wp-170-agent-delegation-contract-and-adrs.md) | 0401, 0402, 0403, 0406, 0409 | none | Repo work merged | the four `Proposed` records await the user's acceptance |
+| WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Not started | none (a release and its promotion are the maintainer's) |
+| WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Not started | none |
+| WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | fork work for the UnifAI session; priority and scope are the user's decision |
+| WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 
 ### OKF stream phases
 

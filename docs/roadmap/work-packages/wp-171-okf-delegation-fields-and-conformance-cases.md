@@ -1,0 +1,31 @@
+# WP-171: OKF delegation fields and conformance cases
+
+- **State:** Not started
+- **ADRs:** [ADR-0401](../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md)
+- **Depends on:** [WP-170](wp-170-agent-delegation-contract-and-adrs.md)
+- **Related:** [ADR-0579](../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md), [WP-163](wp-163-okf-v0-3-schema-and-consumers.md), [WP-51](wp-51-adaptation-hooks-conformance.md)
+- **Target:** v0.11
+- **Estimated files touched:** ~8 in `zuno-demo-agents` (schema, corp limits policy, narrowing check, conformance cases, tests) and ~3 in `zuno-demo` (admission view and narrowing)
+
+## Goal
+
+Make delegation expressible and reviewable in OKF v0.3 as two optional fields, with a corp ceiling, and
+prove every reader handles them with the conformance cases.
+
+## Steps
+
+1. `zuno-demo-agents/platform/okf/schema/zuno-okf-v0.3.schema.json`: `zuno.delegation.targets[{agent, task}]`
+   and `zuno.limits.delegation.max_depth`. `policies/limits/limits-policy.yaml`: `max_delegation_depth`
+   (initial 2) and `delegation.allow_write` (false).
+2. `platform/okf/check_narrowing.py`: `max_depth` at most the ceiling; targets well formed, an agent never its own target.
+3. Conformance cases: valid with a declared target; target unknown; depth above the ceiling; an agent targeting itself;
+   no `delegation` field (no delegation).
+4. `zuno-demo`: `admit_okf_bundle.agents_view` exposes the delegation view; `okf_narrowing.py` checks the ceiling at
+   admission; `evaluations/common/okf_release.py` `agent_declaration` already returns the block.
+5. Branch on `zuno-demo-agents` and a PR to `devel`; the release and its promotion are the maintainer's. Coordinate with the
+   session that releases that repository before promoting, since mcp-gateway reads the release at build time.
+
+## Acceptance
+
+Conformance cases pass through all five readers with no skip; the fixtures self-test and the schema validators pass;
+`check_okf_read_boundary.py` stays green.
