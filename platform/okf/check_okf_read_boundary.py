@@ -32,6 +32,7 @@ READ = re.compile(
 
 HOOKS: Dict[str, str] = {
     "components/mcp-gateway/app/agent_declarations.py": "mcp-gateway hook",
+    "components/a2a-gateway/app/agent_declarations.py": "a2a-gateway hook (ADR-0585)",
     "platform/supply-chain/admit_okf_bundle.py": "admission hook (agents_view)",
     "platform/supply-chain/okf_narrowing.py": "admission hook (v0.3 narrowing rule)",
     "platform/okf/generate_stack_config.py": "ADR-0581 generator hook",
