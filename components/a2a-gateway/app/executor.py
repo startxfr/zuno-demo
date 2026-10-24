@@ -119,6 +119,7 @@ class ZunoAgentExecutor(AgentExecutor):
             {"role": "user", "content": request_text},
         ]
         tools = await self._available_tools(common)
+        offered = {t["function"]["name"] for t in tools or []}
         for _ in range(self._settings.max_tool_rounds + 1):
             reply = await self._llm.chat(messages=messages, tools=tools, **common)
             calls = reply.get("tool_calls") or []
@@ -127,9 +128,11 @@ class ZunoAgentExecutor(AgentExecutor):
             messages.append({"role": "assistant", "content": reply.get("content") or "", "tool_calls": calls})
             for call in calls:
                 function = call.get("function") or {}
-                result = await self._tools.call_tool(
-                    str(function.get("name") or ""), parse_arguments(function.get("arguments")), **common,
-                )
+                name = str(function.get("name") or "")
+                if name not in offered:  # never run a tool that was not offered (read-only, listed for this task)
+                    result = f"The tool {name} is not available."
+                else:
+                    result = await self._tools.call_tool(name, parse_arguments(function.get("arguments")), **common)
                 messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
         # Out of rounds: ask once more without tools so the user gets a final answer.
         reply = await self._llm.chat(messages=messages, tools=None, **common)
@@ -146,4 +149,7 @@ class ZunoAgentExecutor(AgentExecutor):
         except Exception:
             logger.warning("tool listing failed for %s", self._agent.name, exc_info=True)
             return None
-        return to_openai_tools(listed) or None
+        # No approval exists across hops (ADR-0409, WP-173 step 5): only tools that declare themselves
+        # read-only are offered, so a write can never run here without the approval UnifAI would ask.
+        read_only = [t for t in listed if (t.get("annotations") or {}).get("readOnlyHint") is True]
+        return to_openai_tools(read_only) or None

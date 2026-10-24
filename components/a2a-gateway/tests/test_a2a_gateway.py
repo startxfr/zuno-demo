@@ -188,7 +188,8 @@ class TurnTests(GatewayTestCase):
         self.assertEqual([c["headers"]["x-zuno-data-classification"] for c in self.down.llm_calls], ["C3", "C1"])
 
     async def test_tools_go_through_the_mcp_gateway_with_the_same_identity(self) -> None:
-        self.down.tools = [{"name": "search_confluence", "description": "d", "inputSchema": {"type": "object"}}]
+        self.down.tools = [{"name": "search_confluence", "description": "d", "inputSchema": {"type": "object"},
+                            "annotations": {"readOnlyHint": True}}]
         self.down.llm_script = [
             {"role": "assistant", "content": "", "tool_calls": [
                 {"id": "c1", "type": "function", "function": {"name": "search_confluence", "arguments": '{"query": "route"}'}}]},
@@ -204,8 +205,26 @@ class TurnTests(GatewayTestCase):
         self.assertIn("tools", self.down.llm_calls[0]["body"])
         self.assertEqual(self.down.llm_calls[1]["body"]["messages"][-1]["role"], "tool")
 
+    async def test_only_read_only_tools_are_offered_and_run(self) -> None:
+        self.down.tools = [
+            {"name": "search_confluence", "inputSchema": {"type": "object"}, "annotations": {"readOnlyHint": True}},
+            {"name": "aap.cluster.audit", "inputSchema": {"type": "object"}, "annotations": {"readOnlyHint": False}},
+            {"name": "no_hint_tool", "inputSchema": {"type": "object"}},
+        ]
+        self.down.llm_script = [
+            {"role": "assistant", "content": "", "tool_calls": [
+                {"id": "c1", "type": "function", "function": {"name": "aap.cluster.audit", "arguments": "{}"}}]},
+            {"role": "assistant", "content": "done without the write tool"},
+        ]
+        response = await self.send("alpha", "tok-consultant", "launch an audit")
+        offered = [t["function"]["name"] for t in self.down.llm_calls[0]["body"]["tools"]]
+        self.assertEqual(offered, ["search_confluence"])
+        self.assertEqual([c["body"]["method"] for c in self.down.mcp_calls], ["tools/list"])  # never called
+        self.assertEqual(response.root.result.artifacts[0].parts[0].root.text, "done without the write tool")
+
     async def test_tool_rounds_are_bounded(self) -> None:
-        self.down.tools = [{"name": "search_confluence", "inputSchema": {"type": "object"}}]
+        self.down.tools = [{"name": "search_confluence", "inputSchema": {"type": "object"},
+                            "annotations": {"readOnlyHint": True}}]
         looping = {"role": "assistant", "content": "", "tool_calls": [
             {"id": "c", "type": "function", "function": {"name": "search_confluence", "arguments": "{}"}}]}
         self.down.llm_script = [looping] * 10

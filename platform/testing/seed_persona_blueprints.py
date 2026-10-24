@@ -39,6 +39,11 @@ PERSONA_AGENT: Dict[str, str] = {
     "board-01": "advantage", "board-02": "advantage",
 }
 
+# Agents the admitted release (0.3.0) carries as `active`; the a2a-gateway serves only these. The other
+# agents are placeholders: a persona whose only agent is one of them still gets its A2A blueprint (it
+# targets that agent and starts to answer when the agent turns active), but it cannot be validated yet.
+ACTIVE_AGENTS = frozenset({"tekos", "arkos", "comage"})
+
 _USER_NODE = {"rid": "user_question_node_rid", "name": "User Question Node", "type": "user_question_node",
               "config": {"type": "user_question_node"}}
 _FINAL_NODE = {"rid": "final_answer_node_rid", "name": "Final Answer Node", "type": "final_answer_node",
@@ -186,8 +191,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                 continue
             for blueprint in blueprints_for(persona):
                 blueprint_id = seeder.save(persona, blueprint)
-                problem = seeder.validate(persona, blueprint_id) if args.validate else None
-                status = "ok" if problem is None else f"INVALID: {problem}"
+                pending = blueprint["name"].endswith("-a2a") and PERSONA_AGENT[persona] not in ACTIVE_AGENTS
+                problem = seeder.validate(persona, blueprint_id) if args.validate and not pending else None
+                status = f"saved, agent '{PERSONA_AGENT[persona]}' is not active yet" if pending else (
+                    "ok" if problem is None else f"INVALID: {problem}")
                 failures += problem is not None
                 print(f"{persona}: {blueprint['name']} {blueprint_id} {status}")
         except Exception as exc:  # one persona failing must not hide the others

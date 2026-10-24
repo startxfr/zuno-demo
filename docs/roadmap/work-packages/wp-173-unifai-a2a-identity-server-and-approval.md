@@ -64,3 +64,10 @@ Steps 1 to 5 (client identity, classification, limits, A2A server, approval) wai
 - **A run with no identity binding cannot write** through a delegation (no approver).
 - Acceptance: an approval survives a restart of the worker or the API and expires after 300 seconds (a silence is a refusal); an
   auto-approval set for another run does not cross the hop.
+
+## Related work (2026-10-24)
+
+[WP-175](wp-175-a2a-gateway-and-persona-test-blueprints.md) delivers step 1's first half (`forward_user_token` on the A2A node, fork commit
+`178cbd52b`) and a zuno-side A2A gateway ([ADR-0585](../../adr/0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md))
+for calls a user makes directly. It does not render `X-Zuno-Delegated-By` / `X-Zuno-Delegation-Depth`, does not raise approvals and does not
+lift the operator refusal of step 6: the rest of this work package is unchanged, and the fork's own server of step 4 stays specified.

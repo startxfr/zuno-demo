@@ -42,7 +42,9 @@ UnifAI blueprint.
 5. **Client side.** The fork's A2A node accepts `auth_method: forward_user_token`
    (WP-173 step 1), limited to cluster-internal or allow-listed targets, so the token of
    the initiating user reaches the gateway and no stored credential is involved.
-6. **Out of scope.** Approval across hops (ADR-0409) is not implemented: the gateway
+6. **Read-only tools.** With no approval across hops, the tool loop offers, and runs, only the tools the
+   mcp-gateway lists with `readOnlyHint: true`; a write tool is never reachable through this gateway.
+7. **Out of scope.** Approval across hops (ADR-0409) is not implemented: the gateway
    never raises `input-required`. The operator keeps refusing A2A in objects it manages
    (WP-173 step 6); the gateway is reached from blueprints a person builds in the UI.
 

@@ -40,3 +40,9 @@ for agents that declare no target.
   turn is read from real traces to confirm the indirect bound (or trigger a cap).
 - **Approval (ADR-0409):** an approval reaches the user who started the chain, survives a worker restart, expires after 300 seconds, and a write to a
   target absent from `delegation.write_allowed` is refused.
+
+## Note (2026-10-24)
+
+[WP-175](wp-175-a2a-gateway-and-persona-test-blueprints.md)'s A2A gateway does not serve this work package: a persona blueprint is not an agent of the
+release, so its calls carry no delegation chain, whereas a declared Tekos to Arkos delegation needs the chain headers from the platform and
+the operator to accept `zuno.delegation.targets` (WP-173).

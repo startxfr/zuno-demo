@@ -13,7 +13,7 @@
 
 ## Goal
 
-Each of the 17 business personas owns `test-<persona>-chat` and `test-<persona>-a2a` in UnifAI on demo333. The second one
+Each of the 16 business personas owns `test-<persona>-chat` and `test-<persona>-a2a` in UnifAI on demo333. The second one
 delegates to an agent the persona is entitled to, over A2A, with the persona's own token; a persona asking for an agent it is
 not entitled to is refused like an unknown agent.
 
@@ -33,6 +33,14 @@ not entitled to is refused like an unknown agent.
 
 The tests of the component pass; on demo333 a persona's `test-<persona>-a2a` blueprint validates and answers, the ai-gateway routing
 decision and quota are attributed to that persona, and the mcp-gateway tool surface is the agent's.
+
+## Known limits
+
+- Only `tekos`, `arkos` and `comage` are `active` in the admitted release (0.3.0), so the gateway serves only these. The six personas
+  of the advantage, finance and board families have no active agent: their A2A blueprints target their own (placeholder) agent and
+  answer once it is active.
+- A persona blueprint carries no delegation chain (it is not an agent), so the chain checks of the gateway are exercised by tests only.
+- Only read-only tools are offered (no approval across hops).
 
 ## Open questions
 

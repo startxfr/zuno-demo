@@ -57,6 +57,15 @@ def test_the_a2a_target_is_an_agent_the_persona_is_entitled_to() -> None:
         assert any(g.lstrip("/") == f"agent_{agent}" for g in users[persona]), f"{persona} lacks agent_{agent}"
 
 
+def test_personas_with_an_active_agent_target_it() -> None:
+    for persona, groups in _realm_users().items():
+        if persona not in seed.PERSONA_AGENT:
+            continue
+        active = [a for a in seed.ACTIVE_AGENTS if f"agent_{a}" in {g.lstrip("/") for g in groups}]
+        if active:
+            assert seed.PERSONA_AGENT[persona] in seed.ACTIVE_AGENTS, f"{persona} could target one of {active}"
+
+
 def test_negative_test_personas_are_not_seeded() -> None:
     assert not [p for p in seed.PERSONA_AGENT if "only-user" in p]
     assert len(seed.PERSONA_AGENT) == 16

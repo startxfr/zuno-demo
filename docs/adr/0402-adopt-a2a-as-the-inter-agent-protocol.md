@@ -40,3 +40,10 @@ until it exists, no delegation runs.
 ## Consequences
 
 No code change from this ADR. It fixes the vocabulary the other four rely on.
+
+## Update (2026-10-24)
+
+[ADR-0585](0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) adds a zuno-side A2A gateway
+(`components/a2a-gateway`) that serves the active agents of the admitted release. "No delegation runs" above therefore no longer
+holds for a call a user makes directly, for instance from a blueprint. A delegation declared in a bundle (`zuno.delegation.targets`)
+still waits for WP-173, because the operator refuses it and the platform does not yet render the chain headers.
