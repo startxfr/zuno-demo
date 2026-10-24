@@ -215,7 +215,13 @@ objects (`ExternalModel`, `MaaSModelRef`, the subscription restricted to
 the ai-gateway ServiceAccount, auth policy) stay in place, unused, ready
 for a fixed reconciler. Local models are served through MaaS and their
 token budgets are enforced by the gateway-level `TokenRateLimitPolicy`
-(clause 2 as amended), on the group ceiling; the per-user ceiling is not
-yet proven live and stays a follow-up of
+(clause 2 as amended): the **group ceiling is enforced**, the controller's
+**per-subscription budgets are enforced**, and the **per-user ceiling is
+NOT enforced**. The Kuadrant wasm shim on demo333 drops the token-limit
+action pairs at the end of a request (live order tests, 2026-10-24), and
+Kuadrant orders those pairs by limit name, so the user limit, last, is
+never counted; moving it ahead stopped other limits from counting instead.
+An upstream report is being drafted; the per-user ceiling stays a
+follow-up of
 [WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md).
 

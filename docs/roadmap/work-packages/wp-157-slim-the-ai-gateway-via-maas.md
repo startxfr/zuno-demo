@@ -280,10 +280,21 @@ an image):
   direct branches, `externalEgressEnabled` stays off, and the MaaS-side SaaS
   objects stay in place unused. Named exception in ADR-0570.
 
-Open after the sequence: the per-user ceiling defect (an order test is
-running: Kuadrant orders the token-limit actions by name, so the user limit
-ran last of thirteen; it is now renamed `a-standard-user` to run first);
-the V0-V14 equivalence checks.
+- **Per-user ceiling: NOT enforced (order tests, user go).** Kuadrant
+  orders a route's token-limit actions by limit name: the maas-controller's
+  `models_as_a_service_*` subscription limits, then `standard-group`, then
+  `standard-user` last. Renaming the user limit to run first made it count
+  (446 tokens for three chats) and stopped the group limit, then last.
+  Moving both gateway limits ahead made both count but stopped the
+  per-subscription budgets (Lightspeed's 200k among them). So the wasm shim
+  drops the action pairs at the end of a request. The original order is
+  restored (000f6d75): **group ceiling enforced, per-subscription budgets
+  enforced, per-user ceiling not enforced**. An upstream report is being
+  drafted; the user limit stays in the policy, harmless, and is not to be
+  described as enforced.
+
+Open after the sequence: the per-user ceiling (upstream shim defect); the
+V0-V14 equivalence checks.
 
 ## Acceptance
 
