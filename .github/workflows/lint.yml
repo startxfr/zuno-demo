@@ -221,6 +221,9 @@ jobs:
       # noticing - the probe fixture still held the pre-ef7b5c43
       # generate_image description, so the narration gate was scoring a
       # schema the runtime no longer sends. Not wired here is why.
+      - name: evaluations delegation checks tests (ADR-0401/0403/0406, WP-174)
+        working-directory: evaluations
+        run: python3 tests/test_delegation_checks.py
       - name: evaluations tool-calling conformance tests (ADR-0526/WP-087)
         working-directory: evaluations
         run: |

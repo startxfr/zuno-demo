@@ -46,6 +46,8 @@ configMapGenerator:
       # Job (day2_stresstest.py puts this directory on sys.path).
       - unifai_target.py=../../../../../evaluations/common/unifai_target.py
       - unifai_checks.py=../../../../../evaluations/common/unifai_checks.py
+      # ADR-0401/0403/0406 (WP-174): tekos/security_checks.py imports it.
+      - delegation_checks.py=../../../../../evaluations/common/delegation_checks.py
       # WP-165: where the checks find agents/ and the corp policies (the
       # repository layout, or this Job's mounts below).
       - okf_release.py=../../../../../evaluations/common/okf_release.py

@@ -45,6 +45,7 @@ from run_scenarios import MCP_GATEWAY_URL, _invoke_tool, _unifai, auth_headers
 # WP-165: agents and the corp policies come from the admitted release.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 from okf_release import okf_root  # noqa: E402
+import delegation_checks  # noqa: E402  (ADR-0401/0403/0406, WP-174)
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -78,6 +79,9 @@ class CheckResult:
     name: str
     passed: bool
     detail: str = ""
+    # A check that cannot apply (unifai_checks.skip, delegation_checks): reported with its
+    # reason, left out of every count, never counted as a pass.
+    skipped: bool = False
 
 
 def confluence_policy_is_c2_and_local_only() -> CheckResult:
@@ -448,6 +452,17 @@ CHECKS = [
 ]
 
 
+# ADR-0401/0403/0406 (WP-174): the first declared delegation, Tekos to Arkos, through the gateway.
+# Where agents/ and policies/ live depends on the layout: the repository or an extracted release
+# (okf_root) or the acceptance-gate Job (/agents/<name> and /gate/policies).
+CHECKS += delegation_checks.tekos_to_arkos_checks(
+    CheckResult,
+    root=[okf_root(pathlib.Path(__file__).resolve().parents[2]), pathlib.Path("/gate"), pathlib.Path("/")],
+    mcp_gateway_url=MCP_GATEWAY_URL,
+    auth_headers=auth_headers,
+)
+
+
 def run() -> list:
     results = []
     for check in CHECKS:
@@ -465,12 +480,12 @@ def main() -> int:
 
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
-        print(f"{'✓' if r.passed else '✗':<6}{r.name}")
-        if not r.passed and r.detail:
+        print(f"{'-' if r.skipped else '✓' if r.passed else '✗':<6}{r.name}")
+        if (not r.passed or r.skipped) and r.detail:
             print(f"      -> {r.detail}")
 
     _unifai().cleanup()
-    if all(r.passed for r in results):
+    if all(r.passed for r in results if not r.skipped):
         print("\nRESULT: PASS")
         return 0
     print("\nRESULT: FAIL")

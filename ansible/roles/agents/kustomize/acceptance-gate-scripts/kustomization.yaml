@@ -15,6 +15,8 @@ configMapGenerator:
       # security_checks.py `import unifai_checks`; both resolve from /gate.
       - unifai_target.py=../../../../../evaluations/common/unifai_target.py
       - unifai_checks.py=../../../../../evaluations/common/unifai_checks.py
+      # ADR-0401/0403/0406 (WP-174): tekos/security_checks.py imports it.
+      - delegation_checks.py=../../../../../evaluations/common/delegation_checks.py
       # WP-165: where the checks find agents/ and the corp policies (the
       # repository layout, or this Job's mounts below).
       - okf_release.py=../../../../../evaluations/common/okf_release.py
@@ -33,6 +35,9 @@ configMapGenerator:
       # FileNotFoundError.
       - classification.yaml=../../../../../policies/data-classification/classification.yaml
       - tool-policy.yaml=../../../../../.cache/okf-release/current/policies/tools/tool-policy.yaml
+      # WP-174: the delegated-write flag (delegation_checks.allows_delegated_writes); without it the
+      # checks assume the gateway's own default, false.
+      - limits-policy.yaml=../../../../../.cache/okf-release/current/policies/limits/limits-policy.yaml
       - provider-routing.yaml=../../../../../platform/ai-gateway/provider-routing.yaml
       # gate_checks.py's two write-code/DAT-boundary checks (added
       # alongside stress_test.py's gaps) read these at /policies/model-

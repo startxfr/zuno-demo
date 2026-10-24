@@ -57,6 +57,11 @@ def read_document(path: pathlib.Path) -> dict:
     return front
 
 
+def has_agent(root: pathlib.Path, agent: str) -> bool:
+    """Whether `root` holds this agent's bundle (for callers that search several layouts)."""
+    return (root / "agents" / agent / "agent.okf.md").is_file()
+
+
 def agent_declaration(root: pathlib.Path, agent: str) -> dict:
     """The `zuno` block of agents/<agent>/agent.okf.md."""
     return read_document(root / "agents" / agent / "agent.okf.md").get("zuno") or {}

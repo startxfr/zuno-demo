@@ -376,6 +376,8 @@
                       path: data-classification/classification.yaml
                     - key: tool-policy.yaml
                       path: tools/tool-policy.yaml
+                    - key: limits-policy.yaml
+                      path: limits/limits-policy.yaml
               - name: gate-platform
                 configMap:
                   name: acceptance-gate-scripts

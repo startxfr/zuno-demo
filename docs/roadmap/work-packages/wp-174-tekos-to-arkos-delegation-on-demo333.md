@@ -15,7 +15,7 @@ on the live cluster as the `eval-*` personas.
 ## Steps
 
 1. Tekos declares Arkos / `draft-architecture-testimonial` as its only target (an agents release, promoted).
-2. Evaluation scenarios as `eval-*` personas: the delegation runs; refused when the user lacks `agent_arkos`; refused for an
+2. The gateway-level scenarios are written (`evaluations/common/delegation_checks.py`, wired into `evaluations/tekos/security_checks.py`, shipped in both Jobs' ConfigMaps, 17 unit tests): they skip until the admitted release declares Tekos -> Arkos. Add the behavioural ones once WP-173 exists. Evaluation scenarios as `eval-*` personas: the delegation runs; refused when the user lacks `agent_arkos`; refused for an
    undeclared target; refused at depth 2; refused on a cycle; a delegated write refused while `delegation.allow_write` is false;
    the chain appears in the trace and the gateway audit.
 3. When WP-173 delivers end-to-end approval, validate a delegated write with the user's approval and across a worker
