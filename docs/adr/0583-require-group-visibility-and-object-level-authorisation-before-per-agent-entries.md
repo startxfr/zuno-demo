@@ -85,3 +85,11 @@ sensitive until fixed.
 Work happens in the fork, upstream-first. The operator needs a release for the
 group restriction. The pilot on demo333 is the first place to verify it; no
 change to demo222 until the cutover (ADR-0573).
+
+## Verification note (2026-10-24)
+
+Clauses 1, 3 and 4 were verified on the `demo333` pilot and the clause 2 audit
+fixed its cross-user findings; see
+[the evidence](../roadmap/evidence/adr-0583-authorization-verification.md). The
+status stays `Accepted` until the remaining audit items are closed and the
+two-user probe runs as a standing check.
