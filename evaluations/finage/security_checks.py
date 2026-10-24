@@ -49,7 +49,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos")
 from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _invoke_tool, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
-from okf_release import okf_root  # noqa: E402  (WP-165: agents and corp policies)
+from okf_release import okf_root, task_declarations  # noqa: E402  (WP-165: agents and corp policies)
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -100,22 +100,17 @@ def finage_never_declares_sales_or_adv_knowledge_domains() -> CheckResult:
     live attempt denied by the MCP Gateway) is scenarios 12/13/18 in
     scenarios.yaml, not repeated here.
     """
-    tasks_dir = okf_root(REPO_ROOT) / "agents" / "finage" / "tasks"
+    declarations = task_declarations(okf_root(REPO_ROOT), "finage")
     offending: list = []
     checked = 0
-    for task_path in sorted(tasks_dir.glob("*.md")):
-        parts = task_path.read_text(encoding="utf-8").split("---", 2)
-        if len(parts) < 3:
-            continue
+    for task_name, zuno in declarations.items():
         checked += 1
-        frontmatter = yaml.safe_load(parts[1]) or {}
-        zuno = frontmatter.get("zuno") or {}
         allowed_knowledge = zuno.get("allowed_knowledge") or []
         allowed_tools = zuno.get("allowed_tools") or []
         if "knowledge.sales" in allowed_knowledge:
-            offending.append(f"{task_path.name}: allowed_knowledge includes knowledge.sales")
+            offending.append(f"{task_name}.md: allowed_knowledge includes knowledge.sales")
         if "knowledge.adv" in allowed_knowledge:
-            offending.append(f"{task_path.name}: allowed_knowledge includes knowledge.adv")
+            offending.append(f"{task_name}.md: allowed_knowledge includes knowledge.adv")
         for tool in allowed_tools:
             # ADR-0512 (WP-55), kept by ADR-0528: a project_required task
             # declares salesforce.opportunity.read for the project-binding
@@ -126,7 +121,7 @@ def finage_never_declares_sales_or_adv_knowledge_domains() -> CheckResult:
             if tool == PROJECT_BINDING_CAPABILITY and zuno.get("project_required") is True:
                 continue
             if tool.startswith("salesforce.") or tool.startswith("aramis."):
-                offending.append(f"{task_path.name}: allowed_tools includes {tool}")
+                offending.append(f"{task_name}.md: allowed_tools includes {tool}")
     ok = not offending
     return CheckResult(
         "finage_never_declares_sales_or_adv_knowledge_domains",

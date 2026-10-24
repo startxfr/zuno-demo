@@ -25,7 +25,8 @@ class BoundaryLint(unittest.TestCase):
         return lint.find_reads([path], root)
 
     def test_detects_each_read_shape(self):
-        for text in ('p = d / "agent.okf.md"\n', "p = d / 'okf-index.json'\n", 'p = d / "tasks" / f"{t}.md"\n'):
+        for text in ('p = okf_root(R) / "agents" / "x" / "tasks"\n', 'p = (a) / "agents" / name\n',
+                     'p = d / "agent.okf.md"\n', "p = d / 'okf-index.json'\n", 'p = d / "tasks" / f"{t}.md"\n'):
             self.assertTrue(self._found("components/x/app.py", text), text)
 
     def test_ignores_comments_and_prose(self):

@@ -50,7 +50,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos")
 from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _invoke_tool, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
-from okf_release import okf_root  # noqa: E402  (WP-165: agents and corp policies)
+from okf_release import okf_root, task_declarations  # noqa: E402  (WP-165: agents and corp policies)
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -107,23 +107,18 @@ def advantage_never_declares_the_sales_knowledge_domain() -> CheckResult:
     Comage/Sales capabilities" property WP-35's own acceptance grep
     checks, kept here as a redundant, independently-runnable proof.
     """
-    tasks_dir = okf_root(REPO_ROOT) / "agents" / "advantage" / "tasks"
+    declarations = task_declarations(okf_root(REPO_ROOT), "advantage")
     offending: list = []
     checked = 0
-    for task_path in sorted(tasks_dir.glob("*.md")):
-        parts = task_path.read_text(encoding="utf-8").split("---", 2)
-        if len(parts) < 3:
-            continue
+    for task_name, zuno in declarations.items():
         checked += 1
-        frontmatter = yaml.safe_load(parts[1]) or {}
-        zuno = frontmatter.get("zuno") or {}
         allowed_knowledge = zuno.get("allowed_knowledge") or []
         allowed_tools = zuno.get("allowed_tools") or []
         if "knowledge.sales" in allowed_knowledge:
-            offending.append(f"{task_path.name}: allowed_knowledge includes knowledge.sales")
+            offending.append(f"{task_name}.md: allowed_knowledge includes knowledge.sales")
         for tool in allowed_tools:
             if tool.startswith("salesforce."):
-                offending.append(f"{task_path.name}: allowed_tools includes {tool}")
+                offending.append(f"{task_name}.md: allowed_tools includes {tool}")
     ok = not offending
     return CheckResult(
         "advantage_never_declares_the_sales_knowledge_domain",

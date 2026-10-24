@@ -25,7 +25,10 @@ from typing import Dict, Iterable, List
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCAN_DIRS = ("components", "platform", "evaluations")
 SUFFIXES = {".py", ".go"}
-READ = re.compile(r"""agent\.okf\.md["']|okf-index\.json["']|["']tasks["']\s*/\s*f?["']""")
+READ = re.compile(
+    r"""agent\.okf\.md["']|okf-index\.json["']|["']tasks["']\s*/\s*f?["']"""
+    r"""|\)\s*/\s*["']agents["']\s*/"""  # <release root> / "agents" / <agent> ...
+)
 
 HOOKS: Dict[str, str] = {
     "components/mcp-gateway/app/agent_declarations.py": "mcp-gateway hook",
@@ -34,11 +37,10 @@ HOOKS: Dict[str, str] = {
     "platform/okf/generate_stack_config.py": "ADR-0581 generator hook",
     "platform/okf/release_cache.py": "release access point",
     "components/mlops/src/mlops.py": "mlops hook (_task_system_prompt)",
+    "evaluations/common/okf_release.py": "evaluations hook (agent_declaration, task_declarations)",
 }
 
 BASELINE: Dict[str, str] = {
-    "evaluations/tekos/gate_checks.py": "reads agent frontmatter for a gate; move behind the evaluations reader",
-    "evaluations/tekos/run_scenarios.py": "reads agent frontmatter; move behind the evaluations reader",
     "platform/docs/check_docs.py": "documentation drift checks read the admitted release",
     "platform/testing/day2_contract_attribution.py": "reads okf-index.json for attribution",
 }

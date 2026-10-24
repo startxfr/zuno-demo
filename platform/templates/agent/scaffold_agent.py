@@ -255,7 +255,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos")
 from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
-from okf_release import okf_root  # noqa: E402  (WP-165: agents and corp policies)
+from okf_release import okf_root, task_declarations  # noqa: E402  (WP-165: agents and corp policies)
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -284,22 +284,17 @@ def {py_name}_declares_only_scaffolded_knowledge_and_tools() -> CheckResult:
     """
     allowed_knowledge_ceiling = {spec.knowledge_domains!r}
     allowed_tools_ceiling = {spec.tools!r}
-    tasks_dir = okf_root(REPO_ROOT) / "agents" / "{spec.name}" / "tasks"
+    declarations = task_declarations(okf_root(REPO_ROOT), "{spec.name}")
     offending = []
     checked = 0
-    for task_path in sorted(tasks_dir.glob("*.md")):
-        parts = task_path.read_text(encoding="utf-8").split("---", 2)
-        if len(parts) < 3:
-            continue
+    for task_name, zuno in declarations.items():
         checked += 1
-        frontmatter = yaml.safe_load(parts[1]) or {{}}
-        zuno = frontmatter.get("zuno") or {{}}
         for domain in zuno.get("allowed_knowledge") or []:
             if domain not in allowed_knowledge_ceiling:
-                offending.append(f"{{task_path.name}}: allowed_knowledge includes undeclared {{domain}}")
+                offending.append(f"{{task_name}}.md: allowed_knowledge includes undeclared {{domain}}")
         for tool in zuno.get("allowed_tools") or []:
             if tool not in allowed_tools_ceiling:
-                offending.append(f"{{task_path.name}}: allowed_tools includes undeclared {{tool}}")
+                offending.append(f"{{task_name}}.md: allowed_tools includes undeclared {{tool}}")
     ok = not offending
     return CheckResult(
         "{py_name}_declares_only_scaffolded_knowledge_and_tools",

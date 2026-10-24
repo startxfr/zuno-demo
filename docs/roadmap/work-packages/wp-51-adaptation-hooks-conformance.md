@@ -37,9 +37,17 @@ Done in this repository:
   `generate_stack_config.py`) does the same through `checked_frontmatter`;
   `platform/okf/tests/test_okf_conformance.py` runs every case through it.
 - `platform/okf/check_okf_read_boundary.py` (CI: lint.yml) fails on a new
-  direct OKF read outside the hooks; four pre-existing reads are a baseline
-  that may only shrink (two tekos evaluation scripts, `check_docs.py`,
+  direct OKF read outside the hooks (it also catches `<root> / "agents" / ...`
+  path building, which found the agent scaffold template); two pre-existing
+  reads are a baseline that may only shrink (`check_docs.py`,
   `day2_contract_attribution.py`).
+- Evaluations hook (`evaluations/common/okf_release.py`: `agent_declaration`,
+  `task_declarations`, version-checked). The tekos gate checks, `run_scenarios`,
+  the naveo/advantage/finage security checks and the agent scaffold template now
+  read through it; their results on the admitted release 0.3.0 are identical to
+  before. A task file without frontmatter used to be skipped silently by three
+  of them; it is now refused by name. `evaluations/tests/test_okf_hook.py`
+  covers it.
 - mlops hook (`_task_system_prompt` in `components/mlops/src/mlops.py`) refuses a
   missing or unsupported `okf_version` by name; three tests in `test_mlops.py`
   (versions, refusals, conformance cases).
@@ -48,7 +56,8 @@ Done in this repository:
 
 Remaining before this WP closes:
 
-- The evaluations reader, then empty the lint baseline.
+- `check_docs.py` and `day2_contract_attribution.py` still read the release
+  directly (the baseline); move them behind a hook or retire the baseline entries.
 - The conformance cases are merged on zuno-demo-agents devel (PR #7). The
   release builder now ships them as an optional corp-artifact layer (branch
   `prep/wp51-release-conformance`, ADR-0577 amendment 2026-10-24) and

@@ -367,12 +367,11 @@ def _agent_status() -> str:
     for candidate in (_here, _here.parent / "common"):
         if str(candidate) not in sys.path:
             sys.path.insert(0, str(candidate))
-    from okf_release import okf_root
+    from okf_release import agent_declaration, okf_root
 
-    path = okf_root(pathlib.Path(__file__).resolve().parents[2]) / "agents" / AGENT / "agent.okf.md"
     try:
-        front = yaml.safe_load(path.read_text().split("---", 2)[1])
-        return str((front.get("zuno") or {}).get("status", "")).strip()
+        zuno = agent_declaration(okf_root(pathlib.Path(__file__).resolve().parents[2]), AGENT)
+        return str(zuno.get("status", "")).strip()
     except Exception:  # noqa: BLE001 - unknown status means "assume active"
         return ""
 

@@ -35,7 +35,7 @@ import yaml
 
 # WP-165: agents and the corp policies come from the admitted release.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
-from okf_release import okf_root  # noqa: E402
+from okf_release import agent_declaration, okf_root, task_declarations  # noqa: E402
 
 try:
     from day2_report import log_test_line
@@ -128,19 +128,15 @@ def tekos_declares_no_dat_or_image_generation_capability() -> CheckResult:
     it only ever looked for `image.generation.create`/`generate_image`.
     """
     repo_root = pathlib.Path(__file__).resolve().parents[2]
-    bundle = yaml.safe_load(
-        (okf_root(repo_root) / "agents/tekos/agent.okf.md").read_text().split("---", 2)[1]
-    )
-    tasks = bundle.get("zuno", {}).get("tasks", [])
+    tasks = agent_declaration(okf_root(repo_root), "tekos").get("tasks", [])
+    declarations = task_declarations(okf_root(repo_root), "tekos")
     dat_declared = "draft-architecture-testimonial" in tasks
 
     image_gen_tasks = []
     for task_name in tasks:
-        task_path = okf_root(repo_root) / "agents/tekos/tasks" / f"{task_name}.md"
-        if not task_path.exists():
+        if task_name not in declarations:
             continue
-        task_frontmatter = yaml.safe_load(task_path.read_text().split("---", 2)[1])
-        allowed_tools = task_frontmatter.get("zuno", {}).get("allowed_tools", [])
+        allowed_tools = declarations[task_name].get("allowed_tools", [])
         if "image.generation.create" in allowed_tools or "generate_image" in allowed_tools:
             image_gen_tasks.append(task_name)
 
@@ -166,18 +162,14 @@ def arkos_declares_no_photorealistic_image_generation_capability() -> CheckResul
     legitimately declares that one on both its tasks.
     """
     repo_root = pathlib.Path(__file__).resolve().parents[2]
-    bundle = yaml.safe_load(
-        (okf_root(repo_root) / "agents/arkos/agent.okf.md").read_text().split("---", 2)[1]
-    )
-    tasks = bundle.get("zuno", {}).get("tasks", [])
+    tasks = agent_declaration(okf_root(repo_root), "arkos").get("tasks", [])
+    declarations = task_declarations(okf_root(repo_root), "arkos")
 
     image_gen_tasks = []
     for task_name in tasks:
-        task_path = okf_root(repo_root) / "agents/arkos/tasks" / f"{task_name}.md"
-        if not task_path.exists():
+        if task_name not in declarations:
             continue
-        task_frontmatter = yaml.safe_load(task_path.read_text().split("---", 2)[1])
-        allowed_tools = task_frontmatter.get("zuno", {}).get("allowed_tools", [])
+        allowed_tools = declarations[task_name].get("allowed_tools", [])
         if "image.generation.create" in allowed_tools or "generate_image" in allowed_tools:
             image_gen_tasks.append(task_name)
 
