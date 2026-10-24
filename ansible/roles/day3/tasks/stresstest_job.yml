@@ -130,12 +130,33 @@
   register: _day2_stress_eval_client_secret
   no_log: true
 
+# The stresstest signs in through its own client, zuno-stresstest: the only
+# client the ai-gateway trusts to select a quota class (the token-budget
+# proof forces the tiny `stresstest` class). zuno-evaluations stays the
+# fallback on a cluster that does not have it yet.
+- name: "day2-stresstest | read the zuno-stresstest client secret from zuno-auth"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: zuno-stresstest-client-secret
+  register: _day2_stress_stress_client_secret
+  no_log: true
+
+- name: "day2-stresstest | pick the client the Jobs sign in through"
+  ansible.builtin.set_fact:
+    _day2_stress_client: >-
+      {{ {'id': 'zuno-stresstest', 'secret': _day2_stress_stress_client_secret.resources[0].data.client_secret}
+         if (_day2_stress_stress_client_secret.resources | default([]) | length) > 0
+         else ({'id': 'zuno-evaluations', 'secret': _day2_stress_eval_client_secret.resources[0].data.client_secret}
+               if (_day2_stress_eval_client_secret.resources | default([]) | length) > 0 else {}) }}
+  no_log: true
+
 - name: "day2-stresstest | build the credentials data"
   ansible.builtin.set_fact:
     _day2_stress_secret_data: >-
       {{ {'demo-persona-password': _day2_stress_demo_password_secret.resources[0].data.password}
-         | combine({'eval-client-secret': _day2_stress_eval_client_secret.resources[0].data.client_secret}
-                   if (_day2_stress_eval_client_secret.resources | default([]) | length) > 0 else {}) }}
+         | combine({'eval-client-secret': _day2_stress_client.secret} if _day2_stress_client.secret is defined else {}) }}
+    day2_stresstest_client_id: "{{ _day2_stress_client.id | default('zuno-evaluations') }}"
   no_log: true
 
 - name: "day2-stresstest | copy the combined credentials into one zuno-ai-run Secret the Job can mount"

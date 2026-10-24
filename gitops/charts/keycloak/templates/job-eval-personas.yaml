@@ -70,6 +70,15 @@ spec:
                 secretKeyRef:
                   name: demo-personas-password
                   key: password
+            # The zuno-stresstest client's secret (externalsecret-zuno-
+            # stresstest-client.yaml); optional so a cluster without it still
+            # gets its personas.
+            - name: STRESS_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: zuno-stresstest-client-secret
+                  key: client_secret
+                  optional: true
           volumeMounts:
             - name: personas
               mountPath: /personas
@@ -102,6 +111,19 @@ spec:
               if [ -z "$ready" ]; then
                 echo "ERROR: keycloak or realm '$KC_REALM' never became reachable" >&2
                 exit 1
+              fi
+
+              # zuno-stresstest: the client reconcile Job creates it from the realm
+              # file without a secret; set the Vault-generated one here, every run.
+              if [ -n "${STRESS_CLIENT_SECRET:-}" ]; then
+                sid=$($KCADM get clients -r "$KC_REALM" $CFG -q clientId=zuno-stresstest \
+                        --fields id --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+                if [ -n "$sid" ]; then
+                  $KCADM update "clients/$sid" -r "$KC_REALM" $CFG -s "secret=$STRESS_CLIENT_SECRET"
+                  echo "zuno-stresstest client secret set"
+                else
+                  echo "WARNING: client zuno-stresstest does not exist yet; secret not set"
+                fi
               fi
 
               # evalPersonasGroup: a top-level group the personas join, created

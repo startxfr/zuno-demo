@@ -543,6 +543,18 @@
     vault_seed_fields:
       client_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
 
+# zuno-stresstest: the confidential client of the day-3 stresstest Jobs, the
+# only client the ai-gateway trusts to select a quota class. Read by the
+# keycloak chart (externalsecret-zuno-stresstest-client.yaml), which sets it
+# on the client from the evaluation-personas Job.
+- name: "vault | generate and seed the zuno-stresstest client secret (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: keycloak/zuno-stresstest
+    vault_seed_fields:
+      client_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+
 # Grafana's oauth-proxy sidecar (gitops/charts/grafana): AES-key-sized
 # opaque secret for signing/encrypting its session cookie, same
 # single-opaque-value shape as mcp/gateway-workload-token below.

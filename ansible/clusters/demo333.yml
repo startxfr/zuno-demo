@@ -185,12 +185,13 @@ zuno_ai_gateway_quota_fail_modes: true
 # image built from 18cc412e or later (ai-gateway-21).
 zuno_ai_gateway_closed_class_maas_only: true
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
-# non-standard quota class and a project id. zuno-evaluations is the
-# confidential, password-grant-only client of the evaluation and stresstest
-# harnesses (platform/testing, evaluations/*), which select the stresstest
-# class; user-facing clients are never listed here.
+# non-standard quota class and a project id. Only zuno-stresstest, the
+# confidential, password-grant-only client of the day-3 stresstest Jobs,
+# whose token-budget proof forces the `stresstest` class. zuno-evaluations
+# (RAGAS, probes, the acceptance gate) is not trusted: its personas get the
+# `evaluation` class from their group. User-facing clients are never listed.
 zuno_ai_gateway_trusted_platform_clients:
-  - zuno-evaluations
+  - zuno-stresstest
 # Step C (user go 2026-10-24, after step B verified): the SaaS models'
 # MaaS subscriptions and auth policies keep only the ai-gateway
 # ServiceAccount; the /agent_tekos and /sales persona grants go (inventory
