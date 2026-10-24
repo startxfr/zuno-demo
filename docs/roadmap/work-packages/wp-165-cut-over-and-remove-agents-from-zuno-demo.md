@@ -1,6 +1,6 @@
 # WP-165: Cut over and remove agents from zuno-demo
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-24)
 - **ADRs:** [ADR-0576](../../adr/0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md), [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md), [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)
 - **Depends on:** [WP-161](wp-161-fetch-okf-content-at-pod-start.md), [WP-162](wp-162-keyless-okf-verification-in-unifai-operator.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
 - **Related:** [ADR-0106](../../adr/0106-enforce-okf-bundle-signing-and-validation.md), [ADR-0535](../../adr/0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md), [WP-51](wp-51-adaptation-hooks-conformance.md)
@@ -90,3 +90,13 @@ statuses match.
 against the admitted release; a full promotion cycle (tag, PR, merge, roll)
 works with no file under `zuno-demo` naming an agent version except
 `platform/okf/agents.lock`.
+
+## Acceptance, met 2026-10-24
+
+`agents/` is absent; `check_docs.py`, the Day 2 agents check (keyless
+admission of the pinned release) and the tekos acceptance gate are green
+against the admitted release (WP-156 step 6, 2026-10-24); a full promotion
+cycle ran live with no file under zuno-demo naming an agent version except
+`platform/okf/agents.lock` (release 0.3.0, PR #3; details in ADR-0580's dated
+note).
+

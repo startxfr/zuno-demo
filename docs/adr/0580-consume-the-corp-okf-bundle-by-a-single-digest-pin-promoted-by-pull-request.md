@@ -1,6 +1,6 @@
 # ADR-0580: Consume the corp OKF bundle by a single digest pin, promoted by pull request
 
-- **Status:** Partially implemented (2026-10-23, WP-160, WP-161 and WP-165) - see the amendment and implementation note below
+- **Status:** Implemented (2026-10-24, WP-160, WP-161 and WP-165) - see the amendment and implementation note below; a full promotion cycle (release 0.3.0) ran live on demo333
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -167,3 +167,19 @@ is verified by WP-161 before relying on it.
 
 `make d3 admit agents` is safe to run any time; it changes nothing on the
 cluster unless the mirror is configured.
+
+### 2026-10-24 - first full promotion cycle, live
+
+Release 0.3.0 of zuno-demo-agents (tekos 0.2.0: its answers end with "— Tekos")
+went through the whole chain: the release pull request merged to `main`, tag
+and keyless signature by `publish.yml`, `okf-promote` opened zuno-demo pull
+request #3 (only `agents.lock` and tekos in `stack-config.generated.yaml`
+changed; the other agents kept their digests, builds being reproducible),
+merge to `devel`, then on demo333: mcp-gateway rolled and its okf-fetch init
+container verified 0.3.0, the unifai role applied the tekos bundle, ai-gateway
+and mlops were rebuilt reading the release at build time (this ADR's
+amendment), and a live UnifAI tekos answer ended with "— Tekos". The first
+`okf-promote` run failed when WP-168 removed the knowledge bindings mid-run;
+admission now treats a knowledge domain as served when a UnifAI RAG source
+carries its tag (c85941ab).
+

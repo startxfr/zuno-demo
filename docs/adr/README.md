@@ -336,7 +336,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0577](0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md) | Implemented | Publish OKF as per-agent artifacts plus a corp index artifact |
 | [ADR-0578](0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md) | Implemented | Sign OKF artifacts keyless with GitHub OIDC and verify them offline by identity |
 | [ADR-0579](0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md) | Accepted | Extend OKF to v0.3 with skills, model roles, guardrails and limits |
-| [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Partially implemented | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
+| [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Implemented | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
 | [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Accepted | Derive stack configuration from the admitted corp bundle |
 | [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Accepted | Serve a per-agent entry and descriptive sheet from the admitted bundle |
 | [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Accepted | Require group visibility and object-level authorisation before per-agent entries |

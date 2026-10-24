@@ -249,7 +249,7 @@ verifies it offline by identity, fetches agent content at pod start instead
 of baking it into images, and generates Keycloak groups, MaaS subscriptions,
 Kuadrant policies, ai-gateway inputs and UnifAI bundles from the release.
 
-**9 ADRs.** Implemented: ADR-0576, ADR-0577, ADR-0578 (2026-10-23, the cutover of WP-165); partially implemented: ADR-0580. Open: ADR-0579, ADR-0580, ADR-0581 – ADR-0584; WP-161, WP-163 – WP-165, WP-167.
+**9 ADRs.** Implemented: ADR-0576, ADR-0577, ADR-0578 (2026-10-23, the cutover of WP-165) and ADR-0580 (2026-10-24, first full promotion cycle). Open: ADR-0579, ADR-0581 – ADR-0584; WP-161, WP-163, WP-164, WP-167.
 
 ## OKF stream
 
