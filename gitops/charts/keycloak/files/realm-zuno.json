@@ -1022,10 +1022,16 @@
             "secret": "${vault.unifai_client_secret}",
             "redirectUris": [
                 "https://unifai-identity-zuno-unifai.apps.mycluster.example.com/*",
-                "https://unifai-ui-zuno-unifai.apps.mycluster.example.com/*"
+                "https://unifai-ui-zuno-unifai.apps.mycluster.example.com/*",
+                "https://unifai-identity-unifai-devel.apps.mycluster.example.com/*",
+                "https://unifai-ui-unifai-devel.apps.mycluster.example.com/*",
+                "https://unifai-identity-unifai-olm.apps.mycluster.example.com/*",
+                "https://unifai-ui-unifai-olm.apps.mycluster.example.com/*"
             ],
             "webOrigins": [
-                "https://unifai-ui-zuno-unifai.apps.mycluster.example.com"
+                "https://unifai-ui-zuno-unifai.apps.mycluster.example.com",
+                "https://unifai-ui-unifai-devel.apps.mycluster.example.com",
+                "https://unifai-ui-unifai-olm.apps.mycluster.example.com"
             ],
             "standardFlowEnabled": true,
             "directAccessGrantsEnabled": false,

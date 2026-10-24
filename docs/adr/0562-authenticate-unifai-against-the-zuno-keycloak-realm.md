@@ -162,3 +162,19 @@ works.
 Every command against a cluster passes `--context` explicitly. `demo333` is
 powered off at the time of writing; WP-151's live steps start by asking the
 user to power it on.
+
+## Implementation note (2026-10-24, demo333)
+
+The hand-made realm `unifai` is retired. All three UnifAI stacks on demo333
+(`zuno-unifai`, `unifai-devel`, `unifai-olm`) now sign in through the `unifai`
+client of realm `zuno` (`identity.external`, group claims through
+`DIRECTORY_PROVIDER=oidc-claims`, admin `ai-ops-01`). The two `KeycloakRealmImport`
+`unifai-realm`, the live realm and the Keycloak instance of `unifai-olm` were
+deleted. The client's redirect URIs and web origins now also cover the
+`unifai-devel` and `unifai-olm` routes; `job-client-reconcile` keeps them.
+
+Login was verified with real browser-flow sign-ins of `consultant-01`, `sale-01`,
+`board-01` and `ai-ops-01`. On `zuno-unifai` a persona sees exactly the team
+workspaces and blueprints of its `agent_*` groups. `unifai-devel` and
+`unifai-olm` declare no OKF bundle, so they show no team workspace yet.
+`identity.keycloak` stays forbidden on Zuno clusters (ADR-0572).
