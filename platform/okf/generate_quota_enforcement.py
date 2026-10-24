@@ -141,16 +141,20 @@ TRLP_DIMENSION_HEADER = {
 }
 
 # The identity property the gateway-identity predicate compares against the
-# ai-gateway's ServiceAccount username. Authorino's kubernetesTokenReview
-# identity is the TokenReview status, whose user.username carries
-# system:serviceaccount:<ns>:<name>. NOT verified on the MaaS AuthPolicy yet:
-# inventory V1 (docs/roadmap/evidence/wp-157-inventory.md section 4) reads
-# what maas-gateway-auth publishes; change this constant and regenerate if
-# it differs. Guarded with has() at each level in a conditional, because one
+# ai-gateway's ServiceAccount username. In a TokenRateLimitPolicy,
+# auth.identity is not the raw TokenReview: it is the filter the MaaS
+# AuthPolicy (maas-gateway-auth) publishes - groups, groups_str,
+# selected_subscription(_key), subscription_error*, subscription_info and
+# userid - and it has no `user` key. userid is apiKeyValidation.username,
+# else preferred_username, else sub, else user.username, so for the
+# ai-gateway it carries system:serviceaccount:zuno-ai-run:ai-gateway. Read
+# live on demo333 2026-10-24 (inventory V1, docs/roadmap/evidence/
+# wp-157-inventory.md section 4); every controller-generated limit counts on
+# auth.identity.userid too. Guarded with has() in a conditional, because one
 # unresolvable expression makes the wasm-shim drop EVERY descriptor of the
 # request (see _class_predicate), which on the MaaS Gateway would also drop
 # the controller's per-subscription limits merged with this policy.
-GATEWAY_IDENTITY_PROPERTY = "auth.identity.user.username"
+GATEWAY_IDENTITY_PROPERTY = "auth.identity.userid"
 
 # D3 + D4: what is enforced at MaaS today. Everything else in the policy is
 # generated too, but rendered only behind its own default-false value, so the
@@ -312,7 +316,7 @@ def _gateway_identity_predicate_format() -> str:
 
     Built as nested conditionals with has() on every path segment, never as
     a bare comparison: on a caller whose identity lacks the property (a
-    persona token, an API key) a bare `auth.identity.user.username` fails to
+    persona token, an API key) a bare `auth.identity.userid` fails to
     resolve, and the wasm-shim then sends no descriptor at all for the
     request - see _class_predicate for the live evidence of that failure.
     """

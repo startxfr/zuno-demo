@@ -9,7 +9,7 @@
 {{- if not (has $trl.attachment (list "defaults" "overrides")) }}
 {{- fail "quotaEnforcement.tokenRateLimits.attachment must be defaults or overrides" }}
 {{- end }}
-{{- $gatewayIdentity := printf "(has(auth.identity.user) ? (has(auth.identity.user.username) ? auth.identity.user.username == '%s' : false) : false)" $trl.gatewayIdentity.username }}
+{{- $gatewayIdentity := printf "(has(auth.identity.userid) ? auth.identity.userid == '%s' : false)" $trl.gatewayIdentity.username }}
 # GENERATED FILE (ADR-0511, WP-157 step 5) - do not edit.
 # Source: policies/quotas/quota-policy.yaml of the admitted agents release.
 # Regenerate with: python3 platform/okf/generate_quota_enforcement.py

@@ -154,9 +154,12 @@ Enable sequence, on demo333 first (`oc --context` on every command), each
 step only after the verifications named (inventory section 4):
 
 1. Step 1 done and **V0** green (MaaS front healthy, both defects closed).
-2. **V1**: read what `maas-gateway-auth` publishes. If the ServiceAccount
-   username is not at `auth.identity.user.username`, change
-   `GATEWAY_IDENTITY_PROPERTY` in the generator and regenerate.
+2. **V1**, done 2026-10-24 (read-only): in a TokenRateLimitPolicy,
+   `auth.identity` is the filter `maas-gateway-auth` publishes, which has no
+   `user` key; the ServiceAccount username is `auth.identity.userid`, the
+   property every controller-generated limit counts on.
+   `GATEWAY_IDENTITY_PROPERTY` now reads it. Not provable before the policy
+   is applied: the wasm-shim descriptor of an actual ServiceAccount call.
 3. `gatewayIdentity.enabled` on the ai-gateway. Every model already grants
    the ServiceAccount; check one via_maas call per local model returns 200
    and **V8** (counter scope).
