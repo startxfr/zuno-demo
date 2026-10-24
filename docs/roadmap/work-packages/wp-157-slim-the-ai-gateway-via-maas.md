@@ -125,6 +125,84 @@ Taken on the inventory in
 Nothing is applied on a cluster before step 1 (the MaaS front fixed and a
 forwarded-identity call proven for one local and one external model).
 
+## Progress (2026-10-24): steps 3-5 prepared behind switches, all off
+
+Landed on `devel` without changing a running cluster: every new behaviour
+sits behind a switch that defaults to today's behaviour, and the default
+renders of the touched charts are unchanged (models: the same 75 objects in
+the same order, only comment lines differ; connectivity-link and ai-gateway:
+byte-identical `helm template` output). The ai-gateway image picks the code
+up at its next build and behaves as before until a switch is set.
+
+| Switch (chart value) | Default | When on |
+|---|---|---|
+| models `externalModels[].enabled` (per provider) | `true` for `mistral-large` and `gpt-oss-120b-ovhcloud`, `false` for `mistral-codestral`, `openai-gpt-4o-mini`, `anthropic-claude`, `gemini-pro` | renders the provider's ExternalSecret (`api-key`, `zuno-ai-run`, from its existing Vault path), its `maas.opendatahub.io` ExternalModel, its plaintext DestinationRule (one per host) and its MaaSModelRef, MaaSSubscription (ai-gateway ServiceAccount only, D5) and MaaSAuthPolicy. OpenAI, Anthropic and Gemini use `provider: openai-compatible` (D8) |
+| models `maas.saasSubscriptions.gatewayOnly` | `false` | the ExternalModel-backed entries keep only their `user:` subscriptions: the `/agent_tekos` and `/sales` grants on `mistral-large-maas` and `gpt-oss-120b-ovhcloud-maas` are no longer rendered (the inventory's finding 6) |
+| connectivity-link `quotaEnforcement.tokenRateLimits.enabled` (+ `targetGateway.{name,namespace}`, required) | `false` | renders the generated `TokenRateLimitPolicy` `zuno-token-quota` on the MaaS Gateway (`attachment: defaults` or `overrides`, `strategy: merge`): `standard-user` 3,000,000/24h and `standard-group` 30,000,000/24h, counted on the attested headers, applied only when MaaS sees the ai-gateway ServiceAccount (D1, D2, D5) |
+| connectivity-link `tokenRateLimits.enforceProjectDimension`, `enforceNonStandardClasses` | `false` | adds the generated project limits and the `intensive`/`stresstest` limits. Left off until ADR-0563 clause 5 gives a verified project id and class (D3, D4): a live limit nobody can reach would read as enforcement that is not there |
+| ai-gateway `maasAdapter.gatewayIdentity.enabled` (`MAAS_GATEWAY_IDENTITY`) | `false` | MaaS calls authenticate with the pod's ServiceAccount token, never the caller's, and carry `X-Zuno-User-Sub`, `X-Zuno-Groups` (sorted, `\|`-joined, `(none)` when empty), `X-Zuno-Quota-Class`, `X-Zuno-Project-Id` (named once, `app/maas_adapter.py` `ATTESTED_HEADERS`; a test checks the generated policy reads the same names). No token or no request context refuses the call |
+| ai-gateway `maasAdapter.quota429Passthrough.enabled` (`MAAS_QUOTA_429_PASSTHROUGH`) | `false` | a 429 from a via_maas candidate stops the fallback loop (no direct sibling, no SaaS) and returns the gateway's 429 `quota_exceeded` body with MaaS's `Retry-After`, streaming included; MaaS clients get `max_retries=0`. A direct SaaS 429 or a MaaS 5xx still falls back |
+| ai-gateway `maasAdapter.failModes.enabled` (`QUOTA_FAIL_MODES_ENFORCED`) | `false` | reads the generated `app/quota_fail_modes.yaml`: a direct sibling of a via_maas local candidate serves only `open` classes (ADR-0570 clause 7), and a budget-config fault in `quota.py` admits `open` classes instead of denying every class (finding 2) |
+
+The generator (`platform/okf/generate_quota_enforcement.py`) now also writes
+`gitops/charts/connectivity-link/templates/quota-tokenratelimitpolicies.yaml`
+and `components/ai-gateway/app/quota_fail_modes.yaml`; `--check` covers
+them and `okf-promote.yml` commits them with a promotion. `quota_budgets.yaml`
+and `quota.py` are unchanged.
+
+Enable sequence, on demo333 first (`oc --context` on every command), each
+step only after the verifications named (inventory section 4):
+
+1. Step 1 done and **V0** green (MaaS front healthy, both defects closed).
+2. **V1**: read what `maas-gateway-auth` publishes. If the ServiceAccount
+   username is not at `auth.identity.user.username`, change
+   `GATEWAY_IDENTITY_PROPERTY` in the generator and regenerate.
+3. `gatewayIdentity.enabled` on the ai-gateway. Every model already grants
+   the ServiceAccount; check one via_maas call per local model returns 200
+   and **V8** (counter scope).
+4. `maas.saasSubscriptions.gatewayOnly: true` in the models chart.
+5. **V10** (pick `attachment`), **V7** and **V9**, then
+   `tokenRateLimits.enabled` with the cluster's MaaS Gateway as target, on
+   one connectivity-link Application only. Proof is a real 429, never
+   `Enforced` (WP-54).
+6. **V12** (MaaS's 429 status, body, headers) and **V6**, then
+   `quota429Passthrough.enabled`; re-run the 429 half of **V13** and the
+   UnifAI notice.
+7. **V13** (sibling drill) and **V14** (Limitador down), then
+   `failModes.enabled`.
+8. Per SaaS provider, after **V4** (the two existing ExternalModels) or
+   **V2/V3** (the four new ones): `externalModels[].enabled`, then (not in
+   this change) `via_maas` in `provider-routing.yaml` and
+   `externalEgressEnabled`. The image provider stays direct unless **V5**
+   passes (D7).
+9. Project and non-standard classes (`enforceProjectDimension`,
+   `enforceNonStandardClasses`) only after ADR-0563 clause 5 and **V11**.
+
+Recorded on the way:
+
+- Gemini's OpenAI-compatible endpoint sits under `/v1beta/openai/`, and the
+  `maas.opendatahub.io` ExternalModel has no path field; V3 decides whether
+  the bare host works, else Gemini stays a named exception (D8 (a)) or D10
+  is reopened.
+- With `failModes` on, a closed-class request with a LoRA adapter declared
+  loses its adapter: MaaS cannot carry adapters and the direct sibling is
+  skipped, so the next eligible model serves it.
+- `quota429Passthrough` defaults off rather than on: a MaaS 429 is not proven
+  to mean quota only (an llm-d scheduler shedding load may answer 429), and
+  a `/sales` persona's 5,000 tokens/h subscription would start failing turns
+  the direct sibling serves today.
+
+Follow-ups, deliberately not in this change (each gated on the live
+equivalence checks above): delete `app/quota.py`, `app/quota_budgets.yaml`,
+`tests/test_quota_budgets.py`, the ledger calls in `main.py` and
+`_render_budgets` (and `quota_budgets.yaml` from `okf-promote.yml`); remove
+the SaaS `providerSecrets` env and `platform/ai-gateway/externalsecret-*.yaml`
+(except `ovhcloud` while the image provider is direct) and the direct SaaS
+branches of `providers.py`, with a test that no SaaS key variable is read;
+re-target `platform/testing/token_quota_429.py` to the MaaS 429; re-target the
+request-rate `RateLimitPolicy` onto the MaaS Gateway (D9); optionally
+generate the subscriptions' coarse ceilings (D1).
+
 ## Acceptance
 
 Both MaaS defects closed with live evidence; the ai-gateway image contains
