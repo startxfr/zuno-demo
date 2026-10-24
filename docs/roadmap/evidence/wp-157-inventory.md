@@ -304,8 +304,10 @@ on; user go given directly for each), 2026-10-24:
   `Retry-After: 86026`. The refusal came on the first call because the counter of that hour had already
   consumed more than 50 tokens. The shape is right (no fallback, the passthrough body). The value is not: 86026 s
   is about 24 h, while the limit that tripped has a 1 h window, so the delay should not exceed 3600 s. The
-  gateway seems to derive it from its own 24 h standard ceiling, not from the 1 h subscription window
-  (to be fixed in the gateway; not yet confirmed in the code).
+  gateway derives it from its own policy windows (`quota_windows.clock.retry_after`, called from the 429
+  handler in `app/main.py` when MaaS sends none): the 24 h standard windows, not the 1 h subscription window
+  of the MaaS limit that tripped. A fix is for the gateway: bound the value by the window of the limit that
+  produced the 429, which MaaS does not report.
 
 Defect observed and still open: the per-user limit `standard-user` (counter on `x-zuno-user-sub`)
 never created a counter in Limitador, while `standard-group` (same shape, header `x-zuno-groups`)
