@@ -130,6 +130,66 @@ def _reply_of(result: Dict[str, Any]) -> str:
     return ""
 
 
+def _span_attrs(span: Dict[str, Any]) -> Dict[str, Any]:
+    return {a.get("key"): next(iter((a.get("value") or {}).values()), None) for a in span.get("attributes", [])}
+
+
+def tempo_rag_searches(
+    run_id: str, tempo_url: str, *, wait_seconds: float = 25, client: Optional[httpx.Client] = None
+) -> List[Dict[str, Any]]:
+    """The `rag.search` spans of the trace of run `run_id`, from Tempo (WP-147).
+
+    A UnifAI run is one trace whose `mas.session` spans carry `mas.run.id` (the session id). A node
+    that retrieves before the model (retrieve_first) emits no tool event, so the span is the proof
+    that retrieval ran. Each item holds `source_type` and `results` (``rag.results.count``, None when
+    the span lacks it). The trace is flushed a few seconds after the run, hence the bounded retry;
+    [] when none appears in `wait_seconds`. Raises `UnifaiError` when Tempo cannot be reached.
+    """
+    http = client or httpx.Client(timeout=20)
+    base = tempo_url.rstrip("/")
+    deadline = time.monotonic() + wait_seconds
+    try:
+        while True:
+            now = int(time.time())
+            found = http.get(
+                f"{base}/api/search",
+                params={"q": f'{{ span.mas.run.id = "{run_id}" }}', "limit": 1, "start": now - 3600, "end": now + 60},
+            )
+            if found.status_code != 200:
+                raise UnifaiError(f"tempo search failed: {found.status_code}")
+            traces = found.json().get("traces") or []
+            if traces:
+                trace = http.get(f"{base}/api/traces/{traces[0]['traceID']}")
+                if trace.status_code == 200:
+                    spans = [
+                        sp
+                        for batch in trace.json().get("batches", [])
+                        for scope in batch.get("scopeSpans", [])
+                        for sp in scope.get("spans", [])
+                        if sp.get("name") == "rag.search"
+                    ]
+                    if spans:
+                        out = []
+                        for sp in spans:
+                            attrs = _span_attrs(sp)
+                            count = attrs.get("rag.results.count")
+                            out.append(
+                                {
+                                    "source_type": attrs.get("rag.source_type"),
+                                    "results": int(count) if str(count).isdigit() else None,
+                                }
+                            )
+                        return out
+            if time.monotonic() >= deadline:
+                return []
+            time.sleep(2)
+    except httpx.HTTPError as exc:
+        raise UnifaiError(f"tempo unreachable: {exc}") from exc
+    finally:
+        if client is None:
+            http.close()
+
+
 class UnifaiTarget:
     def __init__(
         self,
@@ -345,10 +405,14 @@ class UnifaiTarget:
         ``timed_out`` and ``stopped`` (a ``stop_on`` tool was seen).
         """
         deadline = time.monotonic() + deadline_seconds
-        out: Dict[str, Any] = {"tools": [], "reply": "", "blob": "", "timed_out": False, "stopped": False}
+        out: Dict[str, Any] = {
+            "tools": [], "reply": "", "blob": "", "timed_out": False, "stopped": False, "session_id": "",
+        }
         stream = self.stream(persona, message, workflow=workflow, timeout=deadline_seconds + 30)
         try:
             for chunk in stream:
+                if not out["session_id"] and self._sessions:
+                    out["session_id"] = self._sessions[-1][1]  # the run id the traces carry (mas.run.id)
                 out["blob"] += str(chunk)
                 if chunk.get("type") == "tool_calling" and chunk.get("tool"):
                     out["tools"].append(chunk["tool"])

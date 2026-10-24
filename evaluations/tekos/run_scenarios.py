@@ -330,6 +330,12 @@ _unifai_target = None
 # Tool-name aliases (capability ids, retriever fallback) live in the shared transport module.
 
 
+def _unifai_tempo_rag_searches(run_id: str, tempo_url: str):
+    from unifai_target import tempo_rag_searches  # lazy, same reason as _unifai()
+
+    return tempo_rag_searches(run_id, tempo_url)
+
+
 def _unifai():
     global _unifai_target
     if _unifai_target is None:
@@ -542,6 +548,35 @@ def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], ok, detail)
 
 
+def u_rag_retrieval_executed(s: Dict[str, Any]) -> ScenarioResult:
+    """The retrieval ran before the model, proven by the trace (WP-155, comage scenario 11).
+
+    An agent with retrieve_first retrieves before the model reasons, so no tool event exists, and an
+    agent with no indexed corpus for its topic has no page to cite. What can be proven is that the
+    retrieval executed: the run's trace carries at least one `rag.search` span (Tempo, `TEMPO_URL`).
+    Without `TEMPO_URL` the scenario is skipped, never passed. A citation needs a corpus for the
+    topic; the detail says how many results the searches returned."""
+    tempo = os.getenv("TEMPO_URL", "").strip()
+    if not tempo:
+        return _skip(s, "no trace backend (TEMPO_URL unset), retrieval cannot be observed")
+    persona = os.getenv("UNIFAI_RAG_PERSONA") or _UNIFAI_RAG_PERSONAS.get(AGENT) or s.get("persona", "consultant-01")
+    question = _UNIFAI_RAG_QUESTION or s.get("query", "")
+    try:
+        run_ = _unifai().collect(persona, question, deadline_seconds=170)
+    except Exception as exc:  # noqa: BLE001
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
+    run_id = run_.get("session_id", "")
+    if not run_id:
+        return ScenarioResult(s["id"], s["title"], False, "the turn produced no session id")
+    try:
+        searches = _unifai_tempo_rag_searches(run_id, tempo)
+    except Exception as exc:  # noqa: BLE001 - an unreachable backend cannot prove anything
+        return ScenarioResult(s["id"], s["title"], False, f"trace backend: {exc}")
+    results = [x["results"] for x in searches]
+    detail = f"rag.search spans={len(searches)} results={results} (no citation expected without a corpus for the topic)"
+    return ScenarioResult(s["id"], s["title"], bool(searches) and bool(run_["reply"]), detail)
+
+
 def u_chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:
     """ADR-0007 on UnifAI: a placeholder agent must not answer. Its workflow is not exposed to
     the persona; if it nevertheless is, a chat turn must not return a reply."""
@@ -662,6 +697,7 @@ HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "chat_streaming_sse": u_chat_streaming,
     "chat_triggers_tool": u_chat_triggers_tool,
     "rag_retrieval_has_citation": u_rag_retrieval,
+    "rag_retrieval_executed": u_rag_retrieval_executed,
     "chat_blocked_for_placeholder_agent": u_chat_blocked_for_placeholder_agent,
     # ADR-0526 (WP-087): only the agents whose scenarios.yaml declares the
     # type actually run it.

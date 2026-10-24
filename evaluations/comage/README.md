@@ -54,8 +54,9 @@ is unconditional, so it never needed this distinction): an ordinary
 deal-status question answered from `knowledge.sales` alone (7, no live
 citation expected) versus a question asking for a mutable field's CURRENT
 value, which triggers a live `salesforce.opportunity.read` tool call
-(10), RAG retrieval contributing a citation for
-a sales topic (11), MCP Gateway policy enforcement (12-13, 18 - 18 is the
+(10), the RAG retrieval executing before the model for
+a sales topic (11, proven by the run's `rag.search` span in Tempo: set `TEMPO_URL`, the scenario is skipped without it;
+a citation needs a sales corpus, which is not indexed yet), MCP Gateway policy enforcement (12-13, 18 - 18 is the
 sharpest of the three: `salesforce.opportunity.update` is denied for
 `check-deal-status` even though Comage's OTHER task,
 `update-opportunity-status`, declares it - proving ADR-0011's task_rights

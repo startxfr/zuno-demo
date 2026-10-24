@@ -344,3 +344,107 @@ def test_tekos_reexport_exposes_login_name():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     assert mod.login_name("sale-01") == "eval-sale-01"
+
+
+# --- comage scenario 11 (WP-155): the retrieval proven by the run's trace -----------------------------
+
+TEMPO = "https://tempo.test"
+
+
+def _tempo_client(traces, spans):
+    """A Tempo that answers /api/search with `traces` and /api/traces/<id> with a trace holding `spans`."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/api/search":
+            assert 'span.mas.run.id = "run-1"' in request.url.params["q"]
+            return httpx.Response(200, json={"traces": traces})
+        if request.url.path == "/api/traces/t1":
+            return httpx.Response(200, json={"batches": [{"scopeSpans": [{"spans": spans}]}]})
+        return httpx.Response(404)
+
+    return httpx.Client(transport=httpx.MockTransport(handler))
+
+
+def _rag_span(count, source="CONFLUENCE"):
+    return {
+        "name": "rag.search",
+        "attributes": [
+            {"key": "rag.source_type", "value": {"stringValue": source}},
+            {"key": "rag.results.count", "value": {"intValue": str(count)}},
+        ],
+    }
+
+
+def test_tempo_rag_searches_returns_the_spans_of_the_run():
+    spans = [_rag_span(5), _rag_span(0, "WEB"), {"name": "mas.session", "attributes": []}]
+    got = ut.tempo_rag_searches("run-1", TEMPO, wait_seconds=0, client=_tempo_client([{"traceID": "t1"}], spans))
+    assert got == [{"source_type": "CONFLUENCE", "results": 5}, {"source_type": "WEB", "results": 0}]
+
+
+def test_tempo_rag_searches_is_empty_when_the_trace_has_no_retrieval_span():
+    spans = [{"name": "mas.session", "attributes": []}]
+    assert ut.tempo_rag_searches("run-1", TEMPO, wait_seconds=0, client=_tempo_client([{"traceID": "t1"}], spans)) == []
+
+
+def test_tempo_rag_searches_is_empty_when_no_trace_matches_the_run():
+    assert ut.tempo_rag_searches("run-1", TEMPO, wait_seconds=0, client=_tempo_client([], [])) == []
+
+
+def test_tempo_rag_searches_raises_when_tempo_is_unreachable():
+    def boom(request):
+        raise httpx.ConnectError("down")
+
+    client = httpx.Client(transport=httpx.MockTransport(boom))
+    try:
+        ut.tempo_rag_searches("run-1", TEMPO, wait_seconds=0, client=client)
+    except ut.UnifaiError as exc:
+        assert "unreachable" in str(exc)
+    else:
+        raise AssertionError("an unreachable Tempo must raise")
+
+
+def _rag_executed(tempo_url: str, collect_result: str, searches: str) -> str:
+    """Runs comage's u_rag_retrieval_executed with a stubbed turn and a stubbed Tempo helper."""
+    return _probe(
+        "comage",
+        f"""
+        import run_scenarios as rs
+        os.environ["TEMPO_URL"] = {tempo_url!r}
+        class FakeTarget:
+            def collect(self, *a, **k):
+                return {collect_result}
+        rs._unifai_target = FakeTarget()
+        def fake_searches(run_id, url):
+            r = {searches}
+            if isinstance(r, Exception):
+                raise r
+            return r
+        rs._unifai_tempo_rag_searches = fake_searches
+        res = rs.u_rag_retrieval_executed({{"id": 11, "title": "t", "query": "q"}})
+        print(res.passed, res.skipped, res.detail)
+        """,
+    )
+
+
+def test_rag_retrieval_executed_passes_on_a_rag_search_span():
+    out = _rag_executed(
+        "http://tempo", '{"session_id": "s1", "reply": "ok", "tools": []}', '[{"source_type": "CONFLUENCE", "results": 5}]'
+    )
+    assert out.startswith("True False") and "spans=1" in out and "results=[5]" in out, out
+
+
+def test_rag_retrieval_executed_fails_without_any_span():
+    out = _rag_executed("http://tempo", '{"session_id": "s1", "reply": "ok", "tools": []}', "[]")
+    assert out.startswith("False False") and "spans=0" in out, out
+
+
+def test_rag_retrieval_executed_fails_without_a_reply_or_when_tempo_is_down():
+    out = _rag_executed("http://tempo", '{"session_id": "s1", "reply": "", "tools": []}', '[{"source_type": "WEB", "results": 1}]')
+    assert out.startswith("False False"), out
+    out = _rag_executed("http://tempo", '{"session_id": "s1", "reply": "ok", "tools": []}', "RuntimeError('down')")
+    assert out.startswith("False False") and "trace backend" in out, out
+
+
+def test_rag_retrieval_executed_is_skipped_not_passed_without_a_trace_backend():
+    out = _rag_executed("", '{"session_id": "s1", "reply": "ok", "tools": []}', '[{"source_type": "WEB", "results": 1}]')
+    assert out.startswith("False True") and "TEMPO_URL" in out, out

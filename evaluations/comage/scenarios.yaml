@@ -88,8 +88,12 @@ scenarios:
     message: "What is the CURRENT stage of the Acme Renewal opportunity right now?"
 
   - id: 11
-    title: RAG retrieval contributes at least one citation for a sales topic
-    type: rag_retrieval_has_citation
+    # The agent retrieves before the model (retrieve_first), which emits no tool event, and no
+    # sales corpus is indexed yet (knowledge.sales is not ingested, Salesforce is simulated): a
+    # citation cannot be asserted. The run's trace proves the retrieval executed (rag.search span,
+    # needs TEMPO_URL, skipped without). Back to rag_retrieval_has_citation once a corpus exists.
+    title: RAG retrieval is executed before the model for a sales topic (trace); citations wait for a sales corpus
+    type: rag_retrieval_executed
     query: "Acme Renewal opportunity purchase order status"
 
   - id: 12

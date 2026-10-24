@@ -184,3 +184,6 @@ by the 75% threshold of ADR-0028 plus the mandatory security and capability laye
 Known, accepted misses: scenario 19 needs the in-cluster Kubernetes client (not reproducible from
 a workstation), and the first-token latency of comage and arkos sits above the 6 s objective under
 load (6.7 to 9.7 s; 3.7 to 4.2 s measured alone).
+
+Update 2026-10-24: comage scenario 11 now proves that the retrieval executed (trace) instead of asking for a citation that no
+indexed corpus can give; details in the evidence file. Comage scenarios 19/20, security 8/8.

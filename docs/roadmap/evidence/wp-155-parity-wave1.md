@@ -207,3 +207,22 @@ same Confluence sources, `retrieveFirst` emits no retriever event). Scenario 10 
 `confluence.page.read` as well as `confluence.page.search` as proof of reaching live Confluence (the
 model chooses between them). Scenarios `--target unifai`: **17/18 (94%)**, only 19 (in-cluster client)
 fails; first token passed on this run, so the latency remains load-dependent.
+
+### comage scenario 11 re-examined (2026-10-24)
+
+The scenario failed on every run (`tool_calls=[]`, earlier `['salesforce.opportunity.read']`). Two causes, found read-only
+on demo333 and neither a wiring defect: the comage agent now has `retrieve_first: true`, so the retrieval runs before the model and emits
+no tool event; and no sales corpus exists (`knowledge-comage` is a Confluence retriever, the only indexed sources are the tekos
+Confluence spaces and the Red Hat web sources; `knowledge.sales` and `knowledge.sxa-legacy` are not ingested and Salesforce is
+simulated), so "Acme Renewal opportunity purchase order status" has nothing to cite. A run's trace does show the retrieval: the
+`mas.session` spans carry `mas.run.id` (the session id) and the rag service emits `rag.search` spans (`rag.source_type`,
+`rag.results.count`) in the same trace.
+
+Scenario 11 of comage is now `rag_retrieval_executed`: it asks the same question, then looks the run up in Tempo (`TEMPO_URL`) and passes
+if a `rag.search` span exists and a reply came; without `TEMPO_URL` it is skipped, never passed. Live on demo333 with the eval-* personas
+(two runs): scenario 11 passes, scenarios 19/20 (95%, only 19 fails: in-cluster client), security 8/8. The citation check returns the day a
+sales corpus is indexed (switch the type back to `rag_retrieval_has_citation`).
+
+Seen on the way: `unifai_forwards_identity_to_the_gateways` missed twice in four comage runs (`tool_calls=[]`, a reply of 82 to 137
+characters: the model answers without calling the tool), and the newer gate check
+`tekos_retriever_finds_red_hat_docs_for_a_basic_openshift_question` needs `UNIFAI_RAG_URL` outside the cluster.
