@@ -14,7 +14,7 @@ on the live cluster as the `eval-*` personas.
 
 ## Steps
 
-1. Tekos declares Arkos / `draft-architecture-testimonial` as its only target (an agents release, promoted).
+1. Tekos declares Arkos / `draft-architecture-testimonial` as its only target (an agents release, promoted). **Not before WP-173 lifts the operator's refusal**: operator 0.1.35 puts any bundle declaring `zuno.delegation.targets` in `Valid=False` (`DelegationUnsupported`), so an earlier declaration would take Tekos off the cluster. The gateway-level checks stay skipped until then, which is the intended state.
 2. The gateway-level scenarios are written (`evaluations/common/delegation_checks.py`, wired into `evaluations/tekos/security_checks.py`, shipped in both Jobs' ConfigMaps, 17 unit tests): they skip until the admitted release declares Tekos -> Arkos. Add the behavioural ones once WP-173 exists. Evaluation scenarios as `eval-*` personas: the delegation runs; refused when the user lacks `agent_arkos`; refused for an
    undeclared target; refused at depth 2; refused on a cycle; a delegated write refused while `delegation.allow_write` is false;
    the chain appears in the trace and the gateway audit.

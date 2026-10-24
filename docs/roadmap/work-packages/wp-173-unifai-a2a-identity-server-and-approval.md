@@ -38,3 +38,19 @@ An agent can delegate to another over A2A as the initiating user, within the lim
 A user-authored workflow with an A2A node is refused until enabled; with it enabled, a declared delegation runs as the user,
 shows its chain in the trace, stops at the depth limit and at a cycle, and an approval raised by the target reaches the
 user and survives a worker restart.
+
+## Progress (2026-10-24)
+
+Step 6 is delivered (UnifAI fork, operator 0.1.35, live on demo333; the fork's roadmap item R-507): an `UnifaiAgent` of type
+`a2a_agent_node` is refused at admission and one stored earlier goes to Error; a workflow or template holding an
+`a2a_agent_node`, inline or through an expanded `$ref`, goes to Error before any UnifAI call; a bundle declaring
+`zuno.delegation.targets` is `Valid=False`, reason `DelegationUnsupported`, nothing emitted; the embedded OKF v0.3 schema is
+synced with zuno-demo-agents `51b9e92`, so the delegation fields pass schema validation and then hit that explicit refusal.
+Hiding the A2A element from the UnifAI catalog was decided against by the user.
+
+**Consequence for zuno-demo:** an agent that declares a delegation target is not deployed by this operator until
+steps 1 to 5 land and the refusal is lifted. Declaring Tekos -> Arkos in the agents repository before that would take Tekos
+off demo333. The declaration is therefore the last step of [WP-174](wp-174-tekos-to-arkos-delegation-on-demo333.md),
+not a preparation for it.
+
+Steps 1 to 5 (client identity, classification, limits, A2A server, approval) wait for the user's priority.

@@ -956,7 +956,7 @@ frozen mirror.
 | WP-170 | [wp-170](work-packages/wp-170-agent-delegation-contract-and-adrs.md) | 0401, 0402, 0403, 0406, 0409 | none | Repo work merged | the four `Proposed` records await the user's acceptance |
 | WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Repo work merged | merged on zuno-demo-agents devel (PR #9); a release and its promotion into agents.lock are the maintainer's |
 | WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Repo work merged | live once the release carrying the delegation fields and tool `access` is promoted |
-| WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | fork work for the UnifAI session; priority and scope are the user's decision |
+| WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | step 6 (the operator refuses A2A and delegation targets) is live in operator 0.1.35; steps 1 to 5 wait for the user's priority |
 | WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 
 ### OKF stream phases
