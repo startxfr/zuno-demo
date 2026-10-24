@@ -199,6 +199,19 @@ def _layer(reference: str, media_type: str) -> bytes:
     return fetch_blob(repository, layers[0]["digest"])
 
 
+CONFORMANCE_MEDIA_TYPE = "application/vnd.zuno.okf.conformance.v1.tar+gzip"
+
+
+def _optional_layer(reference: str, media_type: str) -> Optional[bytes]:
+    """The one layer of this media type, or None when the artifact has none
+    (releases cut before the layer existed). More than one is still an error."""
+    repository = reference.split("@", 1)[0]
+    layers = [l for l in manifest(reference).get("layers", []) if l["mediaType"] == media_type]
+    if len(layers) > 1:
+        raise AdmissionError(f"{reference}: expected at most one {media_type} layer, found {len(layers)}")
+    return fetch_blob(repository, layers[0]["digest"]) if layers else None
+
+
 def verify(reference: str, dev: bool = False) -> dict:
     """Verify the corp artifact and every agent it lists; return the index."""
     if "@sha256:" not in reference:
@@ -236,6 +249,11 @@ def extract(reference: str, out: pathlib.Path, dev: bool = False) -> dict:
     for agent in index["agents"]:
         _untar(_layer(agent["reference"], "application/vnd.zuno.okf.bundle.v2.tar+gzip"),
                out / "agents" / agent["name"])
+    # ADR-0508: the conformance cases ride in the signed corp artifact when the
+    # release carries them; extracted as out/conformance/cases/.
+    cases = _optional_layer(reference, CONFORMANCE_MEDIA_TYPE)
+    if cases is not None:
+        _untar(cases, out / "conformance")
     (out / "okf-index.json").write_text(json.dumps(index, indent=2, sort_keys=True) + "\n")
     return index
 

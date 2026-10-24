@@ -9,6 +9,11 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Amendment (2026-10-24) - ADR-0577 gains an optional conformance layer
+
+The corp artifact may carry the OKF conformance cases as a third, optional
+layer (ADR-0508, WP-51). No status change.
+
 ## Supersessions (2026-10-24) - onboarding ADRs follow the agent extraction
 
 ADR-0307 (self-service agent onboarding) and ADR-0410 (a sixth agent as its

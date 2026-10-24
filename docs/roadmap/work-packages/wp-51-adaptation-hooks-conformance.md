@@ -49,9 +49,13 @@ Done in this repository:
 Remaining before this WP closes:
 
 - The evaluations reader, then empty the lint baseline.
-- The conformance cases are merged on zuno-demo-agents devel (PR #7) but not
-  yet carried by a release; decide how (inside the release or as its own
-  attested artifact, ADR-0508) so the fixture tests stop skipping in CI.
+- The conformance cases are merged on zuno-demo-agents devel (PR #7). The
+  release builder now ships them as an optional corp-artifact layer (branch
+  `prep/wp51-release-conformance`, ADR-0577 amendment 2026-10-24) and
+  `admit_okf_bundle.extract` unpacks it; they reach this repo's CI once a
+  release carrying the layer (0.3.1) is promoted into `platform/okf/agents.lock`
+  (release version bump and promotion are the maintainer's), at which point the
+  fixture tests stop skipping.
 - Finding to settle: the admission reader (`okf_narrowing.py`) skips documents
   that are not v0.3 instead of refusing them; harmless today, worth a decision
   when v0.2 stops being readable.

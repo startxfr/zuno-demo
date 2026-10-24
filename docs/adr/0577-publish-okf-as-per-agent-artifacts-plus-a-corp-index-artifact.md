@@ -107,6 +107,19 @@ index names each agent by digest; `zuno-demo` pins the corp digest
 only through the corp index; since WP-165 no copy of it remains in
 `zuno-demo`.
 
+## Amendment (2026-10-24) - an optional conformance layer
+
+The corp artifact may carry a third layer,
+`application/vnd.zuno.okf.conformance.v1.tar+gzip`, holding the OKF reader
+conformance cases (`conformance/cases/` of `zuno-demo-agents`,
+[ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md),
+WP-51). It is optional and last: a consumer that reads the policies and index
+layers by media type is unaffected, and `admit_okf_bundle.extract` unpacks it
+under `conformance/cases/` of the extracted release when present. It is signed
+with the rest of the corp manifest, so the readers' fixture tests run against
+content the release vouches for. The README and the self-check test beside
+the cases are not shipped.
+
 ## Consequences
 
 The platform admits one coherent release instead of n independent agents,

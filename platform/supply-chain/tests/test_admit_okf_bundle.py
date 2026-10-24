@@ -200,5 +200,49 @@ class LockAndArchiveTest(unittest.TestCase):
                 admit._untar(buf.getvalue(), pathlib.Path(tmp) / "out")
 
 
+class ConformanceLayerExtractTest(unittest.TestCase):
+    """ADR-0508: extract() unpacks the optional conformance layer of a release."""
+
+    def _tar(self, files: dict) -> bytes:
+        buf = io.BytesIO()
+        with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+            for name, data in files.items():
+                info = tarfile.TarInfo(name)
+                info.size = len(data)
+                tar.addfile(info, io.BytesIO(data))
+        return buf.getvalue()
+
+    def _extract(self, layers: list):
+        index = {"agents": []}
+        blobs = {"sha256:p": self._tar({"tools/x.yaml": b"a: 1\n"})}
+        manifest_layers = [{"mediaType": "application/vnd.zuno.okf.policies.v1.tar+gzip", "digest": "sha256:p"}]
+        for i, files in enumerate(layers):
+            blobs[f"sha256:c{i}"] = self._tar(files)
+            manifest_layers.append({"mediaType": admit.CONFORMANCE_MEDIA_TYPE, "digest": f"sha256:c{i}"})
+        saved = (admit.verify, admit.manifest, admit.fetch_blob)
+        admit.verify = lambda reference, dev=False: index
+        admit.manifest = lambda reference: {"layers": manifest_layers}
+        admit.fetch_blob = lambda repository, digest: blobs[digest]
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                out = pathlib.Path(tmp) / "release"
+                admit.extract("r/okf-corp@sha256:1", out)
+                return sorted(p.relative_to(out).as_posix() for p in out.rglob("*") if p.is_file())
+        finally:
+            admit.verify, admit.manifest, admit.fetch_blob = saved
+
+    def test_the_cases_land_under_conformance(self) -> None:
+        files = self._extract([{"cases/valid-x/expected.json": b"{}\n"}])
+        self.assertIn("conformance/cases/valid-x/expected.json", files)
+
+    def test_a_release_without_the_layer_still_extracts(self) -> None:
+        files = self._extract([])
+        self.assertEqual(files, ["okf-index.json", "policies/tools/x.yaml"])
+
+    def test_two_conformance_layers_are_refused(self) -> None:
+        with self.assertRaises(admit.AdmissionError):
+            self._extract([{"cases/a": b"1"}, {"cases/b": b"2"}])
+
+
 if __name__ == "__main__":
     unittest.main()
