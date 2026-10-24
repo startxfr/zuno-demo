@@ -1275,6 +1275,10 @@ def _load_tool_probes(config: MlopsConfig) -> Optional[Dict[str, Any]]:
     return doc
 
 
+# ADR-0508 clause 3 / ADR-0579 clause 6: the OKF schema versions mlops reads.
+SUPPORTED_OKF_VERSIONS = ("v0.2", "v0.3")
+
+
 def _task_system_prompt(config: MlopsConfig, task_name: str) -> str:
     """The task's own prompt body, the same text agent-runtime sends as the
     system message. Load-bearing: the regression this measures does NOT
@@ -1286,6 +1290,14 @@ def _task_system_prompt(config: MlopsConfig, task_name: str) -> str:
     parts = raw.split("---", 2)
     if len(parts) < 3:
         raise SystemExit(f"{path} has no YAML frontmatter; cannot recover its prompt body")
+    # ADR-0508: this function is mlops's OKF hook, so it states the schema
+    # versions it understands and refuses the rest by name.
+    version = (yaml.safe_load(parts[1]) or {}).get("okf_version")
+    if version is None:
+        raise SystemExit(f"{path}: missing okf_version (supported: {', '.join(SUPPORTED_OKF_VERSIONS)})")
+    if version not in SUPPORTED_OKF_VERSIONS:
+        raise SystemExit(
+            f"{path}: unsupported okf_version {version!r} (supported: {', '.join(SUPPORTED_OKF_VERSIONS)})")
     return parts[2].strip()
 
 

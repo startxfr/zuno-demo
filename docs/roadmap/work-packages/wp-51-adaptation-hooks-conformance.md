@@ -37,18 +37,21 @@ Done in this repository:
   `generate_stack_config.py`) does the same through `checked_frontmatter`;
   `platform/okf/tests/test_okf_conformance.py` runs every case through it.
 - `platform/okf/check_okf_read_boundary.py` (CI: lint.yml) fails on a new
-  direct OKF read outside the hooks; five pre-existing reads are a baseline
-  that may only shrink (mlops, two tekos evaluation scripts, `check_docs.py`,
+  direct OKF read outside the hooks; four pre-existing reads are a baseline
+  that may only shrink (two tekos evaluation scripts, `check_docs.py`,
   `day2_contract_attribution.py`).
+- mlops hook (`_task_system_prompt` in `components/mlops/src/mlops.py`) refuses a
+  missing or unsupported `okf_version` by name; three tests in `test_mlops.py`
+  (versions, refusals, conformance cases).
 - Proven: flipping one expected value fails the matching hook only; the live
   release 0.3.0 still loads (8 agents) through both hooks.
 
 Remaining before this WP closes:
 
-- Publish the conformance cases (part A) in the agents repository and have the
-  release carry them (or attest them), so the fixture tests stop skipping in CI.
-- The mlops hook (task prompt read, `components/mlops/src/mlops.py`) and the
-  evaluations reader, then empty the lint baseline.
+- The evaluations reader, then empty the lint baseline.
+- The conformance cases are merged on zuno-demo-agents devel (PR #7) but not
+  yet carried by a release; decide how (inside the release or as its own
+  attested artifact, ADR-0508) so the fixture tests stop skipping in CI.
 - Finding to settle: the admission reader (`okf_narrowing.py`) skips documents
   that are not v0.3 instead of refusing them; harmless today, worth a decision
   when v0.2 stops being readable.

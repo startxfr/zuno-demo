@@ -999,7 +999,7 @@ WP-50's.
 | WP-48 | [wp-48](work-packages/wp-48-okf-repo-bootstrap.md) | 0506 (start) | WP-44, WP-45, WP-46 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-158) |
 | WP-49 | [wp-49](work-packages/wp-49-pinned-ref-builds.md) | 0507 | WP-48 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-160) |
 | WP-50 | [wp-50](work-packages/wp-50-okf-extraction-cutover.md) | 0506+0507 (close) | WP-49 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-165) |
-| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-160 (was WP-49, abandoned) | Repo work in review | mcp-gateway and admission hooks, version check and boundary lint done (2026-10-24); remaining: publish the conformance cases in zuno-demo-agents, mlops hook, empty the lint baseline |
+| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-160 (was WP-49, abandoned) | Repo work in review | mcp-gateway and admission hooks, version check and boundary lint done (2026-10-24); mlops hook done; remaining: have a release carry the conformance cases (merged on zuno-demo-agents devel), evaluations reader, empty the lint baseline |
 
 ### Phase 35 — OKF: live reconciliation
 

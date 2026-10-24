@@ -748,6 +748,57 @@ def test_task_system_prompt_is_the_body_not_the_frontmatter() -> None:
     assert body and "okf_version" not in body
 
 
+def _task_file(agents_dir: pathlib.Path, front: str, body: str = "Do the thing.\n") -> None:
+    task = agents_dir / "alpha" / "tasks"
+    task.mkdir(parents=True, exist_ok=True)
+    (task / "ask.md").write_text(f"---\n{front}type: task\n---\n{body}")
+
+
+def test_task_system_prompt_reads_the_supported_okf_versions() -> None:
+    """ADR-0508: v0.2 and v0.3 read; the body is returned either way."""
+    assert mlops.SUPPORTED_OKF_VERSIONS == ("v0.2", "v0.3")
+    for version in mlops.SUPPORTED_OKF_VERSIONS:
+        with tempfile.TemporaryDirectory() as d:
+            _task_file(pathlib.Path(d), f"okf_version: {version}\n")
+            assert mlops._task_system_prompt(_config(agents_dir=d, agent="alpha"), "ask") == "Do the thing."
+
+
+def test_task_system_prompt_refuses_an_unsupported_or_missing_okf_version_by_name() -> None:
+    for front, needle in (("okf_version: v0.9\n", "unsupported okf_version 'v0.9'"), ("", "missing okf_version")):
+        with tempfile.TemporaryDirectory() as d:
+            _task_file(pathlib.Path(d), front)
+            try:
+                mlops._task_system_prompt(_config(agents_dir=d, agent="alpha"), "ask")
+            except SystemExit as exc:
+                assert needle in str(exc), str(exc)
+            else:
+                raise AssertionError("the task must be refused")
+
+
+def test_task_system_prompt_against_the_conformance_cases() -> None:
+    """Every task of the valid and security cases yields a prompt body; the
+    task-level refusal case is refused. Skipped, loudly, without the cases."""
+    repo = pathlib.Path(__file__).resolve().parents[3]
+    sys.path.insert(0, str(repo / "platform" / "okf"))
+    import release_cache
+
+    cases = release_cache.conformance_dir()
+    if cases is None:
+        print("SKIP no OKF conformance cases (set ZUNO_OKF_CONFORMANCE_DIR)")
+        return
+    for case in sorted(p for p in cases.iterdir() if p.is_dir()):
+        for task in sorted(case.glob("agents/*/tasks/*.md")):
+            config = _config(agents_dir=str(task.parents[2]), agent=task.parents[1].name)
+            if case.name == "invalid-task-unsupported-version":
+                try:
+                    mlops._task_system_prompt(config, task.stem)
+                except SystemExit as exc:
+                    assert "unsupported okf_version" in str(exc)
+                    continue
+                raise AssertionError(f"{case.name} must be refused")
+            assert mlops._task_system_prompt(config, task.stem), f"{case.name}/{task.name}"
+
+
 # ---------------------------------------------------------------------------
 # WP-087: reproducible training
 # ---------------------------------------------------------------------------
@@ -1020,6 +1071,9 @@ TESTS = [
     test_load_tool_probes_returns_none_when_the_agent_has_no_probe_set,
     test_load_tool_probes_reads_the_real_shipped_fixture,
     test_task_system_prompt_is_the_body_not_the_frontmatter,
+    test_task_system_prompt_reads_the_supported_okf_versions,
+    test_task_system_prompt_refuses_an_unsupported_or_missing_okf_version_by_name,
+    test_task_system_prompt_against_the_conformance_cases,
     test_extract_answer_drops_the_reasoning_block_and_a_restarted_turn,
     test_chat_stop_ids_prefer_the_templates_end_of_turn_over_tokenizer_eos,
     test_registry_session_sends_a_bearer_token_and_trusts_the_service_ca,

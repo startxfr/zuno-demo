@@ -33,10 +33,10 @@ HOOKS: Dict[str, str] = {
     "platform/supply-chain/okf_narrowing.py": "admission hook (v0.3 narrowing rule)",
     "platform/okf/generate_stack_config.py": "ADR-0581 generator hook",
     "platform/okf/release_cache.py": "release access point",
+    "components/mlops/src/mlops.py": "mlops hook (_task_system_prompt)",
 }
 
 BASELINE: Dict[str, str] = {
-    "components/mlops/src/mlops.py": "reads a task prompt body; mlops hook still to write (WP-51 part B)",
     "evaluations/tekos/gate_checks.py": "reads agent frontmatter for a gate; move behind the evaluations reader",
     "evaluations/tekos/run_scenarios.py": "reads agent frontmatter; move behind the evaluations reader",
     "platform/docs/check_docs.py": "documentation drift checks read the admitted release",
