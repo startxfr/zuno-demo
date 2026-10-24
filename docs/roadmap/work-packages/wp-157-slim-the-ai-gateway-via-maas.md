@@ -195,8 +195,9 @@ Recorded on the way:
   a `/sales` persona's 5,000 tokens/h subscription would start failing turns
   the direct sibling serves today.
 
-Follow-ups, deliberately not in this change (each gated on the live
-equivalence checks above): delete `app/quota.py`, `app/quota_budgets.yaml`,
+Follow-ups as planned before the live checks (superseded by the Closure
+below: the ledger and the SaaS keys stay; only the ledger's removal remains,
+as the follow-up section): delete `app/quota.py`, `app/quota_budgets.yaml`,
 `tests/test_quota_budgets.py`, the ledger calls in `main.py` and
 `_render_budgets` (and `quota_budgets.yaml` from `okf-promote.yml`); remove
 the SaaS `providerSecrets` env and `platform/ai-gateway/externalsecret-*.yaml`
@@ -296,28 +297,60 @@ an image):
 Open after the sequence: the per-user ceiling (upstream shim defect); the
 V0-V14 equivalence checks.
 
-## Closure draft (2026-10-24, not yet Done)
+## Closure (2026-10-24, partial, user decision)
 
-Prepared for the closure decision; the work package stays open until the
-user closes it. Each line says what is proven live on demo333 and what is
-not.
+WP-157 closes on the scope delivered below; what MaaS cannot enforce today
+stays with the gateway's ledger and moves to the follow-up section. Live on
+demo333, each line verified by a second session.
 
-| Area | State | Evidence |
-|---|---|---|
-| Local models through MaaS | Done. The four local models are served via MaaS under the ai-gateway ServiceAccount with attested headers; personas can no longer call MaaS directly (401). | V0, step 1 |
-| Group token ceiling | Enforced, **per model**: Limitador keeps one counter per route, so the ceiling is not a cross-model total as ADR-0511 intends. | V8, V9, V10 |
-| Per-subscription budgets | Enforced (ai-gateway subscription counters decrement; a lowered limit answers 429). Lightspeed's own budget is in the same position but not exercised. | V7, revert check |
-| Per-user token ceiling | **Not enforced.** The wasm shim drops the trailing action pairs of a request and the user limit is last; moving it ahead loses other limits. Follow-up, upstream report. | order tests |
-| MaaS 429 to the caller | Passed through with no fallback, WP-148 body. `Retry-After` is computed since MaaS sends none; the value is now the subscription window remaining (fix 80e9733b, image ai-gateway-22), proven by tests, not yet by a drill. | V12, drill |
-| Closed quota classes | Refused when MaaS has no path (no SaaS answer); `open` keeps its fallbacks. During a Limitador outage the MaaS path admits without counting (about one call in five fails), so a `closed` class is not enforceable there. | V13 redone, V14 |
-| SaaS providers | **Named exception**: stay direct with their keys (vendor route defect, ADR-0570 amendment). MaaS-side SaaS objects stay, unused. | V4, pilot |
-| Not run | V2, V3, V5 (need SaaS through MaaS), V6 (personas no longer reach MaaS), V11 (project dimension not enforced). | inventory |
+**Proven:**
 
-Consequences for the removals listed under Follow-ups: `app/quota.py`
-cannot go on equivalence grounds while the per-user ceiling is not enforced
-and the group ceiling is per model, unless the user accepts those two gaps
-or amends ADR-0511 clause 2; the SaaS keys and direct branches stay
-(exception).
+- Local models through MaaS: the four local models are served via MaaS
+  under the ai-gateway ServiceAccount with attested headers (D5); personas
+  can no longer call MaaS directly (401). (V0, step 1)
+- Group token ceiling, **per model**, from the generated gateway
+  `TokenRateLimitPolicy`. (V8, V9, V10)
+- Per-subscription budgets of the maas-controller (a lowered limit answers
+  429; the counters decrement). Lightspeed's budget sits in the same
+  position, not exercised. (V7, order revert)
+- MaaS 429 passed to the caller with no fallback, WP-148 body; MaaS sends no
+  `Retry-After`, so the gateway computes it from the model's subscription
+  window. (V12, drills)
+- Closed quota classes refused when MaaS has no path, with no SaaS answer;
+  `open` keeps its fallbacks. (V13 redone)
+- Limitador outage measured: the MaaS path is fail-open, about one call in
+  five fails during the outage. (V14)
+- SaaS providers: named exception, direct with their keys (vendor route
+  defect); the persona SaaS subscriptions are gone, the MaaS-side SaaS
+  objects stay unused. (V4, pilot)
+
+**Not proven or not enforced:**
+
+- Per-user token ceiling (wasm shim drops the trailing action pairs; order
+  tests).
+- Cross-model total (counters per route, V8).
+- A `closed` class during a Limitador outage (admitted uncounted, V14).
+- V2, V3, V5 (need SaaS through MaaS), V6 (personas no longer reach MaaS),
+  V11 (project dimension not enforced): not run.
+
+**Kept:** `app/quota.py`, `app/quota_budgets.yaml` and the ledger calls, as
+the per-user and cross-model guard (ADR-0511 and ADR-0570 amendments of
+2026-10-24); the SaaS keys, ExternalSecrets and direct branches.
+
+## Follow-up: per-user and cross-model ceiling at MaaS
+
+Open, not scheduled. Goal: enforce the per-user ceiling and a cross-model
+total outside the gateway, so `app/quota.py` and its budgets can go.
+
+- Report the wasm shim defect upstream (Kuadrant): the trailing token-limit
+  action pairs of a request are never counted; actions are ordered by limit
+  name, so the last limit is always the one lost.
+- Once fixed, re-run the order check (both gateway limits and every
+  per-subscription limit counting), then V8 for a cross-model total
+  (a policy whose counter spans routes, or another design).
+- Only then, on proven equivalence: remove `app/quota.py`,
+  `quota_budgets.yaml`, `tests/test_quota_budgets.py`, the ledger calls and
+  `_render_budgets`.
 
 ## Acceptance
 

@@ -225,3 +225,17 @@ An upstream report is being drafted; the per-user ceiling stays a
 follow-up of
 [WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md).
 
+## Amendment (2026-10-24, WP-157 partial closure)
+
+**Clause 2** (as amended) and **clause 3**: `app/quota.py`,
+`quota_budgets.yaml` and the ledger calls are **kept**. MaaS enforces the
+group ceiling per model and the per-subscription budgets; the per-user
+ceiling and the cross-model total are not enforceable there today (see
+ADR-0511's amendment of the same date), so the gateway's ledger stays their
+guard. **Clause 4** is narrowed by the SaaS exception above: the SaaS keys
+and direct branches stay in the gateway. WP-157 closes on the delivered
+scope (local models through MaaS under the gateway's ServiceAccount with
+attested headers, the generated gateway policy, the 429 pass-through with a
+computed `Retry-After`, closed quota classes refused without a MaaS path,
+the persona SaaS subscriptions removed); the removal of the ledger is its
+follow-up.

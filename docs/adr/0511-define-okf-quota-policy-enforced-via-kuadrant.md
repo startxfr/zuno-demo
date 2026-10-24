@@ -222,6 +222,26 @@ fallback. Until ADR-0563 clause 5 is settled only the `standard` class is
 enforced at MaaS; `intensive` and the project dimension are recorded as not
 enforced, never dropped silently.
 
+## Amendment (2026-10-24, WP-157 closure) - where each ceiling is enforced
+
+The stacked ceilings above are **not all enforced at MaaS**; live evidence
+on demo333 (WP-157 inventory and order tests) splits them:
+
+- **At MaaS (Kuadrant):** the group ceiling, **per model** (Limitador keeps
+  one counter namespace per route, so a group's tokens on two models are two
+  counters), and the maas-controller's per-subscription budgets.
+- **In the ai-gateway (`app/quota.py`, kept):** the per-user ceiling and the
+  cross-model total. The gateway-level `standard-user` limit stays in the
+  generated policy but is never counted (the Kuadrant wasm shim drops the
+  trailing token-limit action pairs of a request), and no MaaS counter spans
+  models. `quota.py` stays the per-user and cross-model guard until an
+  upstream fix of the shim or another design; its removal is a follow-up of
+  [WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md),
+  not part of it.
+
+Clause 2's rule that limits live only in `quota-policy.yaml` still holds:
+both the generated policy and `quota.py`'s budgets come from it.
+
 ## Amendment (2026-10-24) - delegated calls
 
 A call made inside an agent-to-agent delegation carries the initiating user's token
