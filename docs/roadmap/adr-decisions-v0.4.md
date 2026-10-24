@@ -67,3 +67,25 @@ Rows 0401, 0402, 0403, 0406 and 0409 were promoted on the same day (see their re
 | 0408 | group ACLs, incremental sync and stale-point deletion ([WP-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md)) | verify revocation removes private content |
 | 0409 | `ChannelApprovalGate` (HITL) in the fork | mapping to zuno policy and persisted checkpoints |
 
+### Second pass on ADR-0407 and ADR-0408 (2026-10-24, user decision: annotate, keep the stubs)
+
+Both stay `Proposed` stubs. A stub has no status of its own (the index and the consistency check read it from this
+file), so superseding one would mean promoting it to a record only to retire it; the user preferred to record the conclusion
+here and decide again if the need returns.
+
+- **ADR-0408 (remove private RAG content when a user loses source access): covered, with one proof still open.** UnifAI's RAG
+  filters on the caller's groups at query time, fail-closed (`acl_groups`, [ADR-0568](../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)):
+  a user who loses a group stops retrieving that content at the next query, so the embeddings need not be removed to protect it.
+  A page deleted at its source has its points deleted at the next incremental sync
+  ([WP-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md)). What is not shown yet is the revocation itself on the
+  live cluster: remove a persona from a group, query as that persona, get nothing. That check, not a new decision, closes this stub;
+  a new record is needed only if a store private to one user appears (none exists today).
+  Note: [ADR-0110](../adr/0110-automate-document-acl-synchronization.md) still says `Implemented` for a component
+  (`rag-ingestion`) that WP-168 retired.
+- **ADR-0407 (task-oriented frontend views): an open need with no owner.** Its two predecessors are gone
+  ([ADR-0505](../adr/0505-open-okf-tasks-as-concurrent-per-agent-frontend-tabs.md) abandoned,
+  [ADR-0515](../adr/0515-per-conversation-tabs-one-browser-tab-per-agent.md) superseded by ADR-0561) and the zuno frontend is retired
+  (WP-156). The per-agent entry and sheet ([ADR-0582](../adr/0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md))
+  help to find an agent, not to run a structured task. The interface belongs to UnifAI now, so a task-oriented view would be proposed
+  upstream first ([ADR-0575](../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)). Revisit if a demo needs one.
+
