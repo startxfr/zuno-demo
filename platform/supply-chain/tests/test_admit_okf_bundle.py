@@ -126,6 +126,32 @@ class ValidateTest(AdmitTestCase):
         self.assertEqual(len(errors), 1)
         self.assertIn("exceeds the corp ceiling 8192", errors[0])
 
+    def _v03_demo(self, extra: str) -> None:
+        write(self.release / "agents/demo/agent.okf.md",
+              AGENT.replace("okf_version: v0.2", "okf_version: v0.3")
+                   .replace("  model: {preferred_classification: C1}\n",
+                            "  model: {preferred_classification: C1}\n" + extra))
+        write(self.release / "policies/limits/limits-policy.yaml", "max_delegation_depth: 2\n")
+
+    def test_delegation_depth_above_the_corp_ceiling_is_refused_at_admission(self) -> None:
+        # ADR-0406: the ceiling is checked here too, after the agents repository's CI.
+        self._v03_demo("  limits: {delegation: {max_depth: 3}}\n")
+        errors = admit.validate(self.release)[0]
+        self.assertEqual(len(errors), 1)
+        self.assertIn("delegation max_depth 3 exceeds the corp ceiling 2", errors[0])
+
+    def test_a_delegation_target_must_exist_and_not_be_the_agent_itself(self) -> None:
+        self._v03_demo("  delegation: {targets: [{agent: ghost, task: ask}]}\n")
+        self.assertIn("target agent 'ghost' is not in the release", admit.validate(self.release)[0][0])
+        self._v03_demo("  delegation: {targets: [{agent: demo, task: ask}]}\n")
+        self.assertIn("is the agent itself", admit.validate(self.release)[0][0])
+
+    def test_delegation_in_a_v02_bundle_is_refused(self) -> None:
+        write(self.release / "agents/demo/agent.okf.md",
+              AGENT.replace("  model: {preferred_classification: C1}\n",
+                            "  model: {preferred_classification: C1}\n  delegation: {targets: [{agent: demo, task: ask}]}\n"))
+        self.assertIn("delegation is an OKF v0.3 field", admit.validate(self.release)[0][0])
+
     def test_unserved_knowledge_domain_is_a_warning(self) -> None:
         # WP-168: nothing serves the domain (no UnifAI source tagged with it).
         # Allowing it grants no access, so the release stays servable.

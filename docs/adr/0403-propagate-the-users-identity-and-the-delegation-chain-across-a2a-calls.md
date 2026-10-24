@@ -50,8 +50,14 @@ rather than an on-behalf-of exchange.
    the target as they do today. The delegator's tool rights are not intersected:
    delegation exists so that B can do what A cannot. "A task can only narrow its agent's
    declaration" (`policy.py`) still holds.
-5. **Classification only rises along the chain.** The effective classification of a
-   delegated call is the highest of the chain (the raise-only rule of ADR-0565).
+5. **Classification rises along the chain and never falls (ADR-0565).** `preferred_classification` is the
+   level a run starts at, and it escalates during the turn; it is not a ceiling. On a delegation the
+   delegating run passes its current level with the A2A request (`X-Zuno-Data-Classification`); the
+   target's run starts at the higher of that and its own default and only rises; the result returning to
+   the delegator raises the delegator's run to at least the target's final level, so the ai-gateway floor
+   and the local-only rules (ADR-0035, ADR-0550) apply to what comes back. The mcp-gateway judges each
+   call on the header it receives, as for any call: it cannot see the delegator's run, so keeping the level
+   monotone is the duty of the A2A client and server (WP-173), proven by their tests.
 6. **The chain is audited.** The gateway log line and the tool span add the user's
    `sub`, `delegated_by` (the chain) and `delegation_depth`, so a delegated call can be
    reconstructed. Counters keep their current low-cardinality labels.

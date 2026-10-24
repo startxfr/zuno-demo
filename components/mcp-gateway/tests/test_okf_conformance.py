@@ -63,6 +63,12 @@ class ConformanceCases(unittest.TestCase):
                     self.assertEqual(
                         {"status": got.status, "access_groups": got.access_groups, "tasks": got.tasks}, want, name
                     )
+                # ADR-0401 / ADR-0406: the optional `delegation` section, ignored by readers that predate it.
+                section = json.loads((case / "expected.json").read_text()).get("delegation")
+                for name, want in ((section or {}).get("agents") or {}).items():
+                    got = store.get(name)
+                    self.assertEqual([{"agent": a, "task": t} for a, t in got.delegation_targets], want["targets"], name)
+                    self.assertEqual(got.max_depth, want["max_depth"] or 1, name)
 
 
 class VersionCheck(unittest.TestCase):

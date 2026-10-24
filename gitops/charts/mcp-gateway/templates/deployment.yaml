@@ -129,6 +129,9 @@ spec:
               value: /okf/agents
             - name: TOOL_POLICY_PATH
               value: /okf/policies/tools/tool-policy.yaml
+            # ADR-0406: the corp delegation ceiling and the delegated-write flag.
+            - name: LIMITS_POLICY_PATH
+              value: /okf/policies/limits/limits-policy.yaml
 {{- end }}
           volumeMounts:
             - name: tmp

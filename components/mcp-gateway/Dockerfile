@@ -46,6 +46,7 @@ COPY platform/bindings ./platform/bindings
 ENV TOOL_POLICY_PATH=/okf/policies/tools/tool-policy.yaml \
     DATA_CLASSIFICATION_PATH=/app/policies/data-classification/classification.yaml \
     AGENTS_DIR=/okf/agents \
+    LIMITS_POLICY_PATH=/okf/policies/limits/limits-policy.yaml \
     TOOL_BINDINGS_PATH=/app/platform/bindings/tools/tool-bindings.yaml \
     PYTHONUNBUFFERED=1
 

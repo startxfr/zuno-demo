@@ -100,7 +100,12 @@ async def adopt_incoming_trace_context(request: Request) -> None:
 
 @contextmanager
 def tool_invoke_span(
-    tool_name: str, classification: str, run_id: Optional[str] = None
+    tool_name: str,
+    classification: str,
+    run_id: Optional[str] = None,
+    caller_sub: Optional[str] = None,
+    delegated_by: Optional[str] = None,
+    delegation_depth: Optional[int] = None,
 ) -> Iterator["ToolInvokeRecorder"]:
     """Wraps one tool invocation end to end (policy decision + downstream
     call): records a `tool_invoke` span and the zuno.tool_invocations
@@ -118,6 +123,13 @@ def tool_invoke_span(
         span.set_attribute("zuno.classification", classification)
         if run_id:
             span.set_attribute("zuno.run_id", run_id)
+        # ADR-0403 clause 6: the initiating user and, for a delegated call, the
+        # chain. Span attributes only: neither belongs on a low-cardinality counter.
+        if caller_sub:
+            span.set_attribute("zuno.user_sub", caller_sub)
+        if delegated_by:
+            span.set_attribute("zuno.delegated_by", delegated_by)
+            span.set_attribute("zuno.delegation_depth", delegation_depth or 0)
         recorder = ToolInvokeRecorder()
         try:
             yield recorder

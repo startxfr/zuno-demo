@@ -19,8 +19,8 @@ See [Standard clauses](README.md#standard-clauses) for Context, Alternatives, Co
 
 [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md)
 states how the intersection applies when an agent delegates to another: the five
-factors apply to the **target** agent and its task alone, for the initiating user
-and at the highest classification of the chain; the delegator's own tool rights are
-not intersected, because delegating exists so the target can do what the delegator
+factors apply to the **target** agent and its task alone, for the initiating user,
+at a classification that only rises along the chain (ADR-0565); the delegator's own
+tool rights are not intersected, because delegating exists so the target can do what the delegator
 cannot. What the delegator contributes is the signed declaration of the target
 ([ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md)).

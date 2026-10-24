@@ -45,6 +45,7 @@ class Corp:
         limits = load(policies, "limits/limits-policy.yaml")
         self.max_tokens: Optional[int] = limits.get("max_tokens")
         self.max_concurrent: Optional[int] = limits.get("max_concurrent_requests")
+        self.max_delegation_depth: Optional[int] = limits.get("max_delegation_depth")
         self.quota_classes: Set[str] = set((load(policies, "quotas/quota-policy.yaml").get("classes") or {}).keys())
 
 
@@ -72,9 +73,28 @@ def _limits(where: str, limits: dict, corp: Corp) -> List[str]:
     if corp.max_concurrent is not None and (limits.get("max_concurrent_requests") or 0) > corp.max_concurrent:
         out.append(f"{where}: max_concurrent_requests {limits['max_concurrent_requests']} exceeds the corp "
                    f"ceiling {corp.max_concurrent} (policies/limits/limits-policy.yaml)")
+    depth = (limits.get("delegation") or {}).get("max_depth")
+    if corp.max_delegation_depth is not None and depth is not None and depth > corp.max_delegation_depth:
+        out.append(f"{where}: delegation max_depth {depth} exceeds the corp ceiling {corp.max_delegation_depth} "
+                   f"(policies/limits/limits-policy.yaml)")
     qc = limits.get("quota_class")
     if qc is not None and qc not in corp.quota_classes:
         out.append(f"{where}: quota_class {qc!r} is not a class of policies/quotas/quota-policy.yaml")
+    return out
+
+
+def _delegation(label: str, bundle: pathlib.Path, z: dict) -> List[str]:
+    """ADR-0401: the declared delegation targets exist in the release and are not the agent itself."""
+    out: List[str] = []
+    name = z.get("name", bundle.name)
+    for target in (z.get("delegation") or {}).get("targets") or []:
+        agent, task = target.get("agent"), target.get("task")
+        if agent == name:
+            out.append(f"{label}/agent.okf.md: delegation target {agent!r} is the agent itself")
+        elif not (bundle.parent / str(agent) / "agent.okf.md").is_file():
+            out.append(f"{label}/agent.okf.md: delegation target agent {agent!r} is not in the release")
+        elif not (bundle.parent / str(agent) / "tasks" / f"{task}.md").is_file():
+            out.append(f"{label}/agent.okf.md: delegation target task {agent}/{task} does not exist")
     return out
 
 
@@ -87,14 +107,18 @@ def _skill_path(bundle: pathlib.Path, ref: str, corp_skills: pathlib.Path) -> pa
 def check_bundle(bundle: pathlib.Path, corp: Corp, root: pathlib.Path) -> List[str]:
     label = bundle.relative_to(root).as_posix()
     agent = frontmatter(bundle / "agent.okf.md")
-    if agent.get("okf_version") != "v0.3":
-        return []
     z = agent.get("zuno") or {}
+    if agent.get("okf_version") != "v0.3":
+        if z.get("delegation") or (z.get("limits") or {}).get("delegation"):
+            return [f"{label}/agent.okf.md: delegation is an OKF v0.3 field; this bundle declares "
+                    f"okf_version {agent.get('okf_version')!r}"]
+        return []
     classification = (z.get("model") or {}).get("preferred_classification", "")
     findings: List[str] = []
 
     findings += _models(f"{label}/agent.okf.md", z.get("models") or {}, classification, corp)
     findings += _limits(f"{label}/agent.okf.md", z.get("limits") or {}, corp)
+    findings += _delegation(label, bundle, z)
 
     guard = z.get("guardrails") or {}
     mode = guard.get("mode")

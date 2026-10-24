@@ -41,9 +41,9 @@ confused deputy, which this ADR exists to prevent.
    declaration and task rights, intersected with the user's, under ADR-0011 as
    amended by ADR-0403. Being declared as a target does not widen the tools of the
    delegator, and the delegator's tools are not consulted for the target's calls.
-5. **What comes back is bounded.** A result returned from B to A must not carry a
-   classification above the delegating task's own ceiling (ADR-0565); a response
-   above it is refused with an error naming the ceiling, never silently downgraded.
+5. **What comes back raises, never lowers.** A target's result enters the delegator's run at the
+   target's classification or higher (ADR-0565's monotone escalation, detailed in ADR-0403 clause 5),
+   so a delegation can never be used to carry data into a run handled at a lower level.
 6. **Default is no delegation.** Absent field, empty list or unreadable bundle all
    mean refusal. A deployment that never declares a target behaves as today.
 

@@ -33,6 +33,7 @@ from typing import Dict, List, Optional
 
 import yaml
 
+from app.agent_chain import Chain, DelegationLimits, verify_chain
 from app.agent_declarations import AgentDeclarationStore
 
 logger = logging.getLogger("mcp_gateway.policy")
@@ -74,6 +75,10 @@ class ToolPolicyEntry:
     # for entries that don't set it - the front-door falls back to a
     # generic sentence in that case, see this file's own module docstring.
     description: Optional[str] = None
+    # ADR-0406 / ADR-0409: `read` when the tool changes nothing in an external
+    # system, `write` otherwise. Absent in tool-policy.yaml means `write` (fail
+    # closed): only a delegated call looks at it.
+    access: str = "write"
 
 
 class PolicyStore:
@@ -119,6 +124,7 @@ class PolicyStore:
                         capability=item.get("capability"),
                         subject_field=item.get("subject_field"),
                         description=item.get("description"),
+                        access="read" if item.get("access") == "read" else "write",
                     )
                     # ADR-0116: one entry, two names during migration - the
                     # legacy tool name and the canonical capability ID both
@@ -210,6 +216,8 @@ def evaluate(
     caller_groups: List[str],
     request_classification: str,
     equivalent_names: Optional[List[str]] = None,
+    chain: Optional[Chain] = None,
+    limits: Optional[DelegationLimits] = None,
 ) -> PolicyDecision:
     """The full ADR-0011 intersection, now enforced entirely in this
     gateway (ADR-0036 - previously only the last three of five factors were
@@ -235,6 +243,14 @@ def evaluate(
     in the set matches the tool; this lets bundles/policy migrate from
     legacy names to canonical IDs without a flag day. Defaults to just
     [tool_name] (pre-ADR-0116 behavior).
+
+    chain (ADR-0403): the delegators of this call, empty for a direct call. When
+    present, agent_name/task_name are the *target* and the five factors apply to
+    it alone, as before; on top of that the chain is verified (declared targets,
+    active agents, entitlement, depth, cycle), the call's classification may not
+    exceed any delegator's own, and a write tool is refused unless the corp policy
+    allows delegated writes (ADR-0406, ADR-0409). `limits` is required with a chain:
+    its absence refuses, never allows.
     """
     names = set(equivalent_names or [tool_name])
 
@@ -247,6 +263,14 @@ def evaluate(
     agent = agents.get(agent_name)
     if agent is None:
         return PolicyDecision(allowed=False, reason=f"unknown calling agent '{agent_name}'")
+
+    delegated = bool(chain)
+    if delegated:
+        if limits is None:
+            return PolicyDecision(allowed=False, reason="delegation limits unavailable (ADR-0406)")
+        refusal = verify_chain(chain, agent_name, task_name, caller_groups, agents, limits)
+        if refusal:
+            return PolicyDecision(allowed=False, reason=refusal)
 
     if not (names & set(agent.declared_tools())):
         return PolicyDecision(
@@ -269,7 +293,18 @@ def evaluate(
             ),
         )
 
-    return _evaluate_tool_policy(store, tool_name, names, caller_groups, request_classification)
+    decision = _evaluate_tool_policy(store, tool_name, names, caller_groups, request_classification)
+    if delegated and decision.allowed and not limits.allow_write:
+        entry = next((e for e in (store.get_tool(n) for n in names) if e is not None), None)
+        if entry is None or entry.access != "read":
+            return PolicyDecision(
+                allowed=False,
+                reason=(
+                    f"tool '{tool_name}' is a write tool and delegated writes are refused until "
+                    "delegation.allow_write is set (ADR-0406, ADR-0409)"
+                ),
+            )
+    return decision
 
 
 def _evaluate_tool_policy(

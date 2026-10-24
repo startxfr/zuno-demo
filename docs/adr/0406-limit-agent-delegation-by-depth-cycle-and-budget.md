@@ -33,8 +33,9 @@ already counts for that user.
    delegating task's own timeout.
 5. **Writes.** Until human approval works across a delegation
    ([ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md)),
-   a corp flag `delegation.allow_write` (default `false`) makes the gateway refuse write and
-   destructive tools on a delegated call.
+   a corp flag `delegation.allow_write` (default `false`) makes the gateway refuse, on a delegated call, every tool
+   whose `tool-policy.yaml` entry does not say `access: read`. `access` is `read` or `write` on every tool; an
+   entry that omits it is a `write` tool (fail closed).
 
 ## Alternatives considered
 

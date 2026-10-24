@@ -17,6 +17,7 @@ from typing import Any, Dict, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
+from app.agent_chain import Chain, ChainError, DelegationLimits, parse_chain
 from app.agent_declarations import AgentDeclarationStore
 from app.auth import CallerIdentity, validate_token, validate_token_or_kubernetes
 from app.bindings import BindingRegistry
@@ -44,6 +45,7 @@ app = FastAPI(
 policy_store = PolicyStore()
 agent_declarations = AgentDeclarationStore()  # ADR-0036/0038: agents/<name>/agent.okf.md bundles
 binding_registry = BindingRegistry()  # ADR-0116: capability -> physical backend
+delegation_limits = DelegationLimits()  # ADR-0406: corp ceiling and the delegated-write flag
 
 
 def _binding_coverage_error() -> Optional[str]:
@@ -106,6 +108,7 @@ async def reload_policy() -> Dict[str, Any]:
     policy_store.reload()
     agent_declarations.reload()
     binding_registry.reload()
+    delegation_limits.reload()
     binding_coverage_error = _binding_coverage_error()
     return {
         "loaded": (
@@ -148,6 +151,15 @@ def _self_scope_denial_reason(
 
 
 
+def _read_chain(delegated_by: str, depth: str) -> Chain:
+    """ADR-0403: parse the delegation headers, refusing malformed ones with a 403
+    (a policy refusal, identical in shape to every other)."""
+    try:
+        return parse_chain(delegated_by, depth)
+    except ChainError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
 async def _authorize_and_invoke(
     *,
     tool_name: str,
@@ -158,6 +170,7 @@ async def _authorize_and_invoke(
     x_zuno_task: str,
     x_zuno_run_id: str = "",
     frontdoor_policy: bool = False,
+    chain: Optional[Chain] = None,
 ) -> Dict[str, Any]:
     """The complete ADR-0011 authorization + invoke path, shared by both
     front doors: the REST contract (`POST /v1/tools/{name}/invoke`) and the
@@ -178,7 +191,19 @@ async def _authorize_and_invoke(
     """
     request_id = str(uuid.uuid4())
     started = time.monotonic()
-    with tool_invoke_span(tool_name, classification, run_id=x_zuno_run_id or None) as call:
+    chain = chain or Chain()
+    if chain and frontdoor_policy:
+        # A delegation chain names agents; a caller that carries no agent
+        # declaration has nothing to chain from.
+        raise HTTPException(status_code=403, detail="a delegation chain requires an X-Zuno-Agent declaration")
+    with tool_invoke_span(
+        tool_name,
+        classification,
+        run_id=x_zuno_run_id or None,
+        caller_sub=identity.sub,
+        delegated_by=chain.render() or None,
+        delegation_depth=chain.depth,
+    ) as call:
         # ADR-0116: the binding registry is the single source of known tool
         # names (canonical capability IDs + migration aliases) - an unknown
         # name fails closed here, before any policy or backend work.
@@ -207,13 +232,15 @@ async def _authorize_and_invoke(
                 caller_groups=identity.groups,
                 request_classification=classification,
                 equivalent_names=binding.all_names(),
+                chain=chain,
+                limits=delegation_limits,
             )
         call.mcp_server = decision.mcp_server
         call.reason = decision.reason
 
         logger.info(
             "tool=%s capability=%s binding=%s auth_mode=%s agent=%s task=%s caller=%s groups=%s "
-            "classification=%s allowed=%s reason=%s request_id=%s",
+            "classification=%s delegated_by=%s depth=%s allowed=%s reason=%s request_id=%s",
             tool_name,
             binding.capability,
             binding.backend,
@@ -223,6 +250,8 @@ async def _authorize_and_invoke(
             identity.sub,
             identity.groups,
             classification,
+            chain.render() or "-",
+            chain.depth,
             decision.allowed,
             decision.reason,
             request_id,
@@ -320,8 +349,11 @@ async def invoke_tool(
     x_zuno_agent: str = Header(default="", alias="X-Zuno-Agent"),
     x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
     x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
+    x_zuno_delegated_by: str = Header(default="", alias="X-Zuno-Delegated-By"),
+    x_zuno_delegation_depth: str = Header(default="", alias="X-Zuno-Delegation-Depth"),
 ) -> Dict[str, Any]:
     classification = x_zuno_data_classification.upper()
+    chain = _read_chain(x_zuno_delegated_by, x_zuno_delegation_depth)
 
     raw_body = await request.body()
     if raw_body:
@@ -342,11 +374,12 @@ async def invoke_tool(
         x_zuno_agent=x_zuno_agent,
         x_zuno_task=x_zuno_task,
         x_zuno_run_id=x_zuno_run_id,
+        chain=chain,
     )
 
 
 def _agent_surface(
-    identity: CallerIdentity, agent_name: str, task_name: str, classification: str
+    identity: CallerIdentity, agent_name: str, task_name: str, classification: str, chain: Optional[Chain] = None
 ) -> mcp_frontdoor.Surface:
     """The `/mcp` surface of one agent task (ADR-0571): the task's declared
     tools, each decided by the same evaluate() `/v1/tools/{name}/invoke` uses.
@@ -371,6 +404,8 @@ def _agent_surface(
             caller_groups=identity.groups,
             request_classification=classification,
             equivalent_names=binding.all_names(),
+            chain=chain,
+            limits=delegation_limits,
         )
 
     return mcp_frontdoor.Surface(capabilities=capabilities, decide=decide)
@@ -411,6 +446,8 @@ async def mcp_frontdoor_endpoint(
     x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
     x_zuno_agent: str = Header(default="", alias="X-Zuno-Agent"),
     x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
+    x_zuno_delegated_by: str = Header(default="", alias="X-Zuno-Delegated-By"),
+    x_zuno_delegation_depth: str = Header(default="", alias="X-Zuno-Delegation-Depth"),
 ) -> JSONResponse:
     # ADR-0571 (WP-152): a caller that declares an agent (UnifAI forwards
     # X-Zuno-Agent/X-Zuno-Task with the user's own Keycloak JWT, ADR-0563) gets
@@ -435,7 +472,10 @@ async def mcp_frontdoor_endpoint(
                 status_code=403, detail=f"caller is not entitled to agent '{agent_name}' (ADR-0040)"
             )
     classification = x_zuno_data_classification.upper()
-    surface = _agent_surface(identity, agent_name, task_name, classification) if agent_mode else None
+    chain = _read_chain(x_zuno_delegated_by, x_zuno_delegation_depth)
+    if chain and not agent_mode:
+        raise HTTPException(status_code=403, detail="a delegation chain requires an X-Zuno-Agent declaration")
+    surface = _agent_surface(identity, agent_name, task_name, classification, chain) if agent_mode else None
 
     # Classification defaults to C2 because `confluence` is a C2 domain
     # (policies/data-classification/classification.yaml). A C1 default would
@@ -466,6 +506,7 @@ async def mcp_frontdoor_endpoint(
                 x_zuno_task=task_name,
                 x_zuno_run_id=x_zuno_run_id,
                 frontdoor_policy=not agent_mode,
+                chain=chain,
             )
         except HTTPException as exc:
             if exc.status_code == 404:

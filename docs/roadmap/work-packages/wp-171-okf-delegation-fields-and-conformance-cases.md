@@ -1,6 +1,6 @@
 # WP-171: OKF delegation fields and conformance cases
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0401](../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md)
 - **Depends on:** [WP-170](wp-170-agent-delegation-contract-and-adrs.md)
 - **Related:** [ADR-0579](../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md), [WP-163](wp-163-okf-v0-3-schema-and-consumers.md), [WP-51](wp-51-adaptation-hooks-conformance.md)
@@ -20,9 +20,12 @@ prove every reader handles them with the conformance cases.
 2. `platform/okf/check_narrowing.py`: `max_depth` at most the ceiling; targets well formed, an agent never its own target.
 3. Conformance cases: valid with a declared target; target unknown; depth above the ceiling; an agent targeting itself;
    no `delegation` field (no delegation).
-4. `zuno-demo`: `admit_okf_bundle.agents_view` exposes the delegation view; `okf_narrowing.py` checks the ceiling at
-   admission; `evaluations/common/okf_release.py` `agent_declaration` already returns the block.
-5. Branch on `zuno-demo-agents` and a PR to `devel`; the release and its promotion are the maintainer's. Coordinate with the
+4. `zuno-demo`: `okf_narrowing.py` checks the ceiling, the targets and the v0.3-only rule at admission (done); `agents_view`
+   is deliberately unchanged, so released conformance cases keep their meaning; `evaluations/common/okf_release.py`
+   `agent_declaration` already returns the block.
+5. `policies/tools/tool-policy.yaml`: every tool declares `access: read | write` (absent means write), validated by
+   `validate_okf_bundle.py`, used by WP-172 to refuse delegated writes.
+6. Branch `prep/delegation-schema` on `zuno-demo-agents` (pushed) and a PR to `devel`; the release and its promotion are the maintainer's. Coordinate with the
    session that releases that repository before promoting, since mcp-gateway reads the release at build time.
 
 ## Acceptance

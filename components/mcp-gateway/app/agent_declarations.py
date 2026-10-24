@@ -20,7 +20,7 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import yaml
 
@@ -58,6 +58,13 @@ class AgentDeclaration:
     # agent. Checked by the /mcp front-door for callers that declare an agent
     # (ADR-0571); the REST contract's caller (agent-runtime) checks it itself.
     access_groups: List[str] = field(default_factory=list)
+    # ADR-0403: zuno.model.preferred_classification, the floor this agent adds to a
+    # delegation chain's effective classification (raise-only, ADR-0565).
+    classification: str = ""
+    # ADR-0401: zuno.delegation.targets as (agent, task); empty means the agent
+    # may not delegate. ADR-0406: zuno.limits.delegation.max_depth, default 1.
+    delegation_targets: List[Tuple[str, str]] = field(default_factory=list)
+    max_depth: int = 1
 
     def declared_tools(self) -> List[str]:
         tools: List[str] = []
@@ -105,8 +112,22 @@ class AgentDeclarationStore:
             task_zuno = task_frontmatter.get("zuno") or {}
             tasks[task_name] = list(task_zuno.get("allowed_tools", []))
         access_groups = list((zuno.get("access") or {}).get("groups") or [])
+        # A malformed delegation entry is skipped, never widened: fewer targets
+        # can only mean fewer delegations (the schema refuses it upstream anyway).
+        targets = [
+            (str(t["agent"]), str(t["task"]))
+            for t in ((zuno.get("delegation") or {}).get("targets") or [])
+            if isinstance(t, dict) and t.get("agent") and t.get("task")
+        ]
+        depth = ((zuno.get("limits") or {}).get("delegation") or {}).get("max_depth")
         return AgentDeclaration(
-            name=name, status=zuno.get("status", "placeholder"), tasks=tasks, access_groups=access_groups
+            name=name,
+            status=zuno.get("status", "placeholder"),
+            tasks=tasks,
+            access_groups=access_groups,
+            classification=str((zuno.get("model") or {}).get("preferred_classification") or ""),
+            delegation_targets=targets,
+            max_depth=depth if isinstance(depth, int) and not isinstance(depth, bool) and depth >= 1 else 1,
         )
 
     @property

@@ -55,6 +55,35 @@ class ConformanceCases(unittest.TestCase):
                 self.assertEqual(view, expected["agents"])
 
 
+class DelegationNarrowing(unittest.TestCase):
+    """The admission narrowing rule (platform/supply-chain/okf_narrowing.py) on the `delegation` section
+    of the cases: valid cases pass, `narrowing-` cases raise the expected finding. The ceiling comes from a
+    temporary corp policy, because the pinned release may predate `max_delegation_depth`."""
+
+    def test_narrowing_findings_match_the_cases(self):
+        if CASES is None:
+            self.skipTest(SKIP)
+        sys.path.insert(0, str(ROOT / "platform" / "supply-chain"))
+        import okf_narrowing
+
+        policies = pathlib.Path(tempfile.mkdtemp())
+        (policies / "limits").mkdir()
+        (policies / "limits" / "limits-policy.yaml").write_text("max_delegation_depth: 2\n")
+        corp = okf_narrowing.Corp(policies)
+        for case in _case_dirs():
+            section = json.loads((case / "expected.json").read_text()).get("delegation")
+            if section is None:
+                continue
+            with self.subTest(case=case.name):
+                findings = [f for b in sorted((case / "agents").iterdir())
+                            for f in okf_narrowing.check_bundle(b, corp, case)]
+                needle = section.get("narrowing_error")
+                if needle is None:
+                    self.assertEqual(findings, [])
+                else:
+                    self.assertTrue(any(needle in f for f in findings), findings)
+
+
 class VersionCheck(unittest.TestCase):
     def _release(self, version):
         root = pathlib.Path(tempfile.mkdtemp())
