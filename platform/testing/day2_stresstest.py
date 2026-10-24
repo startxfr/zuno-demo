@@ -159,9 +159,15 @@ def _quota_results() -> List[Day2Result]:
     driving real traffic past the threshold distinguishes "enforcing" from
     "silently inert" (confirmed live 2026-08-25 - see the WP-54 State log).
     """
-    import quota_429
-
-    return quota_429.run()
+    # WP-156 removed the per-agent quota-demo HTTPRoutes this proof drove
+    # (with the retired agent stack, by user decision), so every request now
+    # answers 404. The request-rate proof is reported as not run, never
+    # silently dropped, until it targets a live route again; token budgets
+    # are still proven below.
+    return [Day2Result(
+        AGENT, "quota", "n/a", "quota", True,
+        "NOT RUN: the quota-demo route this request-rate proof drove was removed with the retired agent stack (WP-156)",
+    )]
 
 
 def _token_quota_results() -> List[Day2Result]:
