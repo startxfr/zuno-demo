@@ -1,6 +1,6 @@
 # WP-51: Adaptation hooks and conformance suite (promotes ADR-0508)
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** ADR-0508
 - **Depends on:** WP-160 (fixtures consumed from the admitted corp
   release; WP-49 and WP-50, its original predecessors, were abandoned on
@@ -18,6 +18,40 @@
 - **Estimated files touched:** ~6 (A, in zuno-demo-agents) + ~8 (B, in
   zuno-demo); the `unifai-operator` hook (`internal/okf/`, ADR-0575) is
   that fork's own work.
+
+## Progress (2026-10-24)
+
+Decisions taken with the user: fixtures live in `zuno-demo-agents`
+(`conformance/`, prepared on a local branch and consumed through
+`ZUNO_OKF_CONFORMANCE_DIR`; nothing published yet); every reader accepts
+`okf_version` `v0.2` and `v0.3` only (ADR-0579 clause 6: the admitted release
+0.3.0 is still entirely v0.2, so "v0.3 only" would refuse it); parsers stay
+per component (ADR-0508 clause 4).
+
+Done in this repository:
+
+- mcp-gateway hook (`agent_declarations.py`) refuses a missing or unsupported
+  `okf_version` on the agent index and on every task, naming file and version;
+  `tests/test_okf_conformance.py` runs every case through it.
+- Admission hook (`admit_okf_bundle.py` `agents_view`, behind
+  `generate_stack_config.py`) does the same through `checked_frontmatter`;
+  `platform/okf/tests/test_okf_conformance.py` runs every case through it.
+- `platform/okf/check_okf_read_boundary.py` (CI: lint.yml) fails on a new
+  direct OKF read outside the hooks; five pre-existing reads are a baseline
+  that may only shrink (mlops, two tekos evaluation scripts, `check_docs.py`,
+  `day2_contract_attribution.py`).
+- Proven: flipping one expected value fails the matching hook only; the live
+  release 0.3.0 still loads (8 agents) through both hooks.
+
+Remaining before this WP closes:
+
+- Publish the conformance cases (part A) in the agents repository and have the
+  release carry them (or attest them), so the fixture tests stop skipping in CI.
+- The mlops hook (task prompt read, `components/mlops/src/mlops.py`) and the
+  evaluations reader, then empty the lint baseline.
+- Finding to settle: the admission reader (`okf_narrowing.py`) skips documents
+  that are not v0.3 instead of refusing them; harmless today, worth a decision
+  when v0.2 stops being readable.
 
 ## Re-scoped plan (2026-10-23)
 

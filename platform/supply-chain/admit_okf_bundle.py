@@ -248,6 +248,25 @@ def frontmatter(path: pathlib.Path) -> dict:
     return (yaml.safe_load(text[4:end]) or {}) if text.startswith("---\n") and end > 0 else {}
 
 
+# ADR-0508 clause 3 / ADR-0579 clause 6: the OKF schema versions this reader
+# understands. Anything else, or no version, is refused by name.
+SUPPORTED_OKF_VERSIONS = ("v0.2", "v0.3")
+
+
+def checked_frontmatter(path: pathlib.Path) -> dict:
+    """frontmatter() for an OKF document read as a bundle member: it must have
+    a frontmatter block and declare a supported okf_version, or the read
+    fails with the file and the version named."""
+    front = frontmatter(path)
+    version = front.get("okf_version")
+    supported = ", ".join(SUPPORTED_OKF_VERSIONS)
+    if version is None:
+        raise ValueError(f"{path}: missing okf_version or frontmatter (supported: {supported})")
+    if version not in SUPPORTED_OKF_VERSIONS:
+        raise ValueError(f"{path}: unsupported okf_version {version!r} (supported: {supported})")
+    return front
+
+
 def load_yaml(path: pathlib.Path) -> dict:
     return (yaml.safe_load(path.read_text(encoding="utf-8")) or {}) if path.is_file() else {}
 
@@ -267,10 +286,10 @@ def agents_view(release: pathlib.Path) -> Dict[str, dict]:
     index = json.loads((release / "okf-index.json").read_text()) if (release / "okf-index.json").is_file() else {}
     versions = {a["name"]: a["version"] for a in index.get("agents", [])}
     for agent_md in sorted((release / "agents").glob("*/agent.okf.md")):
-        z = frontmatter(agent_md).get("zuno") or {}
+        z = checked_frontmatter(agent_md).get("zuno") or {}
         tasks = {}
         for task in z.get("tasks") or []:
-            tz = frontmatter(agent_md.parent / "tasks" / f"{task}.md").get("zuno") or {}
+            tz = checked_frontmatter(agent_md.parent / "tasks" / f"{task}.md").get("zuno") or {}
             tasks[task] = {
                 "tools": sorted(tz.get("allowed_tools") or []),
                 "knowledge": sorted(tz.get("allowed_knowledge") or []),

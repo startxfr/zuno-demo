@@ -65,7 +65,7 @@ def okf_v03_fields(agent_dir: pathlib.Path) -> dict:
 
     models/guardrails/limits are exposed for the consumers WP-157 and the
     ai-gateway wiring will add; nothing reads them yet."""
-    z = admit.frontmatter(agent_dir / "agent.okf.md").get("zuno") or {}
+    z = admit.checked_frontmatter(agent_dir / "agent.okf.md").get("zuno") or {}
     out = {}
     if z.get("models"):
         out["models"] = z["models"]

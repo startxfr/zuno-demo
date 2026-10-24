@@ -61,6 +61,17 @@ jobs:
       # okf-release job below verifies.
       - name: Validate canonical platform documentation (ADR-0323)
         run: python3 platform/docs/check_docs.py
+      # ADR-0508/WP-51: OKF is read only by per-component hooks. The fixture
+      # tests skip until the conformance cases ship in the admitted release
+      # (zuno-demo-agents/conformance/cases, WP-51 part A).
+      - name: OKF read boundary (ADR-0508)
+        run: |
+          python3 platform/okf/check_okf_read_boundary.py
+          python3 platform/okf/tests/test_okf_read_boundary.py
+      - name: OKF conformance cases through the admission and mcp-gateway hooks (ADR-0508)
+        run: |
+          python3 platform/okf/tests/test_okf_conformance.py
+          python3 components/mcp-gateway/tests/test_okf_conformance.py
       - name: Validate knowledge-domain descriptors and references (ADR-0202/ADR-0203)
         run: python3 platform/docs/check_knowledge_refs.py
       - name: Verify generated quota enforcement matches the released quota-policy.yaml (ADR-0511)
