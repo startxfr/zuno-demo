@@ -166,6 +166,11 @@ zuno_ai_gateway_maas_gateway_identity: true
 # counting live (brief Progress); the user ceiling is not to be advertised.
 zuno_ai_gateway_maas_quota_429_passthrough: true
 zuno_ai_gateway_quota_fail_modes: true
+# WP-157 inventory V13 (user go 2026-10-24): a `closed` quota class
+# (stresstest, intensive) is served only through MaaS, so it is refused
+# rather than answered by a direct SaaS fallback when MaaS fails. Needs the
+# image built from 18cc412e or later (ai-gateway-21).
+zuno_ai_gateway_closed_class_maas_only: true
 # Step C (user go 2026-10-24, after step B verified): the SaaS models'
 # MaaS subscriptions and auth policies keep only the ai-gateway
 # ServiceAccount; the /agent_tekos and /sales persona grants go (inventory
