@@ -1,6 +1,6 @@
 # WP-157: Slim the ai-gateway by delegating quotas, keys and exposure to MaaS
 
-- **State:** Not started
+- **State:** Done (2026-10-24)
 - **ADRs:** [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md)
 - **Depends on:** [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md)
 - **Related:** [ADR-0118](../../adr/0118-keep-the-ai-gateway-as-policy-router-and-defer-maas-delegation.md), [ADR-0511](../../adr/0511-define-okf-quota-policy-enforced-via-kuadrant.md), [ADR-0528](../../adr/0528-rekey-project-binding-quota-and-telemetry-onto-the-zuno-project-id.md), [ADR-0560](../../adr/0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md), [WP-54](wp-54-quota-policy-and-kuadrant-translation.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md)
