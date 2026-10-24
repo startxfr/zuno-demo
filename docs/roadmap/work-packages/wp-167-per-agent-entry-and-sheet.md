@@ -88,4 +88,14 @@ bundle workflow in Error (HTTP 400 on the new metadata key; 0.1.30 will tolerate
 version of the page only looked in the personal workspace, so every agent showed "not found" (it now
 looks in every team of the caller).
 
-Left: the conformance test in `zuno-demo-agents` for the icon and color shapes.
+## Conformance test (2026-10-24)
+
+Written in `zuno-demo-agents`, branch `prep/wp167-ui-conformance` (7a772e3), pull request to `devel`
+waiting to be opened and merged. The OKF v0.3 schema accepted any icon string and any run of letters as
+a color, while the operator and the UnifAI API refuse anything outside `^[a-z0-9][a-z0-9-]{0,39}$`
+(icon) and `#rrggbb` or 3 to 30 letters (color). The v0.3 schema now carries those shapes (v0.2 is left
+free-form), the valid conformance cases state their `ui` block in `expected.json`, and
+`conformance/test_ui_display.py` checks the shapes, that the v0.3 schema refuses bad values (the previous
+schema accepted them) and that every real agent complies, whatever its `okf_version` (all eight are v0.2 at
+the time of writing, so the schema change alone would not protect them). CI runs the new test.
+Left: merge the pull request; the release version bump is a separate decision.
