@@ -1,6 +1,6 @@
 # WP-51: Adaptation hooks and conformance suite (promotes ADR-0508)
 
-- **State:** Repo work in review
+- **State:** Done
 - **ADRs:** ADR-0508
 - **Depends on:** WP-160 (fixtures consumed from the admitted corp
   release; WP-49 and WP-50, its original predecessors, were abandoned on
@@ -59,19 +59,17 @@ Finding fixed on the way: `check_docs.py`'s agent-status-vs-ADR check read the
 first `status:` line of each bundle, which is `verification.status: unverified`,
 so it never fired; it now reads `zuno.status` and passes on release 0.3.0.
 
-Remaining before this WP closes:
+Closed (2026-10-24): release v0.3.1, carrying the conformance cases as an
+optional corp-artifact layer, was promoted into `platform/okf/agents.lock`
+(PR #4). The fixture tests of all five readers run, with no skip, against the
+admitted release locally and in the `policy-as-code` job. `okf_narrowing.py`
+skips only v0.2 bundles, which carry none of the v0.3 fields the narrowing rule
+constrains; any other version is already refused by `agents_view` at admission
+(revisit when v0.2 stops being readable, end of v0.12, ADR-0579 clause 6).
 
-- The conformance cases are merged on zuno-demo-agents devel (PR #7). The
-  release builder now ships them as an optional corp-artifact layer (branch
-  `prep/wp51-release-conformance`, ADR-0577 amendment 2026-10-24) and
-  `admit_okf_bundle.extract` unpacks it; they reach this repo's CI once a
-  release carrying the layer (0.3.1) is promoted into `platform/okf/agents.lock`
-  (release version bump and promotion are the maintainer's), at which point the
-  fixture tests stop skipping.
-- Settled: `okf_narrowing.py` skips only v0.2 bundles, which carry none of the
-  v0.3 fields the narrowing rule constrains; any other version is already refused
-  by `agents_view` (`checked_frontmatter`) at admission. No change needed. It is
-  revisited when v0.2 stops being readable (end of v0.12, ADR-0579 clause 6).
+Not caused by this WP, seen in the same CI run: the `python` job's
+`pin_release.py tests` and the `helm` job's workload hardening baseline were
+already failing on `main` on 2026-10-23.
 
 ## Re-scoped plan (2026-10-23)
 
@@ -182,7 +180,7 @@ None (component CI only; deploys ride the next normal rollout).
 
 ## Status updates (then re-run check_docs.py)
 
-On all three parts merged: ADR-0508 → `Implemented - see the
+On all three parts merged (done 2026-10-24): ADR-0508 → `Implemented - see the
 conformance/ tree in zuno-okf and each component's hook module.`
 Index + tracker + MEMORY.md accordingly.
 

@@ -32,7 +32,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
-| v0.10 | 5 | 1 | 6 | WP-51 |
+| v0.10 | 5 | — | 6 | — |
 | v0.11 | 16 | 11 | 14 | WP-146, WP-157, WP-166 |
 | v0.12 | 9 | 5 | 9 | WP-161, WP-163, WP-164, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -999,7 +999,7 @@ WP-50's.
 | WP-48 | [wp-48](work-packages/wp-48-okf-repo-bootstrap.md) | 0506 (start) | WP-44, WP-45, WP-46 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-158) |
 | WP-49 | [wp-49](work-packages/wp-49-pinned-ref-builds.md) | 0507 | WP-48 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-160) |
 | WP-50 | [wp-50](work-packages/wp-50-okf-extraction-cutover.md) | 0506+0507 (close) | WP-49 | Abandoned | none (abandoned 2026-10-22: ADR superseded by ADR-0576/ADR-0580 before any work; replaced by WP-165) |
-| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-160 (was WP-49, abandoned) | Repo work in review | mcp-gateway and admission hooks, version check and boundary lint done (2026-10-24); mlops hook done; remaining: have a release carry the conformance cases (merged on zuno-demo-agents devel), evaluations reader, empty the lint baseline |
+| WP-51 | [wp-51](work-packages/wp-51-adaptation-hooks-conformance.md) | 0508 | WP-160 (was WP-49, abandoned) | Done (2026-10-24) | none - release v0.3.1 promoted; every reader's fixture tests run in CI against the admitted release |
 
 ### Phase 35 — OKF: live reconciliation
 

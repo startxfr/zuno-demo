@@ -219,9 +219,9 @@ repository that does not yet exist.
 
 Overtaken on 2026-10-22 by v0.12: ADR-0506, ADR-0507, ADR-0509 and ADR-0510
 are superseded without having started, and their work packages are
-abandoned. Only ADR-0508 (adaptation hooks) remains.
+abandoned. Only ADR-0508 (adaptation hooks) remained, and it was implemented on 2026-10-24 (WP-51).
 
-**5 ADRs: 1 `Proposed`, 4 superseded.** Open: ADR-0508; WP-51.
+**5 ADRs: 1 `Implemented`, 4 superseded.** Open: none.
 
 ## v0.11
 

@@ -1,6 +1,6 @@
 # ADR-0508: Isolate OKF parsing behind per-component adaptation hooks
 
-- **Status:** Proposed
+- **Status:** Implemented (2026-10-24, WP-51) - every OKF reader of this platform (mcp-gateway, admission and the ADR-0581 generator, mlops, the evaluations, `check_docs.py`) reads through one version-checked hook accepting `okf_version` v0.2 and v0.3; the conformance cases live in `zuno-demo-agents/conformance/` and ship in the release's corp artifact; `platform/okf/check_okf_read_boundary.py` keeps new direct reads out in CI
 - **Target:** v0.10 (retargeted from v0.7 on 2026-09-05 — see ADR-0506's note. Previously retargeted from OKF v0.2 on 2026-08-30 — see ADR-0506's note)
 - **Date:** 2026-08-18
 - **Decision owners:** Zuno Demo architecture team

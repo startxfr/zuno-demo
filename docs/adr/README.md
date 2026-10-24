@@ -303,7 +303,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | Proposed | Isolate OKF parsing behind per-component adaptation hooks |
+| [ADR-0508](0508-isolate-okf-parsing-behind-per-component-adaptation-hooks.md) | Implemented | Isolate OKF parsing behind per-component adaptation hooks |
 
 ## v0.11
 
