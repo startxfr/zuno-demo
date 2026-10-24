@@ -145,6 +145,11 @@ agentGroups: []
 # never drift) and shares the demo personas' password (Secret
 # demo-personas-password). Created by templates/job-eval-personas.yaml:
 # create-only users, missing memberships added, nothing ever removed.
+# Every evaluation persona also joins this group, which the Job creates when
+# missing. The ai-gateway runs a member of it under the `evaluation` quota
+# class (its own budget) on any path, UnifAI chats included; no user can add
+# themselves to a group. Empty = no extra group.
+evalPersonasGroup: /zuno-evaluation
 evalPersonas:
   - username: eval-consultant-01
     copyOf: consultant-01

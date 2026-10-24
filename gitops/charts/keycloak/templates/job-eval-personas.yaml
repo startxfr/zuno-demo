@@ -7,7 +7,7 @@ reconcile so a fault here never blocks client reconciliation.
 
 Per persona: created when missing (enabled, email verified), password set to
 the demo personas' shared one on every run (so a rotated Secret follows), and
-every group of its source persona added if missing. Nothing is ever deleted:
+every group of its source persona (plus evalPersonasGroup) added if missing. Nothing is ever deleted:
 a persona dropped from the values, or a group dropped from its source, is
 reported and left alone.
 
@@ -102,6 +102,15 @@ spec:
               if [ -z "$ready" ]; then
                 echo "ERROR: keycloak or realm '$KC_REALM' never became reachable" >&2
                 exit 1
+              fi
+
+              # evalPersonasGroup: a top-level group the personas join, created
+              # here when missing (the realm import is create-only and the client
+              # reconcile Job only manages agent_* groups).
+              EVAL_GROUP={{ .Values.evalPersonasGroup | default "" | quote }}
+              if [ -n "$EVAL_GROUP" ] && ! $KCADM get "group-by-path$EVAL_GROUP" -r "$KC_REALM" $CFG >/dev/null 2>&1; then
+                $KCADM create groups -r "$KC_REALM" $CFG -s "name=${EVAL_GROUP#/}"
+                echo "created group $EVAL_GROUP"
               fi
 
               created=0

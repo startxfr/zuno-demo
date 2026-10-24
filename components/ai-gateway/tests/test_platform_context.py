@@ -70,6 +70,46 @@ def test_untrusted_unknown_class_is_not_denied() -> None:
     assert _context_seen(_identity("zuno-frontend"), {"X-Zuno-Quota-Class": "no-such-class"}) == ("standard", None)
 
 
+def _member(azp=None):
+    claims = {"azp": azp} if azp else {}
+    return CallerIdentity(sub="eval", groups=["sales", "zuno-evaluation"], raw_claims=claims, token="t")
+
+
+def _with_evaluation_class():
+    classes = dict(getattr(app_main.quota.ledger, "_classes", None) or {})
+    classes.setdefault("evaluation", {"fail_mode": "open", "tokens": {}})
+    return mock.patch.object(app_main.quota.ledger, "_classes", classes)
+
+
+def test_evaluation_group_member_runs_under_evaluation() -> None:
+    """The eval-* and stress-* personas reach the gateway through UnifAI with
+    their own token (an untrusted client): the group decides the class."""
+    with _with_evaluation_class():
+        assert app_main._platform_context(_member("unifai-ui"), "", "") == ("evaluation", None)
+
+
+def test_evaluation_group_member_ignores_its_own_class_header() -> None:
+    with _with_evaluation_class():
+        assert app_main._platform_context(_member("unifai-ui"), "stresstest", "p-1") == ("evaluation", None)
+
+
+def test_evaluation_class_unknown_to_the_budgets_falls_back_to_standard() -> None:
+    classes = {k: v for k, v in (getattr(app_main.quota.ledger, "_classes", None) or {}).items() if k != "evaluation"}
+    with mock.patch.object(app_main.quota.ledger, "_classes", classes):
+        assert app_main._platform_context(_member("unifai-ui"), "", "") == ("standard", None)
+
+
+def test_non_member_stays_standard() -> None:
+    with _with_evaluation_class():
+        assert app_main._platform_context(_identity("unifai-ui"), "", "") == ("standard", None)
+
+
+def test_trusted_client_header_still_wins_for_a_member() -> None:
+    with _with_evaluation_class(), mock.patch.dict(os.environ, {"TRUSTED_PLATFORM_CLIENTS": "zuno-evaluations"}):
+        assert app_main._platform_context(_member("zuno-evaluations"), "stresstest", "") == ("stresstest", None)
+        assert app_main._platform_context(_member("zuno-evaluations"), "", "") == ("evaluation", None)
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in list(globals().items()):

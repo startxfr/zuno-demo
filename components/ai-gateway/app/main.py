@@ -11,6 +11,7 @@ from components/agent-runtime.
 from __future__ import annotations
 
 import json
+import os
 import logging
 import time
 import uuid
@@ -314,7 +315,7 @@ async def chat_completions(
     # project binding. Platform-side context: honoured only when the caller's
     # token comes from a client in TRUSTED_PLATFORM_CLIENTS (app/auth.py);
     # from any other caller they are ignored (standard class, no project).
-    x_zuno_quota_class: str = Header(default="standard", alias="X-Zuno-Quota-Class"),
+    x_zuno_quota_class: str = Header(default="", alias="X-Zuno-Quota-Class"),
     x_zuno_project_id: str = Header(default="", alias="X-Zuno-Project-Id"),
     # ADR-0544: per-request generation ceiling - components/agent-runtime's
     # ModelRouter forwards a task's own declared max_tokens (OKF frontmatter)
@@ -603,18 +604,40 @@ def _platform_context(
 ) -> "tuple[str, Optional[str]]":
     """The quota class and project id the request runs under. Both are
     platform-side context (ADR-0511, ADR-0528): taken from the headers only
-    for a trusted platform client, otherwise `standard` and no project,
-    whatever the caller sent."""
-    quota_class = quota_class_header.strip() or "standard"
+    for a trusted platform client, otherwise no project and the caller's
+    default class, whatever the caller sent. The default class is
+    `evaluation` for a member of the evaluation group (the eval-* and
+    stress-* personas, whose chats reach the gateway through UnifAI with
+    their own token), once the loaded budgets define that class; `standard`
+    otherwise."""
+    default_class = _default_quota_class(identity)
+    quota_class = quota_class_header.strip() or default_class
     project_id = project_id_header.strip() or None
     if identity.is_trusted_platform_client:
         return quota_class, project_id
-    if quota_class != "standard" or project_id:
+    if quota_class != default_class or project_id:
         logger.info(
             "ignoring platform context headers from untrusted client %r (caller=%s)",
             (identity.raw_claims or {}).get("azp"), identity.sub,
         )
-    return "standard", None
+    return default_class, None
+
+
+EVALUATION_QUOTA_CLASS = "evaluation"
+
+
+def _default_quota_class(identity: CallerIdentity) -> str:
+    """`evaluation` for a member of EVALUATION_GROUP (default
+    zuno-evaluation, the group the Keycloak evaluation-personas Job gives the
+    eval-* and stress-* personas), provided the budgets define the class -
+    an image older than the policy that adds it keeps them on `standard`
+    rather than denying them as an unknown class."""
+    group = os.getenv("EVALUATION_GROUP", "zuno-evaluation").strip().lstrip("/")
+    if not group or group not in (identity.groups or []):
+        return "standard"
+    if EVALUATION_QUOTA_CLASS not in (getattr(quota.ledger, "_classes", None) or {}):
+        return "standard"
+    return EVALUATION_QUOTA_CLASS
 
 
 def _maas_call_kwargs(
