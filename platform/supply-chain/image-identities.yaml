@@ -25,9 +25,10 @@ images:
 operator:
   release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/unifai-operator-release\.yml@refs/tags/operator-v'
 
-# What every image carries besides its signature (cosign attest). Both are
-# required: the provenance says which workflow built it from which commit, the
-# SBOM lists what is in it.
+# What every image carries besides its signature. The provenance (cosign attest)
+# says which workflow built it from which commit. The SBOM lists what is in it; it
+# is tens of MB, far over what the public Rekor log accepts as an attestation, so
+# it is a separate OCI artifact (tag sha256-<image digest>.sbom) signed by the same
+# identity. Both are required.
 attestations:
   provenance: https://slsa.dev/provenance/v1
-  sbom: https://spdx.dev/Document

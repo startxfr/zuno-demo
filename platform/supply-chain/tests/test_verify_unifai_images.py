@@ -33,8 +33,12 @@ class FakeCosign:
 
     def __init__(self, signer=None, missing=()):
         # signer: {reference: certificate identity}; missing: {(reference, 'verify'|'verify-attestation'|type)}
-        self.signer = signer or {}
-        self.missing = set(missing)
+        self.signer = dict(signer or {})
+        # the SBOM of an image is a signed artifact at its own reference
+        for ref, who in list(self.signer.items()):
+            if v.DIGEST_RE.search(ref):
+                self.signer[v.sbom_reference(ref)] = who
+        self.missing = {(v.sbom_reference(r) if k == "sbom" else r, k) for r, k in missing}
         self.calls = []
 
     def run(self, args, env=None, cwd=None):
@@ -42,6 +46,8 @@ class FakeCosign:
         sub = args[1]
         ref = args[args.index("--offline") + 1]
         kind = args[args.index("--type") + 1] if "--type" in args else sub
+        if ref.endswith(".sbom"):
+            kind = "sbom"
         if (ref, kind) in self.missing or (ref, sub) in self.missing:
             raise admit.AdmissionError(f"cosign {sub} failed: no matching signatures")
         identity = self.signer.get(ref)
@@ -104,9 +110,11 @@ class Identities(unittest.TestCase):
     def test_a_release_signature_is_accepted_and_all_three_proofs_are_checked(self):
         result, fake = self.verify(UI, PUBLISH + "@refs/tags/v1.2.0")
         self.assertTrue(result.ok, result.reason)
-        self.assertEqual([c[1] for c in fake.calls], ["verify", "verify-attestation", "verify-attestation"])
+        self.assertEqual([c[1] for c in fake.calls], ["verify", "verify-attestation", "verify"])
         types = [c[c.index("--type") + 1] for c in fake.calls if "--type" in c]
-        self.assertEqual(types, ["https://slsa.dev/provenance/v1", "https://spdx.dev/Document"])
+        self.assertEqual(types, ["https://slsa.dev/provenance/v1"])
+        self.assertEqual(fake.calls[2][fake.calls[2].index("--offline") + 1],
+                         f"quay.io/zuno/unifai-ui:sha256-{'a' * 64}.sbom")
         self.assertTrue(all("--offline" in c for c in fake.calls))
 
     def test_a_devel_signature_needs_the_explicit_opt_in(self):
@@ -129,7 +137,7 @@ class Identities(unittest.TestCase):
 
     def test_a_missing_provenance_or_sbom_is_refused_by_name(self):
         signer = PUBLISH + "@refs/tags/v1.0.0"
-        for missing, label in (("https://slsa.dev/provenance/v1", "provenance"), ("https://spdx.dev/Document", "sbom")):
+        for missing, label in (("https://slsa.dev/provenance/v1", "provenance"), ("sbom", "sbom")):
             result, _ = self.verify(UI, signer, missing=[(UI, missing)])
             self.assertFalse(result.ok)
             self.assertTrue(result.reason.startswith(label), result.reason)

@@ -176,7 +176,7 @@ this script mutates chart files unlike its read-only siblings above.
 
 The UnifAI runtime images (`quay.io/zuno/unifai-*`) are built and signed by the fork's CI, not in this cluster. Before the `unifai`
 role applies them, `verify_unifai_images.py` requires of each one a reference **pinned by digest** (a tag is refused), a keyless
-**signature** by the identity written in `image-identities.yaml`, and a **provenance** and an **SBOM** attestation by the same identity,
+**signature** by the identity written in `image-identities.yaml`, and a **provenance** and a signed **SBOM** artifact by the same identity,
 all checked offline against `platform/okf/sigstore/trusted_root.json` (the OKF machinery of `admit_okf_bundle.py`). `--pods` reads
 `oc get pods -o json` and compares what runs to the pinned digests, then verifies every running UnifAI image. A development build
 (the `devel` branch workflow) is accepted only with `--accept-dev` (`zuno_unifai_accept_dev_signatures`). Exit code 1 and a JSON

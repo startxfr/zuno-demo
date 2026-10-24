@@ -11,7 +11,9 @@ runs, this script requires of every image:
    (platform/supply-chain/image-identities.yaml), checked offline against the
    committed Sigstore trusted root - the same machinery as the OKF releases
    (admit_okf_bundle.offline_trust);
-3. a **provenance** and an **SBOM** attestation signed by the same identity.
+3. a **provenance** attestation and a signed **SBOM** artifact, by the same identity. The
+   SBOM (tens of MB) is too large for the public Rekor log as an attestation, so the fork
+   publishes it as an OCI artifact tagged `sha256-<image digest>.sbom` and signs that.
 
 A development build (`devel` branch workflow) is accepted only with --accept-dev; a
 release (a `vX.Y.Z` tag workflow) always. Third-party images (databases, queues) are
@@ -93,6 +95,11 @@ def digest_of(reference: str) -> str:
     return match.group(1)
 
 
+def sbom_reference(reference: str) -> str:
+    """Where the fork publishes the SBOM of a pinned image: `<repo>:sha256-<hex>.sbom`."""
+    return f"{repository(reference)}:{digest_of(reference).replace(':', '-')}.sbom"
+
+
 def subject_regexp(identities: dict, kind: str, accept_dev: bool) -> str:
     section = identities[kind]
     parts = [section["release_subject_regexp"]]
@@ -108,17 +115,20 @@ def verify_image(reference: str, env: Dict[str, str], identities: dict, accept_d
     except ImageError as exc:
         return Result(reference, False, str(exc))
     subject = subject_regexp(identities, kind, accept_dev)
-    common = ["--offline", reference, "--certificate-oidc-issuer", identities["issuer"],
-              "--certificate-identity-regexp", subject, "--output", "json"]
-    steps = [("signature", ["verify"] + common)]
-    for label in ("provenance", "sbom"):
-        steps.append((label, ["verify-attestation", "--type", identities["attestations"][label]] + common))
+    flags = ["--certificate-oidc-issuer", identities["issuer"], "--certificate-identity-regexp", subject,
+             "--output", "json"]
+    steps = [
+        ("signature", ["verify", "--offline", reference] + flags),
+        ("provenance", ["verify-attestation", "--type", identities["attestations"]["provenance"],
+                        "--offline", reference] + flags),
+        ("sbom", ["verify", "--offline", sbom_reference(reference)] + flags),
+    ]
     for label, args in steps:
         try:
             admit.run([admit.require("cosign")] + args, env=env)
         except admit.AdmissionError as exc:
             return Result(reference, False, f"{label}: {exc}")
-    return Result(reference, True, "signature, provenance and sbom verified")
+    return Result(reference, True, "signature, provenance and signed sbom verified")
 
 
 def verify_all(references: Iterable[str], accept_dev: bool = False,

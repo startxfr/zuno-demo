@@ -30,7 +30,7 @@ The state found on 2026-10-24:
 
 1. **The fork builds and signs in CI; zuno verifies.** A GitHub Actions workflow of the fork builds the five
    images, pushes them, signs each digest keyless with the workflow's GitHub OIDC identity, and attaches a build
-   provenance and an SBOM as attestations. The trust model is the one of ADR-0578 (offline verification against
+   provenance as an attestation and publishes the SBOM as a signed artifact (clause 3). The trust model is the one of ADR-0578 (offline verification against
    the committed Sigstore trusted root), applied to images built outside the cluster; RHTAS stays the mechanism
    for images built inside it (ADR-0535). The images are no longer built or pushed by hand for any cluster that
    verifies them (`make images-devel` stays for local development and yields unsigned images).
@@ -38,8 +38,11 @@ The state found on 2026-10-24:
    on a `vX.Y.Z` tag (a release) and on the `devel` branch (a development build); the operator release workflow
    on an `operator-vX.Y.Z` tag (no development identity). A cluster accepts the `devel` identity only if its
    own variables say so (`zuno_unifai_accept_dev_signatures`): demo333 does, a production cluster does not.
-3. **Three proofs per image.** A signature by an accepted identity, a provenance attestation and an SBOM
-   attestation signed by the same identity. A missing one refuses the image.
+3. **Three proofs per image.** A signature by an accepted identity, a provenance attestation and a signed SBOM
+   artifact by the same identity. A missing one refuses the image. The SBOM is not an attestation: the first CI
+   run (2026-10-25) showed a 25 MB SPDX document for `unifai-backend`, which the public Rekor log rejects
+   (provenance, 971 bytes, was accepted). The fork pushes it as its own OCI artifact tagged
+   `sha256-<image digest>.sbom` and signs that artifact; the verifier derives the tag from the pinned digest.
 4. **Pinned by digest, per cluster.** Every UnifAI image a cluster verifies is written `repo@sha256:...` in
    `ansible/clusters/<cluster>.yml`. A tag is refused as unpinned. `check_unifai_pins.py` fails in CI for a
    cluster that verifies without pinning, and reports a cluster that switched verification off.
