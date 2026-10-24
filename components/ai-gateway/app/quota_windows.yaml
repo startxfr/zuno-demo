@@ -12,6 +12,10 @@ classes:
     user: 24h
     group: 24h
     project: 24h
+  evaluation:
+    user: 24h
+    group: 24h
+    project: 24h
   stresstest:
     user: 5m
     group: 5m

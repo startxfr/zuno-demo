@@ -45,6 +45,42 @@ spec:
     strategy: merge
     limits:
     {{- if $trl.enforceNonStandardClasses }}
+      evaluation-user:
+        rates:
+          - limit: 20000000
+            window: 24h
+        counters:
+          - expression: "request.headers['x-zuno-user-sub']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'evaluation' : false)"
+          - predicate: "'x-zuno-user-sub' in request.headers"
+    {{- end }}
+    {{- if $trl.enforceNonStandardClasses }}
+      evaluation-group:
+        rates:
+          - limit: 200000000
+            window: 24h
+        counters:
+          - expression: "request.headers['x-zuno-groups']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'evaluation' : false)"
+          - predicate: "'x-zuno-groups' in request.headers"
+    {{- end }}
+    {{- if and $trl.enforceNonStandardClasses $trl.enforceProjectDimension }}
+      evaluation-project:
+        rates:
+          - limit: 100000000
+            window: 24h
+        counters:
+          - expression: "request.headers['x-zuno-project-id']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'evaluation' : false)"
+          - predicate: "'x-zuno-project-id' in request.headers"
+    {{- end }}
+    {{- if $trl.enforceNonStandardClasses }}
       intensive-user:
         rates:
           - limit: 500000
@@ -82,7 +118,7 @@ spec:
     {{- end }}
       standard-user:
         rates:
-          - limit: 3000000
+          - limit: 10000000
             window: 24h
         counters:
           - expression: "request.headers['x-zuno-user-sub']"
@@ -92,7 +128,7 @@ spec:
           - predicate: "'x-zuno-user-sub' in request.headers"
       standard-group:
         rates:
-          - limit: 30000000
+          - limit: 100000000
             window: 24h
         counters:
           - expression: "request.headers['x-zuno-groups']"
@@ -103,7 +139,7 @@ spec:
     {{- if $trl.enforceProjectDimension }}
       standard-project:
         rates:
-          - limit: 15000000
+          - limit: 50000000
             window: 24h
         counters:
           - expression: "request.headers['x-zuno-project-id']"
