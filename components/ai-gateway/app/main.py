@@ -310,10 +310,10 @@ async def chat_completions(
     # model_call span can be found by the per-run resource dashboard.
     x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
     # ADR-0511 (WP-54): quota class per the executing task's
-    # zuno.quota_class (absent = standard), and the ADR-0512 verified
-    # project binding - both only ever set platform-side (agent-runtime);
-    # the BFF strips inbound copies from end users. The same two headers
-    # key the Kuadrant request-rate dimension.
+    # zuno.quota_class (absent = standard), and the ADR-0512/0528 verified
+    # project binding. Platform-side context: honoured only when the caller's
+    # token comes from a client in TRUSTED_PLATFORM_CLIENTS (app/auth.py);
+    # from any other caller they are ignored (standard class, no project).
     x_zuno_quota_class: str = Header(default="standard", alias="X-Zuno-Quota-Class"),
     x_zuno_project_id: str = Header(default="", alias="X-Zuno-Project-Id"),
     # ADR-0544: per-request generation ceiling - components/agent-runtime's
@@ -336,8 +336,7 @@ async def chat_completions(
     )
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
     run_id = x_zuno_run_id.strip() or None
-    quota_class = x_zuno_quota_class.strip() or "standard"
-    project_id = x_zuno_project_id.strip() or None
+    quota_class, project_id = _platform_context(identity, x_zuno_quota_class, x_zuno_project_id)
     max_tokens = _parse_max_tokens(x_zuno_max_tokens)
     # ADR-0511: token-budget check BEFORE dispatch, on top of (never
     # instead of) the classification/eligibility intersection below.
@@ -597,6 +596,25 @@ def _adapter_skips_maas(
 # WP-157 (ADR-0570) preparatory switches. Each helper below returns today's
 # behaviour unless its env flag is on (all default off; see
 # gitops/charts/ai-gateway/values.yaml's maasAdapter block).
+
+
+def _platform_context(
+    identity: CallerIdentity, quota_class_header: str, project_id_header: str,
+) -> "tuple[str, Optional[str]]":
+    """The quota class and project id the request runs under. Both are
+    platform-side context (ADR-0511, ADR-0528): taken from the headers only
+    for a trusted platform client, otherwise `standard` and no project,
+    whatever the caller sent."""
+    quota_class = quota_class_header.strip() or "standard"
+    project_id = project_id_header.strip() or None
+    if identity.is_trusted_platform_client:
+        return quota_class, project_id
+    if quota_class != "standard" or project_id:
+        logger.info(
+            "ignoring platform context headers from untrusted client %r (caller=%s)",
+            (identity.raw_claims or {}).get("azp"), identity.sub,
+        )
+    return "standard", None
 
 
 def _maas_call_kwargs(

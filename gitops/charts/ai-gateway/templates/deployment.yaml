@@ -179,6 +179,10 @@ spec:
             - name: QUOTA_FAIL_MODES_ENFORCED
               value: "true"
             {{- end }}
+            {{- if .Values.trustedPlatformClients }}
+            - name: TRUSTED_PLATFORM_CLIENTS
+              value: {{ join "," .Values.trustedPlatformClients | quote }}
+            {{- end }}
             {{- if .Values.maasAdapter.closedClassMaasOnly.enabled }}
             - name: QUOTA_CLOSED_CLASS_MAAS_ONLY
               value: "true"

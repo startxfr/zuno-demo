@@ -50,6 +50,7 @@
     gitops_app_name: "zuno-ai-gateway-d1"
     gitops_app_extra_helm_values:
       clusterBaseDomain: "{{ cluster_base_domain }}"
+      trustedPlatformClients: "{{ zuno_ai_gateway_trusted_platform_clients | default([]) }}"
       maasAdapter:
         gatewayIdentity:
           enabled: "{{ zuno_ai_gateway_maas_gateway_identity | default(false) | bool }}"

@@ -33,6 +33,16 @@ KEYCLOAK_JWKS_URL = os.getenv(
 JWT_AUDIENCE = os.getenv("JWT_AUDIENCE") or None
 JWT_LEEWAY_SECONDS = int(os.getenv("JWT_LEEWAY_SECONDS", "30"))
 
+
+def trusted_platform_clients() -> set:
+    """Keycloak clients (the token's `azp`) whose calls may set the
+    platform-side request context: a non-standard quota class and a project
+    id (ADR-0511, ADR-0528). Comma-separated TRUSTED_PLATFORM_CLIENTS, read
+    per call; empty (the default) trusts no client, so those headers are
+    ignored on every call."""
+    raw = os.getenv("TRUSTED_PLATFORM_CLIENTS", "")
+    return {c.strip() for c in raw.split(",") if c.strip()}
+
 _jwks_client: Optional[PyJWKClient] = None
 
 
@@ -49,6 +59,11 @@ class CallerIdentity:
     groups: List[str]
     raw_claims: dict
     token: str
+
+    @property
+    def is_trusted_platform_client(self) -> bool:
+        client = (self.raw_claims or {}).get("azp")
+        return bool(client) and client in trusted_platform_clients()
 
 
 def _extract_bearer_token(authorization: Optional[str]) -> str:

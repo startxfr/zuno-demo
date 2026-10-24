@@ -161,6 +161,12 @@ maasAdapter:
   closedClassMaasOnly:
     enabled: false
 
+# ADR-0511/ADR-0528: Keycloak clients (the token's `azp`) whose calls may set
+# a non-standard quota class (X-Zuno-Quota-Class) and a project id
+# (X-Zuno-Project-Id). Any other caller runs under `standard` with no
+# project. Empty = no client is trusted.
+trustedPlatformClients: []
+
 # ADR-0104: opt-in semantic cache in the existing platform Redis
 # (gitops/charts/redis, zuno-auth namespace - same instance
 # gitops/charts/tekos already uses for sessions). Disabled by default;

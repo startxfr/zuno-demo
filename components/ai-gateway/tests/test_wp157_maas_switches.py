@@ -36,7 +36,12 @@ from app.auth import CallerIdentity, validate_token  # noqa: E402
 from app.routing import ProviderCandidate, RoutingTable  # noqa: E402
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
-_IDENTITY = CallerIdentity(sub="alice", groups=["/sales", "/agent_tekos"], raw_claims={}, token="caller-bearer")
+# A trusted platform client, so the quota class and project headers these
+# tests send are honoured (app/auth.py TRUSTED_PLATFORM_CLIENTS).
+_PLATFORM_CLIENT = "zuno-platform-test"
+_IDENTITY = CallerIdentity(
+    sub="alice", groups=["/sales", "/agent_tekos"], raw_claims={"azp": _PLATFORM_CLIENT}, token="caller-bearer",
+)
 
 _CFGS = {
     "local-maas": {"kind": "local", "model": "qwen", "via_maas": True, "endpoint": "https://maas/zuno-ai-run/qwen/v1"},
@@ -92,7 +97,7 @@ class _Env:
             return None
 
         self.patches = [
-            mock.patch.dict(os.environ, env or {}),
+            mock.patch.dict(os.environ, {"TRUSTED_PLATFORM_CLIENTS": _PLATFORM_CLIENT, **(env or {})}),
             mock.patch.object(maas_adapter, "MAAS_ADAPTER_ENABLED", True),
             mock.patch.object(app_main, "chat_model_for", fake_chat_model_for),
             mock.patch.object(app_main.routing_table, "provider_config", side_effect=lambda n: _CFGS[n]),
