@@ -296,6 +296,29 @@ an image):
 Open after the sequence: the per-user ceiling (upstream shim defect); the
 V0-V14 equivalence checks.
 
+## Closure draft (2026-10-24, not yet Done)
+
+Prepared for the closure decision; the work package stays open until the
+user closes it. Each line says what is proven live on demo333 and what is
+not.
+
+| Area | State | Evidence |
+|---|---|---|
+| Local models through MaaS | Done. The four local models are served via MaaS under the ai-gateway ServiceAccount with attested headers; personas can no longer call MaaS directly (401). | V0, step 1 |
+| Group token ceiling | Enforced, **per model**: Limitador keeps one counter per route, so the ceiling is not a cross-model total as ADR-0511 intends. | V8, V9, V10 |
+| Per-subscription budgets | Enforced (ai-gateway subscription counters decrement; a lowered limit answers 429). Lightspeed's own budget is in the same position but not exercised. | V7, revert check |
+| Per-user token ceiling | **Not enforced.** The wasm shim drops the trailing action pairs of a request and the user limit is last; moving it ahead loses other limits. Follow-up, upstream report. | order tests |
+| MaaS 429 to the caller | Passed through with no fallback, WP-148 body. `Retry-After` is computed since MaaS sends none; the value is now the subscription window remaining (fix 80e9733b, image ai-gateway-22), proven by tests, not yet by a drill. | V12, drill |
+| Closed quota classes | Refused when MaaS has no path (no SaaS answer); `open` keeps its fallbacks. During a Limitador outage the MaaS path admits without counting (about one call in five fails), so a `closed` class is not enforceable there. | V13 redone, V14 |
+| SaaS providers | **Named exception**: stay direct with their keys (vendor route defect, ADR-0570 amendment). MaaS-side SaaS objects stay, unused. | V4, pilot |
+| Not run | V2, V3, V5 (need SaaS through MaaS), V6 (personas no longer reach MaaS), V11 (project dimension not enforced). | inventory |
+
+Consequences for the removals listed under Follow-ups: `app/quota.py`
+cannot go on equivalence grounds while the per-user ceiling is not enforced
+and the group ceiling is per model, unless the user accepts those two gaps
+or amends ADR-0511 clause 2; the SaaS keys and direct branches stay
+(exception).
+
 ## Acceptance
 
 Both MaaS defects closed with live evidence; the ai-gateway image contains
