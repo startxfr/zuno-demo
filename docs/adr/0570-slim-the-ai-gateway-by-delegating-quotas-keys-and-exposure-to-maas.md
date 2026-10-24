@@ -195,3 +195,27 @@ project (WP-157 decision D5), which also ends the per-persona SaaS
 subscriptions. Details and the live verifications that gate each removal:
 [WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md),
 [inventory](../roadmap/evidence/wp-157-inventory.md).
+
+## Amendment (2026-10-24, SaaS providers stay direct: named exception)
+
+**Clauses 1 and 4** take a named exception, by user decision after the
+mistral-large pilot. The chat SaaS providers (`mistral`,
+`mistral-codestral`, `ovhcloud-gpt-oss-120b`, `openai`, `gemini`,
+`anthropic`) stay **direct** from the ai-gateway, which keeps their keys
+and its direct branches; `maasAdapter.externalEgressEnabled` stays off.
+The reason is a vendor defect: the `HTTPRoute` that RHOAI's ExternalModel
+reconciler generates has no URL rewrite on its path-prefix rule, so the
+provider receives `/zuno-ai-run/<model>/v1/chat/completions` and answers
+404 (seen as a hang), while its header rule matches on
+`X-Gateway-Model-Name`, an identity no subscription carries. A generated
+route is not edited by hand. The exception is bounded as before: SaaS is
+eligible for C1 (and C2 where `provider-routing.yaml` says so) only, the
+gateway's classification stays the outer policy, and the MaaS-side SaaS
+objects (`ExternalModel`, `MaaSModelRef`, the subscription restricted to
+the ai-gateway ServiceAccount, auth policy) stay in place, unused, ready
+for a fixed reconciler. Local models are served through MaaS and their
+token budgets are enforced by the gateway-level `TokenRateLimitPolicy`
+(clause 2 as amended), on the group ceiling; the per-user ceiling is not
+yet proven live and stays a follow-up of
+[WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md).
+
