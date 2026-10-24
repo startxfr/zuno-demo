@@ -68,9 +68,10 @@ Remaining before this WP closes:
   release carrying the layer (0.3.1) is promoted into `platform/okf/agents.lock`
   (release version bump and promotion are the maintainer's), at which point the
   fixture tests stop skipping.
-- Finding to settle: the admission reader (`okf_narrowing.py`) skips documents
-  that are not v0.3 instead of refusing them; harmless today, worth a decision
-  when v0.2 stops being readable.
+- Settled: `okf_narrowing.py` skips only v0.2 bundles, which carry none of the
+  v0.3 fields the narrowing rule constrains; any other version is already refused
+  by `agents_view` (`checked_frontmatter`) at admission. No change needed. It is
+  revisited when v0.2 stops being readable (end of v0.12, ADR-0579 clause 6).
 
 ## Re-scoped plan (2026-10-23)
 
