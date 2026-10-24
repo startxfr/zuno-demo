@@ -315,7 +315,14 @@ demo333, each line verified by a second session.
   position, not exercised. (V7, order revert)
 - MaaS 429 passed to the caller with no fallback, WP-148 body; MaaS sends no
   `Retry-After`, so the gateway computes it from the model's subscription
-  window. (V12, drills)
+  window. Drill on `ai-gateway-23` (2026-10-24, user go): the
+  `qwen36-27b-instruct-ai-gateway` limit lowered to 50 tokens per 1 h for
+  about 5 s, a persona chat 22 s after the first qwen36 call of the window
+  got HTTP 429, `quota_exceeded`, `Retry-After: 3569` (within the 1 h
+  window; the gateway counts from the start of that first call, about 9 s
+  before its log line); limit restored to 1,000,000, TRLP back,
+  `zuno-models-d1` Synced/Healthy. The first drill, on `ai-gateway-21`, had
+  sent 86026 s (the 24 h policy window), fixed by 80e9733b. (V12, drills)
 - Closed quota classes refused when MaaS has no path, with no SaaS answer;
   `open` keeps its fallbacks. (V13 redone)
 - Limitador outage measured: the MaaS path is fail-open, about one call in
