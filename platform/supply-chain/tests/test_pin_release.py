@@ -34,6 +34,11 @@ FULL_PINS = [
     {"chart_values": "gitops/charts/ai-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/mcp-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/diagram-render/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
+    {"chart_values": "gitops/charts/mcp-gateway/values.yaml", "path": "okf.fetch.image.tag", "tag": "v0.1.0"},
+    {"chart_values": "gitops/charts/mcp-aap/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
+    {"chart_values": "gitops/charts/mcp-git-forge/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
+    {"chart_values": "gitops/charts/mcp-salesforce/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
+    {"chart_values": "gitops/charts/mlops/values.yaml", "path": "images.mlops.tag", "tag": "v0.1.0"},
 ]
 
 
@@ -48,6 +53,10 @@ def _repoint_module_at(tmp_root: Path):
     "shadow" import never registers there)."""
     pin_release.REPO_ROOT = tmp_root
     pin_release.LEDGER_PATH = tmp_root / "platform" / "supply-chain" / "pinned-releases.yaml"
+    # ADR-0549: the ledger is written by release_ledger.append_entry, which reads
+    # its own LEDGER_PATH; leaving it alone made these tests append to the
+    # repository's real pinned-releases.yaml.
+    pin_release.release_ledger.LEDGER_PATH = pin_release.LEDGER_PATH
     return pin_release
 
 

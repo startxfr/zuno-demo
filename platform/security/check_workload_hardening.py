@@ -170,6 +170,13 @@ def check_no_hardcoded_secret_values(chart: str, findings: Findings) -> None:
                 name = env.get("name", "")
                 if not _SECRET_ENV_NAME_PATTERN.search(name):
                     continue
+                if name.endswith("_PATH"):
+                    # A filesystem path to a credential mounted from a Secret
+                    # (e.g. MAAS_SA_TOKEN_PATH="/var/run/secrets/maas/token" -
+                    # components/ai-gateway/app/maas_adapter.py reads the
+                    # token from that file). The value is a location, never
+                    # the credential; the Secret itself is the volume mount.
+                    continue
                 if name.endswith("_ENV"):
                     # Meta-variable naming *which other* env var holds a
                     # secret (e.g. MAAS_GATEWAY_API_KEY_ENV="MAAS_GATEWAY_

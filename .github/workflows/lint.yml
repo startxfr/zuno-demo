@@ -109,8 +109,14 @@ jobs:
           helm dependency build gitops/charts/keycloak
           pip install pytest
           python3 -m pytest -q platform/keycloak/tests
+      # The check renders the keycloak and postgresql charts, which both depend
+      # on the startx "operator" chart (alias:startx); keycloak's was built
+      # above, postgresql's was not and `helm template` refused to render it.
       - name: Workload hardening baseline (ADR-0052)
-        run: python3 platform/security/check_workload_hardening.py
+        run: |
+          helm dependency build gitops/charts/postgresql
+          python3 platform/security/check_workload_hardening.py
+          python3 platform/security/tests/test_secret_env_names.py
 
   python:
     runs-on: ubuntu-latest
