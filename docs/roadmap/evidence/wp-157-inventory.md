@@ -287,6 +287,26 @@ hand-set `X-Zuno-*` headers, plus persona chats through the gateway. Nothing bur
 | V13 | Run (user go), `payload-processing` at 0 replicas for 47 s, restored. A `standard` persona chat answered 200 in 31.3 s on `qwen3.6-27b-instruct` (the direct sibling after the failed MaaS attempt, slow because of the failed hops). A `stresstest` chat (header `X-Zuno-Quota-Class: stresstest`) logged `provider 'local-gpt-oss-maas' failed ... Error code: 500` and `skipping direct sibling local-gpt-oss: quota class 'stresstest' is fail_mode closed (ADR-0570 clause 7)` for each of the three local candidates, and was then answered in 2.8 s by `gpt-4o-mini` (a SaaS fallback), not by an error. So the sibling skip works, but the request is not refused: the SaaS fallbacks still serve it. A MaaS 429 never reaching the sibling was not exercised (no 429). | `oc scale`; ai-gateway log |
 | V14 | Inconclusive. `oc scale deploy/limitador-limitador --replicas=0` did not hold: the Limitador operator brought a new pod back within seconds (it was `0/1` for the first 10 s). During that window two SA calls to MaaS (qwen36) returned 200 in about 0.6 s each and a persona chat returned 200, which suggests the gateway admits when Limitador is not ready (`failureMode: allow` on the `ratelimit-check` and `ratelimit-report` services of the wasm config), but Limitador was not shown to be fully down. Side effect to know: the restart emptied the in-memory counters (all token counters restart at their full limit). To measure it, the Limitador custom resource or the operator would need to be paused, a bigger Kuadrant change not done here. | `oc scale`; Limitador pod list Second attempt (user go): a temporary deny-all-ingress NetworkPolicy on the Limitador pods (`app=limitador`, no sidecar) in `kuadrant-system` for 7 s, deleted at once, nothing scaled or edited. Three SA calls to MaaS (qwen36) during the cut returned 200, 200 and a 500 (`Internal Server Error.`, 0.2 s) , the same 500 seen on this model before any change, so it cannot be attributed to the cut. I did not prove the cut bit: the gateway's wasm shim holds an established gRPC connection to Limitador and a NetworkPolicy does not tear down established connections, so no new connection was refused. V14 therefore remains unanswered; cutting the established connection would need a Limitador or gateway restart. |
 
+Follow-up drills after the gateway image `ai-gateway-21` (computed `Retry-After`, `QUOTA_CLOSED_CLASS_MAAS_ONLY`
+on; user go given directly for each), 2026-10-24:
+
+- Closed class under a MaaS outage (V13 redone, `payload-processing` at 0 replicas for 44 s, restored).
+  A `stresstest` persona chat is refused: HTTP 502, `all eligible providers failed for classification C1:
+  local-maas: Error code: 500; local: direct sibling skipped for closed quota class 'stresstest'; ...`,
+  in 0.5 s; openai, gemini, anthropic, mistral, mistral-codestral and ovhcloud-gpt-oss-120b are skipped
+  ("fail_mode closed and this candidate is not reached through MaaS"), so there is no SaaS answer any more.
+  A `standard` chat in the same outage falls back to the direct sibling: 200 in 30.8 s. With MaaS healthy,
+  both classes are answered through `local-maas` (200 in 10-18 s).
+- Computed `Retry-After` on a real MaaS 429 (limit of `qwen36-27b-instruct-ai-gateway` lowered from 1,000,000 to
+  50 tokens per 1 h for 5 s, restored; TRLP back to 1,000,000 and `zuno-models-d1` Synced/Healthy). The gateway
+  answered HTTP 429, `content-type: application/json`, body
+  `{"error":"quota_exceeded","quota_class":"standard","dimension":"maas","provider":"local-maas"}`, header
+  `Retry-After: 86026`. The refusal came on the first call because the counter of that hour had already
+  consumed more than 50 tokens. The shape is right (no fallback, the passthrough body). The value is not: 86026 s
+  is about 24 h, while the limit that tripped has a 1 h window, so the delay should not exceed 3600 s. The
+  gateway seems to derive it from its own 24 h standard ceiling, not from the 1 h subscription window
+  (to be fixed in the gateway; not yet confirmed in the code).
+
 Defect observed and still open: the per-user limit `standard-user` (counter on `x-zuno-user-sub`)
 never created a counter in Limitador, while `standard-group` (same shape, header `x-zuno-groups`)
 counts. The wasm actions for the two limits are identical, apart from the header and the limit hash,
