@@ -162,6 +162,23 @@ spec:
             # hardening choice this doesn't reverse).
             - name: MAAS_SA_TOKEN_PATH
               value: /var/run/secrets/maas/token
+            {{- /*
+            WP-157 (ADR-0570): each switch renders its env var only when on,
+            so the default pod template is unchanged and landing this rolls
+            no pod. See values.yaml's maasAdapter block for what each does.
+            */}}
+            {{- if .Values.maasAdapter.gatewayIdentity.enabled }}
+            - name: MAAS_GATEWAY_IDENTITY
+              value: "true"
+            {{- end }}
+            {{- if .Values.maasAdapter.quota429Passthrough.enabled }}
+            - name: MAAS_QUOTA_429_PASSTHROUGH
+              value: "true"
+            {{- end }}
+            {{- if .Values.maasAdapter.failModes.enabled }}
+            - name: QUOTA_FAIL_MODES_ENFORCED
+              value: "true"
+            {{- end }}
             # ADR-0104: semantic cache, default off - see
             # components/ai-gateway/app/semantic_cache.py and
             # platform/ai-gateway/provider-routing.yaml's `cache_enabled`

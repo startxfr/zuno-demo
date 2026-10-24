@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from app import guardrails, quota, reasoning as reasoning_fallback, routing_decisions, semantic_cache
+from app import guardrails, maas_adapter, quota, quota_fail_modes, reasoning as reasoning_fallback, routing_decisions, semantic_cache
 from app.auth import CallerIdentity, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
 from app.image_routing import ImageRoutingError, ImageRoutingTable
@@ -343,6 +343,9 @@ async def chat_completions(
     # instead of) the classification/eligibility intersection below.
     # Exhaustion is an explicit 429, never silent degradation.
     denial = quota.ledger.check(quota_class, identity.sub, identity.groups, project_id)
+    if denial is not None and _budget_fault_rides_through(denial, quota_class):
+        logger.warning("quota budget config fault: class %r is fail_mode open, admitting", quota_class)
+        denial = None
     if denial is not None:
         headers = {"Retry-After": str(denial.retry_after)} if denial.retry_after else None
         return JSONResponse(denial.detail(), status_code=429, headers=headers)
@@ -403,6 +406,20 @@ async def chat_completions(
             identity=identity, tools=payload.tools, agent=x_zuno_agent, run_id=run_id,
             project_id=project_id, quota_class=quota_class, max_tokens=max_tokens,
         )
+        if maas_adapter.quota_429_passthrough_enabled():
+            # WP-157: a MaaS 429 must reach the caller as an HTTP 429, and a
+            # StreamingResponse has sent its 200 before the first chunk is
+            # produced. So the stream is driven to its first chunk here (a
+            # candidate only ever raises MaasQuotaExceeded before yielding
+            # anything); only with the flag on, so the default path keeps
+            # sending its headers before the first token.
+            try:
+                first_chunk: Optional[str] = await stream.__anext__()
+            except maas_adapter.MaasQuotaExceeded as quota_denial:
+                return _maas_quota_response(quota_denial, quota_class)
+            except StopAsyncIteration:
+                first_chunk = None
+            stream = _prepend(first_chunk, stream)
         if gr_mode != "off":
             stream = _observed_stream(
                 stream, prompt=gr_prompt, agent=x_zuno_agent, run_id=run_id, project_id=project_id,
@@ -413,26 +430,30 @@ async def chat_completions(
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
 
-    result = await _invoke_with_fallback(
-        candidates,
-        classification,
-        messages,
-        caller_sub=identity.sub,
-        groups=identity.groups,
-        caller_bearer_token=identity.token,
-        local_only=local_only,
-        task_id=x_zuno_task,
-        requested_model=payload.model,
-        raw_messages=payload.messages,
-        request_id=request_id,
-        adapter_decl=adapter_decl,
-        quota_class=quota_class,
-        project_id=project_id,
-        tools=payload.tools,
-        agent=x_zuno_agent,
-        run_id=run_id,
-        max_tokens=max_tokens,
-    )
+    try:
+        result = await _invoke_with_fallback(
+            candidates,
+            classification,
+            messages,
+            caller_sub=identity.sub,
+            groups=identity.groups,
+            caller_bearer_token=identity.token,
+            local_only=local_only,
+            task_id=x_zuno_task,
+            requested_model=payload.model,
+            raw_messages=payload.messages,
+            request_id=request_id,
+            adapter_decl=adapter_decl,
+            quota_class=quota_class,
+            project_id=project_id,
+            tools=payload.tools,
+            agent=x_zuno_agent,
+            run_id=run_id,
+            max_tokens=max_tokens,
+        )
+    except maas_adapter.MaasQuotaExceeded as quota_denial:
+        # Raised only with MAAS_QUOTA_429_PASSTHROUGH on (WP-157).
+        return _maas_quota_response(quota_denial, quota_class)
     if gr_mode == "off":
         return result
     reply = result.choices[0].message.content or ""
@@ -570,6 +591,83 @@ def _adapter_skips_maas(
     behavior change, and cheaper than resolving sibling capabilities
     here."""
     return adapter_decl is not None and bool(cfg.get("via_maas", False))
+
+
+# ---------------------------------------------------------------------------
+# WP-157 (ADR-0570) preparatory switches. Each helper below returns today's
+# behaviour unless its env flag is on (all default off; see
+# gitops/charts/ai-gateway/values.yaml's maasAdapter block).
+
+
+def _maas_call_kwargs(
+    sub: Optional[str], groups: Optional[List[str]], quota_class: str, project_id: Optional[str],
+) -> Dict[str, Any]:
+    """D5: the attested context for chat_model_for, or {} so the default
+    call is exactly today's (MAAS_GATEWAY_IDENTITY off)."""
+    if not maas_adapter.gateway_identity_enabled():
+        return {}
+    return {
+        "maas_context": maas_adapter.MaasCallContext(
+            sub=sub or "",
+            groups=tuple(groups or ()),
+            quota_class=quota_class or "standard",
+            project_id=project_id,
+        )
+    }
+
+
+def _skips_direct_sibling(candidate: ProviderCandidate, quota_class: str) -> bool:
+    """ADR-0570 clause 7 (QUOTA_FAIL_MODES_ENFORCED): a direct-Service
+    sibling bypasses MaaS's quota, so it serves only classes whose
+    fail_mode is `open`. Applies to every sibling of a closed class, also
+    when an adapter declaration made the via_maas twin skip itself: a LoRA
+    adapter has no MaaS path, so a closed-class adapter request is served
+    by the next eligible model instead (recorded in the WP-157 brief)."""
+    if not quota_fail_modes.enforced():
+        return False
+    if quota_fail_modes.fail_modes.fail_open(quota_class):
+        return False
+    return candidate.name in routing_table.direct_sibling_names()
+
+
+def _budget_fault_rides_through(denial: "quota.QuotaDenial", quota_class: str) -> bool:
+    """QUOTA_FAIL_MODES_ENFORCED: app/quota.py denies every class, `standard`
+    included, when its budget file is unreadable (WP-157 inventory finding 2,
+    contrary to its own docstring). With the flag on, an `open` class rides
+    through that fault; a class unknown to a healthy config stays denied."""
+    if not quota_fail_modes.enforced() or denial.dimension != "class":
+        return False
+    config_fault = bool(getattr(quota.ledger, "_config_error", None)) or not getattr(quota.ledger, "_classes", None)
+    return config_fault and quota_fail_modes.fail_modes.fail_open(quota_class)
+
+
+def _maas_quota_denial(
+    candidate: ProviderCandidate, cfg: Dict[str, Any], exc: BaseException,
+) -> Optional[maas_adapter.MaasQuotaExceeded]:
+    """MAAS_QUOTA_429_PASSTHROUGH: a 429 from a candidate reached THROUGH
+    MaaS is a quota denial, never a reason to try the direct sibling (which
+    would bypass the quota) or a SaaS model. A 429 from a direct SaaS
+    provider stays an ordinary provider failure (the vendor's own rate
+    limit), as today."""
+    if not maas_adapter.quota_429_passthrough_enabled():
+        return None
+    if not maas_adapter.should_use_maas(cfg, candidate.kind):
+        return None
+    return maas_adapter.quota_exceeded_from(exc, candidate.name)
+
+
+def _maas_quota_response(denial: maas_adapter.MaasQuotaExceeded, quota_class: str) -> JSONResponse:
+    """The gateway's own 429 contract (WP-148): status 429, `quota_exceeded`
+    body, Retry-After when MaaS gave one."""
+    headers = {"Retry-After": str(denial.retry_after)} if denial.retry_after else None
+    return JSONResponse(denial.detail(quota_class), status_code=429, headers=headers)
+
+
+async def _prepend(first: Optional[str], rest: AsyncIterator[str]) -> AsyncIterator[str]:
+    if first is not None:
+        yield first
+    async for chunk in rest:
+        yield chunk
 
 
 def _resolve_adapter(
@@ -720,6 +818,13 @@ async def _invoke_with_fallback(
                 "adapters cannot traverse MaaS", candidate.name,
             )
             continue
+        if _skips_direct_sibling(candidate, quota_class):
+            logger.info(
+                "skipping direct sibling %s: quota class %r is fail_mode closed "
+                "(ADR-0570 clause 7)", candidate.name, quota_class,
+            )
+            errors.append(f"{candidate.name}: direct sibling skipped for closed quota class {quota_class!r}")
+            continue
         model_name = cfg.get("model", candidate.name)
         # ADR-0303 (WP-39): adapter_name is None unless this candidate is
         # local AND a declaration exists - effective_model_name is what
@@ -739,6 +844,7 @@ async def _invoke_with_fallback(
                 model = chat_model_for(
                     candidate, cfg, request_id=request_id, adapter=adapter_name,
                     caller_bearer_token=caller_bearer_token, max_tokens=max_tokens,
+                    **_maas_call_kwargs(caller_sub, groups, quota_class, project_id),
                 )
                 if tools:
                     model = model.bind_tools(tools)
@@ -757,6 +863,13 @@ async def _invoke_with_fallback(
                     prompt_tokens + completion_tokens,
                 )
         except Exception as exc:
+            quota_denial = _maas_quota_denial(candidate, cfg, exc)
+            if quota_denial is not None:
+                logger.warning(
+                    "provider '%s' (via MaaS) answered 429 for caller=%s: quota "
+                    "exceeded, not falling back", candidate.name, caller_sub,
+                )
+                raise quota_denial from exc
             logger.warning(
                 "provider '%s' failed for caller=%s, trying next fallback: %s",
                 candidate.name, caller_sub, exc,
@@ -918,6 +1031,13 @@ async def _stream_completion(
                 "adapters cannot traverse MaaS", candidate.name,
             )
             continue
+        if _skips_direct_sibling(candidate, quota_class):
+            logger.info(
+                "skipping direct sibling %s: quota class %r is fail_mode closed "
+                "(ADR-0570 clause 7)", candidate.name, quota_class,
+            )
+            errors.append(f"{candidate.name}: direct sibling skipped for closed quota class {quota_class!r}")
+            continue
         model_name = cfg.get("model", candidate.name)
         adapter_name = _resolve_adapter(candidate, cfg, adapter_decl)
         effective_model_name = adapter_name or model_name
@@ -936,6 +1056,11 @@ async def _stream_completion(
                     candidate, cfg, request_id=request_id, adapter=adapter_name,
                     caller_bearer_token=identity.token if identity else None,
                     max_tokens=max_tokens,
+                    **_maas_call_kwargs(
+                        identity.sub if identity else None,
+                        identity.groups if identity else None,
+                        quota_class, project_id,
+                    ),
                 )
                 if tools:
                     model = model.bind_tools(tools)
@@ -982,6 +1107,15 @@ async def _stream_completion(
                         prompt_tokens + completion_tokens,
                     )
         except Exception as exc:
+            # Only before the first token: a quota 429 comes at request start,
+            # and once tokens went out the stream can only end in error.
+            quota_denial = None if sent_any else _maas_quota_denial(candidate, cfg, exc)
+            if quota_denial is not None:
+                logger.warning(
+                    "provider '%s' (via MaaS) answered 429: quota exceeded, not "
+                    "falling back", candidate.name,
+                )
+                raise quota_denial from exc
             logger.warning("provider '%s' failed mid-stream-setup: %s", candidate.name, exc)
             errors.append(f"{candidate.name}: {exc}")
             if sent_any:

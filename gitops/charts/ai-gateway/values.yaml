@@ -124,6 +124,35 @@ maasAdapter:
   # decide (WP-27 brief's follow-up) - stays false until that decision is
   # made, regardless of `enabled` above.
   externalEgressEnabled: false
+  # WP-157 (ADR-0570, decisions of 2026-10-24). Three preparatory switches,
+  # all off: off renders no env var at all (the pod template is unchanged).
+  # Enable sequence and the live verification gating each one: the WP-157
+  # brief's progress note of 2026-10-24.
+  #
+  # D5: authenticate to MaaS with this pod's ServiceAccount token
+  # (MAAS_SA_TOKEN_PATH) instead of the caller's Keycloak token, and attach
+  # the gateway-attested X-Zuno-User-Sub, X-Zuno-Groups, X-Zuno-Quota-Class
+  # and X-Zuno-Project-Id headers (app/maas_adapter.py ATTESTED_HEADERS) that
+  # the generated TokenRateLimitPolicy counts on. Pair with the models
+  # chart's maas.saasSubscriptions.gatewayOnly and the connectivity-link
+  # chart's quotaEnforcement.tokenRateLimits.
+  gatewayIdentity:
+    enabled: false
+  # A 429 from MaaS on a via_maas candidate is a quota denial, not an
+  # outage: stop the fallback loop (no direct sibling, no SaaS), return the
+  # gateway's 429 quota_exceeded body with MaaS's Retry-After (the contract
+  # UnifAI renders, WP-148), and give the MaaS client max_retries=0. Off by
+  # default because today such a 429 falls back to the direct sibling and
+  # still serves the user (a /sales persona's 5,000 tokens/h subscription,
+  # or an llm-d scheduler shedding load, would start failing turns).
+  quota429Passthrough:
+    enabled: false
+  # ADR-0570 clause 7 + the policy's fail_mode (app/quota_fail_modes.yaml,
+  # generated): a direct-Service sibling of a via_maas local candidate
+  # serves only `open` classes (standard); and a token-budget config fault
+  # lets `open` classes through instead of denying every class.
+  failModes:
+    enabled: false
 
 # ADR-0104: opt-in semantic cache in the existing platform Redis
 # (gitops/charts/redis, zuno-auth namespace - same instance

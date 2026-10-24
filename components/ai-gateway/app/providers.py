@@ -59,6 +59,9 @@ def chat_model_for(
     adapter: Optional[str] = None,
     caller_bearer_token: Optional[str] = None,
     max_tokens: Optional[int] = None,
+    # WP-157 D5: the request's attested quota context, passed by app/main.py
+    # only when MAAS_GATEWAY_IDENTITY is on; only the MaaS transport reads it.
+    maas_context: Optional[maas_adapter.MaasCallContext] = None,
 ) -> BaseChatModel:
     via_maas = maas_adapter.should_use_maas(cfg, candidate.kind)
     if adapter and (candidate.kind != "local" or via_maas or not cfg.get("serves_adapters", False)):
@@ -91,7 +94,7 @@ def chat_model_for(
         # real usage.
         return maas_adapter.chat_model_via_maas(
             cfg, request_id=request_id, caller_bearer_token=caller_bearer_token,
-            max_tokens=max_tokens,
+            max_tokens=max_tokens, context=maas_context,
         )
 
     if candidate.kind == "local":

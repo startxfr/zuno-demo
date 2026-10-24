@@ -30,7 +30,9 @@ comparison this prototype exists to inform.
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple
+from urllib.parse import quote
 
 from langchain_core.language_models.chat_models import BaseChatModel
 
@@ -75,6 +77,148 @@ def enabled() -> bool:
     return MAAS_ADAPTER_ENABLED
 
 
+def _env_flag(name: str) -> bool:
+    # Read per call (not at import like the switches above), so a test can
+    # flip it with mock.patch.dict(os.environ) and nothing is cached.
+    return os.getenv(name, "false").strip().lower() == "true"
+
+
+# ---------------------------------------------------------------------------
+# WP-157 decision D5 (ADR-0570 amendment of 2026-10-24): the gateway's own
+# identity towards MaaS. Off by default (chart value
+# maasAdapter.gatewayIdentity.enabled renders MAAS_GATEWAY_IDENTITY=true).
+#
+# Off: today's behaviour - the caller's Keycloak token is forwarded
+# (_maas_bearer_token below) and no quota context leaves the gateway.
+# On: the pod's ServiceAccount token authenticates every MaaS call, and the
+# gateway attaches what it has itself validated (app/auth.py) or been told
+# by its platform caller, as the headers below. MaaS trusts them only
+# because only this pod holds that token: the generated TokenRateLimitPolicy
+# (gitops/charts/connectivity-link/templates/quota-tokenratelimitpolicies.yaml)
+# applies its limits only when the authenticated identity is this
+# ServiceAccount, and counts on these headers.
+#
+# THE ONE PLACE these names are defined. platform/okf/generate_quota_enforcement.py
+# repeats them (lower-cased, ATTESTED_HEADERS) for the policy it generates;
+# tests/test_maas_gateway_identity.py fails if the two sets drift.
+ATTESTED_HEADERS: Dict[str, str] = {
+    # The caller's validated JWT `sub` (CallerIdentity.sub).
+    "user": "X-Zuno-User-Sub",
+    # The caller's groups claim, sorted and joined with "|", "(none)" when
+    # empty - the same key app/quota.py's group dimension uses, so the
+    # Kuadrant counter has the ledger's granularity.
+    "groups": "X-Zuno-Groups",
+    # The quota class the request runs under (X-Zuno-Quota-Class from the
+    # platform caller, default `standard`).
+    "quota_class": "X-Zuno-Quota-Class",
+    # The verified zuno project id (ADR-0528), only when the request has one.
+    "project": "X-Zuno-Project-Id",
+}
+# Characters kept as-is in an attested value; anything else (a non-ASCII
+# group name, a header-breaking control character) is percent-encoded, which
+# keeps the value a valid HTTP header and the counter key stable.
+_HEADER_SAFE = "/|()-_.:@+= "
+
+
+def gateway_identity_enabled() -> bool:
+    return _env_flag("MAAS_GATEWAY_IDENTITY")
+
+
+@dataclass(frozen=True)
+class MaasCallContext:
+    """What the gateway attests to MaaS about one request (D5)."""
+
+    sub: str
+    groups: Tuple[str, ...] = ()
+    quota_class: str = "standard"
+    project_id: Optional[str] = None
+
+
+def groups_key(groups) -> str:
+    return "|".join(sorted(groups or ())) or "(none)"
+
+
+def attested_headers(context: MaasCallContext) -> Dict[str, str]:
+    headers = {
+        ATTESTED_HEADERS["user"]: context.sub,
+        ATTESTED_HEADERS["groups"]: groups_key(context.groups),
+        ATTESTED_HEADERS["quota_class"]: context.quota_class or "standard",
+    }
+    if context.project_id:
+        headers[ATTESTED_HEADERS["project"]] = context.project_id
+    return {name: quote(str(value), safe=_HEADER_SAFE) for name, value in headers.items()}
+
+
+def _service_account_token() -> str:
+    if MAAS_SA_TOKEN_PATH and os.path.exists(MAAS_SA_TOKEN_PATH):
+        with open(MAAS_SA_TOKEN_PATH, "r", encoding="utf-8") as fh:
+            token = fh.read().strip()
+        if token:
+            return token
+    raise MaasAdapterError(
+        "MAAS_GATEWAY_IDENTITY is on but no ServiceAccount token is readable at "
+        f"MAAS_SA_TOKEN_PATH={MAAS_SA_TOKEN_PATH!r} - refusing to fall back to "
+        "the caller's token, which would carry no attested quota context"
+    )
+
+
+# ---------------------------------------------------------------------------
+# WP-157 step 4 (inventory finding 4): a MaaS 429 is a quota denial, not an
+# outage. Off by default (maasAdapter.quota429Passthrough.enabled renders
+# MAAS_QUOTA_429_PASSTHROUGH=true): today a 429 from MaaS falls through to the
+# direct sibling and then to SaaS like any provider error.
+def quota_429_passthrough_enabled() -> bool:
+    return _env_flag("MAAS_QUOTA_429_PASSTHROUGH")
+
+
+class MaasQuotaExceeded(Exception):
+    """A via_maas candidate answered 429. Carries what app/main.py needs to
+    return the gateway's own 429 contract (WP-148: status 429, Retry-After,
+    `quota_exceeded` body) instead of trying the next candidate."""
+
+    def __init__(self, provider: str, retry_after: Optional[int] = None, upstream_message: str = ""):
+        super().__init__(f"MaaS quota exceeded on {provider}")
+        self.provider = provider
+        self.retry_after = retry_after
+        self.upstream_message = upstream_message
+
+    def detail(self, quota_class: str) -> Dict[str, Any]:
+        # Same keys as app/quota.py's QuotaDenial.detail() where MaaS gives
+        # an equivalent; MaaS's own 429 does not name the dimension or the
+        # budget (to capture live, inventory V12), so neither is invented.
+        return {
+            "error": "quota_exceeded",
+            "quota_class": quota_class,
+            "dimension": "maas",
+            "provider": self.provider,
+        }
+
+
+def _status_and_headers(exc: BaseException):
+    status = getattr(exc, "status_code", None)
+    response = getattr(exc, "response", None)
+    if status is None and response is not None:
+        status = getattr(response, "status_code", None)
+    headers = getattr(response, "headers", None) or {}
+    return status, headers
+
+
+def quota_exceeded_from(exc: BaseException, provider: str) -> Optional[MaasQuotaExceeded]:
+    """A MaasQuotaExceeded when `exc` is an HTTP 429 (the openai SDK's
+    RateLimitError, or anything carrying status_code 429), else None."""
+    status, headers = _status_and_headers(exc)
+    if status != 429:
+        return None
+    retry_after: Optional[int] = None
+    raw = headers.get("retry-after") if hasattr(headers, "get") else None
+    if raw is not None:
+        try:
+            retry_after = max(1, int(float(str(raw).strip())))
+        except ValueError:
+            retry_after = None  # an HTTP-date form; not forwarded
+    return MaasQuotaExceeded(provider, retry_after, str(exc)[:200])
+
+
 def _maas_bearer_token(caller_bearer_token: Optional[str] = None) -> str:
     """2026-09-01 (identity-per-caller): prefers the real caller's own
     Keycloak bearer token (the one this gateway already validated for its
@@ -96,7 +240,12 @@ def _maas_bearer_token(caller_bearer_token: Optional[str] = None) -> str:
     provider failure and this candidate's own existing fallback-to-next-
     provider handling (app/main.py) takes over, same as any other
     transient provider error.
+
+    WP-157 D5: with MAAS_GATEWAY_IDENTITY on, the pod's ServiceAccount token
+    always wins and the caller's token is never sent to MaaS.
     """
+    if gateway_identity_enabled():
+        return _service_account_token()
     if caller_bearer_token:
         return caller_bearer_token
     if MAAS_SA_TOKEN_PATH and os.path.exists(MAAS_SA_TOKEN_PATH):
@@ -131,6 +280,7 @@ def chat_model_via_maas(
     request_id: Optional[str] = None,
     caller_bearer_token: Optional[str] = None,
     max_tokens: Optional[int] = None,
+    context: Optional[MaasCallContext] = None,
 ) -> BaseChatModel:
     """The exact same `ChatOpenAI` class every direct candidate in
     app/providers.py already uses, pointed at the MaaS gateway's
@@ -172,6 +322,22 @@ def chat_model_via_maas(
     from langchain_openai import ChatOpenAI
 
     default_headers = {"X-Zuno-Request-Id": request_id} if request_id else None
+    # WP-157 D5: attested quota context, only with the gateway's own identity
+    # (a forwarded caller token must never carry headers MaaS would trust).
+    if gateway_identity_enabled():
+        if context is None:
+            raise MaasAdapterError(
+                "MAAS_GATEWAY_IDENTITY is on but no request context reached the "
+                "MaaS adapter - refusing an unattested call"
+            )
+        default_headers = {**(default_headers or {}), **attested_headers(context)}
+    extra: Dict[str, Any] = {}
+    if quota_429_passthrough_enabled():
+        # A 429 is answered to the caller at once (app/main.py), so the SDK
+        # must not retry it first; this also drops the SDK's retries of
+        # 5xx/connection errors on MaaS calls, which the candidate loop's own
+        # fallback already covers.
+        extra["max_retries"] = 0
 
     # ADR-0521 (WP-076) step 4, live incident 2026-08-26: maas-default-
     # gateway's TLS cert is issued by the same cluster
@@ -210,4 +376,5 @@ def chat_model_via_maas(
         # preferred candidate (local-maas) is via_maas: true, so this is
         # the branch its declared max_tokens actually reaches.
         max_tokens=max_tokens,
+        **extra,
     )

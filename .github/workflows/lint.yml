@@ -148,6 +148,9 @@ jobs:
           # including the via_maas branch structure-demo's own preferred
           # candidate actually uses.
           python3 tests/test_max_tokens_passthrough.py
+          # WP-157: the default-off MaaS switches (429 pass-through, gateway
+          # identity and its attested headers, per-class fail modes).
+          python3 tests/test_wp157_maas_switches.py
       - name: supply-chain pin_release.py tests (ADR-0115)
         working-directory: platform/supply-chain
         run: |

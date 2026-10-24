@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import yaml
 
@@ -70,6 +70,19 @@ class RoutingTable:
 
     def reload(self) -> None:
         self._config = self._load()
+
+    def direct_sibling_names(self) -> Set[str]:
+        """ADR-0570 clause 7 / ADR-0521 item 6: the local providers that reach
+        a model WITHOUT MaaS while a `via_maas: true` entry reaches the same
+        model through it (same `model`, e.g. `local` beside `local-maas`).
+        Derived, not declared, so provider-routing.yaml needs no new key."""
+        providers = self._config.get("providers") or []
+        maas_models = {p.get("model") for p in providers if p.get("via_maas")}
+        return {
+            p["name"]
+            for p in providers
+            if p.get("kind") == "local" and not p.get("via_maas") and p.get("model") in maas_models
+        }
 
     def provider_config(self, name: str) -> Dict[str, Any]:
         if not self._config.get("providers"):
