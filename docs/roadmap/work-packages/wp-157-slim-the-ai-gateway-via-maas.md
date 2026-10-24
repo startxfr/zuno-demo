@@ -49,6 +49,9 @@ generation are gone; routing behaviour and metrics are unchanged.
    `gitops/charts/ai-gateway/values.yaml` and
    `platform/ai-gateway/externalsecret-*.yaml`. List each quota rule and
    each provider with its target MaaS construct.
+   Progress (2026-10-24): inventory, live verifications and a plan for steps
+   3-5 with open decisions in
+   [`wp-157-inventory.md`](../evidence/wp-157-inventory.md).
 
 3. **SaaS providers as MaaS models.** For each SaaS provider (OpenAI,
    Gemini, Anthropic, Mistral, Codestral, and the image provider), declare
