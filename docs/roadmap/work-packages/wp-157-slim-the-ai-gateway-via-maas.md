@@ -235,8 +235,13 @@ each verified by a second session before the next:
     stays in the policy because it is harmless, but it is not to be
     described as enforced, and ADR-0570 clause 2 is not closed on it.
 - **Step B** (`quota429Passthrough`, `failModes`): turned on with the user's
-  go after step A, on the group ceiling alone.
-- **Step C** (`maas.saasSubscriptions.gatewayOnly`): after step B is green.
+  go after step A, on the group ceiling alone. Green: persona chats answer
+  200 through MaaS with no 401, 404, 500 or fallback, and the group counter
+  keeps counting. Not exercised, so not claimed: a real MaaS 429 passed to
+  the caller, and the fail-open path during a Limitador outage.
+- **Step C** (`maas.saasSubscriptions.gatewayOnly`): turned on after step B.
+  The rendered change removes only the four persona MaaSSubscriptions of
+  the SaaS models and the persona groups of their auth policies.
 
 ## Acceptance
 

@@ -166,6 +166,11 @@ zuno_ai_gateway_maas_gateway_identity: true
 # counting live (brief Progress); the user ceiling is not to be advertised.
 zuno_ai_gateway_maas_quota_429_passthrough: true
 zuno_ai_gateway_quota_fail_modes: true
+# Step C (user go 2026-10-24, after step B verified): the SaaS models'
+# MaaS subscriptions and auth policies keep only the ai-gateway
+# ServiceAccount; the /agent_tekos and /sales persona grants go (inventory
+# finding 6). Rendered diff checked against the live values first.
+zuno_models_saas_subscriptions_gateway_only: true
 # Step A (user go 2026-10-24): the gateway-level token quota policy on the
 # MaaS gateway, generated from the release (stacked ceilings standard-user
 # 3M/24h, standard-group 30M/24h, counted on the ai-gateway's attested
