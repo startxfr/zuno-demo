@@ -681,6 +681,7 @@ def _note_maas_call(
     if not maas_adapter.should_use_maas(cfg, candidate.kind):
         return
     quota_windows.clock.hit(quota_class, sub, maas_adapter.groups_key(groups), project_id)
+    quota_windows.clock.hit_model(candidate.name, cfg.get("maas_quota_window"))
 
 
 def _maas_quota_response(
@@ -695,11 +696,17 @@ def _maas_quota_response(
     call it saw in each (app/quota_windows.py); UnifAI turns the header into
     metadata.error.retry_after."""
     if denial.retry_after is None:
+        try:
+            model_window = routing_table.provider_config(denial.provider).get("maas_quota_window")
+        except StopIteration:
+            model_window = None
         denial.retry_after = quota_windows.clock.retry_after(
             quota_class,
             identity.sub if identity else None,
             maas_adapter.groups_key(identity.groups if identity else None),
             project_id,
+            provider=denial.provider,
+            model_window=model_window,
         )
     headers = {"Retry-After": str(denial.retry_after)} if denial.retry_after else None
     return JSONResponse(denial.detail(quota_class), status_code=429, headers=headers)

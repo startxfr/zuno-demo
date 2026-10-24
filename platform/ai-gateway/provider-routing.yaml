@@ -182,6 +182,10 @@ providers:
     model: qwen3.6-27b-instruct
     max_model_len: 32768
     via_maas: true
+    # WP-157: the window of this model's ai-gateway MaaSSubscription
+    # (gitops/charts/models/values.yaml), for the Retry-After of a MaaS
+    # 429; tests/test_wp157_v_findings.py checks the two agree.
+    maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen36-27b-instruct/v1
     temperature: 0.2
     timeout_seconds: 60
@@ -243,6 +247,10 @@ providers:
     model: gpt-oss-20b
     max_model_len: 32768
     via_maas: true
+    # WP-157: the window of this model's ai-gateway MaaSSubscription
+    # (gitops/charts/models/values.yaml), for the Retry-After of a MaaS
+    # 429; tests/test_wp157_v_findings.py checks the two agree.
+    maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1
     temperature: 0.2
     timeout_seconds: 60
@@ -291,6 +299,10 @@ providers:
     model: qwen3.5-9b-wesh
     max_model_len: 32768
     via_maas: true
+    # WP-157: the window of this model's ai-gateway MaaSSubscription
+    # (gitops/charts/models/values.yaml), for the Retry-After of a MaaS
+    # 429; tests/test_wp157_v_findings.py checks the two agree.
+    maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b-wesh/v1
     temperature: 0.2
     timeout_seconds: 60
@@ -321,6 +333,10 @@ providers:
     model: qwen3.5-9b
     max_model_len: 8192
     via_maas: true
+    # WP-157: the window of this model's ai-gateway MaaSSubscription
+    # (gitops/charts/models/values.yaml), for the Retry-After of a MaaS
+    # 429; tests/test_wp157_v_findings.py checks the two agree.
+    maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b/v1
     temperature: 0.2
     timeout_seconds: 60

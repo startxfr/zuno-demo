@@ -28,6 +28,7 @@ import openai  # noqa: E402
 
 from app import main as app_main  # noqa: E402
 from app import quota_windows  # noqa: E402
+import test_wp157_maas_switches as switches  # noqa: E402
 from test_wp157_maas_switches import _Env, _post  # noqa: E402
 
 _ON = {"MAAS_QUOTA_429_PASSTHROUGH": "true"}
@@ -121,12 +122,82 @@ def test_a_plain_maas_429_on_the_streaming_path_too() -> None:
     assert r.headers.get("retry-after") == "86400"
 
 
+def test_subscription_window_wins_over_the_policy_window() -> None:
+    """Live drill 2026-10-24: the 1 h subscription limit tripped and the
+    gateway sent 86026 s (the 24 h policy window). With the provider's
+    maas_quota_window, the delay is what remains of that 1 h."""
+    tick, clock = _fresh_clock()
+    cfg = dict(switches._CFGS["local-maas"], maas_quota_window="1h")
+    with mock.patch.object(quota_windows, "clock", clock), \
+            mock.patch.dict(switches._CFGS, {"local-maas": cfg}):
+        with _Env({}, env=_ON):
+            assert _post().status_code == 200  # the subscription window starts
+        tick.now += 1000
+        with _Env({"local-maas": _plain_429()}, env=_ON):
+            r = _post()
+    assert r.status_code == 429, r.text
+    assert r.headers.get("retry-after") == str(3600 - 1000)
+
+
+def test_subscription_window_unknown_start_is_the_whole_window() -> None:
+    _tick, clock = _fresh_clock()
+    assert clock.retry_after("standard", "a", "g", None, provider="p", model_window="1h") == 3600
+
+
+def test_subscription_window_restarts_after_it_expires() -> None:
+    tick, clock = _fresh_clock()
+    clock.hit_model("p", "1h")
+    tick.now += 3700
+    clock.hit_model("p", "1h")
+    tick.now += 100
+    assert clock.retry_after("standard", "a", "g", None, provider="p", model_window="1h") == 3500
+
+
+def test_maas_quota_window_matches_the_ai_gateway_subscription() -> None:
+    """provider-routing.yaml repeats the window of each model's ai-gateway
+    MaaSSubscription; the two must not drift."""
+    import pathlib
+    import yaml
+
+    root = pathlib.Path(__file__).resolve().parents[3]
+    routing = yaml.safe_load((root / "platform/ai-gateway/provider-routing.yaml").read_text())
+    values = yaml.safe_load((root / "gitops/charts/models/values.yaml").read_text())
+
+    def models(node):
+        if isinstance(node, dict):
+            if "publishedName" in node:
+                yield node
+            for child in node.values():
+                yield from models(child)
+        elif isinstance(node, list):
+            for child in node:
+                yield from models(child)
+
+    windows = {}
+    for model in models(values):
+        for sub in model.get("subscriptions") or []:
+            if str(sub.get("user", "")).endswith(":ai-gateway"):
+                windows[model["publishedName"]] = {r["window"] for r in sub.get("tokenRateLimits") or []}
+    checked = 0
+    for entry in routing["providers"]:
+        if not entry.get("via_maas"):
+            continue
+        published = entry["endpoint"].rstrip("/").split("/")[-2]
+        assert entry.get("maas_quota_window"), f"{entry['name']}: via_maas without maas_quota_window"
+        assert windows.get(published) == {entry["maas_quota_window"]}, (
+            f"{entry['name']}: maas_quota_window {entry['maas_quota_window']} != "
+            f"{published} ai-gateway subscription window(s) {windows.get(published)}"
+        )
+        checked += 1
+    assert checked >= 4
+
+
 def test_flag_off_records_nothing() -> None:
     _tick, clock = _fresh_clock()
     with mock.patch.object(quota_windows, "clock", clock):
         with _Env({}):
             assert _post().status_code == 200
-    assert clock._starts == {}
+    assert clock._starts == {} and clock._model_starts == {}
 
 
 # -- V13: closed class refused without a MaaS path ------------------------------
