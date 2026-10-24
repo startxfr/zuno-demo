@@ -25,6 +25,15 @@
     build_dockerfile_path: Dockerfile
     build_context_dir: components/diagram-render
 
+# The A2A gateway serves each admitted zuno agent over Agent2Agent; it calls mcp-gateway and
+# ai-gateway with the caller's token, so it is built and deployed with the mcp run component.
+- name: "mcp_build | build a2a-gateway"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: a2a-gateway
+    build_dockerfile_path: components/a2a-gateway/Dockerfile
+    build_context_dir: "."
+
 # ADR-0119 (WP-057): discovered, not hand-listed one block per server -
 # same reasoning as .github/workflows/build-publish.yml's
 # discover-mcp-servers job (every MCP server shares the same Dockerfile/

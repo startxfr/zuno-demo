@@ -325,6 +325,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Partially implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
 | [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) | Implemented | Deploy UnifAI through ArgoCD from a pinned OLM catalog |
 | [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Accepted | Upstream generic UnifAI changes and isolate zuno-specific code |
+| [ADR-0585](0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) | Accepted | Serve zuno agents over A2A from a gateway that answers with the caller's identity |
 
 ## v0.12
 

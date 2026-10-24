@@ -1,0 +1,36 @@
+---
+# A2A gateway: serves each admitted zuno agent over Agent2Agent, answered with the caller's own
+# identity (ansible/roles/mcp installs it under the mcp run component, like diagram-render).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-a2a-gateway-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-149"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/a2a-gateway
+    helm:
+      releaseName: zuno-a2a-gateway-d1
+      values: |
+        # Substituted by ansible/tasks/apply_gitops_app.yml - feeds the chart's derived keycloak issuer.
+        clusterBaseDomain: apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  ignoreDifferences:
+    # ADR-0059: image.openshift.io/triggers patches this field from the ImageStream.
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

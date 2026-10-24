@@ -1,0 +1,142 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: a2a-gateway
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: a2a-gateway
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+    image.openshift.io/triggers: |-
+      {{ include "a2a-gateway.imageTrigger" (dict "repository" .Values.image.repository "tag" .Values.image.tag "container" "a2a-gateway") }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: a2a-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: a2a-gateway
+      {{- if .Values.okf.fetch.enabled }}
+      annotations:
+        # ADR-0580: a promoted release changes this, which rolls the pods.
+        zuno.startx.fr/okf-corp-reference: {{ .Values.okf.fetch.corpReference | quote }}
+      {{- end }}
+    spec:
+      serviceAccountName: a2a-gateway
+      priorityClassName: zuno-workload-default
+      automountServiceAccountToken: false
+      {{- if .Values.topologySpreadConstraints.enabled }}
+      topologySpreadConstraints:
+        - maxSkew: {{ .Values.topologySpreadConstraints.maxSkew }}
+          topologyKey: {{ .Values.topologySpreadConstraints.topologyKey }}
+          whenUnsatisfiable: {{ .Values.topologySpreadConstraints.whenUnsatisfiable }}
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: a2a-gateway
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      {{- if .Values.okf.fetch.enabled }}
+      {{- if not (contains "@sha256:" .Values.okf.fetch.corpReference) }}
+      {{- fail "okf.fetch.corpReference must be a @sha256: reference when okf.fetch.enabled is true" }}
+      {{- end }}
+      initContainers:
+        # ADR-0580/WP-161: pull, verify offline, extract. Non-zero exit on any verification
+        # failure keeps the pod in Init (fail closed).
+        - name: okf-fetch
+          image: "{{ .Values.okf.fetch.image.repository }}:{{ .Values.okf.fetch.image.tag }}"
+          imagePullPolicy: {{ .Values.okf.fetch.image.pullPolicy }}
+          command:
+            - python3
+            - /app/platform/supply-chain/admit_okf_bundle.py
+            - extract
+            - {{ .Values.okf.fetch.corpReference | quote }}
+            - --out
+            - /okf
+          env:
+            - name: HOME
+              value: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: okf
+              mountPath: /okf
+            - name: okf-tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.okf.fetch.resources | nindent 12 }}
+      {{- end }}
+      containers:
+        - name: a2a-gateway
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: KEYCLOAK_ISSUER
+              value: {{ .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) | quote }}
+            - name: KEYCLOAK_JWKS_URL
+              value: {{ .Values.keycloakJwksUrl | quote }}
+            - name: JWT_AUDIENCE
+              value: {{ .Values.jwtAudience | quote }}
+            - name: AI_GATEWAY_URL
+              value: {{ .Values.aiGatewayUrl | quote }}
+            - name: MCP_GATEWAY_URL
+              value: {{ .Values.mcpGatewayUrl | quote }}
+            - name: PUBLIC_BASE_URL
+              value: {{ .Values.publicBaseUrl | quote }}
+            - name: A2A_TOOLS_ENABLED
+              value: {{ .Values.toolsEnabled | quote }}
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+{{- if .Values.okf.fetch.enabled }}
+            - name: AGENTS_DIR
+              value: /okf/agents
+            - name: LIMITS_POLICY_PATH
+              value: /okf/policies/limits/limits-policy.yaml
+{{- end }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.okf.fetch.enabled }}
+            - name: okf
+              mountPath: /okf
+              readOnly: true
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.okf.fetch.enabled }}
+        - name: okf
+          emptyDir: {}
+        - name: okf-tmp
+          emptyDir: {}
+        {{- end }}

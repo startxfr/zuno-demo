@@ -32,6 +32,10 @@ spec:
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: mcp-gateway
+        # The A2A gateway answers an agent turn with a model call made with the caller's own token.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: a2a-gateway
         # WP-087: the mlops training pipeline runs the SAME acceptance gate
         # from zuno-mlops, so the acceptance-gate peer above cannot reach
         # it - an ingress `from` peer carrying only a podSelector matches

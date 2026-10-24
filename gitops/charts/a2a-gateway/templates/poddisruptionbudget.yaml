@@ -1,0 +1,15 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: a2a-gateway
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: a2a-gateway
+    zuno.io/managed-by: argocd
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: a2a-gateway
+{{- end }}

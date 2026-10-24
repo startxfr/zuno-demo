@@ -133,3 +133,32 @@
     gitops_component_name: "diagram-render"
     gitops_app_phase: "d1"
     gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+
+# A2A gateway: serves each admitted zuno agent over Agent2Agent for UnifAI blueprints - deployed
+# under this same "mcp" Day1 run component (it sits beside mcp-gateway and calls it with the
+# caller's own token), like diagram-render above. Agents and the corp limits policy come from the
+# same admitted release as mcp-gateway (okf-fetch init container), merged into the Application's
+# inline values as for the d1 Application above.
+- name: "mcp | apply the A2A gateway GitOps Application (d0, no-op)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "a2a-gateway"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d0"
+
+- name: "mcp | apply the A2A gateway GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "a2a-gateway"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/a2a-gateway/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+        | combine({'okf': {'fetch': {'enabled': true, 'corpReference': _mcp_okf_reference,
+                                     'image': {'tag': zuno_okf_fetch_image_tag | default('latest')}}}},
+                  recursive=True)
+      }}
+    gitops_app_refresh: true

@@ -1,0 +1,64 @@
+namespace: zuno-ai-run
+
+image:
+  # Built by the "a2a-gateway" build component into zuno-ai-build's ImageStream, pulled
+  # cross-namespace into zuno-ai-run via the system:image-puller RoleBinding.
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/a2a-gateway
+  # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
+  tag: latest
+  pullPolicy: Always
+
+replicas: 1
+
+# ADR-0101: PodDisruptionBudget and a soft spread across zones. The task store is in memory, so
+# more than one replica needs sticky sessions for tasks/get; one replica is the demo footprint.
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+topologySpreadConstraints:
+  enabled: true
+  maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Same identity wiring as mcp-gateway (see its values.yaml for the issuer / JWKS split).
+clusterBaseDomain: apps.mycluster.example.com
+keycloakIssuer: ""
+keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
+# Tokens of the `unifai` client carry this audience (maas-gateway-audience mapper). A token minted
+# for another client of the realm is refused. Empty = the audience is not checked.
+jwtAudience: zuno-admin-api
+
+# Downstream gateways, called with the caller's own token.
+aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
+mcpGatewayUrl: http://mcp-gateway.zuno-ai-run.svc:8080
+# URL written in the agent cards: where UnifAI's A2A client posts.
+publicBaseUrl: http://a2a-gateway.zuno-ai-run.svc:8080
+toolsEnabled: true
+
+# Namespace of the UnifAI stack whose multi-agent pods may call this service.
+unifaiNamespace: zuno-unifai
+
+# ADR-0580/WP-161: agent definitions come from the admitted zuno-demo-agents release, pulled and
+# verified offline by an init container (same mechanism as mcp-gateway). A failed verification
+# keeps the pod in Init (fail closed). ansible/roles/a2a_gateway enables it with the locked digest.
+okf:
+  fetch:
+    enabled: false
+    corpReference: ""
+    image:
+      repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/supply-chain-signer
+      tag: latest
+      pullPolicy: Always
+    resources:
+      requests: {cpu: 50m, memory: 64Mi}
+      limits: {cpu: 500m, memory: 256Mi}

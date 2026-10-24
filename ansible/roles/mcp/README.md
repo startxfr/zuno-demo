@@ -16,3 +16,7 @@ name-mismatch self-sufficiency pattern this role uses throughout. All four
 images (`mcp-gateway`,
 `mcp-confluence`, `mcp-salesforce`, `mcp-git-forge`) build via the
 `mcp_build` Day 1 build component (`make d1 build mcp`).
+
+Also applies `gitops/apps/a2a-gateway` (`gitops/charts/a2a-gateway`, ADR-0585/WP-175): the A2A gateway that serves each active
+agent over Agent2Agent with the caller's own identity (`components/a2a-gateway`), built by `mcp_build` and fed by the same admitted
+agents release as the mcp-gateway.
