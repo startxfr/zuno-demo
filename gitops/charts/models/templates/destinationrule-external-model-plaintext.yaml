@@ -45,7 +45,18 @@ port 8000 in gitops/charts/ai-gateway/templates/deployment.yaml): 443
 carries every outbound HTTPS call ai-gateway makes, so excluding it would
 pull far more than these two hosts out of the mesh.
 */}}
-{{- range $key, $model := .Values.externalModels }}
+{{- /*
+WP-157 step 3: .Values.externalModels is a list now. Only ENABLED entries get
+a rule (a disabled provider has no ExternalModel, hence no controller-owned
+DestinationRule to win over), and one rule per HOST: two entries on the same
+vendor host (mistral-large and mistral-codestral, both api.mistral.ai) would
+otherwise render two rules with the same host and workloadSelector, which
+Istio resolves by an unpredictable tiebreak.
+*/}}
+{{- $seenHosts := dict }}
+{{- range $model := .Values.externalModels }}
+{{- if and (ne (toString $model.enabled) "false") (not (hasKey $seenHosts $model.endpoint)) }}
+{{- $_ := set $seenHosts $model.endpoint true }}
 apiVersion: networking.istio.io/v1
 kind: DestinationRule
 metadata:
@@ -66,4 +77,5 @@ spec:
     tls:
       mode: DISABLE
 ---
+{{- end }}
 {{- end }}

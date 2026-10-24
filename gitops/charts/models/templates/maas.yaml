@@ -137,11 +137,50 @@ spec:
     clientId: {{ .Values.maas.externalOIDC.clientId }}
 {{- end }}
 {{- range .Values.maas.models }}
----
 {{- $model := . }}
+{{- /*
+WP-157 step 3: an ExternalModel-backed entry is published only while its
+backend's .Values.externalModels entry is enabled - one switch per provider,
+so a disabled SaaS provider has no MaaSModelRef pointing at a missing CR and
+no subscription granting it. A backend missing from that list is a typo, not
+a reason to publish silently.
+*/}}
+{{- $published := true }}
+{{- if eq (toString .modelRefKind) "ExternalModel" }}
+{{- $found := false }}
+{{- range $.Values.externalModels }}
+{{- if eq .name $model.backendInferenceServiceName }}
+{{- $found = true }}
+{{- $published = ne (toString .enabled) "false" }}
+{{- end }}
+{{- end }}
+{{- if not $found }}
+{{- fail (printf "maas.models[%s]: modelRefKind ExternalModel but no externalModels entry is named %s" .publishedName .backendInferenceServiceName) }}
+{{- end }}
+{{- end }}
+{{- /*
+WP-157 decision D5 / ADR-0570 Security considerations: with
+maas.saasSubscriptions.gatewayOnly, an ExternalModel-backed entry keeps only
+its service-identity (`user:`) subscriptions - the ai-gateway ServiceAccount -
+and drops the persona-group ones. Off by default (current behaviour).
+*/}}
+{{- $subs := .subscriptions }}
+{{- if and (eq (toString .modelRefKind) "ExternalModel") $.Values.maas.saasSubscriptions.gatewayOnly }}
+{{- $subs = list }}
+{{- range .subscriptions }}
+{{- if .user }}
+{{- $subs = append $subs . }}
+{{- end }}
+{{- end }}
+{{- if not $subs }}
+{{- fail (printf "maas.models[%s]: maas.saasSubscriptions.gatewayOnly leaves no subscription (add a user: entry for the ai-gateway ServiceAccount)" .publishedName) }}
+{{- end }}
+{{- end }}
+{{- if $published }}
+---
 {{- if eq .modelRefKind "ExternalModel" }}
 # The published backend is {{ .backendInferenceServiceName }}'s own
-# ExternalModel CR (templates/externalmodel-*.yaml) - a genuinely external
+# ExternalModel CR (templates/externalmodel.yaml) - a genuinely external
 # SaaS endpoint, not a local workload. This CR only points MaaS's
 # governance plane at it by name (ADR-0537, WP-106 Phase 3).
 {{- else }}
@@ -170,7 +209,7 @@ spec:
     kind: {{ .modelRefKind | default "LLMInferenceService" }}
     name: {{ .backendInferenceServiceName }}
 ---
-{{- range .subscriptions }}
+{{- range $subs }}
 apiVersion: maas.opendatahub.io/v1alpha1
 kind: MaaSSubscription
 metadata:
@@ -238,7 +277,7 @@ spec:
   subjects:
     {{- $authGroups := list }}
     {{- $authUsers := list }}
-    {{- range .subscriptions }}
+    {{- range $subs }}
     {{- if .user }}
     {{- $authUsers = append $authUsers .user }}
     {{- else }}
@@ -255,5 +294,6 @@ spec:
     users:
       {{- toYaml $authUsers | nindent 6 }}
     {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}

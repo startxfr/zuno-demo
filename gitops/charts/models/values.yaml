@@ -954,6 +954,25 @@ maas:
     enabled: true
     clientId: zuno-admin-api
 
+  # WP-157 decision D5 (ADR-0570 amendment of 2026-10-24, Security
+  # considerations): the fix of the inventory's finding 6. The two SaaS
+  # entries below (mistral-large-maas, gpt-oss-120b-ovhcloud-maas) grant the
+  # persona groups /agent_tekos and /sales, so a persona can call a SaaS model
+  # through MaaS directly, outside Zuno's C1/C2/C3 classification - while
+  # ADR-0570 grants SaaS subscriptions only to identities limited to C1
+  # content, and Tekos handles C2 work. With gatewayOnly: true, every
+  # ExternalModel-backed entry keeps only its `user:` subscriptions (the
+  # ai-gateway ServiceAccount) and the persona-group MaaSSubscriptions and
+  # MaaSAuthPolicy subjects are no longer rendered (ArgoCD prunes them).
+  # Default false = today's grants, unchanged. Turn it on together with the
+  # ai-gateway's MAAS_GATEWAY_IDENTITY (chart value
+  # maasAdapter.gatewayIdentity.enabled), once V0/V1 of
+  # docs/roadmap/evidence/wp-157-inventory.md hold: until the gateway
+  # presents its own ServiceAccount, a forwarded persona token needs the
+  # persona grant. The WP-157 entries below never carry persona grants.
+  saasSubscriptions:
+    gatewayOnly: false
+
   models:
     # The proven WP-27 reference: gpt-oss-20b, live-verified end-to-end
     # (Ready MaaSModelRef, group-based subscription access, denial for an
@@ -1202,7 +1221,7 @@ maas:
 
     # ADR-0537 (WP-106, Phase 3): mistral-large-latest, published as a
     # MaaSModelRef backed by an ExternalModel CR (templates/
-    # externalmodel-mistral.yaml) instead of an LLMInferenceService -
+    # externalmodel.yaml) instead of an LLMInferenceService -
     # modelRefKind below overrides templates/maas.yaml's default. Stays on
     # its native api.mistral.ai endpoint (explicit decision: NOT migrated
     # to OVHcloud) - only its governance changes. Same two-persona-group +
@@ -1235,7 +1254,7 @@ maas:
 
     # ADR-0537 (WP-106, Phase 3): gpt-oss-120b via OVHcloud AI Endpoints
     # (ADR-0416), published the same way as mistral-large-latest above -
-    # see templates/externalmodel-ovhcloud-gpt-oss-120b.yaml. Finage's
+    # see templates/externalmodel.yaml. Finage's
     # existing exclusion from this model (ADR-0416,
     # zuno.model.local_only: true) stays enforced solely in ai-gateway's
     # own routing/classification layer - deliberately NOT duplicated into
@@ -1265,20 +1284,96 @@ maas:
       authPolicy:
         name: gpt-oss-120b-ovhcloud-entitlement
 
-# ADR-0537 (WP-106, Phase 3): the two SaaS models published via ExternalModel
+    # WP-157 step 3 (ADR-0570): the remaining chat SaaS providers, published
+    # only while their externalModels entry (below) is enabled - all four
+    # ship disabled. Per decision D5 their only subscriber is the ai-gateway
+    # ServiceAccount, never a persona group: Zuno's classification stays the
+    # outer policy for every SaaS call, and ADR-0570's Security
+    # considerations allow a SaaS subscription only to an identity limited to
+    # C1 content. The ceiling is the same coarse infrastructure tier as the
+    # gateway's other subscriptions; per-user budgets are the gateway-level
+    # TokenRateLimitPolicy's job (D1, connectivity-link chart).
+    - publishedName: mistral-codestral-maas
+      modelRefKind: ExternalModel
+      backendInferenceServiceName: mistral-codestral
+      subscriptions:
+        - name: mistral-codestral-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
+      authPolicy:
+        name: mistral-codestral-entitlement
+    - publishedName: openai-gpt-4o-mini-maas
+      modelRefKind: ExternalModel
+      backendInferenceServiceName: openai-gpt-4o-mini
+      subscriptions:
+        - name: openai-gpt-4o-mini-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
+      authPolicy:
+        name: openai-gpt-4o-mini-entitlement
+    - publishedName: anthropic-claude-maas
+      modelRefKind: ExternalModel
+      backendInferenceServiceName: anthropic-claude
+      subscriptions:
+        - name: anthropic-claude-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
+      authPolicy:
+        name: anthropic-claude-entitlement
+    - publishedName: gemini-pro-maas
+      modelRefKind: ExternalModel
+      backendInferenceServiceName: gemini-pro
+      subscriptions:
+        - name: gemini-pro-ai-gateway
+          user: "system:serviceaccount:zuno-ai-run:ai-gateway"
+          tokenRateLimits:
+            - limit: 1000000
+              window: 1h
+          priority: 100
+      authPolicy:
+        name: gemini-pro-entitlement
+
+# ADR-0537 (WP-106, Phase 3): the SaaS models published via ExternalModel
 # above. `name` is both the ExternalModel CR's own metadata.name and the
-# `backendInferenceServiceName` each maas.models entry above points at.
+# `backendInferenceServiceName` the matching maas.models entry points at.
 # credentialRef requires the target Secret's data key to be literally
 # "api-key" (verified via the CRD schema) - the existing
-# platform/ai-gateway/externalsecret-{mistral,ovhcloud}.yaml Secrets use
-# "api_key" for ai-gateway's own direct-call consumption, so each entry here
-# gets its own mirror ExternalSecret (same Vault path/property, different
-# target Secret + key name) rather than editing those - ADR-0416/ADR-0415's
+# platform/ai-gateway/externalsecret-<provider>.yaml Secrets use "api_key"
+# for ai-gateway's own direct-call consumption, so each entry here gets its
+# own mirror ExternalSecret (same Vault path/property, different target
+# Secret + key name) rather than editing those - ADR-0416/ADR-0415's
 # already-settled "one key per account" principle stays intact; this only
 # adds a second Kubernetes Secret pointing at the same Vault value.
+#
+# WP-157 step 3 (ADR-0570): a LIST, rendered by templates/externalmodel.yaml
+# (ExternalSecret + ExternalModel) and templates/destinationrule-external-
+# model-plaintext.yaml (one DestinationRule per distinct host). An entry is
+# enabled unless it sets `enabled: false`; a disabled entry renders nothing
+# here AND its maas.models entry (MaaSModelRef/MaaSSubscription/
+# MaaSAuthPolicy) is skipped too (templates/maas.yaml looks the backend up in
+# this list), so `enabled` is the one switch per provider. The two entries
+# that predate WP-157 stay enabled and render the same objects as before.
+# The four WP-157 entries ship disabled: each is turned on only once its live
+# verification passes on demo333 (inventory V2-V4,
+# docs/roadmap/evidence/wp-157-inventory.md section 4).
+#
+# `provider` values: `mistral` and `openai-compatible` are the two the
+# existing CRs already use. OpenAI, Gemini and Anthropic go through their
+# vendors' OpenAI-compatible endpoints with `provider: openai-compatible`
+# (WP-157 decision D8) rather than a guessed native value.
+# `endpoint` is a bare host, as on the two existing CRs (the DestinationRule
+# template uses it as an Istio host too).
 externalModels:
-  mistral:
-    name: mistral-large
+  - name: mistral-large
     endpoint: api.mistral.ai
     provider: mistral
     targetModel: mistral-large-latest
@@ -1286,14 +1381,62 @@ externalModels:
     vault:
       path: providers/mistral
       property: api_key
-  ovhcloudGptOss120b:
-    name: gpt-oss-120b-ovhcloud
+  - name: gpt-oss-120b-ovhcloud
     endpoint: oai.endpoints.kepler.ai.cloud.ovh.net
     provider: openai-compatible
     targetModel: gpt-oss-120b
     secretName: llm-provider-ovhcloud-maas
     vault:
       path: providers/ovhcloud
+      property: api_key
+  # WP-157: ADR-0417's dedicated Codestral account (Vault
+  # providers/mistral-codestral), same native Mistral API and host as
+  # mistral-large above. Inventory V3.
+  - name: mistral-codestral
+    enabled: false
+    endpoint: api.mistral.ai
+    provider: mistral
+    targetModel: codestral-latest
+    secretName: llm-provider-mistral-codestral-maas
+    vault:
+      path: providers/mistral-codestral
+      property: api_key
+  # WP-157 D8: OpenAI's own API is OpenAI-format; `openai-compatible` keeps
+  # one provider value for the three OpenAI-format vendors. Inventory V3.
+  - name: openai-gpt-4o-mini
+    enabled: false
+    endpoint: api.openai.com
+    provider: openai-compatible
+    targetModel: gpt-4o-mini
+    secretName: llm-provider-openai-maas
+    vault:
+      path: providers/openai
+      property: api_key
+  # WP-157 D8: Anthropic's OpenAI SDK compatibility endpoint
+  # (https://api.anthropic.com/v1/chat/completions). If V2 fails with
+  # streaming or usage, Anthropic stays direct as a named exception (D8 (a)).
+  - name: anthropic-claude
+    enabled: false
+    endpoint: api.anthropic.com
+    provider: openai-compatible
+    targetModel: claude-3-5-sonnet-latest
+    secretName: llm-provider-anthropic-maas
+    vault:
+      path: providers/anthropic
+      property: api_key
+  # WP-157 D8: Google's OpenAI-compatible endpoint lives under a path prefix
+  # (https://generativelanguage.googleapis.com/v1beta/openai/), and this
+  # CRD's spec has no path field (only the inference.opendatahub.io
+  # ExternalModel has one, D10). V3 decides whether MaaS reaches it with a
+  # bare host; if not, Gemini stays direct (D8 (a)) or D10 is reopened.
+  - name: gemini-pro
+    enabled: false
+    endpoint: generativelanguage.googleapis.com
+    provider: openai-compatible
+    targetModel: gemini-1.5-pro
+    secretName: llm-provider-gemini-maas
+    vault:
+      path: providers/gemini
       property: api_key
 
 lmEval:
