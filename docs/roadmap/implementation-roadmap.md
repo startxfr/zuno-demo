@@ -34,7 +34,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 22 | 17 | 19 | WP-166, WP-170, WP-171, WP-172, WP-173, WP-174 |
-| v0.12 | 9 | 5 | 9 | WP-161, WP-163, WP-164, WP-167 |
+| v0.12 | 9 | 5 | 9 | WP-161, WP-164, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -948,7 +948,7 @@ frozen mirror.
 | WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Done | v0.2.0 admitted offline and pinned in platform/okf/agents.lock by okf-promote (target branch devel) |
 | WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Operator pending | live and durable on demo333 since 2026-10-23 (okf-fetch on supply-chain-signer:latest built from devel); mlops and ai-gateway read the release at build time since WP-165 (ADR-0580 amendment) |
 | WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Done | operator 0.1.25 on stable; five agents of release v0.1.1 verified keyless on demo333 |
-| WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Repo work in review | schemas, corp ceilings, narrowing rule and the operator reader (0.1.27) are done; bundle migration waits for the zuno-demo-agents 0.3.0 promotion |
+| WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Done (2026-10-24) | schemas, corp ceilings, narrowing rule, operator reader (0.1.27); tekos migrated to OKF v0.3 and live on release v0.4.0, the other seven bundles migrate with their own releases |
 | WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator and consumers live on demo333 (unifai role, Keycloak groups); quotas/MaaS/routing delivered by WP-157 (partial closure), release 0.3.0 promotion proves the live effect |
 | WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Done | agents/ removed, readers on the admitted release, Transit OKF chain gone (dc931dec); full promotion cycle live 2026-10-24 (release 0.3.0, PR #3, "— Tekos" answer on demo333) |
 | WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Done (2026-10-24) | Red Hat docs on UnifAI (38 web sources, 16/18 vs 13/18), rag-service and rag-ingestion retired on demo333 and in the repository |

@@ -1,6 +1,6 @@
 # WP-163: OKF v0.3 schema and its consumers
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-24)
 - **ADRs:** [ADR-0579](../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md)
 - **Depends on:** [WP-158](wp-158-bootstrap-the-zuno-demo-agents-repository.md), [WP-160](wp-160-admit-the-corp-okf-release-in-zuno-demo.md)
 - **Related:** [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md), [ADR-0567](../../adr/0567-move-trustyai-guardrails-into-the-ai-gateway.md), [WP-162](wp-162-keyless-okf-verification-in-unifai-operator.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)
@@ -90,3 +90,14 @@ unmapped in the bundle status), which answers the open question on where a skill
 step is the migration of the agents' bundles to v0.3 in `zuno-demo-agents` and its promotion (release
 0.3.0, [WP-165](wp-165-cut-over-and-remove-agents-from-zuno-demo.md)'s cycle), after which the
 acceptance is checked live.
+
+## Live acceptance (2026-10-24, zuno-demo-agents v0.4.0)
+
+The tekos bundle was migrated to OKF v0.3 (whole bundle, including the six content notes, once the
+validator accepted v0.2 and v0.3 notes) and released in v0.4.0, promoted in `platform/okf/agents.lock`
+(okf-corp@sha256:af3824cd…, okf-tekos@sha256:9a991bbb…, tekos 0.3.0). On demo333 the
+UnifaiAgentBundle `tekos` is Verified (keyless, `publish.yml` on tag `v0.4.0`), Valid "OKF v0.3, 4 tasks,
+shape retrieve_reason_respond", WithinCeilings, Emitted (17 objects) and Ready; mcp-gateway fetched and
+verified the same release (8 agents); a tekos chat as consultant-01 answered 200 and ends with the
+"— Tekos" signature. `models`, `guardrails` and `limits` stay unmapped in the operator, so they have no
+runtime effect yet. The other seven bundles still declare OKF v0.2 and migrate with their own releases.
