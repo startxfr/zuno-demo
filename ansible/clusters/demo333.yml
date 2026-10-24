@@ -139,18 +139,18 @@ zuno_unifai_values:
     identity:
       oidcClaims: true
     images:
-      backend: image-registry.openshift-image-registry.svc:5000/zuno-unifai/unifai-backend:devel-e76c71cd0
-      identity: image-registry.openshift-image-registry.svc:5000/zuno-unifai/unifai-identity:devel-e76c71cd0
-      multiagent: image-registry.openshift-image-registry.svc:5000/zuno-unifai/unifai-multiagent:devel-7d2c02708
-      rag: image-registry.openshift-image-registry.svc:5000/zuno-unifai/unifai-rag:devel-ed9007147
-      ui: image-registry.openshift-image-registry.svc:5000/zuno-unifai/unifai-ui:devel-387573fec
+      backend: quay.io/zuno/unifai-backend:devel-1bb72a84d
+      identity: quay.io/zuno/unifai-identity:devel-1bb72a84d
+      multiagent: quay.io/zuno/unifai-multiagent:devel-1bb72a84d
+      rag: quay.io/zuno/unifai-rag:devel-1bb72a84d
+      ui: quay.io/zuno/unifai-ui:devel-1bb72a84d
     rag:
       tokenReview: true
     ragClients:
     - namespace: zuno-ai-run
       podLabels:
         zuno.io/rag-client: 'true'
-    version: devel-e76c71cd0
+    version: devel-1bb72a84d
   redhatDocs:
     enabled: true
     syncInterval: 168h
