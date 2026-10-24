@@ -118,8 +118,13 @@ def _security_results() -> List[Day2Result]:
     module = _load_security_checks()
     if module is None:
         return [Day2Result(AGENT, "security", "n/a", "coverage", True, "no security_checks.py for this agent")]
+    # A check that cannot apply (unifai_checks.skip, delegation_checks) carries `skipped`: it is
+    # reported as NOT RUN in the coverage category, never as a pass of the security layer and
+    # never as a failure of the run - the same convention as the retired layers below.
     return [
-        Day2Result(AGENT, "security", r.name, "security", r.passed, r.detail)
+        Day2Result(AGENT, "security", r.name, "coverage", True, f"NOT RUN: {r.detail}")
+        if getattr(r, "skipped", False)
+        else Day2Result(AGENT, "security", r.name, "security", r.passed, r.detail)
         for r in module.run()
     ]
 

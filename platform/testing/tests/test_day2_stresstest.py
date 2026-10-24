@@ -46,6 +46,37 @@ def test_stress_test_layer_is_reported_not_run() -> None:
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+def test_a_skipped_security_check_is_not_run_never_a_failure_nor_a_security_pass() -> None:
+    """A check that cannot apply (the Tekos -> Arkos delegation checks while the release declares
+    nothing) must not turn the run red, and must not be counted among the security passes."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class R:
+        name: str
+        passed: bool
+        detail: str = ""
+        skipped: bool = False
+
+    module = types.ModuleType("security_checks")
+    module.run = lambda: [
+        R("real_check", True, "ok"),
+        R("failing_check", False, "status=500"),
+        R("delegation_x", False, "skipped: delegation is not enabled", skipped=True),
+    ]
+    saved = day2_stresstest._load_security_checks
+    day2_stresstest._load_security_checks = lambda: module
+    try:
+        rows = {r.id: r for r in day2_stresstest._security_results()}
+    finally:
+        day2_stresstest._load_security_checks = saved
+    assert (rows["real_check"].category, rows["real_check"].passed) == ("security", True)
+    assert (rows["failing_check"].category, rows["failing_check"].passed) == ("security", False)
+    skipped = rows["delegation_x"]
+    assert (skipped.category, skipped.passed) == ("coverage", True), skipped
+    assert skipped.detail.startswith("NOT RUN: skipped: delegation is not enabled"), skipped.detail
+
+
 def test_rag_ingestion_layer_is_gone() -> None:
     assert not hasattr(day2_stresstest, "_rag_ingestion_results")
     assert not hasattr(day2_stresstest, "_load_stress_test")
@@ -86,6 +117,7 @@ def test_main_cleans_up_unifai_sessions() -> None:
 
 TESTS = [
     test_stress_test_layer_is_reported_not_run,
+    test_a_skipped_security_check_is_not_run_never_a_failure_nor_a_security_pass,
     test_rag_ingestion_layer_is_gone,
     test_main_cleans_up_unifai_sessions,
 ]
