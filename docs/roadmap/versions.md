@@ -54,13 +54,15 @@ observed, one rollback forced), which closed the whole v0.1–v0.3 roadmap.
 Agent-to-agent evolution: A2A protocol adoption, identity propagation across
 agent calls, controlled shared memory, delegation traceability and limits,
 task-oriented frontend views, automated removal of inaccessible private RAG
-content, advanced human approval workflows (ADR-0401 – ADR-0409, all still
-stubs). The band also carries the model-fleet, ingestion-throughput,
+content, advanced human approval workflows (ADR-0401 – ADR-0409). ADR-0401,
+ADR-0402, ADR-0403, ADR-0406 and ADR-0409 left the band on 2026-10-24 for v0.11
+(full records, the delegation contract); ADR-0404, ADR-0405, ADR-0407 and
+ADR-0408 stay here as stubs. The band also carries the model-fleet, ingestion-throughput,
 observability and project work actually delivered during it — ADR-0516,
 ADR-0518 – ADR-0520, ADR-0524 – ADR-0531, ADR-0536, plus the webinar
 sovereign-AI demonstration (ADR-0550).
 
-**34 ADRs.** Open: ADR-0401 – ADR-0409 (stubs), ADR-0550 (`Accepted`);
+**29 ADRs.** Open: ADR-0404, ADR-0405, ADR-0407, ADR-0408 (stubs), ADR-0550 (`Accepted`);
 WP-55, WP-093, WP-101, WP-112, WP-135, WP-136, WP-137.
 
 ## v0.5
@@ -234,8 +236,8 @@ of truth, delivered to the operator as signed OCI artifacts; the ai-gateway
 stays the model policy router and is slimmed onto MaaS. Piloted on demo333
 with tekos; demo222 cuts over only after full validation.
 
-**17 ADRs: 15 `Accepted`, ADR-0564 superseded in part by ADR-0577 and
-ADR-0578, ADR-0353 `Proposed`.** Open: ADR-0353, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575; WP-146 – WP-157.
+**22 ADRs: 16 `Accepted`, ADR-0564 superseded in part by ADR-0577 and
+ADR-0578, ADR-0353, ADR-0401, ADR-0403, ADR-0406 and ADR-0409 `Proposed`.** Open: ADR-0353, ADR-0401, ADR-0402, ADR-0403, ADR-0406, ADR-0409, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575; WP-146 – WP-157.
 
 ## v0.12
 

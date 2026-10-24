@@ -11,15 +11,15 @@ These nine decisions were originally drafted as ADR-0201–0209 under the v0.2 r
 
 ### ADR-0401: Introduce agent-to-agent communication
 
-Allow approved agent delegation while preserving identity, budget and policy boundaries.
+Promoted to a full decision record (2026-10-24, retargeted to v0.11, UnifAI stream): see [ADR-0401](../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md).
 
 ### ADR-0402: Adopt A2A as the inter-agent protocol
 
-Use a standard protocol for agent delegation instead of bespoke point-to-point contracts.
+Promoted to a full decision record (2026-10-24, retargeted to v0.11, UnifAI stream): see [ADR-0402](../adr/0402-adopt-a2a-as-the-inter-agent-protocol.md).
 
 ### ADR-0403: Propagate user identity across agent-to-agent calls
 
-Keep authorization grounded in the initiating user during delegated operations.
+Promoted to a full decision record (2026-10-24, retargeted to v0.11, UnifAI stream): see [ADR-0403](../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md).
 
 ### ADR-0404: Introduce controlled shared agent memory
 
@@ -31,7 +31,7 @@ Make delegated actions understandable and auditable in the user experience.
 
 ### ADR-0406: Limit recursive agent delegation
 
-Prevent loops and runaway cost through hop/depth and policy limits.
+Promoted to a full decision record (2026-10-24, retargeted to v0.11, UnifAI stream): see [ADR-0406](../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md).
 
 ### ADR-0407: Add specialized task-oriented frontend views
 
@@ -45,13 +45,15 @@ Remove embeddings/content when a user loses source access.
 
 ### ADR-0409: Introduce advanced human approval workflows
 
-Pause sensitive operations for explicit approval and resume from persisted checkpoints.
+Promoted to a full decision record (2026-10-24, retargeted to v0.11, UnifAI stream): see [ADR-0409](../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md).
 
 ## Reassessment (2026-10-24) - against the UnifAI platform
 
 These stubs predate [ADR-0561](../adr/0561-adopt-unifai-as-the-agent-platform.md).
 No status changes here; each row records what the UnifAI fork already provides
 and what remains, so that a later decision can promote, amend or supersede it.
+
+Rows 0401, 0402, 0403, 0406 and 0409 were promoted on the same day (see their records); the table keeps what each found.
 
 | ADR | Already provided | Open |
 |---|---|---|

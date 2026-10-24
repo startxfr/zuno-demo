@@ -108,3 +108,14 @@ system prompt, so it is reviewed with the same CODEOWNERS rule as
 
 No step of this decision touches a cluster. The schema change is a release
 of `zuno-demo-agents`; its consumers ship before it is used.
+
+## Amendment (2026-10-24) - optional delegation fields
+
+Two optional fields are added to OKF v0.3, absent by default (which means no
+delegation): `zuno.delegation.targets`, a list of `{agent, task}` the agent may
+delegate to ([ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md)),
+and `zuno.limits.delegation.max_depth`, at most the corp ceiling
+`max_delegation_depth` ([ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md)).
+The corp limits policy also gains `delegation.allow_write` (default `false`).
+No new `okf_version`: readers that ignore unknown optional fields are unaffected, and
+the operator and schema are updated to accept them.

@@ -9,6 +9,13 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Promotion and retarget (2026-10-24) - the agent delegation contract
+
+ADR-0401, ADR-0402, ADR-0403, ADR-0406 and ADR-0409 are promoted from v0.4 stubs
+to full records and move to v0.11, the UnifAI stream where the work happens.
+ADR-0402 is `Accepted` (the A2A SDK is already adopted); the other four are
+`Proposed`. ADR-0404, ADR-0405, ADR-0407 and ADR-0408 stay v0.4 stubs.
+
 ## Retarget and retitle (2026-10-24) - ADR-0353 written
 
 ADR-0353 (an optional external registry for first-party runtime images) was a

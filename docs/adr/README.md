@@ -76,7 +76,7 @@ renumbered to close a cosmetic gap.
 
 ### Stub records
 
-Nine rows marked *(stub)* have no file of their own: their text lives in
+Four rows marked *(stub)* have no file of their own: their text lives in
 `../roadmap/adr-decisions-v0.*.md` and the link points at the anchor. A stub
 is promoted to a real file by Step 0 of the work package that implements it.
 
@@ -208,15 +208,10 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0401](../roadmap/adr-decisions-v0.4.md#adr-0401-introduce-agent-to-agent-communication) *(stub)* | Proposed | Introduce agent-to-agent communication |
-| [ADR-0402](../roadmap/adr-decisions-v0.4.md#adr-0402-adopt-a2a-as-the-inter-agent-protocol) *(stub)* | Proposed | Adopt A2A as the inter-agent protocol |
-| [ADR-0403](../roadmap/adr-decisions-v0.4.md#adr-0403-propagate-user-identity-across-agent-to-agent-calls) *(stub)* | Proposed | Propagate user identity across agent-to-agent calls |
 | [ADR-0404](../roadmap/adr-decisions-v0.4.md#adr-0404-introduce-controlled-shared-agent-memory) *(stub)* | Proposed | Introduce controlled shared agent memory |
 | [ADR-0405](../roadmap/adr-decisions-v0.4.md#adr-0405-expose-agent-delegation-traces-to-users) *(stub)* | Proposed | Expose agent delegation traces to users |
-| [ADR-0406](../roadmap/adr-decisions-v0.4.md#adr-0406-limit-recursive-agent-delegation) *(stub)* | Proposed | Limit recursive agent delegation |
 | [ADR-0407](../roadmap/adr-decisions-v0.4.md#adr-0407-add-specialized-task-oriented-frontend-views) *(stub)* | Proposed | Add specialized task-oriented frontend views |
 | [ADR-0408](../roadmap/adr-decisions-v0.4.md#adr-0408-automate-removal-of-inaccessible-private-rag-content) *(stub)* | Proposed | Automate removal of inaccessible private RAG content |
-| [ADR-0409](../roadmap/adr-decisions-v0.4.md#adr-0409-introduce-advanced-human-approval-workflows) *(stub)* | Proposed | Introduce advanced human approval workflows |
 | [ADR-0413](0413-consolidate-grafana-dashboards-into-six-platform-views.md) | Implemented | Consolidate Grafana dashboards into six platform views |
 | [ADR-0414](0414-consolidate-zuno-ai-run-into-three-tiered-mig-predictors.md) | Implemented | Consolidate zuno-ai-run into three tiered MIG predictors |
 | [ADR-0415](0415-consume-stable-diffusion-xl-via-ovhcloud-ai-endpoints.md) | Implemented | Consume stable-diffusion-xl via OVHcloud AI Endpoints |
@@ -309,6 +304,11 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0353](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) | Proposed | Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF |
+| [ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md) | Proposed | Introduce agent-to-agent delegation limited to the targets an agent declares |
+| [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Accepted | Adopt A2A as the inter-agent protocol |
+| [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) | Proposed | Propagate the user's identity and the delegation chain across agent-to-agent calls |
+| [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Proposed | Limit agent delegation by depth, cycle and budget |
+| [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Proposed | Introduce human approval for delegated operations, resumable from persisted checkpoints |
 | [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md) | Implemented | Keep the ai-gateway as the policy router in front of UnifAI |
 | [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Accepted | Adopt UnifAI as the agent platform |
 | [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md) | Implemented | Authenticate UnifAI against the zuno Keycloak realm |

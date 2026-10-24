@@ -221,3 +221,12 @@ exhausted denies. Limitador has no "try the project, else the user"
 fallback. Until ADR-0563 clause 5 is settled only the `standard` class is
 enforced at MaaS; `intensive` and the project dimension are recorded as not
 enforced, never dropped silently.
+
+## Amendment (2026-10-24) - delegated calls
+
+A call made inside an agent-to-agent delegation carries the initiating user's token
+([ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md))
+and is therefore charged to that user's quota, group and project exactly like a direct
+call; no quota dimension is added per agent or per hop
+([ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) clause 3). The chain
+is recorded in the audit and the spans, not in the counters.
