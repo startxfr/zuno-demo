@@ -8,13 +8,13 @@ classes:
     fail_mode: open
     tokens:
       user:
-        budget: 3000000
+        budget: 10000000
         window: 24h
       group:
-        budget: 30000000
+        budget: 100000000
         window: 24h
       project:
-        budget: 15000000
+        budget: 50000000
         window: 24h
   intensive:
     fail_mode: closed
@@ -27,6 +27,18 @@ classes:
         window: 24h
       project:
         budget: 2500000
+        window: 24h
+  evaluation:
+    fail_mode: open
+    tokens:
+      user:
+        budget: 20000000
+        window: 24h
+      group:
+        budget: 200000000
+        window: 24h
+      project:
+        budget: 100000000
         window: 24h
   stresstest:
     fail_mode: closed

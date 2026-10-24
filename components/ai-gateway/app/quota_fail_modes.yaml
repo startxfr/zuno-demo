@@ -7,4 +7,5 @@
 classes:
   standard: open
   intensive: closed
+  evaluation: open
   stresstest: closed

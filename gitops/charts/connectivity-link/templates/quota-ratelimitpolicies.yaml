@@ -28,6 +28,31 @@ spec:
     kind: HTTPRoute
     name: {{ .name }}
   limits:
+    evaluation-user:
+      rates:
+        - limit: 120
+          window: 5m
+      counters:
+        - expression: 'auth.identity.sub'
+      when:
+        - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'evaluation' : false)"
+    evaluation-group:
+      rates:
+        - limit: 1200
+          window: 5m
+      counters:
+        - expression: "auth.identity.groups.join('|')"
+      when:
+        - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'evaluation' : false)"
+    evaluation-project:
+      rates:
+        - limit: 600
+          window: 5m
+      counters:
+        - expression: "request.headers['x-zuno-project-id']"
+      when:
+        - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'evaluation' : false)"
+        - predicate: "'x-zuno-project-id' in request.headers"
     intensive-user:
       rates:
         - limit: 10
