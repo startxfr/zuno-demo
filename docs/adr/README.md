@@ -76,7 +76,7 @@ renumbered to close a cosmetic gap.
 
 ### Stub records
 
-Ten rows marked *(stub)* have no file of their own: their text lives in
+Nine rows marked *(stub)* have no file of their own: their text lives in
 `../roadmap/adr-decisions-v0.*.md` and the link points at the anchor. A stub
 is promoted to a real file by Step 0 of the work package that implements it.
 
@@ -201,7 +201,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0326](0326-generalize-the-tekos-vertical-slice-to-the-four-remaining-agents.md) | Implemented | Generalize the Tekos vertical slice to the four remaining agents |
 | [ADR-0340](0340-extend-business-role-authorization-with-cdp-and-scoped-capabilities.md) | Implemented | Extend business-role authorization with CDP and scoped capabilities |
 | [ADR-0351](0351-share-rtx-pro-6000-gpus-via-nvidia-mig-with-scale-from-zero-burst-capacity.md) | Implemented | Share RTX PRO 6000 GPUs via NVIDIA MIG with scale-from-zero burst capacity |
-| [ADR-0353](../roadmap/adr-decisions-v0.3.md#adr-0353-support-an-optional-external-registry-as-the-first-party-runtime-image-source) *(stub)* | Proposed | Support an optional external registry as the first-party runtime image source |
 | [ADR-0355](0355-expose-aap-audits-to-agents-through-an-mcp-aap-server.md) | Implemented | Expose AAP audits to agents through an mcp-aap server |
 | [ADR-0532](0532-accept-knowledge-adv-as-sourceless-pending-a-replacement-adapter.md) | Implemented | Accept `knowledge.adv` as sourceless pending a replacement adapter |
 
@@ -309,6 +308,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
+| [ADR-0353](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) | Proposed | Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF |
 | [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md) | Implemented | Keep the ai-gateway as the policy router in front of UnifAI |
 | [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Accepted | Adopt UnifAI as the agent platform |
 | [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md) | Implemented | Authenticate UnifAI against the zuno Keycloak realm |

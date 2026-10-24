@@ -47,7 +47,7 @@ server exposing AAP audits to agents) and ADR-0532, which accepts
 after a live verification (autonomy enabled, one full tune-evaluate cycle
 observed, one rollback forced), which closed the whole v0.1–v0.3 roadmap.
 
-**16 ADRs.** Open: ADR-0353 (stub); WP-34.
+**15 ADRs.** Open: WP-34. ADR-0353 (external registry for first-party images, a stub of this band) moved to v0.11 on 2026-10-24, rewritten as the split between the internal registry and quay.io/zuno.
 
 ## v0.4
 
@@ -234,8 +234,8 @@ of truth, delivered to the operator as signed OCI artifacts; the ai-gateway
 stays the model policy router and is slimmed onto MaaS. Piloted on demo333
 with tekos; demo222 cuts over only after full validation.
 
-**16 ADRs: 15 `Accepted`, ADR-0564 superseded in part by ADR-0577 and
-ADR-0578.** Open: ADR-0560 – ADR-0563, ADR-0565 – ADR-0575; WP-146 – WP-157.
+**17 ADRs: 15 `Accepted`, ADR-0564 superseded in part by ADR-0577 and
+ADR-0578, ADR-0353 `Proposed`.** Open: ADR-0353, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575; WP-146 – WP-157.
 
 ## v0.12
 

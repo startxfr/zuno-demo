@@ -343,6 +343,12 @@ services) and ADR-0116/0117's (how agents reach third-party SaaS tool
 backends): ADR-0353 would decide where first-party runtime images
 themselves are sourced from.
 
+> **Update (2026-10-24):** ADR-0353 is now written, retitled
+> [Source runtime images by family](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md).
+> It keeps the internal registry for the components zuno-demo builds, recognises
+> `quay.io/zuno` for the UnifAI stack and the OKF release, and adds no per-chart
+> registry override.
+
 ### Implemented foundations
 
 - `.github/workflows/build-publish.yml` builds first-party images, publishes SHA-based tags, generates SPDX SBOMs, scans HIGH/CRITICAL vulnerabilities with Trivy (reported, `continue-on-error: true` - see the 2026-08-19 note above), signs images with keyless Cosign through GitHub OIDC and attests the SBOM.

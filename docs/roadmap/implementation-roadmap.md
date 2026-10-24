@@ -25,7 +25,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0 | 72 | — | 7 | — |
 | v0.1 | 29 | — | 18 | — |
 | v0.2 | 14 | — | 17 | WP-098 |
-| v0.3 | 16 | 1 | 19 | — |
+| v0.3 | 15 | — | 19 | — |
 | v0.4 | 35 | 9 | 31 | WP-55, WP-101 |
 | v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 16 | 11 | 14 | WP-146, WP-157, WP-166 |
+| v0.11 | 17 | 12 | 14 | WP-146, WP-157, WP-166 |
 | v0.12 | 9 | 5 | 9 | WP-161, WP-163, WP-164, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 

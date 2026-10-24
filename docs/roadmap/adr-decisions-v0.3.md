@@ -63,4 +63,4 @@ Promoted to a full decision record: see [ADR-0342](../adr/0342-support-multiple-
 
 ### ADR-0353: Support an optional external registry as the first-party runtime image source
 
-Decide whether/how gitops charts may optionally source first-party runtime images from Quay (or another external registry) instead of the in-cluster mirror + BuildConfig default ADR-0115 leaves unchanged - and, if adopted, how that differs from ADR-0352's "internal vs external" axis (which governs who deploys platform infrastructure services, not where first-party application images come from).
+Promoted to a full decision record, retitled to what it decided: see [ADR-0353](../adr/0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) (images are sourced by family: the internal registry for zuno-demo's components, quay.io/zuno for UnifAI and OKF).

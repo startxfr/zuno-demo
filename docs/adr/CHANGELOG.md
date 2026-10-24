@@ -9,6 +9,14 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Retarget and retitle (2026-10-24) - ADR-0353 written
+
+ADR-0353 (an optional external registry for first-party runtime images) was a
+v0.3 stub deferred to by ADR-0115. It is promoted to a full record, moves from
+v0.3 to v0.11 and is retitled to what it decides: images are sourced by family,
+the internal registry for zuno-demo's components and `quay.io/zuno` for the
+UnifAI stack and the OKF release.
+
 ## Amendment (2026-10-24) - ADR-0577 gains an optional conformance layer
 
 The corp artifact may carry the OKF conformance cases as a third, optional
