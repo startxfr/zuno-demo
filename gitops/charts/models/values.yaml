@@ -956,7 +956,7 @@ maas:
 
   # WP-157 decision D5 (ADR-0570 amendment of 2026-10-24, Security
   # considerations): the fix of the inventory's finding 6. The two SaaS
-  # entries below (mistral-large-maas, gpt-oss-120b-ovhcloud-maas) grant the
+  # entries below (mistral-large, gpt-oss-120b-ovhcloud) grant the
   # persona groups /agent_tekos and /sales, so a persona can call a SaaS model
   # through MaaS directly, outside Zuno's C1/C2/C3 classification - while
   # ADR-0570 grants SaaS subscriptions only to identities limited to C1
@@ -1227,7 +1227,7 @@ maas:
     # to OVHcloud) - only its governance changes. Same two-persona-group +
     # ai-gateway-catch-all pattern and rate limits as every model above,
     # reused verbatim rather than inventing new tiers for this ADR.
-    - publishedName: mistral-large-maas
+    - publishedName: mistral-large
       modelRefKind: ExternalModel
       backendInferenceServiceName: mistral-large
       subscriptions:
@@ -1259,7 +1259,7 @@ maas:
     # zuno.model.local_only: true) stays enforced solely in ai-gateway's
     # own routing/classification layer - deliberately NOT duplicated into
     # this entry's authPolicy subjects, per ADR-0537 Decision 3.
-    - publishedName: gpt-oss-120b-ovhcloud-maas
+    - publishedName: gpt-oss-120b-ovhcloud
       modelRefKind: ExternalModel
       backendInferenceServiceName: gpt-oss-120b-ovhcloud
       subscriptions:
@@ -1293,7 +1293,7 @@ maas:
     # C1 content. The ceiling is the same coarse infrastructure tier as the
     # gateway's other subscriptions; per-user budgets are the gateway-level
     # TokenRateLimitPolicy's job (D1, connectivity-link chart).
-    - publishedName: mistral-codestral-maas
+    - publishedName: mistral-codestral
       modelRefKind: ExternalModel
       backendInferenceServiceName: mistral-codestral
       subscriptions:
@@ -1305,7 +1305,7 @@ maas:
           priority: 100
       authPolicy:
         name: mistral-codestral-entitlement
-    - publishedName: openai-gpt-4o-mini-maas
+    - publishedName: openai-gpt-4o-mini
       modelRefKind: ExternalModel
       backendInferenceServiceName: openai-gpt-4o-mini
       subscriptions:
@@ -1317,7 +1317,7 @@ maas:
           priority: 100
       authPolicy:
         name: openai-gpt-4o-mini-entitlement
-    - publishedName: anthropic-claude-maas
+    - publishedName: anthropic-claude
       modelRefKind: ExternalModel
       backendInferenceServiceName: anthropic-claude
       subscriptions:
@@ -1329,7 +1329,7 @@ maas:
           priority: 100
       authPolicy:
         name: anthropic-claude-entitlement
-    - publishedName: gemini-pro-maas
+    - publishedName: gemini-pro
       modelRefKind: ExternalModel
       backendInferenceServiceName: gemini-pro
       subscriptions:

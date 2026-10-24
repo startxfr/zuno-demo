@@ -203,8 +203,8 @@ spec:
   modelRef:
     # ADR-0537 (WP-106, Phase 3): defaults to LLMInferenceService (every
     # entry before this ADR relied on the implicit default) - the two
-    # ExternalModel-backed entries (mistral-large-maas,
-    # gpt-oss-120b-ovhcloud-maas) set modelRefKind: ExternalModel
+    # ExternalModel-backed entries (mistral-large,
+    # gpt-oss-120b-ovhcloud) set modelRefKind: ExternalModel
     # explicitly in values.yaml.
     kind: {{ .modelRefKind | default "LLMInferenceService" }}
     name: {{ .backendInferenceServiceName }}
