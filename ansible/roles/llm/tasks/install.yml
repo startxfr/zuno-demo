@@ -57,6 +57,8 @@
           enabled: "{{ zuno_ai_gateway_maas_quota_429_passthrough | default(false) | bool }}"
         failModes:
           enabled: "{{ zuno_ai_gateway_quota_fail_modes | default(false) | bool }}"
+        closedClassMaasOnly:
+          enabled: "{{ zuno_ai_gateway_closed_class_maas_only | default(false) | bool }}"
         # WP-157 SaaS-through-MaaS pilot: lets a SaaS provider marked
         # via_maas (the `mistral` pilot) reach MaaS. Off by default; turning
         # it on is an egress decision of its own (chart values comment).

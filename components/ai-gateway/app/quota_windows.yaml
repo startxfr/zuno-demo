@@ -1,0 +1,18 @@
+# GENERATED FILE (WP-157, inventory V7/V12) - do not edit. Source:
+# policies/quotas/quota-policy.yaml of the admitted agents release.
+# class -> dimension -> token window, read by app/quota_windows.py to
+# compute the Retry-After of a MaaS 429, which carries none.
+# Regenerate with: python3 platform/okf/generate_quota_enforcement.py
+classes:
+  standard:
+    user: 24h
+    group: 24h
+    project: 24h
+  intensive:
+    user: 24h
+    group: 24h
+    project: 24h
+  stresstest:
+    user: 5m
+    group: 5m
+    project: 5m

@@ -179,6 +179,10 @@ spec:
             - name: QUOTA_FAIL_MODES_ENFORCED
               value: "true"
             {{- end }}
+            {{- if .Values.maasAdapter.closedClassMaasOnly.enabled }}
+            - name: QUOTA_CLOSED_CLASS_MAAS_ONLY
+              value: "true"
+            {{- end }}
             # ADR-0104: semantic cache, default off - see
             # components/ai-gateway/app/semantic_cache.py and
             # platform/ai-gateway/provider-routing.yaml's `cache_enabled`

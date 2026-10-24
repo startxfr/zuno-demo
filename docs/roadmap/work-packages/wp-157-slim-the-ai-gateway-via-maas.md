@@ -251,6 +251,23 @@ each verified by a second session before the next:
   step does not touch), and MaaS external egress is off on demo333, so a
   SaaS route answers 500 past authorization.
 
+Code from the V-checks (2026-10-24, user decisions, repo only, not yet in
+an image):
+
+- **Computed Retry-After (V7, V12).** MaaS's quota 429 carries no
+  `Retry-After`, so with `quota429Passthrough` on the gateway computes it
+  from the token windows of the policy (generated
+  `app/quota_windows.yaml`), counted from the first MaaS call it saw for
+  each counter key, since Limitador starts a window at its first hit. It
+  takes the longest remaining window of the caller's keys (MaaS does not
+  say which ceiling fired), and the class's full window when this replica
+  saw no start. The WP-148 contract is unchanged.
+- **Closed classes refused without MaaS (V13).** A new switch
+  `maasAdapter.closedClassMaasOnly` (Ansible
+  `zuno_ai_gateway_closed_class_maas_only`, default off): a `closed` class
+  is served only through MaaS, so a `stresstest` request whose MaaS path
+  fails is refused instead of answered by a direct SaaS fallback.
+
 Open after the sequence: the per-user ceiling defect; routing the SaaS
 providers through MaaS (with external egress) before the direct SaaS
 branches and keys can go; the V0-V14 equivalence checks.

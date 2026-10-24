@@ -49,6 +49,11 @@ clause 3); enforcement config is generated, never hand-authored:
      the gateway still needs once the budgets move to Kuadrant (ADR-0570
      clause 7: the direct-Service sibling only for `open` classes).
 
+  5. components/ai-gateway/app/quota_windows.yaml
+     (WP-157, inventory V7/V12) class -> dimension -> token window: a MaaS
+     429 carries no Retry-After, so the gateway computes one from these
+     windows, which Limitador starts at the first hit.
+
 Dimension key expressions (recorded simplifications):
   - user:    auth.identity.sub (validated JWT, ADR-0033)
   - group:   the caller's full sorted business-role group set joined
@@ -86,6 +91,7 @@ RLP_PATH = REPO_ROOT / "gitops" / "charts" / "connectivity-link" / "templates" /
 BUDGETS_PATH = REPO_ROOT / "components" / "ai-gateway" / "app" / "quota_budgets.yaml"
 TRLP_PATH = REPO_ROOT / "gitops" / "charts" / "connectivity-link" / "templates" / "quota-tokenratelimitpolicies.yaml"
 FAIL_MODES_PATH = REPO_ROOT / "components" / "ai-gateway" / "app" / "quota_fail_modes.yaml"
+QUOTA_WINDOWS_PATH = REPO_ROOT / "components" / "ai-gateway" / "app" / "quota_windows.yaml"
 # Not generated - hand-authored, because it carries the demo route's own
 # Gateway/JWKS wiring and the rationale comments for it. But its AuthPolicy
 # has to publish exactly the identity properties the generated counters
@@ -440,6 +446,21 @@ def _render_fail_modes(doc: Dict) -> str:
     return header + yaml.safe_dump({"classes": modes}, sort_keys=False)
 
 
+def _render_quota_windows(doc: Dict) -> str:
+    windows = {}
+    for name, cls in (doc.get("classes") or {}).items():
+        tokens = (cls or {}).get("tokens") or {}
+        windows[name] = {dim: spec.get("window") for dim, spec in tokens.items() if (spec or {}).get("window")}
+    header = (
+        "# GENERATED FILE (WP-157, inventory V7/V12) - do not edit. Source:\n"
+        "# policies/quotas/quota-policy.yaml of the admitted agents release.\n"
+        "# class -> dimension -> token window, read by app/quota_windows.py to\n"
+        "# compute the Retry-After of a MaaS 429, which carries none.\n"
+        f"# Regenerate with: {REGEN_CMD}\n"
+    )
+    return header + yaml.safe_dump({"classes": windows}, sort_keys=False)
+
+
 def _check_trlp_counters() -> List[str]:
     """The token counters may only read the attested headers.
 
@@ -623,6 +644,7 @@ def main() -> int:
             BUDGETS_PATH: _render_budgets(doc),
             TRLP_PATH: _render_trlp(doc.get("classes") or {}),
             FAIL_MODES_PATH: _render_fail_modes(doc),
+            QUOTA_WINDOWS_PATH: _render_quota_windows(doc),
         }
     except ValueError as exc:
         print(f"error: {exc}", file=sys.stderr)

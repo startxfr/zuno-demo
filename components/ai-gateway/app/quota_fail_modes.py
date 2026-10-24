@@ -18,6 +18,12 @@ behaves exactly as before. With it on:
   quota.py's own docstring) lets an `open` class through. quota.py itself is
   left untouched; it goes with the ledger.
 
+With QUOTA_CLOSED_CLASS_MAAS_ONLY also on (WP-157 inventory V13: a
+`stresstest` request whose local candidates had all failed was answered by a
+direct SaaS fallback, outside any quota), a `closed` class skips every
+candidate not reached through MaaS - direct SaaS providers as well as direct
+siblings - so with no MaaS path left the request is refused, not served.
+
 A class missing from the file, or a file that cannot be read, is `closed`:
 ADR-0511's default.
 """
@@ -38,6 +44,14 @@ FAIL_MODES_PATH = pathlib.Path(__file__).resolve().parent / "quota_fail_modes.ya
 def enforced() -> bool:
     """Read per call, so a test (or a restart with the env set) flips it."""
     return os.getenv("QUOTA_FAIL_MODES_ENFORCED", "false").strip().lower() == "true"
+
+
+def closed_class_maas_only() -> bool:
+    """QUOTA_CLOSED_CLASS_MAAS_ONLY (chart value
+    maasAdapter.closedClassMaasOnly.enabled, default false): a `closed` class
+    is served only by a candidate reached through MaaS, where its quota is
+    enforced. Read per call, like enforced()."""
+    return os.getenv("QUOTA_CLOSED_CLASS_MAAS_ONLY", "false").strip().lower() == "true"
 
 
 class FailModes:

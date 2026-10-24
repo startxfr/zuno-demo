@@ -118,6 +118,7 @@ jobs:
             gitops/charts/connectivity-link/templates/quota-tokenratelimitpolicies.yaml
             components/ai-gateway/app/quota_budgets.yaml
             components/ai-gateway/app/quota_fail_modes.yaml
+            components/ai-gateway/app/quota_windows.yaml
           commit-message: "okf: promote zuno-demo-agents ${{ steps.candidate.outputs.tag }}"
           title: "okf: promote zuno-demo-agents ${{ steps.candidate.outputs.tag }}"
           body-path: ${{ runner.temp }}/body.md

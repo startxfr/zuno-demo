@@ -153,6 +153,13 @@ maasAdapter:
   # lets `open` classes through instead of denying every class.
   failModes:
     enabled: false
+  # WP-157 inventory V13: with this on too, a `closed` class (stresstest,
+  # intensive) is served only by a candidate reached through MaaS, where its
+  # quota counts; a direct SaaS provider or direct sibling is skipped, so
+  # when MaaS has no path left the request is refused instead of answered
+  # by a quota-free SaaS fallback.
+  closedClassMaasOnly:
+    enabled: false
 
 # ADR-0104: opt-in semantic cache in the existing platform Redis
 # (gitops/charts/redis, zuno-auth namespace - same instance
