@@ -337,17 +337,6 @@ def _gateway_identity_predicate_format() -> str:
     return expr
 
 
-# WP-157 workaround (order test and user go, 2026-10-24): on demo333 the
-# wasm shim never counts the LAST token-limit action pair of a request
-# (proven live: whichever limit ran last never appeared in Limitador).
-# Kuadrant orders a Gateway's token-limit actions by limit name, after the
-# maas-controller's `models_as_a_service_*` ones, so these budgets would
-# run last. The prefix moves every one of them ahead of the MaaS limits, and
-# the last slot falls to a MaaS subscription limit; values, counters and
-# predicates are unchanged. Drop it once the shim defect is fixed.
-TRLP_LIMIT_NAME_PREFIX = {"user": "a-", "group": "a-", "project": "a-"}
-
-
 def _render_trlp(classes: Dict[str, Dict]) -> str:
     """One gateway-level TokenRateLimitPolicy carrying the ADR-0511 token
     budgets (WP-157 step 5, D1-D5). See the module docstring, item 3."""
@@ -416,7 +405,7 @@ def _render_trlp(classes: Dict[str, Dict]) -> str:
                 cond = guards[0] if len(guards) == 1 else f"and {' '.join(guards)}"
                 lines.append(f"    {{{{- if {cond} }}}}")
             lines += [
-                f"      {TRLP_LIMIT_NAME_PREFIX.get(dim, '')}{cls_name}-{dim}:",
+                f"      {cls_name}-{dim}:",
                 "        rates:",
                 f"          - limit: {tok.get('budget')}",
                 f"            window: {tok.get('window')}",

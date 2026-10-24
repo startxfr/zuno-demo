@@ -45,7 +45,7 @@ spec:
     strategy: merge
     limits:
     {{- if $trl.enforceNonStandardClasses }}
-      a-intensive-user:
+      intensive-user:
         rates:
           - limit: 500000
             window: 24h
@@ -57,7 +57,7 @@ spec:
           - predicate: "'x-zuno-user-sub' in request.headers"
     {{- end }}
     {{- if $trl.enforceNonStandardClasses }}
-      a-intensive-group:
+      intensive-group:
         rates:
           - limit: 5000000
             window: 24h
@@ -69,7 +69,7 @@ spec:
           - predicate: "'x-zuno-groups' in request.headers"
     {{- end }}
     {{- if and $trl.enforceNonStandardClasses $trl.enforceProjectDimension }}
-      a-intensive-project:
+      intensive-project:
         rates:
           - limit: 2500000
             window: 24h
@@ -80,7 +80,7 @@ spec:
           - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'intensive' : false)"
           - predicate: "'x-zuno-project-id' in request.headers"
     {{- end }}
-      a-standard-user:
+      standard-user:
         rates:
           - limit: 3000000
             window: 24h
@@ -90,7 +90,7 @@ spec:
           - predicate: {{ $gatewayIdentity | quote }}
           - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'standard' : true)"
           - predicate: "'x-zuno-user-sub' in request.headers"
-      a-standard-group:
+      standard-group:
         rates:
           - limit: 30000000
             window: 24h
@@ -101,7 +101,7 @@ spec:
           - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'standard' : true)"
           - predicate: "'x-zuno-groups' in request.headers"
     {{- if $trl.enforceProjectDimension }}
-      a-standard-project:
+      standard-project:
         rates:
           - limit: 15000000
             window: 24h
@@ -113,7 +113,7 @@ spec:
           - predicate: "'x-zuno-project-id' in request.headers"
     {{- end }}
     {{- if $trl.enforceNonStandardClasses }}
-      a-stresstest-user:
+      stresstest-user:
         rates:
           - limit: 2000
             window: 5m
@@ -125,7 +125,7 @@ spec:
           - predicate: "'x-zuno-user-sub' in request.headers"
     {{- end }}
     {{- if $trl.enforceNonStandardClasses }}
-      a-stresstest-group:
+      stresstest-group:
         rates:
           - limit: 8000
             window: 5m
@@ -137,7 +137,7 @@ spec:
           - predicate: "'x-zuno-groups' in request.headers"
     {{- end }}
     {{- if and $trl.enforceNonStandardClasses $trl.enforceProjectDimension }}
-      a-stresstest-project:
+      stresstest-project:
         rates:
           - limit: 4000
             window: 5m
