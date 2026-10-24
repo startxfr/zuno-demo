@@ -1,0 +1,10 @@
+# GENERATED FILE (ADR-0511, WP-157 decision D6) - do not edit. Source:
+# policies/quotas/quota-policy.yaml of the admitted agents release.
+# class -> fail_mode, read by app/quota_fail_modes.py (ADR-0570 clause 7:
+# the direct-Service sibling of a via_maas candidate serves only `open`
+# classes). A class absent here is `closed` (ADR-0511 default).
+# Regenerate with: python3 platform/okf/generate_quota_enforcement.py
+classes:
+  standard: open
+  intensive: closed
+  stresstest: closed

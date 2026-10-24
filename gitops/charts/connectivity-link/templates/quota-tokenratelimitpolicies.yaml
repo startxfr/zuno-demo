@@ -1,0 +1,151 @@
+{{- if .Values.quotaEnforcement.tokenRateLimits.enabled }}
+{{- $trl := .Values.quotaEnforcement.tokenRateLimits }}
+{{- if not (and $trl.targetGateway.name $trl.targetGateway.namespace) }}
+{{- fail "quotaEnforcement.tokenRateLimits.targetGateway.name and .namespace must be set when tokenRateLimits.enabled is true (the MaaS Gateway of this cluster)" }}
+{{- end }}
+{{- if not $trl.gatewayIdentity.username }}
+{{- fail "quotaEnforcement.tokenRateLimits.gatewayIdentity.username must be set when tokenRateLimits.enabled is true (the ai-gateway ServiceAccount username)" }}
+{{- end }}
+{{- if not (has $trl.attachment (list "defaults" "overrides")) }}
+{{- fail "quotaEnforcement.tokenRateLimits.attachment must be defaults or overrides" }}
+{{- end }}
+{{- $gatewayIdentity := printf "(has(auth.identity.user) ? (has(auth.identity.user.username) ? auth.identity.user.username == '%s' : false) : false)" $trl.gatewayIdentity.username }}
+# GENERATED FILE (ADR-0511, WP-157 step 5) - do not edit.
+# Source: policies/quotas/quota-policy.yaml of the admitted agents release.
+# Regenerate with: python3 platform/okf/generate_quota_enforcement.py
+# ADR-0511's token budgets as ONE TokenRateLimitPolicy on the MaaS
+# Gateway (ADR-0570 clause 2 as amended 2026-10-24, WP-157 D1), so a
+# budget spans every model behind it. Stacked ceilings (D2): each limit
+# below is enforced on its own and the first exhausted one denies; the
+# policy file's project-then-user fallback is not expressible in
+# Limitador. Counters read the headers the ai-gateway attests (D5) and
+# every limit applies only to the ai-gateway's own ServiceAccount, so a
+# direct MaaS client cannot forge them; direct clients stay bounded by
+# their MaaSSubscription. Rendered: standard user and group (D3+D4).
+# The project dimension (enforceProjectDimension) and the intensive and
+# stresstest classes (enforceNonStandardClasses) are generated but NOT
+# rendered by default: no caller sends a verified project id or a
+# non-standard class until ADR-0563 clause 5 is settled, and a live
+# limit nobody can reach would read as enforcement that is not there.
+# Strategy merge keeps the maas-controller's per-route policies in
+# force beside this one (to prove live, inventory V10).
+apiVersion: kuadrant.io/v1alpha1
+kind: TokenRateLimitPolicy
+metadata:
+  name: zuno-token-quota
+  namespace: {{ $trl.targetGateway.namespace }}
+  labels:
+    app.kubernetes.io/part-of: zuno-quota-enforcement
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: {{ $trl.targetGateway.name }}
+  {{ $trl.attachment }}:
+    strategy: merge
+    limits:
+    {{- if $trl.enforceNonStandardClasses }}
+      intensive-user:
+        rates:
+          - limit: 500000
+            window: 24h
+        counters:
+          - expression: "request.headers['x-zuno-user-sub']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'intensive' : false)"
+          - predicate: "'x-zuno-user-sub' in request.headers"
+    {{- end }}
+    {{- if $trl.enforceNonStandardClasses }}
+      intensive-group:
+        rates:
+          - limit: 5000000
+            window: 24h
+        counters:
+          - expression: "request.headers['x-zuno-groups']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'intensive' : false)"
+          - predicate: "'x-zuno-groups' in request.headers"
+    {{- end }}
+    {{- if and $trl.enforceNonStandardClasses $trl.enforceProjectDimension }}
+      intensive-project:
+        rates:
+          - limit: 2500000
+            window: 24h
+        counters:
+          - expression: "request.headers['x-zuno-project-id']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'intensive' : false)"
+          - predicate: "'x-zuno-project-id' in request.headers"
+    {{- end }}
+      standard-user:
+        rates:
+          - limit: 3000000
+            window: 24h
+        counters:
+          - expression: "request.headers['x-zuno-user-sub']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'standard' : true)"
+          - predicate: "'x-zuno-user-sub' in request.headers"
+      standard-group:
+        rates:
+          - limit: 30000000
+            window: 24h
+        counters:
+          - expression: "request.headers['x-zuno-groups']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'standard' : true)"
+          - predicate: "'x-zuno-groups' in request.headers"
+    {{- if $trl.enforceProjectDimension }}
+      standard-project:
+        rates:
+          - limit: 15000000
+            window: 24h
+        counters:
+          - expression: "request.headers['x-zuno-project-id']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'standard' : true)"
+          - predicate: "'x-zuno-project-id' in request.headers"
+    {{- end }}
+    {{- if $trl.enforceNonStandardClasses }}
+      stresstest-user:
+        rates:
+          - limit: 2000
+            window: 5m
+        counters:
+          - expression: "request.headers['x-zuno-user-sub']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'stresstest' : false)"
+          - predicate: "'x-zuno-user-sub' in request.headers"
+    {{- end }}
+    {{- if $trl.enforceNonStandardClasses }}
+      stresstest-group:
+        rates:
+          - limit: 8000
+            window: 5m
+        counters:
+          - expression: "request.headers['x-zuno-groups']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'stresstest' : false)"
+          - predicate: "'x-zuno-groups' in request.headers"
+    {{- end }}
+    {{- if and $trl.enforceNonStandardClasses $trl.enforceProjectDimension }}
+      stresstest-project:
+        rates:
+          - limit: 4000
+            window: 5m
+        counters:
+          - expression: "request.headers['x-zuno-project-id']"
+        when:
+          - predicate: {{ $gatewayIdentity | quote }}
+          - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'stresstest' : false)"
+          - predicate: "'x-zuno-project-id' in request.headers"
+    {{- end }}
+{{- end }}

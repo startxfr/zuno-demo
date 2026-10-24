@@ -27,6 +27,28 @@ clause 3); enforcement config is generated, never hand-authored:
      modes - the slice AI Gateway's budget check (app/quota.py) needs;
      only the inference layer can meter tokens (ADR-0029).
 
+  3. gitops/charts/connectivity-link/templates/quota-tokenratelimitpolicies.yaml
+     (WP-157 step 5, ADR-0570 clause 2 as amended 2026-10-24, decisions
+     D1-D5) The same token budgets as ONE Kuadrant `TokenRateLimitPolicy`
+     (kuadrant.io/v1alpha1) attached to the MaaS Gateway, so a budget spans
+     every model behind it (a MaaSSubscription is per model and
+     single-select, inventory finding 5). Stacked ceilings (D2): each
+     enforced dimension is its own limit and the first exhausted one denies;
+     the project-then-user fallback of ADR-0511 clause 2 is not expressible
+     in Limitador and is not attempted. Counters read the headers the
+     ai-gateway attests on its MaaS calls (D5) and every limit applies only
+     when the caller is the ai-gateway's own ServiceAccount, so a direct
+     MaaS client cannot forge them. Only `standard` user/group are rendered
+     by default (D3+D4); the project dimension and the non-standard classes
+     are generated behind their own default-false values. The whole file is
+     guarded by `.Values.quotaEnforcement.tokenRateLimits.enabled` (default
+     false); the target Gateway is a value.
+
+  4. components/ai-gateway/app/quota_fail_modes.yaml
+     (WP-157 decision D6) class -> fail_mode, the only part of the policy
+     the gateway still needs once the budgets move to Kuadrant (ADR-0570
+     clause 7: the direct-Service sibling only for `open` classes).
+
 Dimension key expressions (recorded simplifications):
   - user:    auth.identity.sub (validated JWT, ADR-0033)
   - group:   the caller's full sorted business-role group set joined
@@ -42,7 +64,7 @@ set by the platform per the task's zuno.quota_class (WP-55 wiring).
 
 Usage (from the repository root):
 
-    python3 platform/okf/generate_quota_enforcement.py           # regenerate both files
+    python3 platform/okf/generate_quota_enforcement.py           # regenerate every file
     python3 platform/okf/generate_quota_enforcement.py --check   # CI drift gate
 """
 from __future__ import annotations
@@ -62,6 +84,8 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 POLICY_REL = pathlib.Path("policies") / "quotas" / "quota-policy.yaml"
 RLP_PATH = REPO_ROOT / "gitops" / "charts" / "connectivity-link" / "templates" / "quota-ratelimitpolicies.yaml"
 BUDGETS_PATH = REPO_ROOT / "components" / "ai-gateway" / "app" / "quota_budgets.yaml"
+TRLP_PATH = REPO_ROOT / "gitops" / "charts" / "connectivity-link" / "templates" / "quota-tokenratelimitpolicies.yaml"
+FAIL_MODES_PATH = REPO_ROOT / "components" / "ai-gateway" / "app" / "quota_fail_modes.yaml"
 # Not generated - hand-authored, because it carries the demo route's own
 # Gateway/JWKS wiring and the rationale comments for it. But its AuthPolicy
 # has to publish exactly the identity properties the generated counters
@@ -89,6 +113,51 @@ COUNTER_EXPRESSIONS = {
     "group": "auth.identity.groups.join('|')",
     "project": f"request.headers['{PROJECT_HEADER}']",
 }
+
+# WP-157 decision D5: the headers the ai-gateway attests on every MaaS call
+# when it presents its own ServiceAccount (MAAS_GATEWAY_IDENTITY). The names
+# are owned by components/ai-gateway/app/maas_adapter.py (ATTESTED_HEADERS);
+# its test suite reads the generated TokenRateLimitPolicy and fails if the
+# two sets drift. Lower-case: Envoy lower-cases header names, and CEL map
+# keys are case-sensitive.
+ATTESTED_USER_HEADER = "x-zuno-user-sub"
+ATTESTED_GROUPS_HEADER = "x-zuno-groups"
+ATTESTED_HEADERS = (ATTESTED_USER_HEADER, ATTESTED_GROUPS_HEADER, CLASS_HEADER, PROJECT_HEADER)
+
+# Token counters key on the attested headers, never on auth.identity: the
+# caller MaaS authenticates is the gateway's ServiceAccount, the same for
+# every user. The group key is the gateway's sorted group set joined with
+# '|' (app/quota.py's own group key), so the counter granularity matches the
+# ledger it replaces.
+TRLP_COUNTER_EXPRESSIONS = {
+    "user": f"request.headers['{ATTESTED_USER_HEADER}']",
+    "group": f"request.headers['{ATTESTED_GROUPS_HEADER}']",
+    "project": f"request.headers['{PROJECT_HEADER}']",
+}
+TRLP_DIMENSION_HEADER = {
+    "user": ATTESTED_USER_HEADER,
+    "group": ATTESTED_GROUPS_HEADER,
+    "project": PROJECT_HEADER,
+}
+
+# The identity property the gateway-identity predicate compares against the
+# ai-gateway's ServiceAccount username. Authorino's kubernetesTokenReview
+# identity is the TokenReview status, whose user.username carries
+# system:serviceaccount:<ns>:<name>. NOT verified on the MaaS AuthPolicy yet:
+# inventory V1 (docs/roadmap/evidence/wp-157-inventory.md section 4) reads
+# what maas-gateway-auth publishes; change this constant and regenerate if
+# it differs. Guarded with has() at each level in a conditional, because one
+# unresolvable expression makes the wasm-shim drop EVERY descriptor of the
+# request (see _class_predicate), which on the MaaS Gateway would also drop
+# the controller's per-subscription limits merged with this policy.
+GATEWAY_IDENTITY_PROPERTY = "auth.identity.user.username"
+
+# D3 + D4: what is enforced at MaaS today. Everything else in the policy is
+# generated too, but rendered only behind its own default-false value, so the
+# live object never carries a limit that nobody sends the input for.
+ENFORCED_CLASSES = ("standard",)
+ENFORCED_DIMENSIONS = ("user", "group")
+FAIL_MODES = ("open", "closed")
 
 
 def _class_predicate(cls_name: str) -> str:
@@ -235,6 +304,155 @@ def _render_budgets(doc: Dict) -> str:
         f"#   {REGEN_CMD}\n"
     )
     return header + yaml.safe_dump(slim, sort_keys=False)
+
+
+def _gateway_identity_predicate_format() -> str:
+    """A printf format (one %s: the ServiceAccount username) for the
+    predicate that confines a limit to the ai-gateway's own calls.
+
+    Built as nested conditionals with has() on every path segment, never as
+    a bare comparison: on a caller whose identity lacks the property (a
+    persona token, an API key) a bare `auth.identity.user.username` fails to
+    resolve, and the wasm-shim then sends no descriptor at all for the
+    request - see _class_predicate for the live evidence of that failure.
+    """
+    root, _, rest = GATEWAY_IDENTITY_PROPERTY.partition("auth.identity.")
+    if root or not rest:
+        raise ValueError(f"GATEWAY_IDENTITY_PROPERTY must start with auth.identity.: {GATEWAY_IDENTITY_PROPERTY!r}")
+    segments = rest.split(".")
+    expr = f"{GATEWAY_IDENTITY_PROPERTY} == '%s'"
+    for depth in range(len(segments), 0, -1):
+        path = "auth.identity." + ".".join(segments[:depth])
+        expr = f"(has({path}) ? {expr} : false)"
+    return expr
+
+
+def _render_trlp(classes: Dict[str, Dict]) -> str:
+    """One gateway-level TokenRateLimitPolicy carrying the ADR-0511 token
+    budgets (WP-157 step 5, D1-D5). See the module docstring, item 3."""
+    lines: List[str] = [
+        "{{- if .Values.quotaEnforcement.tokenRateLimits.enabled }}",
+        "{{- $trl := .Values.quotaEnforcement.tokenRateLimits }}",
+        "{{- if not (and $trl.targetGateway.name $trl.targetGateway.namespace) }}",
+        '{{- fail "quotaEnforcement.tokenRateLimits.targetGateway.name and .namespace must be set when tokenRateLimits.enabled is true (the MaaS Gateway of this cluster)" }}',
+        "{{- end }}",
+        "{{- if not $trl.gatewayIdentity.username }}",
+        '{{- fail "quotaEnforcement.tokenRateLimits.gatewayIdentity.username must be set when tokenRateLimits.enabled is true (the ai-gateway ServiceAccount username)" }}',
+        "{{- end }}",
+        '{{- if not (has $trl.attachment (list "defaults" "overrides")) }}',
+        '{{- fail "quotaEnforcement.tokenRateLimits.attachment must be defaults or overrides" }}',
+        "{{- end }}",
+        "{{- $gatewayIdentity := printf "
+        + _yaml_double_quoted(_gateway_identity_predicate_format())
+        + " $trl.gatewayIdentity.username }}",
+        "# GENERATED FILE (ADR-0511, WP-157 step 5) - do not edit.",
+        "# Source: policies/quotas/quota-policy.yaml of the admitted agents release.",
+        f"# Regenerate with: {REGEN_CMD}",
+        "# ADR-0511's token budgets as ONE TokenRateLimitPolicy on the MaaS",
+        "# Gateway (ADR-0570 clause 2 as amended 2026-10-24, WP-157 D1), so a",
+        "# budget spans every model behind it. Stacked ceilings (D2): each limit",
+        "# below is enforced on its own and the first exhausted one denies; the",
+        "# policy file's project-then-user fallback is not expressible in",
+        "# Limitador. Counters read the headers the ai-gateway attests (D5) and",
+        "# every limit applies only to the ai-gateway's own ServiceAccount, so a",
+        "# direct MaaS client cannot forge them; direct clients stay bounded by",
+        "# their MaaSSubscription. Rendered: standard user and group (D3+D4).",
+        "# The project dimension (enforceProjectDimension) and the intensive and",
+        "# stresstest classes (enforceNonStandardClasses) are generated but NOT",
+        "# rendered by default: no caller sends a verified project id or a",
+        "# non-standard class until ADR-0563 clause 5 is settled, and a live",
+        "# limit nobody can reach would read as enforcement that is not there.",
+        "# Strategy merge keeps the maas-controller's per-route policies in",
+        "# force beside this one (to prove live, inventory V10).",
+        "apiVersion: kuadrant.io/v1alpha1",
+        "kind: TokenRateLimitPolicy",
+        "metadata:",
+        "  name: zuno-token-quota",
+        "  namespace: {{ $trl.targetGateway.namespace }}",
+        "  labels:",
+        "    app.kubernetes.io/part-of: zuno-quota-enforcement",
+        "spec:",
+        "  targetRef:",
+        "    group: gateway.networking.k8s.io",
+        "    kind: Gateway",
+        "    name: {{ $trl.targetGateway.name }}",
+        "  {{ $trl.attachment }}:",
+        "    strategy: merge",
+        "    limits:",
+    ]
+    for cls_name, cls in sorted(classes.items()):
+        for dim in ("user", "group", "project"):
+            tok = (cls.get("tokens") or {}).get(dim) or {}
+            if not tok:
+                continue
+            guards = []
+            if cls_name not in ENFORCED_CLASSES:
+                guards.append("$trl.enforceNonStandardClasses")
+            if dim not in ENFORCED_DIMENSIONS:
+                guards.append("$trl.enforceProjectDimension")
+            presence = f"'{TRLP_DIMENSION_HEADER[dim]}' in request.headers"
+            if guards:
+                cond = guards[0] if len(guards) == 1 else f"and {' '.join(guards)}"
+                lines.append(f"    {{{{- if {cond} }}}}")
+            lines += [
+                f"      {cls_name}-{dim}:",
+                "        rates:",
+                f"          - limit: {tok.get('budget')}",
+                f"            window: {tok.get('window')}",
+                "        counters:",
+                f"          - expression: {TRLP_COUNTER_EXPRESSIONS[dim]!r}",
+                "        when:",
+                "          - predicate: {{ $gatewayIdentity | quote }}",
+                f"          - predicate: {_class_predicate(cls_name)!r}",
+                f"          - predicate: {presence!r}",
+            ]
+            if guards:
+                lines.append("    {{- end }}")
+    lines.append("{{- end }}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _yaml_double_quoted(text: str) -> str:
+    """A Go-template string literal (double-quoted, backslash escapes)."""
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def _render_fail_modes(doc: Dict) -> str:
+    modes = {}
+    for name, cls in (doc.get("classes") or {}).items():
+        mode = (cls or {}).get("fail_mode")
+        if mode not in FAIL_MODES:
+            raise ValueError(f"class {name!r}: fail_mode {mode!r} is not one of {', '.join(FAIL_MODES)}")
+        modes[name] = mode
+    header = (
+        "# GENERATED FILE (ADR-0511, WP-157 decision D6) - do not edit. Source:\n"
+        "# policies/quotas/quota-policy.yaml of the admitted agents release.\n"
+        "# class -> fail_mode, read by app/quota_fail_modes.py (ADR-0570 clause 7:\n"
+        "# the direct-Service sibling of a via_maas candidate serves only `open`\n"
+        "# classes). A class absent here is `closed` (ADR-0511 default).\n"
+        f"# Regenerate with: {REGEN_CMD}\n"
+    )
+    return header + yaml.safe_dump({"classes": modes}, sort_keys=False)
+
+
+def _check_trlp_counters() -> List[str]:
+    """The token counters may only read the attested headers.
+
+    A counter on auth.identity would count the gateway's ServiceAccount,
+    one bucket for every user; a counter on any other header would read
+    something the gateway does not set, which the shim cannot resolve -
+    the silent no-op _check_identity_filter guards for the RLP.
+    """
+    problems = []
+    allowed = {f"request.headers['{h}']" for h in ATTESTED_HEADERS}
+    for dim, expression in TRLP_COUNTER_EXPRESSIONS.items():
+        if expression not in allowed:
+            problems.append(
+                f"TokenRateLimitPolicy counter {dim!r} reads {expression!r}, which is not "
+                "one of the ai-gateway's attested headers (ATTESTED_HEADERS)"
+            )
+    return problems
 
 
 # Both spellings, because CEL accepts both and this repo already needs the
@@ -395,14 +613,20 @@ def main() -> int:
             print(f"error: {exc}", file=sys.stderr)
             return 1
     doc = yaml.safe_load((release / POLICY_REL).read_text(encoding="utf-8")) or {}
-    expected = {
-        RLP_PATH: _render_rlp(doc.get("classes") or {}),
-        BUDGETS_PATH: _render_budgets(doc),
-    }
+    try:
+        expected = {
+            RLP_PATH: _render_rlp(doc.get("classes") or {}),
+            BUDGETS_PATH: _render_budgets(doc),
+            TRLP_PATH: _render_trlp(doc.get("classes") or {}),
+            FAIL_MODES_PATH: _render_fail_modes(doc),
+        }
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
 
     # Runs in both modes: a regeneration that leaves enforcement silently
     # inert is not a success, so this is reported even when writing.
-    failures: List[str] = _self_test_identity_lint() + _check_identity_filter()
+    failures: List[str] = _self_test_identity_lint() + _check_identity_filter() + _check_trlp_counters()
     written: List[str] = []
     for path, content in expected.items():
         rel = path.relative_to(REPO_ROOT)
