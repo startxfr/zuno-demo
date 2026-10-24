@@ -263,6 +263,38 @@ command (ADR-0559). V0 is the ADR-0570 clause 8 prerequisite.
     MaaS gateway deny or admit? This decides whether `open` can be honoured on
     the MaaS path at all.
 
+### 4a. Results on demo333, 2026-10-24 (read-only and probes already used)
+
+State at the time: ai-gateway with `MAAS_GATEWAY_IDENTITY`, `MAAS_QUOTA_429_PASSTHROUGH` and
+`QUOTA_FAIL_MODES_ENFORCED` on (steps A, B, C of the live enable applied and verified in that
+order); TRLP `zuno-token-quota` on `maas-default-gateway`; SaaS subscriptions reduced to the
+ai-gateway ones. Probes were made from the ai-gateway pod with its ServiceAccount token and
+hand-set `X-Zuno-*` headers, plus persona chats through the gateway. Nothing burned a real budget.
+
+| # | Result | Evidence |
+|---|---|---|
+| V0 | Partly passed. Local model: 200 via MaaS with the gateway ServiceAccount token (4 local models, streaming included). Envoy: `kuadrant-wasm-shim.vm_reload_failure` = 0 (no `remote_load` failure counter is present on this proxy build). External model: not 200, see V4. A persona Keycloak token sent straight to a MaaS route is rejected at authentication (401), so "forwarded user token" is no longer a path in use (D5). | `pilot-agent request GET stats`; probes |
+| V1 | Passed. Six controller TRLPs plus `zuno-token-quota` are `Accepted` and `Enforced`. The identity published to TRLPs is the `identity` filter of `maas-gateway-auth`, with properties `groups`, `groups_str`, `keyId`, `keyName`, `selected_subscription`, `selected_subscription_key`, `subscription_error`, `subscription_error_message`, `subscription_info`, `userid`. There is no `sub` and no `user.username`: the generator uses `auth.identity.userid`. For the ai-gateway ServiceAccount `userid` is `system:serviceaccount:zuno-ai-run:ai-gateway` (it is the key of the per-route counters in Limitador). | `oc get tokenratelimitpolicy -A`; AuthPolicy `maas-gateway-auth`; Limitador `/counters` |
+| V2, V3, V5 | Not run: they need an ExternalModel with egress (`MAAS_EXTERNAL_EGRESS_ENABLED=false`) and a mutation. | decision pending (pilot with `mistral-large`) |
+| V4 | Not passed. `mistral-large` and `gpt-oss-120b-ovhcloud` ExternalModels are `Ready`, a request with the ServiceAccount token passes authentication and authorization but ends in HTTP 500 upstream (egress disabled). The path-style route `/gpt-oss-120b-ovhcloud/v1/...` answers 403; the header-style route (`/v1/chat/completions` with `X-Gateway-Model-Name`) answers 500. No working SaaS route through MaaS was established. | probes |
+| V6 | Not run. Personas cannot call MaaS directly any more (401), so the selection among several subscriptions cannot be exercised with a persona token. The SaaS entitlements now list only the ai-gateway ServiceAccount. | probes; `maasauthpolicy` |
+| V7 | Not run: it needs a real 429 (a stresstest-sized limit or a throwaway low-quota persona). | decision pending |
+| V8 | Partly passed. Counters are per route (one Limitador namespace per model): the gateway-level group counter appears separately under `qwen36-27b-instruct-kserve-route` and `gpt-oss-20b-kserve-route`, so there is no cross-model total. Within a model, the group counter is keyed by the header value (one counter per distinct `X-Zuno-Groups`). The controller's per-subscription counters are keyed by `userid` (shared by every call of the ServiceAccount). Two users of the same group on one model were not run. | Limitador `/counters/<namespace>` |
+| V9 | Passed. A streamed call with `stream_options.include_usage` moved the group counter by exactly prompt + completion tokens (18 + 64 = 82: 30000000 to 29999918) and the per-route subscription counter by the same 82. | probe, Limitador |
+| V10 | Passed. `zuno-token-quota` (gateway, `defaults`, `merge`) and the six per-route policies are all `Enforced`; the gateway-level group limit counted tokens next to the per-route limits (see V9). `gateway-default-deny` has been `Overridden` since 2026-09-07 and lists itself among the overriders. No 429 was produced. | `oc get tokenratelimitpolicy -A`; Limitador |
+| V11 | Not run: the project header is not part of the enforced classes yet. | |
+| V12 | Not run: needs a real MaaS 429. The gateway code path exists behind `MAAS_QUOTA_429_PASSTHROUGH` (on) but was not exercised. | decision pending |
+| V13, V14 | Not run: they scale `payload-processing` / Limitador to 0, which takes MaaS or Kuadrant down. | decision pending |
+
+Defect observed and still open: the per-user limit `standard-user` (counter on `x-zuno-user-sub`)
+never created a counter in Limitador, while `standard-group` (same shape, header `x-zuno-groups`)
+counts. The wasm actions for the two limits are identical, apart from the header and the limit hash,
+in every action set of the EnvoyFilter, and the ai-gateway sends a non-empty `X-Zuno-User-Sub` on
+every persona chat. The gateway logs `kuadrant_wasm_shim: proxy_on_grpc_receive invalid context_id,
+no match found` about once per call. Synthetic non-streamed calls made right after a gateway pod
+restart did not create counters, then did a few minutes later; the cause is not known. ADR-0570
+clause 2 may be closed on the group ceiling only, written as such.
+
 ## 5. Proposed design for steps 3-5 (plan, not code)
 
 ### (a) SaaS ExternalModels in `gitops/charts/models`
