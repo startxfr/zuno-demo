@@ -41,7 +41,7 @@ olsConfig:
     # gpt-oss-20b (unlike qwen) publishes the SAME string for all three -
     # see gitops/charts/models/values.yaml's gptOssModel block.
     llmISvcName: gpt-oss-20b
-    maasModelRef: zuno-ai-run/gpt-oss-20b-maas
+    maasModelRef: zuno-ai-run/gpt-oss-20b
     modelName: gpt-oss-20b
     # 2026-09-09: switched from qwen36-27b-instruct to gpt-oss-20b as
     # Lightspeed's default model. Initially set to `endpointMode: maas`

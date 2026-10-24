@@ -182,7 +182,7 @@ providers:
     model: qwen3.6-27b-instruct
     max_model_len: 32768
     via_maas: true
-    maas_model_ref: zuno-ai-run/qwen36-27b-instruct-maas
+    maas_model_ref: zuno-ai-run/qwen36-27b-instruct
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen36-27b-instruct/v1
     temperature: 0.2
     timeout_seconds: 60
@@ -243,7 +243,7 @@ providers:
     model: gpt-oss-20b
     max_model_len: 32768
     via_maas: true
-    maas_model_ref: zuno-ai-run/gpt-oss-20b-maas
+    maas_model_ref: zuno-ai-run/gpt-oss-20b
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1
     temperature: 0.2
     timeout_seconds: 60
@@ -292,7 +292,7 @@ providers:
     model: qwen3.5-9b-wesh
     max_model_len: 32768
     via_maas: true
-    maas_model_ref: zuno-ai-run/qwen35-9b-wesh-maas
+    maas_model_ref: zuno-ai-run/qwen35-9b-wesh
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b-wesh/v1
     temperature: 0.2
     timeout_seconds: 60
@@ -323,7 +323,7 @@ providers:
     model: qwen3.5-9b
     max_model_len: 8192
     via_maas: true
-    maas_model_ref: zuno-ai-run/qwen35-9b-maas
+    maas_model_ref: zuno-ai-run/qwen35-9b
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b/v1
     temperature: 0.2
     timeout_seconds: 60

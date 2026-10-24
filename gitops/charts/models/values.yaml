@@ -964,7 +964,7 @@ maas:
       # from the backend it points at (gptOssModel.inferenceServiceName).
       # Kept separate so the published/governed identity doesn't have to
       # match the underlying deployment's name.
-      publishedName: gpt-oss-20b-maas
+      publishedName: gpt-oss-20b
       # The LLMInferenceService this entry publishes - must match exactly
       # one of gptOssModel.inferenceServiceName / (this chart's top-level)
       # inferenceServiceName.
@@ -1066,7 +1066,7 @@ maas:
     # decision, WP-076) rather than every agent_* group - this stays a
     # pure structural generalization of the proven pattern; broader group
     # coverage is a deliberate follow-up, not this step's job.
-    - publishedName: qwen36-27b-instruct-maas
+    - publishedName: qwen36-27b-instruct
       backendInferenceServiceName: qwen36-27b-instruct
       endpointOverride: ""
       subscriptions:
@@ -1125,7 +1125,7 @@ maas:
     # and rate limits as the two models above (their scoping decision is
     # reused verbatim; broadening group coverage stays a separate,
     # deliberate change).
-    - publishedName: qwen35-9b-wesh-maas
+    - publishedName: qwen35-9b-wesh
       backendInferenceServiceName: qwen35-9b-wesh
       # Structurally useless for the identity path - see gpt-oss-20b's own
       # entry for the live elimination of this field. Kept wired and empty
@@ -1166,7 +1166,7 @@ maas:
     # and rate limits as the two models above (their scoping decision is
     # reused verbatim; broadening group coverage stays a separate,
     # deliberate change).
-    - publishedName: qwen35-9b-maas
+    - publishedName: qwen35-9b
       backendInferenceServiceName: qwen35-9b
       # Structurally useless for the identity path - see gpt-oss-20b's own
       # entry for the live elimination of this field. Kept wired and empty
