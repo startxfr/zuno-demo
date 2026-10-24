@@ -206,6 +206,38 @@ re-target `platform/testing/token_quota_429.py` to the MaaS 429; re-target the
 request-rate `RateLimitPolicy` onto the MaaS Gateway (D9); optionally
 generate the subscriptions' coarse ceilings (D1).
 
+## Live enable on demo333 (2026-10-24)
+
+Switches turned on one at a time through `ansible/clusters/demo333.yml`,
+each verified by a second session before the next:
+
+- **gatewayIdentity** (`maasAdapter.gatewayIdentity`): green. Persona chats
+  reach MaaS under the ai-gateway ServiceAccount with the attested headers;
+  `local-maas` successes went from 0 to 36 with no 401, 404 or fallback.
+  It needed an ai-gateway image built from a commit carrying the code and
+  the served-model-name fix in the routing ConfigMap.
+- **Step A** (`quotaEnforcement.tokenRateLimits`): the TokenRateLimitPolicy
+  `openshift-ingress/zuno-token-quota` is Accepted and Enforced (created
+  01:42:21Z); the maas-controller's per-route policies stay Enforced; access
+  control is unchanged (no token or a bogus token 401, a spoofed
+  `X-Maas-Username` 403). The gateway pod was restarted at 01:49:11Z
+  (same ReplicaSet, revision 1) to reload the wasm module.
+  - **Group ceiling: counts.** Limitador shows a `standard-group` counter
+    keyed on the real groups value for persona chats (288 tokens on qwen36),
+    also after the reload. Synthetic probes with new header values did not
+    always create a counter; not explained.
+  - **Per-user ceiling: NOT proven.** No `standard-user` counter has ever
+    appeared in Limitador, before or after the reload, although its action
+    in the gateway's wasm configuration has the same shape as the group one
+    and `X-Zuno-User-Sub` always carries the caller's non-empty `sub`. The
+    gateway logs `proxy_on_grpc_receive invalid context_id, no match found`
+    about once per call (the shim defect class seen in WP-54). The limit
+    stays in the policy because it is harmless, but it is not to be
+    described as enforced, and ADR-0570 clause 2 is not closed on it.
+- **Step B** (`quota429Passthrough`, `failModes`): turned on with the user's
+  go after step A, on the group ceiling alone.
+- **Step C** (`maas.saasSubscriptions.gatewayOnly`): after step B is green.
+
 ## Acceptance
 
 Both MaaS defects closed with live evidence; the ai-gateway image contains

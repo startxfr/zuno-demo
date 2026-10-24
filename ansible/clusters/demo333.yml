@@ -159,6 +159,13 @@ zuno_unifai_values:
 # headers. The token-quota policy, the 429 pass-through and the fail modes
 # stay off until their own go.
 zuno_ai_gateway_maas_gateway_identity: true
+# Step B (user go 2026-10-24, after step A): a MaaS 429 is answered to the
+# caller with Retry-After instead of falling back, and the fail modes are
+# enforced (fail-open on a Limitador outage, with a warning). Taken with the
+# per-user ceiling NOT proven: on 2026-10-24 only the group counter was seen
+# counting live (brief Progress); the user ceiling is not to be advertised.
+zuno_ai_gateway_maas_quota_429_passthrough: true
+zuno_ai_gateway_quota_fail_modes: true
 # Step A (user go 2026-10-24): the gateway-level token quota policy on the
 # MaaS gateway, generated from the release (stacked ceilings standard-user
 # 3M/24h, standard-group 30M/24h, counted on the ai-gateway's attested
