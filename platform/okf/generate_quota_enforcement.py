@@ -337,13 +337,15 @@ def _gateway_identity_predicate_format() -> str:
     return expr
 
 
-# WP-157 order test (user go 2026-10-24): Kuadrant orders a Gateway's
-# token-limit actions by limit name, after the maas-controller's
-# `models_as_a_service_*` ones, so `<class>-user` ran last of 13 actions per
-# request, and its counter never appeared in Limitador. The prefix moves the
-# user limits first; values, counters and predicates are unchanged. Revert
-# with the commit if the order makes no difference.
-TRLP_LIMIT_NAME_PREFIX = {"user": "a-"}
+# WP-157 workaround (order test and user go, 2026-10-24): on demo333 the
+# wasm shim never counts the LAST token-limit action pair of a request
+# (proven live: whichever limit ran last never appeared in Limitador).
+# Kuadrant orders a Gateway's token-limit actions by limit name, after the
+# maas-controller's `models_as_a_service_*` ones, so these budgets would
+# run last. The prefix moves every one of them ahead of the MaaS limits, and
+# the last slot falls to a MaaS subscription limit; values, counters and
+# predicates are unchanged. Drop it once the shim defect is fixed.
+TRLP_LIMIT_NAME_PREFIX = {"user": "a-", "group": "a-", "project": "a-"}
 
 
 def _render_trlp(classes: Dict[str, Dict]) -> str:
