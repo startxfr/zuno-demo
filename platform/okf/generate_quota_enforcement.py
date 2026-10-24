@@ -337,6 +337,15 @@ def _gateway_identity_predicate_format() -> str:
     return expr
 
 
+# WP-157 order test (user go 2026-10-24): Kuadrant orders a Gateway's
+# token-limit actions by limit name, after the maas-controller's
+# `models_as_a_service_*` ones, so `<class>-user` ran last of 13 actions per
+# request, and its counter never appeared in Limitador. The prefix moves the
+# user limits first; values, counters and predicates are unchanged. Revert
+# with the commit if the order makes no difference.
+TRLP_LIMIT_NAME_PREFIX = {"user": "a-"}
+
+
 def _render_trlp(classes: Dict[str, Dict]) -> str:
     """One gateway-level TokenRateLimitPolicy carrying the ADR-0511 token
     budgets (WP-157 step 5, D1-D5). See the module docstring, item 3."""
@@ -405,7 +414,7 @@ def _render_trlp(classes: Dict[str, Dict]) -> str:
                 cond = guards[0] if len(guards) == 1 else f"and {' '.join(guards)}"
                 lines.append(f"    {{{{- if {cond} }}}}")
             lines += [
-                f"      {cls_name}-{dim}:",
+                f"      {TRLP_LIMIT_NAME_PREFIX.get(dim, '')}{cls_name}-{dim}:",
                 "        rates:",
                 f"          - limit: {tok.get('budget')}",
                 f"            window: {tok.get('window')}",

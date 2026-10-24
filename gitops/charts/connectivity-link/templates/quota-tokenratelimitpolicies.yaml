@@ -45,7 +45,7 @@ spec:
     strategy: merge
     limits:
     {{- if $trl.enforceNonStandardClasses }}
-      intensive-user:
+      a-intensive-user:
         rates:
           - limit: 500000
             window: 24h
@@ -80,7 +80,7 @@ spec:
           - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'intensive' : false)"
           - predicate: "'x-zuno-project-id' in request.headers"
     {{- end }}
-      standard-user:
+      a-standard-user:
         rates:
           - limit: 3000000
             window: 24h
@@ -113,7 +113,7 @@ spec:
           - predicate: "'x-zuno-project-id' in request.headers"
     {{- end }}
     {{- if $trl.enforceNonStandardClasses }}
-      stresstest-user:
+      a-stresstest-user:
         rates:
           - limit: 2000
             window: 5m
