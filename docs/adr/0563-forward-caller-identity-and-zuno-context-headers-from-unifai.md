@@ -122,6 +122,21 @@ id and an `unknown` identity. Fixed in the fork (`5ba7aed85`) and proposed
 upstream; until a stack runs an image carrying that fix, forwarding fails
 closed for foreground Temporal runs.
 
+## Implementation note (2026-10-24): who decides the Zuno context headers
+
+WP-146 step 6 is decided: **a header template is never trusted on its own.** A UnifAI user can still create an
+LLM or MCP resource with any `X-Zuno-*` template; what matters is what the gateways do with the result.
+- The MCP gateway only lets such a header narrow a call (an unknown or non-declaring agent is refused); every
+  right remains the intersection with the caller's verified groups (ADR-0036).
+- The ai-gateway honours `X-Zuno-Quota-Class` and `X-Zuno-Project-Id` only from a token whose `azp` is in its
+  trusted platform clients (empty by default); any other caller runs the standard class with no project.
+  This is the verification clause 5 asked for, in the simplest form: the caller is verified, not the header.
+  A project id resolved server-side from a verified grant (ADR-0528) is not implemented; the project
+  dimension is dropped for untrusted callers.
+- Classification keeps the floor of ADR-0565.
+No resource creation is restricted on the UnifAI side. Probes and the live check:
+[wp-146-header-authorship-2026-10-24.md](../roadmap/evidence/wp-146-header-authorship-2026-10-24.md).
+
 ## Planned supersession
 
 None. ADR-0032's decision stands and is implemented by a new hop; its

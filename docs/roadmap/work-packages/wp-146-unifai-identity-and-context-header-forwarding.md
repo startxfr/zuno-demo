@@ -1,6 +1,6 @@
 # WP-146: UnifAI identity and context-header forwarding
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-24)
 - **ADRs:** [ADR-0563](../../adr/0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md), [ADR-0562](../../adr/0562-authenticate-unifai-against-the-zuno-keycloak-realm.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
 - **Depends on:** none
 - **Related:** [ADR-0560](../../adr/0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md), [ADR-0036](../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md), [ADR-0021](../../adr/0021-route-models-according-to-c1-c2-c3-classification.md), [WP-148](wp-148-unifai-parity-memory-routing-quota-ux.md), [WP-150](wp-150-unifai-operator-okf-agent-bundles.md)
@@ -157,5 +157,8 @@ work package closes when step 6 is decided and step 7 is checked.
   `X-Authenticated-User` surface is therefore not reachable from outside the stack namespace.
   The operator's `unifai-internal-apis` policy only admits the UnifAI pods, labelled internal
   clients, the ingress and monitoring namespaces and the operator namespaces.
-- **Step 6 stays open.** Header authorship (who may create LLM or MCP resources with `X-Zuno-*`
-  templates, and what the gateways verify) needs a decision recorded in ADR-0563.
+- **Step 6 decided (2026-10-24).** A header template is never trusted on its own: the MCP gateway
+  lets a forged declaration only narrow a call, and the ai-gateway honours the quota class and the project
+  id only from a trusted platform client (commit 2f981d17, image `ai-gateway-23`). Recorded in an
+  implementation note of ADR-0563; probes and the live check in
+  [wp-146-header-authorship-2026-10-24.md](../evidence/wp-146-header-authorship-2026-10-24.md).

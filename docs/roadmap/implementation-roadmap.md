@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 22 | 17 | 19 | WP-146, WP-166, WP-170, WP-171, WP-172, WP-173, WP-174 |
+| v0.11 | 22 | 17 | 19 | WP-166, WP-170, WP-171, WP-172, WP-173, WP-174 |
 | v0.12 | 9 | 5 | 9 | WP-161, WP-163, WP-164, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -906,7 +906,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-146 | [wp-146](work-packages/wp-146-unifai-identity-and-context-header-forwarding.md) | 0563, 0562, 0575 | none | Repo work in review | live-proven on demo333 2026-10-17 (user JWT + templated X-Zuno-* headers, fail-closed, MAS-side refresh); operator 0.1.13 wiring released; upstream Temporal context bug fixed (5ba7aed85); header-authorship decision and the X-Authenticated-User exposure fix remain |
+| WP-146 | [wp-146](work-packages/wp-146-unifai-identity-and-context-header-forwarding.md) | 0563, 0562, 0575 | none | Done (2026-10-24) | live-proven on demo333 2026-10-17 (user JWT + templated X-Zuno-* headers, fail-closed, MAS-side refresh); X-Authenticated-User surface checked unreachable from outside the stack (2026-10-23); header authorship decided 2026-10-24 (never trust the template; ai-gateway quota headers only from trusted platform clients), see ADR-0563 |
 | WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Done | instrumentation merged in fork devel (c918f732b); operator env block, zuno collector rule/dashboard, gateway traceparent and a live trace remain |
 | WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Done | live-proven on demo333 2026-10-22 on fork devel e76c71cd0 (routing explanation, structured 429, memory tool and extraction node, group-bound teams); browser rendering not tested |
 | WP-149 | [wp-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md) | 0568, 0575 | none | Done (2026-10-24) | hybrid search, ACL, incremental sync and restore proven on demo333 |
