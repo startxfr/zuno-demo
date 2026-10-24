@@ -311,10 +311,10 @@ on; user go given directly for each), 2026-10-24:
 
 - V14 answered (user go, 2026-10-24 08:52 UTC): the Limitador pod was deleted while a loop sent one
   ServiceAccount call to MaaS (qwen36) every 1.5 s; the operator recreated the pod within about a minute.
-  Over the roughly 45 s of the outage, 13 of the 17 calls returned 200 (0.3 s, the gateway admits when
+  Over the roughly 45 s of the outage, 17 of the 21 calls returned 200 (0.3 s, the gateway admits when
   Limitador is unreachable: `failureMode: allow` on the `ratelimit-check` and `ratelimit-report` services) and 4
   returned HTTP 500 `Internal Server Error` (0.22 s each, at 08:52:14, :22, :37 and :44); before and after the
-  window every call was 200. So the MaaS path is fail-open but not perfectly: about one call in four failed
+  window every call was 200. So the MaaS path is fail-open but not perfectly: about one call in five failed
   during the outage, which the earlier 500s seen outside any outage (about one call in a hundred) do not explain.
   `open` can be honoured on the MaaS path, with that residual error rate; a `closed` class cannot be enforced
   there at all, since the gateway admits calls without counting them. All Limitador counters restarted at
