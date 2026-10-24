@@ -26,7 +26,7 @@ not entitled to is refused like an unknown agent.
    mcp-gateway. Tests drive it with the A2A SDK client UnifAI uses.
 3. **Deployment.** Chart, Applications, network policies (ai-gateway and mcp-gateway accept the new pod), build and install under the
    `mcp` run component. Live steps wait for the user's go and for the session that owns `zuno-unifai` to roll the fork image.
-4. **Persona blueprints.** `platform/testing/seed_persona_blueprints.py` creates, validates and cleans the 34 blueprints.
+4. **Persona blueprints.** `platform/testing/seed_persona_blueprints.py` creates, validates and cleans the 32 blueprints.
 5. **Proof.** One turn per persona family on demo333, the entitlement refusals, and the depth limit.
 
 ## Acceptance
