@@ -43,7 +43,29 @@
   vars:
     istio_ca_caller_component: "connectivity-link"
 
+# WP-157 (step A of the live enable sequence): the gateway-level token
+# quota policy is a per-cluster knob, zuno_connectivity_link_token_rate_limits
+# in ansible/clusters/<cluster>.yml (the chart's
+# quotaEnforcement.tokenRateLimits keys). Unset or not enabled, the d1
+# Application is applied exactly as before, from its static manifest.
+- name: "connectivity_link | load this cluster's non-secret variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
+# Loaded like every other role's, so zuno_gitops_target_revision applies
+# here too (this role never read it, which is why its d1 Application stayed
+# on main on demo333 while the rest followed devel).
+- name: "connectivity_link | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _connectivity_link_confidential_file
+
+- name: "connectivity_link | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _connectivity_link_confidential_file.stat.exists
+
 - name: "connectivity_link | apply the connectivity-link GitOps Application (d1: Kuadrant instance)"
+  when: not (zuno_connectivity_link_token_rate_limits.enabled | default(false) | bool)
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
     gitops_component_name: "connectivity-link"
@@ -63,6 +85,33 @@
     # complete) pass through as-is, same fix shape check_docs.py's
     # gitops_values_clobber check recommends (see cert_manager's own
     # read-and-combine pattern for a case that DOES need one).
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15
+
+# Read-and-combine (the shape check_docs.py's gitops_values_clobber check
+# recommends): extra values REPLACE the manifest's inline values, so the
+# static ones are read back first and the token quota block merged in.
+# The policy template exists from devel on: the cluster's
+# zuno_gitops_target_revision must name devel (or a later release branch).
+- name: "connectivity_link | read the d1 manifest's static values (token quota policy on)"
+  when: zuno_connectivity_link_token_rate_limits.enabled | default(false) | bool
+  ansible.builtin.set_fact:
+    _connectivity_link_d1_static_values: >-
+      {{ ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/connectivity-link/application-d1.yaml')
+            | replace('apps.mycluster.example.com', cluster_base_domain)
+            | from_yaml).spec.source.helm.values | from_yaml) }}
+
+- name: "connectivity_link | apply the connectivity-link GitOps Application (d1, token quota policy on)"
+  when: zuno_connectivity_link_token_rate_limits.enabled | default(false) | bool
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "connectivity-link"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-connectivity-link-d1"
+    gitops_app_extra_helm_values: >-
+      {{ _connectivity_link_d1_static_values
+         | combine({'quotaEnforcement': {'tokenRateLimits':
+             zuno_connectivity_link_token_rate_limits}}, recursive=True) }}
     gitops_app_wait_retries: 30
     gitops_app_wait_delay: 15
 

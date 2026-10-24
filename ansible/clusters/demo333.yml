@@ -159,3 +159,18 @@ zuno_unifai_values:
 # headers. The token-quota policy, the 429 pass-through and the fail modes
 # stay off until their own go.
 zuno_ai_gateway_maas_gateway_identity: true
+# Step A (user go 2026-10-24): the gateway-level token quota policy on the
+# MaaS gateway, generated from the release (stacked ceilings standard-user
+# 3M/24h, standard-group 30M/24h, counted on the ai-gateway's attested
+# headers, only for its ServiceAccount). d1 only. Its Application moves from
+# main to devel (zuno_gitops_target_revision, now loaded by the role), whose
+# connectivity-link render is otherwise identical (checked 2026-10-24 with
+# the live values).
+zuno_connectivity_link_token_rate_limits:
+  enabled: true
+  targetGateway:
+    name: maas-default-gateway
+    namespace: openshift-ingress
+  attachment: defaults
+  gatewayIdentity:
+    username: system:serviceaccount:zuno-ai-run:ai-gateway
