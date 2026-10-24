@@ -38,11 +38,10 @@ import release_cache  # noqa: E402
 
 def run() -> "list[Day2Result]":
     try:
-        release = release_cache.release_dir()
+        index = release_cache.read_index(release_cache.release_dir())
     except release_cache.ReleaseUnavailable as exc:
         return [Day2Result("all", "contract", "n/a", "contract", False,
                            f"the admitted agents release could not be verified: {exc}")]
-    index = json.loads((release / "okf-index.json").read_text(encoding="utf-8"))
     return [
         Day2Result(agent["name"], "contract", "contract-tests-attestation", "contract", True,
                    f"release {index['release']}: {agent['name']} {agent['version']} carries a verified "

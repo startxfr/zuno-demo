@@ -37,12 +37,11 @@ HOOKS: Dict[str, str] = {
     "platform/okf/generate_stack_config.py": "ADR-0581 generator hook",
     "platform/okf/release_cache.py": "release access point",
     "components/mlops/src/mlops.py": "mlops hook (_task_system_prompt)",
+    "platform/docs/check_docs.py": "documentation drift hook (_okf_frontmatter)",
     "evaluations/common/okf_release.py": "evaluations hook (agent_declaration, task_declarations)",
 }
 
 BASELINE: Dict[str, str] = {
-    "platform/docs/check_docs.py": "documentation drift checks read the admitted release",
-    "platform/testing/day2_contract_attribution.py": "reads okf-index.json for attribution",
 }
 
 

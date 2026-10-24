@@ -871,8 +871,12 @@ def check_agent_status_vs_adr() -> List[Finding]:
         if not okf_path.is_file():
             continue
 
-        status_match = re.search(r"^\s*status:\s*(\S+)", okf_path.read_text(), re.MULTILINE)
-        if not status_match or status_match.group(1) != "active":
+        try:
+            status = str((_okf_frontmatter(okf_path).get("zuno") or {}).get("status", ""))
+        except ValueError as exc:
+            findings.append(Finding("agent_status_vs_adr", str(exc)))
+            continue
+        if status != "active":
             continue
 
         for adr_id in _wp_governing_adrs(wp_path):
@@ -930,6 +934,10 @@ def check_doc_links() -> List[Finding]:
     return findings
 
 
+# ADR-0508 clause 3 / ADR-0579 clause 6.
+OKF_SUPPORTED_VERSIONS = ("v0.2", "v0.3")
+
+
 def _okf_frontmatter(path: pathlib.Path) -> dict:
     """Parse an OKF bundle's leading `---` YAML frontmatter block.
 
@@ -940,8 +948,17 @@ def _okf_frontmatter(path: pathlib.Path) -> dict:
     """
     parts = path.read_text(encoding="utf-8").split("---", 2)
     if len(parts) < 3 or parts[0].strip():
-        return {}
-    return yaml.safe_load(parts[1]) or {}
+        raise ValueError(f"{path}: expected a leading '---' YAML frontmatter block")
+    front = yaml.safe_load(parts[1]) or {}
+    # ADR-0508: this function is check_docs's OKF hook, so it states the schema
+    # versions it understands and refuses the rest by name.
+    version = front.get("okf_version")
+    supported = ", ".join(OKF_SUPPORTED_VERSIONS)
+    if version is None:
+        raise ValueError(f"{path}: missing okf_version (supported: {supported})")
+    if version not in OKF_SUPPORTED_VERSIONS:
+        raise ValueError(f"{path}: unsupported okf_version {version!r} (supported: {supported})")
+    return front
 
 
 def check_model_roles() -> List[Finding]:
@@ -1026,7 +1043,11 @@ def check_model_roles() -> List[Finding]:
                     ))
 
     for okf_path in sorted((release / "agents").glob("*/agent.okf.md")):
-        zuno = (_okf_frontmatter(okf_path).get("zuno") or {})
+        try:
+            zuno = (_okf_frontmatter(okf_path).get("zuno") or {})
+        except ValueError as exc:
+            findings.append(Finding("model_roles", str(exc)))
+            continue
         agent = zuno.get("name", okf_path.parent.name)
         for task in zuno.get("tasks") or []:
             if (agent, task) not in declared:

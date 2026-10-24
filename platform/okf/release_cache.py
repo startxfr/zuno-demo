@@ -136,5 +136,18 @@ def conformance_dir() -> Optional[pathlib.Path]:
         return None
     return candidate if candidate.is_dir() else None
 
+def read_index(release: pathlib.Path) -> dict:
+    """okf-index.json of an extracted release (the corp artifact's index layer),
+    refused by name when absent or of an unknown schemaVersion (ADR-0508)."""
+    import json
+
+    path = release / "okf-index.json"
+    if not path.is_file():
+        raise ReleaseUnavailable(f"{path}: the release holds no okf-index.json")
+    index = json.loads(path.read_text(encoding="utf-8"))
+    if index.get("schemaVersion") != 1:
+        raise ReleaseUnavailable(f"{path}: unsupported index schemaVersion {index.get('schemaVersion')!r} (supported: 1)")
+    return index
+
 if __name__ == "__main__":
     sys.exit(main())

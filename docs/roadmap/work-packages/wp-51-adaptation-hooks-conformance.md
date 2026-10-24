@@ -38,9 +38,10 @@ Done in this repository:
   `platform/okf/tests/test_okf_conformance.py` runs every case through it.
 - `platform/okf/check_okf_read_boundary.py` (CI: lint.yml) fails on a new
   direct OKF read outside the hooks (it also catches `<root> / "agents" / ...`
-  path building, which found the agent scaffold template); two pre-existing
-  reads are a baseline that may only shrink (`check_docs.py`,
-  `day2_contract_attribution.py`).
+  path building, which found the agent scaffold template); the baseline is
+  now empty (`check_docs.py` reads through `_okf_frontmatter`,
+  `day2_contract_attribution.py` through `release_cache.read_index`, both
+  version-checked).
 - Evaluations hook (`evaluations/common/okf_release.py`: `agent_declaration`,
   `task_declarations`, version-checked). The tekos gate checks, `run_scenarios`,
   the naveo/advantage/finage security checks and the agent scaffold template now
@@ -54,10 +55,12 @@ Done in this repository:
 - Proven: flipping one expected value fails the matching hook only; the live
   release 0.3.0 still loads (8 agents) through both hooks.
 
+Finding fixed on the way: `check_docs.py`'s agent-status-vs-ADR check read the
+first `status:` line of each bundle, which is `verification.status: unverified`,
+so it never fired; it now reads `zuno.status` and passes on release 0.3.0.
+
 Remaining before this WP closes:
 
-- `check_docs.py` and `day2_contract_attribution.py` still read the release
-  directly (the baseline); move them behind a hook or retire the baseline entries.
 - The conformance cases are merged on zuno-demo-agents devel (PR #7). The
   release builder now ships them as an optional corp-artifact layer (branch
   `prep/wp51-release-conformance`, ADR-0577 amendment 2026-10-24) and
