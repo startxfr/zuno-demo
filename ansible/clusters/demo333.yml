@@ -39,3 +39,116 @@ zuno_mariadb_backup_s3_region: "eu-central-1"
 # main, which is a release branch fast-forwarded by hand. The first build-role
 # run after this change rebuilds each image from devel.
 zuno_build_git_ref: "devel"
+
+# UnifAI stack on demo333 (WP-154/WP-168): the non-secret overrides that were
+# only kept in a private vars file until now. They are deep-merged over the
+# role defaults by ansible/roles/unifai (zuno_unifai_values); bundle settings
+# are per agent (zuno_unifai_bundle_settings). Image tags are immutable
+# devel-<sha> builds of this cluster's registry. No secret belongs here.
+zuno_unifai_bundle_settings:
+  advantage:
+    entitlement: Enforced
+    groupTeam: true
+    retriever: knowledge-advantage
+  arkos:
+    entitlement: Enforced
+    groupTeam: true
+    retrieveFirst: true
+    retriever: knowledge-arkos
+  comage:
+    entitlement: Enforced
+    groupTeam: true
+    retrieveFirst: true
+    retriever: knowledge-comage
+  finage:
+    entitlement: Enforced
+    groupTeam: true
+    retriever: knowledge-finage
+  naveo:
+    entitlement: Enforced
+    groupTeam: true
+    retriever: knowledge-naveo
+  tekos:
+    classificationOverrides:
+      answer-technical-question: C2
+    entitlement: Enforced
+    groupTeam: true
+    retrieveFirst: true
+    retriever: knowledge-tekos
+zuno_unifai_released_bundles: true
+zuno_unifai_released_bundles_exclude: []
+zuno_unifai_values:
+  ragSources:
+  - aclGroups:
+    - consultant/confluence-archi-satellite
+    - consultant/confluence-build-satellite
+    - consultant/confluence-run-satellite
+    confluence:
+      baseUrl: https://startxfr.atlassian.net
+      excludeLabels:
+      - obsolete
+      rootTitle: 'Technologie : Satellite'
+      spaceKey: SXSI
+    name: tekos-satellite
+    syncInterval: 6h
+    tags:
+    - knowledge.tech
+    type: confluence
+    visibility: shared
+  - aclGroups:
+    - consultant/confluence-archi-openshift
+    - consultant/confluence-build-openshift
+    - consultant/confluence-run-openshift
+    confluence:
+      baseUrl: https://startxfr.atlassian.net
+      excludeLabels:
+      - obsolete
+      rootTitle: 'Technologie : Openshift'
+      spaceKey: SXSI
+    name: tekos-openshift
+    syncInterval: 6h
+    tags:
+    - knowledge.tech
+    type: confluence
+    visibility: shared
+  retrievers:
+  - config:
+      forward_user_token: true
+      source_type: CONFLUENCE
+      threshold: 0.3
+      top_k_results: 5
+    name: knowledge-comage
+    teamRef: agent-comage
+  - config:
+      forward_user_token: true
+      source_type: CONFLUENCE
+      threshold: 0.3
+      top_k_results: 5
+    name: knowledge-tekos
+    teamRef: agent-tekos
+  - config:
+      forward_user_token: true
+      source_type: CONFLUENCE
+      threshold: 0.3
+      top_k_results: 5
+    name: knowledge-arkos
+    teamRef: agent-arkos
+  stack:
+    identity:
+      oidcClaims: true
+    images:
+      backend: image-registry.openshift-image-registry.svc:5000/zuno-unifai/unifai-backend:devel-e76c71cd0
+      identity: image-registry.openshift-image-registry.svc:5000/zuno-unifai/unifai-identity:devel-e76c71cd0
+      multiagent: quay.io/zuno/unifai-multiagent:devel-266bb09ef
+      rag: image-registry.openshift-image-registry.svc:5000/zuno-unifai/unifai-rag:devel-ed9007147
+      ui: image-registry.openshift-image-registry.svc:5000/zuno-unifai/unifai-ui:devel-387573fec
+    rag:
+      tokenReview: true
+    ragClients:
+    - namespace: zuno-ai-run
+      podLabels:
+        zuno.io/rag-client: 'true'
+    version: devel-e76c71cd0
+  redhatDocs:
+    enabled: true
+    syncInterval: 168h
