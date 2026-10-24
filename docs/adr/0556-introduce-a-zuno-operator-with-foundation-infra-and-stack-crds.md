@@ -52,6 +52,17 @@ The zuno operator applies and asserts that `UnifaiStack` the way it applies
 an ArgoCD Application, and never reconciles its children. Clause 3's reading
 of ADR-0327's boundary loses its object once aiagent-operator is retired.
 
+## Open points (2026-10-24 review)
+
+Still `Proposed`; no code exists. Two items to settle before acceptance:
+
+1. Decision clause 1 still describes the operator as sitting "beside the
+   AIAgent operator"; that operator is retired (ADR-0572, WP-156), so the
+   clause is read as "alone in `operator/`".
+2. Clause 4 (progressive migration) does not mention
+   [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md);
+   the operator's apply loop must work through a remote ArgoCD too.
+
 ## Decision
 
 This is a **contract ADR**, following the ADR-0327 → ADR-0308

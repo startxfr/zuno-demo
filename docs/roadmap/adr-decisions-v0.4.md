@@ -46,3 +46,22 @@ Remove embeddings/content when a user loses source access.
 ### ADR-0409: Introduce advanced human approval workflows
 
 Pause sensitive operations for explicit approval and resume from persisted checkpoints.
+
+## Reassessment (2026-10-24) - against the UnifAI platform
+
+These stubs predate [ADR-0561](../adr/0561-adopt-unifai-as-the-agent-platform.md).
+No status changes here; each row records what the UnifAI fork already provides
+and what remains, so that a later decision can promote, amend or supersede it.
+
+| ADR | Already provided | Open |
+|---|---|---|
+| 0401 | `A2AAgentNode` and `A2AProvider` in `startx-unifai` | zuno authorisation policy for delegation |
+| 0402 | the nodes use the `a2a-sdk` | none: adoption is a fact, a decision can say so |
+| 0403 | none found in the A2A node (WP-146 forwards the user JWT to MCP only) | **the real gap**: carry the initiating user's identity across A2A calls |
+| 0404 | project memory ([WP-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md)) | sharing promoted knowledge across agents |
+| 0405 | OTel spans ([WP-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md)) | user-facing display of delegation traces |
+| 0406 | LangGraph recursion limit, thread-depth cycle guard (50) | hop and budget limits per delegation |
+| 0407 | per-agent entry and sheet ([WP-167](work-packages/wp-167-per-agent-entry-and-sheet.md), ADR-0582) | task-oriented views beyond chat |
+| 0408 | group ACLs, incremental sync and stale-point deletion ([WP-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md)) | verify revocation removes private content |
+| 0409 | `ChannelApprovalGate` (HITL) in the fork | mapping to zuno policy and persisted checkpoints |
+

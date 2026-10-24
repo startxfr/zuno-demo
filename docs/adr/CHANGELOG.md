@@ -9,6 +9,14 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Supersessions (2026-10-24) - onboarding ADRs follow the agent extraction
+
+ADR-0307 (self-service agent onboarding) and ADR-0410 (a sixth agent as its
+proof) rested on `agents/`, the `AIAgent` CR and `platform/templates/agent/`,
+all removed by WP-156 and WP-165. Both move to Retired, superseded by
+ADR-0582, ADR-0583 and ADR-0584, which now govern an agent's entry, visibility
+and lifecycle.
+
 ## Supersession (2026-10-23) - WP-165 cuts agents over to zuno-demo-agents
 
 With `agents/`, the moved corp policies and the OKF Vault Transit chain

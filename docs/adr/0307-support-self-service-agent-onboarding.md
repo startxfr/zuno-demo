@@ -1,6 +1,6 @@
 # ADR-0307: Support self-service agent onboarding
 
-- **Status:** Proposed (deferred - WP-41 cancelled 2026-08-23; the merged template generator under `platform/templates/agent/` remains in the repo but self-service onboarding is not an active decision)
+- **Status:** Superseded by [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md), [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) and [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) (2026-10-24) - the `agents/` tree, the `AIAgent` CR and `platform/templates/agent/` this decision scaffolded were removed by WP-156 and WP-165; an agent is now defined in `zuno-demo-agents` and its entry, visibility and lifecycle are governed by those ADRs. Previously: Proposed (deferred)
 - **Target:** v0.9 (retargeted from v0.7 on 2026-08-30, same day it was first moved from v0.4 — user decision: Naveo will not be pursued as the new-agent onboarding proof before at least v0.9, possibly later)
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team

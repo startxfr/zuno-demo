@@ -291,9 +291,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0307](0307-support-self-service-agent-onboarding.md) | Proposed | Support self-service agent onboarding |
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Partially implemented | Run day-0 platform services in internal or external mode |
-| [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | Proposed | Expand the agent catalog beyond the initial five agents |
 | [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | Implemented | Adopt RHTAS as the artifact trust and supply-chain service |
 | [ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md) | Implemented | Close ADR-0111's last SecNumCloud gap with an in-cluster release ledger |
 | [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | Proposed | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
@@ -385,11 +383,13 @@ part of its decision is still in force.
 | [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) | v0.2 | Superseded by ADR-0219 | Import real SXA content via S3 into MariaDB, served through MCP and RAG |
 | [ADR-0217](0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md) | v0.2 | Superseded by ADR-0219 | Ingest a weekly SXA corpus as a new RAG domain |
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Superseded by ADR-0526 | Support dynamic LoRA adapter loading |
+| [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.9 | Superseded by ADR-0582, ADR-0583 and ADR-0584 | Support self-service agent onboarding |
 | [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v0.3 | Superseded by ADR-0564 | Expand agent lifecycle management through the AIAgent Operator |
 | [ADR-0327](0327-define-the-aiagent-crd-reconciliation-contract-before-implementing-the-operator.md) | v0.3 | Superseded by ADR-0564 | Define the AIAgent CRD reconciliation contract before implementing the operator |
 | [ADR-0332](0332-remove-console-favorites-provisioning.md) | v0 | Deprecated | Remove Console favorites provisioning |
 | [ADR-0342](0342-support-multiple-agent-graph-shapes-in-agent-runtime.md) | v0.3 | Superseded by ADR-0561 | Support multiple agent graph shapes in Agent Runtime |
 | [ADR-0350](0350-provide-an-aiagent-kubernetes-crd-and-operator.md) | v0.3 | Superseded by ADR-0564 | Provide an AIAgent Kubernetes CRD and operator |
+| [ADR-0410](0410-expand-the-agent-catalog-beyond-the-initial-five-agents.md) | v0.9 | Superseded by ADR-0582, ADR-0583 and ADR-0584 | Expand the agent catalog beyond the initial five agents |
 | [ADR-0411](0411-trust-the-vault-pki-root-for-the-tekos-frontend-oidc-client.md) | v0.4 | Superseded by ADR-0561 | Trust the Vault PKI root in every agent frontend's OIDC client |
 | [ADR-0412](0412-serve-gpt-oss-20b-on-the-unmanaged-full-gpu-node.md) | v0.4 | Superseded by ADR-0414 | Serve gpt-oss-20b on the unmanaged full-GPU node |
 | [ADR-0420](0420-sign-supply-chain-artifacts-in-cluster-with-vault-transit.md) | v0.4 | Superseded by ADR-0535 | Sign supply-chain artifacts in-cluster with Vault Transit |

@@ -1,6 +1,6 @@
 # ADR-0410: Expand the agent catalog beyond the initial five agents
 
-- **Status:** Proposed (deferred - WP-41 cancelled 2026-08-23; the merged Naveo agent bundle under `agents/naveo/` remains in the repo but the sixth-agent deployment gate is not being pursued)
+- **Status:** Superseded by [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md), [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) and [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) (2026-10-24) - the sixth-agent proof relied on the template path and `agents/naveo/`, both removed by WP-156 and WP-165. Previously: Proposed (deferred)
 - **Target:** v0.9 (retargeted from v0.7 on 2026-08-30, same day it was first moved from v0.4 — user decision: Naveo will not be pursued as the new-agent onboarding proof before at least v0.9, possibly later)
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
