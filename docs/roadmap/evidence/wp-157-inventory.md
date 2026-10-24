@@ -296,6 +296,19 @@ no match found` about once per call. Synthetic non-streamed calls made right aft
 restart did not create counters, then did a few minutes later; the cause is not known. ADR-0570
 clause 2 may be closed on the group ceiling only, written as such.
 
+Bounded diagnosis session of the per-user ceiling (read-only, after the second V14 attempt):
+the Limitador definitions of `standard-user` and `standard-group` are identical in every
+namespace apart from the header and the hash (checked on `qwen35-9b-wesh-kserve-route`); a scan of
+the 69 scopes of the wasm config found no `standard-user` counter anywhere, only group counters.
+The only structural difference left is the order: in each action set the user check/report pair is
+the LAST of 13 actions (auth, then six limits as check + report pairs, ours after the
+subscription limits), and the shim logs `invalid context_id, no match found` for gRPC answers that
+arrive after their request context ended. Working hypothesis, not proven: the last pair loses the
+race against the end of the request. A test would put `standard-user` first in the generated
+policy, or give the route fewer limits, and compare; it needs a policy change, so it is left as
+the follow-up. WP-157 closes on the group ceiling (written plainly); the per-user ceiling is a
+named follow-up, with this hypothesis as its starting point.
+
 ## 5. Proposed design for steps 3-5 (plan, not code)
 
 ### (a) SaaS ExternalModels in `gitops/charts/models`
