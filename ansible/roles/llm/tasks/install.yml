@@ -7,6 +7,11 @@
 # the idempotency guarantee: a status check, not a rebuild, once the image
 # exists). WP-156 removed agent-runtime from this role's loops (and its
 # first-run OKF signing); ai-gateway stays.
+# The WP-157 ai-gateway switches are per-cluster knobs
+# (ansible/clusters/<cluster>.yml), so the cluster file is loaded first.
+- name: "llm | load this cluster's non-secret variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "llm | ensure the ai-gateway image is built"
   ansible.builtin.include_role:
     name: ai_gateway_build
@@ -26,14 +31,29 @@
   loop_control:
     loop_var: _llm_component
 
-- name: "llm | apply the provider-routing/AI Inference Gateway GitOps Applications (d1)"
+- name: "llm | apply the provider-routing GitOps Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
-    gitops_component_name: "{{ _llm_component }}"
+    gitops_component_name: "llm"
     gitops_app_phase: "d1"
-    gitops_app_name: "zuno-{{ _llm_component }}-d1"
-  loop:
-    - llm
-    - ai-gateway
-  loop_control:
-    loop_var: _llm_component
+    gitops_app_name: "zuno-llm-d1"
+
+# Inline values REPLACE the manifest's own (apply_gitops_app.yml), hence
+# clusterBaseDomain restated. The three WP-157 switches default to the
+# chart's own false; a cluster turns one on in ansible/clusters/<cluster>.yml
+# only after its live verification (WP-157 brief, enable sequence).
+- name: "llm | apply the AI Inference Gateway GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "ai-gateway"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-ai-gateway-d1"
+    gitops_app_extra_helm_values:
+      clusterBaseDomain: "{{ cluster_base_domain }}"
+      maasAdapter:
+        gatewayIdentity:
+          enabled: "{{ zuno_ai_gateway_maas_gateway_identity | default(false) | bool }}"
+        quota429Passthrough:
+          enabled: "{{ zuno_ai_gateway_maas_quota_429_passthrough | default(false) | bool }}"
+        failModes:
+          enabled: "{{ zuno_ai_gateway_quota_fail_modes | default(false) | bool }}"

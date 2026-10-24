@@ -50,6 +50,13 @@
       # discovered here so a new cluster gets its own.
       modelStorage:
         storageClassName: "{{ cluster_default_storage_class }}"
+      # WP-157 (inventory finding 6): when true, the SaaS ExternalModels'
+      # subscriptions keep only the ai-gateway ServiceAccount, dropping the
+      # /agent_tekos and /sales persona grants. Per-cluster knob in
+      # ansible/clusters/<cluster>.yml.
+      maas:
+        saasSubscriptions:
+          gatewayOnly: "{{ zuno_models_saas_subscriptions_gateway_only | default(false) | bool }}"
       image:
         vllm: "{{ _models_discovered_vllm_image }}"
       # Which bucket/directory contain the model weights
