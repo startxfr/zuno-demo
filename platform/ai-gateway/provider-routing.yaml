@@ -360,18 +360,29 @@ providers:
     temperature: 0.2
     eligible_for: [C1, C2]
 
+  # WP-157 (ADR-0570), SaaS-through-MaaS pilot: `via_maas` routes this
+  # provider through the MaaS gateway's `mistral-large` ExternalModel (its
+  # only subscriber is the ai-gateway ServiceAccount), but only once
+  # maasAdapter.externalEgressEnabled is on (the third gate of
+  # app/maas_adapter.py:should_use_maas). While it is off this entry is
+  # served directly exactly as before: the direct ChatMistralAI branch of
+  # app/providers.py ignores `endpoint`, which only the MaaS transport
+  # reads. Extended to the other SaaS providers only after the pilot is
+  # verified live.
   - name: mistral
     kind: saas
     role: general-external
     model: mistral-large-latest
     api_key_env: MISTRAL_API_KEY
+    via_maas: true
+    endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/mistral-large/v1
     temperature: 0.2
     eligible_for: [C1]
 
   # ADR-0417: Codestral, Mistral's code-specialized model, via the native
-  # Mistral API - same transport as the `mistral` entry above (no
-  # endpoint: override, langchain_mistralai talks to api.mistral.ai
-  # directly), but a DEDICATED api_key/account (MISTRAL_CODESTRAL_API_KEY,
+  # Mistral API - same direct transport as the `mistral` entry above
+  # (langchain_mistralai talks to api.mistral.ai directly; no via_maas
+  # here), but a DEDICATED api_key/account (MISTRAL_CODESTRAL_API_KEY,
   # zuno/providers/mistral-codestral) so Codestral running low on credits
   # is a distinguishable event from mistral-large-latest doing so.
   # eligible_for is [C1, C2] only, never C3 - same unconditional SaaS rule

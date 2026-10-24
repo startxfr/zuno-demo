@@ -253,6 +253,44 @@ def test_external_egress_opt_in_only_affects_non_local_candidates() -> None:
     assert maas_adapter.should_use_maas(cfg, "local") is True
 
 
+
+def _real_provider_entry(name: str) -> dict:
+    import yaml
+
+    path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "..", "..",
+        "platform", "ai-gateway", "provider-routing.yaml",
+    )
+    with open(path, encoding="utf-8") as fh:
+        return next(p for p in yaml.safe_load(fh)["providers"] if p["name"] == name)
+
+
+def test_mistral_pilot_stays_direct_until_external_egress_is_on() -> None:
+    """WP-157 SaaS-through-MaaS pilot: the real `mistral` entry carries
+    via_maas and a MaaS endpoint, yet with MAAS_EXTERNAL_EGRESS_ENABLED off
+    it is built by the direct ChatMistralAI branch (which never reads
+    `endpoint`), exactly as before the pilot; with it on, by the MaaS
+    transport at its own ExternalModel route."""
+    cfg = _real_provider_entry("mistral")
+    candidate = ProviderCandidate(name="mistral", kind="saas")
+    _reset_adapter_env(MAAS_ADAPTER_ENABLED="true", MAAS_GATEWAY_ENDPOINT="http://maas.example/v1")
+    assert maas_adapter.should_use_maas(cfg, "saas") is False
+    with mock.patch("langchain_mistralai.ChatMistralAI") as direct, \
+            mock.patch.object(maas_adapter, "chat_model_via_maas") as via_maas:
+        providers.chat_model_for(candidate, cfg)
+    assert direct.called and not via_maas.called
+
+    _reset_adapter_env(
+        MAAS_ADAPTER_ENABLED="true",
+        MAAS_GATEWAY_ENDPOINT="http://maas.example/v1",
+        MAAS_EXTERNAL_EGRESS_ENABLED="true",
+    )
+    with mock.patch.object(maas_adapter, "chat_model_via_maas") as via_maas:
+        providers.chat_model_for(candidate, cfg)
+    assert via_maas.called
+    assert cfg["endpoint"].endswith("/zuno-ai-run/mistral-large/v1")
+    _reset_adapter_env()
+
 TESTS = [
     test_adapter_disabled_by_default,
     test_provider_must_opt_in_even_when_globally_enabled,
@@ -270,6 +308,7 @@ TESTS = [
     test_maas_adapter_never_widens_c3_local_only_eligibility,
     test_external_egress_stays_blocked_even_when_adapter_and_provider_both_opt_in,
     test_external_egress_opt_in_only_affects_non_local_candidates,
+    test_mistral_pilot_stays_direct_until_external_egress_is_on,
 ]
 
 

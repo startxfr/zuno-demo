@@ -39,7 +39,7 @@
     gitops_app_name: "zuno-llm-d1"
 
 # Inline values REPLACE the manifest's own (apply_gitops_app.yml), hence
-# clusterBaseDomain restated. The three WP-157 switches default to the
+# clusterBaseDomain restated. The WP-157 switches default to the
 # chart's own false; a cluster turns one on in ansible/clusters/<cluster>.yml
 # only after its live verification (WP-157 brief, enable sequence).
 - name: "llm | apply the AI Inference Gateway GitOps Application (d1)"
@@ -57,3 +57,7 @@
           enabled: "{{ zuno_ai_gateway_maas_quota_429_passthrough | default(false) | bool }}"
         failModes:
           enabled: "{{ zuno_ai_gateway_quota_fail_modes | default(false) | bool }}"
+        # WP-157 SaaS-through-MaaS pilot: lets a SaaS provider marked
+        # via_maas (the `mistral` pilot) reach MaaS. Off by default; turning
+        # it on is an egress decision of its own (chart values comment).
+        externalEgressEnabled: "{{ zuno_ai_gateway_maas_external_egress | default(false) | bool }}"
