@@ -1,6 +1,6 @@
 # WP-170: Agent delegation contract and ADRs
 
-- **State:** Repo work merged
+- **State:** Done (2026-10-24)
 - **ADRs:** [ADR-0401](../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0402](../../adr/0402-adopt-a2a-as-the-inter-agent-protocol.md), [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md), [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md)
 - **Depends on:** none
 - **Related:** [WP-171](wp-171-okf-delegation-fields-and-conformance-cases.md), [WP-172](wp-172-gateway-enforcement-of-the-delegation-chain.md), [WP-173](wp-173-unifai-a2a-identity-server-and-approval.md), [WP-174](wp-174-tekos-to-arkos-delegation-on-demo333.md)
@@ -35,3 +35,13 @@ which limits, and amend the three ADRs the contract touches (ADR-0011, ADR-0579,
 
 Whether ADR-0405 (user-facing delegation traces beyond spans) needs its own record once the chain is
 audited.
+
+## Closed (2026-10-24)
+
+The user settled the open choices of each record and ADR-0401, ADR-0403, ADR-0406 and ADR-0409 are `Accepted`, each with a "Decisions of
+2026-10-24" section and a "Before Implemented" list. Implementation continues in WP-171 to WP-174; the records become `Implemented` after
+WP-174's live proofs. Decisions: no consent of the target; agent plus task; the classification return rule proved live; the residual risk of
+unbound headers accepted with WP-146 step 6 and `JWT_AUDIENCE` as prerequisites of the first live delegation; the chain format frozen; depth 1
+under a ceiling of 2; no explicit breadth cap; the wait is the delegating task's timeout with `cancel_task`; the cost is the user's; delegated
+writes lifted per target through `delegation.write_allowed`; an approval survives a worker restart and expires after 300 seconds; approving
+the delegation itself is a per-agent option, off by default.

@@ -21,7 +21,22 @@ on the live cluster as the `eval-*` personas.
 3. When WP-173 delivers end-to-end approval, validate a delegated write with the user's approval and across a worker
    restart, then flip `delegation.allow_write` in the corp policy.
 
+## Prerequisites (decided when ADR-0403 was accepted, 2026-10-24)
+
+Before Tekos declares any target: WP-146 step 6 is closed (who may author the `X-Zuno-*` templates in UnifAI) and `JWT_AUDIENCE` is enforced on the
+gateways. WP-173 must have lifted the operator's refusal of delegation targets, and the per-target write list must be released.
+
 ## Acceptance
 
 All scenarios pass on demo333 (the user powers it on); the negative tests prove the identity boundary; nothing else changes
 for agents that declare no target.
+
+## Live proofs that make the ADRs `Implemented` (2026-10-24)
+
+- **Classification on return (ADR-0401):** a Tekos run (C1) that receives a result from Arkos (C3) continues at C3 and the local-only rules apply.
+- **Chain and refusals (ADR-0401, ADR-0403):** the audit line and the trace carry `sub`, `delegated_by`, `delegation_depth`; unentitled user, undeclared
+  target, depth 2 and a cycle are refused.
+- **Limits (ADR-0406):** the cost lands on the initiating user; a delegation that is no longer awaited cancels the remote task; the number of calls per
+  turn is read from real traces to confirm the indirect bound (or trigger a cap).
+- **Approval (ADR-0409):** an approval reaches the user who started the chain, survives a worker restart, expires after 300 seconds, and a write to a
+  target absent from `delegation.write_allowed` is refused.

@@ -236,8 +236,8 @@ of truth, delivered to the operator as signed OCI artifacts; the ai-gateway
 stays the model policy router and is slimmed onto MaaS. Piloted on demo333
 with tekos; demo222 cuts over only after full validation.
 
-**22 ADRs: 16 `Accepted`, ADR-0564 superseded in part by ADR-0577 and
-ADR-0578, ADR-0353, ADR-0401, ADR-0403, ADR-0406 and ADR-0409 `Proposed`.** Open: ADR-0353, ADR-0401, ADR-0402, ADR-0403, ADR-0406, ADR-0409, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575; WP-146 – WP-157, WP-166, WP-170 – WP-174.
+**22 ADRs: 20 `Accepted`, ADR-0564 superseded in part by ADR-0577 and
+ADR-0578, ADR-0353 `Proposed`.** Open: ADR-0353, ADR-0401, ADR-0402, ADR-0403, ADR-0406, ADR-0409, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575; WP-146 – WP-157, WP-166, WP-171 – WP-174.
 
 ## v0.12
 

@@ -304,11 +304,11 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0353](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) | Proposed | Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF |
-| [ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md) | Proposed | Introduce agent-to-agent delegation limited to the targets an agent declares |
+| [ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md) | Accepted | Introduce agent-to-agent delegation limited to the targets an agent declares |
 | [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Accepted | Adopt A2A as the inter-agent protocol |
-| [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) | Proposed | Propagate the user's identity and the delegation chain across agent-to-agent calls |
-| [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Proposed | Limit agent delegation by depth, cycle and budget |
-| [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Proposed | Introduce human approval for delegated operations, resumable from persisted checkpoints |
+| [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) | Accepted | Propagate the user's identity and the delegation chain across agent-to-agent calls |
+| [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Accepted | Limit agent delegation by depth, cycle and budget |
+| [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Accepted | Introduce human approval for delegated operations, resumable from persisted checkpoints |
 | [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md) | Implemented | Keep the ai-gateway as the policy router in front of UnifAI |
 | [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Accepted | Adopt UnifAI as the agent platform |
 | [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md) | Implemented | Authenticate UnifAI against the zuno Keycloak realm |

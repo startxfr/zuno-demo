@@ -1,6 +1,6 @@
 # ADR-0401: Introduce agent-to-agent delegation limited to the targets an agent declares
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-24) - the decisions below are settled; it becomes `Implemented` once the proofs of "Before Implemented" are made live (WP-174)
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
@@ -46,6 +46,28 @@ confused deputy, which this ADR exists to prevent.
    so a delegation can never be used to carry data into a run handled at a lower level.
 6. **Default is no delegation.** Absent field, empty list or unreadable bundle all
    mean refusal. A deployment that never declares a target behaves as today.
+
+## Decisions of 2026-10-24
+
+Taken with the user while closing this record:
+
+- **The target does not consent.** Only the delegating agent declares the delegation. A user who holds
+  `agent_arkos` can already use Arkos directly; delegation gives that user nothing more, and one place to
+  review is better than two. Rejected: a target-side `accepts_from` field (a second field, a second review
+  and a schema release) and a consent required only of sensitive targets (two rules to explain and test).
+- **A target is an agent and a task** (`{agent, task}`), never a whole agent: the least privilege, and a task
+  added later by another team is not reachable until the delegator has reviewed it.
+- **The return rule is proved, not only specified.** "What comes back raises, never lowers" (clause 5) is kept
+  by the agents' runs in the UnifAI fork (WP-173), because the gateway cannot see the delegator's run. The
+  proof is an acceptance criterion of WP-174, below. Rejected: relying on the fork's unit tests alone, and an
+  independent check in the ai-gateway (it does not see the chain, so it would need a new header and new code).
+
+## Before Implemented
+
+On demo333, as an `eval-*` persona: a Tekos run (C1) that receives a result from Arkos (C3) continues at C3,
+so the ai-gateway floor and the local-only rules (ADR-0035, ADR-0550) apply to it; and the refusals of WP-174
+(unentitled user, undeclared target, depth, cycle) hold. Prerequisites of the first live delegation are listed
+in [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md).
 
 ## Alternatives considered
 

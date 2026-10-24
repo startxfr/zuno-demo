@@ -9,6 +9,13 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Acceptance (2026-10-24) - the agent delegation contract
+
+ADR-0401, ADR-0403, ADR-0406 and ADR-0409 move from `Proposed` to `Accepted` with the user's decisions recorded in each
+(no consent of the target, agent plus task, depth 1 under a ceiling of 2, a per-target list of delegated writes
+replacing `delegation.allow_write`, a pending approval that survives a worker restart). They become `Implemented` after the live
+proofs of WP-174; two prerequisites of the first live delegation (WP-146 step 6 and `JWT_AUDIENCE`) are recorded in ADR-0403.
+
 ## Promotion and retarget (2026-10-24) - the agent delegation contract
 
 ADR-0401, ADR-0402, ADR-0403, ADR-0406 and ADR-0409 are promoted from v0.4 stubs

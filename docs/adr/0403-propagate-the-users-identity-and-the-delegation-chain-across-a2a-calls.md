@@ -1,6 +1,6 @@
 # ADR-0403: Propagate the user's identity and the delegation chain across agent-to-agent calls
 
-- **Status:** Proposed
+- **Status:** Accepted (2026-10-24) - the decisions below are settled; it becomes `Implemented` once the proofs of "Before Implemented" are made live (WP-174)
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
@@ -80,6 +80,29 @@ whose headers the platform renders (ADR-0563 clause 4), and not a hostile holder
 token. This is the same boundary as `X-Zuno-Agent`. Token exchange (below) and WP-146
 step 6 would close it; until then the audit says what the headers claimed, not what was
 proven.
+
+## Decisions of 2026-10-24
+
+Taken with the user while closing this record:
+
+- **The residual risk is accepted**, because it concerns attribution and governance, not privilege (see above).
+  The record is not held back for a signed chain. Rejected: waiting for a chain signed with a workload secret or
+  for a Keycloak token exchange, which would add a signing component or a realm change (the realm is created once,
+  ADR-0530) for a risk that grants nothing new.
+- **Conditions before the first live delegation.** Two older weaknesses are closed before Tekos declares any target
+  (WP-174's prerequisites, not this record's): WP-146 step 6 (who may author the `X-Zuno-*` templates in UnifAI)
+  and the enforcement of `JWT_AUDIENCE` on the gateways (today a token from any client of realm `zuno` is accepted).
+- **The format is frozen:** `X-Zuno-Delegated-By: <agent>:<task>[,...]` and `X-Zuno-Delegation-Depth: <n>`. The
+  gateway applies it and the WP-173 brief gives it to the fork, so a later change costs two repositories.
+  Rejected: waiting for the A2A server to choose a structured or signed header.
+- **No headers means a direct call (depth 0),** evaluated exactly as before. Rejected: refusing a direct call to an
+  agent that is somebody's declared target; Arkos stays usable directly by a user who holds its group.
+
+## Before Implemented
+
+On demo333: a delegated call carries the user's own token and the chain, shows in the gateway audit line and the
+trace with the user's `sub`, `delegated_by` and `delegation_depth`, and the refusals of ADR-0401's list hold. The two
+conditions above are met before that run.
 
 ## Alternatives considered
 

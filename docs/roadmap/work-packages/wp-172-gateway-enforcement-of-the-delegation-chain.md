@@ -46,3 +46,7 @@ header. ADR-0401 and ADR-0403 say so.
 
 Not live until a release carrying the OKF delegation fields and `access` is promoted (WP-171); before that no bundle
 declares a target, so every delegated call is refused.
+
+Decided when the records were accepted: the boolean `delegation.allow_write` is transitional. When approval ships (WP-173) the gateway check
+becomes "the target `agent/task` is on `delegation.write_allowed`" (ADR-0409 clause 5), and this module's `DelegationLimits` and `evaluate`
+change with it, in the same corp release.
