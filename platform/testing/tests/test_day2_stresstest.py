@@ -77,6 +77,40 @@ def test_a_skipped_security_check_is_not_run_never_a_failure_nor_a_security_pass
     assert skipped.detail.startswith("NOT RUN: skipped: delegation is not enabled"), skipped.detail
 
 
+def test_a_skipped_scenario_is_not_run_never_a_failure_nor_an_acceptance_pass() -> None:
+    """A scenario that cannot apply on UnifAI (no placeholder tiles, no bearer
+    token on the UI) must not turn the run red, nor count as an acceptance pass."""
+    from dataclasses import dataclass
+
+    @dataclass
+    class R:
+        id: int
+        passed: bool
+        detail: str = ""
+        skipped: bool = False
+
+    module = types.ModuleType("run_scenarios")
+    module.run = lambda: [
+        R(1, True, "ok"),
+        R(2, False, "status=500"),
+        R(6, False, "skipped: UnifAI has no placeholder agent tiles", skipped=True),
+    ]
+    saved = sys.modules.get("run_scenarios")
+    sys.modules["run_scenarios"] = module
+    try:
+        rows = {r.id: r for r in day2_stresstest._scenario_results()}
+    finally:
+        if saved is None:
+            sys.modules.pop("run_scenarios", None)
+        else:
+            sys.modules["run_scenarios"] = saved
+    assert (rows["1"].category, rows["1"].passed) == ("acceptance", True)
+    assert (rows["2"].category, rows["2"].passed) == ("acceptance", False)
+    skipped = rows["6"]
+    assert (skipped.category, skipped.passed) == ("coverage", True), skipped
+    assert skipped.detail.startswith("NOT RUN: skipped: UnifAI has no placeholder"), skipped.detail
+
+
 def test_rag_ingestion_layer_is_gone() -> None:
     assert not hasattr(day2_stresstest, "_rag_ingestion_results")
     assert not hasattr(day2_stresstest, "_load_stress_test")
@@ -118,6 +152,7 @@ def test_main_cleans_up_unifai_sessions() -> None:
 TESTS = [
     test_stress_test_layer_is_reported_not_run,
     test_a_skipped_security_check_is_not_run_never_a_failure_nor_a_security_pass,
+    test_a_skipped_scenario_is_not_run_never_a_failure_nor_an_acceptance_pass,
     test_rag_ingestion_layer_is_gone,
     test_main_cleans_up_unifai_sessions,
 ]

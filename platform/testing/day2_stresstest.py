@@ -108,8 +108,13 @@ def _safe_run(layer: str, fn) -> List[Day2Result]:
 def _scenario_results() -> List[Day2Result]:
     import run_scenarios
 
+    # Same convention as _security_results(): a scenario that cannot apply on
+    # UnifAI carries `skipped` and is reported as NOT RUN in the coverage
+    # category, never as an acceptance pass and never as a failure of the run.
     return [
-        Day2Result(AGENT, "scenario", str(r.id), "acceptance", r.passed, r.detail)
+        Day2Result(AGENT, "scenario", str(r.id), "coverage", True, f"NOT RUN: {r.detail}")
+        if getattr(r, "skipped", False)
+        else Day2Result(AGENT, "scenario", str(r.id), "acceptance", r.passed, r.detail)
         for r in run_scenarios.run()
     ]
 
