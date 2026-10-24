@@ -222,6 +222,9 @@
           metadata:
             labels:
               app.kubernetes.io/name: acceptance-gate
+              # gate_checks.py queries the UnifAI rag server (its NetworkPolicy
+              # admits zuno.io/rag-client pods from zuno-ai-run).
+              zuno.io/rag-client: "true"
           spec:
             restartPolicy: Never
             priorityClassName: zuno-platform-weak

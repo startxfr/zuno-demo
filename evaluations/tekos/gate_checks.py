@@ -181,11 +181,57 @@ def arkos_declares_no_photorealistic_image_generation_capability() -> CheckResul
     )
 
 
+def tekos_retriever_finds_red_hat_docs_for_a_basic_openshift_question() -> CheckResult:
+    """The Red Hat documentation is ingested and served to Tekos: the UnifAI
+    retriever (query.bearer, the path UnifAI's knowledge-tekos retriever uses),
+    queried as a Tekos persona over the WEB sources tagged knowledge.tech,
+    returns at least one passage from docs.redhat.com for a basic OpenShift
+    question. Retrieval only, no model in the loop, so the result does not
+    depend on how an answer is worded. Runs in a pod labelled
+    zuno.io/rag-client=true (the rag server's NetworkPolicy)."""
+    import os
+
+    import httpx
+    import run_scenarios
+
+    url = os.getenv("UNIFAI_RAG_URL", "http://unifai-rag-server.zuno-unifai.svc:13456")
+    persona = os.getenv("UNIFAI_RAG_PERSONA", "consultant-01")
+    resp = httpx.get(
+        f"{url}/api/sources/query.bearer",
+        params={
+            "query": "What is a namespace in OpenShift?",
+            "sourceType": "WEB",
+            "tags": "knowledge.tech",
+            "top_k_results": 5,
+        },
+        headers={"Authorization": f"Bearer {run_scenarios.get_token(persona)}"},
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        return CheckResult(
+            "tekos_retriever_finds_red_hat_docs_for_a_basic_openshift_question", False,
+            f"query.bearer status={resp.status_code}",
+        )
+    matches = resp.json().get("matches", [])
+    # The source URL's metadata key is not part of a stable contract; any
+    # metadata value naming docs.redhat.com counts.
+    from_docs = [
+        m for m in matches
+        if any("docs.redhat.com" in str(v) for v in (m.get("metadata") or {}).values())
+    ]
+    return CheckResult(
+        "tekos_retriever_finds_red_hat_docs_for_a_basic_openshift_question",
+        bool(from_docs),
+        f"matches={len(matches)} from_docs_redhat_com={len(from_docs)}",
+    )
+
+
 CHECKS = [
     c2_permits_saas_fallback_when_not_local_only,
     tekos_write_code_prefers_mistral_codestral,
     tekos_declares_no_dat_or_image_generation_capability,
     arkos_declares_no_photorealistic_image_generation_capability,
+    tekos_retriever_finds_red_hat_docs_for_a_basic_openshift_question,
 ]
 
 

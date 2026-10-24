@@ -96,6 +96,9 @@ scenarios:
 
   - id: 11
     title: RAG retrieval contributes at least one citation for a technical question
+    # Two legs on UnifAI: an internal Confluence page (S0R42) and the Red Hat
+    # documentation (a basic OpenShift question whose answer cites
+    # docs.redhat.com); both must pass (run_scenarios.py u_rag_retrieval).
     type: rag_retrieval_has_citation
     query: "OpenShift AI model serving NVIDIA L4"
 

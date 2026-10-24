@@ -495,6 +495,16 @@ _TEKOS_RAG_QUESTION = (
 )
 _UNIFAI_RAG_QUESTION = os.getenv("UNIFAI_RAG_QUESTION") or (_TEKOS_RAG_QUESTION if AGENT in ("tekos", "arkos") else "")
 _UNIFAI_RAG_EXPECT = os.getenv("UNIFAI_RAG_EXPECT", "S0R42" if AGENT in ("tekos", "arkos") else "")
+# Tekos's retriever also searches the Red Hat documentation (WEB sources, knowledge.tech): a basic
+# product question must be answered from it and cite it. Tekos only; override or disable
+# (UNIFAI_RAG_WEB_QUESTION="") for another corpus.
+_TEKOS_RAG_WEB_QUESTION = (
+    "What is a namespace in OpenShift? Answer from the Red Hat documentation and cite the source URL."
+)
+_UNIFAI_RAG_WEB_QUESTION = os.getenv(
+    "UNIFAI_RAG_WEB_QUESTION", _TEKOS_RAG_WEB_QUESTION if AGENT == "tekos" else ""
+)
+_UNIFAI_RAG_WEB_EXPECT = os.getenv("UNIFAI_RAG_WEB_EXPECT", "docs.redhat.com")
 # A member of the agent's knowledge groups (override with UNIFAI_RAG_PERSONA).
 _UNIFAI_RAG_PERSONAS = {
     "tekos": "consultant-01", "arkos": "consultant-01", "comage": "sale-01", "advantage": "adv-01", "finage": "finance-01",
@@ -518,7 +528,18 @@ def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
     # the retriever tool call is still required.
     used_retriever = any("retriever" in t for t in tools)
     ok = names_page if _UNIFAI_RAG_EXPECT else (used_retriever and names_page)
-    return ScenarioResult(s["id"], s["title"], ok, f"tool_calls={tools} names_page={names_page}")
+    detail = f"tool_calls={tools} names_page={names_page}"
+    if _UNIFAI_RAG_WEB_QUESTION:
+        # Second leg: the same retriever over the Red Hat documentation. The answer must cite it.
+        try:
+            web = _unifai().collect(persona, _UNIFAI_RAG_WEB_QUESTION, deadline_seconds=170)
+            cites_docs = _UNIFAI_RAG_WEB_EXPECT in web["reply"]
+        except Exception as exc:  # noqa: BLE001
+            cites_docs = False
+            detail += f" web_error={exc}"
+        ok = ok and cites_docs
+        detail += f" cites_red_hat_docs={cites_docs}"
+    return ScenarioResult(s["id"], s["title"], ok, detail)
 
 
 def u_chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:
