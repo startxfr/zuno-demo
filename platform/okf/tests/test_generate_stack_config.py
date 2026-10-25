@@ -209,5 +209,71 @@ class MaasSubscriptionsTest(unittest.TestCase):
                          gen.MAAS_HEADER + "maas:\n  agentSubscriptions: {}\n")
 
 
+class ModelRoutingTest(MaasSubscriptionsTest):
+    """ADR-0581 amendment (WP-164 lot 2): the corp routing policy, reordered by roles, forbidden as exclude."""
+
+    def corp(self, doc) -> None:
+        (self.dir / "policies" / "model-routing" / "model-routing-policy.yaml").write_text(
+            yaml.safe_dump(doc, sort_keys=False))
+
+    def routing(self):
+        return gen.model_routing(self.dir, gen.admit.agents_view(self.dir))
+
+    def test_roles_in_corp_order_leave_the_entry_unchanged(self) -> None:
+        entry = {"agent": "alpha", "task": "one", "preferred": ["local-big-maas", "local-small-maas"],
+                 "fallback": ["saas-one"], "local_only_for": ["C2"]}
+        self.corp({"adapters": [{"agent": "alpha", "task": "one", "adapter": "a-lora"}], "preferences": [entry]})
+        self.agent("alpha", ["agent_alpha"], tasks={"one": {"preferred": ["quality", "default"]}})
+        self.assertEqual(self.routing(), {"adapters": [{"agent": "alpha", "task": "one", "adapter": "a-lora"}],
+                                          "preferences": [entry]})
+
+    def test_task_roles_reorder_the_corp_candidates_and_keep_strict(self) -> None:
+        self.corp({"preferences": [{"agent": "alpha", "task": "one", "strict": True,
+                                    "prefer": ["local-big-maas", "local-small-maas", "saas-one"]}]})
+        self.agent("alpha", ["agent_alpha"], tasks={"one": {"preferred": ["default"]}})
+        self.assertEqual(self.routing()["preferences"], [
+            {"agent": "alpha", "task": "one", "strict": True,
+             "prefer": ["local-small-maas", "local-big-maas", "saas-one"]}])
+
+    def test_agent_roles_apply_when_the_task_has_none_and_never_add_a_model(self) -> None:
+        self.corp({"preferences": [{"agent": "alpha", "task": "one", "prefer": ["local-big", "saas-one"]}]})
+        self.agent("alpha", ["agent_alpha"], models={"preferred": ["general-external", "reasoning"]})
+        prefs = self.routing()["preferences"]
+        self.assertEqual(prefs, [{"agent": "alpha", "task": "one", "prefer": ["saas-one", "local-big"]}])
+
+    def test_forbidden_roles_of_agent_and_task_become_exclude(self) -> None:
+        self.corp({"preferences": [{"agent": "alpha", "task": "one", "prefer": ["local-big-maas"]}]})
+        self.agent("alpha", ["agent_alpha"], models={"forbidden": ["general-external"]},
+                   tasks={"one": {"forbidden": ["quality"]}})
+        self.assertEqual(self.routing()["preferences"], [
+            {"agent": "alpha", "task": "one", "prefer": ["local-big-maas"],
+             "exclude": ["local-big-maas", "local-big", "saas-one"]}])
+
+    def test_task_without_a_corp_entry_gets_a_prefer_list_from_its_roles(self) -> None:
+        self.corp({"preferences": [{"agent": "other", "task": "x", "prefer": ["saas-one"]}]})
+        self.agent("alpha", ["agent_alpha"], tasks={"one": {"preferred": ["default", "quality"]},
+                                                    "two": {"forbidden": ["reasoning"]}, "three": None})
+        self.assertEqual(self.routing()["preferences"], [
+            {"agent": "other", "task": "x", "prefer": ["saas-one"]},
+            {"agent": "alpha", "task": "one", "prefer": ["local-small-maas", "local-big-maas", "local-big"]},
+            {"agent": "alpha", "task": "two", "exclude": ["local-secret-maas"]},
+        ])
+
+    def test_render_model_routing_golden(self) -> None:
+        self.corp({"adapters": [], "preferences": [{"agent": "alpha", "task": "one", "prefer": ["local-big"]}]})
+        self.agent("alpha", ["agent_alpha"])
+        self.assertEqual(gen.render_model_routing({"modelRouting": self.routing()}), gen.MODEL_ROUTING_HEADER + """adapters: []
+preferences:
+- agent: alpha
+  task: one
+  prefer:
+  - local-big
+""")
+
+    def test_no_release_pinned_gives_an_empty_policy(self) -> None:
+        self.assertEqual(gen.render_model_routing(gen.build(None, None)),
+                         gen.MODEL_ROUTING_HEADER + "adapters: []\npreferences: []\n")
+
+
 if __name__ == "__main__":
     unittest.main()

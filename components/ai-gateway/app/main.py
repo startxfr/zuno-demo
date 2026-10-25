@@ -66,9 +66,11 @@ model_routing_policy = ModelRoutingPolicy()  # ADR-0303 (WP-39)
 tuning_controller = TuningController()  # ADR-0309 (WP-42) - inert unless the policy enables it
 # The routing files are a ConfigMap of another Argo CD Application: reload them
 # when the mounted copy changes instead of waiting for a pod restart.
+# The model-routing policy can be generated and mounted too (ADR-0581, WP-164 lot 2).
 routing_watcher = RoutingWatcher({
     routing_table.path: routing_table.reload,
     image_routing_table.path: image_routing_table.reload,
+    model_routing_policy.path: model_routing_policy.reload,
 })
 
 
@@ -372,9 +374,11 @@ async def chat_completions(
     # entries that opt in - see model_routing_policy.py/routing.py.
     preference = model_routing_policy.preference_for(x_zuno_agent, x_zuno_task)
     strict_preference = model_routing_policy.strict_for(x_zuno_agent, x_zuno_task)
+    # ADR-0581: the (agent, task)'s forbidden model roles, as provider names - narrows only.
+    exclude = model_routing_policy.exclude_for(x_zuno_agent, x_zuno_task)
     try:
         candidates = routing_table.candidates_for(
-            classification, local_only=local_only, prefer=preference, strict=strict_preference
+            classification, local_only=local_only, prefer=preference, strict=strict_preference, exclude=exclude
         )
     except RoutingError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc

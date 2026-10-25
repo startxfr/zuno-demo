@@ -168,6 +168,16 @@ maasAdapter:
 quotaLedger:
   store: memory
 
+# ADR-0581 (WP-164 lot 2): mount the model-routing policy generated from the
+# admitted agents release (files/model-routing.generated.yaml, written by
+# platform/okf/generate_stack_config.py) instead of reading only the copy
+# baked into the image. The gateway reloads it when the ConfigMap changes,
+# and falls back to the baked copy if the file is missing. Needs an image
+# with the `exclude` field and the fallback (ai-gateway after WP-164 lot 2);
+# an older image would read `exclude` as an unknown key and ignore it.
+modelRouting:
+  generated: false
+
 # ADR-0511/ADR-0528: Keycloak clients (the token's `azp`) whose calls may set
 # a non-standard quota class (X-Zuno-Quota-Class) and a project id
 # (X-Zuno-Project-Id). Any other caller runs under `standard` with no

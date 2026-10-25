@@ -170,6 +170,22 @@ therefore not generated yet. The quota budgets themselves are generated from the
    - `forbidden` becomes a new `exclude` field.
 
    With release 0.6.1 nothing changes. Code next, repo only; ai-gateway is rebuilt only with the user's go.
+
+   **Code landed, not enabled (2026-10-25).**
+   - The generator writes `gitops/charts/ai-gateway/files/model-routing.generated.yaml`, steps 1-4
+     of the amendment. With release 0.6.3 it equals the corp policy exactly (24 entries); 7 tests.
+   - ai-gateway: the `exclude` field (after eligibility and local-only, before `prefer`/`strict`,
+     fail closed when nothing is left). The routing watcher reloads the policy file. A missing
+     mounted file falls back to the copy baked into the image. 9 tests; suite 280/280.
+   - Chart: a ConfigMap, the mount and `MODEL_ROUTING_POLICY_PATH` behind `modelRouting.generated`
+     (default false; the default render is unchanged). The llm role passes
+     `zuno_ai_gateway_model_routing_generated`. okf-promote commits the new file.
+   - To enable, with the user's go:
+     1. `make d1 build ai-gateway`, then check that the image contains this commit;
+     2. set `zuno_ai_gateway_model_routing_generated: true` in `ansible/clusters/demo333.yml`;
+     3. run the llm role.
+     Proof: the gateway logs `loaded model-routing policy from /app/config-model-routing/...`, and
+     a tekos chat routes as before.
 3. **Guardrail modes.** They wait for a user decision on the hook.
 4. **Per-agent limits.**
    - `memory.history` goes to unifai-operator.

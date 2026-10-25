@@ -114,7 +114,7 @@ Keycloak Job runs as a sync hook, as it already does.
   ServiceAccount subscriptions.
 - SaaS models get no persona group (WP-157 decision D5).
 
-**Model routing (clause 2, decided 2026-10-25, not built yet).**
+**Model routing (clause 2, decided 2026-10-25; code landed 2026-10-25 behind `modelRouting.generated`, not enabled yet, see WP-164).**
 
 The generator writes `gitops/charts/ai-gateway/files/model-routing.generated.yaml`. It uses the schema
 `app/model_routing_policy.py` already loads, and the ai-gateway chart mounts it at

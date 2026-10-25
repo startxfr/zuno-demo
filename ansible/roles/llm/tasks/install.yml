@@ -53,6 +53,9 @@
       trustedPlatformClients: "{{ zuno_ai_gateway_trusted_platform_clients | default([]) }}"
       quotaLedger:
         store: "{{ zuno_ai_gateway_quota_ledger_store | default('memory') }}"
+      # ADR-0581 (WP-164 lot 2): mount the generated model-routing policy.
+      modelRouting:
+        generated: "{{ zuno_ai_gateway_model_routing_generated | default(false) | bool }}"
       maasAdapter:
         gatewayIdentity:
           enabled: "{{ zuno_ai_gateway_maas_gateway_identity | default(false) | bool }}"
