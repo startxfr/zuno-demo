@@ -1,0 +1,14 @@
+{{- if .Values.gptOssModel.defaultReasoningEffort }}
+# Patched copy of vLLM's harmony_utils.py giving the Harmony system message a server-side default reasoning
+# effort (env ZUNO_DEFAULT_REASONING_EFFORT). See values.yaml gptOssModel.defaultReasoningEffort.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.gptOssModel.inferenceServiceName }}-harmony-patch
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+data:
+  harmony_utils.py: |
+{{ .Files.Get "files/gptoss-harmony_utils.py" | indent 4 }}
+{{- end }}

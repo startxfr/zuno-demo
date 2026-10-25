@@ -163,6 +163,20 @@ spec:
           {{- end }}
         resources:
           {{- toYaml .Values.gptOssModel.resources | nindent 10 }}
+        {{- if .Values.gptOssModel.defaultReasoningEffort }}
+        env:
+          - name: ZUNO_DEFAULT_REASONING_EFFORT
+            value: {{ .Values.gptOssModel.defaultReasoningEffort | quote }}
+        volumeMounts:
+          - name: harmony-patch
+            mountPath: /opt/app-root/lib64/python3.12/site-packages/vllm/entrypoints/openai/parser/harmony_utils.py
+            subPath: harmony_utils.py
+            readOnly: true
+    volumes:
+      - name: harmony-patch
+        configMap:
+          name: {{ .Values.gptOssModel.inferenceServiceName }}-harmony-patch
+    {{- end }}
   router:
     # An explicit ref is mandatory: an empty gateway: {} does not
     # auto-create or reuse a Gateway on this RHOAI build, and omitting the

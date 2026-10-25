@@ -558,6 +558,15 @@ embeddingModel:
 # gitops/charts/namespaces/values.yaml).
 gptOssModel:
   inferenceServiceName: gpt-oss-20b
+  # Server-side default Harmony reasoning effort (low | medium | high; empty = vLLM's own default, medium).
+  # vLLM only reads the effort from the request, and --default-chat-template-kwargs does not reach the Harmony
+  # path (measured 2026-10-25), so a client that cannot send it - Lightspeed's tool-result classifier, a hard-coded
+  # 128 output tokens that gpt-oss's reasoning eats - gets no usable answer. Setting this mounts a patched copy of
+  # vLLM's harmony_utils.py (files/gptoss-harmony_utils.py, ConfigMap gpt-oss-20b-harmony-patch) that falls back to
+  # ZUNO_DEFAULT_REASONING_EFFORT when the request carries none; a request that sends `reasoning_effort` keeps it.
+  # The patch is for vLLM 0.24.0+rhaiv.9 (original file sha256 fa52ad6ac8b35371...); re-derive it when the image
+  # changes. See docs/roadmap/evidence/lightspeed-tool-result-inspection-2026-10-25.md.
+  defaultReasoningEffort: low
   # Same modelId-vs-API-id split as the chat model; also the S3 directory
   # name under modelsS3 (<prefix>/<servedModelName>/).
   servedModelName: gpt-oss-20b
