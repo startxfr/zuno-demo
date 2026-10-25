@@ -185,6 +185,7 @@ jobs:
           python3 tests/test_verify_unifai_images.py
           python3 tests/test_check_unifai_pins.py
           python3 tests/test_pin_unifai_images.py
+          python3 tests/test_pin_operator_catalog.py
           python3 check_unifai_pins.py
       - name: OpenShift GitOps operator health check (WP-176 follow-up)
         run: python3 platform/gitops/tests/test_check_gitops_operator.py
