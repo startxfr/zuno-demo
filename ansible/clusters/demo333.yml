@@ -43,14 +43,12 @@ zuno_build_git_ref: "devel"
 # UnifAI stack on demo333 (WP-154/WP-168): the non-secret overrides that were
 # only kept in a private vars file until now. They are deep-merged over the
 # role defaults by ansible/roles/unifai (zuno_unifai_values); bundle settings
-# are per agent (zuno_unifai_bundle_settings). Image tags are immutable
-# devel-<sha> builds of this cluster's registry. No secret belongs here.
-# Verification of the UnifAI images (ADR-0586, WP-176). OFF here until the first
-# CI-built, signed images exist and the operator renders digests explicitly: then
-# the stack images below are pinned by digest and these two lines flip together
-# (verify true, accept dev signatures true, because demo333 runs the devel
-# branch). While it is off, check_unifai_pins.py reports it and does not fail.
-zuno_unifai_verify_images: false
+# are per agent (zuno_unifai_bundle_settings). The application images are the
+# CI-built, signed devel-<sha> images, pinned by digest. No secret belongs here.
+# Verification of the UnifAI images (ADR-0586, WP-176): ON. The `unifai` role
+# refuses to apply a stack image whose digest is not signed by the fork's publish
+# workflow (accept dev signatures true, because demo333 runs the devel branch).
+zuno_unifai_verify_images: true
 zuno_unifai_accept_dev_signatures: true
 # The catalog and the operator images (d0) are verified only once the operator
 # release workflow signs them (WP-176 step 6); until then this stays false.
@@ -150,11 +148,11 @@ zuno_unifai_values:
     identity:
       oidcClaims: true
     images:
-      backend: quay.io/zuno/unifai-backend:devel-178cbd52b
-      identity: quay.io/zuno/unifai-identity:devel-178cbd52b
-      multiagent: quay.io/zuno/unifai-multiagent:devel-178cbd52b
-      rag: quay.io/zuno/unifai-rag:devel-178cbd52b
-      ui: quay.io/zuno/unifai-ui:devel-178cbd52b
+      backend: quay.io/zuno/unifai-backend@sha256:e19d98f7a44bfe3fe1a944ea517fd0ef28c5d5b0b06e13262e50e7bb7134951e  # devel-ffb64e335
+      identity: quay.io/zuno/unifai-identity@sha256:e51c6b2e51d0b4eaede4c092add59c6a8f6cf41625b1433b6d0b0c79dab33d3b  # devel-ffb64e335
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:af8bc38f24bcbf807636099bfbe0ae24c7134844ff4cf6bc7469d890fbf9f490  # devel-ffb64e335
+      rag: quay.io/zuno/unifai-rag@sha256:28fedc7ed3e1b9902219e9e42eaadafaddddfd4c19b81d0747aed36ea2481b27  # devel-ffb64e335
+      ui: quay.io/zuno/unifai-ui@sha256:20cf4ab46e8495fe1a54a2ef85c580b9b136c57b0a150468b089d62232137aa1  # devel-ffb64e335
     rag:
       tokenReview: true
     ragClients:
