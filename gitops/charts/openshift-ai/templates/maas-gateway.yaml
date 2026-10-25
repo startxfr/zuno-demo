@@ -93,6 +93,11 @@ spec:
                 values:
                   - openshift-ingress
                   - redhat-ods-applications
+                  # RHOAI 3.5 GA moved maas-api (and its HTTPRoute
+                  # maas-api-route: /maas-api/v1/api-keys, subscriptions)
+                  # here; without it the route is NotAllowedByListeners
+                  # and no user can mint a MaaS API key.
+                  - redhat-ai-gateway-infra
                   - zuno-ai-run
       tls:
         certificateRefs:
