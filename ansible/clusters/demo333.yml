@@ -50,6 +50,12 @@ zuno_build_git_ref: "devel"
 # workflow (accept dev signatures true, because demo333 runs the devel branch).
 zuno_unifai_verify_images: true
 zuno_unifai_accept_dev_signatures: true
+# Cluster-side admission of the UnifAI images (WP-178): the Sigstore policy-controller REFUSES a pod of
+# quay.io/zuno/unifai-** in zuno-unifai and unifai-operator whose image is not signed by an identity of
+# platform/supply-chain/image-identities.yaml (the third-party services stay `warn`). Applied by `make d1 install
+# rhtas-config`. Back to warn: set this to `warn` and re-run; at once: `oc label namespace zuno-unifai
+# policy.rhtas.com/include-` (docs/platform/operations.md).
+zuno_unifai_admission_mode: enforce
 # The catalog (d0) is verified like the stack images (WP-176 step 6): since operator
 # 0.1.39 the operator, its bundle and its catalog carry the operator release workflow's
 # identity. This cluster's CatalogSource was applied by hand with `:latest`, so the role
