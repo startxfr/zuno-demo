@@ -11,7 +11,7 @@
 - name: "unifai | verify running | read the pods of the operator"
   kubernetes.core.k8s_info:
     kind: Pod
-    namespace: openshift-operators
+    namespace: "{{ zuno_unifai_operator_namespace | default('unifai-operator') }}"
   register: _unifai_operator_pods
   when: zuno_unifai_verify_catalog | default(false) | bool
 

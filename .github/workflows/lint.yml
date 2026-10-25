@@ -184,6 +184,7 @@ jobs:
         run: |
           python3 tests/test_verify_unifai_images.py
           python3 tests/test_check_unifai_pins.py
+          python3 tests/test_pin_unifai_images.py
           python3 check_unifai_pins.py
       - name: confluence MCP server tests
         working-directory: components/mcp-servers/confluence

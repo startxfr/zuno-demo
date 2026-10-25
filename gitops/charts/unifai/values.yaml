@@ -96,6 +96,10 @@ stack:
     credentialsVaultPath: postgresql/backup-s3
     accessKeyProperty: access_key
     secretKeyProperty: secret_key
+    # Images of the backup CronJobs and the restore Jobs (operator >= 0.1.36 takes
+    # repo@sha256:... verbatim): `awsCli` (default public.ecr.aws/aws-cli/aws-cli)
+    # and `mongo` (default docker.io/library/mongo). Pinned per cluster (ADR-0586).
+    images: {}
 
 # Shared LLM of the platform: the ai-gateway, called with the user's own token
 # (ADR-0560, ADR-0563). Agent bundles emit their own per-task copies.

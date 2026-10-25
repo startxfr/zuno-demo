@@ -3,7 +3,8 @@
 # zuno_unifai_verify_catalog is true). Compares every running UnifAI application
 # image to the pinned digests and verifies the signature and attestations of every
 # running UnifAI image, operator included. A pod started by hand with another image,
-# or an image replaced behind a tag, fails here.
+# or an image replaced behind a tag, fails here. The pinned third-party services
+# (unsigned) are compared to their pins from the pod spec.
 - name: "unifai | verify running | derive the pinned references"
   ansible.builtin.include_tasks: verify_images_refs.yml
   vars:
@@ -14,6 +15,7 @@
     argv: >-
       {{ ['python3', zuno_repo_root ~ '/platform/supply-chain/verify_unifai_images.py']
          + (_unifai_image_refs | map('regex_replace', '^', '--ref=') | list)
+         + (_unifai_third_party_refs | default([]) | map('regex_replace', '^', '--third-party=') | list)
          + ['--pods', '-']
          + (['--accept-dev'] if (zuno_unifai_accept_dev_signatures | default(false) | bool) else []) }}
     stdin: >-

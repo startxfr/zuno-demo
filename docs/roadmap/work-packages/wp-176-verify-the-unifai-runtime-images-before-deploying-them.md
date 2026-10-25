@@ -30,12 +30,14 @@ by the fork's build workflow.
 4. **Switch on, in one commit.** The five digests in `demo333.yml`, `zuno_unifai_verify_images: true`, `zuno_unifai_accept_dev_signatures: true`. Waits for the operator to render
    a digest explicitly (the operator owner announces the version).
 5. **Third-party images** by digest in `demo333.yml` (databases, queues, docling, embedding), with the note that they are unsigned. Decide separately what replaces `bitnamilegacy`. **Done 2026-10-25** (repo): seven services pinned in `demo333.yml`, required by `check_unifai_pins.py`; the `aws-cli` image of the backup CronJobs is not in `spec.images` and stays on its tag (operator side).
-6. **The operator, bundle and catalog.** The operator release workflow signs and attests them; then `zuno_unifai_verify_catalog` flips to true and the drift check covers the operator pod.
+6. **The operator, bundle and catalog.** (a) a9, on a fork branch: the operator image is built and signed in CI (`publish-images.yml` on `devel`, identity `refs/heads/devel`), the canary deploys that digest, the release retags it without rebuilding and the CSV references it by digest. (b) zuno-demo, on a fork branch based on a9's (`feat/signed-bundle-catalog`): `unifai-operator-release.yml` signs the bundle and the catalog, attests their provenance, publishes their SBOM as a signed artifact, and adds the release identity's own signature on the operator digest. (c) `image-identities.yaml` accepts the operator image under the `devel` identity (development only) and under the release workflow's. (d) Once a signed release exists: `catalogImage` of the d0 chart on its digest, `zuno_unifai_verify_catalog: true`, the drift check covers the operator pod (namespace `unifai-operator`). Operator 0.1.36 to 0.1.38 stay unsigned, no re-cut.
+7. **Release path rehearsal.** A pre-release tag (`v0.0.0-rc1`) on the fork builds the five images with the `quay-release` environment and the owner's approval; the verifier accepts them without `--accept-dev` and refuses a `devel` build; the rc tags are removed from quay afterwards.
+8. **Done 2026-10-25 (repo and demo333):** the backup Jobs' images pinned (`stack.backup.images`), the drift check of the third-party pins, the operator pod namespace, `pin_unifai_images.py` (one command: resolve, verify, rewrite the five digests). The cluster-side admission is WP-178.
 
 ## Acceptance
 
 The verifier refuses an unsigned, an unpinned and a wrongly signed image and accepts the CI-built ones; the stack applies only with verified, digest-pinned images;
-`make d1 check unifai` fails for a pod started with another image. Live steps wait for demo333 to be powered on and the user's go.
+`make d2 check unifai` fails for a pod started with another image (the original text said `d1`: `unifai` is a Day 2 component). Live steps wait for demo333 to be powered on and the user's go.
 
 ## Open questions
 

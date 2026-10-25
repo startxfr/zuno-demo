@@ -165,6 +165,12 @@ zuno_unifai_values:
       multiagent: quay.io/zuno/unifai-multiagent@sha256:af8bc38f24bcbf807636099bfbe0ae24c7134844ff4cf6bc7469d890fbf9f490  # devel-ffb64e335
       rag: quay.io/zuno/unifai-rag@sha256:28fedc7ed3e1b9902219e9e42eaadafaddddfd4c19b81d0747aed36ea2481b27  # devel-ffb64e335
       ui: quay.io/zuno/unifai-ui@sha256:20cf4ab46e8495fe1a54a2ef85c580b9b136c57b0a150468b089d62232137aa1  # devel-ffb64e335
+    backup:
+      # The CronJobs and restore Jobs (ADR-0586 clause 7): pinned by digest, unsigned,
+      # the manifest list of the tag that ran (aws-cli 2.22.35, mongo 7.0.16).
+      images:
+        awsCli: public.ecr.aws/aws-cli/aws-cli@sha256:71a65c33c30e36dbfdff15707514f3b7b6fc789f2f134722f959b5cd13b93dd5  # 2.22.35
+        mongo: docker.io/library/mongo@sha256:c630c59342c1493d50345136df2af14a76b9e827dd5316bfabee07a0880a5f3a  # 7.0.16
     rag:
       tokenReview: true
     ragClients:

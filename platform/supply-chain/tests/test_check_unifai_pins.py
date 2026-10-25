@@ -21,7 +21,7 @@ def images(**over):
     out = {k: f"quay.io/zuno/unifai-{k}{D}" for k in c.APPLICATION_IMAGES}
     out.update({k: f"docker.io/x/{k}{D}" for k in c.THIRD_PARTY_IMAGES})
     out.update(over)
-    return {"zuno_unifai_values": {"stack": {"images": out}}}
+    return {"zuno_unifai_values": {"stack": {"images": out, "backup": {"images": {k: f"x/{k}{D}" for k in c.BACKUP_IMAGES}}}}}
 
 
 class Pins(unittest.TestCase):
@@ -32,6 +32,17 @@ class Pins(unittest.TestCase):
         doc = images()
         del doc["zuno_unifai_values"]["stack"]["images"]["temporal"]
         self.assertTrue(any("temporal is missing" in f for f in c.check_cluster("demo", doc)[0]))
+
+    def test_the_backup_images_must_be_pinned_unless_the_backup_is_off(self):
+        doc = images()
+        doc["zuno_unifai_values"]["stack"]["backup"]["images"]["awsCli"] = "public.ecr.aws/aws-cli/aws-cli:2.22.35"
+        del doc["zuno_unifai_values"]["stack"]["backup"]["images"]["mongo"]
+        findings, _ = c.check_cluster("demo", doc)
+        self.assertEqual(len(findings), 2)
+        self.assertTrue(any("backup.images.awsCli" in f for f in findings))
+        self.assertTrue(any("backup.images.mongo is missing" in f for f in findings))
+        doc["zuno_unifai_values"]["stack"]["backup"] = {"enabled": False}
+        self.assertEqual(c.check_cluster("demo", doc), ([], []))
 
     def test_a_cluster_with_five_digests_passes(self):
         self.assertEqual(c.check_cluster("demo", images()), ([], []))
@@ -49,7 +60,7 @@ class Pins(unittest.TestCase):
 
     def test_a_version_alone_is_not_a_pin(self):
         findings, _ = c.check_cluster("demo", {"zuno_unifai_values": {"stack": {"version": "devel-1bb72a84d"}}})
-        self.assertEqual(len(findings), len(c.APPLICATION_IMAGES) + len(c.THIRD_PARTY_IMAGES))
+        self.assertEqual(len(findings), len(c.APPLICATION_IMAGES) + len(c.THIRD_PARTY_IMAGES) + len(c.BACKUP_IMAGES))
 
     def test_a_listed_data_service_must_be_pinned_too(self):
         findings, _ = c.check_cluster("demo", images(qdrant="docker.io/qdrant/qdrant:v1.16.0"))

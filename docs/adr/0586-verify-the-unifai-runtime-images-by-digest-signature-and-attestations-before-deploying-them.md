@@ -63,7 +63,12 @@ The state found on 2026-10-24:
    that ran, so the image does not change), `temporal` leaves `latest`, and `check_unifai_pins.py` requires them
    while verification is on. Not covered: the `aws-cli` image of the two backup CronJobs, which the operator sets
    outside `spec.images`, and `embedding`, which this cluster does not run.
-8. **Admission by the cluster is a later step,** not part of this record. OpenShift's `ClusterImagePolicy`
+   *Update 2026-10-25:* the backup Jobs' two images are pinned too (`stack.backup.images.awsCli` and `.mongo`, operator
+   0.1.36 takes them verbatim), and `make d2 check unifai` compares what runs to every third-party pin from the pod spec
+   (the runtime reports the platform manifest digest for a pinned manifest list, never the pin). The RabbitMQ image stays
+   `bitnamilegacy`, frozen: its chart is the vendored Bitnami one, so replacing the image means rewriting an upstream
+   chart; the user accepts that residual risk (2026-10-25).
+8. **Admission by the cluster is a later step,** not part of this record (WP-178, 2026-10-25). OpenShift's `ClusterImagePolicy`
    (`config.openshift.io/v1`, generally available since 4.20) verifies at pull and has no "digest only" rule
    like `policy-controller`, but it matches a keyless signer by e-mail, which a GitHub workflow identity is not;
    the choice between a public-key policy and keyless needs `oc explain` on the live cluster first.
@@ -88,6 +93,18 @@ The state found on 2026-10-24:
   accident today (it also leaks the bare hex where a chart reads the tag as a version). That fix is the operator
   owner's and comes before any pin is written.
 - Images pushed by hand (`make images-devel`) cannot be pinned on a cluster that verifies.
+
+## Residual risks (2026-10-25)
+
+- **Unsigned operator releases.** Operator 0.1.36 to 0.1.38 (and the catalog the d0 chart pins, 0.1.30) are unsigned and are not
+  re-cut: the first signed release is the first one after the operator image is built and signed in CI (`publish-images.yml`
+  on `devel`, the release workflow retags that digest without rebuilding and the CSV references it by digest) and the
+  bundle and catalog are signed. `zuno_unifai_verify_catalog` stays false until then.
+- **Operator identity.** The operator image is signed by the `devel` identity of `publish-images.yml`, also when it is released
+  (`vX.Y.Z` is that same digest). A cluster that does not accept the development identity needs the release workflow to
+  add its own signature on the digest; written in WP-176 step 6.
+- **RabbitMQ and the third-party services** are pinned, not signed, and RabbitMQ is frozen (decision 7).
+- **No admission at the cluster:** a manifest applied outside the role is not refused until WP-178.
 
 ## Security considerations
 

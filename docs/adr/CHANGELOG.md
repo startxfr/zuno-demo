@@ -9,6 +9,13 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Amended (2026-10-25) - ADR-0586 records the live proof and its residual risks
+
+The signed images run on demo333: CI-built digests, verified before the stack is applied, drift checked by `make d2 check unifai`. The
+SBOM is a separately signed artifact, not an attestation (Rekor rejected a 25 MB one). Third-party services and the backup Jobs'
+images are pinned by digest, unsigned; RabbitMQ stays frozen on `bitnamilegacy` (accepted risk). The operator, bundle and catalog follow
+with their first signed release; cluster-side admission is WP-178.
+
 ## New record (2026-10-24) - ADR-0586 verifies the UnifAI runtime images
 
 ADR-0586 (Proposed, v0.11) treats the gap ADR-0353 stated: the UnifAI runtime images are built and signed by the fork's CI and

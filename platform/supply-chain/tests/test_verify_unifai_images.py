@@ -11,6 +11,7 @@ import json
 import pathlib
 import re
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
@@ -99,6 +100,42 @@ class Pinning(unittest.TestCase):
     def test_the_repository_of_a_reference_ignores_tag_digest_and_registry_port(self):
         self.assertEqual(v.repository(f"quay.io/zuno/unifai-ui:t@{D1}"), "quay.io/zuno/unifai-ui")
         self.assertEqual(v.repository("localhost:5000/zuno/unifai-ui"), "localhost:5000/zuno/unifai-ui")
+
+
+class ThirdPartyDrift(unittest.TestCase):
+    MONGO = "docker.io/library/mongo@sha256:" + "c" * 64
+    MONGO7 = "docker.io/library/mongo@sha256:" + "d" * 64
+
+    @staticmethod
+    def pods(*images, phase="Running", init=()):
+        return {"items": [{"metadata": {"name": f"p{i}"}, "status": {"phase": phase},
+                           "spec": {"containers": [{"image": img}], "initContainers": [{"image": x} for x in init]}}
+                          for i, img in enumerate(images)]}
+
+    def test_a_pod_running_a_pinned_reference_is_clean(self):
+        self.assertEqual(v.check_third_party(self.pods(self.MONGO, init=[self.MONGO7]), [self.MONGO, self.MONGO7]), [])
+
+    def test_a_tag_or_another_digest_of_a_pinned_repository_is_drift(self):
+        for image in ("docker.io/library/mongo:8.0.3", "docker.io/library/mongo@sha256:" + "e" * 64):
+            findings = v.check_third_party(self.pods(image), [self.MONGO])
+            self.assertEqual(len(findings), 1, image)
+            self.assertIn("drift", findings[0])
+
+    def test_an_unrelated_image_and_ended_pods_are_ignored(self):
+        self.assertEqual(v.check_third_party(self.pods("quay.io/other/x:1"), [self.MONGO]), [])
+        self.assertEqual(v.check_third_party(self.pods("docker.io/library/mongo:old", phase="Succeeded"), [self.MONGO]), [])
+
+    def test_the_cli_reports_third_party_drift(self):
+        fake = FakeCosign({UI: PUBLISH + "@refs/heads/devel"})
+        path = pathlib.Path(tempfile.mkdtemp()) / "pods.json"
+        path.write_text(json.dumps(self.pods("docker.io/library/mongo:8.0.3")))
+        out = io.StringIO()
+        with fake.install(), contextlib.redirect_stdout(out):
+            code = v.main(["--ref", UI, "--accept-dev", "--pods", str(path), "--third-party", self.MONGO])
+        report = json.loads(out.getvalue())
+        self.assertEqual(code, 1)
+        self.assertTrue(report["results"][0]["ok"])
+        self.assertEqual(len(report["pod_findings"]), 1)
 
 
 class Identities(unittest.TestCase):
