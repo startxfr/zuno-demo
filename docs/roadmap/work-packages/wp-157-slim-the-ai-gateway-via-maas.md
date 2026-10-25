@@ -308,8 +308,14 @@ demo333, each line verified by a second session.
 - Local models through MaaS: the four local models are served via MaaS
   under the ai-gateway ServiceAccount with attested headers (D5); personas
   can no longer call MaaS directly (401). (V0, step 1)
-- Group token ceiling, **per model**, from the generated gateway
-  `TokenRateLimitPolicy`. (V8, V9, V10)
+- ~~Group token ceiling, per model, from the generated gateway
+  `TokenRateLimitPolicy`.~~ **Corrected 2026-10-25:** not enforced at MaaS
+  on the local-model routes. Their several subscription limits sort first
+  and the wasm shim never reaches the `standard-*` pair (a live read showed
+  the subscription counter moving while the group counter stayed still).
+  The group ceiling, like the user, cross-model, `evaluation` and
+  `stresstest` ceilings, is enforced only by the ai-gateway's
+  `app/quota.py`. (V8, V9, V10, correction in ADR-0511 and ADR-0570)
 - Per-subscription budgets of the maas-controller (a lowered limit answers
   429; the counters decrement). Lightspeed's budget sits in the same
   position, not exercised. (V7, order revert)

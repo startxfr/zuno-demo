@@ -242,6 +242,29 @@ on demo333 (WP-157 inventory and order tests) splits them:
 Clause 2's rule that limits live only in `quota-policy.yaml` still holds:
 both the generated policy and `quota.py`'s budgets come from it.
 
+Correction (2026-10-25, live read on demo333 after the v0.5.0 quota
+release): the gateway-level group ceiling is **not** enforced on the routes
+that carry several subscription limits. On qwen36, qwen35-9b, qwen35-9b-wesh
+and gpt-oss-20b (four or three controller subscription limits each), two
+persona chats moved the ai-gateway subscription counter (1,000,000 to
+999,859) while the `standard-group` counter did not move and no
+`standard-user` counter exists: the wasm shim processes only the first
+limit pairs of a request, the limits run in name order, and the
+`standard-*` pair comes after the subscription limits. On the routes with
+one subscription limit (mistral-large, gpt-oss-120b-ovhcloud, unused while
+SaaS stays direct) the group pair may count; that is not verified. The
+`evaluation` and `stresstest` gateway limits are not rendered at all
+(`enforceNonStandardClasses` is off). Pruning the unused subscription
+limits would not help: the ai-gateway and Lightspeed limits still sort
+first.
+
+So, plainly: the user, group, cross-model, `evaluation`, `intensive` and
+`stresstest` token ceilings are enforced **only by the ai-gateway's
+`app/quota.py`** (10M user / 100M group per 24h for `standard` since
+v0.5.0, each class its own budget). On the local models MaaS enforces only
+the per-subscription budgets. The upstream shim defect is the blocker for
+moving any ceiling to MaaS.
+
 ## Amendment (2026-10-24) - delegated calls
 
 A call made inside an agent-to-agent delegation carries the initiating user's token
