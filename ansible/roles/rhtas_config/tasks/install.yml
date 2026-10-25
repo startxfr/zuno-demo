@@ -167,6 +167,25 @@
     namespace: zuno-rhtas
     wait: false
 
+# WP-178 / ADR-0586: cluster-side admission of the UnifAI images. The identities come from the one file zuno's
+# offline verifier reads (platform/supply-chain/image-identities.yaml): the release identities always, the
+# development ones only on a cluster that accepts development builds (zuno_unifai_accept_dev_signatures, from
+# ansible/clusters/<cluster>.yml). Mode `warn` (nothing is refused) until the user flips it.
+- name: "rhtas_config | load the committed per-cluster variables (UnifAI admission settings)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
+- name: "rhtas_config | derive the UnifAI admission policy"
+  ansible.builtin.set_fact:
+    _rhtas_config_unifai_admission: >-
+      {%- set ids = lookup('ansible.builtin.file', zuno_repo_root + '/platform/supply-chain/image-identities.yaml') | from_yaml -%}
+      {%- set dev = zuno_unifai_accept_dev_signatures | default(false) | bool -%}
+      {%- set rx = [ids.images.release_subject_regexp, ids.operator.release_subject_regexp] -%}
+      {%- if dev -%}{%- set _ = rx.append(ids.images.dev_subject_regexp) -%}{%- set _ = rx.append(ids.operator.dev_subject_regexp) -%}{%- endif -%}
+      {{ {'enabled': (zuno_unifai_admission_enabled | default(true) | bool),
+          'mode': (zuno_unifai_admission_mode | default('warn')),
+          'issuer': ids.issuer,
+          'subjectRegExps': rx} }}
+
 # gitops_app_extra_helm_values REPLACES spec.source.helm.values wholesale
 # rather than merging (17e4117c's finding for cert-manager - values is a
 # YAML *string* key, combine(recursive=True) cannot descend into it).
@@ -191,7 +210,8 @@
             {
               'policyOperand': {
                 'trustRoot': {'rootJsonBase64': _rhtas_config_tuf_root.stdout | trim},
-                'clusterImagePolicy': {'certIdentityIssuer': 'https://keycloak.' + cluster_base_domain + '/realms/zuno'}
+                'clusterImagePolicy': {'certIdentityIssuer': 'https://keycloak.' + cluster_base_domain + '/realms/zuno'},
+                'unifai': _rhtas_config_unifai_admission
               }
             },
             recursive=True
@@ -216,6 +236,38 @@
      | first | default('False')) == 'True'
   retries: 30
   delay: 10
+
+# The UnifAI namespaces opt in to the admission webhook (it only sees namespaces labelled policy.rhtas.com/include=true).
+# Patched here, once the policy exists, so a pod admitted before the policy is Ready is never judged by an empty policy.
+- name: "rhtas_config | wait for the UnifAI ClusterImagePolicy to report Ready"
+  kubernetes.core.k8s_info:
+    api_version: policy.sigstore.dev/v1alpha1
+    kind: ClusterImagePolicy
+    name: zuno-unifai-images
+  register: _rhtas_config_unifai_cip
+  until: >-
+    (_rhtas_config_unifai_cip.resources | default([]) | length) > 0 and
+    (_rhtas_config_unifai_cip.resources[0].status.conditions | default([])
+     | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list
+     | first | default('False')) == 'True'
+  retries: 30
+  delay: 10
+  when: _rhtas_config_unifai_admission.enabled | bool
+
+- name: "rhtas_config | opt the UnifAI namespaces in to the admission webhook"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: v1
+    kind: Namespace
+    name: "{{ item }}"
+    definition:
+      metadata:
+        labels:
+          policy.rhtas.com/include: "true"
+  loop: "{{ zuno_unifai_admission_namespaces | default(['zuno-unifai', 'unifai-operator']) }}"
+  register: _rhtas_config_unifai_ns
+  failed_when: false
+  when: _rhtas_config_unifai_admission.enabled | bool
 
 - name: "rhtas_config | install summary"
   ansible.builtin.debug:

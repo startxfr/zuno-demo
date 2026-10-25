@@ -1,0 +1,35 @@
+{{- if and .Values.policyOperand.enabled .Values.policyOperand.unifai.enabled }}
+{{- if not .Values.policyOperand.unifai.subjectRegExps }}
+{{- fail "policyOperand.unifai.subjectRegExps is empty: pass the GitHub workflow identities (ansible/roles/rhtas_config reads platform/supply-chain/image-identities.yaml)" }}
+{{- end }}
+# WP-178 / ADR-0586: cluster-side admission of the UnifAI images. Every container image under
+# quay.io/zuno/unifai-** of a namespace carrying policy.rhtas.com/include=true must carry a keyless signature
+# whose certificate names one of the fork's workflows (identities passed by the role, never written twice):
+# the publish-images workflow on a release tag (and on `devel` only where the cluster accepts development builds)
+# and the operator release workflow. mode warn = a violation is a warning, nothing is refused.
+# Not checked here: provenance and SBOM (see values.yaml); zuno's verifier does it before the stack is applied.
+# v1alpha1, see clusterimagepolicy.yaml.
+apiVersion: policy.sigstore.dev/v1alpha1
+kind: ClusterImagePolicy
+metadata:
+  name: zuno-unifai-images
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  mode: {{ .Values.policyOperand.unifai.mode }}
+  images:
+    - glob: {{ .Values.policyOperand.unifai.imageGlob | quote }}
+  authorities:
+    - name: github-keyless
+      ctlog:
+        trustRootRef: public-sigstore-trust-root
+      keyless:
+        trustRootRef: public-sigstore-trust-root
+        identities:
+          {{- range .Values.policyOperand.unifai.subjectRegExps }}
+          - issuer: {{ $.Values.policyOperand.unifai.issuer | quote }}
+            subjectRegExp: {{ . | quote }}
+          {{- end }}
+{{- end }}
