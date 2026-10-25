@@ -339,7 +339,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Implemented | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
 | [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Accepted | Derive stack configuration from the admitted corp bundle |
 | [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Accepted | Serve a per-agent entry and descriptive sheet from the admitted bundle |
-| [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Accepted | Require group visibility and object-level authorisation before per-agent entries |
+| [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Implemented | Require group visibility and object-level authorisation before per-agent entries |
 | [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
 
 ## OKF v0.1

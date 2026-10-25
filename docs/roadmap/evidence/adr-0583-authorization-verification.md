@@ -110,22 +110,13 @@ is fetched; adding it there is quick and recommended.
 
 ## Status of ADR-0583
 
-Clauses 1 to 4 are verified on the rolled stack and clause 5 is in place: the
-standing checks exist and pass against demo333, apart from the authenticated
-A2A denial, which needs a run from inside the cluster. The residual risks above
-are accepted. The ADR stays `Accepted` until the closing steps below are done.
+`Implemented` (2026-10-25). The closing steps were done: the Confluence host
+binding is rolled out, the Tekos stresstest on `devel` cd197d24 passed both
+standing checks (`a2a_gateway_denies_unentitled_callers_like_unknown_agents`:
+anonymous 401, denied and unknown 404 with identical bodies;
+`unifai_denies_another_users_objects_like_missing_ones`), with security checks
+14/14 overall, and the residual risks above are accepted.
 
-Closing steps, in order:
-
-1. (Done 2026-10-25.) The operator derives `confluence_allowed_hosts` from `spec.rag.confluence`
-   and the outbound guard runs when a Confluence source is registered (a9,
-   waiting for the user's confirmation in that session). Roll it out and
-   re-run the 18-check probe.
-2. Run the Tekos security checks from inside the cluster (an evaluation
-   campaign); `a2a_gateway_denies_unentitled_callers_like_unknown_agents` and
-   `unifai_denies_another_users_objects_like_missing_ones` must both pass.
-3. Flip the status: `Accepted` to `Implemented` in the ADR header and in
-   `docs/adr/README.md`, replace the ADR's verification note with a pointer to
-   this file, update the WP-167 and WP-154 status lines in
-   `docs/roadmap/implementation-roadmap.md` and their work-package files, and run
-   `platform/docs/check_docs.py`.
+Still open, not blocking: the A2A gateway image does not yet carry the uniform
+404 for names no agent can have (the check passes with a valid unknown name);
+it ships with the next gateway rebuild.

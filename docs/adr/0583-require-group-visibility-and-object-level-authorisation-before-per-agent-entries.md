@@ -1,6 +1,6 @@
 # ADR-0583: Require group visibility and object-level authorisation before per-agent entries
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -86,10 +86,12 @@ Work happens in the fork, upstream-first. The operator needs a release for the
 group restriction. The pilot on demo333 is the first place to verify it; no
 change to demo222 until the cutover (ADR-0573).
 
-## Verification note (2026-10-24)
+## Verification note (2026-10-25)
 
-Clauses 1, 3 and 4 were verified on the `demo333` pilot and the clause 2 audit
-fixed its cross-user findings; see
-[the evidence](../roadmap/evidence/adr-0583-authorization-verification.md). The
-status stays `Accepted` until the remaining audit items are closed and the
-two-user probe runs as a standing check.
+Implemented. Clauses 1, 3 and 4 were verified on the `demo333` pilot, the
+clause 2 audit was run in two passes and its findings fixed (the outbound-URL
+guard and the Confluence credential binding included), and the clause 5 probe
+runs as standing checks in the Tekos security checks (14/14 in the 2026-10-25
+stresstest). Residual risks accepted by the user are listed in
+[the evidence](../roadmap/evidence/adr-0583-authorization-verification.md),
+which also records the checks and the roll-out.
