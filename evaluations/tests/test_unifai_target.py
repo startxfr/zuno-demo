@@ -448,3 +448,61 @@ def test_rag_retrieval_executed_fails_without_a_reply_or_when_tempo_is_down():
 def test_rag_retrieval_executed_is_skipped_not_passed_without_a_trace_backend():
     out = _rag_executed("", '{"session_id": "s1", "reply": "ok", "tools": []}', '[{"source_type": "WEB", "results": 1}]')
     assert out.startswith("False True") and "TEMPO_URL" in out, out
+
+
+def test_cross_user_isolation_check_passes_on_uniform_denials_and_fails_on_a_tell():
+    from dataclasses import dataclass
+    sys.path.insert(0, str(EVAL / "common"))
+    import unifai_checks
+
+    @dataclass
+    class CR:
+        name: str
+        passed: bool
+        detail: str
+        skipped: bool = False
+
+    class Resp:
+        def __init__(self, status, body):
+            self.status_code, self.text = status, body
+
+        def json(self):
+            return [{"blueprint_id": "bp1"}]
+
+    def fake(tell):
+        class Client:
+            def __init__(self, who):
+                self.who = who
+
+            def get(self, url, params=None, **kw):
+                if "available.blueprints" in url:
+                    return Resp(200, "[]")
+                key = params.get("teamId") or params.get("sessionId")
+                if tell and key in ("TEAM", "SID"):
+                    return Resp(403, "denied")
+                return Resp(404, "not found")
+
+            delete = get
+
+        class U:
+            ui_url = "http://ui"
+
+            def client(self, p):
+                return Client(p)
+
+            def teams(self, p):
+                return [{"team_id": "TEAM"}] if p == "owner" else []
+
+            def create(self, p, bp):
+                return "SID"
+
+            def cleanup(self):
+                return 0, 0
+
+        return U()
+
+    ok = unifai_checks.cross_user_isolation(CR, lambda: fake(False), owner="owner", other="other")()
+    bad = unifai_checks.cross_user_isolation(CR, lambda: fake(True), owner="owner", other="other")()
+    assert ok.passed, ok.detail
+    assert not bad.passed and "team.get" in bad.detail
+    assert "a2a_gateway_denies_unentitled" in dir(unifai_checks)

@@ -46,6 +46,8 @@ from run_scenarios import MCP_GATEWAY_URL, _invoke_tool, _unifai, auth_headers
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 from okf_release import okf_root  # noqa: E402
 import delegation_checks  # noqa: E402  (ADR-0401/0403/0406, WP-174)
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
+import unifai_checks  # noqa: E402  (ADR-0583 two-user probe, ADR-0585 A2A gateway)
 try:
     from day2_report import log_test_line
 except ImportError:
@@ -435,6 +437,17 @@ def unifai_tekos_never_generates_photorealistic_images() -> CheckResult:
     ok = "image.generation.create" not in tools and "image/png" not in blob
     return CheckResult("unifai_tekos_never_generates_photorealistic_images", ok, f"tool_calls={tools}")
 
+A2A_GATEWAY_URL = os.getenv("A2A_GATEWAY_URL", "http://a2a-gateway.zuno-ai-run.svc.cluster.local:8080")
+
+# Platform-wide (not Tekos-specific), kept here like the confluence-mcp bypass check: object-level
+# authorisation between two real people (ADR-0583) and the A2A gateway's identity contract (ADR-0585).
+unifai_denies_another_users_objects_like_missing_ones = unifai_checks.cross_user_isolation(
+    CheckResult, _unifai, owner="consultant-01", other="sale-01"
+)
+a2a_gateway_denies_unentitled_callers_like_unknown_agents = unifai_checks.a2a_gateway_denies_unentitled(
+    CheckResult, agent="tekos", persona="sale-01", a2a_gateway_url=A2A_GATEWAY_URL, auth_headers=auth_headers
+)
+
 
 CHECKS = [
     unifai_forwards_identity_to_the_gateways,
@@ -446,6 +459,8 @@ CHECKS = [
     direct_call_to_confluence_mcp_denied_without_gateway_token,
     mcp_gateway_denies_generate_image_for_tekos_agent_declaration,
     unifai_tekos_never_generates_photorealistic_images,
+    unifai_denies_another_users_objects_like_missing_ones,
+    a2a_gateway_denies_unentitled_callers_like_unknown_agents,
     mcp_gateway_denies_aap_cluster_audit_for_unauthorized_group,
     mcp_gateway_denies_aap_platform_audit_for_unauthorized_group,
     aap_platform_audit_succeeds_for_an_authorized_caller,
