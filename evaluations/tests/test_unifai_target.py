@@ -507,6 +507,52 @@ def test_rag_retrieval_executed_is_skipped_not_passed_without_a_trace_backend():
     assert out.startswith("False True") and "TEMPO_URL" in out, out
 
 
+def _triggers_tool(tempo_url: str, tools: str, searches: str) -> str:
+    """Runs tekos's u_chat_triggers_tool (scenario 10, expect_tool search_confluence) with a stubbed
+    turn and a stubbed Tempo helper."""
+    return _probe(
+        "tekos",
+        f"""
+        import run_scenarios as rs
+        os.environ["TEMPO_URL"] = {tempo_url!r}
+        class FakeTarget:
+            def collect(self, *a, **k):
+                return {{"session_id": "s1", "reply": "ok", "tools": {tools}}}
+        rs._unifai_target = FakeTarget()
+        rs._unifai_placeholder_skip = lambda s: False
+        def fake_searches(run_id, url):
+            r = {searches}
+            if isinstance(r, Exception):
+                raise r
+            return r
+        rs._unifai_tempo_rag_searches = fake_searches
+        res = rs.u_chat_triggers_tool({{"id": 10, "title": "t", "persona": "p", "message": "m",
+                                        "expect_tool": "search_confluence"}})
+        print(res.passed, res.detail)
+        """,
+    )
+
+
+def test_triggers_tool_passes_on_the_tool_event_without_reading_the_trace():
+    out = _triggers_tool("", '["docs_rag_retriever_tool"]', "RuntimeError('must not be called')")
+    assert out.startswith("True") and "trace" not in out, out
+
+
+def test_triggers_tool_without_a_tool_event_passes_on_a_confluence_rag_search_span():
+    """retrieve_first emits no tool event (tekos scenario 10, run 3 of 2026-10-25)."""
+    out = _triggers_tool("http://tempo", "[]", '[{"source_type": "WEB", "results": 3}, {"source_type": "CONFLUENCE", "results": 5}]')
+    assert out.startswith("True") and "CONFLUENCE spans=1 of 2" in out, out
+
+
+def test_triggers_tool_without_a_tool_event_fails_on_web_spans_only_or_no_backend():
+    out = _triggers_tool("http://tempo", "[]", '[{"source_type": "WEB", "results": 3}]')
+    assert out.startswith("False") and "spans=0 of 1" in out, out
+    out = _triggers_tool("http://tempo", "[]", "RuntimeError('down')")
+    assert out.startswith("False") and "trace backend" in out, out
+    out = _triggers_tool("", "[]", '[{"source_type": "CONFLUENCE", "results": 5}]')
+    assert out.startswith("False") and "TEMPO_URL unset" in out, out
+
+
 def test_cross_user_isolation_check_passes_on_uniform_denials_and_fails_on_a_tell():
     from dataclasses import dataclass
     sys.path.insert(0, str(EVAL / "common"))

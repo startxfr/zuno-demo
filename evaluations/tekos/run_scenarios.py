@@ -487,9 +487,33 @@ def u_chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     except Exception as exc:  # noqa: BLE001
         return ScenarioResult(s["id"], s["title"], False, str(exc))
     tools = run_["tools"]
-    return ScenarioResult(
-        s["id"], s["title"], any(t in want for t in tools), f"expected one of {list(want)} tool_calls={tools}"
-    )
+    ok = any(t in want for t in tools)
+    detail = f"expected one of {list(want)} tool_calls={tools}"
+    if not ok and any("retriever" in w for w in want):
+        ok, why = _unifai_retrieval_in_trace(run_, "CONFLUENCE")
+        detail += f" {why}"
+    return ScenarioResult(s["id"], s["title"], ok, detail)
+
+
+def _unifai_retrieval_in_trace(run_: Dict[str, Any], source_type: str) -> tuple:
+    """(proven, detail): the run's trace holds a `rag.search` span over `source_type`.
+
+    With retrieve_first the retriever runs before the model and emits no tool event, so a scenario
+    that accepts the retriever can find no call in the stream (tekos scenario 10, 2026-10-25). The
+    span is the proof instead. Without `TEMPO_URL` or a session id nothing is proven, and the check
+    fails as before."""
+    tempo = os.getenv("TEMPO_URL", "").strip()
+    if not tempo:
+        return False, "trace=unchecked (TEMPO_URL unset)"
+    run_id = run_.get("session_id", "")
+    if not run_id:
+        return False, "trace=unchecked (no session id)"
+    try:
+        searches = _unifai_tempo_rag_searches(run_id, tempo)
+    except Exception as exc:  # noqa: BLE001 - an unreachable backend cannot prove anything
+        return False, f"trace backend: {exc}"
+    hits = [x for x in searches if str(x.get("source_type") or "").upper() == source_type]
+    return bool(hits), f"rag.search {source_type} spans={len(hits)} of {len(searches)}"
 
 
 # A page of the tekos RAG sources (space SXSI, tree "Technologie : Satellite"), and what it
