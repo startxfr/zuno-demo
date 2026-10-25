@@ -200,12 +200,13 @@ def _short_error(exc: Exception) -> str:
     """One short, neutral line for a tool failure: no stack, no validator dump, no documentation URL.
 
     A schema-validation failure becomes a plain instruction: some callers judge a raw validator message
-    suspicious and abort the whole turn instead of retrying.
+    suspicious and abort the whole turn, and read an instruction aimed at the model the same way: the text
+    describes what happened, it never tells the model what to do.
     """
     lines = [ln.strip() for ln in str(exc).splitlines() if ln.strip() and "errors.pydantic.dev" not in ln]
     text = lines[0] if lines else "the tool call failed"
     if "validation error" in text.lower():
-        return "The search could not run: send one short text to look for in the argument 'query'."
+        return "No result: the search arguments did not match the tool's schema."
     return text if len(text) <= _MAX_ERROR_CHARS else text[: _MAX_ERROR_CHARS - 1] + "\u2026"
 
 
@@ -399,6 +400,12 @@ async def dispatch(
         arguments = normalise_arguments(
             binding_for_names.all_names() if binding_for_names else [name], arguments
         )
+        if _is_search(binding_for_names.all_names() if binding_for_names else [name]) and not str(
+            arguments.get("query", "")
+        ).strip():
+            # A search with no text cannot match anything: answer like an empty result instead of an error,
+            # so the caller keeps its turn and decides what to do. The downstream tool is not called.
+            return _result(request_id, _tool_ok("No pages found: the search text was empty."))
         try:
             payload = await invoke_tool(tool_name=name, arguments=arguments)
         except PermissionError as exc:

@@ -60,7 +60,7 @@ def test_a_numeric_string_limit_becomes_an_integer():
 
 def test_a_validation_failure_becomes_a_plain_instruction():
     err = ValueError("confluence MCP server returned a tool error: Error executing tool search_pages: 1 validation error for search_pagesArguments")
-    assert mcp_frontdoor._short_error(err) == "The search could not run: send one short text to look for in the argument 'query'."
+    assert mcp_frontdoor._short_error(err) == "No result: the search arguments did not match the tool's schema."
 
 
 def test_short_error_has_one_line_no_validator_url_and_is_capped():
@@ -123,3 +123,27 @@ def test_dispatch_still_refuses_a_tool_that_is_not_exposed():
         classification="C1", invoke_tool=invoke, surface=surface,
     ))
     assert out["result"]["isError"] is True and "not exposed" in out["result"]["content"][0]["text"]
+
+
+def test_an_empty_search_is_answered_like_an_empty_result_without_calling_the_tool():
+    called = []
+
+    async def invoke(tool_name, arguments):
+        called.append(arguments)
+        return {}
+
+    for arguments in ({}, {"query": "  "}, {"limit": 5}):
+        out = _call(arguments, invoke)
+        result = out["result"]
+        assert result["isError"] is False
+        assert result["content"][0]["text"] == "No pages found: the search text was empty."
+    assert called == []
+
+
+def test_error_texts_never_tell_the_model_what_to_do():
+    texts = [
+        mcp_frontdoor._short_error(ValueError("1 validation error for X")),
+        mcp_frontdoor._short_error(ValueError("")),
+    ]
+    for text in texts:
+        assert not any(word in text.lower() for word in ("send ", "retry", "please", "try again"))
