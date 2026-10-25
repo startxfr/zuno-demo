@@ -93,5 +93,121 @@ class GenerateTest(unittest.TestCase):
         self.assertTrue(keyless["subjectRegExp"].endswith("publish\\.yml@refs/tags/v"))
 
 
+CATALOG = """models:
+- {name: local-big-maas, kind: local, role: quality, eligible_for: [C1, C2, C3]}
+- {name: local-big, kind: local, role: quality, eligible_for: [C1, C2, C3]}
+- {name: local-small-maas, kind: local, role: default, eligible_for: [C1, C2, C3]}
+- {name: local-secret-maas, kind: local, role: reasoning, eligible_for: [C3]}
+- {name: saas-one, kind: saas, role: general-external, eligible_for: [C1, C2]}
+"""
+ROUTING = {"providers": [
+    {"name": "local-big-maas", "kind": "local", "model": "big", "via_maas": True,
+     "endpoint": "https://maas.svc/zuno-ai-run/big-pub/v1"},
+    {"name": "local-big", "kind": "local", "model": "big", "endpoint": "https://big.svc:8000/v1"},
+    {"name": "local-small-maas", "kind": "local", "model": "small", "via_maas": True,
+     "endpoint": "https://maas.svc/zuno-ai-run/small-pub/v1/"},
+    {"name": "local-secret-maas", "kind": "local", "model": "secret", "via_maas": True,
+     "endpoint": "https://maas.svc/zuno-ai-run/secret-pub/v1"},
+    {"name": "saas-one", "kind": "saas", "model": "x"},
+]}
+
+
+class MaasSubscriptionsTest(unittest.TestCase):
+    """ADR-0581 clause 2: groups x the local MaaS models each active agent can reach."""
+
+    def setUp(self) -> None:
+        self.dir = pathlib.Path(tempfile.mkdtemp())
+        (self.dir / "policies" / "models").mkdir(parents=True)
+        (self.dir / "policies" / "model-routing").mkdir(parents=True)
+        (self.dir / "policies" / "models" / "model-catalog.yaml").write_text(CATALOG)
+        (self.dir / "policies" / "model-routing" / "model-routing-policy.yaml").write_text("preferences: []\n")
+
+    def tearDown(self) -> None:
+        shutil.rmtree(self.dir)
+
+    def agent(self, name, groups, classification="C2", status="active", tasks=None, models=None):
+        tasks = tasks or {"one": None}
+        agent = self.dir / "agents" / name
+        (agent / "tasks").mkdir(parents=True)
+        z = {"name": name, "tasks": list(tasks), "access": {"groups": groups}, "status": status,
+             "model": {"preferred_classification": classification}}
+        if models:
+            z["models"] = models
+        (agent / "agent.okf.md").write_text("---\n" + yaml.safe_dump({"okf_version": "v0.3", "type": "agent",
+                                                                     "title": name, "zuno": z}) + "---\n")
+        for task, task_models in tasks.items():
+            tz = {"allowed_tools": [], "allowed_knowledge": []}
+            if task_models:
+                tz["models"] = task_models
+            (agent / "tasks" / f"{task}.md").write_text("---\n" + yaml.safe_dump(
+                {"okf_version": "v0.3", "type": "task", "title": task, "zuno": tz}) + "---\n")
+
+    def subs(self):
+        return gen.maas_agent_subscriptions(self.dir, gen.admit.agents_view(self.dir), ROUTING)
+
+    def test_published_models_follow_the_via_maas_endpoint(self) -> None:
+        self.assertEqual(gen.published_models(ROUTING), {
+            "local-big-maas": "big-pub", "local-big": "big-pub",
+            "local-small-maas": "small-pub", "local-secret-maas": "secret-pub"})
+
+    def test_active_agents_reach_every_eligible_local_model_saas_and_placeholders_never(self) -> None:
+        self.agent("alpha", ["agent_alpha", "agent_alpha_preview"], classification="C1")
+        self.agent("beta", ["agent_beta"], classification="C3")
+        self.agent("ghost", ["agent_ghost"], status="placeholder")
+        self.assertEqual(self.subs(), {
+            "big-pub": {"agents": ["alpha", "beta"],
+                        "groups": ["/agent_alpha", "/agent_alpha_preview", "/agent_beta"]},
+            # eligible for C3 only: a C1 agent never sends data that may reach it
+            "secret-pub": {"agents": ["beta"], "groups": ["/agent_beta"]},
+            "small-pub": {"agents": ["alpha", "beta"],
+                          "groups": ["/agent_alpha", "/agent_alpha_preview", "/agent_beta"]},
+        })
+
+    def test_strict_preference_narrows_and_plain_preference_does_not(self) -> None:
+        (self.dir / "policies" / "model-routing" / "model-routing-policy.yaml").write_text(yaml.safe_dump({
+            "preferences": [
+                {"agent": "alpha", "task": "one", "prefer": ["local-small-maas"], "strict": True},
+                {"agent": "beta", "task": "one", "preferred": ["local-small-maas"]},
+            ]}))
+        self.agent("alpha", ["agent_alpha"])
+        self.agent("beta", ["agent_beta"])
+        subs = self.subs()
+        self.assertEqual(subs["small-pub"]["agents"], ["alpha", "beta"])
+        self.assertEqual(subs["big-pub"]["agents"], ["beta"])
+
+    def test_forbidden_roles_narrow_and_preferred_roles_only_reorder(self) -> None:
+        self.agent("alpha", ["agent_alpha"], tasks={"one": {"forbidden": ["quality"]}})
+        self.agent("beta", ["agent_beta"], models={"forbidden": ["default"]})
+        self.agent("gamma", ["agent_gamma"], tasks={"one": {"preferred": ["default"]}})
+        subs = self.subs()
+        self.assertEqual(subs["big-pub"]["agents"], ["beta", "gamma"])
+        self.assertEqual(subs["small-pub"]["agents"], ["alpha", "gamma"])
+
+    def test_one_task_reaching_a_model_is_enough(self) -> None:
+        self.agent("alpha", ["agent_alpha"], tasks={"one": {"forbidden": ["quality"]}, "two": None})
+        self.assertEqual(self.subs()["big-pub"]["agents"], ["alpha"])
+
+    def test_render_maas_golden(self) -> None:
+        self.agent("alpha", ["agent_alpha"], classification="C1")
+        config = {"maas": {"agentSubscriptions": self.subs()}}
+        self.assertEqual(gen.render_maas(config), gen.MAAS_HEADER + """maas:
+  agentSubscriptions:
+    big-pub:
+      agents:
+      - alpha
+      groups:
+      - /agent_alpha
+    small-pub:
+      agents:
+      - alpha
+      groups:
+      - /agent_alpha
+""")
+
+    def test_no_release_pinned_gives_no_subscription(self) -> None:
+        self.assertEqual(gen.render_maas(gen.build(None, None)),
+                         gen.MAAS_HEADER + "maas:\n  agentSubscriptions: {}\n")
+
+
 if __name__ == "__main__":
     unittest.main()

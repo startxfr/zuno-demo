@@ -136,6 +136,24 @@ spec:
     issuerUrl: https://keycloak.{{ .Values.clusterBaseDomain }}/realms/zuno
     clientId: {{ .Values.maas.externalOIDC.clientId }}
 {{- end }}
+{{- /*
+ADR-0581 clause 2 (WP-164): maas.agentSubscriptions comes from
+values.agents.generated.yaml (the models role passes it). A key naming no
+LLMInferenceService-backed entry below is a stale or mistyped generation:
+fail rather than grant nothing silently. SaaS (ExternalModel) entries never
+take persona groups (WP-157 D5).
+*/}}
+{{- range $published, $_ := .Values.maas.agentSubscriptions }}
+{{- $known := false }}
+{{- range $.Values.maas.models }}
+{{- if and (eq .publishedName $published) (ne (toString .modelRefKind) "ExternalModel") }}
+{{- $known = true }}
+{{- end }}
+{{- end }}
+{{- if not $known }}
+{{- fail (printf "maas.agentSubscriptions[%s]: no local (LLMInferenceService) maas.models entry is published under that name" $published) }}
+{{- end }}
+{{- end }}
 {{- range .Values.maas.models }}
 {{- $model := . }}
 {{- /*
@@ -165,6 +183,11 @@ its service-identity (`user:`) subscriptions - the ai-gateway ServiceAccount -
 and drops the persona-group ones. Off by default (current behaviour).
 */}}
 {{- $subs := .subscriptions }}
+{{- $generated := index $.Values.maas.agentSubscriptions .publishedName }}
+{{- if and $generated (ne (toString .modelRefKind) "ExternalModel") }}
+{{- $tier := $.Values.maas.agentSubscriptionTier }}
+{{- $subs = append $subs (dict "name" (printf "%s-agents" .publishedName) "groups" $generated.groups "tokenRateLimits" $tier.tokenRateLimits "priority" $tier.priority) }}
+{{- end }}
 {{- if and (eq (toString .modelRefKind) "ExternalModel") $.Values.maas.saasSubscriptions.gatewayOnly }}
 {{- $subs = list }}
 {{- range .subscriptions }}
@@ -238,6 +261,13 @@ spec:
     # maassubscription.spec.owner --recursive`).
     users:
       - {{ .user | quote }}
+    {{- else if .groups }}
+    # ADR-0581 clause 2: the entitlement groups of every active agent that
+    # can reach this model (values.agents.generated.yaml).
+    groups:
+      {{- range .groups }}
+      - name: {{ . }}
+      {{- end }}
     {{- else }}
     groups:
       - name: {{ .group }}
@@ -280,6 +310,8 @@ spec:
     {{- range $subs }}
     {{- if .user }}
     {{- $authUsers = append $authUsers .user }}
+    {{- else if .groups }}
+    {{- $authGroups = concat $authGroups .groups }}
     {{- else }}
     {{- $authGroups = append $authGroups .group }}
     {{- end }}

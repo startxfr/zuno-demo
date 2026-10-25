@@ -945,8 +945,8 @@ maas:
 
   # 2026-09-01: lets ai-gateway forward the real calling user's Keycloak
   # identity to the MaaS Gateway instead of its own fixed ServiceAccount
-  # credential, so the per-group MaaSSubscription token budgets below
-  # (agent_tekos/sales) actually get used instead of every call landing in
+  # credential, so the per-group MaaSSubscription token budgets (the
+  # generated agent-group ones, agentSubscriptions below) get used instead of every call landing in
   # the single shared "ai-gateway" subscription. See templates/maas.yaml's
   # own comment on the ModelsAsService block for the clientId caveat still
   # to verify live.
@@ -956,8 +956,8 @@ maas:
 
   # WP-157 decision D5 (ADR-0570 amendment of 2026-10-24, Security
   # considerations): the fix of the inventory's finding 6. The two SaaS
-  # entries below (mistral-large, gpt-oss-120b-ovhcloud) grant the
-  # persona groups /agent_tekos and /sales, so a persona can call a SaaS model
+  # entries below (mistral-large, gpt-oss-120b-ovhcloud) granted the
+  # persona groups /agent_tekos and /sales, so a persona could call a SaaS model
   # through MaaS directly, outside Zuno's C1/C2/C3 classification - while
   # ADR-0570 grants SaaS subscriptions only to identities limited to C1
   # content, and Tekos handles C2 work. With gatewayOnly: true, every
@@ -970,14 +970,37 @@ maas:
   # docs/roadmap/evidence/wp-157-inventory.md hold: until the gateway
   # presents its own ServiceAccount, a forwarded persona token needs the
   # persona grant. The WP-157 entries below never carry persona grants.
+  # Since WP-164 (ADR-0581) no SaaS entry carries a persona group at all:
+  # the generated agent subscriptions are rendered for local models only.
+  # The switch stays as a guard against a hand-added group: entry.
   saasSubscriptions:
     gatewayOnly: false
+
+  # ADR-0581 clause 2 (WP-164): the persona-group subscriptions are derived
+  # from the admitted agents release, never hand-written. The generator
+  # (platform/okf/generate_stack_config.py) writes values.agents.generated.yaml
+  # next to this file: for each LOCAL published model, the entitlement groups
+  # of the active agents that can reach it. The models role passes it here.
+  # The template renders ONE MaaSSubscription per model, `<model>-agents`,
+  # owned by all those groups, so a persona in several agent groups matches
+  # one subscription only (how MaaS breaks a priority tie is unverified,
+  # ADR-0570 clause 3). SaaS models never get persona groups (WP-157 D5).
+  # Empty by default: a cluster that does not pass the generated file keeps
+  # only the service-identity subscriptions below.
+  agentSubscriptions: {}
+  # Platform policy, not agent-derived: the tier every generated
+  # subscription gets (the former /agent_tekos tier).
+  agentSubscriptionTier:
+    tokenRateLimits:
+      - limit: 100000
+        window: 1h
+    priority: 10
 
   models:
     # The proven WP-27 reference: gpt-oss-20b, live-verified end-to-end
     # (Ready MaaSModelRef, group-based subscription access, denial for an
     # unentitled group). qwen below mirrors this exactly per its own
-    # WP-076 scoping decision - same two groups, same rate limits - so
+    # WP-076 scoping decision - same subscribers, same rate limits - so
     # this stays the reference to diff against.
     - # The MaaSModelRef CR's own name (the "published entry"), distinct
       # from the backend it points at (gptOssModel.inferenceServiceName).
@@ -1015,27 +1038,10 @@ maas:
       # below stays disabled too rather than re-testing the same dead end.
       endpointOverride: ""
 
-      # Two Keycloak groups (gitops/charts/keycloak/files/realm-zuno.json)
-      # demonstrating different MaaSSubscription access to the same
-      # published model via different token rate limits (MaaSSubscription
-      # has no separate "which models" dimension beyond modelRefs[], so
-      # differentiated *rate* is the schema-supported way to show two
-      # groups getting different access) - agent_tekos (Tekos's own
-      # primary consumers) gets the higher limit, sales a materially
-      # lower one to make the difference obvious in a live comparison.
+      # Service identities only. The persona groups (formerly /agent_tekos
+      # and /sales, hand-written) come from the agents release: the
+      # template adds `gpt-oss-20b-agents` from agentSubscriptions above.
       subscriptions:
-        - name: gpt-oss-20b-tekos
-          group: /agent_tekos
-          tokenRateLimits:
-            - limit: 100000
-              window: 1h
-          priority: 10
-        - name: gpt-oss-20b-sales
-          group: /sales
-          tokenRateLimits:
-            - limit: 5000
-              window: 1h
-          priority: 1
         # ADR-0521 (WP-076) step 3: ai-gateway's own identity, not a
         # persona. `user:` (MaaSSubscription.spec.owner.users /
         # MaaSAuthPolicy.spec.subjects.users - both schema-valid without a
@@ -1080,27 +1086,13 @@ maas:
         name: gpt-oss-20b-entitlement
 
     # ADR-0521 (WP-076): qwen3.6-27b-instruct, generalizing the gpt-oss-20b
-    # pattern above to the primary/default local chat model. Same two
-    # groups and rate limits as gpt-oss-20b (user-confirmed scoping
-    # decision, WP-076) rather than every agent_* group - this stays a
-    # pure structural generalization of the proven pattern; broader group
-    # coverage is a deliberate follow-up, not this step's job.
+    # pattern above to the primary/default local chat model. Same service
+    # identities and rate limits as gpt-oss-20b (WP-076); its persona
+    # groups are generated (agentSubscriptions, WP-164).
     - publishedName: qwen36-27b-instruct
       backendInferenceServiceName: qwen36-27b-instruct
       endpointOverride: ""
       subscriptions:
-        - name: qwen36-27b-instruct-tekos
-          group: /agent_tekos
-          tokenRateLimits:
-            - limit: 100000
-              window: 1h
-          priority: 10
-        - name: qwen36-27b-instruct-sales
-          group: /sales
-          tokenRateLimits:
-            - limit: 5000
-              window: 1h
-          priority: 1
         # ADR-0521 (WP-076) step 3: same ai-gateway-own-identity entry as
         # gptOssModel's own - see that one's comment for the full
         # user-vs-group scoping/rate-limit rationale.
@@ -1140,10 +1132,9 @@ maas:
     # ADR-0526 (WP-087) / ADR-0521 decisions 5-6: the French urban-register variant, which carries all of Comage's traffic. Same manifest
     # set every published model here gets - a MaaSModelRef, its
     # MaaSSubscriptions and a MaaSAuthPolicy, all rendered by
-    # templates/maas.yaml's range over this list. Same two persona groups
-    # and rate limits as the two models above (their scoping decision is
-    # reused verbatim; broadening group coverage stays a separate,
-    # deliberate change).
+    # templates/maas.yaml's range over this list. Same service identities
+    # and rate limits as the two models above; persona groups generated
+    # (agentSubscriptions, WP-164).
     - publishedName: qwen35-9b-wesh
       backendInferenceServiceName: qwen35-9b-wesh
       # Structurally useless for the identity path - see gpt-oss-20b's own
@@ -1151,18 +1142,6 @@ maas:
       # for consistency, not re-tested.
       endpointOverride: ""
       subscriptions:
-        - name: qwen35-9b-wesh-tekos
-          group: /agent_tekos
-          tokenRateLimits:
-            - limit: 100000
-              window: 1h
-          priority: 10
-        - name: qwen35-9b-wesh-sales
-          group: /sales
-          tokenRateLimits:
-            - limit: 5000
-              window: 1h
-          priority: 1
         # ADR-0521 (WP-076) step 3: ai-gateway's OWN ServiceAccount
         # identity, not a persona. This grant is what the `via_maas: true`
         # provider entry in platform/ai-gateway/provider-routing.yaml
@@ -1181,10 +1160,9 @@ maas:
     # ADR-0526 (WP-087) / ADR-0521 decisions 5-6: the unmodified Qwen3.5-9B base, published so the variant's MaaS path has a same-base comparison point. Same manifest
     # set every published model here gets - a MaaSModelRef, its
     # MaaSSubscriptions and a MaaSAuthPolicy, all rendered by
-    # templates/maas.yaml's range over this list. Same two persona groups
-    # and rate limits as the two models above (their scoping decision is
-    # reused verbatim; broadening group coverage stays a separate,
-    # deliberate change).
+    # templates/maas.yaml's range over this list. Same service identities
+    # and rate limits as the two models above; persona groups generated
+    # (agentSubscriptions, WP-164).
     - publishedName: qwen35-9b
       backendInferenceServiceName: qwen35-9b
       # Structurally useless for the identity path - see gpt-oss-20b's own
@@ -1192,18 +1170,6 @@ maas:
       # for consistency, not re-tested.
       endpointOverride: ""
       subscriptions:
-        - name: qwen35-9b-tekos
-          group: /agent_tekos
-          tokenRateLimits:
-            - limit: 100000
-              window: 1h
-          priority: 10
-        - name: qwen35-9b-sales
-          group: /sales
-          tokenRateLimits:
-            - limit: 5000
-              window: 1h
-          priority: 1
         # ADR-0521 (WP-076) step 3: ai-gateway's OWN ServiceAccount
         # identity, not a persona. This grant is what the `via_maas: true`
         # provider entry in platform/ai-gateway/provider-routing.yaml
@@ -1224,25 +1190,13 @@ maas:
     # externalmodel.yaml) instead of an LLMInferenceService -
     # modelRefKind below overrides templates/maas.yaml's default. Stays on
     # its native api.mistral.ai endpoint (explicit decision: NOT migrated
-    # to OVHcloud) - only its governance changes. Same two-persona-group +
-    # ai-gateway-catch-all pattern and rate limits as every model above,
-    # reused verbatim rather than inventing new tiers for this ADR.
+    # to OVHcloud) - only its governance changes. Only the ai-gateway
+    # ServiceAccount subscribes: SaaS models get no persona group (WP-157
+    # D5; the former /agent_tekos and /sales grants were removed by WP-164).
     - publishedName: mistral-large
       modelRefKind: ExternalModel
       backendInferenceServiceName: mistral-large
       subscriptions:
-        - name: mistral-large-tekos
-          group: /agent_tekos
-          tokenRateLimits:
-            - limit: 100000
-              window: 1h
-          priority: 10
-        - name: mistral-large-sales
-          group: /sales
-          tokenRateLimits:
-            - limit: 5000
-              window: 1h
-          priority: 1
         - name: mistral-large-ai-gateway
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:
@@ -1263,18 +1217,6 @@ maas:
       modelRefKind: ExternalModel
       backendInferenceServiceName: gpt-oss-120b-ovhcloud
       subscriptions:
-        - name: gpt-oss-120b-ovhcloud-tekos
-          group: /agent_tekos
-          tokenRateLimits:
-            - limit: 100000
-              window: 1h
-          priority: 10
-        - name: gpt-oss-120b-ovhcloud-sales
-          group: /sales
-          tokenRateLimits:
-            - limit: 5000
-              window: 1h
-          priority: 1
         - name: gpt-oss-120b-ovhcloud-ai-gateway
           user: "system:serviceaccount:zuno-ai-run:ai-gateway"
           tokenRateLimits:

@@ -114,6 +114,7 @@ jobs:
           add-paths: |
             platform/okf/agents.lock
             platform/okf/stack-config.generated.yaml
+            gitops/charts/models/values.agents.generated.yaml
             gitops/charts/connectivity-link/templates/quota-ratelimitpolicies.yaml
             gitops/charts/connectivity-link/templates/quota-tokenratelimitpolicies.yaml
             components/ai-gateway/app/quota_budgets.yaml
