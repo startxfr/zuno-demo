@@ -35,15 +35,11 @@ olsConfig:
     #   modelName    - what the KServe predictor itself answers to, used
     #                  only when endpointMode=direct bypasses MaaS.
     #
-    # FALLBACK (branch lightspeed/qwen35-fallback, 2026-10-25): qwen35-9b, a
-    # non-reasoning answer by default (enable_thinking: false server-side,
-    # gitops/charts/models/values.yaml qwen35Model), so the tool-result
-    # classifier's 128-token call gets an answer (ADR-0524). Its published and
-    # LLMInferenceService name is qwen35-9b; the served name vLLM answers to is
-    # qwen3.5-9b (the same body model ai-gateway's local-qwen35-maas sends).
-    llmISvcName: qwen35-9b
-    maasModelRef: qwen3.5-9b
-    modelName: qwen3.5-9b
+    # gpt-oss-20b (unlike qwen) publishes the SAME string for all three -
+    # see gitops/charts/models/values.yaml's gptOssModel block.
+    llmISvcName: gpt-oss-20b
+    maasModelRef: gpt-oss-20b
+    modelName: gpt-oss-20b
     # 2026-10-24: back on MaaS. The 2026-09-09 fallback to `direct` was forced by the
     # MaaS AuthPolicy matching the request path against a model identity that no
     # caller could present; since the MaaSModelRefs carry the plain served-model
@@ -64,12 +60,11 @@ olsConfig:
     # (LOCAL_MODEL_ENDPOINT). Admis par networkpolicy-gptoss.yaml's
     # lightspeed.enabled block (gitops/charts/models/values.yaml
     # lightspeed.enabled: true).
-    # Direct mode would also need a Lightspeed admission in
-    # networkpolicy-qwen35.yaml (only gpt-oss has one); MaaS mode does not.
-    directEndpoint: https://qwen35-9b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
-    # qwen35-9b is served with maxModelLen: 32768 (gitops/charts/models/
-    # values.yaml qwen35Model block); matched here. gpt-oss-20b would be 131072.
-    contextWindowSize: 32768
+    directEndpoint: https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
+    # gpt-oss-20b is served with maxModelLen: 131072, its native window
+    # (gitops/charts/models/values.yaml gptOssModel block, raised from 32768
+    # on 2026-10-25); matched here.
+    contextWindowSize: 131072
     maxTokensForResponse: 2048
     # Lightspeed inspects every tool result with a classifier that calls THIS model with a hard-coded
     # 128-token limit. gpt-oss-20b reasons by default and the reasoning eats the 128 tokens, so every
