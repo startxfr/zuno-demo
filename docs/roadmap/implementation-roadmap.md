@@ -960,7 +960,7 @@ frozen mirror.
 | WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Repo work in review | zuno-side A2A gateway (components/a2a-gateway) and two test blueprints per business persona; the fork's identity forwarding on the A2A node is pushed; the demo333 roll-out waits for the user's go |
 | WP-176 | [wp-176](work-packages/wp-176-verify-the-unifai-runtime-images-before-deploying-them.md) | 0586, 0353, 0574 | none | Repo work merged | fork workflow branch for review, the `quay-devel` GitHub environment (user), first signed build, operator digest support (a9), then flip verification on in `demo333.yml` |
-| WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Not started | token ceilings at MaaS for user, group and cross-model, then removal of quota.py; blocked outside the repo, waits for a Kuadrant fix (upstream report drafted, not filed) |
+| WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Repo work in review | works with the Kuadrant two-limit ceiling: counters probe and Redis-backed quota ledger in review, live proof after the user's go; removing quota.py deferred until Kuadrant is fixed |
 
 ### OKF stream phases
 

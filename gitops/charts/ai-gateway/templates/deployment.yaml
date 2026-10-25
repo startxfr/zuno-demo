@@ -187,6 +187,10 @@ spec:
             - name: QUOTA_CLOSED_CLASS_MAAS_ONLY
               value: "true"
             {{- end }}
+            {{- if eq (.Values.quotaLedger.store | default "memory") "redis" }}
+            - name: QUOTA_LEDGER_STORE
+              value: "redis"
+            {{- end }}
             # ADR-0104: semantic cache, default off - see
             # components/ai-gateway/app/semantic_cache.py and
             # platform/ai-gateway/provider-routing.yaml's `cache_enabled`

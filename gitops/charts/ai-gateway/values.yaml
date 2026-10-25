@@ -161,6 +161,13 @@ maasAdapter:
   closedClassMaasOnly:
     enabled: false
 
+# WP-177: where the token-budget ledger (app/quota.py) keeps its counters.
+# `memory` = in-process, reset by a restart (default); `redis` = also written
+# to the platform Redis (REDIS_ADDR), so a restart or a second replica keeps
+# the budgets. Redis is best effort: a fault falls back to the local counter.
+quotaLedger:
+  store: memory
+
 # ADR-0511/ADR-0528: Keycloak clients (the token's `azp`) whose calls may set
 # a non-standard quota class (X-Zuno-Quota-Class) and a project id
 # (X-Zuno-Project-Id). Any other caller runs under `standard` with no

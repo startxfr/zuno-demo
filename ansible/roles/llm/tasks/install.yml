@@ -51,6 +51,8 @@
     gitops_app_extra_helm_values:
       clusterBaseDomain: "{{ cluster_base_domain }}"
       trustedPlatformClients: "{{ zuno_ai_gateway_trusted_platform_clients | default([]) }}"
+      quotaLedger:
+        store: "{{ zuno_ai_gateway_quota_ledger_store | default('memory') }}"
       maasAdapter:
         gatewayIdentity:
           enabled: "{{ zuno_ai_gateway_maas_gateway_identity | default(false) | bool }}"
