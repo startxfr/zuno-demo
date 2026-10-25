@@ -92,8 +92,10 @@ Every request and redirect hop of a user-supplied URL is vetted again and the co
 address (`net_guard_httpx`, `net_guard_requests`): MCP transports and validator, the A2A client, discovery GETs, and
 the Confluence session. Rolled on demo333 with the a2a-gateway rebuild (uniform 404 for every `/agents/` name no
 agent can have). Checks after the roll: 18/18 probe, `cross_user_isolation`, real delegated A2A turns as `sale-01`,
-`paas-dev-01` and `recrut-01`. Not covered by any e2e: MCP and A2A against a real external server (no fixture), so the
-address pinning there rests on unit tests.
+`paas-dev-01` and `recrut-01`. The operator e2e has no external MCP/A2A server, so the fork carries one (fork `81f31c718`,
+`multi-agent/tests/integration/external_servers`): a real MCP server and a real A2A server on a local port, driven by the
+platform's own clients through the guarded transport (tool call, agent answer, original host name kept under address
+pinning, a name that turns private after connecting, a redirect to the metadata address). No cluster needed.
 
 ## Open decisions and recommendations
 
