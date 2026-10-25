@@ -574,3 +574,20 @@ Outage aftermath on demo333 (2026-10-25). After a cluster outage, MaaS returned 
 - **Fix.** Restarting the gateway pod (11:44) did not help: gpt-oss-20b still returned 500 for 5 calls in 10. Restarting Authorino
   (11:46, user go) did: SA-token probes then returned 30/30 HTTP 200 on gpt-oss-20b, qwen35-9b and qwen35-9b-wesh. An Authorino
   restart belongs in the post-outage checklist. Before restarting it, look for `UNAVAILABLE` from the shim, not from Limitador.
+
+Follow-up 2026-10-25 (after the WP-177 live proof), four open points:
+- Redis outage drill (no real outage; the real `app.quota` run with `kubectl exec` in the live ai-gateway pod, Redis unreachable). The first
+  version of the ledger store stalled the first call about 4.4 s, because redis-py retries a failed connection three times with a growing
+  wait by default; fixed in facd34e7 (no retries), built as `ai-gateway-26` and rolled. Re-run through the production client path: first
+  `check`+`consume` 350 ms (imports included), 20 rounds 351 ms, no exception, the local budget still denies at the limit, Redis skipped for
+  5 s after the fault. A drill script that builds its own client does not exercise this path (my first re-run did that and still showed 2.8 s).
+- Lightspeed counter in real use: a question asked in the OpenShift console moved the `lightspeed-gpt-oss-20b-tokens` subscription counter on
+  the `gpt-oss-20b` route (none before; 18,346 tokens after, four MaaS calls answered 200 by the Lightspeed service account). The console showed
+  "Lightspeed stopped the operation because a tool result failed the safety inspection" for the `search_openshift_docs` tool: that is Lightspeed's
+  own tool-result inspection (`Tool-result inspection enabled=True` in its log), not a Zuno component; not investigated.
+- MaaS 500s: the 11:33-11:36Z burst (qwen36, gpt-oss-20b, qwen35-9b-wesh, with `kuadrant_wasm_shim: gRPC status code is not OK`) was stale
+  Authorino connections after the cluster outage of about 10:10Z; the Authorino restart at 11:46Z fixed it (inventory, e546e7ad). The single 500
+  seen on `local-maas` and `local-gpt-oss-maas` during the WP-177 drill (about 02:32Z by the gateway log, request served by the next fallback)
+  is not explained: nobody else ran anything then, the logs and the model pods that served it are gone, and Istio shows one 500 per model
+  service in that minute. Not reproduced; a short repro run is planned once the stack is quiet.
+

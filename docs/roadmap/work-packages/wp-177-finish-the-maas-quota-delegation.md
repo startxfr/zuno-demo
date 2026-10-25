@@ -54,7 +54,8 @@ The user accepted the missing per-user ceiling at MaaS on 2026-10-25. The upstre
 | V2, V3, V5 | They need an ExternalModel with egress (`MAAS_EXTERNAL_EGRESS_ENABLED=false`); the vendor route defect is open. SaaS providers stay direct (ADR-0570 exception). |
 | V6 | Personas no longer reach MaaS (401), so the choice among several subscriptions cannot be exercised with a persona token. |
 | V11 | Needs a verified project id; a server-resolved one (ADR-0528) is not implemented. |
-| Lightspeed counter | Not exercised in real use since the Limitador restart. |
+| Lightspeed counter | Done 2026-10-25: a console question moved `lightspeed-gpt-oss-20b-tokens` (18,346 tokens). |
+| Redis outage on the live gateway | Done 2026-10-25 as an in-pod drill with an unreachable Redis; it found and fixed a 4 s stall (facd34e7). |
 
 ## Side item
 
