@@ -165,8 +165,12 @@ spec:
           - --gpu-memory-utilization={{ .Values.qwen35Model.gpuMemoryUtilization }}
           - --max-num-seqs={{ .Values.qwen35Model.maxNumSeqs }}
           {{- with .Values.qwen35Model.defaultChatTemplateKwargs }}
+          # The KServe template starts vLLM with `eval "exec vllm serve ... $@"`, and
+          # the eval strips bare double quotes: the JSON must be single-quoted INSIDE
+          # the argument to reach vLLM intact (a bare JSON value crash-looped the pod,
+          # 2026-10-25: "invalid loads value: '{enable_thinking:false}'").
           - --default-chat-template-kwargs
-          - {{ toJson . | quote }}
+          - {{ printf "'%s'" (toJson .) | quote }}
           {{- end }}
           - --enforce-eager
           - --enable-auto-tool-choice
