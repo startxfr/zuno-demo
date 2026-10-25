@@ -352,6 +352,36 @@ policy, or give the route fewer limits, and compare; it needs a policy change, s
 the follow-up. WP-157 closes on the group ceiling (written plainly); the per-user ceiling is a
 named follow-up, with this hypothesis as its starting point.
 
+Follow-up 2026-10-25 (v0.5.0 limits live: standard 10M per user, 100M per group). Read-only
+check on the `qwen36-27b-instruct` route, two persona chats (`eval-consultant-01`, group
+`zuno-evaluation`), both 200 via `local-maas`: the per-subscription `ai-gateway` counter moved
+(1000000 to 999859 after 141 tokens) and the `standard-group` counter for that group string did not
+move (29999527 before and after); no `standard-user` counter exists. The live limits of that route
+sort by name as `...ai-gateway`, `...lightspeed`, `...sales`, `...tekos`, `standard-group`,
+`standard-user`, so the group and user pairs are never in the first two. Three consequences: the
+group ceiling is counted only on routes with at most one subscription limit
+(`mistral-large`, `gpt-oss-120b-ovhcloud`; not re-measured here); the user ceiling is counted
+nowhere; and the policy status (Accepted, Enforced) says nothing about either. The Lightspeed
+counter was not exercised (no Lightspeed traffic since the Limitador restart). Existing counters
+keep the `max_value` they were created with (30000000 on the group counters created before the
+100M change), so a limit change reaches them only when their 24 h window ends.
+The evaluation limits are not rendered (`enforceNonStandardClasses` is false): the live policy
+carries `standard-user` and `standard-group` only, so a request of class `evaluation` or
+`stresstest` meets no gateway ceiling.
+
+The hypothesis above is now confirmed by a minimal reproduction on a throwaway Gateway, route and
+TokenRateLimitPolicy (removed afterwards; no live route touched): four limits `l1` to `l4` with
+one header counter each, ten requests carrying the four headers. Limitador counts `l1` and `l2`
+(10 each) and nothing for `l3` and `l4`, and the proxy logs `invalid context_id` ten times.
+Renaming `l1` to `z1` moves the counted set to `l2` and `l3`. The shim therefore completes only
+the first two limits by sorted name, on any route; it is not specific to MaaS or to the order of
+the user pair. The upstream report is drafted and not filed (user decision).
+
+V2, V3, V5, V6 and V11 stay not run: V2, V3 and V5 need an ExternalModel with egress
+(`MAAS_EXTERNAL_EGRESS_ENABLED=false`) and the vendor route defect is open; V6 needs a persona
+token on MaaS, which the ai-gateway identity no longer allows; V11 needs a verified project id
+(ADR-0528, not implemented).
+
 ## 5. Proposed design for steps 3-5 (plan, not code)
 
 ### (a) SaaS ExternalModels in `gitops/charts/models`
