@@ -42,6 +42,22 @@ decision and quota are attributed to that persona, and the mcp-gateway tool surf
 - A persona blueprint carries no delegation chain (it is not an agent), so the chain checks of the gateway are exercised by tests only.
 - Only read-only tools are offered (no approval across hops).
 
+## Validation on demo333 (2026-10-25, read-only)
+
+`blueprint.validate` on the 32 blueprints, signed in as the owner of each set (no session, no model call):
+26 valid, 6 invalid as expected (`ENDPOINT_UNREACHABLE`: the A2A card of a placeholder agent is not served).
+
+| Persona | chat | a2a (target agent) |
+|---|---|---|
+| sale-01, sale-02, recrut-01 | valid | valid (comage) |
+| consultant-01/02/03, ai-dev-01, ai-ops-01, paas-dev-01, paas-ops-01 | valid | valid (tekos) |
+| adv-01, adv-02, board-01, board-02 | valid | invalid (advantage, placeholder) |
+| finance-01, finance-02 | valid | invalid (finage, placeholder) |
+
+Finding: the sets of sale-01, consultant-01, adv-01, finance-01 and board-01 are owned by their evaluation twins
+(`eval-<persona>`), because the seeding ran with the twin sign-in (`login_name`, WP-169); the real logins of those five
+personas see none of them. The other eleven personas own their own sets.
+
 ## Open questions
 
 - Approval across hops (ADR-0409) is not part of this work package.
