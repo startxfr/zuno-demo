@@ -123,8 +123,39 @@ zuno_unifai_values:
     - knowledge.tech
     type: confluence
     visibility: shared
+  - name: sales-demo
+    # Synthetic French sales pages ("données de démonstration") for comage's knowledge.sales: the pages live in this
+    # repository (gitops/charts/unifai/files/sales-corpus/) and are read from GitHub raw, because the RAG web connector
+    # refuses cluster-internal addresses on purpose (SSRF guard), so an in-cluster static server cannot be crawled.
+    type: web
+    visibility: public
+    tags:
+    - knowledge.sales
+    syncInterval: 168h
+    web:
+      crawl: none
+      maxPages: 12
+      metadata:
+        family: sales-demo
+        language: fr
+      urls:
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/bon-de-commande.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/calendrier-facturation.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/escalade-validation.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/fiche-formation.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/fiche-support-openshift.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/glossaire-ventes.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/index.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/opportunite-acme-renewal.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/politique-remises.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/processus-renouvellement.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/qualification-opportunite.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/reponses-objections.html
   retrievers:
   - config:
+      # WEB too: the sales-demo source (knowledge.sales) is a web source.
+      extra_source_types:
+      - WEB
       forward_user_token: true
       source_type: CONFLUENCE
       threshold: 0.3
