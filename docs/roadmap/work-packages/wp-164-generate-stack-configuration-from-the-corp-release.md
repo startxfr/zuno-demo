@@ -148,3 +148,29 @@ and `limits` fields the generator already emits. MaaS subscriptions from groups 
 ai-gateway routing and guardrail inputs, and per-agent limits in the TokenRateLimitPolicies are
 therefore not generated yet. The quota budgets themselves are generated from the corp policy
 (WP-157, WP-177).
+
+## Update (2026-10-25): consumers of the per-agent fields
+
+68 split the open consumers into four lots, user-approved:
+
+1. **MaaS subscriptions, live on demo333** (devel `0f80d954` + `c5c724b0`).
+   - `values.agents.generated.yaml` is generated, and the models role passes it to the chart.
+   - One `<model>-agents` subscription per local model (agent groups, priority 10, 100000 tokens/1h)
+     replaces the hand-written `<model>-tekos`.
+   - `/sales` (priority 1, 5000/1h) and the ServiceAccount subscriptions stay hand-written.
+   - The entitlement auth policies hold `/sales` plus the agent groups.
+   - Order applied: the models role ran from the branch first (a no-op on the live chart), then the
+     merge switched everything at once.
+   - Live result: 16 subscriptions, the four `-tekos` replaced by `-agents` (Active), and all six
+     MaaSModelRefs Ready. 7 golden tests.
+2. **Model routing.** Designed in the 2026-10-25 amendment of ADR-0581:
+   - a generated routing file mounted in ai-gateway;
+   - corp candidate sets;
+   - agent roles reorder them (user decision);
+   - `forbidden` becomes a new `exclude` field.
+
+   With release 0.6.1 nothing changes. Code next, repo only; ai-gateway is rebuilt only with the user's go.
+3. **Guardrail modes.** They wait for a user decision on the hook.
+4. **Per-agent limits.**
+   - `memory.history` goes to unifai-operator.
+   - Token budgets go to `quota.py`, keyed by agent, since Kuadrant cannot key on the agent.

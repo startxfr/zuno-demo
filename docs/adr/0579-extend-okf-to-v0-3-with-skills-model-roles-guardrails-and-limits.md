@@ -119,3 +119,15 @@ and `zuno.limits.delegation.max_depth`, at most the corp ceiling
 The corp limits policy also gains `delegation.allow_write` (default `false`).
 No new `okf_version`: readers that ignore unknown optional fields are unaffected, and
 the operator and schema are updated to accept them.
+
+## Amendment (2026-10-25) - roles may reorder, not only narrow
+
+Clause 5 says a bundle may only narrow the corp policies. For model ORDER the user decided otherwise on
+2026-10-25: the `zuno.models.preferred` roles of a task, or else of the agent, reorder the candidates of the
+corp routing entry for that task. Preferred roles come first, in role order; the other candidates follow
+in corp order.
+
+The narrowing rule still holds for everything else. An agent cannot add a model to the corp entry, loosen
+`strict`, change `local_only_for`, or reach a model its classification does not allow. `forbidden` roles
+still only exclude. How the generated routing file applies this is in the 2026-10-25 amendment of
+[ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md).
