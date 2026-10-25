@@ -982,7 +982,13 @@ maas:
     clientId: zuno-admin-api
     # 2026-10-25 test: a Tenant with externalOIDC in the namespace
     # maas-controller reconciles (templates/maas.yaml). Off = not rendered.
-    subscriptionNamespaceTenant: true
+    # NEGATIVE on RHOAI 3.5 GA (tested 22:08-22:13Z): the Tenant was created but
+    # never reconciled (empty status) and maas-gateway-auth kept only api-keys and
+    # openshift-identities. maas-controller reads the AITenant (ai-tenants) and the
+    # MaaSTenantConfig, not the Tenant kind; the AITenant's spec.oidc is derived by
+    # the platform (likely GatewayConfig spec.oidc, which moves the whole RHOAI
+    # gateway to OIDC). Kept off.
+    subscriptionNamespaceTenant: false
     subscriptionNamespace: models-as-a-service
 
   # WP-157 decision D5 (ADR-0570 amendment of 2026-10-24, Security
