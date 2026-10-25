@@ -1,6 +1,6 @@
 # WP-178: Admit only signed UnifAI images at the cluster
 
-- **State:** Repo work merged
+- **State:** Done (2026-10-25)
 - **ADRs:** [ADR-0586](../../adr/0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md)
 - **Depends on:** [WP-176](wp-176-verify-the-unifai-runtime-images-before-deploying-them.md)
 - **Related:** [WP-110](wp-110-rhtas-operator-live-findings.md)
@@ -39,16 +39,14 @@ by the `unifai` role, so a hand-applied manifest or a rollout outside the role c
    `policycontroller.yaml` (`configData`); `ansible/roles/rhtas_config` passes the identities from `image-identities.yaml` (development ones only on a
    cluster that accepts them), waits for the policy, and labels the namespaces.
 2. **Done 2026-10-25 (demo333).** `make d1 install rhtas-config` (`zuno-unifai-images` Ready in `warn`, TrustRoot `public-sigstore-trust-root`, `config-policy-controller` `no-match-policy: warn`, `zuno-unifai` and `unifai-operator` labelled). On both namespaces, server-side dry-run pods: a CI-signed `unifai-ui` digest and operator 0.1.40 are admitted without a warning, the unsigned digest is a warning, a third-party digest is a `no matching policies` warning; a real pod (redis-insight) was deleted and recreated normally. `make d1 check rhtas-config` and `make d2 check unifai` stay green.
-3. **One release cycle in `warn`** (first real admission 2026-10-25: operator 0.1.41, catalogue moved by the role, the new operator pod `quay.io/zuno/unifai-operator@sha256:ed6a01f5...` admitted with no warning; the `zuno-unifai` pods were not recreated, so the application images still wait for their next pin) without an unexpected warning (watch the webhook log).
-3b. **Done (repo, 2026-10-25), closing work decided by the user:** an admission preflight in the pin scripts (`platform/supply-chain/admission_preflight.py`:
-   a server-side dry-run Pod per digest through the real webhook, run by `pin_unifai_images.py` and `pin_operator_catalog.py` after the offline verification, so a
-   digest cosign accepts but the controller does not, e.g. one signed only in the Ed25519 Rekor v2 log, stops the pin), the runbook in `docs/platform/operations.md`
-   (look, warn/enforce, break-glass, limits), `zuno_unifai_admission_enabled: false` removes the labels too. The webhook keeps `failurePolicy: Ignore` and one replica
-   (fail-open, accepted). Other clusters get the policy in `warn` by default.
-3c. **Real admission of the application images** (restart of `unifai-ui`, `unifai-identity`, `unifai-rag-server`, `unifai-backend` one by one, no warning in the webhook):
-   `unifai-backend` done 2026-10-25 20:49 UTC (admitted without a warning); the others wait for the tekos stresstest series of 2026-10-25 to end (about 21:40 UTC).
-4. **`enforce`** for `zuno-unifai-images` only (the third-party services stay `warn` through `no-match-policy`), by the user's decision, with a break-glass in the
-   runbook (remove the namespace label).
+3. **Warn cycle, done 2026-10-25:** operator 0.1.41 (catalogue moved by the role, new operator pod admitted without a warning), then `unifai-backend`, `unifai-ui`,
+   `unifai-identity` and `unifai-rag-server` recreated by their controllers: no warning in the webhook; the pin preflight validates the five current digests and the three
+   digests of the operator release. (A deliberate restart of `unifai-backend` at 20:49 UTC hit a running tekos stresstest of another session: noted by them.)
+4. **`enforce`, done 2026-10-25 (user's go):** `zuno_unifai_admission_mode: enforce` in `ansible/clusters/demo333.yml`, `make d1 install rhtas-config`. On the real policy, server-side
+   dry-run pods in `zuno-unifai` and `unifai-operator`: the unsigned `unifai-ui` and `unifai-backend` digests and the `unifai-ui:devel-1bb72a84d` tag are **refused**
+   (`admission webhook "policy.rhtas.com" denied the request ... no signatures found`); a CI-signed digest and operator 0.1.41 are admitted; a third-party digest is admitted with a
+   `no matching policies` warning; `unifai-ui` recreated by its controller in `enforce` is `Ready` in 5 s. `make d1 check rhtas-config` and `make d2 check unifai` are green.
+   Only `zuno-unifai-images` is in `enforce`; `zuno-first-party-images` and the third-party services stay `warn`. Break-glass: `docs/platform/operations.md`.
 
 ## Acceptance
 

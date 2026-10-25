@@ -9,6 +9,12 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Amended (2026-10-25) - ADR-0586 decision 8 is in force
+
+WP-178 is `Done`: the Sigstore policy-controller refuses an unsigned UnifAI image at admission in `enforce` on demo333 (`zuno-unifai`, `unifai-operator`), after a warn cycle with
+the operator 0.1.41 and four recreated application pods without a warning. Limits recorded: fail-open webhook, ECDSA-only transparency-log keys (the pin scripts preflight the
+digests against the webhook), no attestation check at admission, third-party services in `warn`.
+
 ## Implemented (2026-10-25) - ADR-0586 verifies the UnifAI runtime images
 
 ADR-0586 is `Implemented` and WP-176 `Done`: the application images, the operator 0.1.40 with its bundle and catalog are signed in the

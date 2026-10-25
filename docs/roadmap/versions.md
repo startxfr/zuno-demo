@@ -237,7 +237,7 @@ stays the model policy router and is slimmed onto MaaS. Piloted on demo333
 with tekos; demo222 cuts over only after full validation.
 
 **24 ADRs: 21 `Accepted`, 1 `Implemented` (ADR-0586), ADR-0564 superseded in part by ADR-0577 and
-ADR-0578, ADR-0353 `Proposed`.** Open: ADR-0353, ADR-0401, ADR-0402, ADR-0403, ADR-0406, ADR-0409, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575, ADR-0585; WP-146 – WP-157, WP-166, WP-171 – WP-175, WP-178.
+ADR-0578, ADR-0353 `Proposed`.** Open: ADR-0353, ADR-0401, ADR-0402, ADR-0403, ADR-0406, ADR-0409, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575, ADR-0585; WP-146 – WP-157, WP-166, WP-171 – WP-175.
 
 ## v0.12
 

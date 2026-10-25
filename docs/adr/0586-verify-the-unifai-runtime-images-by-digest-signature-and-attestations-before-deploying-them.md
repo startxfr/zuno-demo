@@ -70,7 +70,9 @@ The state found on 2026-10-24:
    chart; the user accepts that residual risk (2026-10-25).
 8. **Admission by the cluster is a later step,** not part of this record (WP-178, 2026-10-25).
    *Update 2026-10-25:* WP-178 runs it on demo333 in `warn` mode with the Sigstore policy-controller (offline public-Sigstore TrustRoot, the
-   identities of `image-identities.yaml`, `no-match-policy: warn` for the unsigned third-party services); `enforce` stays a separate decision. OpenShift's `ClusterImagePolicy`
+   identities of `image-identities.yaml`, `no-match-policy: warn` for the unsigned third-party services). *Update 2026-10-25 (WP-178 Done):* `zuno-unifai-images` is in
+   `enforce` on demo333 (an unsigned UnifAI image is refused at admission in `zuno-unifai` and `unifai-operator`; the third-party services stay `warn`); the pin scripts run an
+   admission preflight; the webhook stays fail-open (`failurePolicy: Ignore`), so it is the second guard after zuno's verifier and drift check. OpenShift's `ClusterImagePolicy`
    (`config.openshift.io/v1`, generally available since 4.20) verifies at pull and has no "digest only" rule
    like `policy-controller`, but it matches a keyless signer by e-mail, which a GitHub workflow identity is not;
    the choice between a public-key policy and keyless needs `oc explain` on the live cluster first.
