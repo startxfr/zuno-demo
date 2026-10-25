@@ -39,7 +39,7 @@ by the `unifai` role, so a hand-applied manifest or a rollout outside the role c
    `policycontroller.yaml` (`configData`); `ansible/roles/rhtas_config` passes the identities from `image-identities.yaml` (development ones only on a
    cluster that accepts them), waits for the policy, and labels the namespaces.
 2. **Done 2026-10-25 (demo333).** `make d1 install rhtas-config` (`zuno-unifai-images` Ready in `warn`, TrustRoot `public-sigstore-trust-root`, `config-policy-controller` `no-match-policy: warn`, `zuno-unifai` and `unifai-operator` labelled). On both namespaces, server-side dry-run pods: a CI-signed `unifai-ui` digest and operator 0.1.40 are admitted without a warning, the unsigned digest is a warning, a third-party digest is a `no matching policies` warning; a real pod (redis-insight) was deleted and recreated normally. `make d1 check rhtas-config` and `make d2 check unifai` stay green.
-3. **One release cycle in `warn`** without an unexpected warning (watch the webhook log).
+3. **One release cycle in `warn`** (first real admission 2026-10-25: operator 0.1.41, catalogue moved by the role, the new operator pod `quay.io/zuno/unifai-operator@sha256:ed6a01f5...` admitted with no warning; the `zuno-unifai` pods were not recreated, so the application images still wait for their next pin) without an unexpected warning (watch the webhook log).
 4. **`enforce`** for `zuno-unifai-images` only (the third-party services stay `warn` through `no-match-policy`), by the user's decision, with a break-glass in the
    runbook (remove the namespace label).
 
