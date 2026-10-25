@@ -182,6 +182,10 @@ spec:
   confluence:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with .web }}
+  web:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   visibility: {{ default "private" .visibility }}
   {{- with .aclGroups }}
   aclGroups:
