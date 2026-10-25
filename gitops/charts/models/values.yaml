@@ -1248,6 +1248,15 @@ maas:
             - limit: 1000000
               window: 1h
           priority: 100
+        # Lightspeed fallback (ADR-0524, 2026-10-25): same dedicated
+        # ServiceAccount, tier and rationale as gpt-oss-20b-lightspeed, for
+        # when Lightspeed's provider is switched to this model.
+        - name: qwen35-9b-lightspeed
+          user: "system:serviceaccount:openshift-lightspeed:lightspeed-maas-client"
+          tokenRateLimits:
+            - limit: 200000
+              window: 1h
+          priority: 50
       authPolicy:
         name: qwen35-9b-entitlement
 
