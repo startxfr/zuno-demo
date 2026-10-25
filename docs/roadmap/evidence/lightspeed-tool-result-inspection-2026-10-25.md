@@ -42,4 +42,21 @@ The classifier `max_tokens` is not configurable.
    needs an explicit decision and an ADR note.
 4. Ask Red Hat to make the classifier `max_tokens` configurable or reasoning-aware (upstream, not Zuno).
 
-Recommendation: check option 1 first (one read-only structured call against qwen36, then a one-line values change), keep the inspection on.
+Recommendation (first version): check option 1 first. **Superseded by the finding below.**
+
+## Fix found (2026-10-25, same day)
+
+Lightspeed can send the reasoning effort itself: `OLSConfig.spec.llm.providers[].models[].parameters.reasoningConfig` is mapped, for the `rhoai_vllm`
+provider, to the request-level `reasoning_effort` (`populate_vllm_reasoning`). Measured on a throwaway vLLM pod (zuno-bench) and in the Lightspeed pod
+on the existing `gpt-oss-20b` route:
+
+- vLLM `--default-chat-template-kwargs '{"reasoning_effort":"low"}'` is accepted but has **no effect** on gpt-oss (the default still reasons 700+ tokens, the
+  content stays empty); the same value inside `chat_template_kwargs` does not work either. Only the top-level request field `reasoning_effort: "low"` does
+  (454 tokens in total for a documentation answer, reasoning about 19 characters).
+- Classifier call as Lightspeed makes it (`json_schema`, `max_tokens=128`) with `reasoningConfig: {effort: low}` set on the model, 5 snippets: 5/5 parsed,
+  44-56 output tokens, verdicts right (the two injection attempts flagged `instruction_override`, the three benign snippets accepted).
+- (A first test of `qwen36-27b-instruct` timed out because the served name is `qwen3.6-27b-instruct`; qwen36 and qwen35-9b also reason by default, so they would
+  hit the same 128-token limit.)
+
+Applied by the chart value `olsConfig.provider.reasoningEffort: low` in `gitops/charts/lightspeed-config` (user go 2026-10-25); the inspection stays enabled.
+Rollback: set the value to empty.
