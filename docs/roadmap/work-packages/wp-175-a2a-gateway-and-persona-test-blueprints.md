@@ -1,6 +1,6 @@
 # WP-175: A2A gateway and persona test blueprints
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-25)
 - **ADRs:** [ADR-0585](../../adr/0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md), [ADR-0402](../../adr/0402-adopt-a2a-as-the-inter-agent-protocol.md), [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md)
 - **Depends on:** [WP-172](wp-172-gateway-enforcement-of-the-delegation-chain.md)
 - **Related:** [WP-173](wp-173-unifai-a2a-identity-server-and-approval.md), [WP-174](wp-174-tekos-to-arkos-delegation-on-demo333.md)
@@ -54,9 +54,10 @@ decision and quota are attributed to that persona, and the mcp-gateway tool surf
 | adv-01, adv-02, board-01, board-02 | valid | invalid (advantage, placeholder) |
 | finance-01, finance-02 | valid | invalid (finage, placeholder) |
 
-Finding: the sets of sale-01, consultant-01, adv-01, finance-01 and board-01 are owned by their evaluation twins
-(`eval-<persona>`), because the seeding ran with the twin sign-in (`login_name`, WP-169); the real logins of those five
-personas see none of them. The other eleven personas own their own sets.
+Fix of the same day (user decision): the sets of sale-01, consultant-01, adv-01, finance-01 and board-01 were owned by
+their evaluation twins (`eval-<persona>`, WP-169), so the real logins saw none of them. They were created again under the
+real accounts (`EVAL_PERSONAS=0`), the twins kept; the three with an active agent validate, the three placeholders
+(advantage, finage) are saved and wait for their agent. Every business persona now owns its two blueprints.
 
 ## Open questions
 
