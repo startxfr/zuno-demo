@@ -164,6 +164,14 @@ class AccessTests(GatewayTestCase):
         self.assertEqual(denied.json(), unknown.json())
         self.assertEqual(self.down.llm_calls, [])
 
+    async def test_a_name_no_agent_can_have_gets_the_same_answer_too(self) -> None:
+        async with self.http("tok-sales") as client:
+            body = {"jsonrpc": "2.0", "id": 1, "method": "message/send", "params": {}}
+            denied = await client.post("/agents/alpha/", json=body)
+            odd = await client.post("/agents/9f3c0d/", json=body)
+        self.assertEqual(odd.status_code, 404)
+        self.assertEqual(odd.json(), denied.json())
+
 
 class TurnTests(GatewayTestCase):
     async def test_entitled_user_gets_an_answer_computed_with_their_own_token(self) -> None:

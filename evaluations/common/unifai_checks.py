@@ -218,7 +218,7 @@ def a2a_gateway_denies_unentitled(
         base = a2a_gateway_url.rstrip("/")
         anon = httpx.post(f"{base}/agents/{agent}/", json=body, timeout=20)
         denied = httpx.post(f"{base}/agents/{agent}/", json=body, headers=auth_headers(persona), timeout=20)
-        unknown = httpx.post(f"{base}/agents/{uuid.uuid4().hex}/", json=body, headers=auth_headers(persona), timeout=20)
+        unknown = httpx.post(f"{base}/agents/unknown-{uuid.uuid4().hex[:12]}/", json=body, headers=auth_headers(persona), timeout=20)
         ok = anon.status_code == 401 and denied.status_code == unknown.status_code == 404 and denied.json() == unknown.json()
         return CheckResult(name, ok, f"anonymous={anon.status_code} denied={denied.status_code} unknown={unknown.status_code}")
 

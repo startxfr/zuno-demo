@@ -92,6 +92,8 @@ def create_app(
     async def authenticate(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         match = _AGENT_PATH.match(request.url.path)
         if not match:
+            if request.url.path.startswith("/agents/"):  # a name no agent can have: same answer as an unknown agent
+                return JSONResponse(_NOT_FOUND, status_code=404)
             return await call_next(request)
         name = match.group(1)
         agent = store.get(name) if served.get(name) else None
