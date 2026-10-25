@@ -50,9 +50,12 @@ zuno_build_git_ref: "devel"
 # workflow (accept dev signatures true, because demo333 runs the devel branch).
 zuno_unifai_verify_images: true
 zuno_unifai_accept_dev_signatures: true
-# The catalog and the operator images (d0) are verified only once the operator
-# release workflow signs them (WP-176 step 6); until then this stays false.
-zuno_unifai_verify_catalog: false
+# The catalog (d0) is verified like the stack images (WP-176 step 6): since operator
+# 0.1.39 the operator, its bundle and its catalog carry the operator release workflow's
+# identity. This cluster's CatalogSource was applied by hand with `:latest`, so the role
+# also pins its spec.image to the verified catalog digest (pin_catalog.yml) and the
+# drift check reads it.
+zuno_unifai_verify_catalog: true
 
 zuno_unifai_bundle_settings:
   advantage:

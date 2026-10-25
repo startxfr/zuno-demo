@@ -15,6 +15,7 @@
     argv: >-
       {{ ['python3', zuno_repo_root ~ '/platform/supply-chain/verify_unifai_images.py']
          + (_unifai_image_refs | map('regex_replace', '^', '--ref=') | list)
+         + ((['--ref=' ~ _unifai_catalog_chart.catalogImage]) if (zuno_unifai_verify_catalog | default(false) | bool) else [])
          + (_unifai_third_party_refs | default([]) | map('regex_replace', '^', '--third-party=') | list)
          + ['--pods', '-']
          + (['--accept-dev'] if (zuno_unifai_accept_dev_signatures | default(false) | bool) else []) }}
@@ -37,3 +38,16 @@
       {% endfor %}
       {{ (_unifai_running.stdout | default('{}') | from_json).error | default('') }}
   when: _unifai_running.rc != 0
+
+# The CatalogSource must run the pinned (and just verified) catalog digest: a hand-applied
+# `:latest`, or an image replaced behind it, is drift.
+- name: "unifai | verify running | the CatalogSource runs the pinned catalog digest"
+  ansible.builtin.fail:
+    msg: >-
+      CatalogSource {{ _unifai_catalog_chart.catalogSourceName }} runs
+      {{ (_unifai_catalog_source.resources | default([{}]))[0].spec.image | default('absent') }}, not the pinned
+      {{ _unifai_catalog_chart.catalogImage }} (ADR-0586). `make d2 install unifai` moves it.
+  when:
+    - zuno_unifai_verify_catalog | default(false) | bool
+    - (_unifai_catalog_source.resources | default([]) | length == 0)
+      or (_unifai_catalog_source.resources[0].spec.image != _unifai_catalog_chart.catalogImage)

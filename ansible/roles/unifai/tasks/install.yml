@@ -43,12 +43,17 @@
          'A unifai-operator Subscription already exists and is not ours: zuno-unifai-d0 renders nothing.' }}
 
 # ADR-0586 / WP-176: the catalog image is verified (digest, signature, provenance, SBOM)
-# before the operator is installed from it. Off until the operator release workflow
-# signs its images (zuno_unifai_verify_catalog, default false).
+# before the operator is installed from it (zuno_unifai_verify_catalog, default false; on
+# since operator 0.1.39, the first release the workflow signs).
 - name: "unifai | verify the operator catalog image"
   ansible.builtin.include_tasks: verify_images.yml
   vars:
     _unifai_verify_scope: catalog
+  when: zuno_unifai_verify_catalog | default(false) | bool
+
+# A catalog applied by hand is moved to the verified digest too (it only runs once verified).
+- name: "unifai | pin the hand-applied CatalogSource to the verified catalog digest"
+  ansible.builtin.include_tasks: pin_catalog.yml
   when: zuno_unifai_verify_catalog | default(false) | bool
 
 - name: "unifai | apply the operator Application (d0)"

@@ -1,6 +1,6 @@
 # ADR-0586: Verify the UnifAI runtime images by digest, signature and attestations before deploying them
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team

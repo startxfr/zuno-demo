@@ -13,9 +13,10 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.30 as
-  # the stable channel head (checked 2026-10-23).
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:8b296b21f723426628c047ec2c2352fb89b97f9d2258c26e7cfaed212f03c7aa
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.39, the first
+  # release signed end to end (ADR-0586): its signature, provenance and SBOM verify
+  # with the operator release workflow's identity, without the development one.
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:1830d914b5c7c3a0fce1b5d577e9033e07e32f869e962ea5fe8fff739785f52c
   catalogSourceName: unifai-operator-catalog
   channel: stable
   package: unifai-operator

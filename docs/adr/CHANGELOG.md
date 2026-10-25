@@ -9,6 +9,12 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Accepted (2026-10-25) - ADR-0586 verifies the UnifAI runtime images
+
+ADR-0586 is `Accepted`. The operator 0.1.39 is the first release signed end to end: operator, bundle and catalog verify with the
+operator release workflow's identity, and demo333 verifies the catalog (`zuno_unifai_verify_catalog: true`) after the role moved its
+hand-applied CatalogSource to the verified digest. `Implemented` waits for the rehearsal of the application images' release path.
+
 ## Amended (2026-10-25) - ADR-0586 records the live proof and its residual risks
 
 The signed images run on demo333: CI-built digests, verified before the stack is applied, drift checked by `make d2 check unifai`. The
