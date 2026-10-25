@@ -290,8 +290,8 @@ an image):
   per-subscription budgets (Lightspeed's 200k among them). So the wasm shim
   drops the action pairs at the end of a request. The original order is
   restored (000f6d75): **group ceiling enforced, per-subscription budgets
-  enforced, per-user ceiling not enforced**. An upstream report is being
-  drafted; the user limit stays in the policy, harmless, and is not to be
+  enforced, per-user ceiling not enforced**. The upstream report was drafted
+  and, by user decision (2026-10-25), not filed and the subject is closed; the user limit stays in the policy, harmless, and is not to be
   described as enforced.
 
 Open after the sequence: the per-user ceiling (upstream shim defect); the
@@ -356,7 +356,8 @@ The per-user, group and cross-model ceilings at MaaS, the removal of `app/quota.
 checks never run (V2, V3, V5, V6, V11) are tracked in
 [WP-177](wp-177-finish-the-maas-quota-delegation.md), blocked on a Kuadrant fix. User decision of 2026-10-25: the missing per-user
 ceiling is accepted until then, and ADR-0570 moves to Partially implemented. The upstream report is drafted in
-[kuadrant-token-limits-upstream-report.md](../evidence/kuadrant-token-limits-upstream-report.md) and not filed.
+[kuadrant-token-limits-upstream-report.md](../evidence/kuadrant-token-limits-upstream-report.md) and, by user decision, not
+filed: reporting to the Kuadrant community is deferred and the subject is closed.
 
 **Closure state:** WP-157 is Done on the scope above. At MaaS only the per-subscription budgets are enforced; every other token
 ceiling is enforced by the ai-gateway's `app/quota.py`.

@@ -221,9 +221,11 @@ NOT enforced**. The Kuadrant wasm shim on demo333 drops the token-limit
 action pairs at the end of a request (live order tests, 2026-10-24), and
 Kuadrant orders those pairs by limit name, so the user limit, last, is
 never counted; moving it ahead stopped other limits from counting instead.
-An upstream report is being drafted; the per-user ceiling stays a
-follow-up of
-[WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md).
+The upstream report is drafted but deliberately not filed (user
+decision of 2026-10-25: the subject is closed here and reporting to the
+Kuadrant community is deferred); the per-user ceiling stays a follow-up of
+[WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md)
+and [WP-177](../roadmap/work-packages/wp-177-finish-the-maas-quota-delegation.md).
 
 ## Amendment (2026-10-24, WP-157 partial closure)
 
@@ -277,8 +279,9 @@ completes **only the first two limits by sorted limit name**, on any route, so i
 the earlier "last pair is lost" reading is narrowed to this. Renaming a limit moves it in or out of the counted
 pair. No Zuno-side reordering fixes it on routes that carry the controller's subscription limits.
 
-Suggested upstream action (not filed; the user decides): open an issue on the Kuadrant project with
-[the drafted report](../roadmap/evidence/kuadrant-token-limits-upstream-report.md). It asks for confirmation of
+Upstream action: **none for now**. By user decision of 2026-10-25 no report is made to the Kuadrant community and the
+subject is closed in this ADR and its work packages. The drafted report is kept as an archive
+([the drafted report](../roadmap/evidence/kuadrant-token-limits-upstream-report.md)); it would ask for confirmation of
 a two-pair ceiling, a fix (or a documented ceiling), a warning naming the skipped limit instead of
 `invalid context_id`, and documentation that the limit name sets the evaluation order. When it is fixed, re-run
 the order check described in [WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md).

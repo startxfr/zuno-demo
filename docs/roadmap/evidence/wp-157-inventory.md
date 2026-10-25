@@ -375,7 +375,7 @@ one header counter each, ten requests carrying the four headers. Limitador count
 (10 each) and nothing for `l3` and `l4`, and the proxy logs `invalid context_id` ten times.
 Renaming `l1` to `z1` moves the counted set to `l2` and `l3`. The shim therefore completes only
 the first two limits by sorted name, on any route; it is not specific to MaaS or to the order of
-the user pair. The upstream report is drafted and not filed (user decision).
+the user pair. The upstream report is drafted and not filed: reporting to the Kuadrant community is deferred and the subject is closed (user decision, 2026-10-25).
 
 V2, V3, V5, V6 and V11 stay not run: V2, V3 and V5 need an ExternalModel with egress
 (`MAAS_EXTERNAL_EGRESS_ENABLED=false`) and the vendor route defect is open; V6 needs a persona

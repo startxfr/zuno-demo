@@ -1,6 +1,6 @@
 # Kuadrant upstream report: token limits beyond the first two are never counted
 
-Status: drafted 2026-10-25, **not filed**. Written to be filed as an issue on the Kuadrant wasm-shim / TokenRateLimitPolicy project; whether and when is a user decision. Reproduced on demo333 (see [wp-157-inventory.md](wp-157-inventory.md), follow-up of 2026-10-25).
+Status: drafted 2026-10-25, **archived, not filed**. By user decision of 2026-10-25 no report is made to the Kuadrant community for now and the subject is closed in ADR-0570, WP-157 and WP-177; this text is kept in case reporting is reopened (it was written to be filed as an issue on the Kuadrant wasm-shim / TokenRateLimitPolicy project). Reproduced on demo333 (see [wp-157-inventory.md](wp-157-inventory.md), follow-up of 2026-10-25).
 
 Generic on purpose: no cluster, host or token names.
 

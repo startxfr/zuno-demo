@@ -23,7 +23,7 @@ The wasm shim completes only the first two limits of a route, by sorted limit na
 route and policy (four limits, ten requests: `l1` and `l2` counted, `l3` and `l4` never; renaming `l1` to `z1` moves the pair).
 Evidence: [wp-157-inventory.md](../evidence/wp-157-inventory.md) (follow-up of 2026-10-25). No Zuno-side reordering works:
 putting the `standard-*` limits first stops the subscription budgets from counting, which was tried and reverted (000f6d75).
-The user accepted the missing per-user ceiling at MaaS on 2026-10-25. The upstream report stays drafted and not filed
+The user accepted the missing per-user ceiling at MaaS on 2026-10-25. The upstream report stays drafted and not filed; reporting upstream is deferred and the subject is closed (user decision of 2026-10-25)
 ([kuadrant-token-limits-upstream-report.md](../evidence/kuadrant-token-limits-upstream-report.md)).
 
 ## Steps
