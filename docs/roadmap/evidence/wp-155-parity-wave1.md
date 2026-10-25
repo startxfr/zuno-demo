@@ -243,3 +243,9 @@ retried forever); the finalizer of the test source was removed by hand, a fragme
 (`rag_retrieval_has_citation`, the answer must contain "en attente de validation", a phrase only the corpus has): run on demo333, 18/20 scenarios
 (90%), 11 passes; 10 failed on a 503 of the UnifAI UI at that moment, 19 is the known in-cluster-client miss; 6 and 17 skipped.
 
+Re-run the same evening, corpus live: comage 18/20 again, and the correction of the first reading: scenario 10 is not a transient 503, it is the documented
+standing miss (no `salesforce-mcp` deployment, so no `salesforce.opportunity.read` call; `tool_calls=[]`), unrelated to the corpus. Tekos and arkos did not move:
+arkos 17/18 (only 19), tekos 16/18 on the second run (only 8, first token 7.9 s then 10.4 s on the shared 9B model, and 19; the first tekos run had 10 and 11
+failing with `tool_calls=[]`, which did not repeat). The operator fix for the stale-source delete ("Source not found" treated as already deleted) lands in
+operator 0.1.43 (a9); a fragment of the test page, if any is still indexed, belongs to the user that ingested it and is removed by a delete from that user.
+
