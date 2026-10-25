@@ -143,7 +143,8 @@
 # files have independent lifecycles and nothing else keeps them honest.
 # Written here because a real bug needed it: `qwen3.5-9b` (role `default`,
 # structurally always reachable as the terminal fallback per ADR-0531
-# decision 1's "additive, never removed" guarantee) serves 8192, while the
+# decision 1's "additive, never removed" guarantee) served 8192 (32768 since
+# 2026-10-25), while the
 # other three local models served 32768 (gpt-oss-20b serves 131072 since
 # 2026-10-25), and nothing in the (since retired)
 # agent-runtime knew that before ADR-0544 - a prompt sized against the 32768 nominal path
@@ -332,7 +333,7 @@ providers:
     kind: local
     role: default
     model: qwen3.5-9b
-    max_model_len: 8192
+    max_model_len: 32768
     via_maas: true
     # WP-157: the window of this model's ai-gateway MaaSSubscription
     # (gitops/charts/models/values.yaml), for the Retry-After of a MaaS
@@ -347,7 +348,7 @@ providers:
     kind: local
     role: default
     model: qwen3.5-9b
-    max_model_len: 8192
+    max_model_len: 32768
     endpoint: https://qwen35-9b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
     temperature: 0.2
     timeout_seconds: 60
