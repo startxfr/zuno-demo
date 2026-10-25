@@ -87,6 +87,7 @@ make d1 reconcile openshift-ai   # diagnose blockers and apply known remediation
 make d2 build
 make d2 install
 make d2 check              # ADR-0053 acceptance/security gate for `agents`
+make d2 reconcile models   # unwedge a model rollout blocked by the GPU quota (asks first)
 
 # Day 3 (ADR-0057/0058): agent availability test and stresstest.
 make d3 test

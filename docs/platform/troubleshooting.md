@@ -58,3 +58,41 @@ generalize to any OLM-managed operator doing this:
    throttling. It doesn't replace step 3's cpu headroom, though: discovery/RESTMapper startup
    cost isn't namespace-scoped, so a cluster with 400+ CRDs can still throttle during startup even
    with the watch scoped down.
+
+## A model change does not take effect: the new pod never starts
+
+**Symptom.** You changed a model in `gitops/charts/models` (vLLM args, `maxModelLen`, an alias)
+and Argo CD shows `zuno-models-d1` Synced and Healthy. The old pod keeps serving the old
+configuration. `oc -n zuno-ai-run get rs` shows a new `<model>-kserve-…` ReplicaSet with 1
+desired and 0 ready. Its events say `FailedCreate … exceeded quota: zuno-ai-run-gpu-cap`.
+After hours, the Deployment reports `ProgressDeadlineExceeded`.
+
+**Cause.**
+- Each model holds one MIG slice, and `zuno-ai-run-gpu-cap` keeps no spare slice.
+- KServe's Deployment uses RollingUpdate, so it wants the new pod before the old one goes.
+- `LLMInferenceService` has no strategy field, and KServe rewrites the Deployment, so
+  `Recreate` cannot be set (ADR-0201 "Rollout hazard").
+
+**Fix.** Run:
+
+```sh
+make d2 reconcile models
+```
+
+It lists the wedged models and asks for confirmation. Then it:
+1. scales the old ReplicaSet to 0;
+2. recreates the new ReplicaSet if the controller is still in backoff (no pod after 2 min);
+3. waits for the new pod to be Ready.
+
+The model is down meanwhile: about 4 min for gpt-oss-20b and qwen35-9b, about 7 min for
+qwen36-27b-instruct. The ai-gateway falls back to the other models. Lightspeed pauses if it
+uses that model.
+
+Options:
+- `EXTRA_VARS="-e model=<llminferenceservice>"` limits the run to one model;
+- `-e confirm=yes` skips the question.
+
+With nothing wedged, the command changes nothing.
+
+Tell the other sessions before you run it.
+

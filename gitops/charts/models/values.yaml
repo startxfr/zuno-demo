@@ -897,6 +897,10 @@ qwen35Model:
   # classifier, a hard 128-token call, get an answer (ADR-0524). It applies to
   # every caller of this model, the ai-gateway's terminal `default` fallback
   # included. Empty map = no flag.
+  # Kept on 2026-10-25 (user decision) although Lightspeed went back to
+  # gpt-oss-20b (server-side reasoning effort low): a ready Lightspeed
+  # fallback, and faster answers for the tekos lookup tasks that prefer this
+  # model. Revisit if their answer quality drops.
   defaultChatTemplateKwargs:
     enable_thinking: false
   llmInferenceService:

@@ -1,0 +1,30 @@
+{#- The LLMInferenceService Deployments whose newest ReplicaSet wants a pod but has none Ready
+    while an older ReplicaSet still serves: the GPU-quota RollingUpdate wedge (tasks/reconcile.yml).
+    Output: JSON list of {model, deployment, new_rs, old_rs}. -#}
+{%- set out = [] -%}
+{%- for d in _mr_deployments.resources -%}
+{%-   set owners = d.metadata.ownerReferences | default([]) | selectattr('kind', 'equalto', 'LLMInferenceService') | list -%}
+{%-   if owners and (model | default('')) in ['', owners[0].name] -%}
+{%-     set ns = namespace(cur=none, cur_rev=-1, old=none) -%}
+{%-     for rs in _mr_replicasets.resources -%}
+{%-       set rs_owners = rs.metadata.ownerReferences | default([]) | selectattr('name', 'equalto', d.metadata.name) | list -%}
+{%-       if rs_owners -%}
+{%-         set rev = (rs.metadata.annotations | default({})).get('deployment.kubernetes.io/revision', '0') | int -%}
+{%-         if rev > ns.cur_rev -%}{%- set ns.cur = rs -%}{%- set ns.cur_rev = rev -%}{%- endif -%}
+{%-       endif -%}
+{%-     endfor -%}
+{%-     for rs in _mr_replicasets.resources -%}
+{%-       set rs_owners = rs.metadata.ownerReferences | default([]) | selectattr('name', 'equalto', d.metadata.name) | list -%}
+{%-       if rs_owners and ns.cur is not none and rs.metadata.name != ns.cur.metadata.name
+             and (rs.status.readyReplicas | default(0)) > 0 -%}
+{%-         set ns.old = rs -%}
+{%-       endif -%}
+{%-     endfor -%}
+{%-     if ns.cur is not none and ns.old is not none
+           and (ns.cur.spec.replicas | default(0)) > 0 and (ns.cur.status.readyReplicas | default(0)) == 0 -%}
+{%-       set _ = out.append({'model': owners[0].name, 'deployment': d.metadata.name,
+                              'new_rs': ns.cur.metadata.name, 'old_rs': ns.old.metadata.name}) -%}
+{%-     endif -%}
+{%-   endif -%}
+{%- endfor -%}
+{{ out | to_json }}
