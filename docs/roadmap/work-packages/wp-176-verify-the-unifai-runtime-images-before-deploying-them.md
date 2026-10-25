@@ -1,6 +1,6 @@
 # WP-176: Verify the UnifAI runtime images before deploying them
 
-- **State:** Repo work merged
+- **State:** Done (2026-10-25)
 - **ADRs:** [ADR-0586](../../adr/0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md), [ADR-0353](../../adr/0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md), [ADR-0574](../../adr/0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md)
 - **Depends on:** none
 - **Related:** [WP-151](wp-151-deploy-unifai-on-zuno-via-argocd.md), [WP-173](wp-173-unifai-a2a-identity-server-and-approval.md)

@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 19 | 23 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-176, WP-178 |
+| v0.11 | 24 | 18 | 23 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-178 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -959,7 +959,7 @@ frozen mirror.
 | WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | step 6 (the operator refuses A2A and delegation targets) is live in operator 0.1.35; steps 1 to 5 wait for the user's priority |
 | WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Done (2026-10-25) | zuno-side A2A gateway live on demo333, 32 test blueprints (26 valid, 6 wait for placeholder agents), real delegated turns and the denial check proven |
-| WP-176 | [wp-176](work-packages/wp-176-verify-the-unifai-runtime-images-before-deploying-them.md) | 0586, 0353, 0574 | none | Repo work merged | live on demo333 for the five application images (CI-signed, digest-pinned, verified before applying, drift checked) and the third-party services and backup Jobs (pinned, unsigned); left: operator, bundle and catalog signing (a9's operator image workflow, then the signed bundle and catalog branch), the release-path rehearsal, then `zuno_unifai_verify_catalog` |
+| WP-176 | [wp-176](work-packages/wp-176-verify-the-unifai-runtime-images-before-deploying-them.md) | 0586, 0353, 0574 | none | Done (2026-10-25) | live on demo333: the five application images (CI-signed, digest-pinned, verified before applying, drift checked), the third-party services and backup Jobs (pinned, unsigned), the operator 0.1.40 with its bundle and catalog (release identity, catalog pinned), the release path rehearsed with a `v0.0.0-rc1` tag; cluster-side admission is WP-178 |
 | WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Done (2026-10-25) | works with the Kuadrant two-limit ceiling: counters probe and Redis-backed quota ledger live on demo333 (budgets survive an ai-gateway restart); removing quota.py deferred until Kuadrant is fixed |
 | WP-178 | [wp-178](work-packages/wp-178-admit-only-signed-unifai-images-at-the-cluster.md) | 0586 | WP-176 | Not started | cluster-side admission of signed UnifAI images with the Sigstore `policy-controller` (OpenShift's `ClusterImagePolicy` cannot express a workflow identity), `warn` then `enforce` |
 

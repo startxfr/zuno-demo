@@ -9,6 +9,13 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Implemented (2026-10-25) - ADR-0586 verifies the UnifAI runtime images
+
+ADR-0586 is `Implemented` and WP-176 `Done`: the application images, the operator 0.1.40 with its bundle and catalog are signed in the
+fork's CI and verified by zuno before the stack is applied and on what runs (demo333); the release path was rehearsed with a `v0.0.0-rc1` tag. Left
+as written risks: RabbitMQ frozen on `bitnamilegacy`, third-party services pinned but not signed, operator releases 0.1.36 to 0.1.38 unsigned;
+cluster-side admission is WP-178.
+
 ## Accepted (2026-10-25) - ADR-0586 verifies the UnifAI runtime images
 
 ADR-0586 is `Accepted`. The operator 0.1.39 is the first release signed end to end: operator, bundle and catalog verify with the

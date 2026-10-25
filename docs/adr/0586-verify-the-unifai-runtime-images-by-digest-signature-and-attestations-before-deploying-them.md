@@ -1,6 +1,6 @@
 # ADR-0586: Verify the UnifAI runtime images by digest, signature and attestations before deploying them
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
@@ -114,13 +114,19 @@ strong as that branch's protections (no force-push, reviewed merges) and is acce
 A production cluster takes release tags only. The verification trusts the committed Sigstore root (no network
 trust), the registry is read but never trusted, and a verification that cannot run refuses.
 
-## Before Implemented
+## Implementation evidence (2026-10-25, demo333)
 
-On demo333, once the first CI-built images exist: the verifier refuses the current unsigned
-`unifai-ui:devel-1bb72a84d` and accepts the CI-built digests; the stack applies only with verified, digest-pinned
-images; pointing `images.ui` at an unsigned image makes the run refuse before applying anything; and `make d1
-check unifai` fails for a pod started with another image. The operator, bundle and catalog follow with their first
-signed release.
+- The verifier refuses the unsigned `unifai-ui:devel-1bb72a84d` (a tag, and its digest `sha256:0b851c4f...` has "no
+  signatures found") and accepts the CI-built digests; the five application images are pinned by digest, verified by
+  `make d2 install unifai` and deployed; the third-party services and the backup Jobs' images are pinned by digest.
+- Pointing `images.ui` at the unsigned digest makes the role stop before applying anything ("The stack images do not
+  verify (ADR-0586), nothing was applied").
+- `make d2 check unifai` (not `d1`: `unifai` is a Day 2 component) failed on the pods that ran other images before the
+  pins were applied, and flags a third-party pod running another image than its pin.
+- The release path ran: `v0.0.0-rc1` built and signed the five images under `quay-release`, accepted WITHOUT
+  `--accept-dev`. Operator 0.1.39 and 0.1.40 (operator, bundle, catalog) verify with the operator release workflow's
+  identity; the catalog digest is pinned in the d0 chart and the hand-applied CatalogSource runs it (checked by the drift
+  check). Residual risks are listed above; cluster-side admission is WP-178.
 
 ## Review evidence
 

@@ -326,7 +326,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) | Implemented | Deploy UnifAI through ArgoCD from a pinned OLM catalog |
 | [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Accepted | Upstream generic UnifAI changes and isolate zuno-specific code |
 | [ADR-0585](0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) | Accepted | Serve zuno agents over A2A from a gateway that answers with the caller's identity |
-| [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) | Accepted | Verify the UnifAI runtime images by digest, signature and attestations before deploying them |
+| [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) | Implemented | Verify the UnifAI runtime images by digest, signature and attestations before deploying them |
 
 ## v0.12
 
