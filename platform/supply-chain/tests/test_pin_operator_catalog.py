@@ -59,6 +59,17 @@ class Pin(unittest.TestCase):
         self.assertIn("bundle", str(ctx.exception))
         self.assertEqual(self.path.read_text(encoding="utf-8"), FILE)
 
+    def test_an_admission_refusal_changes_nothing_and_a_pass_writes(self):
+        def deny(refs):
+            return [v.Result(r, False, "admission: no signatures found") for r in refs]
+        with self.assertRaises(p.PinError) as ctx:
+            p.pin("latest", "0.1.40", self.path, resolver=resolver, verifier=ok, admission=deny)
+        self.assertIn("admission:", str(ctx.exception))
+        self.assertEqual(self.path.read_text(encoding="utf-8"), FILE)
+        p.pin("latest", "0.1.40", self.path, resolver=resolver, verifier=ok,
+              admission=lambda refs: [v.Result(r, True, "admitted") for r in refs])
+        self.assertIn(NEW, self.path.read_text(encoding="utf-8"))
+
     def test_bad_arguments_are_refused(self):
         for target, version in (("sha256:abc", None), ("latest", "0.1"), ("v1", None)):
             with self.assertRaises(p.PinError):

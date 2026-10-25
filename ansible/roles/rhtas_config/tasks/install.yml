@@ -269,6 +269,21 @@
   failed_when: false
   when: _rhtas_config_unifai_admission.enabled | bool
 
+# zuno_unifai_admission_enabled: false takes the namespaces out of the webhook again (the policy itself is pruned by the Application).
+- name: "rhtas_config | take the UnifAI namespaces out of the admission webhook when the admission is off"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: v1
+    kind: Namespace
+    name: "{{ item }}"
+    definition:
+      metadata:
+        labels:
+          policy.rhtas.com/include: null
+  loop: "{{ zuno_unifai_admission_namespaces | default(['zuno-unifai', 'unifai-operator']) }}"
+  failed_when: false
+  when: not (_rhtas_config_unifai_admission.enabled | bool)
+
 - name: "rhtas_config | install summary"
   ansible.builtin.debug:
     msg: >-

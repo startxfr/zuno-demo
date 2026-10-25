@@ -75,6 +75,22 @@ class Pin(unittest.TestCase):
         p.pin("v1.2.0", self.path, False, resolver=resolver, verifier=ok)
         self.assertIn("  # v1.2.0", self.path.read_text(encoding="utf-8"))
 
+    def test_an_admission_refusal_stops_the_pin_with_the_webhooks_words(self):
+        def admission(refs):
+            return [v.Result(r, "unifai-rag" not in r, "admission: no signatures found") for r in refs]
+        with self.assertRaises(p.PinError) as ctx:
+            p.pin("devel-ffb64e335", self.path, True, resolver=resolver, verifier=ok, admission=admission)
+        self.assertIn("admission: no signatures found", str(ctx.exception))
+        self.assertEqual(self.path.read_text(encoding="utf-8"), FILE)
+
+    def test_an_admission_that_passes_or_is_skipped_lets_the_pin_through(self):
+        p.pin("devel-ffb64e335", self.path, True, resolver=resolver, verifier=ok,
+              admission=lambda refs: [v.Result(r, True, "admitted") for r in refs])
+        self.assertIn("# devel-ffb64e335", self.path.read_text(encoding="utf-8"))
+        self.path.write_text(FILE, encoding="utf-8")
+        p.pin("devel-ffb64e335", self.path, True, resolver=resolver, verifier=ok, admission=lambda refs: [])
+        self.assertIn("# devel-ffb64e335", self.path.read_text(encoding="utf-8"))
+
     def test_dry_run_writes_nothing(self):
         p.pin("devel-ffb64e335", self.path, True, dry_run=True, resolver=resolver, verifier=ok)
         self.assertEqual(self.path.read_text(encoding="utf-8"), FILE)

@@ -34,6 +34,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import admit_okf_bundle as admit  # noqa: E402
+import admission_preflight  # noqa: E402
 import verify_unifai_images as v  # noqa: E402
 
 REPO_ROOT = HERE.parents[1]
@@ -77,7 +78,8 @@ def rewrite(text: str, digest: str, version: Optional[str]) -> str:
 
 def pin(target: str, version: Optional[str], values: pathlib.Path = CHART_VALUES, dry_run: bool = False,
         resolver: Callable[[str, str], str] = resolve,
-        verifier: Optional[Callable[[List[str]], List[v.Result]]] = None) -> dict:
+        verifier: Optional[Callable[[List[str]], List[v.Result]]] = None,
+        admission: Optional[Callable[[List[str]], List[v.Result]]] = None) -> dict:
     if version is not None and not VERSION_RE.match(version):
         raise PinError(f"{version}: expected X.Y.Z")
     digest = resolver(CATALOG, "latest") if target == "latest" else target
@@ -91,6 +93,10 @@ def pin(target: str, version: Optional[str], values: pathlib.Path = CHART_VALUES
     refused = [r for r in results if not r.ok]
     if refused:
         raise PinError("; ".join(f"{r.reference}: {r.reason[:200]}" for r in refused))
+    if admission:  # the cluster's admission webhook on the same digests (WP-178)
+        blocked = [r for r in admission(list(refs.values())) if not r.ok]
+        if blocked:
+            raise PinError("; ".join(f"{r.reference}: {r.reason[:300]}" for r in blocked))
     new = rewrite(values.read_text(encoding="utf-8"), digest, version)
     yaml.safe_load(new)
     if not dry_run:
@@ -103,9 +109,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("target", help="`latest` or the catalog digest sha256:...")
     parser.add_argument("--version", help="X.Y.Z of the release: also verify the operator and bundle images")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no-admission-preflight", action="store_true",
+                        help="do not ask the cluster's admission webhook about the digests (WP-178)")
     args = parser.parse_args(argv)
     try:
-        refs = pin(args.target, args.version, dry_run=args.dry_run)
+        refs = pin(args.target, args.version, dry_run=args.dry_run,
+                   admission=None if args.no_admission_preflight else admission_preflight.run_or_skip)
     except (PinError, admit.AdmissionError, OSError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
         return 1

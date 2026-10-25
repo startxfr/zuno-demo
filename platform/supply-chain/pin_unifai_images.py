@@ -6,7 +6,9 @@ This resolves the digest of `quay.io/zuno/unifai-<component>:devel-<sha>` for th
 components (skopeo), verifies every one with the same policy the `unifai` role applies
 (`verify_unifai_images.verify_image`: signature, provenance, signed SBOM, identity of the fork's
 publish workflow), and only then rewrites the five lines. One image that does not verify, or a
-tag that does not exist, changes nothing.
+tag that does not exist, changes nothing. Then, when the cluster answers, the same digests go through its admission webhook (a server-side dry-run
+Pod, `admission_preflight.py`, WP-178): a warning or a refusal stops the pin too. `--no-admission-preflight` skips that
+step; an unreachable cluster skips it with a notice.
 
 Run from the repository root:
     python3 platform/supply-chain/pin_unifai_images.py devel-ffb64e335 [--cluster demo333] [--accept-dev] [--dry-run]
@@ -31,6 +33,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import admit_okf_bundle as admit  # noqa: E402
+import admission_preflight  # noqa: E402
 import verify_unifai_images as v  # noqa: E402
 from check_unifai_pins import APPLICATION_IMAGES  # noqa: E402
 
@@ -70,7 +73,8 @@ def rewrite(text: str, pins: Dict[str, str], label: str) -> str:
 
 def pin(tag: str, cluster_file: pathlib.Path, accept_dev: bool, dry_run: bool = False,
         resolver: Callable[[str, str], str] = resolve_digest,
-        verifier: Optional[Callable[[List[str], bool], List[v.Result]]] = None) -> Dict[str, str]:
+        verifier: Optional[Callable[[List[str], bool], List[v.Result]]] = None,
+        admission: Optional[Callable[[List[str]], List[v.Result]]] = None) -> Dict[str, str]:
     if not TAG_RE.match(tag):
         raise PinError(f"{tag}: expected devel-<sha> or vX.Y.Z")
     if tag.startswith("devel-") and not accept_dev:
@@ -80,6 +84,12 @@ def pin(tag: str, cluster_file: pathlib.Path, accept_dev: bool, dry_run: bool = 
     refused = [r for r in results if not r.ok]
     if refused:
         raise PinError("; ".join(f"{r.reference}: {r.reason[:200]}" for r in refused))
+    # What the cluster's admission webhook says about the same digests (WP-178): a digest cosign accepts but the
+    # policy-controller does not (e.g. a signature only in the Ed25519 Rekor v2 log) would be refused in `enforce`.
+    if admission:
+        refused = [r for r in admission(list(pins.values())) if not r.ok]
+        if refused:
+            raise PinError("; ".join(f"{r.reference}: {r.reason[:300]}" for r in refused))
     new = rewrite(cluster_file.read_text(encoding="utf-8"), pins, tag)
     yaml.safe_load(new)
     if not dry_run:
@@ -93,12 +103,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--cluster", default="demo333")
     parser.add_argument("--accept-dev", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--no-admission-preflight", action="store_true",
+                        help="do not ask the cluster's admission webhook about the digests (WP-178)")
     args = parser.parse_args(argv)
     path = REPO_ROOT / "ansible" / "clusters" / f"{args.cluster}.yml"
     if not path.is_file():
         parser.error(f"{path} does not exist")
     try:
-        pins = pin(args.tag, path, args.accept_dev, args.dry_run)
+        pins = pin(args.tag, path, args.accept_dev, args.dry_run,
+                   admission=None if args.no_admission_preflight else admission_preflight.run_or_skip)
     except (PinError, admit.AdmissionError, OSError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}, indent=2))
         return 1
