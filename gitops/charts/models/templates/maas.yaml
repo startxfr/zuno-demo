@@ -67,6 +67,34 @@ spec:
   gatewayRef:
     name: maas-default-gateway
     namespace: openshift-ingress
+{{- if .Values.maas.externalOIDC.subscriptionNamespaceTenant }}
+---
+# 2026-10-25 test (user decision): MaaS persona tokens. The live maas-gateway-auth
+# AuthPolicy accepts only API keys and ServiceAccount tokens, so a persona's
+# Keycloak JWT gets 401 and the persona-group MaaSSubscriptions are unreachable
+# (WP-164 lot 1 verification). On RHOAI 3.5 GA the Tenant CRD carries
+# spec.externalOIDC, but the Tenant above lives in zuno-ai-run, which
+# maas-controller never reconciles (empty status): it only reads
+# MAAS_SUBSCRIPTION_NAMESPACE. This second Tenant, in that namespace, tests
+# whether externalOIDC there adds a Keycloak method to maas-gateway-auth. If the
+# AuthPolicy does not change, switch it off (maas.externalOIDC.subscriptionNamespaceTenant).
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: Tenant
+metadata:
+  name: default-tenant
+  namespace: {{ .Values.maas.externalOIDC.subscriptionNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  gatewayRef:
+    name: maas-default-gateway
+    namespace: openshift-ingress
+  externalOIDC:
+    issuerUrl: https://keycloak.{{ .Values.clusterBaseDomain }}/realms/zuno
+    clientId: {{ .Values.maas.externalOIDC.clientId }}
+{{- end }}
 {{- if and .Values.maas.externalOIDC.enabled (.Capabilities.APIVersions.Has "components.platform.opendatahub.io/v1alpha1/ModelsAsService") }}
 ---
 # ADR-0517 live finding (demo333, 2026-09-07): a FRESH RHOAI 3.5.0 GA

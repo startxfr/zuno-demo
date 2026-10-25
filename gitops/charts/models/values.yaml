@@ -980,6 +980,10 @@ maas:
   externalOIDC:
     enabled: true
     clientId: zuno-admin-api
+    # 2026-10-25 test: a Tenant with externalOIDC in the namespace
+    # maas-controller reconciles (templates/maas.yaml). Off = not rendered.
+    subscriptionNamespaceTenant: true
+    subscriptionNamespace: models-as-a-service
 
   # WP-157 decision D5 (ADR-0570 amendment of 2026-10-24, Security
   # considerations): the fix of the inventory's finding 6. The two SaaS
