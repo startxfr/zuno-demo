@@ -65,3 +65,45 @@ plain "Say hello in one word." (HTTP 500, `[LLM Backend] An error occurred durin
 Reverted in a73123cd (value empty again); Lightspeed answers again. The classifier limit is therefore still open: tool-using questions fail with the safety-inspection message until
 another route is chosen (a non-reasoning model for Lightspeed, reasoning off on the vLLM route, disabling the inspection, or a Lightspeed fix). Lesson: validate the real
 end-to-end path (a full query), not only the component that failed.
+
+## Second round (2026-10-25 evening): server-side default effort on gpt-oss-20b, and the comparison with qwen3.5-9b
+
+### What was changed on the gpt-oss-20b pod (mounted patch of vLLM code)
+
+- **Why:** vLLM reads the Harmony reasoning effort only from the request field `reasoning_effort`; `--default-chat-template-kwargs` does not reach the Harmony path, and
+  Lightspeed's `reasoningConfig` breaks its main chat (see above). The classifier of Lightspeed (128 tokens, no request field) therefore always ran at the default
+  effort and ran out of tokens.
+- **What:** a copy of the image's `vllm/entrypoints/openai/parser/harmony_utils.py` (vLLM 0.24.0+rhaiv.9, original sha256 `fa52ad6ac8b35371...`) with one added block in
+  `get_system_message`: when the request carries no effort, use the env `ZUNO_DEFAULT_REASONING_EFFORT`. A request that sends `reasoning_effort` keeps it.
+  Tested in a CPU-only pod: unset -> `Low`, `high` -> `High`.
+- **Where:** models chart (`gitops/charts/models`): value `gptOssModel.defaultReasoningEffort: low`, file `files/gptoss-harmony_utils.py`, ConfigMap
+  `gpt-oss-20b-harmony-patch` (`templates/configmap-gptoss-harmony-patch.yaml`), env and a `subPath` volumeMount in `templates/llminferenceservice-gptoss.yaml`.
+  Commit `98becb8b` on devel, rolled by 08 on 2026-10-25 (the old ReplicaSet scaled to 0 because of the `zuno-ai-run-gpu-cap` quota).
+- **Approved by:** the user, in the session that wrote it, after the chart change was rendered and the CPU test shown (2026-10-25).
+- **Effect on others:** every request to gpt-oss-20b that sends no `reasoning_effort` (ai-gateway, the agents, the stresstests) now reasons at `low` instead of vLLM's
+  default. Requests that send an effort are unchanged.
+- **Rollback:** set `gptOssModel.defaultReasoningEffort` to empty (the env, mount, volume and ConfigMap disappear on the next sync; a pod restart follows).
+- **Maintenance risk:** the file is tied to this vLLM build. When the vLLM image digest changes, re-derive the patch from the new file (the diff is 6 lines) or drop
+  it; a mismatching copy could break the server at start. Nothing checks this automatically yet.
+
+### Comparison through the Lightspeed code path (in the Lightspeed pod, OLSConfig unchanged; gpt-oss = default low, qwen3.5-9b = thinking off, 32768)
+
+| Question | gpt-oss-20b | qwen3.5-9b |
+|---|---|---|
+| What is a pod (docs tool) | pass | pass (no tool) |
+| Pods in openshift-lightspeed (OpenShift MCP) | pass | pass |
+| Cluster-wide proxy | **fail** | pass |
+| Cluster minor update | pass | pass |
+| NetworkPolicy ingress rule | **fail** | pass |
+| Install the GitOps operator | **fail** | pass |
+| What is a namespace | pass | pass |
+| OIDC identity provider | pass | pass |
+| Secure route | pass | pass |
+| Persistent storage | pass | pass |
+| **Total** | **7 / 10** | **10 / 10** |
+| Classifier outcome | the 3 failures are `injectionDetected: false` with category `unknown` (Lightspeed requires `none`; temperature 0, so the 3 retries are identical) | always `none` (1 to 3 calls per question) |
+| Tokens per question (MaaS counter, classifier included) | 6k to 23k | 8k to 55k |
+| Time per question (includes about 15 s of script start) | 50 to 65 s | 70 to 120 s |
+| Confluence (zuno-mcp, Keycloak persona token) | works: first call with the wrong argument name (`search_query`), the tool error passes the classifier, it retries with `query` and answers | **fails**: keeps the wrong argument name, the tool error text is classified `injectionDetected: false` with a non-`none` category, Lightspeed aborts |
+
+Limits met while testing: the Lightspeed subscription is 200,000 tokens per hour per model, which allows only about 6 to 10 docs questions per hour (classifier included).
