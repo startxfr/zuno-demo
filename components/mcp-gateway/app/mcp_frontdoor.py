@@ -149,6 +149,41 @@ def _tool_ok(payload: Any) -> Dict[str, Any]:
     return result
 
 
+# Models often name the search argument differently from the tool's own schema. Only the NAME of the
+# argument is rewritten, and only for search capabilities; which tools the caller may use, the values it
+# sends and the downstream authorization are untouched.
+_QUERY_ALIASES = ("search_query", "q", "text", "query_text", "search_term", "keywords")
+_MAX_ERROR_CHARS = 200
+
+
+def _is_search(names: Any) -> bool:
+    return any(str(n).rsplit(".", 1)[-1] == "search" or str(n).startswith("search_") for n in names)
+
+
+def normalise_arguments(names: Any, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Map a common alias of the search argument (`search_query`, `q`, `text`...) to `query`.
+
+    Applies only to search tools, only when `query` is absent or empty, and uses the first alias that
+    carries a value; the alias keys are dropped so the downstream schema sees a canonical call.
+    """
+    if not _is_search(names) or str(arguments.get("query", "")).strip():
+        return arguments
+    for alias in _QUERY_ALIASES:
+        value = arguments.get(alias)
+        if isinstance(value, str) and value.strip():
+            fixed = {k: v for k, v in arguments.items() if k not in _QUERY_ALIASES}
+            fixed["query"] = value
+            return fixed
+    return arguments
+
+
+def _short_error(exc: Exception) -> str:
+    """One short, neutral line for a tool failure: no stack, no validator dump, no documentation URL."""
+    lines = [ln.strip() for ln in str(exc).splitlines() if ln.strip() and "errors.pydantic.dev" not in ln]
+    text = lines[0] if lines else "the tool call failed"
+    return text if len(text) <= _MAX_ERROR_CHARS else text[: _MAX_ERROR_CHARS - 1] + "\u2026"
+
+
 def _input_schema(binding: Any) -> Dict[str, Any]:
     """Advertise an open object schema.
 
@@ -335,6 +370,10 @@ async def dispatch(
                 ),
             )
 
+        binding_for_names = binding_registry.resolve(name)
+        arguments = normalise_arguments(
+            binding_for_names.all_names() if binding_for_names else [name], arguments
+        )
         try:
             payload = await invoke_tool(tool_name=name, arguments=arguments)
         except PermissionError as exc:
@@ -346,7 +385,7 @@ async def dispatch(
             return _result(request_id, _tool_error(f"unknown tool: {exc}"))
         except Exception as exc:  # noqa: BLE001 - surfaced to the client as a tool error
             logger.warning("mcp frontdoor: tool '%s' failed: %s", name, exc)
-            return _result(request_id, _tool_error(str(exc)))
+            return _result(request_id, _tool_error(_short_error(exc)))
         return _result(request_id, _tool_ok(payload))
 
     raise JsonRpcError(METHOD_NOT_FOUND, f"unknown method '{method}'")
