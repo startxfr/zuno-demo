@@ -510,7 +510,11 @@ _TEKOS_RAG_WEB_QUESTION = (
 _UNIFAI_RAG_WEB_QUESTION = os.getenv(
     "UNIFAI_RAG_WEB_QUESTION", _TEKOS_RAG_WEB_QUESTION if AGENT == "tekos" else ""
 )
-_UNIFAI_RAG_WEB_EXPECT = os.getenv("UNIFAI_RAG_WEB_EXPECT", "docs.redhat.com")
+# The OpenShift documentation path, not just the host: the former demo web_search returned a fixed
+# docs.redhat.com page for any query, so the bare host could be matched without retrieval (2026-10-25).
+_UNIFAI_RAG_WEB_EXPECT = os.getenv(
+    "UNIFAI_RAG_WEB_EXPECT", "docs.redhat.com/en/documentation/openshift_container_platform"
+)
 # A member of the agent's knowledge groups (override with UNIFAI_RAG_PERSONA).
 _UNIFAI_RAG_PERSONAS = {
     "tekos": "consultant-01", "arkos": "consultant-01", "comage": "sale-01", "advantage": "adv-01", "finage": "finance-01",
@@ -540,6 +544,9 @@ def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
         try:
             web = _unifai().collect(persona, _UNIFAI_RAG_WEB_QUESTION, deadline_seconds=170)
             cites_docs = _UNIFAI_RAG_WEB_EXPECT in web["reply"]
+            # A run cut by the deadline has an empty reply: say so, it is not "no citation".
+            if web.get("timed_out"):
+                detail += " web_timed_out=True"
         except Exception as exc:  # noqa: BLE001
             cites_docs = False
             detail += f" web_error={exc}"

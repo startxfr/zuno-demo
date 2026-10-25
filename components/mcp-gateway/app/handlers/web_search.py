@@ -1,17 +1,33 @@
-"""Demo-mode handler for the ``web_search`` MCP tool.
+"""Handler for the ``web_search`` MCP tool while no web search provider is configured.
 
-To make this call a real web search: replace the body below with a call to
-an approved web search API (e.g. Bing Web Search or a similar provider)
-using a key sourced from ``secret/zuno/providers/web-search`` (not yet
-provisioned). Per MEMORY.md section 7, external web searches must never
-leak internal context in the outbound query -- keep that constraint when
-wiring the real API (only forward the user-visible query terms, never
-retrieved internal document content).
+No web search API is provisioned on this platform (a key would live at
+``secret/zuno/providers/web-search``). The handler used to return two fixed
+"demo" results whatever the query (OpenShift AI 3.5 release notes, NVIDIA
+GPU Operator). Agents took them for real search results: on a question
+they did not match, Tekos re-queried about thirty times in three minutes and
+could cite a page it never read (tekos stresstest scenario #11, 2026-10-25).
+
+It now answers honestly: no results, and a message the model reads, telling
+it to answer from the documents its retriever already returned. The call
+still succeeds (HTTP 200): an error would surface as a 502 the agent
+framework may retry.
+
+To make this a real web search: call an approved web search API with the
+key above. Per MEMORY.md section 7, external web searches must never leak
+internal context in the outbound query -- only forward the user-visible
+query terms, never retrieved internal document content.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+
+UNAVAILABLE_MESSAGE = (
+    "No web search provider is configured on this platform, so no web results exist. "
+    "Do not call this tool again for this question: answer from the documents already "
+    "retrieved (internal documentation and the indexed Red Hat documentation), and cite "
+    "their URLs."
+)
 
 
 async def handle(
@@ -26,18 +42,8 @@ async def handle(
     # always None here and intentionally unused.
     query = str(arguments.get("query", "")).strip()
     return {
-        "demo_mode": True,
+        "available": False,
         "query": query,
-        "results": [
-            {
-                "title": "OpenShift AI 3.5 Release Notes",
-                "url": "https://docs.redhat.com/en/documentation/red_hat_openshift_ai/3.5",
-                "snippet": "Official Red Hat documentation covering OpenShift AI 3.5 EA2 capabilities, including KServe and DataScienceCluster components.",
-            },
-            {
-                "title": "NVIDIA GPU Operator on OpenShift",
-                "url": "https://docs.nvidia.com/datacenter/cloud-native/openshift/latest/",
-                "snippet": "Installation and ClusterPolicy configuration guidance for the NVIDIA GPU Operator on Red Hat OpenShift.",
-            },
-        ],
+        "results": [],
+        "message": UNAVAILABLE_MESSAGE,
     }
