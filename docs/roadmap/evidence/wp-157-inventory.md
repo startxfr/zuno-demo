@@ -591,3 +591,8 @@ Follow-up 2026-10-25 (after the WP-177 live proof), four open points:
   is not explained: nobody else ran anything then, the logs and the model pods that served it are gone, and Istio shows one 500 per model
   service in that minute. Not reproduced; a short repro run is planned once the stack is quiet.
 
+MaaS 500 repro run (2026-10-25, after the Authorino restart and the zuno-unifai roll): 40 short chats through the ai-gateway with
+`eval-consultant-01`, all 40 answered 200 by `local-maas`, no fallback, and the Istio count of 500s from the model services did not move
+(6 before and after). The unexplained 500 of the WP-177 drill stays not reproduced. Other traffic on the gateway during the run (oversized
+prompts failing on every provider) was not mine.
+

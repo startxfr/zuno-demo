@@ -226,3 +226,10 @@ sales corpus is indexed (switch the type back to `rag_retrieval_has_citation`).
 Seen on the way: `unifai_forwards_identity_to_the_gateways` missed twice in four comage runs (`tool_calls=[]`, a reply of 82 to 137
 characters: the model answers without calling the tool), and the newer gate check
 `tekos_retriever_finds_red_hat_docs_for_a_basic_openshift_question` needs `UNIFAI_RAG_URL` outside the cluster.
+
+Comage identity check after the change (a5b69d9d: the prompt names `salesforce.opportunity.read`, at most two turns, a pass on a later turn is
+reported as `attempt=2/2`). Live on demo333 after the zuno-unifai roll to `devel-8498fe02b` (operator 0.1.38; the comage and arkos bundles show
+Error "signature manifest has 35 layers", their workflows stay Ready): four runs of `unifai_forwards_identity_to_the_gateways`, all
+`PASS attempt=1/2: tool_calls=['salesforce.opportunity.read']`; the full comage security suite 8/8. Before the change it missed 2 of 4 runs.
+Four runs is a small sample; the retry is the safety net, and two turns without the call would still fail.
+
