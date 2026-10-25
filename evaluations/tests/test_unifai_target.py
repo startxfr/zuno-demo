@@ -210,6 +210,63 @@ def test_skip_is_never_a_pass():
     assert r.skipped and not r.passed and "because" in r.detail
 
 
+def _identity_check(turns, attempts):
+    """identity_forwarded over a fake target that answers `turns` in order."""
+    import unifai_checks
+    from dataclasses import dataclass
+
+    @dataclass
+    class CheckResult:
+        name: str
+        passed: bool
+        detail: str = ""
+        skipped: bool = False
+
+    calls = []
+
+    class Target:
+        def collect(self, persona, prompt, deadline_seconds, stop_on):
+            calls.append(prompt)
+            return turns[len(calls) - 1]
+
+    check = unifai_checks.identity_forwarded(
+        CheckResult, lambda: Target(), "p", "ask", ("salesforce.opportunity.read",), attempts=attempts
+    )
+    return check(), calls
+
+
+def _turn(tools, reply="some reply", stopped=False):
+    return {"tools": tools, "reply": reply, "stopped": stopped}
+
+
+def test_identity_check_passes_on_the_first_turn_that_calls_the_tool():
+    r, calls = _identity_check([_turn(["salesforce.opportunity.read"])], attempts=2)
+    assert r.passed and len(calls) == 1 and r.detail.startswith("attempt=1/2")
+
+
+def test_identity_check_retries_once_and_reports_the_attempt():
+    r, calls = _identity_check([_turn([]), _turn(["salesforce.opportunity.read"])], attempts=2)
+    assert r.passed and len(calls) == 2
+    assert r.detail.startswith("attempt=2/2") and "tool_calls=[]" in r.detail
+
+
+def test_identity_check_fails_when_no_turn_calls_the_tool():
+    r, calls = _identity_check([_turn([]), _turn(["other.tool"])], attempts=2)
+    assert not r.passed and len(calls) == 2 and r.detail.startswith("attempt=2/2")
+
+
+def test_identity_check_single_attempt_keeps_its_old_detail():
+    r, calls = _identity_check([_turn([])], attempts=1)
+    assert not r.passed and len(calls) == 1 and r.detail == "tool_calls=[] reply_len=10"
+
+
+def test_identity_check_needs_a_reply_or_a_stop_with_the_tool():
+    r, _ = _identity_check([_turn(["salesforce.opportunity.read"], reply="")], attempts=1)
+    assert not r.passed
+    r, _ = _identity_check([_turn(["salesforce.opportunity.read"], reply="", stopped=True)], attempts=1)
+    assert r.passed
+
+
 AGENTS = ["tekos", "comage", "arkos", "advantage", "finage", "naveo"]
 PLACEHOLDERS = {"advantage", "finage", "naveo"}
 

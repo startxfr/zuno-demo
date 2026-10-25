@@ -234,8 +234,13 @@ def direct_call_to_salesforce_mcp_denied_without_gateway_token() -> CheckResult:
 # ADR-0032/0033/0040 proven through UnifAI's session API, built from the shared factories in
 # evaluations/common/unifai_checks.py. The checks above reach shared services (MCP gateway,
 # ai-gateway, MCP servers) directly.
+# The model sometimes answers a plain "status of the deal" question without calling a tool (2 misses in 4 runs),
+# which proves nothing about the token. Name the tool, as the tekos check does, and allow one retry; two turns
+# without the call still fail.
 unifai_forwards_identity_to_the_gateways = unifai_checks.identity_forwarded(
-    CheckResult, _unifai, "sale-01", "What's the status of the Acme Renewal deal?", ("salesforce.opportunity.read",)
+    CheckResult, _unifai, "sale-01",
+    "Use the salesforce.opportunity.read tool to look up the Acme Renewal opportunity and tell me its status.",
+    ("salesforce.opportunity.read",), attempts=2,
 )
 unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
 business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(

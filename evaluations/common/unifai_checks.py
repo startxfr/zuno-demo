@@ -34,17 +34,35 @@ def _reaches(tools: Sequence[str], expect: Sequence[str]) -> bool:
 
 
 def identity_forwarded(
-    CheckResult: Any, unifai: Callable, persona: str, prompt: str, expect_tools: Sequence[str], timeout: float = 150
+    CheckResult: Any,
+    unifai: Callable,
+    persona: str,
+    prompt: str,
+    expect_tools: Sequence[str],
+    timeout: float = 150,
+    attempts: int = 1,
 ) -> Callable[[], Any]:
     """ADR-0032 on UnifAI: the signed-in person's own token must reach the tool gateway. The MCP
     gateway only serves a validated Keycloak JWT, so a tool call that returns a reply is direct
-    evidence the token travelled UnifAI -> mcp-gateway."""
+    evidence the token travelled UnifAI -> mcp-gateway.
+
+    The agent decides whether to call a tool, so a model that answers from its own knowledge
+    proves nothing either way. `attempts` (default 1) allows that many turns; the check passes on
+    the first turn that reaches an expected tool and FAILS when none does, and the detail line
+    names every turn so a pass on a later attempt is never hidden."""
     name = "unifai_forwards_identity_to_the_gateways"
 
     def check() -> Any:
-        run_ = unifai().collect(persona, prompt, deadline_seconds=timeout, stop_on=tuple(expect_tools))
-        ok = _reaches(run_["tools"], expect_tools) and (bool(run_["reply"]) or run_["stopped"])
-        return CheckResult(name, ok, f"tool_calls={run_['tools']} reply_len={len(run_['reply'])}")
+        seen = []
+        for attempt in range(1, max(1, attempts) + 1):
+            run_ = unifai().collect(persona, prompt, deadline_seconds=timeout, stop_on=tuple(expect_tools))
+            ok = _reaches(run_["tools"], expect_tools) and (bool(run_["reply"]) or run_["stopped"])
+            seen.append(f"tool_calls={run_['tools']} reply_len={len(run_['reply'])}")
+            if ok:
+                break
+        if attempts <= 1:
+            return CheckResult(name, ok, seen[0])
+        return CheckResult(name, ok, f"attempt={len(seen)}/{attempts}: " + " | ".join(seen))
 
     check.__name__ = name
     return check
