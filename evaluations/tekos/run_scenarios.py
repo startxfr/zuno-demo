@@ -510,10 +510,11 @@ _TEKOS_RAG_WEB_QUESTION = (
 _UNIFAI_RAG_WEB_QUESTION = os.getenv(
     "UNIFAI_RAG_WEB_QUESTION", _TEKOS_RAG_WEB_QUESTION if AGENT == "tekos" else ""
 )
-# The OpenShift documentation path, not just the host: the former demo web_search returned a fixed
-# docs.redhat.com page for any query, so the bare host could be matched without retrieval (2026-10-25).
+# Comma-separated substrings the reply must ALL contain: the host and the OpenShift documentation path.
+# The bare host is not enough: the former demo web_search returned a fixed docs.redhat.com page for any
+# query (2026-10-25). The corpus holds both /documentation/... and /en/documentation/... URL forms.
 _UNIFAI_RAG_WEB_EXPECT = os.getenv(
-    "UNIFAI_RAG_WEB_EXPECT", "docs.redhat.com/en/documentation/openshift_container_platform"
+    "UNIFAI_RAG_WEB_EXPECT", "docs.redhat.com,/documentation/openshift_container_platform/"
 )
 # A member of the agent's knowledge groups (override with UNIFAI_RAG_PERSONA).
 _UNIFAI_RAG_PERSONAS = {
@@ -543,7 +544,7 @@ def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
         # Second leg: the same retriever over the Red Hat documentation. The answer must cite it.
         try:
             web = _unifai().collect(persona, _UNIFAI_RAG_WEB_QUESTION, deadline_seconds=170)
-            cites_docs = _UNIFAI_RAG_WEB_EXPECT in web["reply"]
+            cites_docs = all(part in web["reply"] for part in _UNIFAI_RAG_WEB_EXPECT.split(",") if part)
             # A run cut by the deadline has an empty reply: say so, it is not "no citation".
             if web.get("timed_out"):
                 detail += " web_timed_out=True"

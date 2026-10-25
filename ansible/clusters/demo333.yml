@@ -137,7 +137,10 @@ zuno_unifai_values:
       - WEB
       source_type: CONFLUENCE
       threshold: 0.3
-      top_k_results: 5
+      # 10, not 5 (2026-10-25): the Red Hat corpus repeats each page across
+      # OCP 4.21/4.22 and two URL forms, so 5 slots held 2-3 distinct
+      # passages and missed definitional ones (tekos scenario #11).
+      top_k_results: 10
     name: knowledge-tekos
     teamRef: agent-tekos
   - config:
