@@ -319,7 +319,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Partially implemented | Move TrustyAI guardrails into the ai-gateway |
 | [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) | Partially implemented | Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings |
 | [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Partially implemented | Close UnifAI parity gaps generically |
-| [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Accepted | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
+| [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Partially implemented | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
 | [ADR-0571](0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md) | Implemented | Evaluate the RHOAI MCP gateway before extending mcp-gateway |
 | [ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md) | Accepted | Scope the zuno operator to the platform foundation |
 | [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Partially implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |

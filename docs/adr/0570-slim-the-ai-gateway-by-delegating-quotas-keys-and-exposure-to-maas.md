@@ -1,6 +1,6 @@
 # ADR-0570: Slim the ai-gateway by delegating quotas, keys and exposure to MaaS
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -282,3 +282,25 @@ Suggested upstream action (not filed; the user decides): open an issue on the Ku
 a two-pair ceiling, a fix (or a documented ceiling), a warning naming the skipped limit instead of
 `invalid context_id`, and documentation that the limit name sets the evaluation order. When it is fixed, re-run
 the order check described in [WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md).
+
+## Amendment (2026-10-25) - closure state
+
+The status moves from Accepted to Partially implemented, by user decision of 2026-10-25 (honest, partial closure).
+
+**Delivered and verified on demo333** ([WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md)): local models
+reached through MaaS under the ai-gateway ServiceAccount with attested `X-Zuno-*` headers (clause 1 for local models,
+clause 5 for the exposure of local models); the maas-controller's per-subscription budgets; the MaaS 429 passed to the caller
+with a `Retry-After` computed from the subscription window; closed quota classes refused when MaaS has no path.
+
+**Not delivered:**
+
+- Clause 2 for the user, group, cross-model, `evaluation`, `intensive` and `stresstest` ceilings: the generated gateway
+  `TokenRateLimitPolicy` is Accepted and Enforced but the Kuadrant wasm shim counts only the first two limits by sorted name
+  (see the amendment above), so these ceilings stay in the ai-gateway. The user accepted this on 2026-10-25.
+- Clause 3, the removal of `app/quota.py`, `quota_budgets.yaml` and the ledger calls: gated on proven equivalence, so it waits
+  for the Kuadrant fix.
+- Clauses 1 and 4 for SaaS providers: named exception (direct, with their keys) while the vendor route defect is open.
+- Checks never run: V2, V3, V5, V6, V11.
+
+The remaining work and its order are in [WP-177](../roadmap/work-packages/wp-177-finish-the-maas-quota-delegation.md). The
+decision moves to Implemented when WP-177 closes, or is amended again if the user drops the removal of `quota.py`.

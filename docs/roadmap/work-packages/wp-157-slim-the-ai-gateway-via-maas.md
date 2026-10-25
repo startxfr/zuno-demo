@@ -350,32 +350,16 @@ demo333, each line verified by a second session.
 the per-user and cross-model guard (ADR-0511 and ADR-0570 amendments of
 2026-10-24); the SaaS keys, ExternalSecrets and direct branches.
 
-## Follow-up: per-user and cross-model ceiling at MaaS
+## Follow-up: moved to WP-177
 
-Open, not scheduled. Goal: enforce the per-user ceiling and a cross-model
-total outside the gateway, so `app/quota.py` and its budgets can go.
+The per-user, group and cross-model ceilings at MaaS, the removal of `app/quota.py`, the SaaS providers through MaaS and the
+checks never run (V2, V3, V5, V6, V11) are tracked in
+[WP-177](wp-177-finish-the-maas-quota-delegation.md), blocked on a Kuadrant fix. User decision of 2026-10-25: the missing per-user
+ceiling is accepted until then, and ADR-0570 moves to Partially implemented. The upstream report is drafted in
+[kuadrant-token-limits-upstream-report.md](../evidence/kuadrant-token-limits-upstream-report.md) and not filed.
 
-- Report the wasm shim defect upstream (Kuadrant): only the first two
-  token limits of a route, by sorted limit name, are counted (confirmed
-  2026-10-25 on a throwaway route: four limits, `l1`/`l2` counted, `l3`/`l4`
-  never; renaming `l1` to `z1` moves the counted pair). The report is drafted
-  in [kuadrant-token-limits-upstream-report.md](../evidence/kuadrant-token-limits-upstream-report.md)
-  and **not filed**; filing it is the user's decision. User decision
-  2026-10-25: the per-user ceiling is accepted as not enforced at MaaS until
-  Kuadrant fixes it (see the ADR-0570 amendment of the same date); nothing
-  else changes on the Zuno side.
-- Once fixed, re-run the order check (both gateway limits and every
-  per-subscription limit counting), then V8 for a cross-model total
-  (a policy whose counter spans routes, or another design).
-- Platform context: since 2f981d17 the gateway honours the quota class
-  and project id headers only from Keycloak clients listed in
-  `trustedPlatformClients` (none on demo333). `platform/testing`'s
-  stresstest and quota-429 runners cannot select a class until their client
-  is declared there, and the project dimension stays unused until a
-  server-resolved project id from a verified grant exists (ADR-0528).
-- Only then, on proven equivalence: remove `app/quota.py`,
-  `quota_budgets.yaml`, `tests/test_quota_budgets.py`, the ledger calls and
-  `_render_budgets`.
+**Closure state:** WP-157 is Done on the scope above. At MaaS only the per-subscription budgets are enforced; every other token
+ceiling is enforced by the ai-gateway's `app/quota.py`.
 
 ## Acceptance
 

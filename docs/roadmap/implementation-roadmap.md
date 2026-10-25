@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 19 | 21 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-175, WP-176 |
+| v0.11 | 24 | 19 | 22 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-175, WP-176, WP-177 |
 | v0.12 | 9 | 5 | 9 | WP-161, WP-164, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -917,7 +917,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-154 | [wp-154](work-packages/wp-154-tekos-pilot-on-demo333.md) | 0573, 0561 | WP-146 - WP-153 | Done (2026-10-24) | tekos gates 18/18, 12/12, 4/4 on UnifAI as eval-* personas |
 | WP-155 | [wp-155](work-packages/wp-155-migrate-remaining-agents-and-cut-demo222-over.md) | 0573, 0561 | WP-154 | Done | demo333 is powered off - live steps wait for the user to power it on |
 | WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Done | phase 2 landed 2026-10-23 (agent stack uninstalled and removed, frontend Keycloak clients and agent PGO databases dropped, ADR-0042/0214/0411 superseded); step-6 chain green on demo333 2026-10-24; rag-service and rag-ingestion stay for WP-168 |
-| WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Done (2026-10-24) | local models, group ceiling per model and per-subscription budgets enforced at MaaS; SaaS stay direct (vendor route defect); quota.py kept for the per-user and cross-model ceilings (follow-up in the brief) |
+| WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Done (2026-10-24) | local models through MaaS with the per-subscription budgets, the 429 pass-through and closed-class refusal; the user, group and cross-model ceilings stay in the ai-gateway's quota.py (Kuadrant counts two limits per route); follow-up in WP-177 |
 | WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Repo work in review | split out of WP-156 by user decision 2026-10-23 |
 | WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Repo work merged | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |
 
@@ -960,6 +960,7 @@ frozen mirror.
 | WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Repo work in review | zuno-side A2A gateway (components/a2a-gateway) and two test blueprints per business persona; the fork's identity forwarding on the A2A node is pushed; the demo333 roll-out waits for the user's go |
 | WP-176 | [wp-176](work-packages/wp-176-verify-the-unifai-runtime-images-before-deploying-them.md) | 0586, 0353, 0574 | none | Repo work merged | fork workflow branch for review, the `quay-devel` GitHub environment (user), first signed build, operator digest support (a9), then flip verification on in `demo333.yml` |
+| WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Not started | token ceilings at MaaS for user, group and cross-model, then removal of quota.py; blocked outside the repo, waits for a Kuadrant fix (upstream report drafted, not filed) |
 
 ### OKF stream phases
 
