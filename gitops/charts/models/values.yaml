@@ -989,7 +989,8 @@ maas:
   # only the service-identity subscriptions below.
   agentSubscriptions: {}
   # Platform policy, not agent-derived: the tier every generated
-  # subscription gets (the former /agent_tekos tier).
+  # subscription gets (the former /agent_tekos tier). The /sales business-
+  # role subscriptions stay hand-written on each local model (WP-164).
   agentSubscriptionTier:
     tokenRateLimits:
       - limit: 100000
@@ -1038,10 +1039,21 @@ maas:
       # below stays disabled too rather than re-testing the same dead end.
       endpointOverride: ""
 
-      # Service identities only. The persona groups (formerly /agent_tekos
-      # and /sales, hand-written) come from the agents release: the
-      # template adds `gpt-oss-20b-agents` from agentSubscriptions above.
+      # The agent persona groups (formerly a hand-written /agent_tekos entry)
+      # come from the agents release: the template adds `gpt-oss-20b-agents`
+      # from agentSubscriptions above. /sales and the service identities
+      # stay hand-written here.
       subscriptions:
+        # Platform policy, not agent-derived (kept on purpose by WP-164): the
+        # /sales business-role tier, a materially lower limit than the
+        # generated gpt-oss-20b-agents subscription, so the two-tier access
+        # difference of ADR-0201/WP-27 stays demonstrable.
+        - name: gpt-oss-20b-sales
+          group: /sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
         # ADR-0521 (WP-076) step 3: ai-gateway's own identity, not a
         # persona. `user:` (MaaSSubscription.spec.owner.users /
         # MaaSAuthPolicy.spec.subjects.users - both schema-valid without a
@@ -1087,12 +1099,22 @@ maas:
 
     # ADR-0521 (WP-076): qwen3.6-27b-instruct, generalizing the gpt-oss-20b
     # pattern above to the primary/default local chat model. Same service
-    # identities and rate limits as gpt-oss-20b (WP-076); its persona
-    # groups are generated (agentSubscriptions, WP-164).
+    # identities, /sales tier and rate limits as gpt-oss-20b (WP-076); its
+    # agent groups are generated (agentSubscriptions, WP-164).
     - publishedName: qwen36-27b-instruct
       backendInferenceServiceName: qwen36-27b-instruct
       endpointOverride: ""
       subscriptions:
+        # Platform policy, not agent-derived (kept on purpose by WP-164): the
+        # /sales business-role tier, a materially lower limit than the
+        # generated qwen36-27b-instruct-agents subscription, so the two-tier access
+        # difference of ADR-0201/WP-27 stays demonstrable.
+        - name: qwen36-27b-instruct-sales
+          group: /sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
         # ADR-0521 (WP-076) step 3: same ai-gateway-own-identity entry as
         # gptOssModel's own - see that one's comment for the full
         # user-vs-group scoping/rate-limit rationale.
@@ -1133,8 +1155,8 @@ maas:
     # set every published model here gets - a MaaSModelRef, its
     # MaaSSubscriptions and a MaaSAuthPolicy, all rendered by
     # templates/maas.yaml's range over this list. Same service identities
-    # and rate limits as the two models above; persona groups generated
-    # (agentSubscriptions, WP-164).
+    # /sales tier and rate limits as the two models above; agent groups
+    # generated (agentSubscriptions, WP-164).
     - publishedName: qwen35-9b-wesh
       backendInferenceServiceName: qwen35-9b-wesh
       # Structurally useless for the identity path - see gpt-oss-20b's own
@@ -1142,6 +1164,16 @@ maas:
       # for consistency, not re-tested.
       endpointOverride: ""
       subscriptions:
+        # Platform policy, not agent-derived (kept on purpose by WP-164): the
+        # /sales business-role tier, a materially lower limit than the
+        # generated qwen35-9b-wesh-agents subscription, so the two-tier access
+        # difference of ADR-0201/WP-27 stays demonstrable.
+        - name: qwen35-9b-wesh-sales
+          group: /sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
         # ADR-0521 (WP-076) step 3: ai-gateway's OWN ServiceAccount
         # identity, not a persona. This grant is what the `via_maas: true`
         # provider entry in platform/ai-gateway/provider-routing.yaml
@@ -1161,8 +1193,8 @@ maas:
     # set every published model here gets - a MaaSModelRef, its
     # MaaSSubscriptions and a MaaSAuthPolicy, all rendered by
     # templates/maas.yaml's range over this list. Same service identities
-    # and rate limits as the two models above; persona groups generated
-    # (agentSubscriptions, WP-164).
+    # /sales tier and rate limits as the two models above; agent groups
+    # generated (agentSubscriptions, WP-164).
     - publishedName: qwen35-9b
       backendInferenceServiceName: qwen35-9b
       # Structurally useless for the identity path - see gpt-oss-20b's own
@@ -1170,6 +1202,16 @@ maas:
       # for consistency, not re-tested.
       endpointOverride: ""
       subscriptions:
+        # Platform policy, not agent-derived (kept on purpose by WP-164): the
+        # /sales business-role tier, a materially lower limit than the
+        # generated qwen35-9b-agents subscription, so the two-tier access
+        # difference of ADR-0201/WP-27 stays demonstrable.
+        - name: qwen35-9b-sales
+          group: /sales
+          tokenRateLimits:
+            - limit: 5000
+              window: 1h
+          priority: 1
         # ADR-0521 (WP-076) step 3: ai-gateway's OWN ServiceAccount
         # identity, not a persona. This grant is what the `via_maas: true`
         # provider entry in platform/ai-gateway/provider-routing.yaml
