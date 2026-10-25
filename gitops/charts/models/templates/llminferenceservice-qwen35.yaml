@@ -164,6 +164,10 @@ spec:
           - --max-model-len={{ .Values.qwen35Model.maxModelLen }}
           - --gpu-memory-utilization={{ .Values.qwen35Model.gpuMemoryUtilization }}
           - --max-num-seqs={{ .Values.qwen35Model.maxNumSeqs }}
+          {{- with .Values.qwen35Model.defaultChatTemplateKwargs }}
+          - --default-chat-template-kwargs
+          - {{ toJson . | quote }}
+          {{- end }}
           - --enforce-eager
           - --enable-auto-tool-choice
           - --tool-call-parser=qwen3_xml

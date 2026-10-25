@@ -870,16 +870,26 @@ qwen35Model:
   # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
   # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
   s3Source: sources
-  # Deliberately BELOW the 32768 the 48GB models use - see the block
-  # comment above. Raising this is the first thing to suspect if the pod
-  # OOMs or vLLM fails to allocate its KV pool at startup.
-  maxModelLen: 8192
+  # 32768 since the Lightspeed fallback (2026-10-25), was 8192. Benched on
+  # this slice (docs/roadmap/evidence/model-bench-24gb-slice-2026-10-25.md):
+  # weights 17.7 GiB, KV 2.77 GiB = 85,395 tokens (2.6x at 32k), with
+  # --enforce-eager as here. Still the first thing to suspect if the pod
+  # OOMs or vLLM fails to allocate its KV pool at startup (back to 8192).
+  maxModelLen: 32768
   # Fraction of the 24GB slice vLLM may claim. High on purpose, for the
   # same reason maxModelLen is low.
   gpuMemoryUtilization: "0.95"
   # Bounds concurrent sequences so the activation working set stays inside
   # what is left after the weights.
   maxNumSeqs: 4
+  # Server-side default chat-template kwargs (vLLM --default-chat-template-kwargs).
+  # enable_thinking: false makes the model answer without a reasoning block
+  # unless a request asks for one. That is what lets Lightspeed's tool-result
+  # classifier, a hard 128-token call, get an answer (ADR-0524). It applies to
+  # every caller of this model, the ai-gateway's terminal `default` fallback
+  # included. Empty map = no flag.
+  defaultChatTemplateKwargs:
+    enable_thinking: false
   llmInferenceService:
     routerGateway:
       name: maas-default-gateway
@@ -1238,6 +1248,15 @@ maas:
             - limit: 1000000
               window: 1h
           priority: 100
+        # Lightspeed fallback (ADR-0524, 2026-10-25): same dedicated
+        # ServiceAccount, tier and rationale as gpt-oss-20b-lightspeed, for
+        # when Lightspeed's provider is switched to this model.
+        - name: qwen35-9b-lightspeed
+          user: "system:serviceaccount:openshift-lightspeed:lightspeed-maas-client"
+          tokenRateLimits:
+            - limit: 200000
+              window: 1h
+          priority: 50
       authPolicy:
         name: qwen35-9b-entitlement
 
