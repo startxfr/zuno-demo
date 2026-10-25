@@ -561,3 +561,16 @@ Synced/Healthy, no Redis warning in the gateway log. One transient: `local-maas`
 half a second, for one request, which fell back to `qwen35-9b-wesh` and was answered 200; the ledger runs before the provider call, so it
 is not the cause, and it did not recur in the next eight calls. Not exercised: Lightspeed traffic, a Redis outage on the live gateway.
 
+
+Outage aftermath on demo333 (2026-10-25). After a cluster outage, MaaS returned intermittent HTTP 500s on every local model.
+
+- **What failed.** Between 11:27 and 11:33 UTC the maas-default-gateway logged `kuadrant_wasm_shim: gRPC status code is not OK`.
+  ai-gateway saw 500s from `qwen36-27b-instruct`, `gpt-oss-20b` and `qwen35-9b-wesh`, then timeouts. The `stresstest` quota class
+  fails closed (no direct sibling), so those requests failed. A tekos stresstest (WP-164 step 7) ended at 56/59: two security checks
+  timed out and the RAG web leg got no citation. In the following ten minutes, about 4 calls in 14 still returned 500.
+- **Cause.** About 30% of Authorino requests returned `UNAVAILABLE` (gRPC code 14) with no logged cause, while maas-api answered 200
+  and Limitador was healthy. Likely cause: Authorino kept stale connections after the outage. This differs from the Limitador
+  pattern of V14.
+- **Fix.** Restarting the gateway pod (11:44) did not help: gpt-oss-20b still returned 500 for 5 calls in 10. Restarting Authorino
+  (11:46, user go) did: SA-token probes then returned 30/30 HTTP 200 on gpt-oss-20b, qwen35-9b and qwen35-9b-wesh. An Authorino
+  restart belongs in the post-outage checklist. Before restarting it, look for `UNAVAILABLE` from the shim, not from Limitador.

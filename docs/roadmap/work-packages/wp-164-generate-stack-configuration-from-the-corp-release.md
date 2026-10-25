@@ -104,4 +104,47 @@ Rendered with the demo333 released values, the chart differs only by the unused 
 leaving. That takes effect at the next `unifai` role run. The Vault Transit key stays as
 the image-signing rollback (ADR-0535).
 
-Still open: step 7, the live promotion proof.
+Step 7, the live promotion proof, is done (below).
+
+## Update (2026-10-25): step 7 proven on demo333
+
+The test release is zuno-demo-agents v0.6.1 (corp `sha256:3b46220a…`): tekos 0.4.1 adds
+`list_drive_files` to the task `find-relevant-docs` and declares a second group,
+`agent_tekos_preview`. Release 0.6.0 was never cut; 0.6.1 carries its change plus a prompt example.
+
+- **Generated diff.** Promotion PR #8 (merged as `db049ead`) changed only `agents.lock` and
+  `stack-config.generated.yaml`. The diff held the release and reference, `+agent_tekos_preview` in
+  `keycloak.groups` and in `agents.tekos.groups`, the tekos version and digest, and the tekos
+  UnifAI bundle reference. The 5 quota files did not change, because the corp policy layer is
+  byte-identical. A local rebuild gave the same digests for the other 7 agents. This was predicted
+  before the release: the exact diff came from a local build fed to the generator. `--check` passed
+  for both generators against the extracted release, and the admission diff read
+  `tekos: version 0.3.0 -> 0.4.1; groups +agent_tekos_preview; find-relevant-docs tools +list_drive_files`.
+- **Refused before generation.** A copy of the bundle declaring a tool absent from tool-policy
+  failed `validate_okf_bundle.py` (`unknown tool ... (not in tool-policy.yaml)`).
+- **Keycloak.** The `keycloak` role ran; the reconcile Job logged
+  `created group agent_tekos_preview` and `1 groups created, 8 groups already present`. Membership
+  was not touched.
+- **mcp-gateway.** Before the `mcp` role, a `stress-consultant-01` call to `list_drive_files` as
+  tekos/`find-relevant-docs` returned `403 task 'find-relevant-docs' does not allow tool
+  'list_drive_files' (ADR-0011 task_rights)`. After the role (okf-fetch on the v0.6.1 corp digest),
+  the same call passed task rights and stopped at the downstream check, the same 403 as for
+  `check-my-drive-docs`: `requires a delegated google-workspace credential`.
+- **UnifAI.** The `unifai` role ran (zuno-demo-68). Bundle `tekos` sits at
+  `okf-tekos@sha256:f1168f9d…`, keyless `Verified=True` (`publish.yml@refs/tags/v0.6.1`), Valid,
+  WithinCeilings, Emitted, Ready. Team `agent-tekos` has members `agent_tekos` and
+  `agent_tekos_preview`.
+- **Quotas (WP-54 lesson).** `zuno-token-quota` and the six `maas-trlp-*` TokenRateLimitPolicies
+  are Accepted and Enforced. The tekos stresstest's real 429 passed (`stresstest-429`, 0 5xx).
+  - The first run (56/59) hit MaaS 500s left over from a cluster outage: stale Authorino
+    connections, fixed by an Authorino restart, recorded in the WP-157 inventory.
+  - The rerun scored 58/59: acceptance 18/18, gate 5/5, quota 3/3, coverage 10/10, bulk 10/10,
+    security 13/14.
+  - The one failure is unrelated: the A2A-gateway denial check (ADR-0583, added the same night)
+    cannot reach `a2a-gateway`, whose NetworkPolicy admits only UnifAI's `multiagent` pods.
+
+Still open against ADR-0581 clause 2: no consumer reads the per-agent `models`, `guardrails`
+and `limits` fields the generator already emits. MaaS subscriptions from groups x model roles,
+ai-gateway routing and guardrail inputs, and per-agent limits in the TokenRateLimitPolicies are
+therefore not generated yet. The quota budgets themselves are generated from the corp policy
+(WP-157, WP-177).
