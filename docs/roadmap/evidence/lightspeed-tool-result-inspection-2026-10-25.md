@@ -58,5 +58,10 @@ on the existing `gpt-oss-20b` route:
 - (A first test of `qwen36-27b-instruct` timed out because the served name is `qwen3.6-27b-instruct`; qwen36 and qwen35-9b also reason by default, so they would
   hit the same 128-token limit.)
 
-Applied by the chart value `olsConfig.provider.reasoningEffort: low` in `gitops/charts/lightspeed-config` (user go 2026-10-25); the inspection stays enabled.
-Rollback: set the value to empty.
+**Correction (same day, after the roll-out): this fix does not work as deployed.** The chart value `olsConfig.provider.reasoningEffort: low` (7f1b6213) was applied
+(user go) and the app-server restarted, but with `reasoningConfig` present Lightspeed switches to its `ChatVLLMReasoning` class and EVERY query then fails, including a
+plain "Say hello in one word." (HTTP 500, `[LLM Backend] An error occurred during LLM invocation`, log: `AttributeError: 'dict' object has no attribute 'choices'` in
+`_invoke_llm` / `astream`, although MaaS answered 200). The in-pod classifier test passed because it only exercised the structured-output call, not the streaming chat path.
+Reverted in a73123cd (value empty again); Lightspeed answers again. The classifier limit is therefore still open: tool-using questions fail with the safety-inspection message until
+another route is chosen (a non-reasoning model for Lightspeed, reasoning off on the vLLM route, disabling the inspection, or a Lightspeed fix). Lesson: validate the real
+end-to-end path (a full query), not only the component that failed.
