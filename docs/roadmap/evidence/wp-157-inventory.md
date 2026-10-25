@@ -596,3 +596,30 @@ MaaS 500 repro run (2026-10-25, after the Authorino restart and the zuno-unifai 
 (6 before and after). The unexplained 500 of the WP-177 drill stays not reproduced. Other traffic on the gateway during the run (oversized
 prompts failing on every provider) was not mine.
 
+
+Quota ledger reset for a stresstest persona (2026-10-25, 17:46:54Z, user go). The Redis ledger had kept
+`stress-consultant-01` over its `evaluation` budget (20,148,617 tokens counted in the current bucket), so every
+stresstest chat it made returned 429 and masked the checks under test. Exactly one key was deleted,
+`zuno:quota:evaluation:user:<sub>:20751`, through the ai-gateway pod's Redis client; no other key was touched. The
+next stresstest chats were answered. A ledger that survives restarts (WP-177) needs this manual step when a test
+persona exhausts a long window; a per-run reset in the stresstest harness would avoid it.
+
+MaaS access for personas (2026-10-25). Goal: let persona identities call MaaS directly, so the per-group
+subscriptions show their tiers. Today only service accounts call MaaS (the ai-gateway, Lightspeed).
+
+- **OIDC through a `Tenant`: negative.** A `Tenant` with `externalOIDC` (Keycloak realm `zuno`, client
+  `zuno-admin-api`) in `models-as-a-service` (`a5dbd168`, user go) was never reconciled: empty status, and
+  `maas-gateway-auth` kept its two methods (`api-keys`, `openshift-identities`) from 22:08 to 22:13Z. Switched off
+  in `eeb719c8`; Argo CD pruned it. On RHOAI 3.5 GA, maas-controller reads the `AITenant`
+  `ai-tenants/models-as-a-service` (`spec.oidc`, owned by `Config/default`) and the `MaaSTenantConfig`, not the
+  `Tenant` kind. The `AITenant` appears to be derived from `GatewayConfig/default-gateway` `spec.oidc`, which would move
+  the whole RHOAI gateway and dashboard to Keycloak; not pursued.
+- **API keys: chosen path (user decision).** API keys carry OpenShift groups, which have no leading `/`
+  (`agent_tekos`); Keycloak tokens carry `/agent_tekos`. Since `e515508a` every MaaS group subject is declared in
+  both spellings (`models.maasGroupSpellings` in `maas.yaml`): the `<model>-agents` and `<model>-sales`
+  subscriptions and the entitlement policies. Additive: priorities, limits and service accounts unchanged.
+- **OpenShift groups need no sync.** They are created by OAuth at login from the Keycloak IdP `openshift`
+  (claim `groups`, `mappingMethod: add`; annotation `oauth.openshift.io/generated`). Only `agent_tekos` exists so
+  far, because only `paas-dev-01` has logged in; the other groups appear when a persona that holds them logs in,
+  which getting a MaaS key requires anyway. Each login also creates a `User` and an `Identity`, to delete after
+  the test. The persona key test (log in, mint keys, call, revoke) is with 59.

@@ -174,3 +174,41 @@ therefore not generated yet. The quota budgets themselves are generated from the
 4. **Per-agent limits.**
    - `memory.history` goes to unifai-operator.
    - Token budgets go to `quota.py`, keyed by agent, since Kuadrant cannot key on the agent.
+
+## Update (2026-10-25): tekos stresstests after the search budget
+
+Scenario #11's web leg (cite `docs.redhat.com` on "What is a namespace in OpenShift?") failed in three
+runs of four. Causes found: the `web_search` stub returned the same two pages for any query, and tekos
+re-queried until the run timed out. Fixes, in order:
+
+- `web_search` answers honestly that no provider exists (`c5175c48`).
+- The tekos prompt gets a search budget of at most three searches (release 0.6.3, promoted).
+- Retriever `top_k_results` goes from 5 to 10 (`5009745e`).
+- The UnifAI operator gets a cap on identical calls (a9).
+- `zuno.limits.max_steps` is added (corp ceiling 30, release 0.7.0, admission check `6fc768ae`; not promoted, no
+  agent sets it yet).
+
+| Series | Run | Score | #11 | Notes |
+|---|---|---|---|---|
+| Before 0.6.3 (cap + top_k 10) | 1 | 57/59 | fail | no timeout |
+| | 2 | 59/59 | pass | |
+| | 3 | void | - | qwen35-9b down 16:57-17:16Z |
+| Prompt 0.6.3 | 1 | 57/59 | pass | first token 22 s; one security check timed out |
+| | 2 | 58/59 | pass | first token 45 s |
+| | 3 | 57/59 | fail | no timeout; a check expected a retriever tool event |
+| After the corpus scoping (WP-168) | 1 | 57/59 | fail | first token 8.3 s |
+| | 2 | 57/59 | fail | first token 16.9 s; unifai-backend restarted at 20:49Z mid-run |
+| | 3 | partial | pass | the report kept only 9 results; the Job log shows #11 passing |
+
+- **The loop is fixed:** no timeout since 0.6.3.
+- **#11 is a ranking problem now:** on the misses tekos answers in time, names the Confluence page and
+  cites no OCP URL. The retriever ranks installation guides above the definition (WP-168 update).
+  Ranking work is with a9.
+- **First-token latency** is above the 6 s target in most runs (8-45 s). The runs overlapped model
+  restarts and other sessions' tests; not yet measured on a quiet stack.
+- **Harness:** with retrieval done before reasoning, the retriever call does not always appear as a
+  tool event (`tool_calls=[]` on a passing answer). The check that expects that call needs to accept
+  either.
+- **Lot 1 follow-up:** the `<model>-agents` and `<model>-sales` subscriptions carry both group
+  spellings since `e515508a`, for API-key callers (WP-157 inventory).
+
