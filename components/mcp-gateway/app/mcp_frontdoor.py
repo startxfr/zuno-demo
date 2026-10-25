@@ -164,6 +164,51 @@ def _is_search(names: Any) -> bool:
 _NON_QUERY_ARGUMENTS = frozenset({"space", "limit", "top_k", "source_type", "page_id", "id", "cursor", "offset"})
 
 
+_PAGE_ID_ALIASES = ("id", "pageId", "pageid", "page", "content_id", "contentId")
+_NON_PAGE_ARGUMENTS = frozenset({"space", "limit", "query", "version", "expand", "format"})
+
+
+def _is_page_read(names: Any) -> bool:
+    return any(str(n).endswith(".page.read") for n in names)
+
+
+def _page_id_of(value: Any) -> Optional[str]:
+    """A page id given as a number, a numeric string or a page URL (`.../pages/<id>/...`); else None."""
+    import re as _re
+
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if text.isdigit():
+            return text
+        match = _re.search(r"/pages/(\d+)", text)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _normalise_page_read(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """`page_id` is a string in the tool's schema: accept the id under a common alias or as the one free
+    argument, as a number, a numeric string or a page URL, and send it as a string."""
+    fixed = dict(arguments)
+    if _page_id_of(fixed.get("page_id")) is not None:
+        fixed["page_id"] = _page_id_of(fixed["page_id"])
+        return fixed
+    found = next((_page_id_of(fixed[a]) for a in _PAGE_ID_ALIASES if _page_id_of(fixed.get(a))), None)
+    if found is None:
+        free = [k for k, v in fixed.items() if k != "page_id" and k not in _NON_PAGE_ARGUMENTS and _page_id_of(v)]
+        found = _page_id_of(fixed[free[0]]) if len(free) == 1 else None
+    if found is not None:
+        for alias in _PAGE_ID_ALIASES:
+            fixed.pop(alias, None)
+        fixed = {k: v for k, v in fixed.items() if _page_id_of(v) != found or k == "page_id"}
+        fixed["page_id"] = found
+    return fixed
+
+
 def normalise_arguments(names: Any, arguments: Dict[str, Any]) -> Dict[str, Any]:
     """Make a search call match its tool's schema when the model named the text argument differently.
 
@@ -173,6 +218,8 @@ def normalise_arguments(names: Any, arguments: Dict[str, Any]) -> Dict[str, Any]
     3. a numeric string `limit` becomes an integer.
     Only names and the type of `limit` change; the values a caller sends and every authorization check do not.
     """
+    if _is_page_read(names):
+        return _normalise_page_read(arguments)
     if not _is_search(names):
         return arguments
     fixed = dict(arguments)
@@ -406,6 +453,10 @@ async def dispatch(
             # A search with no text cannot match anything: answer like an empty result instead of an error,
             # so the caller keeps its turn and decides what to do. The downstream tool is not called.
             return _result(request_id, _tool_ok("No pages found: the search text was empty."))
+        if _is_page_read(binding_for_names.all_names() if binding_for_names else [name]) and not str(
+            arguments.get("page_id", "")
+        ).strip():
+            return _result(request_id, _tool_ok("No page found: the page id was missing or not a number."))
         try:
             payload = await invoke_tool(tool_name=name, arguments=arguments)
         except PermissionError as exc:
@@ -416,6 +467,12 @@ async def dispatch(
         except LookupError as exc:
             return _result(request_id, _tool_error(f"unknown tool: {exc}"))
         except Exception as exc:  # noqa: BLE001 - surfaced to the client as a tool error
+            if "validation error" in str(exc).lower():
+                # Arguments that do not match the tool's schema are the model's slip, not a failure of the
+                # platform: answer like an empty result, so the caller does not wrap it as "Tool ... failed:"
+                # and keeps its turn. Argument names only are logged.
+                logger.warning("mcp frontdoor: tool '%s' got arguments that do not match its schema (names: %s)", name, sorted(arguments))
+                return _result(request_id, _tool_ok("No result: the arguments did not match the tool's schema."))
             # Argument NAMES only, never values: enough to see how a model called the tool.
             logger.warning(
                 "mcp frontdoor: tool '%s' failed: %s (argument names: %s)", name, exc, sorted(arguments)

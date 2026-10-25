@@ -103,6 +103,78 @@ def test_dispatch_sends_the_canonical_argument_downstream():
     assert seen == {"query": "satellite"} and out["result"]["isError"] is False
 
 
+PAGE_READ = ["confluence.page.read"]
+
+
+def test_page_read_accepts_the_id_under_any_single_free_argument_as_a_string():
+    for args in ({"id": 729907201}, {"pageId": "729907201"}, {"page_id": 729907201}, {"page": "729907201"}, {"whatever": 729907201}):
+        assert normalise_arguments(PAGE_READ, args) == {"page_id": "729907201"}, args
+
+
+def test_page_read_takes_the_id_out_of_a_page_url():
+    url = "https://x.atlassian.net/wiki/spaces/SXSI/pages/729907201/DEX+-+OpenShift"
+    assert normalise_arguments(PAGE_READ, {"url": url}) == {"page_id": "729907201"}
+
+
+def test_page_read_leaves_ambiguous_or_missing_ids_alone():
+    assert normalise_arguments(PAGE_READ, {"a": 1, "b": 2}) == {"a": 1, "b": 2}
+    assert normalise_arguments(PAGE_READ, {}) == {}
+    assert normalise_arguments(PAGE_READ, {"title": "no id here"}) == {"title": "no id here"}
+
+
+class _ReadRegistry:
+    def resolve(self, name):
+        return _Binding(PAGE_READ) if name == "confluence.page.read" else None
+
+
+def _call_read(arguments, invoke):
+    message = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "confluence.page.read", "arguments": arguments}}
+    surface = type("S", (), {"capabilities": ["confluence.page.read"]})()
+    return asyncio.run(mcp_frontdoor.dispatch(
+        message, policy_store=None, binding_registry=_ReadRegistry(), identity=type("I", (), {"sub": "u"})(),
+        classification="C1", invoke_tool=invoke, surface=surface,
+    ))
+
+
+def test_a_page_read_without_an_id_is_a_normal_empty_result_and_calls_nothing():
+    called = []
+
+    async def invoke(tool_name, arguments):
+        called.append(arguments)
+        return {}
+
+    out = _call_read({}, invoke)["result"]
+    assert out["isError"] is False and out["content"][0]["text"] == "No page found: the page id was missing or not a number."
+    assert called == []
+
+
+def test_a_page_read_sends_the_canonical_id_downstream():
+    seen = {}
+
+    async def invoke(tool_name, arguments):
+        seen.update(arguments)
+        return {"title": "x"}
+
+    assert _call_read({"id": 729907201}, invoke)["result"]["isError"] is False
+    assert seen == {"page_id": "729907201"}
+
+
+def test_a_schema_validation_failure_on_any_tool_is_a_normal_result():
+    async def invoke(tool_name, arguments):
+        raise ValueError("Tool failed: 1 validation error for read_pageArguments")
+
+    out = _call_read({"page_id": "1"}, invoke)["result"]
+    assert out["isError"] is False and out["content"][0]["text"] == "No result: the arguments did not match the tool's schema."
+
+
+def test_other_failures_stay_tool_errors():
+    async def invoke(tool_name, arguments):
+        raise ValueError("upstream timed out")
+
+    out = _call_read({"page_id": "1"}, invoke)["result"]
+    assert out["isError"] is True and out["content"][0]["text"] == "upstream timed out"
+
+
 def test_dispatch_returns_a_short_neutral_tool_error():
     async def invoke(tool_name, arguments):
         raise ValueError("boom\nsecond line with detail\nFor further information visit https://errors.pydantic.dev/x")
