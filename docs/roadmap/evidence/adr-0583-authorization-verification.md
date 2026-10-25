@@ -75,6 +75,17 @@ personas), and the items still open in the fork roadmap.
   against the live gateway, only by the gateway's unit tests.
 - The earlier slow `finance-01` chat did not reproduce (39.8 s, on-topic reply).
 
+## Roll-out with the Confluence binding (fork `devel-8498fe02b`, operator 0.1.38, 2026-10-25)
+
+- `stack.rag.confluenceUrl` is set in the unifai chart; the RAG server and worker
+  carry `CONFLUENCE_ALLOWED_HOSTS=["startxfr.atlassian.net"]`; a source on another
+  host is fetched anonymously, and a source on an internal host is refused when it
+  is registered (operator e2e).
+- The 18-check probe passes again (18/18), `cross_user_isolation` passes, and a
+  real delegated A2A turn as `sale-01` answers in 2.5 s.
+- Unrelated known issue: seven bundles show `signature manifest has 35 layers,
+  at most 32 are read` (tracked by the operator owner); their workflows stay Ready.
+
 ## Open decisions and recommendations
 
 **Confluence allowed hosts (open, recommended to close).** The setting exists
@@ -106,7 +117,7 @@ are accepted. The ADR stays `Accepted` until the closing steps below are done.
 
 Closing steps, in order:
 
-1. The operator derives `confluence_allowed_hosts` from `spec.rag.confluence`
+1. (Done 2026-10-25.) The operator derives `confluence_allowed_hosts` from `spec.rag.confluence`
    and the outbound guard runs when a Confluence source is registered (a9,
    waiting for the user's confirmation in that session). Roll it out and
    re-run the 18-check probe.
