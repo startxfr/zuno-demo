@@ -43,9 +43,29 @@ def test_empty_or_non_string_aliases_do_nothing():
     assert normalise_arguments(SEARCH, {"q": 5}) == {"q": 5}
 
 
+def test_the_single_free_string_argument_becomes_the_query():
+    assert normalise_arguments(SEARCH, {"title": "OpenShift Satellite"}) == {"query": "OpenShift Satellite"}
+    assert normalise_arguments(SEARCH, {"page_title": "x", "space": "SXSI"}) == {"query": "x", "space": "SXSI"}
+
+
+def test_two_free_string_arguments_are_ambiguous_and_left_alone():
+    args = {"title": "a", "topic": "b"}
+    assert normalise_arguments(SEARCH, args) == args
+
+
+def test_a_numeric_string_limit_becomes_an_integer():
+    assert normalise_arguments(SEARCH, {"query": "x", "limit": "5"}) == {"query": "x", "limit": 5}
+    assert normalise_arguments(SEARCH, {"query": "x", "limit": "many"}) == {"query": "x", "limit": "many"}
+
+
+def test_a_validation_failure_becomes_a_plain_instruction():
+    err = ValueError("confluence MCP server returned a tool error: Error executing tool search_pages: 1 validation error for search_pagesArguments")
+    assert mcp_frontdoor._short_error(err) == "The search could not run: send one short text to look for in the argument 'query'."
+
+
 def test_short_error_has_one_line_no_validator_url_and_is_capped():
-    long = "1 validation error for SearchInput\nquery\n  Field required [type=missing]\n    For further information visit https://errors.pydantic.dev/2.7/v/missing"
-    assert mcp_frontdoor._short_error(ValueError(long)) == "1 validation error for SearchInput"
+    long = "boom happened\nquery\n  detail\n    For further information visit https://errors.pydantic.dev/2.7/v/missing"
+    assert mcp_frontdoor._short_error(ValueError(long)) == "boom happened"
     assert len(mcp_frontdoor._short_error(ValueError("x" * 1000))) == 200
     assert mcp_frontdoor._short_error(ValueError("")) == "the tool call failed"
 

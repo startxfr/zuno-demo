@@ -160,27 +160,52 @@ def _is_search(names: Any) -> bool:
     return any(str(n).rsplit(".", 1)[-1] == "search" or str(n).startswith("search_") for n in names)
 
 
-def normalise_arguments(names: Any, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    """Map a common alias of the search argument (`search_query`, `q`, `text`...) to `query`.
+# Arguments a search tool takes besides its text: never turned into the query.
+_NON_QUERY_ARGUMENTS = frozenset({"space", "limit", "top_k", "source_type", "page_id", "id", "cursor", "offset"})
 
-    Applies only to search tools, only when `query` is absent or empty, and uses the first alias that
-    carries a value; the alias keys are dropped so the downstream schema sees a canonical call.
+
+def normalise_arguments(names: Any, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Make a search call match its tool's schema when the model named the text argument differently.
+
+    Applies only to search tools and only when `query` is absent or empty:
+    1. the first of a few common aliases (`search_query`, `q`, `text`...) that carries a value becomes `query`;
+    2. failing that, the one string argument that is not a known option (`space`, `limit`...) becomes `query`;
+    3. a numeric string `limit` becomes an integer.
+    Only names and the type of `limit` change; the values a caller sends and every authorization check do not.
     """
-    if not _is_search(names) or str(arguments.get("query", "")).strip():
+    if not _is_search(names):
         return arguments
-    for alias in _QUERY_ALIASES:
-        value = arguments.get(alias)
-        if isinstance(value, str) and value.strip():
-            fixed = {k: v for k, v in arguments.items() if k not in _QUERY_ALIASES}
+    fixed = dict(arguments)
+    if isinstance(fixed.get("limit"), str) and fixed["limit"].strip().isdigit():
+        fixed["limit"] = int(fixed["limit"].strip())
+    if not str(fixed.get("query", "")).strip():
+        chosen = next(
+            (a for a in _QUERY_ALIASES if isinstance(fixed.get(a), str) and fixed[a].strip()), None
+        )
+        if chosen is None:
+            candidates = [
+                k for k, v in fixed.items()
+                if k != "query" and k not in _NON_QUERY_ARGUMENTS and isinstance(v, str) and v.strip()
+            ]
+            chosen = candidates[0] if len(candidates) == 1 else None
+        if chosen is not None:
+            value = fixed.pop(chosen)
+            for alias in _QUERY_ALIASES:
+                fixed.pop(alias, None)
             fixed["query"] = value
-            return fixed
-    return arguments
+    return fixed
 
 
 def _short_error(exc: Exception) -> str:
-    """One short, neutral line for a tool failure: no stack, no validator dump, no documentation URL."""
+    """One short, neutral line for a tool failure: no stack, no validator dump, no documentation URL.
+
+    A schema-validation failure becomes a plain instruction: some callers judge a raw validator message
+    suspicious and abort the whole turn instead of retrying.
+    """
     lines = [ln.strip() for ln in str(exc).splitlines() if ln.strip() and "errors.pydantic.dev" not in ln]
     text = lines[0] if lines else "the tool call failed"
+    if "validation error" in text.lower():
+        return "The search could not run: send one short text to look for in the argument 'query'."
     return text if len(text) <= _MAX_ERROR_CHARS else text[: _MAX_ERROR_CHARS - 1] + "\u2026"
 
 
@@ -384,7 +409,10 @@ async def dispatch(
         except LookupError as exc:
             return _result(request_id, _tool_error(f"unknown tool: {exc}"))
         except Exception as exc:  # noqa: BLE001 - surfaced to the client as a tool error
-            logger.warning("mcp frontdoor: tool '%s' failed: %s", name, exc)
+            # Argument NAMES only, never values: enough to see how a model called the tool.
+            logger.warning(
+                "mcp frontdoor: tool '%s' failed: %s (argument names: %s)", name, exc, sorted(arguments)
+            )
             return _result(request_id, _tool_error(_short_error(exc)))
         return _result(request_id, _tool_ok(payload))
 
