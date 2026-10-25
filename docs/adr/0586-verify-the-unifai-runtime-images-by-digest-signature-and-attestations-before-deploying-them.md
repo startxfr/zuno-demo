@@ -68,7 +68,9 @@ The state found on 2026-10-24:
    (the runtime reports the platform manifest digest for a pinned manifest list, never the pin). The RabbitMQ image stays
    `bitnamilegacy`, frozen: its chart is the vendored Bitnami one, so replacing the image means rewriting an upstream
    chart; the user accepts that residual risk (2026-10-25).
-8. **Admission by the cluster is a later step,** not part of this record (WP-178, 2026-10-25). OpenShift's `ClusterImagePolicy`
+8. **Admission by the cluster is a later step,** not part of this record (WP-178, 2026-10-25).
+   *Update 2026-10-25:* WP-178 runs it on demo333 in `warn` mode with the Sigstore policy-controller (offline public-Sigstore TrustRoot, the
+   identities of `image-identities.yaml`, `no-match-policy: warn` for the unsigned third-party services); `enforce` stays a separate decision. OpenShift's `ClusterImagePolicy`
    (`config.openshift.io/v1`, generally available since 4.20) verifies at pull and has no "digest only" rule
    like `policy-controller`, but it matches a keyless signer by e-mail, which a GitHub workflow identity is not;
    the choice between a public-key policy and keyless needs `oc explain` on the live cluster first.

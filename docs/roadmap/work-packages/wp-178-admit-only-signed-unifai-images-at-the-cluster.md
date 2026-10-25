@@ -1,6 +1,6 @@
 # WP-178: Admit only signed UnifAI images at the cluster
 
-- **State:** Repo work in review
+- **State:** Repo work merged
 - **ADRs:** [ADR-0586](../../adr/0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md)
 - **Depends on:** [WP-176](wp-176-verify-the-unifai-runtime-images-before-deploying-them.md)
 - **Related:** [WP-110](wp-110-rhtas-operator-live-findings.md)
@@ -38,7 +38,7 @@ by the `unifai` role, so a hand-applied manifest or a rollout outside the role c
    `platform/okf/sigstore/trusted_root.json` (CI runs `--check`); chart templates `trustroot-public.yaml`, `clusterimagepolicy-unifai.yaml`,
    `policycontroller.yaml` (`configData`); `ansible/roles/rhtas_config` passes the identities from `image-identities.yaml` (development ones only on a
    cluster that accepts them), waits for the policy, and labels the namespaces.
-2. **Live (demo333).** `make d1 install rhtas-config`, then the dry-run tests above against the real policy.
+2. **Done 2026-10-25 (demo333).** `make d1 install rhtas-config` (`zuno-unifai-images` Ready in `warn`, TrustRoot `public-sigstore-trust-root`, `config-policy-controller` `no-match-policy: warn`, `zuno-unifai` and `unifai-operator` labelled). On both namespaces, server-side dry-run pods: a CI-signed `unifai-ui` digest and operator 0.1.40 are admitted without a warning, the unsigned digest is a warning, a third-party digest is a `no matching policies` warning; a real pod (redis-insight) was deleted and recreated normally. `make d1 check rhtas-config` and `make d2 check unifai` stay green.
 3. **One release cycle in `warn`** without an unexpected warning (watch the webhook log).
 4. **`enforce`** for `zuno-unifai-images` only (the third-party services stay `warn` through `no-match-policy`), by the user's decision, with a break-glass in the
    runbook (remove the namespace label).
