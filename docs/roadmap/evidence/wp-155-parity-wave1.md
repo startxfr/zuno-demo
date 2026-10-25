@@ -233,3 +233,13 @@ Error "signature manifest has 35 layers", their workflows stay Ready): four runs
 `PASS attempt=1/2: tool_calls=['salesforce.opportunity.read']`; the full comage security suite 8/8. Before the change it missed 2 of 4 runs.
 Four runs is a small sample; the retry is the safety net, and two turns without the call would still fail.
 
+Comage sales corpus (2026-10-26). The `knowledge.sales` domain has a corpus again: twelve synthetic French pages ("données de démonstration")
+in `gitops/charts/unifai/files/sales-corpus/`, read by the `sales-demo` web RAG source (tag `knowledge.sales`, public, 12 pages Ready) from GitHub raw,
+and `knowledge-comage` now also reads WEB sources. Two findings on the way: (1) the UnifAI RAG web connector refuses cluster-internal addresses on purpose
+("resolves to a non-public address", `resolve_public`), so an in-cluster static server cannot be crawled; the pages come from the public repository
+instead; (2) the operator's finalizer could not delete a source whose first pipeline id no longer existed ("Source not found" answered with HTTP 500,
+retried forever); the finalizer of the test source was removed by hand, a fragment of its page may remain indexed. Retrieval as `sale-01` and
+`consultant-01`: "statut du bon de commande d'Acme Renewal" returns the Acme page first (score 1.0). Comage scenario 11 is a citation check again
+(`rag_retrieval_has_citation`, the answer must contain "en attente de validation", a phrase only the corpus has): run on demo333, 18/20 scenarios
+(90%), 11 passes; 10 failed on a 503 of the UnifAI UI at that moment, 19 is the known in-cluster-client miss; 6 and 17 skipped.
+
