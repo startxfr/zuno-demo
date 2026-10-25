@@ -1,4 +1,19 @@
 {{- /*
+models.maasGroupSpellings: a list of group names -> JSON list with both spellings of
+each, "/name" (Keycloak token, full path) and "name" (OpenShift group, MaaS API keys),
+first-seen order, no duplicates.
+*/}}
+{{- define "models.maasGroupSpellings" -}}
+{{- $out := list -}}
+{{- range . -}}
+{{- $bare := trimPrefix "/" . -}}
+{{- range (list (printf "/%s" $bare) $bare) -}}
+{{- if not (has . $out) -}}{{- $out = append $out . -}}{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- toJson $out -}}
+{{- end -}}
+{{- /*
 ADR-0201 (WP-27): OpenShift AI Models-as-a-Service governance plane.
 Schema-checked against the maas.opendatahub.io/v1alpha1 and
 serving.kserve.io/v1alpha2 CRDs confirmed installed on the live cluster
@@ -289,16 +304,16 @@ spec:
     # maassubscription.spec.owner --recursive`).
     users:
       - {{ .user | quote }}
-    {{- else if .groups }}
-    # ADR-0581 clause 2: the entitlement groups of every active agent that
-    # can reach this model (values.agents.generated.yaml).
+    {{- else }}
+    # Each group in both spellings: Keycloak tokens carry the full path
+    # ("/agent_tekos", the groups mapper's full.path), while MaaS API keys carry
+    # the OpenShift group, which Keycloak syncs without the slash ("agent_tekos").
+    # ADR-0581 clause 2: .groups are the generated agent groups
+    # (values.agents.generated.yaml); .group a hand-written one (/sales).
     groups:
-      {{- range .groups }}
+      {{- range include "models.maasGroupSpellings" (.groups | default (list .group)) | fromJsonArray }}
       - name: {{ . }}
       {{- end }}
-    {{- else }}
-    groups:
-      - name: {{ .group }}
     {{- end }}
   priority: {{ .priority }}
   modelRefs:
@@ -338,10 +353,8 @@ spec:
     {{- range $subs }}
     {{- if .user }}
     {{- $authUsers = append $authUsers .user }}
-    {{- else if .groups }}
-    {{- $authGroups = concat $authGroups .groups }}
     {{- else }}
-    {{- $authGroups = append $authGroups .group }}
+    {{- $authGroups = concat $authGroups (include "models.maasGroupSpellings" (.groups | default (list .group)) | fromJsonArray) }}
     {{- end }}
     {{- end }}
     {{- if $authGroups }}
