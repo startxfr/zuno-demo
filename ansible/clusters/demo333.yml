@@ -148,6 +148,18 @@ zuno_unifai_values:
     identity:
       oidcClaims: true
     images:
+      # Third-party images (ADR-0586 clause 7): pinned by digest, NOT signed, their
+      # publishers do not sign them. A digest is the manifest list of the tag that
+      # ran when it was pinned (2026-10-25), so the running image does not change.
+      # rabbitmq is bitnamilegacy, which receives no more updates (replacing it is
+      # a separate decision); temporal ran `latest`, now frozen at this digest.
+      docling: quay.io/docling-project/docling-serve-cpu@sha256:6eda9c524992147c1b0b06a1a9be4894bd68b1f43c86d92c32f996c4c60d18a3  # v1.37.0
+      mongodb: docker.io/library/mongo@sha256:8565ecda5b221016d70f7745ac1ba0b97ccb05836157f8a343e987338fdc8350  # 8.0.3
+      qdrant: docker.io/qdrant/qdrant@sha256:1005201498cf927d835383d0f918b17d8c9da7db58550f169f694455e42d78f4  # v1.16.0
+      rabbitmq: docker.io/bitnamilegacy/rabbitmq@sha256:f31a9990bba3aec8bf2948a4a237e3656e54d2d53f4ecd4495ce044191cb5beb  # 4.0.5-debian-12-r0
+      redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
+      redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
+      temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
       backend: quay.io/zuno/unifai-backend@sha256:e19d98f7a44bfe3fe1a944ea517fd0ef28c5d5b0b06e13262e50e7bb7134951e  # devel-ffb64e335
       identity: quay.io/zuno/unifai-identity@sha256:e51c6b2e51d0b4eaede4c092add59c6a8f6cf41625b1433b6d0b0c79dab33d3b  # devel-ffb64e335
       multiagent: quay.io/zuno/unifai-multiagent@sha256:af8bc38f24bcbf807636099bfbe0ae24c7134844ff4cf6bc7469d890fbf9f490  # devel-ffb64e335

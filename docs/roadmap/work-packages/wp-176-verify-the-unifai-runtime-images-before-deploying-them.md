@@ -29,7 +29,7 @@ by the fork's build workflow.
    and signs. By hand: the verifier refuses the current `unifai-ui:devel-1bb72a84d` and accepts the CI-built digests.
 4. **Switch on, in one commit.** The five digests in `demo333.yml`, `zuno_unifai_verify_images: true`, `zuno_unifai_accept_dev_signatures: true`. Waits for the operator to render
    a digest explicitly (the operator owner announces the version).
-5. **Third-party images** by digest in `demo333.yml` (databases, queues, docling, embedding), with the note that they are unsigned. Decide separately what replaces `bitnamilegacy`.
+5. **Third-party images** by digest in `demo333.yml` (databases, queues, docling, embedding), with the note that they are unsigned. Decide separately what replaces `bitnamilegacy`. **Done 2026-10-25** (repo): seven services pinned in `demo333.yml`, required by `check_unifai_pins.py`; the `aws-cli` image of the backup CronJobs is not in `spec.images` and stays on its tag (operator side).
 6. **The operator, bundle and catalog.** The operator release workflow signs and attests them; then `zuno_unifai_verify_catalog` flips to true and the drift check covers the operator pod.
 
 ## Acceptance

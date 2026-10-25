@@ -19,11 +19,20 @@ D = "@sha256:" + "a" * 64
 
 def images(**over):
     out = {k: f"quay.io/zuno/unifai-{k}{D}" for k in c.APPLICATION_IMAGES}
+    out.update({k: f"docker.io/x/{k}{D}" for k in c.THIRD_PARTY_IMAGES})
     out.update(over)
     return {"zuno_unifai_values": {"stack": {"images": out}}}
 
 
 class Pins(unittest.TestCase):
+    def test_a_third_party_service_must_be_pinned_and_present(self):
+        findings, _ = c.check_cluster("demo", images(mongodb="docker.io/library/mongo:8.0.3"))
+        self.assertEqual(len(findings), 1)
+        self.assertIn("mongodb", findings[0])
+        doc = images()
+        del doc["zuno_unifai_values"]["stack"]["images"]["temporal"]
+        self.assertTrue(any("temporal is missing" in f for f in c.check_cluster("demo", doc)[0]))
+
     def test_a_cluster_with_five_digests_passes(self):
         self.assertEqual(c.check_cluster("demo", images()), ([], []))
 
@@ -40,7 +49,7 @@ class Pins(unittest.TestCase):
 
     def test_a_version_alone_is_not_a_pin(self):
         findings, _ = c.check_cluster("demo", {"zuno_unifai_values": {"stack": {"version": "devel-1bb72a84d"}}})
-        self.assertEqual(len(findings), len(c.APPLICATION_IMAGES))
+        self.assertEqual(len(findings), len(c.APPLICATION_IMAGES) + len(c.THIRD_PARTY_IMAGES))
 
     def test_a_listed_data_service_must_be_pinned_too(self):
         findings, _ = c.check_cluster("demo", images(qdrant="docker.io/qdrant/qdrant:v1.16.0"))

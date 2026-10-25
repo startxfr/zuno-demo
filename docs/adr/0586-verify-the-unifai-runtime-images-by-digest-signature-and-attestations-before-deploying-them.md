@@ -59,6 +59,10 @@ The state found on 2026-10-24:
    embedding image are written by digest in the cluster file. Their publishers do not sign them, so this is a
    pin and not a proof of origin, and the record says so. The RabbitMQ image comes from `bitnamilegacy`, a
    repository that receives no more updates; replacing it is a separate decision.
+   *Applied 2026-10-25 on demo333:* the seven services the stack runs are pinned (the manifest list of the tag
+   that ran, so the image does not change), `temporal` leaves `latest`, and `check_unifai_pins.py` requires them
+   while verification is on. Not covered: the `aws-cli` image of the two backup CronJobs, which the operator sets
+   outside `spec.images`, and `embedding`, which this cluster does not run.
 8. **Admission by the cluster is a later step,** not part of this record. OpenShift's `ClusterImagePolicy`
    (`config.openshift.io/v1`, generally available since 4.20) verifies at pull and has no "digest only" rule
    like `policy-controller`, but it matches a keyless signer by e-mail, which a GitHub workflow identity is not;
