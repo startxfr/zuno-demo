@@ -148,11 +148,11 @@ zuno_unifai_values:
     identity:
       oidcClaims: true
     images:
-      backend: quay.io/zuno/unifai-backend:devel-ffb64e335  # devel-ffb64e335
-      identity: quay.io/zuno/unifai-identity:devel-ffb64e335  # devel-ffb64e335
-      multiagent: quay.io/zuno/unifai-multiagent:devel-ffb64e335  # devel-ffb64e335
-      rag: quay.io/zuno/unifai-rag:devel-ffb64e335  # devel-ffb64e335
-      ui: quay.io/zuno/unifai-ui:devel-ffb64e335  # devel-ffb64e335
+      backend: quay.io/zuno/unifai-backend@sha256:e19d98f7a44bfe3fe1a944ea517fd0ef28c5d5b0b06e13262e50e7bb7134951e  # devel-ffb64e335
+      identity: quay.io/zuno/unifai-identity@sha256:e51c6b2e51d0b4eaede4c092add59c6a8f6cf41625b1433b6d0b0c79dab33d3b  # devel-ffb64e335
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:af8bc38f24bcbf807636099bfbe0ae24c7134844ff4cf6bc7469d890fbf9f490  # devel-ffb64e335
+      rag: quay.io/zuno/unifai-rag@sha256:28fedc7ed3e1b9902219e9e42eaadafaddddfd4c19b81d0747aed36ea2481b27  # devel-ffb64e335
+      ui: quay.io/zuno/unifai-ui@sha256:20cf4ab46e8495fe1a54a2ef85c580b9b136c57b0a150468b089d62232137aa1  # devel-ffb64e335
     rag:
       tokenReview: true
     ragClients:
