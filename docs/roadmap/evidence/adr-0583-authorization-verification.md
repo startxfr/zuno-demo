@@ -86,7 +86,7 @@ operator session) and should land before the ADR moves to `Implemented`. The
 guard is also not applied when a Confluence source is registered, only when it
 is fetched; adding it there is quick and recommended.
 
-**Residual risks proposed for acceptance (to be confirmed by the user).**
+**Residual risks accepted by the user (2026-10-25).**
 
 | Item | Why it is low | Condition |
 |---|---|---|
@@ -99,6 +99,22 @@ is fetched; adding it there is quick and recommended.
 
 ## Status of ADR-0583
 
-Clauses 1, 3 and 4 are verified and clause 5 is half done, so the ADR stays
-`Accepted`. It moves to `Implemented` when the remaining audit items are closed
-the Confluence hosts decision is applied, the residual table is confirmed, and the standing checks pass after the roll-out.
+Clauses 1 to 4 are verified on the rolled stack and clause 5 is in place: the
+standing checks exist and pass against demo333, apart from the authenticated
+A2A denial, which needs a run from inside the cluster. The residual risks above
+are accepted. The ADR stays `Accepted` until the closing steps below are done.
+
+Closing steps, in order:
+
+1. The operator derives `confluence_allowed_hosts` from `spec.rag.confluence`
+   and the outbound guard runs when a Confluence source is registered (a9,
+   waiting for the user's confirmation in that session). Roll it out and
+   re-run the 18-check probe.
+2. Run the Tekos security checks from inside the cluster (an evaluation
+   campaign); `a2a_gateway_denies_unentitled_callers_like_unknown_agents` and
+   `unifai_denies_another_users_objects_like_missing_ones` must both pass.
+3. Flip the status: `Accepted` to `Implemented` in the ADR header and in
+   `docs/adr/README.md`, replace the ADR's verification note with a pointer to
+   this file, update the WP-167 and WP-154 status lines in
+   `docs/roadmap/implementation-roadmap.md` and their work-package files, and run
+   `platform/docs/check_docs.py`.
