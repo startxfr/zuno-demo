@@ -303,4 +303,9 @@ with a `Retry-After` computed from the subscription window; closed quota classes
 - Checks never run: V2, V3, V5, V6, V11.
 
 The remaining work and its order are in [WP-177](../roadmap/work-packages/wp-177-finish-the-maas-quota-delegation.md). The
-decision moves to Implemented when WP-177 closes, or is amended again if the user drops the removal of `quota.py`.
+decision stays Partially implemented.
+
+Update 2026-10-25 (user): no upstream issue for now and no Kuadrant fix expected soon, so WP-177 works with the limitation. The
+ai-gateway ledger stays the guard of those ceilings, WP-177 makes it durable (Redis) and adds a probe that shows which counters move, and
+the removal of `quota.py` is deferred until Kuadrant counts every limit. The status moves to Implemented only if that removal is done, or
+is amended to accept the ledger as the permanent design.
