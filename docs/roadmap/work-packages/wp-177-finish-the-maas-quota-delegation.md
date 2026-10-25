@@ -1,6 +1,6 @@
 # WP-177: Finish the MaaS quota delegation
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-25)
 - **ADRs:** [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md)
 - **Depends on:** [WP-157](wp-157-slim-the-ai-gateway-via-maas.md)
 - **Related:** [ADR-0511](../../adr/0511-define-okf-quota-policy-enforced-via-kuadrant.md), [ADR-0528](../../adr/0528-rekey-project-binding-quota-and-telemetry-onto-the-zuno-project-id.md), [WP-54](wp-54-quota-policy-and-kuadrant-translation.md)
@@ -37,9 +37,10 @@ The user accepted the missing per-user ceiling at MaaS on 2026-10-25. The upstre
    (`zuno:quota:<class>:<dimension>:<key>:<bucket>`, expiry two windows) and reads the larger of the local and Redis value, so a
    restart or a second replica keeps the budgets. Redis is best effort: a fault is logged once, Redis is skipped for 5 s, and the
    local counters alone apply; no request fails because of it.
-3. **Live proof on demo333 (after the user's go, own turn).** Build the image from the merged commit, set the switch, then show
+3. **Live proof on demo333 (done 2026-10-25, user go).** Build the image from the merged commit, set the switch, then show
    that a `stresstest`-class chat through the `zuno-stresstest` client creates the Redis keys, that an ai-gateway pod deletion keeps
-   the consumed total, and that normal service and Lightspeed are unaffected. Run the probe before and after. WP-177 is Done after this.
+   the consumed total, and that normal service and Lightspeed are unaffected. Run the probe before and after. Results in
+   [wp-157-inventory.md](../evidence/wp-157-inventory.md) (follow-up of 2026-10-25, WP-177 live proof).
 4. **Trusted client (done elsewhere).** `TRUSTED_PLATFORM_CLIENTS` is `zuno-stresstest` on demo333 (1e7034ce); `zuno-evaluations`
    no longer selects a quota class. Stress and drill scripts must sign in through `zuno-stresstest`.
 5. **Deferred, only if Kuadrant is fixed:** re-run the minimal reproduction and the probe (expect all families to move), then V8

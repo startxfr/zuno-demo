@@ -546,3 +546,18 @@ token on MaaS, which the ai-gateway identity no longer allows; V11 needs a verif
 - **D11. Credential namespace.** Keep `zuno-ai-run` (Tenant singleton,
   `templates/maas.yaml:33-69`) or a dedicated namespace. **Recommendation:
   keep**; isolation is the gateway pod no longer mounting the keys.
+
+WP-177 live proof on demo333 (2026-10-25, user go). Counters probe before the change:
+`OK: moved ['subscription'] (subscription=+123)`; after: `+144`, same set (group and user still not counted).
+Image `ai-gateway-25` built from devel `2105bd56` (contains the Redis ledger, checked by ancestry); the image trigger rolled it with the
+switch still `memory`, then `quotaLedger.store: redis` was set in the `zuno-ai-gateway-d1` Application values (previous values saved
+outside the repo for a rollback; `zuno_ai_gateway_quota_ledger_store: redis` is in `ansible/clusters/demo333.yml`), Synced/Healthy.
+Durability drill with `eval-consultant-01` signed in through the `zuno-stresstest` client and `X-Zuno-Quota-Class: stresstest` (2000 tokens
+per 5 min per user): chats created `zuno:quota:stresstest:user:<sub>:<bucket>` and `...:group:sha1:<hash>:<bucket>` in the platform Redis
+(value 681 after six chats, matching the usage of those answers; TTL about two windows). The ai-gateway pod was then deleted; the next
+chats were answered 12 times and the 13th returned `429 quota_exceeded`, i.e. the 681 tokens consumed before the restart still counted
+(a reset ledger would have answered about 16 more). Normal service: the standard-class probe chat 200 via `local-maas`, ArgoCD
+Synced/Healthy, no Redis warning in the gateway log. One transient: `local-maas` and `local-gpt-oss-maas` each answered 500 once, within
+half a second, for one request, which fell back to `qwen35-9b-wesh` and was answered 200; the ledger runs before the provider call, so it
+is not the cause, and it did not recur in the next eight calls. Not exercised: Lightspeed traffic, a Redis outage on the live gateway.
+

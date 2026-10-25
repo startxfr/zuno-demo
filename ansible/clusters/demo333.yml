@@ -182,6 +182,10 @@ zuno_ai_gateway_quota_fail_modes: true
 # rather than answered by a direct SaaS fallback when MaaS fails. Needs the
 # image built from 18cc412e or later (ai-gateway-21).
 zuno_ai_gateway_closed_class_maas_only: true
+# WP-177 (user go 2026-10-25): the ai-gateway's token-budget ledger also keeps
+# its counters in the platform Redis, so a restart no longer resets the
+# budgets. Needs the image built from c5ca1b40 or later (ai-gateway-25).
+zuno_ai_gateway_quota_ledger_store: redis
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,

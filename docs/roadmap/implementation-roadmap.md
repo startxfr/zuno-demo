@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 19 | 22 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-175, WP-176, WP-177 |
+| v0.11 | 24 | 19 | 22 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-175, WP-176 |
 | v0.12 | 9 | 5 | 9 | WP-161, WP-164, WP-167 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -960,7 +960,7 @@ frozen mirror.
 | WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Not started | demo333 is powered off - live steps wait for the user to power it on |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Repo work in review | zuno-side A2A gateway (components/a2a-gateway) and two test blueprints per business persona; the fork's identity forwarding on the A2A node is pushed; the demo333 roll-out waits for the user's go |
 | WP-176 | [wp-176](work-packages/wp-176-verify-the-unifai-runtime-images-before-deploying-them.md) | 0586, 0353, 0574 | none | Repo work merged | fork workflow branch for review, the `quay-devel` GitHub environment (user), first signed build, operator digest support (a9), then flip verification on in `demo333.yml` |
-| WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Repo work in review | works with the Kuadrant two-limit ceiling: counters probe and Redis-backed quota ledger in review, live proof after the user's go; removing quota.py deferred until Kuadrant is fixed |
+| WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Done (2026-10-25) | works with the Kuadrant two-limit ceiling: counters probe and Redis-backed quota ledger live on demo333 (budgets survive an ai-gateway restart); removing quota.py deferred until Kuadrant is fixed |
 
 ### OKF stream phases
 
