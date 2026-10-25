@@ -622,4 +622,6 @@ subscriptions show their tiers. Today only service accounts call MaaS (the ai-ga
   (claim `groups`, `mappingMethod: add`; annotation `oauth.openshift.io/generated`). Only `agent_tekos` exists so
   far, because only `paas-dev-01` has logged in; the other groups appear when a persona that holds them logs in,
   which getting a MaaS key requires anyway. Each login also creates a `User` and an `Identity`, to delete after
-  the test. The persona key test (log in, mint keys, call, revoke) is with 59.
+  the test. The persona key test passed on 2026-10-25 (59, recorded in WP-164, `8daee554`), after the
+  maas-api HTTPRoute was admitted by the gateway listener (`59b9be49`): it had been `NotAllowedByListeners`
+  since RHOAI 3.5 moved it to `redhat-ai-gateway-infra`, so no key could be minted.
