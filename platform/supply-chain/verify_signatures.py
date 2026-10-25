@@ -8,8 +8,7 @@ actually deploys, per RELEASING.md), resolves each one's LIVE
 `ImageStreamTag` digest (`oc get istag`), and (WP-111) runs `cosign
 verify` keyless against it - a Fulcio-issued certificate identity/issuer
 checked against a real Rekor entry, replacing the pre-WP-111 `--key`
-mode against the committed Vault Transit public key
-(`agents/zuno-platform-signer.pub`).
+mode against the committed Vault Transit public key (since removed).
 
 Resolving the live digest rather than expecting an already-pinned one in
 `values.yaml` is deliberate: every chart still declares `tag: latest`

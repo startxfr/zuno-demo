@@ -8,15 +8,14 @@
 {{- if not (contains "@sha256:" .reference) -}}
 {{- fail (printf "okf.bundles[%s].reference must be pinned by digest (ADR-0564)" .name) -}}
 {{- end -}}
-{{- if $.Values.okf.verify.keyless -}}
+{{- if not $.Values.okf.verify.keyless -}}
+{{- fail "okf.verify.keyless is required when okf.bundles is set: bundles are verified keyless only (ADR-0578)" -}}
+{{- end -}}
 {{- if not $.Values.okf.trustedRoot -}}
 {{- fail "okf.trustedRoot is required with okf.verify.keyless (ADR-0578)" -}}
 {{- end -}}
 {{- if not (and $.Values.okf.verify.keyless.issuer $.Values.okf.verify.keyless.subjectRegExp) -}}
 {{- fail "okf.verify.keyless needs issuer and subjectRegExp (ADR-0578)" -}}
-{{- end -}}
-{{- else if not $.Values.okf.publicKey -}}
-{{- fail "okf.publicKey is required when okf.bundles is set without okf.verify.keyless (ADR-0564)" -}}
 {{- end -}}
 {{- end -}}
 {{- if and .Values.ragSources (not .Values.stack.rag.sharedPublishers) -}}

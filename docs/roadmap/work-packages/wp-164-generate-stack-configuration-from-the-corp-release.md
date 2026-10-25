@@ -89,3 +89,19 @@ admission of a release now also checks that each allowed knowledge domain is ser
 RAG source (a warning when it is not). Open: quotas, MaaS subscriptions and routing (WP-157), the
 promotion of release 0.3.0 to prove the "takes effect live" acceptance, and the frozen
 `publicKeyRef` path of the hand-pinned Transit bundles.
+
+## Update (2026-10-25)
+
+The frozen Transit path is removed. No cluster pinned a bundle by hand any more, and all 8
+demo333 bundles were already keyless. The changes:
+
+- the `unifai` role no longer passes `okf.publicKey`;
+- `files/zuno-platform-signer.pub` is deleted;
+- the chart drops the `zuno-platform-signer` Secret and the `publicKeyRef` branch;
+- `checks.yaml` refuses bundles without `okf.verify.keyless`.
+
+Rendered with the demo333 released values, the chart differs only by the unused Secret
+leaving. That takes effect at the next `unifai` role run. The Vault Transit key stays as
+the image-signing rollback (ADR-0535).
+
+Still open: step 7, the live promotion proof.

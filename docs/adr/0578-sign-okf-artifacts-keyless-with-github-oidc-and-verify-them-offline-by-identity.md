@@ -123,10 +123,11 @@ and 7 stand.
   role's export of the public key. The Transit key stays for
   `sign-blob`/`verify-blob` (ADR-0535).
 - **Clause 6.** `unifai-operator` verifies keyless bundles (WP-162). The
-  `unifai` role still passes `publicKeyRef` for pre-release bundles pinned
+  `unifai` role passed `publicKeyRef` for pre-release bundles pinned
   by hand, from a frozen copy of the Transit public key
-  (`ansible/roles/unifai/files/`), until WP-164 makes the released,
-  keyless bundles the only path.
+  (`ansible/roles/unifai/files/`), until WP-164 removed that path on
+  2026-10-25: the chart now renders keyless verification only and refuses
+  bundles without it.
 - **ADR-0106.** Its signing mechanism (keyless CI signing of bundle
   directories, later Transit) and its verification points are replaced by
   this record; its requirement that nothing unsigned or invalid runs
