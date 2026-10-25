@@ -257,6 +257,16 @@ unifai_comage_images_only_for_marketing_visual_requests = unifai_checks.marketin
     marketing_prompt="Generate a promotional marketing image of a modern sales team celebrating a big win.",
 )
 
+# Platform-wide checks (ADR-0583 two-user isolation, ADR-0585 A2A gateway identity contract) also run for this
+# agent: `consultant-02` has no `agent_comage` group, `paas-dev-01` is outside `sale-01`'s team workspace.
+A2A_GATEWAY_URL = os.getenv("A2A_GATEWAY_URL", "http://a2a-gateway.zuno-ai-run.svc.cluster.local:8080")
+unifai_denies_another_users_objects_like_missing_ones = unifai_checks.cross_user_isolation(
+    CheckResult, _unifai, owner="sale-01", other="paas-dev-01"
+)
+a2a_gateway_denies_unentitled_callers_like_unknown_agents = unifai_checks.a2a_gateway_denies_unentitled(
+    CheckResult, agent="comage", persona="consultant-02", a2a_gateway_url=A2A_GATEWAY_URL, auth_headers=auth_headers
+)
+
 
 CHECKS = [
     unifai_forwards_identity_to_the_gateways,
@@ -267,6 +277,8 @@ CHECKS = [
     business_role_without_entitlement_denied_by_unifai,
     direct_call_to_salesforce_mcp_denied_without_gateway_token,
     unifai_comage_images_only_for_marketing_visual_requests,
+    unifai_denies_another_users_objects_like_missing_ones,
+    a2a_gateway_denies_unentitled_callers_like_unknown_agents,
 ]
 
 

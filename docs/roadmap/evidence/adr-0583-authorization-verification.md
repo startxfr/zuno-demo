@@ -97,6 +97,13 @@ agent can have). Checks after the roll: 18/18 probe, `cross_user_isolation`, rea
 platform's own clients through the guarded transport (tool call, agent answer, original host name kept under address
 pinning, a name that turns private after connecting, a redirect to the metadata address). No cluster needed.
 
+## Standing checks beyond Tekos (2026-10-25)
+
+`unifai_denies_another_users_objects_like_missing_ones` and `a2a_gateway_denies_unentitled_callers_like_unknown_agents`
+now also run in the Arkos and Comage security checks (Arkos: owner `consultant-02`, other and unentitled persona
+`sale-01`; Comage: owner `sale-01`, other `paas-dev-01`, unentitled `consultant-02`). Both isolation pairs were
+run against demo333 and pass.
+
 ## Open decisions and recommendations
 
 **Confluence allowed hosts (open, recommended to close).** The setting exists
@@ -117,7 +124,7 @@ is fetched; adding it there is quick and recommended.
 | Team name already taken at creation | Reveals a name exists, not its members or content | None |
 | ~~DNS rebinding on the outbound guard~~ | Closed 2026-10-25: the HTTP clients connect to the address just vetted (fork `faed4e198`); Confluence (`requests`) re-vets each request but does not pin | None |
 | ~~Redirects followed by the MCP SDK~~ | Closed 2026-10-25: the installed SDK follows same-origin redirects only; every hop is re-vetted by the guarded transport | None |
-| RAG web fetch resolve-then-connect gap | Same class as DNS rebinding; the web source path was exercised by the operator e2e, not pinned by the transport | Revisit if the web fetcher moves to the guarded transport |
+| ~~RAG web fetch resolve-then-connect gap~~ | Closed 2026-10-25 in the fork (`d895ba2ea`): the web and Confluence `requests` sessions connect to the address they vetted (roll-out pending an image set) | None |
 
 ## Status of ADR-0583
 
