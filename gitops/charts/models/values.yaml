@@ -567,9 +567,13 @@ gptOssModel:
   # Flipped 2026-09-05: verified byte-identical to modelsS3 first (226
   # objects, same sizes, empty aws s3 sync --dryrun).
   s3Source: sources
-  # 131k native; capped well below to bound KV growth while still giving
-  # reasoning tasks far more room than the qwen chat model's 8192.
-  maxModelLen: 32768
+  # Its native 131072 since 2026-10-25 (user decision, was 32768). Benched on
+  # a mig-1g.24gb slice (docs/roadmap/evidence/model-bench-24gb-slice-2026-10-25.md):
+  # weights 13.8 GiB + KV 6.43 GiB (276k tokens, 2.1x one 131k request),
+  # 85 tok/s single / 234 at 4 concurrent, needle found up to 92k tokens.
+  # vLLM's default --gpu-memory-utilization (0.90) still leaves about 5.9 GiB
+  # of KV, about 255k tokens, so the flag is not set.
+  maxModelLen: 131072
   llmInferenceService:
     # ADR-0201/WP-27: which Gateway KServe's own router publishes its
     # HTTPRoute on. This is load-bearing and the history is expensive, so it

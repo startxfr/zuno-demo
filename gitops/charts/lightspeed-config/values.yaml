@@ -61,10 +61,10 @@ olsConfig:
     # lightspeed.enabled block (gitops/charts/models/values.yaml
     # lightspeed.enabled: true).
     directEndpoint: https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
-    # gpt-oss-20b is served with maxModelLen: 32768 (gitops/charts/models/
-    # values.yaml gptOssModel block), well below its 131k native window -
-    # matched here rather than reusing qwen's 128000.
-    contextWindowSize: 32768
+    # gpt-oss-20b is served with maxModelLen: 131072, its native window
+    # (gitops/charts/models/values.yaml gptOssModel block, raised from 32768
+    # on 2026-10-25); matched here.
+    contextWindowSize: 131072
     maxTokensForResponse: 2048
     # Lightspeed inspects every tool result with a classifier that calls THIS model with a hard-coded
     # 128-token limit. gpt-oss-20b reasons by default and the reasoning eats the 128 tokens, so every
