@@ -10,6 +10,7 @@ from components/agent-runtime.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import logging
@@ -42,6 +43,7 @@ from app.schemas import (
     ModelObject,
     RoutingDecision,
 )
+from app.routing_watch import ROUTING_RELOAD_INTERVAL_SECONDS, RoutingWatcher
 from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_empty_response
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -62,6 +64,18 @@ routing_table = RoutingTable()
 image_routing_table = ImageRoutingTable()  # ADR-0415
 model_routing_policy = ModelRoutingPolicy()  # ADR-0303 (WP-39)
 tuning_controller = TuningController()  # ADR-0309 (WP-42) - inert unless the policy enables it
+# The routing files are a ConfigMap of another Argo CD Application: reload them
+# when the mounted copy changes instead of waiting for a pod restart.
+routing_watcher = RoutingWatcher({
+    routing_table.path: routing_table.reload,
+    image_routing_table.path: image_routing_table.reload,
+})
+
+
+@app.on_event("startup")
+async def _start_routing_watch() -> None:
+    if ROUTING_RELOAD_INTERVAL_SECONDS > 0:
+        asyncio.create_task(routing_watcher.run(ROUTING_RELOAD_INTERVAL_SECONDS))
 
 _ROLE_TO_MESSAGE = {"system": SystemMessage, "user": HumanMessage, "assistant": AIMessage}
 

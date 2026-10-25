@@ -65,6 +65,10 @@ class RoutingTable:
             return {}
 
     @property
+    def path(self) -> str:
+        return self._routing_path
+
+    @property
     def loaded(self) -> bool:
         return bool(self._config)
 
