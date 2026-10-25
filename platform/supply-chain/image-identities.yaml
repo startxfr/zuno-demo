@@ -18,11 +18,21 @@ images:
   # Accepted only by a cluster that says so (zuno_unifai_accept_dev_signatures).
   dev_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/publish-images\.yml@refs/heads/devel$'
 
-# The operator, its bundle and its catalog (quay.io/zuno/unifai-operator,
-# -operator-bundle, -operator-catalog), signed by the fork's operator release
-# workflow on an operator-vX.Y.Z tag. No development identity: the operator is
-# never run from a branch build.
+# The operator image (quay.io/zuno/unifai-operator). It is built and signed in CI by the
+# same publish-images workflow as the application images, on `devel` (a9's operator
+# image workflow), and the release only retags that digest. A production release
+# therefore carries a SECOND signature, its provenance and a signature of its SBOM
+# artifact by the operator release workflow, so a cluster that does not accept the
+# development identity can still verify it.
 operator:
+  release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/unifai-operator-release\.yml@refs/tags/operator-v'
+  # The build on the devel branch: accepted only by a cluster that says so.
+  dev_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/publish-images\.yml@refs/heads/devel$'
+
+# The operator's bundle and catalog (quay.io/zuno/unifai-operator-bundle, -catalog):
+# built and signed by the operator release workflow on an operator-vX.Y.Z tag. No
+# development identity: they are never produced from a branch.
+operator_artifacts:
   release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/unifai-operator-release\.yml@refs/tags/operator-v'
 
 # What every image carries besides its signature. The provenance (cosign attest)

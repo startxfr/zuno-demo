@@ -49,7 +49,9 @@ import admit_okf_bundle as admit  # noqa: E402
 IDENTITIES_PATH = HERE / "image-identities.yaml"
 DIGEST_RE = re.compile(r"@(sha256:[0-9a-f]{64})$")
 FAMILY_PREFIX = "quay.io/zuno/unifai-"
-OPERATOR_PREFIX = "quay.io/zuno/unifai-operator"
+OPERATOR_IMAGE = "quay.io/zuno/unifai-operator"
+# The operator's bundle and catalog are built and signed by the operator release workflow only.
+OPERATOR_ARTIFACTS = ("quay.io/zuno/unifai-operator-bundle", "quay.io/zuno/unifai-operator-catalog")
 
 
 class ImageError(ValueError):
@@ -65,7 +67,7 @@ class Result:
 
 def load_identities(path: pathlib.Path = IDENTITIES_PATH) -> dict:
     doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    for key in ("issuer", "images", "operator", "attestations"):
+    for key in ("issuer", "images", "operator", "operator_artifacts", "attestations"):
         if key not in doc:
             raise ImageError(f"{path}: missing '{key}'")
     return doc
@@ -81,7 +83,9 @@ def repository(reference: str) -> str:
 
 def kind_of(reference: str) -> str:
     repo = repository(reference)
-    if repo.startswith(OPERATOR_PREFIX):
+    if repo in OPERATOR_ARTIFACTS:
+        return "operator_artifacts"
+    if repo == OPERATOR_IMAGE:
         return "operator"
     if repo.startswith(FAMILY_PREFIX):
         return "images"

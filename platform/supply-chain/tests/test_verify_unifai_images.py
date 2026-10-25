@@ -166,11 +166,23 @@ class Identities(unittest.TestCase):
                        PUBLISH.replace("startxfr/UnifAI", "someone/UnifAI") + "@refs/tags/v1.0.0"):
             self.assertFalse(self.verify(UI, signer, accept_dev=True)[0].ok, signer)
 
-    def test_the_operator_images_take_only_the_operator_release_identity(self):
-        for ref in (OPERATOR, CATALOG):
+    def test_the_bundle_and_the_catalog_take_only_the_operator_release_identity(self):
+        bundle = f"quay.io/zuno/unifai-operator-bundle@{D2}"
+        for ref in (bundle, CATALOG):
+            self.assertEqual(v.kind_of(ref), "operator_artifacts")
             self.assertTrue(self.verify(ref, OPERATOR_WF + "@refs/tags/operator-v0.1.35")[0].ok, ref)
             self.assertFalse(self.verify(ref, PUBLISH + "@refs/tags/v1.0.0")[0].ok, ref)
             self.assertFalse(self.verify(ref, OPERATOR_WF + "@refs/heads/devel", accept_dev=True)[0].ok, ref)
+            self.assertFalse(self.verify(ref, PUBLISH + "@refs/heads/devel", accept_dev=True)[0].ok, ref)
+
+    def test_the_operator_image_takes_the_release_identity_or_the_devel_build_only_on_request(self):
+        self.assertEqual(v.kind_of(OPERATOR), "operator")
+        self.assertTrue(self.verify(OPERATOR, OPERATOR_WF + "@refs/tags/operator-v0.1.38")[0].ok)
+        devel = PUBLISH + "@refs/heads/devel"
+        self.assertFalse(self.verify(OPERATOR, devel, accept_dev=False)[0].ok)
+        self.assertTrue(self.verify(OPERATOR, devel, accept_dev=True)[0].ok)
+        self.assertFalse(self.verify(OPERATOR, PUBLISH + "@refs/heads/feature/x", accept_dev=True)[0].ok)
+        self.assertFalse(self.verify(OPERATOR, OPERATOR_WF + "@refs/heads/devel", accept_dev=True)[0].ok)
 
     def test_a_missing_provenance_or_sbom_is_refused_by_name(self):
         signer = PUBLISH + "@refs/tags/v1.0.0"
@@ -193,9 +205,11 @@ class Identities(unittest.TestCase):
 
     def test_the_committed_identities_name_the_forks_workflow(self):
         self.assertEqual(ident["issuer"], "https://token.actions.githubusercontent.com")
-        for section in ("images", "operator"):
+        for section in ("images", "operator", "operator_artifacts"):
             self.assertIn("startxfr/UnifAI", ident[section]["release_subject_regexp"].replace("\\", ""))
-        self.assertNotIn("dev_subject_regexp", ident["operator"])
+        # the operator image is built on devel by the publish workflow; its bundle and catalog never are
+        self.assertIn("publish-images", ident["operator"]["dev_subject_regexp"])
+        self.assertNotIn("dev_subject_regexp", ident["operator_artifacts"])
 
 
 class Pods(unittest.TestCase):
