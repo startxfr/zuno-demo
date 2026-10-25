@@ -75,11 +75,16 @@ class RedisCounterStore:
             if not addr:
                 raise RuntimeError("REDIS_ADDR is not configured")
             import redis  # imported lazily: the memory store needs no Redis package
+            from redis.backoff import NoBackoff
+            from redis.retry import Retry
 
             host, _, port = addr.partition(":")
+            # redis-py retries a failed connection 3 times with a growing wait by default; on the request
+            # path that turned one dead Redis into a multi-second stall (drill, 2026-10-25). No retries.
             self._client = redis.Redis(
                 host=host, port=int(port or 6379), password=os.getenv("REDIS_PASSWORD") or None,
                 socket_timeout=0.1, socket_connect_timeout=0.1, decode_responses=True,
+                retry=Retry(NoBackoff(), 0),
             )
         return self._client
 

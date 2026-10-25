@@ -187,3 +187,17 @@ class DurableLedgerTests(unittest.TestCase):
             self.assertIsNone(TokenBudgetLedger(config=CONFIG)._store)
         with mock.patch.dict("os.environ", {"QUOTA_LEDGER_STORE": "redis"}):
             self.assertIsInstance(TokenBudgetLedger(config=CONFIG)._store, RedisCounterStore)
+
+    def test_default_client_does_not_retry_a_dead_redis(self) -> None:
+        # redis-py's default (3 retries with backoff) stalled the request path for seconds.
+        import time
+
+        with mock.patch.dict("os.environ", {"REDIS_ADDR": "127.0.0.1:1"}):
+            store = RedisCounterStore()
+            started = time.perf_counter()
+            self.assertEqual(store.get(("standard", "user", "u", 1)), 0)
+            self.assertLess(time.perf_counter() - started, 1.0)
+            # and the next calls are skipped for the back-off window
+            started = time.perf_counter()
+            store.add(("standard", "user", "u", 1), 5, 3600)
+            self.assertLess(time.perf_counter() - started, 0.05)
