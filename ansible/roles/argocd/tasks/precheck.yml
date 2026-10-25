@@ -56,3 +56,60 @@
 
 - name: "argocd | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+# Health of ArgoCD's own installer (platform/gitops/check_gitops_operator.py): a failed
+# InstallPlan, a CSV left Replacing/Pending by an upgrade that did not finish (demo333 was in
+# that state from 2026-10-12 to 2026-10-25 and nothing said so), a Subscription on a moving
+# channel with Automatic approval, an ArgoCD pod that is not Ready or just restarted.
+# Read-only; `make d0 check argocd` fails on any finding.
+- name: "argocd | read the operator Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    namespace: openshift-gitops-operator
+    name: openshift-gitops-operator
+  register: _argocd_sub
+
+- name: "argocd | read the operator CSVs"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: openshift-gitops-operator
+  register: _argocd_csvs
+
+- name: "argocd | read the operator InstallPlans"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    namespace: openshift-gitops-operator
+  register: _argocd_installplans
+
+- name: "argocd | read the pods of the operator and of ArgoCD"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: "{{ item }}"
+  loop: [openshift-gitops-operator, openshift-gitops]
+  register: _argocd_pods
+
+- name: "argocd | check the operator and ArgoCD health"
+  ansible.builtin.command:
+    argv: "{{ ['python3', zuno_repo_root ~ '/platform/gitops/check_gitops_operator.py'] + (['--allow-moving-channel'] if (zuno_argocd_allow_moving_channel | default(false) | bool) else []) }}"
+    stdin: >-
+      {{ {'subscription': (_argocd_sub.resources | default([{}]) | first | default({}, true)),
+          'csvs': (_argocd_csvs.resources | default([]) | selectattr('metadata.name', 'match', '^openshift-gitops-operator') | list),
+          'installplans': (_argocd_installplans.resources | default([])),
+          'pods': (_argocd_pods.results | map(attribute='resources') | flatten)} | to_json }}
+  register: _argocd_health
+  changed_when: false
+  failed_when: false
+
+- name: "argocd | fail on an unhealthy operator or ArgoCD"
+  ansible.builtin.fail:
+    msg: |-
+      The OpenShift GitOps operator or ArgoCD is not healthy:
+      {% for f in ((_argocd_health.stdout | default('{}') | from_json).findings | default([])) %}
+      - {{ f }}
+      {% endfor %}
+      {{ (_argocd_health.stdout | default('{}') | from_json).error | default('') }}
+  when: _argocd_health.rc != 0

@@ -24,3 +24,13 @@ target ever applies it.
 
 Runs first among prerequisite components - see
 `ansible/playbooks/day0_{check,install}.yml`.
+
+## Operator upgrades and health
+
+The Subscription is on a version channel (`gitops-1.22`) with `Manual` approval, so an upgrade of
+the operator starts only when its InstallPlan is approved. `make d0 check argocd` runs
+`platform/gitops/check_gitops_operator.py` and fails on a failed InstallPlan, a CSV left
+`Replacing` or `Pending`, a Subscription on `latest` with `Automatic` approval (set
+`zuno_argocd_allow_moving_channel: true` in the cluster file to accept it), or an ArgoCD pod that is not
+Ready or restarted in the last 15 minutes. Background: demo333 kept a failed 1.21.4 -> 1.22.0 upgrade for
+13 days, unreported, because the old operator kept running.
