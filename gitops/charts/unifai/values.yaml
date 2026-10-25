@@ -84,6 +84,9 @@ stack:
     # Confluence credentials for the Confluence source type (Vault path of
     # the existing technical identity, ADR-0568).
     confluenceVaultPath: confluence/technical
+    # The site those credentials belong to (ADR-0583): the operator limits them to this host;
+    # a source on another host is fetched anonymously. Empty = sent to every source's baseUrl.
+    confluenceUrl: https://startxfr.atlassian.net
   backup:
     enabled: false
     schedule: "0 2 * * *"

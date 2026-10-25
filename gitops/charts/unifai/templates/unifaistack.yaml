@@ -112,6 +112,9 @@ spec:
     confluence:
       username: {name: unifai-confluence, key: email}
       token: {name: unifai-confluence, key: token}
+      {{- with $s.rag.confluenceUrl }}
+      url: {{ . | quote }}
+      {{- end }}
     {{- end }}
   {{- if $s.backup.enabled }}
   backup:
