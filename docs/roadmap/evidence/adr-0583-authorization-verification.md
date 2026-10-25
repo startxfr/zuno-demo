@@ -86,6 +86,15 @@ personas), and the items still open in the fork roadmap.
 - Unrelated known issue: seven bundles show `signature manifest has 35 layers,
   at most 32 are read` (tracked by the operator owner); their workflows stay Ready.
 
+## Outbound guard, second hardening (fork `devel-9c13a282b`, 2026-10-25)
+
+Every request and redirect hop of a user-supplied URL is vetted again and the connection goes to the vetted
+address (`net_guard_httpx`, `net_guard_requests`): MCP transports and validator, the A2A client, discovery GETs, and
+the Confluence session. Rolled on demo333 with the a2a-gateway rebuild (uniform 404 for every `/agents/` name no
+agent can have). Checks after the roll: 18/18 probe, `cross_user_isolation`, real delegated A2A turns as `sale-01`,
+`paas-dev-01` and `recrut-01`. Not covered by any e2e: MCP and A2A against a real external server (no fixture), so the
+address pinning there rests on unit tests.
+
 ## Open decisions and recommendations
 
 **Confluence allowed hosts (open, recommended to close).** The setting exists
@@ -104,9 +113,9 @@ is fetched; adding it there is quick and recommended.
 | Slack lookups open to any signed-in user | Slack is not configured on this stack | Revisit before enabling Slack |
 | Global RAG counts | Counts only, no content or identifiers | None |
 | Team name already taken at creation | Reveals a name exists, not its members or content | None |
-| DNS rebinding on the outbound guard | Needs an attacker-controlled DNS name answering differently at connect time | Pin the resolved address if the guard moves to a shared HTTP client |
-| Redirects followed by the MCP SDK | Not verified to reach internal addresses | Verify, then fix or accept |
-| RAG web fetch resolve-then-connect gap | Same class as DNS rebinding | Same as above |
+| ~~DNS rebinding on the outbound guard~~ | Closed 2026-10-25: the HTTP clients connect to the address just vetted (fork `faed4e198`); Confluence (`requests`) re-vets each request but does not pin | None |
+| ~~Redirects followed by the MCP SDK~~ | Closed 2026-10-25: the installed SDK follows same-origin redirects only; every hop is re-vetted by the guarded transport | None |
+| RAG web fetch resolve-then-connect gap | Same class as DNS rebinding; the web source path was exercised by the operator e2e, not pinned by the transport | Revisit if the web fetcher moves to the guarded transport |
 
 ## Status of ADR-0583
 
