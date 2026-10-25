@@ -1200,16 +1200,6 @@ maas:
             - limit: 1000000
               window: 1h
           priority: 100
-        # 2026-10-25: Lightspeed's own ServiceAccount, so it can be served by this model. Lightspeed's tool-result
-        # inspection calls the active model with a hard-coded 128-token limit; gpt-oss-20b and the other qwens reason
-        # by default and fail it (docs/roadmap/evidence/lightspeed-tool-result-inspection-2026-10-25.md), this model
-        # answers it. Same scoping and tier as the qwen36 / gpt-oss-20b Lightspeed entries.
-        - name: qwen35-9b-wesh-lightspeed
-          user: "system:serviceaccount:openshift-lightspeed:lightspeed-maas-client"
-          tokenRateLimits:
-            - limit: 200000
-              window: 1h
-          priority: 50
       authPolicy:
         name: qwen35-9b-wesh-entitlement
 
