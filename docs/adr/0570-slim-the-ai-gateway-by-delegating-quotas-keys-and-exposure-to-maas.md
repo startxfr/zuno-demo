@@ -267,3 +267,18 @@ moving any ceiling to MaaS.
 The earlier amendments' "group ceiling enforced" holds only where the shim
 processes the pair; see [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md)'s
 amendment of the same correction.
+
+## Amendment (2026-10-25) - the per-user ceiling is accepted as not enforced at MaaS
+
+Decision of the user (2026-10-25): the per-user token ceiling stays **not enforced at MaaS** until Kuadrant
+fixes the wasm shim; it remains guarded by the ai-gateway's `app/quota.py` only. The defect is now
+reproduced on a throwaway Gateway, route and `TokenRateLimitPolicy` (four limits, ten requests): the shim
+completes **only the first two limits by sorted limit name**, on any route, so it is not specific to MaaS and
+the earlier "last pair is lost" reading is narrowed to this. Renaming a limit moves it in or out of the counted
+pair. No Zuno-side reordering fixes it on routes that carry the controller's subscription limits.
+
+Suggested upstream action (not filed; the user decides): open an issue on the Kuadrant project with
+[the drafted report](../roadmap/evidence/kuadrant-token-limits-upstream-report.md). It asks for confirmation of
+a two-pair ceiling, a fix (or a documented ceiling), a warning naming the skipped limit instead of
+`invalid context_id`, and documentation that the limit name sets the evaluation order. When it is fixed, re-run
+the order check described in [WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md).

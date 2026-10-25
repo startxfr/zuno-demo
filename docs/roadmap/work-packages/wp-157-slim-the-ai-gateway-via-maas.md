@@ -355,9 +355,15 @@ the per-user and cross-model guard (ADR-0511 and ADR-0570 amendments of
 Open, not scheduled. Goal: enforce the per-user ceiling and a cross-model
 total outside the gateway, so `app/quota.py` and its budgets can go.
 
-- Report the wasm shim defect upstream (Kuadrant): the trailing token-limit
-  action pairs of a request are never counted; actions are ordered by limit
-  name, so the last limit is always the one lost.
+- Report the wasm shim defect upstream (Kuadrant): only the first two
+  token limits of a route, by sorted limit name, are counted (confirmed
+  2026-10-25 on a throwaway route: four limits, `l1`/`l2` counted, `l3`/`l4`
+  never; renaming `l1` to `z1` moves the counted pair). The report is drafted
+  in [kuadrant-token-limits-upstream-report.md](../evidence/kuadrant-token-limits-upstream-report.md)
+  and **not filed**; filing it is the user's decision. User decision
+  2026-10-25: the per-user ceiling is accepted as not enforced at MaaS until
+  Kuadrant fixes it (see the ADR-0570 amendment of the same date); nothing
+  else changes on the Zuno side.
 - Once fixed, re-run the order check (both gateway limits and every
   per-subscription limit counting), then V8 for a cross-model total
   (a policy whose counter spans routes, or another design).
