@@ -156,7 +156,7 @@ sources:
   - version:4.22
   web:
     urls:
-    - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/index
+    - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/virtualization/index
     crawl: redhat-docs
     maxPages: 50
     metadata:
@@ -166,7 +166,7 @@ sources:
       family: redhat-virtualization
       language: en
     include:
-    - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html/virtualization/*
+    - https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/virtualization/*
 - name: rh-red-hat-advanced-cluster-management-2-17
   tags:
   - knowledge.tech
