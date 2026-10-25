@@ -160,6 +160,7 @@ sources:
     crawl: redhat-docs
     maxPages: 50
     metadata:
+      book_format: html-single
       product: OpenShift Virtualization
       product_slug: openshift-virtualization
       version: '4.22'
