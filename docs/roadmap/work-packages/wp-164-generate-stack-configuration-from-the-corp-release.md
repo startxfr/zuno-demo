@@ -211,4 +211,25 @@ re-queried until the run timed out. Fixes, in order:
   either.
 - **Lot 1 follow-up:** the `<model>-agents` and `<model>-sales` subscriptions carry both group
   spellings since `e515508a`, for API-key callers (WP-157 inventory).
+- **Lot 1 verified with per-persona API keys (2026-10-25, demo333).** The `maas-api` route was not
+  exposed (`NotAllowedByListeners`: the gateway listener did not allow `redhat-ai-gateway-infra`); `59b9be49`
+  / `f648cb56` added it. Each persona logged in to OpenShift through the `openshift` OpenID IdP (this
+  generates the `User`, `Identity` and the unslashed groups), minted a 2 h key at
+  `POST /maas-api/v1/api-keys`, then sent one chat to `gpt-oss-20b`:
+
+  | Persona (Keycloak groups) | Subscription bound to the key | Chat | Limitador counter |
+  |---|---|---|---|
+  | tekos-entitlement-only-user-01 (`agent_tekos`) | `gpt-oss-20b-agents` | 200 | agents, 100,000/h |
+  | arkos-entitlement-only-user-01 (`agent_arkos`) | `gpt-oss-20b-agents` | 200 | agents |
+  | comage-entitlement-only-user-01 (`agent_comage`) | `gpt-oss-20b-agents` | 200 | agents |
+  | sale-01 (`sales`, `agent_comage`, `agent_finage`) | `gpt-oss-20b-agents` | 200 | agents (priority 10 beats sales) |
+  | sales-role-only-user-01 (`sales`) | `gpt-oss-20b-sales` | 200 | sales, 5,000/h |
+  | consultant-role-only-user-01 (`consultant`) | none | key refused: 400 `invalid_subscription`; its OpenShift token on the model route: 403 | none |
+
+  No credential: 401. A revoked key: 403. Afterwards every test key was revoked, the OAuth access
+  tokens, the generated groups (`agent_arkos`, `agent_comage`, `agent_finage`, `consultant`, `sales`),
+  the `Identity` and `User` objects were deleted, and the test user was removed from `agent_tekos`;
+  the cluster is back to its earlier user and group list. Not covered: `sale-02`-style users that
+  hold only `agent_*` groups of other agents, and the 429 behaviour at the tier ceiling (the sales
+  tier is 5,000 tokens/h; not exhausted on purpose).
 
