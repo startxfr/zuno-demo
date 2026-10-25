@@ -62,6 +62,19 @@ personas), and the items still open in the fork roadmap.
   internal service names outside `zuno-ai-run`) for MCP transports, the A2A
   client, OAuth discovery, the forwarded-token probe and the Confluence fetch.
 
+## Roll-out check on demo333 (fork `devel-ffb64e335`, images pinned by digest, 2026-10-25)
+
+- The 18-check pilot probe passes again (18/18) on the rolled stack.
+- The standing check `cross_user_isolation` (`consultant-01` vs `sale-01`) passes.
+- A2A gateway: anonymous POST to a served agent is refused (401). Real delegated
+  turns: `sale-01` through `test-sale-01-a2a` gets an answer from the comage
+  agent (1.9 s) with its own token. `adv-01`'s A2A blueprint reports a clean
+  404 on the card because `advantage` is still a placeholder (not served).
+- The authenticated denial case of `a2a_gateway_denies_unentitled` runs from a
+  pod with a persona token (cluster-internal service); it is not yet exercised
+  against the live gateway, only by the gateway's unit tests.
+- The earlier slow `finance-01` chat did not reproduce (39.8 s, on-topic reply).
+
 ## Open decisions and recommendations
 
 **Confluence allowed hosts (open, recommended to close).** The setting exists
