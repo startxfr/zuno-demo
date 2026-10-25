@@ -169,3 +169,12 @@ redhatDocs:
 #   visibility: shared
 #   aclGroups: [agent_tekos]
 #   syncInterval: 6h
+
+# A small static site of synthetic French sales pages ("données de démonstration"), served inside the stack
+# so a `web` RAG source tagged knowledge.sales can index them (comage's domain; the Salesforce ingestion of the
+# retired rag-service no longer exists). Off by default. The pages live in files/sales-corpus/.
+salesCorpus:
+  enabled: false
+  name: sales-corpus
+  # python:3.12-slim running its own http.server; pinned by digest like the other third-party images (ADR-0586 cl. 7).
+  image: docker.io/library/python@sha256:e8a38829209aea82774882e5157e1f7c3e8c8393ff53a697b3580896e57f345c  # 3.12-slim
