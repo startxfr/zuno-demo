@@ -1,4 +1,8 @@
 ---
+# `make d2 check unifai` runs this file (day2_check.yml); the precheck comes first.
+- name: "unifai | precheck"
+  ansible.builtin.include_tasks: precheck.yml
+
 - name: "unifai | check the Applications are Synced and Healthy"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
   loop: ["zuno-unifai-d0", "zuno-unifai-d1"]
