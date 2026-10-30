@@ -17,3 +17,11 @@ python3 evaluations/redhat-docs/compare.py --persona consultant-02 --top-k 5
 
 `--engines unifai` queries UnifAI alone (once `rag-service` is retired); `UNIFAI_SOURCE_TYPES`
 (default `WEB`) lists the source types searched on the UnifAI side.
+
+## Ranking set
+
+`ranking.yaml` (24 questions) measures the retriever's ranking (hit@1, hit@5, MRR) before and after a
+change to UnifAI's search: natural questions with the book or Confluence page that answers them,
+and three questions with no answer in the corpus, to calibrate the relevance threshold. Query
+`query.bearer` with each entry's `sourceType` and `tags` and `top_k_results` (not `top_k`), as a
+member of `agent_tekos`. See the file header for the matching rule.
