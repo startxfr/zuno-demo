@@ -30,3 +30,9 @@ Results are kept in `results/`, one JSON report per run (per-question rank, top 
 `ranking-before-2026-10-31.json` is the baseline before UnifAI operator 0.1.44: hit@1 0.52, hit@5
 0.76, MRR 0.63 over the 21 answerable questions, and every no-answer question still gets a top
 score of 0.5, because the score is a fused rank, not a relevance.
+
+`ranking-dbsf-2026-10-31.json`: the same set after UnifAI operator 0.1.45 made DBSF (score-based)
+fusion the default, on the same chunks: hit@1 0.71, hit@5 0.86, MRR 0.77. Still missed: 1
+(namespace definition), 2 and 12. Scores now range 0-2 (sum of normalised dense and sparse scores),
+but the no-answer questions (0.95-1.65) overlap the answered ones (1.02-2.30 at rank 1): no
+threshold separates them yet.
