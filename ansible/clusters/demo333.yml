@@ -233,10 +233,11 @@ zuno_unifai_values:
         limits: {cpu: '4', memory: 4Gi}
     rag:
       tokenReview: true
-      # Layer 4c reranker, 3rd and last try (2026-10-31): the English MiniLM ranked worse than DBSF on French questions
-      # (0.62/0.86/0.70 against 0.71/0.86/0.77); this multilingual cross-encoder is kept only if it matches or beats DBSF,
-      # otherwise the reranker is removed. If TEI cannot load it, remove this line.
-      reranker: {mode: deploy, model: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1, candidates: 10}
+      # Layer 4c reranker OFF (2026-10-31, closed): three CPU rerankers were tried on the French Red Hat set and none matched
+      # DBSF alone (0.71/0.86/0.77): bge-reranker-base timed out (~0.9 s per candidate), the English MiniLM got 0.62/0.86/0.70,
+      # the multilingual mmarco-mMiniLMv2 got 0.67/0.86/0.75 (2.9 s for 10 candidates, no score threshold separates the
+      # unanswerable questions). To retry: reranker: {mode: deploy, model: <model>, candidates: <n>}; the image and
+      # resources keys stay, unused while rag.reranker is unset.
     ragClients:
     - namespace: zuno-ai-run
       podLabels:
