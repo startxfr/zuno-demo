@@ -109,6 +109,11 @@ jobs:
           helm dependency build gitops/charts/keycloak
           pip install pytest
           python3 -m pytest -q platform/keycloak/tests
+      # Renders the models chart (no dependency) and passes each model's vLLM
+      # args through the same shell eval as KServe's start script: a bare JSON
+      # argument crash-looped qwen35-9b on 2026-10-25 (60d6e81e).
+      - name: vLLM args survive the KServe start script
+        run: python3 -m pytest -q platform/models/tests
       # The check renders the keycloak and postgresql charts, which both depend
       # on the startx "operator" chart (alias:startx); keycloak's was built
       # above, postgresql's was not and `helm template` refused to render it.
