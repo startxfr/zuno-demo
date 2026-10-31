@@ -216,7 +216,7 @@ zuno_unifai_values:
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
       backend: quay.io/zuno/unifai-backend@sha256:23635466a7eead52c6c4b2cbb915147f91d0d1ef4600261eb4611e87b78e7568  # devel-be4821358
       identity: quay.io/zuno/unifai-identity@sha256:4a68541949850543d9e8fc85ec96d34ba6e7889b501190e64fe9a1752a9dd741  # devel-be4821358
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:8d5d62c7a31dee5be6a3341b6d01f6d51963d07aea45db6e5ea84c5142c57fe8  # devel-be4821358
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:71f5bb046589cac9d65f430586620d9da21fc99fd843215eb25955b46ead076b  # devel-77e1a6421 (tool errors logged)
       rag: quay.io/zuno/unifai-rag@sha256:24a509279b56937b9c38a78efa257fecc9378dc2a3ff3e5949ba97dd0bdb793d  # devel-be4821358
       ui: quay.io/zuno/unifai-ui@sha256:f031482f7043c8a39b40e295d4d4f7b3c2f089999a33cd4a855addc72cd48386  # devel-be4821358
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
@@ -233,10 +233,9 @@ zuno_unifai_values:
         limits: {cpu: '4', memory: 4Gi}
     rag:
       tokenReview: true
-      # Layer 4c reranker OFF (2026-10-31): bge-reranker-base on CPU costs ~0.9 s per candidate, so 30 candidates exceed
-      # the rag-server's 10 s timeout on every query (+10 s each, results in the fused order). To retry: a smaller model
-      # or fewer/shorter candidates, e.g. reranker: {mode: deploy, model: <smaller>, candidates: 5}; the image and
-      # resources keys below stay, unused while rag.reranker is unset.
+      # Layer 4c reranker, 2nd try (2026-10-31): the CPU bge-reranker-base cost ~0.9 s per candidate and timed out on every
+      # query (+10 s); a 6-layer cross-encoder is ~10x cheaper. Roll back by removing this line.
+      reranker: {mode: deploy, model: cross-encoder/ms-marco-MiniLM-L-6-v2, candidates: 10}
     ragClients:
     - namespace: zuno-ai-run
       podLabels:
