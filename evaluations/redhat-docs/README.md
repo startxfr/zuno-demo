@@ -46,3 +46,18 @@ has "Query:".
 `ranking-prefix-nospace-2026-10-31.json`: the same prefix in the model card's exact format ("Query:",
 no space) gives the same numbers (0.67 / 0.71 / 0.68). The instruction does not help this corpus: by
 the agreed rule it is removed, back to DBSF alone.
+
+The first reranker (TEI on CPU, `BAAI/bge-reranker-base`, 30 candidates) timed out on every query: about
+0.9 s per 512-token candidate, against the rag-server's 10 s read timeout. Every query fell back to the
+fused order and paid the 10 s, so that run (0.67 / 0.90 / 0.76) measures DBSF. No report is kept.
+`ranking-rerank-minilm-2026-10-31.json`: DBSF, then `cross-encoder/ms-marco-MiniLM-L-6-v2` (TEI on CPU)
+reranks 10 candidates. That takes about 1.5 s per query at 512 tokens per candidate, and no query timed
+out. Ranking is WORSE than DBSF alone: hit@1 0.62, hit@5 0.86, MRR 0.70. Questions 1 and 2 drop out of
+the top 10, and 7, 9 and 19 each lose ranks. The score is now a relevance in 0-1:
+
+- The no-answer questions top out at 1e-5 to 8e-5.
+- Most answered questions are above 0.8.
+- Four answered questions sit low: 3 and 11 (top result is Argo CD docs, 0.12 and 0.16), and 19 and 21,
+  which are French Confluence questions (0.15 and 0.00015). The model is trained on English MS MARCO.
+
+A threshold between 8e-5 and 1.5e-4 separates the two groups on this set, but with almost no margin.
