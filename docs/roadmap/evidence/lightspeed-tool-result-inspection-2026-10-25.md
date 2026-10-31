@@ -107,3 +107,16 @@ end-to-end path (a full query), not only the component that failed.
 | Confluence (zuno-mcp, Keycloak persona token) | works: first call with the wrong argument name (`search_query`), the tool error passes the classifier, it retries with `query` and answers | **fails**: keeps the wrong argument name, the tool error text is classified `injectionDetected: false` with a non-`none` category, Lightspeed aborts |
 
 Limits met while testing: the Lightspeed subscription is 200,000 tokens per hour per model, which allows only about 6 to 10 docs questions per hour (classifier included).
+
+## qwen3.6-27b with thinking off, and the decision (2026-11-01)
+
+Read-only test run by zuno-demo-68 through the Lightspeed code path (thinking disabled per request with `chat_template_kwargs.enable_thinking=false`, admin token, no live change), the ten questions of the comparison above:
+
+| Result | Detail |
+|---|---|
+| Questions answered | 4 of the 5 that completed (pods, cluster proxy, minor update, NetworkPolicy ingress) in 67 to 170 s each |
+| Classifier | exercised once: failed on a 7,719-character `pods_list_in_namespace` result with `LengthFinishReasonError` at the hard-coded 128 completion tokens; the documentation tool results were not inspected in the passing runs |
+| Not measured | questions 6 to 10: 429 on the Lightspeed 200,000 tokens/hour window |
+| Context | with `contextWindowSize` 32768 the tool definitions (13,432 tokens) plus the request (1,230) exceed the prompt budget (14,336): the model's real window cannot carry today's MCP tool set; the test only ran with a 40,000 override |
+
+Decision of the user: keep `gpt-oss-20b` with the server-side default reasoning effort `low` and keep the inspection enabled. No OLSConfig, model or budget change. Consequences accepted: about 30% of documentation questions fail on the classifier's `none`/`unknown` category mismatch (7 of 10 pass), Confluence keeps working. Next step if this becomes a priority: the 128-token cap and the `none`/`unknown` strictness are defects of the Lightspeed service, to be reported upstream; qwen3.6-27b is not a fix (slow, still hits the cap, window too small for the tools).
