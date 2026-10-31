@@ -247,6 +247,11 @@ zuno_ai_gateway_closed_class_maas_only: true
 # its counters in the platform Redis, so a restart no longer resets the
 # budgets. Needs the image built from c5ca1b40 or later (ai-gateway-25).
 zuno_ai_gateway_quota_ledger_store: redis
+# WP-164 lots 2 and 3 (user go 2026-10-31): mount the model-routing policy and
+# the per-agent guardrail modes generated from the agents release. Needs the
+# image built from b1facfc2 or later (ai-gateway-28).
+zuno_ai_gateway_model_routing_generated: true
+zuno_ai_gateway_guardrails_modes_generated: true
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,
