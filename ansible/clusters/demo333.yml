@@ -219,14 +219,22 @@ zuno_unifai_values:
       multiagent: quay.io/zuno/unifai-multiagent@sha256:8d5d62c7a31dee5be6a3341b6d01f6d51963d07aea45db6e5ea84c5142c57fe8  # devel-be4821358
       rag: quay.io/zuno/unifai-rag@sha256:24a509279b56937b9c38a78efa257fecc9378dc2a3ff3e5949ba97dd0bdb793d  # devel-be4821358
       ui: quay.io/zuno/unifai-ui@sha256:f031482f7043c8a39b40e295d4d4f7b3c2f089999a33cd4a855addc72cd48386  # devel-be4821358
+      # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
+      reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
       # The CronJobs and restore Jobs (ADR-0586 clause 7): pinned by digest, unsigned,
       # the manifest list of the tag that ran (aws-cli 2.22.35, mongo 7.0.16).
       images:
         awsCli: public.ecr.aws/aws-cli/aws-cli@sha256:71a65c33c30e36dbfdff15707514f3b7b6fc789f2f134722f959b5cd13b93dd5  # 2.22.35
         mongo: docker.io/library/mongo@sha256:c630c59342c1493d50345136df2af14a76b9e827dd5316bfabee07a0880a5f3a  # 7.0.16
+    resources:
+      reranker:
+        requests: {cpu: '1', memory: 1Gi}
+        limits: {cpu: '4', memory: 4Gi}
     rag:
       tokenReview: true
+      # Layer 4c (user go 2026-10-31): TEI on CPU in the stack namespace; candidates reranked per query.
+      reranker: {mode: deploy, model: BAAI/bge-reranker-base, candidates: 30}
     ragClients:
     - namespace: zuno-ai-run
       podLabels:

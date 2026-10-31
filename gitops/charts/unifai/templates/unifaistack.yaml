@@ -18,6 +18,10 @@ spec:
   images:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- with $s.resources }}
+  resources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   storage:
     className: {{ $s.storageClass }}
     sharedClassName: {{ $s.sharedStorageClass }}
@@ -102,6 +106,11 @@ spec:
       queryPrefix: {{ . | toJson }}
       {{- end }}
     hybrid: {{ $s.rag.hybrid }}
+    {{- with $s.rag.reranker }}
+    # Second-stage reranker (unifai-operator >= 0.1.47): the rag pods rerank the fused candidates and fall back to the fused order if it is down.
+    reranker:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
     {{- if $s.rag.tokenReview }}
     # The RAG search accepts OpenShift console tokens (Lightspeed users) after a Kubernetes TokenReview.
     # unifai-operator >= 0.1.29 gives the rag-server its own ServiceAccount and binds it to
