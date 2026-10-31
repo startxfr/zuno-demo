@@ -295,3 +295,28 @@ User go 2026-10-31, coordinated with 68, 59, cc and a0.
   and the direct `local-qwen35` answered in 26 s for 40 tokens. The MaaS path to qwen35-9b is a
   first-token latency lead, to investigate.
 
+## Update (2026-10-31): lot 4, the arkos history window proven end to end
+
+Arkos declares `limits.memory.history {enabled: true, max_turns: 6, token_budget: 6000}`. The proof
+uses one 9-turn conversation (`stress-consultant-01`, team `agent-arkos`) and reads `zuno.prompt_tokens`
+on the run's `model_call` spans in Tempo.
+
+- **Operator 0.1.45 (first run, 15:34Z): not enforced.** The first call of each turn grew from 633 to
+  30,027 tokens, and later calls reached 34,234. Cause, found by a9: the window bounded the conversation
+  messages, but not the "previous agent results" block, where a whole DAT was added every turn.
+- **Second run (17:47Z): stalled.** An arkos reply ran to ~40k tokens on gpt-oss-20b. The ai-gateway
+  dropped the UnifAI client's `max_completion_tokens` (4096), because its request schema had no such
+  field.
+  - Cleared by recreating the UnifAI temporal worker pod (user go). `session.cancel` answered 409.
+  - Fixed in the ai-gateway (`28c23755`, `1193a092`, image `ai-gateway-29`): body caps are honoured,
+    and a call that sets none gets a default of 8192. Proof: `max_tokens` 20 gave `completion_tokens` 20.
+- **Operator 0.1.47 + ai-gateway-29 (18:35Z): enforced.** The first call of each turn: 633, 4216, 4301,
+  7943, 7932, 8163, 10362, 9442, 11309, flat at 8-12k from turn 4. This is about two 6000-token blocks
+  plus the system prompt and the RAG context. The longest reply over 60 model calls was 4096 tokens.
+  - One single call in turn 6 had 30,318 prompt tokens; the calls after it were back at ~10k.
+    Content produced inside a turn (tool results, RAG context) is not windowed.
+- **Follow-ups:**
+  - tekos 0.4.4 gets the same window, and arkos 0.2.1 caps its three uncapped tasks at 8192
+    (zuno-demo-agents branch `tekos/history-window`, for the next agents release).
+  - Operator 0.1.48 will send the task limits as `X-Zuno-Max-Tokens`.
+
