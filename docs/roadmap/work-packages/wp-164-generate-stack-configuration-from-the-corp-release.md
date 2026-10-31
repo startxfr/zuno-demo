@@ -230,6 +230,7 @@ re-queried until the run timed out. Fixes, in order:
 | | 2 | 57/59 | fail | first token 16.9 s; unifai-backend restarted at 20:49Z mid-run |
 | | 3 | partial | pass | the report kept only 9 results; the Job log shows #11 passing |
 | Quiet stack (2026-10-31) | 1 | 51/52 | pass | first token 9.7 s; #10 passes via the Tempo `rag.search` fallback |
+| Local reasoning first (agents v0.8.0, 2026-10-31) | 1 | 52/52 | pass | first token 2.0 s; reranker off; all 44 model calls local |
 
 - **The loop is fixed:** no timeout since 0.6.3.
 - **#11 is a ranking problem now:** on the misses tekos answers in time, names the Confluence page and
@@ -238,6 +239,11 @@ re-queried until the run timed out. Fixes, in order:
 - **First-token latency** is above the 6 s target in every run (8-45 s). On a quiet stack
   (2026-10-31: no other test, GPU nodes at 7% CPU, no restart) it is still 9.7 s, so it is not
   load. The bulk pass gives p50 23.8 s and p95 62.8 s per full answer (10 interactions, 0 errors).
+  Cause: `answer-technical-question` listed `reasoning-external` (ovhcloud-gpt-oss-120b) first. Tekos
+  0.4.3 puts local `reasoning` first (zuno-demo-agents v0.8.0, with tekos 0.4.4's history window). The rerun
+  (2026-10-31 20:17-20:22Z, no other load) gives first token 2.0 s, under the 6 s target, and bulk p50
+  4.1 s, p95 7.2 s (10 interactions, 0 errors). Tempo shows the 44 `model_call` spans of the window on
+  `local-gpt-oss-maas` (29) and `local-maas` (15), none external.
 - **Harness:** with retrieval done before reasoning, the retriever call does not always appear as a
   tool event (`tool_calls=[]` on a passing answer). The check that expects that call needs to accept
   either.
