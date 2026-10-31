@@ -69,3 +69,5 @@ A threshold between 8e-5 and 1.5e-4 separates the two groups on this set, but wi
 and 0.083. The last of these is above answered question 21 (0.048), so no threshold separates the two groups.
 By the agreed rule (keep a reranker only if it matches or beats DBSF alone, 0.71 / 0.86 / 0.77), the
 reranker is removed. The stack goes back to DBSF alone and has no relevance threshold.
+`ranking-dbsf-final-2026-10-31.json`: DBSF alone after the reranker was removed. The scores are the same
+as before: 0.71 / 0.86 / 0.77.
