@@ -104,6 +104,13 @@ now also run in the Arkos and Comage security checks (Arkos: owner `consultant-0
 `sale-01`; Comage: owner `sale-01`, other `paas-dev-01`, unentitled `consultant-02`). Both isolation pairs were
 run against demo333 and pass.
 
+## Roll-out check of the web and Confluence pinning (demo333, 2026-10-31)
+
+In the running `unifai-rag-server` (images `devel-b144878c6`, operator 0.1.45 then 0.1.47): `net_guard_requests`
+carries the pinning (`build_connection_pool_key_attributes`), the resolver lists IPv4 first, and the adapter reports
+`pin active: True` in the application's own venv (`requests` 2.34.2; the system interpreter's 2.25.1 is not the one the
+process runs). The 18-check probe passes (18/18) and `cross_user_isolation` passes on the rolled stack.
+
 ## Open decisions and recommendations
 
 **Confluence allowed hosts (open, recommended to close).** The setting exists
@@ -124,7 +131,7 @@ is fetched; adding it there is quick and recommended.
 | Team name already taken at creation | Reveals a name exists, not its members or content | None |
 | ~~DNS rebinding on the outbound guard~~ | Closed 2026-10-25: the HTTP clients connect to the address just vetted (fork `faed4e198`); Confluence (`requests`) re-vets each request but does not pin | None |
 | ~~Redirects followed by the MCP SDK~~ | Closed 2026-10-25: the installed SDK follows same-origin redirects only; every hop is re-vetted by the guarded transport | None |
-| ~~RAG web fetch resolve-then-connect gap~~ | Closed 2026-10-25 in the fork (`d895ba2ea`): the web and Confluence `requests` sessions connect to the address they vetted (roll-out pending an image set) | None |
+| ~~RAG web fetch resolve-then-connect gap~~ | Closed 2026-10-25 in the fork (`d895ba2ea`) and deployed on demo333 with the image set `devel-b144878c6` (checked in the running `unifai-rag-server`: the adapter pins, `requests` 2.34.2 in the application venv) | None |
 
 ## Status of ADR-0583
 
