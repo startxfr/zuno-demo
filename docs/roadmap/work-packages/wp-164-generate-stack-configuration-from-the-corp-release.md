@@ -229,13 +229,15 @@ re-queried until the run timed out. Fixes, in order:
 | After the corpus scoping (WP-168) | 1 | 57/59 | fail | first token 8.3 s |
 | | 2 | 57/59 | fail | first token 16.9 s; unifai-backend restarted at 20:49Z mid-run |
 | | 3 | partial | pass | the report kept only 9 results; the Job log shows #11 passing |
+| Quiet stack (2026-10-31) | 1 | 51/52 | pass | first token 9.7 s; #10 passes via the Tempo `rag.search` fallback |
 
 - **The loop is fixed:** no timeout since 0.6.3.
 - **#11 is a ranking problem now:** on the misses tekos answers in time, names the Confluence page and
   cites no OCP URL. The retriever ranks installation guides above the definition (WP-168 update).
   Ranking work is with a9.
-- **First-token latency** is above the 6 s target in most runs (8-45 s). The runs overlapped model
-  restarts and other sessions' tests; not yet measured on a quiet stack.
+- **First-token latency** is above the 6 s target in every run (8-45 s). On a quiet stack
+  (2026-10-31: no other test, GPU nodes at 7% CPU, no restart) it is still 9.7 s, so it is not
+  load. The bulk pass gives p50 23.8 s and p95 62.8 s per full answer (10 interactions, 0 errors).
 - **Harness:** with retrieval done before reasoning, the retriever call does not always appear as a
   tool event (`tool_calls=[]` on a passing answer). The check that expects that call needs to accept
   either.
