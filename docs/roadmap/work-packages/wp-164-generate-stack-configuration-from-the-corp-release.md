@@ -329,7 +329,15 @@ on the run's `model_call` spans in Tempo.
     returns the same shape with a base64 PNG.
   - **Fix (user decision, UnifAI fork, a9):** binary payloads leave the model context and become a short
     marker (type, size, alt), and the payload is kept as a run attachment for the UI. A size cap on tool
-    results is a safety net. To verify: rerun the 8-turn arkos proof and check that no call is above ~12k.
+    results is a safety net.
+  - **Fixed (2026-10-31, multiagent `devel-d5d4f936c`, live 21:05Z):** UnifAI replaces base64 payloads in a tool
+    result with a short marker, and caps a tool result at `MAS_TOOL_RESULT_MAX_TOKENS` (default 8000).
+    - Diagram turn (21:18Z): a 51,710-byte `diagram.generation.create` result moved the next call from 1,767
+      to 1,982 prompt tokens (+215, against +19,000 before). The highest prompt in the run was 3,368.
+    - Same 9-turn conversation as the proof (21:12-21:16Z): 104 model calls, highest prompt 6,159, all on
+      `local-gpt-oss-maas`. arkos drew no diagram in that run.
+    - Not checked yet: whether the diagram still shows in the UI. The fix keeps the full output on the
+      observation step.
 - **Follow-ups:**
   - tekos 0.4.4 gets the same window, and arkos 0.2.1 caps its three uncapped tasks at 8192: released in
     zuno-demo-agents v0.8.0 and live on demo333.
