@@ -615,6 +615,49 @@ def u_rag_retrieval_executed(s: Dict[str, Any]) -> ScenarioResult:
     return ScenarioResult(s["id"], s["title"], bool(searches) and bool(run_["reply"]), detail)
 
 
+def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
+    """A real delegation runs (WP-174): the agent hands the question to its declared target through the
+    zuno a2a-gateway and the answer comes back.
+
+    Skipped, never passed, while the admitted release does not declare the delegation (`delegator`,
+    `target`, `target_task` of the scenario) or while `TEMPO_URL` is unset. The proof is the reply plus a
+    delegation span (A2A node) in the run's trace; the span names found are in the detail. The refusals
+    and the chain headers are the gateway checks of `delegation_checks.py`."""
+    _here = pathlib.Path(__file__).resolve().parent
+    for candidate in (_here, _here.parent / "common"):
+        if str(candidate) not in sys.path:
+            sys.path.insert(0, str(candidate))
+    from okf_release import okf_root
+    import delegation_checks
+    from unifai_target import delegation_spans, tempo_run_spans
+
+    delegator, target, target_task = s["delegator"], s["target"], s["target_task"]
+    root = [okf_root(pathlib.Path(__file__).resolve().parents[2]), pathlib.Path("/gate"), pathlib.Path("/")]
+    if not delegation_checks.declares_target(root, delegator, target, target_task):
+        return _skip(s, f"the admitted release does not declare {delegator} -> {target}/{target_task}")
+    tempo = os.getenv("TEMPO_URL", "").strip()
+    if not tempo:
+        return _skip(s, "no trace backend (TEMPO_URL unset), the delegation cannot be observed")
+    persona = s.get("persona", "eval-consultant-01")
+    try:
+        run_ = _unifai().collect(persona, s["message"], deadline_seconds=int(s.get("timeout_seconds", 190)))
+    except Exception as exc:  # noqa: BLE001
+        return ScenarioResult(s["id"], s["title"], False, str(exc))
+    run_id = run_.get("session_id", "")
+    if not run_id:
+        return ScenarioResult(s["id"], s["title"], False, "the turn produced no session id")
+    try:
+        spans = tempo_run_spans(run_id, tempo)
+    except Exception as exc:  # noqa: BLE001 - an unreachable backend cannot prove anything
+        return ScenarioResult(s["id"], s["title"], False, f"trace backend: {exc}")
+    found = delegation_spans(spans)
+    reply = str(run_.get("reply") or "")
+    expect = [e.lower() for e in s.get("expect_any", [])]
+    content_ok = not expect or any(e in reply.lower() for e in expect)
+    detail = f"delegation spans={found[:5]} spans_total={len(spans)} reply_chars={len(reply)} expected_content={content_ok}"
+    return ScenarioResult(s["id"], s["title"], bool(found) and bool(reply) and content_ok, detail)
+
+
 def u_chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:
     """ADR-0007 on UnifAI: a placeholder agent must not answer. Its workflow is not exposed to
     the persona; if it nevertheless is, a chat turn must not return a reply."""
@@ -736,6 +779,7 @@ HANDLERS: Dict[str, Callable[[Dict[str, Any]], ScenarioResult]] = {
     "chat_triggers_tool": u_chat_triggers_tool,
     "rag_retrieval_has_citation": u_rag_retrieval,
     "rag_retrieval_executed": u_rag_retrieval_executed,
+    "chat_delegates": u_chat_delegates,
     "chat_blocked_for_placeholder_agent": u_chat_blocked_for_placeholder_agent,
     # ADR-0526 (WP-087): only the agents whose scenarios.yaml declares the
     # type actually run it.
