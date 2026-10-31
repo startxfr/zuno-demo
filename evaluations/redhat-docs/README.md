@@ -25,3 +25,8 @@ change to UnifAI's search: natural questions with the book or Confluence page th
 and three questions with no answer in the corpus, to calibrate the relevance threshold. Query
 `query.bearer` with each entry's `sourceType` and `tags` and `top_k_results` (not `top_k`), as a
 member of `agent_tekos`. See the file header for the matching rule.
+
+Results are kept in `results/`, one JSON report per run (per-question rank, top score and top URL).
+`ranking-before-2026-10-31.json` is the baseline before UnifAI operator 0.1.44: hit@1 0.52, hit@5
+0.76, MRR 0.63 over the 21 answerable questions, and every no-answer question still gets a top
+score of 0.5, because the score is a fused rank, not a relevance.
