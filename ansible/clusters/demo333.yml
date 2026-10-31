@@ -73,6 +73,15 @@ zuno_unifai_bundle_settings:
     groupTeam: true
     retrieveFirst: true
     retriever: knowledge-arkos
+    # WP-174: Arkos asks Tekos for a technical answer through the zuno a2a-gateway (unifai-operator
+    # >= 0.1.44, plan_draft_write shape). Inert until the agents release declares
+    # zuno.delegation.targets; the target is bounded here and re-checked by the gateway.
+    delegation:
+      gatewayURL: http://a2a-gateway.zuno-ai-run.svc:8080
+      maxRounds: 5
+    ceilings:
+      delegationTargets:
+      - tekos/answer-technical-question
   comage:
     entitlement: Enforced
     groupTeam: true
