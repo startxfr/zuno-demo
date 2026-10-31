@@ -321,8 +321,17 @@ on the run's `model_call` spans in Tempo.
   plus the system prompt and the RAG context. The longest reply over 60 model calls was 4096 tokens.
   - One single call in turn 6 had 30,318 prompt tokens; the calls after it were back at ~10k.
     Content produced inside a turn (tool results, RAG context) is not windowed.
+  - **Cause of that call (traced in Tempo):** node `arkos-draft-architecture-testimonial-draft`,
+    iteration 7, right after its third `diagram.generation.create` call. `generate_diagram` returns the whole
+    rendered SVG as `data_base64` (57,646 bytes from the mcp-gateway), and UnifAI put that tool result into
+    the model context as is: 11,320 → 30,318 prompt tokens. That call ran 62 s and stopped at the 4096 cap.
+    Turn 1 shows the same pattern: a 40,278-byte diagram result, then a 16,150-token call. `generate_image`
+    returns the same shape with a base64 PNG.
+  - **Fix (user decision, UnifAI fork, a9):** binary payloads leave the model context and become a short
+    marker (type, size, alt), and the payload is kept as a run attachment for the UI. A size cap on tool
+    results is a safety net. To verify: rerun the 8-turn arkos proof and check that no call is above ~12k.
 - **Follow-ups:**
-  - tekos 0.4.4 gets the same window, and arkos 0.2.1 caps its three uncapped tasks at 8192
-    (zuno-demo-agents branch `tekos/history-window`, for the next agents release).
-  - Operator 0.1.48 will send the task limits as `X-Zuno-Max-Tokens`.
+  - tekos 0.4.4 gets the same window, and arkos 0.2.1 caps its three uncapped tasks at 8192: released in
+    zuno-demo-agents v0.8.0 and live on demo333.
+  - Operator 0.1.48 sends the task limits as `X-Zuno-Max-Tokens` (live).
 
