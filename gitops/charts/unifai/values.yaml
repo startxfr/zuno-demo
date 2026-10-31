@@ -145,6 +145,9 @@ okf:
   #   servePlaceholder: false   # ADR-0007: placeholder agents are not served by default
   #   retrieveFirst: false      # needs a multiagent image with retrieve_first
   #   classificationOverrides: {}
+  #   delegation: {gatewayURL: http://a2a-gateway.zuno-ai-run.svc:8080, maxRounds: 3}   # unifai-operator >= 0.1.43; with
+  #     ceilings.delegationTargets: [<target agents>]. Inert while unset; enable per bundle through GitOps only with the
+  #     user's approval (WP-174), after the 0.1.44 canary.
 
 # Incrementally synced RAG sources (ADR-0568).
 # Retrievers over the RAG sources (ADR-0568). The caller's token is forwarded so

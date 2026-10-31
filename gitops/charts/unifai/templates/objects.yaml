@@ -109,6 +109,13 @@ spec:
       trustedRootRef: {name: zuno-sigstore-trusted-root, key: trusted_root.json}
   ceilings:
     {{- toYaml .ceilings | nindent 4 }}
+  {{- with .delegation }}
+  # Read-only A2A delegation through the zuno a2a-gateway (unifai-operator >= 0.1.43). Unset = a bundle that declares
+  # zuno.delegation.targets is refused (DelegationUnsupported). The targets themselves are bounded by
+  # ceilings.delegationTargets and re-checked by the gateway.
+  delegation:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   entitlement: {{ default "Enforced" .entitlement }}
   llm:
     type: openai_compatible

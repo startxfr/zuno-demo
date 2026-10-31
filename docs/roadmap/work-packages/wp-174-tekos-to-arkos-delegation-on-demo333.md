@@ -47,3 +47,7 @@ Update (2026-10-31): the operator now emits the delegation through the zuno a2a-
 [WP-175](wp-175-a2a-gateway-and-persona-test-blueprints.md)'s gateway does serve this work package once `spec.delegation` is enabled: it receives the
 chain headers the operator renders, verifies them against the signed declarations and answers as the user. A persona test blueprint still carries no chain
 (it is not an agent of the release). The live proofs above are still to run.
+
+## Progress (2026-10-31): chart ready, nothing enabled
+
+The `unifai` chart renders `delegation` per bundle (`okf.bundles[].delegation`, with `ceilings.delegationTargets` already passed through) only when set; no bundle sets it today, so the rendered objects are unchanged. Enabling it for Tekos -> Arkos stays a separate GitOps change that needs the user's approval, operator 0.1.44 and its canary.
