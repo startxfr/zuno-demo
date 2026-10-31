@@ -168,6 +168,12 @@ maasAdapter:
 quotaLedger:
   store: memory
 
+# Reply cap when a caller sets none (no body max_tokens/max_completion_tokens,
+# no X-Zuno-Max-Tokens): an uncapped arkos reply ran to ~40k tokens on
+# gpt-oss-20b on 2026-10-31. Each candidate still gets at most the room left
+# in its max_model_len. 0 disables it. Needs ai-gateway-29 or later.
+maxTokensDefault: 8192
+
 # ADR-0581 (WP-164 lot 2): mount the model-routing policy generated from the
 # admitted agents release (files/model-routing.generated.yaml, written by
 # platform/okf/generate_stack_config.py) instead of reading only the copy

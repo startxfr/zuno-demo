@@ -191,6 +191,8 @@ spec:
             - name: QUOTA_LEDGER_STORE
               value: "redis"
             {{- end }}
+            - name: MAX_TOKENS_DEFAULT
+              value: {{ .Values.maxTokensDefault | quote }}
             {{- if .Values.guardrails.modesGenerated }}
             # ADR-0579: the generated per-agent guardrail modes (configmap-guardrails-modes.yaml).
             - name: GUARDRAILS_AGENT_MODES_PATH
