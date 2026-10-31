@@ -7,17 +7,16 @@ adapters: []
 preferences:
 - agent: tekos
   task: answer-technical-question
-  preferred:
-  - ovhcloud-gpt-oss-120b
+  prefer:
   - local-gpt-oss-maas
   - local-gpt-oss
+  - ovhcloud-gpt-oss-120b
   - local-qwen35-maas
   - local-qwen35
   - local-wesh-maas
   - local-wesh
   - local-maas
   - local
-  fallback:
   - openai
   - gemini
   - anthropic
