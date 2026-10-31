@@ -230,14 +230,16 @@ def tempo_run_spans(
             http.close()
 
 
-def delegation_spans(spans: List[Dict[str, Any]]) -> List[str]:
-    """Names of the spans that show an A2A delegation: the span name or any attribute value mentions
-    `a2a` or `delegat`. Deliberately loose: the operator's node naming is only known once it runs."""
+def delegation_spans(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The spans that show an A2A delegation attempt: the span name or any attribute value mentions `a2a`,
+    `delegat`. Each item is `{"name", "ok"}`; `ok` is True only when the span says `mas.success` is true.
+    A failed attempt (`mas.success=False`) is an attempt, not a delegation: the caller must not count it."""
     out = []
     for sp in spans:
-        text = " ".join([str(sp.get("name", ""))] + [str(v) for v in (sp.get("attrs") or {}).values()]).lower()
+        attrs = sp.get("attrs") or {}
+        text = " ".join([str(sp.get("name", ""))] + [str(v) for v in attrs.values()]).lower()
         if "a2a" in text or "delegat" in text:
-            out.append(sp.get("name", ""))
+            out.append({"name": sp.get("name", ""), "ok": str(attrs.get("mas.success", "")).lower() == "true"})
     return out
 
 

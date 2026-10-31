@@ -651,11 +651,14 @@ def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
     except Exception as exc:  # noqa: BLE001 - an unreachable backend cannot prove anything
         return ScenarioResult(s["id"], s["title"], False, f"trace backend: {exc}")
     found = delegation_spans(spans)
+    succeeded = [x for x in found if x["ok"]]
     reply = str(run_.get("reply") or "")
     expect = [e.lower() for e in s.get("expect_any", [])]
     content_ok = not expect or any(e in reply.lower() for e in expect)
-    detail = f"delegation spans={found[:5]} spans_total={len(spans)} reply_chars={len(reply)} expected_content={content_ok}"
-    return ScenarioResult(s["id"], s["title"], bool(found) and bool(reply) and content_ok, detail)
+    detail = (f"delegation spans={[x['name'] + (' ok' if x['ok'] else ' FAILED') for x in found[:6]]} "
+              f"succeeded={len(succeeded)} spans_total={len(spans)} reply_chars={len(reply)} expected_content={content_ok}")
+    # A reply that merely contains the topic is not a delegation: only a delegation span that succeeded proves it.
+    return ScenarioResult(s["id"], s["title"], bool(succeeded) and bool(reply) and content_ok, detail)
 
 
 def u_chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:
