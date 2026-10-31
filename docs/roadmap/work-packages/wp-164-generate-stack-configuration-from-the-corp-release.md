@@ -265,3 +265,33 @@ re-queried until the run timed out. Fixes, in order:
   hold only `agent_*` groups of other agents, and the 429 behaviour at the tier ceiling (the sales
   tier is 5,000 tokens/h; not exhausted on purpose).
 
+## Update (2026-10-31): lots 2 and 3 live on demo333
+
+User go 2026-10-31, coordinated with 68, 59, cc and a0.
+
+- **Build:** `ai-gateway-28` from devel `8b9338d9`, which contains the lot 2 (`91a0e333`) and lot 3
+  (`b1facfc2`) code.
+- **Switches:** `zuno_ai_gateway_model_routing_generated` and
+  `zuno_ai_gateway_guardrails_modes_generated` set to true in `ansible/clusters/demo333.yml`, then
+  `make d2 install llm`.
+- **One rollout:** the Deployment was paused during the build and the values change, then resumed.
+  New pod at 11:27Z, Ready, 0 restarts; `zuno-ai-gateway-d1` Synced/Healthy.
+- **Snag, fixed:** the generated ConfigMaps were in wave 65, after the Deployment (60). Enabling the
+  switches made the new pod wait for volumes that Argo CD only creates once that pod is healthy.
+  - The fix (`9f8d18b1`) moves them to wave 55.
+  - The stuck sync operation, started by the llm role run, was terminated.
+  - The old pod served throughout.
+- **Proof:**
+  - The gateway logged `loaded model-routing policy from /app/config-model-routing/... (24
+    preference(s))`.
+  - An in-pod check shows the guardrail modes loaded: minimum `observe` on C1, C2 and C3, tekos
+    `observe`.
+  - A tekos `find-relevant-docs` chat answered 200 from qwen3.5-9b, the first candidate as before, and
+    logged `guardrails clean (mode=observe) agent=tekos`.
+  - Routing and guardrail behaviour are unchanged, as expected with release 0.6.3.
+- **Cosmetic follow-up:** the guardrails module loads its modes at import time, before logging is
+  configured, so its `loaded guardrails agent modes` line is not printed. The modes are loaded.
+- **Seen in the proof call, not caused by this change:** `local-qwen35-maas` timed out (about 60 s),
+  and the direct `local-qwen35` answered in 26 s for 40 tokens. The MaaS path to qwen35-9b is a
+  first-token latency lead, to investigate.
+
