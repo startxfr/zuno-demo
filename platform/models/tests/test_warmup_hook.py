@@ -43,7 +43,7 @@ def script(name="qwen35-9b-wesh", *helm_args):
 def test_only_the_enabled_model_gets_the_hook():
     got = hooks()
     assert got["qwen35-9b-wesh"] is not None and got["qwen35-9b"] is not None
-    assert got["qwen36-27b-instruct"] is None and got["gpt-oss-20b"] is None
+    assert got["qwen36-27b-instruct"] is not None and got["gpt-oss-20b"] is None
 
 
 def test_the_hook_can_be_switched_off():
