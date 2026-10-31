@@ -43,3 +43,6 @@ WORSE than DBSF alone. Questions 3, 9 and 11 drop out of the top 10, and 19 goes
 prefix only changes the dense query embedding (the sparse side is untouched), so the dense side
 alone got worse with it. The live prefix ends with "Query: " (trailing space), where the model card
 has "Query:".
+`ranking-prefix-nospace-2026-10-31.json`: the same prefix in the model card's exact format ("Query:",
+no space) gives the same numbers (0.67 / 0.71 / 0.68). The instruction does not help this corpus: by
+the agreed rule it is removed, back to DBSF alone.

@@ -1,0 +1,168 @@
+{
+  "run": "dbsf+queryPrefix-nospace",
+  "date": "2026-10-31",
+  "index": "demo333, UnifAI operator 0.1.47, app images devel-be4821358: DBSF + EMBEDDING_QUERY_PREFIX 'Instruct: Given a question, retrieve passages that answer it\\nQuery:' (no trailing space, model card format), same chunks",
+  "persona": "stress-consultant-01",
+  "top_k": 10,
+  "script": "startx-unifai fork/ci/rag_eval.py (4341c011c)",
+  "set": "evaluations/redhat-docs/ranking.yaml (e8c2807b)",
+  "hit@1": 0.6666666666666666,
+  "hit@5": 0.7142857142857143,
+  "mrr": 0.6825396825396826,
+  "missed": [
+    1,
+    2,
+    3,
+    9,
+    11,
+    12
+  ],
+  "expect_none_top_scores": [
+    1.1375768,
+    1.0740836,
+    0.8855337
+  ],
+  "rows": [
+    {
+      "id": 1,
+      "rank": null,
+      "top_score": 0.9826031,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/index"
+    },
+    {
+      "id": 2,
+      "rank": null,
+      "top_score": 0.9874482,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/server_administration_guide/"
+    },
+    {
+      "id": 3,
+      "rank": null,
+      "top_score": 0.9336099,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/server_configuration_guide/logging"
+    },
+    {
+      "id": 4,
+      "rank": 1,
+      "top_score": 1.2550486,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/storage/index"
+    },
+    {
+      "id": 5,
+      "rank": 1,
+      "top_score": 1.057416,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/registry/index"
+    },
+    {
+      "id": 6,
+      "rank": 1,
+      "top_score": 1.3857272,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index"
+    },
+    {
+      "id": 7,
+      "rank": 1,
+      "top_score": 1.7217045,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/backup_and_restore/index"
+    },
+    {
+      "id": 8,
+      "rank": 1,
+      "top_score": 1.071398,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/network_security/index"
+    },
+    {
+      "id": 9,
+      "rank": null,
+      "top_score": 1.1453942,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/index"
+    },
+    {
+      "id": 10,
+      "rank": 1,
+      "top_score": 1.0186728,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/index"
+    },
+    {
+      "id": 11,
+      "rank": null,
+      "top_score": 1.1271291,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/networking_operators/index"
+    },
+    {
+      "id": 12,
+      "rank": null,
+      "top_score": 1.4403229,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/building_applications/index"
+    },
+    {
+      "id": 13,
+      "rank": 1,
+      "top_score": 1.4122822,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/index"
+    },
+    {
+      "id": 14,
+      "rank": 1,
+      "top_score": 1.0643815,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/virtualization/index"
+    },
+    {
+      "id": 15,
+      "rank": 1,
+      "top_score": 2.057154,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5"
+    },
+    {
+      "id": 16,
+      "rank": 1,
+      "top_score": 2.2878323,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.17/html-single/understanding_openshift_gitops/index"
+    },
+    {
+      "id": 17,
+      "rank": 1,
+      "top_score": 2.0276587,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_satellite/6.17"
+    },
+    {
+      "id": 18,
+      "rank": 1,
+      "top_score": 2.1432986,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675670604/S0R42+Schedule+Satellite"
+    },
+    {
+      "id": 19,
+      "rank": 3,
+      "top_score": 1.8029206,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675665332/O0B81-BDTBO+Construction+des+tests+de+backup+restore+OADP"
+    },
+    {
+      "id": 20,
+      "rank": 1,
+      "top_score": 2.0090833,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675765260/O0R41-RDUPG+R+daction+du+process+d+upgrade+de+cluster"
+    },
+    {
+      "id": 21,
+      "rank": 1,
+      "top_score": 1.4739796,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675796818/O0R62-EXONS+Correction+d+un+namespace+instable"
+    },
+    {
+      "id": 22,
+      "expect_none": true,
+      "top_score": 1.1375768
+    },
+    {
+      "id": 23,
+      "expect_none": true,
+      "top_score": 1.0740836
+    },
+    {
+      "id": 24,
+      "expect_none": true,
+      "top_score": 0.8855337
+    }
+  ]
+}
