@@ -116,6 +116,10 @@ gatewayLLM:
   # model, fallback) for the UI's "why this model" panel (WP-148). Needs the
   # multiagent image of fork devel e76c71cd0 or later.
   routingLookup: true
+  # Client-side timeout of the UnifAI LLM client for every task and shared LLM (it cuts at 120 s by default
+  # while the ai-gateway allows 180 s to the local models, so a cold first request would fail at 120 s).
+  # Unset keeps the client default; retries are unchanged.
+  timeoutSeconds: ""
 
 # MCP tools through mcp-gateway's MCP endpoint, with the user's own token
 # (ADR-0571 path B until the RHOAI MCP gateway evaluation concludes).

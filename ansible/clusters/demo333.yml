@@ -105,6 +105,8 @@ zuno_unifai_bundle_settings:
 zuno_unifai_released_bundles: true
 zuno_unifai_released_bundles_exclude: []
 zuno_unifai_values:
+  gatewayLLM:
+    timeoutSeconds: 200
   ragSources:
   - aclGroups:
     - consultant/confluence-archi-satellite
