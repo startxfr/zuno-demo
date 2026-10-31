@@ -275,5 +275,45 @@ preferences:
                          gen.MODEL_ROUTING_HEADER + "adapters: []\npreferences: []\n")
 
 
+class GuardrailsModesTest(MaasSubscriptionsTest):
+    """ADR-0579 clause 3 (WP-164 lot 3): corp minimums and the modes agents declare."""
+
+    def policy(self, doc) -> None:
+        (self.dir / "policies" / "guardrails").mkdir(parents=True, exist_ok=True)
+        (self.dir / "policies" / "guardrails" / "guardrails-policy.yaml").write_text(yaml.safe_dump(doc))
+
+    def agent_with_mode(self, name, mode) -> None:
+        self.agent(name, [f"agent_{name}"])
+        if mode is not None:
+            md = self.dir / "agents" / name / "agent.okf.md"
+            fm = yaml.safe_load(md.read_text().split("---")[1])
+            fm["zuno"]["guardrails"] = {"mode": mode}
+            md.write_text("---\n" + yaml.safe_dump(fm) + "---\n")
+
+    def modes(self):
+        return gen.guardrails_modes(self.dir, gen.admit.agents_view(self.dir))
+
+    def test_corp_minimums_and_declared_modes_only(self) -> None:
+        self.policy({"modes": ["off", "observe", "block"],
+                     "minimum_mode_by_classification": {"c1": "observe", "C3": "block"}})
+        self.agent_with_mode("alpha", "block")
+        self.agent_with_mode("beta", None)
+        self.assertEqual(self.modes(), {"minimum_mode_by_classification": {"C1": "observe", "C3": "block"},
+                                        "agents": {"alpha": "block"}})
+
+    def test_no_policy_and_no_declaration_give_an_empty_file(self) -> None:
+        self.agent_with_mode("alpha", None)
+        self.assertEqual(gen.render_guardrails({"guardrails": self.modes()}), gen.GUARDRAILS_HEADER
+                         + "minimum_mode_by_classification: {}\nagents: {}\n")
+
+    def test_an_unknown_mode_is_refused(self) -> None:
+        self.policy({"minimum_mode_by_classification": {"C1": "panic"}})
+        with self.assertRaises(gen.admit.AdmissionError):
+            self.modes()
+
+    def test_no_release_pinned_gives_empty_modes(self) -> None:
+        self.assertEqual(gen.build(None, None)["guardrails"], {"minimum_mode_by_classification": {}, "agents": {}})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,0 +1,19 @@
+{{- if .Values.guardrails.modesGenerated }}
+# ADR-0579 clause 3 (WP-164 lot 3): the corp minimum guardrail mode per
+# classification and each agent's declared mode, generated from the admitted
+# agents release by platform/okf/generate_stack_config.py. The gateway
+# reloads the mounted copy when it changes (app/routing_watch.py).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ai-gateway-guardrails-modes
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: ai-gateway
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "65"
+data:
+  guardrails-modes.yaml: |
+{{ .Files.Get "files/guardrails-modes.generated.yaml" | indent 4 }}
+{{- end }}

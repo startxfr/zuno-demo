@@ -186,7 +186,21 @@ therefore not generated yet. The quota budgets themselves are generated from the
      3. run the llm role.
      Proof: the gateway logs `loaded model-routing policy from /app/config-model-routing/...`, and
      a tekos chat routes as before.
-3. **Guardrail modes.** They wait for a user decision on the hook.
+3. **Guardrail modes.** Decided 2026-10-31 (user): keep `observe` on C1, C2 and C3, and generate a
+   per-agent mode. **Code landed, not enabled (2026-10-31).**
+   - The generator writes `gitops/charts/ai-gateway/files/guardrails-modes.generated.yaml`: the corp
+     `minimum_mode_by_classification` and each agent's `zuno.guardrails.mode`. Release 0.6.3: all
+     minimums `observe`, tekos declares `observe`, so nothing changes. 4 tests.
+   - ai-gateway (`app/guardrails.py`): the effective mode is the strictest of `modeByClassification`,
+     the corp minimum and the calling agent's mode. `X-Zuno-Agent` is caller-supplied, so it can only
+     harden. The routing watcher reloads the file. `categories` is not consumed yet. 6 tests; suite
+     286/286.
+   - Chart: ConfigMap, mount and `GUARDRAILS_AGENT_MODES_PATH` behind `guardrails.modesGenerated`
+     (default false, default render unchanged); the llm role passes
+     `zuno_ai_gateway_guardrails_modes_generated`; okf-promote commits the file.
+   - Enabling shares the lot 2 rebuild: set the variable to true with the lot 2 one, run the llm role.
+     Proof: the gateway logs `loaded guardrails agent modes`; then, as a reverted test, a release
+     declaring `block` for one agent shows `mode=block` in the guardrails log for that agent only.
 4. **Per-agent limits.**
    - `memory.history` goes to unifai-operator.
    - Token budgets go to `quota.py`, keyed by agent, since Kuadrant cannot key on the agent.

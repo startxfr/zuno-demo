@@ -56,6 +56,9 @@
       # ADR-0581 (WP-164 lot 2): mount the generated model-routing policy.
       modelRouting:
         generated: "{{ zuno_ai_gateway_model_routing_generated | default(false) | bool }}"
+      # ADR-0579 (WP-164 lot 3): mount the generated per-agent guardrail modes.
+      guardrails:
+        modesGenerated: "{{ zuno_ai_gateway_guardrails_modes_generated | default(false) | bool }}"
       maasAdapter:
         gatewayIdentity:
           enabled: "{{ zuno_ai_gateway_maas_gateway_identity | default(false) | bool }}"

@@ -226,3 +226,9 @@ guardrails:
     C1: observe
     C2: observe
     C3: observe
+  # ADR-0579 clause 3 (WP-164 lot 3): mount the per-agent modes generated
+  # from the agents release (files/guardrails-modes.generated.yaml): the
+  # effective mode becomes the strictest of modeByClassification, the corp
+  # minimum and the calling agent's `zuno.guardrails.mode`. Needs an image
+  # with app/guardrails.py's AgentModes (ai-gateway after WP-164 lot 3).
+  modesGenerated: false

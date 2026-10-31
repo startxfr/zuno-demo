@@ -116,6 +116,7 @@ jobs:
             platform/okf/stack-config.generated.yaml
             gitops/charts/models/values.agents.generated.yaml
             gitops/charts/ai-gateway/files/model-routing.generated.yaml
+            gitops/charts/ai-gateway/files/guardrails-modes.generated.yaml
             gitops/charts/connectivity-link/templates/quota-ratelimitpolicies.yaml
             gitops/charts/connectivity-link/templates/quota-tokenratelimitpolicies.yaml
             components/ai-gateway/app/quota_budgets.yaml

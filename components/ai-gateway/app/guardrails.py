@@ -16,6 +16,14 @@ What is sent: the last user message and the model's reply, verbatim - the two
 things detections are ABOUT. Never sent: the caller's bearer token, system
 prompts, retrieved document bodies or tool results.
 
+Per agent (ADR-0579 clause 3, WP-164 lot 3): GUARDRAILS_AGENT_MODES_PATH
+names a file generated from the agents release (corp minimum mode per
+classification, and the `zuno.guardrails.mode` each agent declares). The
+effective mode is the STRICTEST of the per-classification mode below, that
+corp minimum and the calling agent's mode. X-Zuno-Agent is caller-supplied,
+so it may only ever harden the mode, never relax it. A missing or unreadable
+file leaves the per-classification mode alone.
+
 A detector outage never breaks a request in either mode (it is counted as
 ``unavailable``): a guardrail that can take inference down would be a worse
 failure than the one it guards against. Making ``block`` fail closed is a
@@ -32,6 +40,7 @@ import os
 from typing import Any, Dict, List, Optional, Set
 
 import httpx
+import yaml
 
 from app.telemetry import guardrails_observe_span, record_guardrails_evaluation
 
@@ -47,6 +56,12 @@ GUARDRAILS_CONFIG_ID = os.getenv("GUARDRAILS_CONFIG_ID", "zuno-observe")
 
 MODES = ("off", "observe", "block")
 DEFAULT_MODE = "observe"
+_RANK = {mode: rank for rank, mode in enumerate(MODES)}
+GUARDRAILS_AGENT_MODES_PATH = os.getenv("GUARDRAILS_AGENT_MODES_PATH", "")
+
+
+def _strictest(*modes: str) -> str:
+    return max(modes, key=lambda m: _RANK.get(m, _RANK[DEFAULT_MODE]))
 
 
 def _load_modes(raw: str) -> Dict[str, str]:
@@ -76,14 +91,63 @@ def _load_modes(raw: str) -> Dict[str, str]:
 MODE_BY_CLASSIFICATION = _load_modes(os.getenv("GUARDRAILS_MODE_BY_CLASSIFICATION", ""))
 
 
-def mode_for(classification: str) -> str:
-    """Effective mode for a (declared) data classification. Unlisted classes
-    get DEFAULT_MODE, and a mode only applies when the selected backend has
-    a URL: an unconfigured backend disables the guardrail instead of
-    erroring on every exchange."""
+class AgentModes:
+    """The generated per-agent modes and corp minimums (ADR-0579 clause 3), reloadable."""
+
+    def __init__(self, path: str = GUARDRAILS_AGENT_MODES_PATH):
+        self.path = path
+        self.minimum: Dict[str, str] = {}
+        self.agents: Dict[str, str] = {}
+        self.reload()
+
+    def reload(self) -> None:
+        if not self.path:
+            return
+        try:
+            with open(self.path, "r", encoding="utf-8") as fh:
+                doc = yaml.safe_load(fh) or {}
+        except FileNotFoundError:
+            logger.info("no guardrails agent modes at %s; per-classification modes only", self.path)
+            return
+        except Exception as exc:  # noqa: BLE001 - keep the loaded modes
+            logger.error("failed to read guardrails agent modes %s: %s", self.path, exc)
+            return
+        self.minimum = self._modes(doc.get("minimum_mode_by_classification"), upper=True)
+        self.agents = self._modes(doc.get("agents"), upper=False)
+        logger.info("loaded guardrails agent modes from %s (%d agent(s))", self.path, len(self.agents))
+
+    @staticmethod
+    def _modes(raw: Any, *, upper: bool) -> Dict[str, str]:
+        out: Dict[str, str] = {}
+        for key, mode in (raw or {}).items() if isinstance(raw, dict) else []:
+            mode = str(mode).strip().lower()
+            if mode not in MODES:
+                logger.warning("ignoring unknown guardrails mode %r for %s", mode, key)
+                continue
+            key = str(key).strip()
+            out[key.upper() if upper else key] = mode
+        return out
+
+
+agent_modes = AgentModes()
+
+
+def mode_for(classification: str, agent: str = "") -> str:
+    """Effective mode for a (declared) data classification and calling agent:
+    the strictest of the per-classification mode (unlisted classes get
+    DEFAULT_MODE), the corp minimum for that class and the agent's declared
+    mode. A mode only applies when the selected backend has a URL: an
+    unconfigured backend disables the guardrail instead of erroring on every
+    exchange."""
     if not _endpoint():
         return "off"
-    return MODE_BY_CLASSIFICATION.get((classification or "").upper(), DEFAULT_MODE)
+    cls = (classification or "").upper()
+    modes = [MODE_BY_CLASSIFICATION.get(cls, DEFAULT_MODE)]
+    if cls in agent_modes.minimum:
+        modes.append(agent_modes.minimum[cls])
+    if agent and agent in agent_modes.agents:
+        modes.append(agent_modes.agents[agent])
+    return _strictest(*modes)
 
 
 def _endpoint() -> str:

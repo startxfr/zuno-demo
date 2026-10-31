@@ -71,6 +71,8 @@ routing_watcher = RoutingWatcher({
     routing_table.path: routing_table.reload,
     image_routing_table.path: image_routing_table.reload,
     model_routing_policy.path: model_routing_policy.reload,
+    # ADR-0579 (WP-164 lot 3): generated per-agent guardrail modes, when mounted.
+    **({guardrails.agent_modes.path: guardrails.agent_modes.reload} if guardrails.agent_modes.path else {}),
 })
 
 
@@ -406,7 +408,8 @@ async def chat_completions(
     # ADR-0567 (WP-153): guardrails mode follows the DECLARED classification.
     # It is the same value routing uses, so a caller cannot get a laxer
     # guardrails mode than the routing it is subject to.
-    gr_mode = guardrails.mode_for(classification)
+    # ADR-0579: the calling agent's declared mode and the corp minimum can only harden it.
+    gr_mode = guardrails.mode_for(classification, x_zuno_agent)
     gr_prompt = _last_user_text(payload.messages) if gr_mode != "off" else ""
     if gr_mode == "block":
         found = await guardrails.evaluate(

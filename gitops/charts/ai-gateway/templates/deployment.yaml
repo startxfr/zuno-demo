@@ -191,6 +191,11 @@ spec:
             - name: QUOTA_LEDGER_STORE
               value: "redis"
             {{- end }}
+            {{- if .Values.guardrails.modesGenerated }}
+            # ADR-0579: the generated per-agent guardrail modes (configmap-guardrails-modes.yaml).
+            - name: GUARDRAILS_AGENT_MODES_PATH
+              value: /app/config-guardrails/guardrails-modes.yaml
+            {{- end }}
             {{- if .Values.modelRouting.generated }}
             # ADR-0581: the generated model-routing policy (configmap-model-routing.yaml).
             - name: MODEL_ROUTING_POLICY_PATH
@@ -244,6 +249,11 @@ spec:
               mountPath: /app/config-model-routing
               readOnly: true
             {{- end }}
+            {{- if .Values.guardrails.modesGenerated }}
+            - name: guardrails-modes
+              mountPath: /app/config-guardrails
+              readOnly: true
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -287,4 +297,9 @@ spec:
         - name: model-routing
           configMap:
             name: ai-gateway-model-routing
+        {{- end }}
+        {{- if .Values.guardrails.modesGenerated }}
+        - name: guardrails-modes
+          configMap:
+            name: ai-gateway-guardrails-modes
         {{- end }}
