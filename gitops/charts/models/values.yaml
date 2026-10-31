@@ -882,6 +882,12 @@ weshModel:
 qwen35Model:
   inferenceServiceName: qwen35-9b
   servedModelName: qwen3.5-9b
+  # Warm-up before traffic (templates/_warmup.tpl), proven on qwen35-9b-wesh
+  # 2026-10-31: the first request after a restart compiled 4 kernels in 82 s.
+  warmup:
+    enabled: true
+    waitSeconds: 900
+    maxSeconds: 300
   # ADR-0546/WP-131: which bucket this model's weights are read from -
   # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
   # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
