@@ -209,6 +209,38 @@ def _to_langchain_messages(messages: List[ChatMessage]) -> List[Any]:
     return result
 
 
+# Reply cap applied when the caller sets none (no body max_tokens /
+# max_completion_tokens, no X-Zuno-Max-Tokens). 0 disables it.
+MAX_TOKENS_DEFAULT = int(os.getenv("MAX_TOKENS_DEFAULT", "0") or 0)
+
+
+def _effective_max_tokens(header_cap: Optional[int], payload: Any) -> Optional[int]:
+    """The reply cap for one request: the smallest of the X-Zuno-Max-Tokens
+    header (ADR-0544, the task's declared limit), the body's max_tokens and
+    max_completion_tokens (OpenAI fields, e.g. the UnifAI client's 4096), or
+    MAX_TOKENS_DEFAULT when none is given. A cap only ever narrows; a
+    non-positive body value is ignored like a malformed header."""
+    caps = [header_cap] + [getattr(payload, f, None) for f in ("max_tokens", "max_completion_tokens")]
+    caps = [c for c in caps if isinstance(c, int) and c > 0]
+    if caps:
+        return min(caps)
+    return MAX_TOKENS_DEFAULT or None
+
+
+def _candidate_max_tokens(
+    max_tokens: Optional[int], cfg: Dict[str, Any], messages: List[Any], tools: Optional[List[Dict[str, Any]]]
+) -> Optional[int]:
+    """The cap sent to one candidate: never more than the room the prompt
+    leaves in its max_model_len (vLLM refuses prompt + max_tokens above the
+    window, so a fixed cap would break long prompts that fit today). The
+    prompt size is the same char/4 estimate as the pre-flight skip."""
+    max_model_len = cfg.get("max_model_len")
+    if not max_tokens or not max_model_len:
+        return max_tokens
+    room = int(max_model_len) - _estimate_prompt_tokens(messages, tools)
+    return min(max_tokens, room) if room > 0 else max_tokens
+
+
 def _parse_max_tokens(raw: str) -> Optional[int]:
     """ADR-0544: X-Zuno-Max-Tokens is an optional control header, not a
     caller-authenticated value - a malformed one must never fail a user's
@@ -356,7 +388,7 @@ async def chat_completions(
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
     run_id = x_zuno_run_id.strip() or None
     quota_class, project_id = _platform_context(identity, x_zuno_quota_class, x_zuno_project_id)
-    max_tokens = _parse_max_tokens(x_zuno_max_tokens)
+    max_tokens = _effective_max_tokens(_parse_max_tokens(x_zuno_max_tokens), payload)
     # ADR-0511: token-budget check BEFORE dispatch, on top of (never
     # instead of) the classification/eligibility intersection below.
     # Exhaustion is an explicit 429, never silent degradation.
@@ -962,7 +994,8 @@ async def _invoke_with_fallback(
                 _note_maas_call(candidate, cfg, quota_class, caller_sub, groups, project_id)
                 model = chat_model_for(
                     candidate, cfg, request_id=request_id, adapter=adapter_name,
-                    caller_bearer_token=caller_bearer_token, max_tokens=max_tokens,
+                    caller_bearer_token=caller_bearer_token,
+                    max_tokens=_candidate_max_tokens(max_tokens, cfg, messages, tools),
                     **_maas_call_kwargs(caller_sub, groups, quota_class, project_id),
                 )
                 if tools:
@@ -1187,7 +1220,7 @@ async def _stream_completion(
                 model = chat_model_for(
                     candidate, cfg, request_id=request_id, adapter=adapter_name,
                     caller_bearer_token=identity.token if identity else None,
-                    max_tokens=max_tokens,
+                    max_tokens=_candidate_max_tokens(max_tokens, cfg, messages, tools),
                     **_maas_call_kwargs(
                         identity.sub if identity else None,
                         identity.groups if identity else None,

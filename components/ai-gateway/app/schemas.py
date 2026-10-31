@@ -48,6 +48,11 @@ class ChatCompletionRequest(BaseModel):
     model: str = "zuno-auto"
     messages: List[ChatMessage]
     stream: bool = False
+    # OpenAI reply caps. Dropped silently before 2026-10-31, so the 4096 the
+    # UnifAI LLM client sends never reached the model and an arkos reply ran
+    # to ~40k tokens on gpt-oss-20b. See main._effective_max_tokens.
+    max_tokens: Optional[int] = None
+    max_completion_tokens: Optional[int] = None
     # ADR-0415: raw OpenAI tool-schema passthrough
     # ([{"type": "function", "function": {"name", "description", "parameters"}}]),
     # bound onto whichever candidate model is selected via
