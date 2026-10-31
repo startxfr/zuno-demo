@@ -84,8 +84,12 @@ in [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-
 - The OKF v0.3 schema gains an optional `zuno.delegation` block, and the narrowing
   rule checks it ([ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md)
   gives its ceiling).
-- Tekos to Arkos (`draft-architecture-testimonial`) is the first declared pair, on
-  demo333 only; nothing else changes until another pair is declared.
+- Arkos to Tekos (`answer-technical-question`) is the first declared pair, on
+  demo333 only; nothing else changes until another pair is declared. (Amended
+  2026-11-01: the first pair was Tekos to Arkos; it was reversed because Tekos's
+  skills serve Arkos's users and not the other way round. Arkos is already C3/local-only,
+  so the static C3 raise of a delegating task costs nothing there, whereas it would have
+  moved every Tekos turn to a local model.)
 - A2A nodes added by hand in the UnifAI interface are refused or put in error by the
   operator until the contract is delivered (WP-173); afterwards the operator emits
   an A2A node only from a declared target.

@@ -57,6 +57,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "tekos")
 from run_scenarios import AGENT, MCP_GATEWAY_URL, TASK_NAME, _invoke_tool, _unifai, auth_headers  # noqa: E402
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402
+import delegation_checks  # noqa: E402  (ADR-0401/0403/0406, WP-174)
 from okf_release import okf_root  # noqa: E402  (WP-165: agents and corp policies)
 try:
     from day2_report import log_test_line
@@ -380,6 +381,18 @@ CHECKS = [
     unifai_denies_another_users_objects_like_missing_ones,
     a2a_gateway_denies_unentitled_callers_like_unknown_agents,
 ]
+
+
+# ADR-0401/0403/0406 (WP-174): the first declared delegation, Arkos to Tekos, through the gateway.
+# Where agents/ and policies/ live depends on the layout: the repository or an extracted release
+# (okf_root) or the acceptance-gate Job (/agents/<name> and /gate/policies). Skipped while the
+# admitted release declares no such target.
+CHECKS += delegation_checks.arkos_to_tekos_checks(
+    CheckResult,
+    root=[okf_root(pathlib.Path(__file__).resolve().parents[2]), pathlib.Path("/gate"), pathlib.Path("/")],
+    mcp_gateway_url=MCP_GATEWAY_URL,
+    auth_headers=auth_headers,
+)
 
 
 def run() -> list:

@@ -86,3 +86,15 @@ consultant fixture now carries this converse case), and a direct call to
 `confluence-mcp` that bypasses the MCP Gateway entirely is denied by the
 server itself (401) - a platform-wide (ADR-0037), not Arkos-specific,
 boundary this gate still verifies.
+
+ADR-0401/0403/0406 (WP-174): the first agent delegation, Arkos to Tekos
+(`answer-technical-question`; the direction was reversed on 2026-11-01 because Tekos's
+skills serve Arkos's users), through the MCP gateway
+(`evaluations/common/delegation_checks.py`, wired into `security_checks.py`): as
+`eval-consultant-01` the delegated surface lists only read tools while the direct one lists a
+write tool; refused when the user lacks `agent_tekos` (persona `arkos-entitlement-only-user-01`),
+for a target Arkos does not declare, beyond the depth limit, on a cycle, with a depth header that
+disagrees and with half a chain. **They are reported as skipped, never as passes, while the
+admitted release does not declare Arkos -> Tekos** and while the corp flag
+`delegation.allow_write` is true. They do not need the A2A server of WP-173; the behavioural proof
+(a real delegation that runs, the chain in the trace) is WP-174's live pass.

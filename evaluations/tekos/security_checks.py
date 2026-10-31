@@ -45,7 +45,6 @@ from run_scenarios import MCP_GATEWAY_URL, _invoke_tool, _unifai, auth_headers
 # WP-165: agents and the corp policies come from the admitted release.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 from okf_release import okf_root  # noqa: E402
-import delegation_checks  # noqa: E402  (ADR-0401/0403/0406, WP-174)
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "common"))
 import unifai_checks  # noqa: E402  (ADR-0583 two-user probe, ADR-0585 A2A gateway)
 try:
@@ -465,17 +464,6 @@ CHECKS = [
     mcp_gateway_denies_aap_platform_audit_for_unauthorized_group,
     aap_platform_audit_succeeds_for_an_authorized_caller,
 ]
-
-
-# ADR-0401/0403/0406 (WP-174): the first declared delegation, Tekos to Arkos, through the gateway.
-# Where agents/ and policies/ live depends on the layout: the repository or an extracted release
-# (okf_root) or the acceptance-gate Job (/agents/<name> and /gate/policies).
-CHECKS += delegation_checks.tekos_to_arkos_checks(
-    CheckResult,
-    root=[okf_root(pathlib.Path(__file__).resolve().parents[2]), pathlib.Path("/gate"), pathlib.Path("/")],
-    mcp_gateway_url=MCP_GATEWAY_URL,
-    auth_headers=auth_headers,
-)
 
 
 def run() -> list:
