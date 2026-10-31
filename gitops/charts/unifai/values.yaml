@@ -76,10 +76,10 @@ stack:
     embeddingUrl: http://embeddings-predictor.zuno-ai-run.svc:8080
     embeddingModel: qwen3-embedding-0.6b
     embeddingDimension: 1024
-    # Instruction prefix of the query side for Qwen3-Embedding (a real newline before "Query: ", trailing space kept).
+    # Instruction prefix of the query side for Qwen3-Embedding (a real newline before "Query:", no trailing space: the model card format; A/B against the trailing-space value).
     # Remove it to roll back; no re-index either way. The ranking settings (spec.rag.search, spec.rag.reranker) stay unset
     # until measured one by one.
-    embeddingQueryPrefix: "Instruct: Given a question, retrieve passages that answer it\nQuery: "
+    embeddingQueryPrefix: "Instruct: Given a question, retrieve passages that answer it\nQuery:"
     hybrid: true
     # Let the RAG search authenticate OpenShift console tokens through the Kubernetes TokenReview API
     # (needs unifai-operator >= 0.1.29; grants the rag-server ServiceAccount system:auth-delegator).
