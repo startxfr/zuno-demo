@@ -46,10 +46,10 @@ documentation only). Steps 2 to 4 are done on branch
   `publish_okf_bundles.yml`, `sign_okf_bundle.py`, `publish_okf_bundle.py`,
   the `zuno/okf-signatures` Vault policy path, the vault role's key
   export, the `zuno-day3-sign` AAP Job Template).
-- **Kept on purpose.** The Transit public key, frozen in
-  `ansible/roles/unifai/files/`, for the pre-release bundles the `unifai`
-  role still verifies with `publicKeyRef` until WP-164 makes released
-  bundles the only path.
+- **Kept on purpose, then removed.** The Transit public key, frozen in
+  `ansible/roles/unifai/files/`, served the pre-release bundles the `unifai`
+  role verified with `publicKeyRef`. WP-164 removed it with the chart's
+  `publicKeyRef` branch on 2026-10-25; every bundle is keyless.
 
 Left for the operator: rebuild the AAP execution environment (oras;
 `make d1 build aap-execution-environment`), supply-chain-signer, ai-gateway

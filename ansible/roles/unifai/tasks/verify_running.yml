@@ -11,9 +11,23 @@
 - name: "unifai | verify running | read the pods of the operator"
   kubernetes.core.k8s_info:
     kind: Pod
-    namespace: openshift-operators
+    namespace: "{{ zuno_unifai_operator_namespace | default('unifai-operator') }}"
   register: _unifai_operator_pods
   when: zuno_unifai_verify_catalog | default(false) | bool
+
+- name: "unifai | verify running | read the chart's catalog settings and the CatalogSource"
+  when: zuno_unifai_verify_catalog | default(false) | bool
+  block:
+    - name: "unifai | verify running | catalog settings"
+      ansible.builtin.set_fact:
+        _unifai_catalog_chart: "{{ (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/unifai/values.yaml') | from_yaml).operator }}"
+    - name: "unifai | verify running | the CatalogSource"
+      kubernetes.core.k8s_info:
+        api_version: operators.coreos.com/v1alpha1
+        kind: CatalogSource
+        namespace: openshift-marketplace
+        name: "{{ _unifai_catalog_chart.catalogSourceName }}"
+      register: _unifai_catalog_source
 
 - name: "unifai | verify running | compare and verify what runs"
   ansible.builtin.include_tasks: verify_running_compare.yml

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><title>Gestion du bon de commande</title></head>
+<body>
+<h1>Gestion du bon de commande</h1>
+<p><em>Données de démonstration (synthétiques) : ce document est fictif, il ne décrit aucune entreprise ni aucun client réel.</em></p>
+<h2>Statuts d'un bon de commande</h2>
+<table border="1"><tr><th>Statut</th><th>Signification</th><th>Action</th></tr>
+<tr><td>Attendu</td><td>Le client n'a pas encore envoyé son bon de commande</td><td>Relancer à J-60 et J-45</td></tr>
+<tr><td>Reçu, en attente de validation finance</td><td>Document reçu, contrôle du montant et des références en cours</td><td>La finance valide sous 5 jours ouvrés</td></tr>
+<tr><td>Validé</td><td>Conforme au devis</td><td>Émission de la facture</td></tr>
+<tr><td>Rejeté</td><td>Écart de montant ou de références</td><td>Demander un bon de commande corrigé</td></tr></table>
+<h2>Règle de continuité</h2><p>Sans bon de commande valide 30 jours avant l'échéance, la facturation est suspendue ; une lettre d'intention signée maintient la couverture 15 jours.</p>
+</body></html>

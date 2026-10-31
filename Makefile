@@ -77,7 +77,12 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
 DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval
-DAY2_VERBS := check install build uninstall all reinstall
+DAY2_VERBS := check install build uninstall reconcile all reinstall
+# Day 2 components with a targeted tasks/reconcile.yml. `reconcile` is limited
+# to them: a Day 2 reconcile never falls back to re-installing a component.
+# models unwedges a model rollout blocked by the GPU quota (ADR-0201
+# "Rollout hazard"); local only, no AAP job template.
+DAY2_RECONCILE_COMPONENTS := models
 
 # ADR-0057/ADR-0058: Day 3 was originally agent test/stresstest operations
 # only; widened 2026-08-24 into the general "operational tasks" tier -
@@ -233,6 +238,7 @@ help:
 	  '  make day2|d2 build [component]      Build one/all Day 2 component images' \
 	  '  make day2|d2 install [component]    Install/deploy one/all Day 2 components (no component: builds first)' \
 	  '  make day2|d2 uninstall [component]  Uninstall one/all Day 2 components (reverse order)' \
+	  '  make day2|d2 reconcile models       Unwedge a model rollout blocked by the GPU quota (asks before the model goes down)' \
 	  '  make day2|d2 all [component]        check + build + install, whichever apply to the component' \
 	  '  make day2|d2 reinstall [component]  Uninstall then install one/all Day 2 components' \
 	  '' \
@@ -340,6 +346,7 @@ _complete-components:
 	  2) case "$(VERB)" in \
 	       build) echo "$(DAY2_BUILD_COMPONENTS) all" ;; \
 	       check) echo "$(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) all" ;; \
+	       reconcile) echo "$(DAY2_RECONCILE_COMPONENTS) all" ;; \
 	       *) echo "$(DAY2_RUN_COMPONENTS) all" ;; \
 	     esac ;; \
 	  3) case "$(VERB)" in \
@@ -528,11 +535,16 @@ if [[ -z "$$verb" ]]; then \
     '  build       Build one/all Day 2 component images' \
     '  install     Install/deploy one/all Day 2 components (no component: builds first)' \
     '  uninstall   Uninstall one/all Day 2 components (reverse order)' \
+    '  reconcile   Unwedge a model rollout blocked by the GPU quota; asks before the model goes down' \
+    '              (EXTRA_VARS="-e confirm=yes" skips the question, "-e model=<name>" limits it to one model)' \
     '  all         check + build + install, whichever apply to the component' \
     '  reinstall   Uninstall then install one/all Day 2 components' \
     '' \
     'Components (check/install/uninstall/all; optional, default: all):' \
     '  $(DAY2_RUN_COMPONENTS)' \
+    '' \
+    'Components (reconcile):' \
+    '  $(DAY2_RECONCILE_COMPONENTS)' \
     '' \
     'Components (check only):' \
     '  $(DAY2_CHECK_ONLY_COMPONENTS)' \
@@ -558,6 +570,7 @@ run_check() { route_or_local check zuno-day2-check-workflow; }; \
 run_build() { route_or_local build zuno-day2-build-workflow; }; \
 run_install() { route_or_local install zuno-day2-install-workflow; }; \
 run_uninstall() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_uninstall.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
+run_reconcile() { $(ANSIBLE_PLAYBOOK) -i $(INVENTORY) ansible/playbooks/day2_reconcile.yml -e "target_component=$$component" $(EXTRA_VARS); }; \
 case "$$verb" in \
   check) \
     case " $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 check component: '$$component' (expected one of: $(DAY2_RUN_COMPONENTS) $(DAY2_CHECK_ONLY_COMPONENTS) or all)" >&2; exit 2;; esac; \
@@ -572,6 +585,9 @@ case "$$verb" in \
   uninstall) \
     case " $(DAY2_RUN_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 uninstall component: '$$component' (expected one of: $(DAY2_RUN_COMPONENTS) or all)" >&2; exit 2;; esac; \
     run_uninstall ;; \
+  reconcile) \
+    case " $(DAY2_RECONCILE_COMPONENTS) all " in *" $$component "*) ;; *) echo "Unsupported day2 reconcile component: '$$component' (expected one of: $(DAY2_RECONCILE_COMPONENTS) or all)" >&2; exit 2;; esac; \
+    run_reconcile ;; \
   all) \
     is_run=0; is_build=0; \
     case " $(DAY2_RUN_COMPONENTS) all " in *" $$component "*) is_run=1;; esac; \

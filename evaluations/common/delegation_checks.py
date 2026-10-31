@@ -159,13 +159,14 @@ def delegation_refused(
     return check
 
 
-def tekos_to_arkos_checks(
+def delegation_checks(
     CheckResult: Any, *, root: Roots, mcp_gateway_url: str, auth_headers: Headers,
-    allowed_persona: str = "eval-consultant-01", unentitled_persona: str = "tekos-entitlement-only-user-01",
+    delegator: str, delegator_task: str, target: str, target_task: str,
+    allowed_persona: str, unentitled_persona: str,
 ) -> List[Callable[[], Any]]:
-    """The WP-174 gateway scenarios for the first declared delegation, Tekos to Arkos."""
-    D, DT = "tekos", "answer-technical-question"
-    T, TT = "arkos", "draft-architecture-testimonial"
+    """The WP-174 gateway scenarios for one declared delegation (delegator -> target/target_task).
+    `unentitled_persona` holds the delegator's entitlement but not the target's."""
+    D, DT, T, TT = delegator, delegator_task, target, target_task
     common = dict(root=root, mcp_gateway_url=mcp_gateway_url, auth_headers=auth_headers)
     need = (D, T, TT)
     return [
@@ -188,3 +189,18 @@ def tekos_to_arkos_checks(
                            persona=allowed_persona, agent=T, task=TT, hops=[], requires=need,
                            malformed={"X-Zuno-Delegated-By": f"{D}:{DT}"}, **common),
     ]
+
+
+def arkos_to_tekos_checks(
+    CheckResult: Any, *, root: Roots, mcp_gateway_url: str, auth_headers: Headers,
+    allowed_persona: str = "eval-consultant-01", unentitled_persona: str = "arkos-entitlement-only-user-01",
+) -> List[Callable[[], Any]]:
+    """The first declared delegation: Arkos asks Tekos for a technical answer (the direction was
+    reversed on 2026-11-01: Tekos's skills serve Arkos's users). The unentitled persona holds
+    agent_arkos only, so the target's entitlement is what refuses it."""
+    return delegation_checks(
+        CheckResult, root=root, mcp_gateway_url=mcp_gateway_url, auth_headers=auth_headers,
+        delegator="arkos", delegator_task="draft-architecture-testimonial",
+        target="tekos", target_task="answer-technical-question",
+        allowed_persona=allowed_persona, unentitled_persona=unentitled_persona,
+    )

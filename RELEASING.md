@@ -98,8 +98,9 @@ maintainer decision, not something to fabricate a tag for. Path 3
    `check_no_latest_tags.py` (wired into `.github/workflows/lint.yml`)
    starts passing once every chart's `tag: latest` is replaced this way.
 5. **Signing note (ADR-0420, 2026-08-22):** `build-publish.yml` no longer
-   signs anything — signing moved fully in-cluster (Vault Transit), since
-   a GitHub-hosted runner has no route to sign against it. Images
+   signs anything — signing moved fully in-cluster (Vault Transit then,
+   keyless through RHTAS since ADR-0535, Transit kept as its rollback),
+   since a GitHub-hosted runner has no route to sign against it. Images
    published to `quay.io/zuno/*` by this release flow are therefore
    *not* signed. `platform/supply-chain/verify_signatures.py` only
    verifies the in-cluster `image-registry...svc:5000/zuno-ai-build/*`

@@ -98,3 +98,42 @@ ADR-0530 scoping (one client, realm `zuno`) and never manages members.
 The generator runs offline once the artifacts are pulled. Applying the
 result is the ordinary Argo CD sync of the touched Applications; the
 Keycloak Job runs as a sync hook, as it already does.
+
+## Amendment (2026-10-25) - generated MaaS subscriptions and model routing
+
+**MaaS subscriptions (clause 2, implemented by WP-164).**
+- `gitops/charts/models/values.agents.generated.yaml` lists, for each LOCAL model published through MaaS, the
+  entitlement groups of the active agents that can reach it.
+- An agent reaches a model when one of its tasks can be routed to it: every catalog model eligible at the
+  agent's classification, narrowed by a `strict` routing preference (ADR-0417) and by `forbidden` roles.
+- The models chart renders one `<model>-agents` MaaSSubscription owned by all those groups, so a persona
+  in several agent groups matches one subscription; MaaS tie-breaking among equal priorities is unverified
+  (ADR-0570 clause 3).
+- The chart also adds the groups to the model's MaaSAuthPolicy.
+- Platform policy stays hand-written: the tier, the `/sales` business-role subscriptions and the
+  ServiceAccount subscriptions.
+- SaaS models get no persona group (WP-157 decision D5).
+
+**Model routing (clause 2, decided 2026-10-25; code landed 2026-10-25 behind `modelRouting.generated`, not enabled yet, see WP-164).**
+
+The generator writes `gitops/charts/ai-gateway/files/model-routing.generated.yaml`. It uses the schema
+`app/model_routing_policy.py` already loads, and the ai-gateway chart mounts it at
+`MODEL_ROUTING_POLICY_PATH`. The copy baked into the image stays as the fallback, and a routing change no
+longer needs an image rebuild. For each `(agent, task)`:
+
+1. **Candidate set.** When the corp policy has an entry, it sets the candidates. An agent never adds a
+   model outside it, never loosens `strict`, and never touches `local_only_for` or classification
+   eligibility, which ai-gateway keeps applying at runtime.
+2. **Order.** The task's `zuno.models.preferred` roles, or else the agent's, move the candidates with
+   those roles to the front, in role order. The other candidates follow in corp order. This ordering
+   power was granted by the user's decision of 2026-10-25 and amends
+   [ADR-0579](0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md).
+3. **Exclusion.** `forbidden` roles, from the task and the agent, become a new `exclude: [catalog names]`
+   field. ai-gateway drops those names after the eligibility and `local_only` filtering, before `prefer`
+   and `strict`. If no candidate is left, it fails closed with its existing `RoutingError`.
+4. **Task without a corp entry.** Its `prefer` list is built from the roles: role order first, then
+   catalog order within a role.
+
+`adapters` and `objectives` are copied from the corp file. With release 0.6.1 no entry changes: every
+tekos task declares its roles in its corp order, arkos and comage (OKF v0.2) declare none, and no
+release declares `forbidden`. A golden test asserts this equality.

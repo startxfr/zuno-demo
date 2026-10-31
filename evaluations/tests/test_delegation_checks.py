@@ -39,11 +39,11 @@ def _md(front: dict) -> str:
 
 def release(declared: bool, allow_write: bool = False, with_policy: bool = True) -> pathlib.Path:
     root = pathlib.Path(tempfile.mkdtemp())
-    zuno = {"name": "tekos", "status": "active", "tasks": ["answer-technical-question"]}
+    zuno = {"name": "arkos", "status": "active", "tasks": ["draft-architecture-testimonial"]}
     if declared:
-        zuno["delegation"] = {"targets": [{"agent": "arkos", "task": "draft-architecture-testimonial"}]}
-    (root / "agents" / "tekos").mkdir(parents=True)
-    (root / "agents" / "tekos" / "agent.okf.md").write_text(_md({"okf_version": "v0.3", "type": "agent", "zuno": zuno}))
+        zuno["delegation"] = {"targets": [{"agent": "tekos", "task": "answer-technical-question"}]}
+    (root / "agents" / "arkos").mkdir(parents=True)
+    (root / "agents" / "arkos" / "agent.okf.md").write_text(_md({"okf_version": "v0.3", "type": "agent", "zuno": zuno}))
     if with_policy:
         (root / "policies" / "tools").mkdir(parents=True)
         (root / "policies" / "tools" / "tool-policy.yaml").write_text(yaml.safe_dump({"tools": [
@@ -80,14 +80,14 @@ def run(check, gateway):
 def surface(root, **kw):
     return dc.delegation_surface(
         CheckResult, root=root, mcp_gateway_url="http://gw", auth_headers=lambda p: {"Authorization": f"Bearer {p}"},
-        persona="eval-consultant-01", delegator="tekos", delegator_task="answer-technical-question",
-        target="arkos", target_task="draft-architecture-testimonial", **kw)
+        persona="eval-consultant-01", delegator="arkos", delegator_task="draft-architecture-testimonial",
+        target="tekos", target_task="answer-technical-question", **kw)
 
 
 def refusal(root, **kw):
     base = dict(name="delegation_refused_x", root=root, mcp_gateway_url="http://gw",
-                auth_headers=lambda p: {"Authorization": f"Bearer {p}"}, persona="p", agent="arkos",
-                task="draft-architecture-testimonial", hops=["tekos:answer-technical-question"])
+                auth_headers=lambda p: {"Authorization": f"Bearer {p}"}, persona="p", agent="tekos",
+                task="answer-technical-question", hops=["arkos:draft-architecture-testimonial"])
     return dc.delegation_refused(CheckResult, **{**base, **kw})
 
 
@@ -97,8 +97,8 @@ class Surface(unittest.TestCase):
         result = run(surface(release(True)), gw)
         self.assertTrue(result.passed, result.detail)
         chained = [c for c in gw.calls if "X-Zuno-Delegated-By" in c][0]
-        self.assertEqual((chained["X-Zuno-Agent"], chained["X-Zuno-Delegation-Depth"]), ("arkos", "1"))
-        self.assertEqual(chained["X-Zuno-Delegated-By"], "tekos:answer-technical-question")
+        self.assertEqual((chained["X-Zuno-Agent"], chained["X-Zuno-Delegation-Depth"]), ("tekos", "1"))
+        self.assertEqual(chained["X-Zuno-Delegated-By"], "arkos:draft-architecture-testimonial")
 
     def test_a_write_tool_on_the_delegated_surface_fails(self):
         result = run(surface(release(True)), FakeGateway(chained=(READ, WRITE)))
@@ -139,13 +139,13 @@ class Refusals(unittest.TestCase):
 
     def test_malformed_headers_replace_the_chain_exactly(self):
         gw = FakeGateway(chained_status=403, direct_status=403)
-        result = run(refusal(release(True), hops=[], malformed={"X-Zuno-Delegated-By": "tekos:t"}), gw)
+        result = run(refusal(release(True), hops=[], malformed={"X-Zuno-Delegated-By": "arkos:t"}), gw)
         self.assertTrue(result.passed)
-        self.assertEqual(gw.calls[0]["X-Zuno-Delegated-By"], "tekos:t")
+        self.assertEqual(gw.calls[0]["X-Zuno-Delegated-By"], "arkos:t")
         self.assertNotIn("X-Zuno-Delegation-Depth", gw.calls[0])
 
     def test_a_refusal_is_skipped_unless_the_delegation_is_declared(self):
-        result = run(refusal(release(False), requires=("tekos", "arkos", "draft-architecture-testimonial")),
+        result = run(refusal(release(False), requires=("arkos", "tekos", "answer-technical-question")),
                      FakeGateway(chained_status=403, direct_status=403))
         self.assertTrue(result.skipped)
 
@@ -153,13 +153,13 @@ class Refusals(unittest.TestCase):
 class Layouts(unittest.TestCase):
     def test_the_first_root_that_holds_the_agent_wins(self):
         empty = pathlib.Path(tempfile.mkdtemp())
-        self.assertTrue(dc.declares_target([empty, release(True)], "tekos", "arkos", "draft-architecture-testimonial"))
-        self.assertFalse(dc.declares_target([empty], "tekos", "arkos", "draft-architecture-testimonial"))
+        self.assertTrue(dc.declares_target([empty, release(True)], "arkos", "tekos", "answer-technical-question"))
+        self.assertFalse(dc.declares_target([empty], "arkos", "tekos", "answer-technical-question"))
 
     def test_a_malformed_agent_bundle_is_not_a_declaration(self):
         root = release(True)
-        (root / "agents" / "tekos" / "agent.okf.md").write_text("# no frontmatter\n")
-        self.assertFalse(dc.declares_target(root, "tekos", "arkos", "draft-architecture-testimonial"))
+        (root / "agents" / "arkos" / "agent.okf.md").write_text("# no frontmatter\n")
+        self.assertFalse(dc.declares_target(root, "arkos", "tekos", "answer-technical-question"))
 
     def test_policies_are_searched_across_roots_and_default_safe(self):
         empty = pathlib.Path(tempfile.mkdtemp())
@@ -168,9 +168,9 @@ class Layouts(unittest.TestCase):
         self.assertTrue(dc.allows_delegated_writes([empty, release(True, allow_write=True)]))
 
 
-class TekosToArkos(unittest.TestCase):
+class ArkosToTekos(unittest.TestCase):
     def checks(self, root):
-        return dc.tekos_to_arkos_checks(CheckResult, root=root, mcp_gateway_url="http://gw",
+        return dc.arkos_to_tekos_checks(CheckResult, root=root, mcp_gateway_url="http://gw",
                                         auth_headers=lambda p: {})
 
     def test_seven_uniquely_named_checks(self):

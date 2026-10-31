@@ -1,0 +1,34 @@
+---
+# ADR-0586 / WP-176 step 6: when this component does not install the operator itself
+# (a CatalogSource and a Subscription applied by hand exist, as on demo333), the
+# CatalogSource must still run the VERIFIED catalog digest, not a moving tag. Only
+# `spec.image` of the existing CatalogSource is patched; the Subscription is untouched.
+# OLM restarts the catalog pod; the available bundles do not change when the digest is
+# the content of the tag it replaces. Needs `_unifai_install_operator` and the d0 chart
+# values (catalogImage, catalogSourceName).
+- name: "unifai | pin catalog | read the chart's catalog settings"
+  ansible.builtin.set_fact:
+    _unifai_catalog_chart: "{{ (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/unifai/values.yaml') | from_yaml).operator }}"
+
+- name: "unifai | pin catalog | read the CatalogSource"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: CatalogSource
+    namespace: openshift-marketplace
+    name: "{{ _unifai_catalog_chart.catalogSourceName }}"
+  register: _unifai_catalog_source
+
+- name: "unifai | pin catalog | point the CatalogSource at the verified digest"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: operators.coreos.com/v1alpha1
+    kind: CatalogSource
+    namespace: openshift-marketplace
+    name: "{{ _unifai_catalog_chart.catalogSourceName }}"
+    definition:
+      spec:
+        image: "{{ _unifai_catalog_chart.catalogImage }}"
+  when:
+    - not (_unifai_install_operator | bool)
+    - _unifai_catalog_source.resources | length == 1
+    - _unifai_catalog_source.resources[0].spec.image != _unifai_catalog_chart.catalogImage

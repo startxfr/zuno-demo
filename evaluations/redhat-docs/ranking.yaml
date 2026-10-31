@@ -1,0 +1,169 @@
+# Retriever ranking evaluation set (WP-168 follow-up, UnifAI operator 0.1.44 ranking work).
+#
+# Natural questions as Tekos users ask them, over the live demo333 corpus (21 Red Hat web sources of
+# gitops/charts/unifai/files/redhat-docs.yaml, tag knowledge.tech, plus the SXSI Confluence sources).
+# Finer than questions.yaml (product level, rag-service comparison): each entry names the BOOK, or
+# the Confluence page, that answers it.
+#
+# Fields:
+#   query        the question, as typed
+#   sourceType   WEB or CONFLUENCE (query.bearer `sourceType`)
+#   tags         query.bearer `tags`
+#   expect       URL fragments; a hit is a result whose source URL contains one of them. Match on
+#                the path, not the whole URL: the index holds both /documentation/ and
+#                /en/documentation/ forms, with or without a trailing slash or `index`.
+#   granularity  book (one html-single book), product (a product crawled from its root, where the
+#                answering page is not pinned) or page (one Confluence page)
+#   expect_none  true: nothing in the corpus answers it; a good retriever returns no result above
+#                the relevance threshold (used to calibrate it)
+#
+# The expected URLs come from the source definitions and earlier query.bearer probes, not from a
+# full listing of the index: an `expect` that never appears in any top-k, before or after, is a
+# corpus gap to report, not a ranking miss.
+#
+# Persona: a member of agent_tekos with knowledge.tech (consultant-01 or its eval/stress twin).
+
+- id: 1
+  query: What is a namespace in OpenShift?
+  sourceType: WEB
+  tags: knowledge.tech
+  # "A project is a Kubernetes namespace with additional annotations" (Working with projects).
+  expect: [openshift_container_platform/4.22/html-single/authentication_and_authorization,
+           openshift_container_platform/4.22/html-single/building_applications]
+  granularity: book
+- id: 2
+  query: How do I connect OpenShift to Keycloak so users log in with their company account?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/authentication_and_authorization]
+  granularity: book
+- id: 3
+  query: How can I give a colleague admin rights on just one project?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/authentication_and_authorization]
+  granularity: book
+- id: 4
+  query: How do I ask for persistent storage for my pod?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/storage]
+  granularity: book
+- id: 5
+  query: How do I expose the internal image registry outside the cluster?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/registry]
+  granularity: book
+- id: 6
+  query: What is an update channel and which one should I pick to upgrade my cluster?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/updating_clusters]
+  granularity: book
+- id: 7
+  query: How do I back up etcd before a risky change?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/backup_and_restore]
+  granularity: book
+- id: 8
+  query: How do I block traffic between two namespaces?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/network_security]
+  granularity: book
+- id: 9
+  query: How do I add more worker nodes automatically when the cluster is full?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/machine_management]
+  granularity: book
+- id: 10
+  query: How do I keep normal pods off a node reserved for databases?
+  sourceType: WEB
+  tags: knowledge.tech
+  # taints and tolerations, node selectors
+  expect: [openshift_container_platform/4.22/html-single/nodes]
+  granularity: book
+- id: 11
+  query: How do I forward application logs to an external Splunk?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/logging]
+  granularity: book
+- id: 12
+  query: How do I create an alert on my own application's metrics?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/monitoring]
+  granularity: book
+- id: 13
+  query: How do I mirror the release images to install a cluster with no internet access?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/disconnected_environments]
+  granularity: book
+- id: 14
+  query: How do I create a Windows virtual machine on OpenShift?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [openshift_container_platform/4.22/html-single/virtualization]
+  granularity: book
+- id: 15
+  query: How do I serve a large language model with OpenShift AI?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [red_hat_openshift_ai_self-managed/3.5]
+  granularity: product
+- id: 16
+  query: What is an ApplicationSet in Argo CD?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [argo-cd.readthedocs.io/en/stable, red_hat_openshift_gitops/1.17]
+  granularity: product
+- id: 17
+  query: How do I register a RHEL server to Satellite?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect: [red_hat_satellite/6.17]
+  granularity: product
+- id: 18
+  query: What does the internal procedure S0R42 'Schedule Satellite' describe?
+  sourceType: CONFLUENCE
+  tags: knowledge.tech
+  expect: [S0R42]
+  granularity: page
+- id: 19
+  query: How do we restore a deleted project with OADP?
+  sourceType: CONFLUENCE
+  tags: knowledge.tech
+  expect: [O0R62-RSNSO]
+  granularity: page
+- id: 20
+  query: What is our process for preparing a cluster upgrade?
+  sourceType: CONFLUENCE
+  tags: knowledge.tech
+  expect: [O0R41-RDUPG]
+  granularity: page
+- id: 21
+  query: A namespace is stuck and unstable, what is the fix procedure?
+  sourceType: CONFLUENCE
+  tags: knowledge.tech
+  expect: [O0R62-EXONS]
+  granularity: page
+- id: 22
+  query: What was the revenue of our Brazilian subsidiary last quarter?
+  sourceType: WEB
+  tags: knowledge.tech
+  expect_none: true
+- id: 23
+  query: Give me a recipe for a chocolate cake.
+  sourceType: WEB
+  tags: knowledge.tech
+  expect_none: true
+- id: 24
+  query: How do I configure a Cisco Catalyst switch VLAN trunk?
+  sourceType: CONFLUENCE
+  tags: knowledge.tech
+  expect_none: true

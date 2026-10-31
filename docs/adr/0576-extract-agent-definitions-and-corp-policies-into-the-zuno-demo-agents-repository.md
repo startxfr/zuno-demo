@@ -151,9 +151,8 @@ only link is that `zuno-demo` consumes a release. Every other clause stands.
 - **Clause 3.** `agents/*/deployment/` is dropped rather than kept: the
   per-agent charts it mirrored were retired by WP-156, and with them
   `generate_deployment_snapshot.py`. The Transit public key left the OKF
-  path; a frozen copy serves only the pre-release bundles the `unifai`
-  role still verifies with `publicKeyRef` (`ansible/roles/unifai/files/`)
-  until WP-164 makes released bundles the only path.
+  path; the frozen copy kept for the pre-release bundles the `unifai`
+  role verified with `publicKeyRef` was removed by WP-164 (2026-10-25).
 - **Clause 6.** The frozen mirror and its check
   (`platform/okf/check_agents_mirror.py`) are gone: every reader takes the
   admitted release instead, through one helper,

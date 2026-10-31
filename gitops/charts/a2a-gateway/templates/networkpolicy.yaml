@@ -1,4 +1,5 @@
-# Ingress allow-list: only UnifAI's multi-agent pods (backend and Temporal worker) may call this
+# Ingress allow-list: only UnifAI's multi-agent pods (backend and Temporal worker) and the
+# acceptance-gate test Job (ADR-0583 standing check, as on the other gateways) may call this
 # service. Egress to ai-gateway and mcp-gateway is opened on THEIR policies (a2a-gateway peer).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -29,3 +30,11 @@ spec:
         - protocol: TCP
           port: 8080
     {{- end }}
+    # The acceptance gate checks the gateway's identity contract (ADR-0585) with persona tokens.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: acceptance-gate
+      ports:
+        - protocol: TCP
+          port: 8080

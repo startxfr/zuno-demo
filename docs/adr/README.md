@@ -319,14 +319,14 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Partially implemented | Move TrustyAI guardrails into the ai-gateway |
 | [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) | Partially implemented | Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings |
 | [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Partially implemented | Close UnifAI parity gaps generically |
-| [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Accepted | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
+| [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Partially implemented | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
 | [ADR-0571](0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md) | Implemented | Evaluate the RHOAI MCP gateway before extending mcp-gateway |
 | [ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md) | Accepted | Scope the zuno operator to the platform foundation |
 | [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Partially implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
 | [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) | Implemented | Deploy UnifAI through ArgoCD from a pinned OLM catalog |
 | [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Accepted | Upstream generic UnifAI changes and isolate zuno-specific code |
 | [ADR-0585](0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) | Accepted | Serve zuno agents over A2A from a gateway that answers with the caller's identity |
-| [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) | Proposed | Verify the UnifAI runtime images by digest, signature and attestations before deploying them |
+| [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) | Implemented | Verify the UnifAI runtime images by digest, signature and attestations before deploying them |
 
 ## v0.12
 
@@ -339,7 +339,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Implemented | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
 | [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Accepted | Derive stack configuration from the admitted corp bundle |
 | [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Accepted | Serve a per-agent entry and descriptive sheet from the admitted bundle |
-| [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Accepted | Require group visibility and object-level authorisation before per-agent entries |
+| [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Implemented | Require group visibility and object-level authorisation before per-agent entries |
 | [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
 
 ## OKF v0.1

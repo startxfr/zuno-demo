@@ -9,9 +9,11 @@ no cluster, no Redis, no model calls.
 """
 from __future__ import annotations
 
+import os
 import unittest
+from unittest import mock
 
-from app.quota import QuotaDenial, TokenBudgetLedger
+from app.quota import QuotaDenial, RedisCounterStore, TokenBudgetLedger
 
 CONFIG = {
     "classes": {
@@ -121,3 +123,81 @@ class QuotaLedgerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _FakeRedis:
+    """Just enough of redis-py for RedisCounterStore: shared between ledgers."""
+
+    def __init__(self, fail: bool = False) -> None:
+        self.data = {}
+        self.expiry = {}
+        self.fail = fail
+
+    def get(self, key):
+        if self.fail:
+            raise ConnectionError("redis down")
+        return self.data.get(key)
+
+    def incrby(self, key, amount):
+        if self.fail:
+            raise ConnectionError("redis down")
+        self.data[key] = int(self.data.get(key, 0)) + amount
+
+    def expire(self, key, seconds):
+        self.expiry[key] = seconds
+
+
+class DurableLedgerTests(unittest.TestCase):
+    def _ledger(self, fake):
+        return TokenBudgetLedger(config=CONFIG, store=RedisCounterStore(client=fake))
+
+    def test_budget_survives_a_restart(self) -> None:
+        fake = _FakeRedis()
+        first = self._ledger(fake)
+        first.consume("standard", "u1", GROUPS, None, 100, now=NOW)
+        restarted = self._ledger(fake)  # new process, empty local counters
+        denial = restarted.check("standard", "u1", GROUPS, None, now=NOW)
+        self.assertIsInstance(denial, QuotaDenial)
+        self.assertEqual(denial.dimension, "user")
+
+    def test_two_replicas_share_the_budget(self) -> None:
+        fake = _FakeRedis()
+        a, b = self._ledger(fake), self._ledger(fake)
+        a.consume("standard", "u1", GROUPS, None, 60, now=NOW)
+        b.consume("standard", "u1", GROUPS, None, 60, now=NOW)
+        self.assertIsNotNone(a.check("standard", "u1", GROUPS, None, now=NOW))
+
+    def test_keys_expire_after_two_windows(self) -> None:
+        fake = _FakeRedis()
+        self._ledger(fake).consume("standard", "u1", GROUPS, None, 10, now=NOW)
+        self.assertTrue(fake.expiry)
+        self.assertTrue(all(v == 2 * 3600 for v in fake.expiry.values()))
+        self.assertTrue(all(k.startswith("zuno:quota:standard:") for k in fake.data))
+
+    def test_redis_down_falls_back_to_local_counters(self) -> None:
+        ledger = self._ledger(_FakeRedis(fail=True))
+        self.assertIsNone(ledger.check("standard", "u1", GROUPS, None, now=NOW))
+        ledger.consume("standard", "u1", GROUPS, None, 100, now=NOW)  # must not raise
+        denial = ledger.check("standard", "u1", GROUPS, None, now=NOW)
+        self.assertIsInstance(denial, QuotaDenial)
+
+    def test_default_store_is_memory(self) -> None:
+        with mock.patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("QUOTA_LEDGER_STORE", None)
+            self.assertIsNone(TokenBudgetLedger(config=CONFIG)._store)
+        with mock.patch.dict("os.environ", {"QUOTA_LEDGER_STORE": "redis"}):
+            self.assertIsInstance(TokenBudgetLedger(config=CONFIG)._store, RedisCounterStore)
+
+    def test_default_client_does_not_retry_a_dead_redis(self) -> None:
+        # redis-py's default (3 retries with backoff) stalled the request path for seconds.
+        import time
+
+        with mock.patch.dict("os.environ", {"REDIS_ADDR": "127.0.0.1:1"}):
+            store = RedisCounterStore()
+            started = time.perf_counter()
+            self.assertEqual(store.get(("standard", "user", "u", 1)), 0)
+            self.assertLess(time.perf_counter() - started, 1.0)
+            # and the next calls are skipped for the back-off window
+            started = time.perf_counter()
+            store.add(("standard", "user", "u", 1), 5, 3600)
+            self.assertLess(time.perf_counter() - started, 0.05)

@@ -1,6 +1,6 @@
 # ADR-0570: Slim the ai-gateway by delegating quotas, keys and exposure to MaaS
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -221,9 +221,11 @@ NOT enforced**. The Kuadrant wasm shim on demo333 drops the token-limit
 action pairs at the end of a request (live order tests, 2026-10-24), and
 Kuadrant orders those pairs by limit name, so the user limit, last, is
 never counted; moving it ahead stopped other limits from counting instead.
-An upstream report is being drafted; the per-user ceiling stays a
-follow-up of
-[WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md).
+The upstream report is drafted but deliberately not filed (user
+decision of 2026-10-25: the subject is closed here and reporting to the
+Kuadrant community is deferred); the per-user ceiling stays a follow-up of
+[WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md)
+and [WP-177](../roadmap/work-packages/wp-177-finish-the-maas-quota-delegation.md).
 
 ## Amendment (2026-10-24, WP-157 partial closure)
 
@@ -239,3 +241,74 @@ attested headers, the generated gateway policy, the 429 pass-through with a
 computed `Retry-After`, closed quota classes refused without a MaaS path,
 the persona SaaS subscriptions removed); the removal of the ledger is its
 follow-up.
+
+## Amendment (2026-10-25) - correction of the WP-157 closure wording
+
+Live read on demo333 after the v0.5.0 quota release: the gateway-level group ceiling is **not** enforced on the routes
+that carry several subscription limits. On qwen36, qwen35-9b, qwen35-9b-wesh
+and gpt-oss-20b (four or three controller subscription limits each), two
+persona chats moved the ai-gateway subscription counter (1,000,000 to
+999,859) while the `standard-group` counter did not move and no
+`standard-user` counter exists: the wasm shim processes only the first
+limit pairs of a request, the limits run in name order, and the
+`standard-*` pair comes after the subscription limits. On the routes with
+one subscription limit (mistral-large, gpt-oss-120b-ovhcloud, unused while
+SaaS stays direct) the group pair may count; that is not verified. The
+`evaluation` and `stresstest` gateway limits are not rendered at all
+(`enforceNonStandardClasses` is off). Pruning the unused subscription
+limits would not help: the ai-gateway and Lightspeed limits still sort
+first.
+
+So, plainly: the user, group, cross-model, `evaluation`, `intensive` and
+`stresstest` token ceilings are enforced **only by the ai-gateway's
+`app/quota.py`** (10M user / 100M group per 24h for `standard` since
+v0.5.0, each class its own budget). On the local models MaaS enforces only
+the per-subscription budgets. The upstream shim defect is the blocker for
+moving any ceiling to MaaS.
+
+The earlier amendments' "group ceiling enforced" holds only where the shim
+processes the pair; see [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md)'s
+amendment of the same correction.
+
+## Amendment (2026-10-25) - the per-user ceiling is accepted as not enforced at MaaS
+
+Decision of the user (2026-10-25): the per-user token ceiling stays **not enforced at MaaS** until Kuadrant
+fixes the wasm shim; it remains guarded by the ai-gateway's `app/quota.py` only. The defect is now
+reproduced on a throwaway Gateway, route and `TokenRateLimitPolicy` (four limits, ten requests): the shim
+completes **only the first two limits by sorted limit name**, on any route, so it is not specific to MaaS and
+the earlier "last pair is lost" reading is narrowed to this. Renaming a limit moves it in or out of the counted
+pair. No Zuno-side reordering fixes it on routes that carry the controller's subscription limits.
+
+Upstream action: **none for now**. By user decision of 2026-10-25 no report is made to the Kuadrant community and the
+subject is closed in this ADR and its work packages. The drafted report is kept as an archive
+([the drafted report](../roadmap/evidence/kuadrant-token-limits-upstream-report.md)); it would ask for confirmation of
+a two-pair ceiling, a fix (or a documented ceiling), a warning naming the skipped limit instead of
+`invalid context_id`, and documentation that the limit name sets the evaluation order. When it is fixed, re-run
+the order check described in [WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md).
+
+## Amendment (2026-10-25) - closure state
+
+The status moves from Accepted to Partially implemented, by user decision of 2026-10-25 (honest, partial closure).
+
+**Delivered and verified on demo333** ([WP-157](../roadmap/work-packages/wp-157-slim-the-ai-gateway-via-maas.md)): local models
+reached through MaaS under the ai-gateway ServiceAccount with attested `X-Zuno-*` headers (clause 1 for local models,
+clause 5 for the exposure of local models); the maas-controller's per-subscription budgets; the MaaS 429 passed to the caller
+with a `Retry-After` computed from the subscription window; closed quota classes refused when MaaS has no path.
+
+**Not delivered:**
+
+- Clause 2 for the user, group, cross-model, `evaluation`, `intensive` and `stresstest` ceilings: the generated gateway
+  `TokenRateLimitPolicy` is Accepted and Enforced but the Kuadrant wasm shim counts only the first two limits by sorted name
+  (see the amendment above), so these ceilings stay in the ai-gateway. The user accepted this on 2026-10-25.
+- Clause 3, the removal of `app/quota.py`, `quota_budgets.yaml` and the ledger calls: gated on proven equivalence, so it waits
+  for the Kuadrant fix.
+- Clauses 1 and 4 for SaaS providers: named exception (direct, with their keys) while the vendor route defect is open.
+- Checks never run: V2, V3, V5, V6, V11.
+
+The remaining work and its order are in [WP-177](../roadmap/work-packages/wp-177-finish-the-maas-quota-delegation.md). The
+decision stays Partially implemented.
+
+Update 2026-10-25 (user): no upstream issue for now and no Kuadrant fix expected soon, so WP-177 works with the limitation. The
+ai-gateway ledger stays the guard of those ceilings, WP-177 makes it durable (Redis) and adds a probe that shows which counters move, and
+the removal of `quota.py` is deferred until Kuadrant counts every limit. The status moves to Implemented only if that removal is done, or
+is amended to accept the ledger as the permanent design.

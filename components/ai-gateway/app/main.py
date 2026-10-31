@@ -10,6 +10,7 @@ from components/agent-runtime.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import logging
@@ -42,6 +43,7 @@ from app.schemas import (
     ModelObject,
     RoutingDecision,
 )
+from app.routing_watch import ROUTING_RELOAD_INTERVAL_SECONDS, RoutingWatcher
 from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_empty_response
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -62,6 +64,22 @@ routing_table = RoutingTable()
 image_routing_table = ImageRoutingTable()  # ADR-0415
 model_routing_policy = ModelRoutingPolicy()  # ADR-0303 (WP-39)
 tuning_controller = TuningController()  # ADR-0309 (WP-42) - inert unless the policy enables it
+# The routing files are a ConfigMap of another Argo CD Application: reload them
+# when the mounted copy changes instead of waiting for a pod restart.
+# The model-routing policy can be generated and mounted too (ADR-0581, WP-164 lot 2).
+routing_watcher = RoutingWatcher({
+    routing_table.path: routing_table.reload,
+    image_routing_table.path: image_routing_table.reload,
+    model_routing_policy.path: model_routing_policy.reload,
+    # ADR-0579 (WP-164 lot 3): generated per-agent guardrail modes, when mounted.
+    **({guardrails.agent_modes.path: guardrails.agent_modes.reload} if guardrails.agent_modes.path else {}),
+})
+
+
+@app.on_event("startup")
+async def _start_routing_watch() -> None:
+    if ROUTING_RELOAD_INTERVAL_SECONDS > 0:
+        asyncio.create_task(routing_watcher.run(ROUTING_RELOAD_INTERVAL_SECONDS))
 
 _ROLE_TO_MESSAGE = {"system": SystemMessage, "user": HumanMessage, "assistant": AIMessage}
 
@@ -358,9 +376,11 @@ async def chat_completions(
     # entries that opt in - see model_routing_policy.py/routing.py.
     preference = model_routing_policy.preference_for(x_zuno_agent, x_zuno_task)
     strict_preference = model_routing_policy.strict_for(x_zuno_agent, x_zuno_task)
+    # ADR-0581: the (agent, task)'s forbidden model roles, as provider names - narrows only.
+    exclude = model_routing_policy.exclude_for(x_zuno_agent, x_zuno_task)
     try:
         candidates = routing_table.candidates_for(
-            classification, local_only=local_only, prefer=preference, strict=strict_preference
+            classification, local_only=local_only, prefer=preference, strict=strict_preference, exclude=exclude
         )
     except RoutingError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -388,7 +408,8 @@ async def chat_completions(
     # ADR-0567 (WP-153): guardrails mode follows the DECLARED classification.
     # It is the same value routing uses, so a caller cannot get a laxer
     # guardrails mode than the routing it is subject to.
-    gr_mode = guardrails.mode_for(classification)
+    # ADR-0579: the calling agent's declared mode and the corp minimum can only harden it.
+    gr_mode = guardrails.mode_for(classification, x_zuno_agent)
     gr_prompt = _last_user_text(payload.messages) if gr_mode != "off" else ""
     if gr_mode == "block":
         found = await guardrails.evaluate(

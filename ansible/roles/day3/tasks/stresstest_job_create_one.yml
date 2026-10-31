@@ -183,6 +183,13 @@
                     value: "agent-{{ day2_stress_agent }}"
                   - name: UNIFAI_VERIFY_TLS
                     value: "1"
+                  # A node that retrieves before the model (retrieve_first)
+                  # emits no tool event; run_scenarios.py then proves the
+                  # retrieval by the run's `rag.search` spans in Tempo (the
+                  # in-cluster URL Grafana and Kiali use; zuno-monitoring
+                  # admits zuno-ai-run).
+                  - name: TEMPO_URL
+                    value: "{{ day2_stress_tempo_url | default('http://tempo-tempo.zuno-monitoring.svc.cluster.local:3200') }}"
                   # ADR-0511/WP-54's quota layer builds the quota-demo
                   # Route's hostname from this. quota_429.py can also
                   # recover it by stripping the agent label off

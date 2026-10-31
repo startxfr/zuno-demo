@@ -290,8 +290,8 @@ an image):
   per-subscription budgets (Lightspeed's 200k among them). So the wasm shim
   drops the action pairs at the end of a request. The original order is
   restored (000f6d75): **group ceiling enforced, per-subscription budgets
-  enforced, per-user ceiling not enforced**. An upstream report is being
-  drafted; the user limit stays in the policy, harmless, and is not to be
+  enforced, per-user ceiling not enforced**. The upstream report was drafted
+  and, by user decision (2026-10-25), not filed and the subject is closed; the user limit stays in the policy, harmless, and is not to be
   described as enforced.
 
 Open after the sequence: the per-user ceiling (upstream shim defect); the
@@ -308,8 +308,14 @@ demo333, each line verified by a second session.
 - Local models through MaaS: the four local models are served via MaaS
   under the ai-gateway ServiceAccount with attested headers (D5); personas
   can no longer call MaaS directly (401). (V0, step 1)
-- Group token ceiling, **per model**, from the generated gateway
-  `TokenRateLimitPolicy`. (V8, V9, V10)
+- ~~Group token ceiling, per model, from the generated gateway
+  `TokenRateLimitPolicy`.~~ **Corrected 2026-10-25:** not enforced at MaaS
+  on the local-model routes. Their several subscription limits sort first
+  and the wasm shim never reaches the `standard-*` pair (a live read showed
+  the subscription counter moving while the group counter stayed still).
+  The group ceiling, like the user, cross-model, `evaluation` and
+  `stresstest` ceilings, is enforced only by the ai-gateway's
+  `app/quota.py`. (V8, V9, V10, correction in ADR-0511 and ADR-0570)
 - Per-subscription budgets of the maas-controller (a lowered limit answers
   429; the counters decrement). Lightspeed's budget sits in the same
   position, not exercised. (V7, order revert)
@@ -344,26 +350,17 @@ demo333, each line verified by a second session.
 the per-user and cross-model guard (ADR-0511 and ADR-0570 amendments of
 2026-10-24); the SaaS keys, ExternalSecrets and direct branches.
 
-## Follow-up: per-user and cross-model ceiling at MaaS
+## Follow-up: moved to WP-177
 
-Open, not scheduled. Goal: enforce the per-user ceiling and a cross-model
-total outside the gateway, so `app/quota.py` and its budgets can go.
+The per-user, group and cross-model ceilings at MaaS, the removal of `app/quota.py`, the SaaS providers through MaaS and the
+checks never run (V2, V3, V5, V6, V11) are tracked in
+[WP-177](wp-177-finish-the-maas-quota-delegation.md), blocked on a Kuadrant fix. User decision of 2026-10-25: the missing per-user
+ceiling is accepted until then, and ADR-0570 moves to Partially implemented. The upstream report is drafted in
+[kuadrant-token-limits-upstream-report.md](../evidence/kuadrant-token-limits-upstream-report.md) and, by user decision, not
+filed: reporting to the Kuadrant community is deferred and the subject is closed.
 
-- Report the wasm shim defect upstream (Kuadrant): the trailing token-limit
-  action pairs of a request are never counted; actions are ordered by limit
-  name, so the last limit is always the one lost.
-- Once fixed, re-run the order check (both gateway limits and every
-  per-subscription limit counting), then V8 for a cross-model total
-  (a policy whose counter spans routes, or another design).
-- Platform context: since 2f981d17 the gateway honours the quota class
-  and project id headers only from Keycloak clients listed in
-  `trustedPlatformClients` (none on demo333). `platform/testing`'s
-  stresstest and quota-429 runners cannot select a class until their client
-  is declared there, and the project dimension stays unused until a
-  server-resolved project id from a verified grant exists (ADR-0528).
-- Only then, on proven equivalence: remove `app/quota.py`,
-  `quota_budgets.yaml`, `tests/test_quota_budgets.py`, the ledger calls and
-  `_render_budgets`.
+**Closure state:** WP-157 is Done on the scope above. At MaaS only the per-subscription budgets are enforced; every other token
+ceiling is enforced by the ai-gateway's `app/quota.py`.
 
 ## Acceptance
 

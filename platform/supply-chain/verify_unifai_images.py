@@ -49,7 +49,9 @@ import admit_okf_bundle as admit  # noqa: E402
 IDENTITIES_PATH = HERE / "image-identities.yaml"
 DIGEST_RE = re.compile(r"@(sha256:[0-9a-f]{64})$")
 FAMILY_PREFIX = "quay.io/zuno/unifai-"
-OPERATOR_PREFIX = "quay.io/zuno/unifai-operator"
+OPERATOR_IMAGE = "quay.io/zuno/unifai-operator"
+# The operator's bundle and catalog are built and signed by the operator release workflow only.
+OPERATOR_ARTIFACTS = ("quay.io/zuno/unifai-operator-bundle", "quay.io/zuno/unifai-operator-catalog")
 
 
 class ImageError(ValueError):
@@ -65,7 +67,7 @@ class Result:
 
 def load_identities(path: pathlib.Path = IDENTITIES_PATH) -> dict:
     doc = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    for key in ("issuer", "images", "operator", "attestations"):
+    for key in ("issuer", "images", "operator", "operator_artifacts", "attestations"):
         if key not in doc:
             raise ImageError(f"{path}: missing '{key}'")
     return doc
@@ -81,7 +83,9 @@ def repository(reference: str) -> str:
 
 def kind_of(reference: str) -> str:
     repo = repository(reference)
-    if repo.startswith(OPERATOR_PREFIX):
+    if repo in OPERATOR_ARTIFACTS:
+        return "operator_artifacts"
+    if repo == OPERATOR_IMAGE:
         return "operator"
     if repo.startswith(FAMILY_PREFIX):
         return "images"
@@ -165,6 +169,31 @@ def check_pods(pods: dict, pinned_digests: Set[str], verify: Callable[[str], Res
     return findings
 
 
+def check_third_party(pods: dict, pinned: Iterable[str]) -> List[str]:
+    """Drift of the pinned third-party services (unsigned, pinned only). A live container
+    whose repository is one of the pinned references must run exactly one of them. The pod
+    spec is read, not the runtime's imageID: for a pinned manifest list the runtime reports
+    the digest of the platform manifest, which is never the pin. Pods that ended (Jobs that
+    completed before a pin) are ignored."""
+    by_repo: Dict[str, Set[str]] = {}
+    for ref in pinned:
+        by_repo.setdefault(repository(ref), set()).add(ref)
+    findings: List[str] = []
+    for pod in pods.get("items", []):
+        if (pod.get("status") or {}).get("phase") in ("Succeeded", "Failed"):
+            continue
+        spec = pod.get("spec") or {}
+        name = (pod.get("metadata") or {}).get("name", "?")
+        for container in (spec.get("containers") or []) + (spec.get("initContainers") or []):
+            image = container.get("image") or ""
+            allowed = by_repo.get(repository(image))
+            if allowed and image not in allowed:
+                finding = f"{name}: runs {image}, expected one of the pinned {', '.join(sorted(allowed))} (drift)"
+                if finding not in findings:
+                    findings.append(finding)
+    return findings
+
+
 def _read_json(arg: str):
     return json.load(sys.stdin) if arg == "-" else json.loads(pathlib.Path(arg).read_text(encoding="utf-8"))
 
@@ -174,6 +203,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--ref", action="append", default=[], help="an image reference, repo@sha256:... (repeatable)")
     parser.add_argument("--refs-json", help="a JSON list of references ('-' for stdin)")
     parser.add_argument("--accept-dev", action="store_true", help="also accept development (devel branch) builds")
+    parser.add_argument("--third-party", action="append", default=[],
+                        help="a pinned third-party reference (repeatable): with --pods, a pod running another image "
+                             "of its repository is drift. Pinned only, never signature-checked")
     parser.add_argument("--pods", help="`oc get pods -o json` output ('-' for stdin): compare what runs")
     args = parser.parse_args(argv)
     if args.refs_json == "-" and args.pods == "-":
@@ -197,7 +229,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             results = [verify(ref) for ref in references]
             if args.pods:
                 pinned = {digest_of(r) for r in references if DIGEST_RE.search(r) and kind_of(r) == "images"}
-                pod_findings = check_pods(_read_json(args.pods), pinned, verify)
+                pods = _read_json(args.pods)
+                pod_findings = check_pods(pods, pinned, verify) + check_third_party(pods, args.third_party)
     except (admit.AdmissionError, OSError, ValueError) as exc:
         print(json.dumps({"ok": False, "error": str(exc)}))
         return 1

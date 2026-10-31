@@ -51,6 +51,16 @@ what Arkos's `draft-architecture-testimonial` task needs at C2/C3
 `X-Zuno-Local-Only` flag before calling `routing_table.candidates_for()`,
 reusing that call's existing fail-closed `RoutingError` when no local
 candidate survives - no new failure path.
+
+ADR-0581 (2026-10-25 amendment, WP-164 lot 2) adds an optional `exclude:
+[provider names]` field to a `preferences:` entry: the catalog names of the
+roles the agent or task declares `forbidden` (OKF v0.3 `zuno.models`).
+`app/routing.py` drops them after the eligibility and local-only filtering,
+before `prefer`/`strict`, and fails closed when nothing is left. An entry
+may carry `exclude` alone. The file can now be generated from the corp
+release (gitops/charts/ai-gateway/files/model-routing.generated.yaml) and
+mounted; when the configured path is missing, the copy baked into the image
+is read instead (MODEL_ROUTING_POLICY_FALLBACK_PATH).
 """
 from __future__ import annotations
 
@@ -63,9 +73,8 @@ import yaml
 
 logger = logging.getLogger("ai_gateway.model_routing_policy")
 
-MODEL_ROUTING_POLICY_PATH = os.getenv(
-    "MODEL_ROUTING_POLICY_PATH", "/app/policies/model-routing/model-routing-policy.yaml"
-)
+MODEL_ROUTING_POLICY_FALLBACK_PATH = "/app/policies/model-routing/model-routing-policy.yaml"
+MODEL_ROUTING_POLICY_PATH = os.getenv("MODEL_ROUTING_POLICY_PATH", MODEL_ROUTING_POLICY_FALLBACK_PATH)
 
 
 def _name_list(value: object) -> List[str]:
@@ -89,9 +98,33 @@ class AdapterDeclaration:
 
 
 class ModelRoutingPolicy:
-    def __init__(self, policy_path: str = MODEL_ROUTING_POLICY_PATH):
-        self._policy_path = policy_path
+    def __init__(
+        self, policy_path: str = MODEL_ROUTING_POLICY_PATH, fallback_path: Optional[str] = MODEL_ROUTING_POLICY_FALLBACK_PATH
+    ):
+        self._configured_path = policy_path
+        self._fallback_path = fallback_path
+        self._exclude: Dict[Tuple[str, str], List[str]] = {}
         self._entries, self._preferences, self._strict, self._local_only_for = self._load()
+
+    @property
+    def path(self) -> str:
+        """The configured file (the one a RoutingWatcher watches), even while the fallback is in use."""
+        return self._configured_path
+
+    def _resolve_path(self) -> str:
+        """The configured file, or the baked fallback when the configured one is missing."""
+        if (
+            self._fallback_path
+            and self._fallback_path != self._configured_path
+            and not os.path.exists(self._configured_path)
+            and os.path.exists(self._fallback_path)
+        ):
+            logger.warning(
+                "model-routing policy %s is missing; using the copy baked into the image (%s)",
+                self._configured_path, self._fallback_path,
+            )
+            return self._fallback_path
+        return self._configured_path
 
     def _load(
         self,
@@ -101,6 +134,8 @@ class ModelRoutingPolicy:
         Dict[Tuple[str, str], bool],
         Dict[Tuple[str, str], set],
     ]:
+        self._policy_path = self._resolve_path()
+        self._exclude = {}
         try:
             with open(self._policy_path, "r", encoding="utf-8") as fh:
                 config = yaml.safe_load(fh) or {}
@@ -135,12 +170,17 @@ class ModelRoutingPolicy:
             agent = raw.get("agent")
             task = raw.get("task")
             names = _preference_names(raw)
-            if not agent or not task or not names:
+            exclude = _name_list(raw.get("exclude"))
+            if not agent or not task or not (names or exclude):
                 logger.warning(
                     "skipping malformed model-routing preference entry (needs agent/task and a "
-                    "non-empty prefer list, or a non-empty preferred/fallback pair): %r",
+                    "non-empty prefer list, a non-empty preferred/fallback pair, or an exclude list): %r",
                     raw,
                 )
+                continue
+            if exclude:
+                self._exclude[(agent, task)] = exclude
+            if not names:
                 continue
             preferences[(agent, task)] = names
             strict[(agent, task)] = bool(raw.get("strict", False))
@@ -169,6 +209,14 @@ class ModelRoutingPolicy:
         if not agent_name or not task_name:
             return None
         names = self._preferences.get((agent_name, task_name))
+        return list(names) if names else None
+
+    def exclude_for(self, agent_name: str, task_name: str) -> Optional[List[str]]:
+        """ADR-0581: provider names this (agent, task) must never be routed to
+        (its `forbidden` model roles), or None. Returns a copy."""
+        if not agent_name or not task_name:
+            return None
+        names = self._exclude.get((agent_name, task_name))
         return list(names) if names else None
 
     def local_only_for_classification(self, agent_name: str, task_name: str, classification: str) -> bool:

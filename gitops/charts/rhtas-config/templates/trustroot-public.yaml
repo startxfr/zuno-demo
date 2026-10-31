@@ -1,0 +1,18 @@
+{{- if and .Values.policyOperand.enabled .Values.policyOperand.unifai.enabled }}
+# WP-178 / ADR-0586: the public Sigstore root (Fulcio CAs, Rekor and CT log keys, timestamp authority) the UnifAI
+# images are signed under (GitHub Actions keyless). Generated from platform/okf/sigstore/trusted_root.json by
+# platform/supply-chain/render_policy_trustroot.py (files/public-sigstore-trustroot.yaml, checked in CI): the very
+# root zuno's offline verifier uses, no network access to fulcio.sigstore.dev or rekor.sigstore.dev. Only ECDSA log
+# keys are included (the controller rejects other key types).
+# v1alpha1 for the same reason as clusterimagepolicy.yaml; same wave as the other policy objects (see trustroot.yaml).
+apiVersion: policy.sigstore.dev/v1alpha1
+kind: TrustRoot
+metadata:
+  name: public-sigstore-trust-root
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  {{- .Files.Get "files/public-sigstore-trustroot.yaml" | fromYaml | toYaml | nindent 2 }}
+{{- end }}

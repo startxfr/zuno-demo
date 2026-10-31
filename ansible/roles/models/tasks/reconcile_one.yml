@@ -1,0 +1,69 @@
+---
+# One wedged model (see tasks/reconcile.yml). _mr_item: {model, deployment, new_rs, old_rs}.
+- name: "models | reconcile {{ _mr_item.model }}: confirm the cause is the GPU quota"
+  kubernetes.core.k8s_info:
+    kind: Event
+    namespace: "{{ models_reconcile_namespace | default('zuno-ai-run') }}"
+    field_selectors:
+      - "involvedObject.name={{ _mr_item.new_rs }}"
+      - "reason=FailedCreate"
+  register: _mr_events
+
+- name: "models | reconcile {{ _mr_item.model }}: skip, not a quota refusal"
+  ansible.builtin.debug:
+    msg: "{{ _mr_item.new_rs }} has no FailedCreate 'exceeded quota' event: not the GPU-quota wedge, left alone."
+  when: >-
+    _mr_events.resources | selectattr('message', 'search', 'exceeded quota') | list | length == 0
+
+- name: "models | reconcile {{ _mr_item.model }}: unwedge"
+  when: >-
+    _mr_events.resources | selectattr('message', 'search', 'exceeded quota') | list | length > 0
+  block:
+    - name: "models | reconcile {{ _mr_item.model }}: scale the old ReplicaSet {{ _mr_item.old_rs }} to 0"
+      kubernetes.core.k8s_scale:
+        api_version: apps/v1
+        kind: ReplicaSet
+        name: "{{ _mr_item.old_rs }}"
+        namespace: "{{ models_reconcile_namespace | default('zuno-ai-run') }}"
+        replicas: 0
+        wait: false
+
+    - name: "models | reconcile {{ _mr_item.model }}: wait up to 2 min for a pod of {{ _mr_item.new_rs }}"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ models_reconcile_namespace | default('zuno-ai-run') }}"
+        label_selectors:
+          - "pod-template-hash={{ _mr_item.new_rs | regex_replace('^.*-', '') }}"
+      register: _mr_pods
+      until: _mr_pods.resources | length > 0
+      retries: 8
+      delay: 15
+      failed_when: false
+
+    - name: "models | reconcile {{ _mr_item.model }}: no pod (controller backoff), recreate {{ _mr_item.new_rs }}"
+      kubernetes.core.k8s:
+        state: absent
+        api_version: apps/v1
+        kind: ReplicaSet
+        name: "{{ _mr_item.new_rs }}"
+        namespace: "{{ models_reconcile_namespace | default('zuno-ai-run') }}"
+      when: _mr_pods.resources | length == 0
+
+    - name: "models | reconcile {{ _mr_item.model }}: wait for the new pod to be Ready (up to 15 min)"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        name: "{{ _mr_item.deployment }}"
+        namespace: "{{ models_reconcile_namespace | default('zuno-ai-run') }}"
+      register: _mr_dep
+      until: >-
+        _mr_dep.resources | length > 0
+        and (_mr_dep.resources[0].status.updatedReplicas | default(0)) >= 1
+        and (_mr_dep.resources[0].status.readyReplicas | default(0)) >= 1
+        and (_mr_dep.resources[0].status.replicas | default(0)) == (_mr_dep.resources[0].status.updatedReplicas | default(0))
+      retries: 60
+      delay: 15
+
+    - name: "models | reconcile {{ _mr_item.model }}: done"
+      ansible.builtin.debug:
+        msg: "{{ _mr_item.model }} rolled out: its new pod is Ready."

@@ -17,3 +17,20 @@
       {%- endfor -%}
       {{ out }}
       {%- endif -%}
+
+# The third-party services are pinned, never signature-checked (ADR-0586 clause 7);
+# the drift check still compares what runs to these pins.
+- name: "unifai | image refs | derive the third-party pins"
+  ansible.builtin.set_fact:
+    _unifai_third_party_refs: >-
+      {%- set stack = (zuno_unifai_values | default({})).stack | default({}) -%}
+      {%- set app = ['backend', 'identity', 'multiagent', 'rag', 'ui'] -%}
+      {%- set out = [] -%}
+      {%- for k, ref in (stack.images | default({})).items() if k not in app and ref -%}
+      {%- set _ = out.append(ref) -%}
+      {%- endfor -%}
+      {%- for k, ref in ((stack.backup | default({})).images | default({})).items() if ref -%}
+      {%- set _ = out.append(ref) -%}
+      {%- endfor -%}
+      {{ out }}
+  when: _unifai_verify_scope == 'stack'

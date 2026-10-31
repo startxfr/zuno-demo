@@ -57,6 +57,10 @@
       maas:
         saasSubscriptions:
           gatewayOnly: "{{ zuno_models_saas_subscriptions_gateway_only | default(false) | bool }}"
+        # ADR-0581 clause 2 (WP-164): the persona-group subscriptions, derived
+        # from the admitted agents release by platform/okf/generate_stack_config.py
+        # (promotion PRs regenerate it; lint.yml checks it), never hand-written.
+        agentSubscriptions: "{{ (lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/models/values.agents.generated.yaml') | from_yaml).maas.agentSubscriptions }}"
       image:
         vllm: "{{ _models_discovered_vllm_image }}"
       # Which bucket/directory contain the model weights

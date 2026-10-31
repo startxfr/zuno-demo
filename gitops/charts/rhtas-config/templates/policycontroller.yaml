@@ -59,4 +59,11 @@ spec:
       webhookNames:
         defaulting: defaulting.clusterimagepolicy.rhtas.com
         validating: validating.clusterimagepolicy.rhtas.com
+      {{- if .Values.policyOperand.noMatchPolicy }}
+      # WP-178: an image that matches no ClusterImagePolicy is denied by default ("no matching policies"), which would
+      # refuse the unsigned third-party services of an opted-in namespace; `warn` only reports them. Rendered by the
+      # upstream chart into ConfigMap config-policy-controller.
+      configData:
+        no-match-policy: {{ .Values.policyOperand.noMatchPolicy | quote }}
+      {{- end }}
 {{- end }}

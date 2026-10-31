@@ -1,0 +1,79 @@
+---
+# `make d2 reconcile models`: unwedge a model rollout blocked by the GPU quota.
+#
+# Every model here is an LLMInferenceService on one MIG slice, and
+# zuno-ai-run-gpu-cap leaves no spare slice. KServe's Deployment uses
+# RollingUpdate (maxSurge 25% = 1 pod), and LLMInferenceService v1alpha2 has
+# no strategy field. KServe rewrites the whole Deployment spec, so
+# `Recreate` cannot be set there. So any spec change creates a new
+# ReplicaSet that the quota refuses (FailedCreate "exceeded quota"), while
+# the old pod keeps serving the OLD spec. This happened four times on
+# 2026-10-25 (gpt-oss-20b twice, qwen35-9b, qwen36-27b-instruct); see
+# ADR-0201 "Rollout hazard".
+#
+# For each wedged model this task file:
+#   1. shows the plan and asks for confirmation (`-e confirm=yes` skips it);
+#   2. scales the OLD ReplicaSet to 0, which frees the slice; the model is
+#      down until the new pod is Ready, a few minutes;
+#   3. if the new ReplicaSet creates no pod within 2 min, deletes it. After
+#      long FailedCreate the controller sits in exponential backoff (qwen36
+#      waited 40 h), and the Deployment recreates the ReplicaSet at once with
+#      a fresh backoff;
+#   4. waits for the new pod to be Ready.
+# Nothing is wedged: nothing changes. `-e model=<llminferenceservice>` limits
+# it to one model.
+- name: "models | reconcile: list the LLMInferenceService Deployments"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ models_reconcile_namespace | default('zuno-ai-run') }}"
+  register: _mr_deployments
+
+- name: "models | reconcile: list the ReplicaSets"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: ReplicaSet
+    namespace: "{{ models_reconcile_namespace | default('zuno-ai-run') }}"
+  register: _mr_replicasets
+
+- name: "models | reconcile: compute the wedged rollouts"
+  ansible.builtin.set_fact:
+    _mr_wedged: "{{ lookup('ansible.builtin.template', 'reconcile_wedged.j2') | from_json }}"
+
+- name: "models | reconcile: nothing to do"
+  ansible.builtin.debug:
+    msg: "No model rollout is wedged on the GPU quota{{ (' for ' + model) if model | default('') else '' }}."
+  when: _mr_wedged | length == 0
+
+- name: "models | reconcile: plan"
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.model }}: the new ReplicaSet {{ item.new_rs }} cannot get its GPU slice (quota).
+      Scaling the old ReplicaSet {{ item.old_rs }} to 0 frees it; {{ item.model }} is DOWN until the
+      new pod is Ready (a few minutes; the ai-gateway falls back to the other models).
+  loop: "{{ _mr_wedged }}"
+  loop_control:
+    label: "{{ item.model }}"
+
+- name: "models | reconcile: confirm"
+  ansible.builtin.pause:
+    prompt: "Type 'yes' to unwedge {{ _mr_wedged | map(attribute='model') | join(', ') }} now"
+  register: _mr_confirm
+  when:
+    - _mr_wedged | length > 0
+    - (confirm | default('')) != 'yes'
+
+- name: "models | reconcile: refuse without confirmation"
+  ansible.builtin.fail:
+    msg: "Not confirmed: nothing changed. Re-run interactively, or with EXTRA_VARS=\"-e confirm=yes\"."
+  when:
+    - _mr_wedged | length > 0
+    - (confirm | default('')) != 'yes'
+    - (_mr_confirm.user_input | default('')) != 'yes'
+
+- name: "models | reconcile: unwedge each model"
+  ansible.builtin.include_tasks: reconcile_one.yml
+  loop: "{{ _mr_wedged }}"
+  loop_control:
+    loop_var: _mr_item
+    label: "{{ _mr_item.model }}"

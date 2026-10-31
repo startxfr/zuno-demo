@@ -65,6 +65,10 @@ class RoutingTable:
             return {}
 
     @property
+    def path(self) -> str:
+        return self._routing_path
+
+    @property
     def loaded(self) -> bool:
         return bool(self._config)
 
@@ -95,6 +99,7 @@ class RoutingTable:
         local_only: bool = False,
         prefer: Optional[List[str]] = None,
         strict: bool = False,
+        exclude: Optional[List[str]] = None,
     ) -> List[ProviderCandidate]:
         """`local_only` (ADR-0035) is a source-level restriction independent
         of `classification`: when true, candidates are further filtered to
@@ -118,6 +123,12 @@ class RoutingTable:
         to a different model would be the wrong behavior on failure (e.g. a
         SaaS-only coding path that should fail visibly, not quietly swap
         providers the caller never asked for) - see `_apply_preference`.
+
+        `exclude` (ADR-0581, WP-164 lot 2) drops the named providers (the
+        catalog names of an agent's or task's `forbidden` model roles) after
+        the eligibility/local-only filtering, before `prefer`/`strict`. It
+        only ever narrows; nothing left fails closed like an empty
+        eligibility set.
         """
         classification = classification.upper()
         if classification not in CLASSIFICATION_RANK:
@@ -144,6 +155,16 @@ class RoutingTable:
                 else f"no provider in {self._routing_path} is eligible for classification {classification}"
             )
             raise RoutingError(f"{reason}; failing closed per ADR-0021 rather than risk violating data-handling policy")
+        if exclude:
+            dropped = set(exclude)
+            remaining = [c for c in candidates if c.name not in dropped]
+            if not remaining:
+                raise RoutingError(
+                    f"every provider eligible for classification {classification} "
+                    f"({[c.name for c in candidates]}) is excluded by the model-routing policy "
+                    f"(forbidden model roles); failing closed per ADR-0581"
+                )
+            candidates = remaining
         if prefer:
             candidates = self._apply_preference(candidates, prefer, strict=strict)
         return candidates

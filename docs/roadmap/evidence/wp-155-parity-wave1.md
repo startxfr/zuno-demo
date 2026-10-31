@@ -226,3 +226,26 @@ sales corpus is indexed (switch the type back to `rag_retrieval_has_citation`).
 Seen on the way: `unifai_forwards_identity_to_the_gateways` missed twice in four comage runs (`tool_calls=[]`, a reply of 82 to 137
 characters: the model answers without calling the tool), and the newer gate check
 `tekos_retriever_finds_red_hat_docs_for_a_basic_openshift_question` needs `UNIFAI_RAG_URL` outside the cluster.
+
+Comage identity check after the change (a5b69d9d: the prompt names `salesforce.opportunity.read`, at most two turns, a pass on a later turn is
+reported as `attempt=2/2`). Live on demo333 after the zuno-unifai roll to `devel-8498fe02b` (operator 0.1.38; the comage and arkos bundles show
+Error "signature manifest has 35 layers", their workflows stay Ready): four runs of `unifai_forwards_identity_to_the_gateways`, all
+`PASS attempt=1/2: tool_calls=['salesforce.opportunity.read']`; the full comage security suite 8/8. Before the change it missed 2 of 4 runs.
+Four runs is a small sample; the retry is the safety net, and two turns without the call would still fail.
+
+Comage sales corpus (2026-10-26). The `knowledge.sales` domain has a corpus again: twelve synthetic French pages ("données de démonstration")
+in `gitops/charts/unifai/files/sales-corpus/`, read by the `sales-demo` web RAG source (tag `knowledge.sales`, public, 12 pages Ready) from GitHub raw,
+and `knowledge-comage` now also reads WEB sources. Two findings on the way: (1) the UnifAI RAG web connector refuses cluster-internal addresses on purpose
+("resolves to a non-public address", `resolve_public`), so an in-cluster static server cannot be crawled; the pages come from the public repository
+instead; (2) the operator's finalizer could not delete a source whose first pipeline id no longer existed ("Source not found" answered with HTTP 500,
+retried forever); the finalizer of the test source was removed by hand, a fragment of its page may remain indexed. Retrieval as `sale-01` and
+`consultant-01`: "statut du bon de commande d'Acme Renewal" returns the Acme page first (score 1.0). Comage scenario 11 is a citation check again
+(`rag_retrieval_has_citation`, the answer must contain "en attente de validation", a phrase only the corpus has): run on demo333, 18/20 scenarios
+(90%), 11 passes; 10 failed on a 503 of the UnifAI UI at that moment, 19 is the known in-cluster-client miss; 6 and 17 skipped.
+
+Re-run the same evening, corpus live: comage 18/20 again, and the correction of the first reading: scenario 10 is not a transient 503, it is the documented
+standing miss (no `salesforce-mcp` deployment, so no `salesforce.opportunity.read` call; `tool_calls=[]`), unrelated to the corpus. Tekos and arkos did not move:
+arkos 17/18 (only 19), tekos 16/18 on the second run (only 8, first token 7.9 s then 10.4 s on the shared 9B model, and 19; the first tekos run had 10 and 11
+failing with `tool_calls=[]`, which did not repeat). The operator fix for the stale-source delete ("Source not found" treated as already deleted) lands in
+operator 0.1.43 (a9); a fragment of the test page, if any is still indexed, belongs to the user that ingested it and is removed by a delete from that user.
+

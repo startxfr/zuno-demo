@@ -88,13 +88,13 @@ scenarios:
     message: "What is the CURRENT stage of the Acme Renewal opportunity right now?"
 
   - id: 11
-    # The agent retrieves before the model (retrieve_first), which emits no tool event, and no
-    # sales corpus is indexed yet (knowledge.sales is not ingested, Salesforce is simulated): a
-    # citation cannot be asserted. The run's trace proves the retrieval executed (rag.search span,
-    # needs TEMPO_URL, skipped without). Back to rag_retrieval_has_citation once a corpus exists.
-    title: RAG retrieval is executed before the model for a sales topic (trace); citations wait for a sales corpus
-    type: rag_retrieval_executed
-    query: "Acme Renewal opportunity purchase order status"
+    # Comage retrieves before the model (retrieve_first), which emits no tool event, so the proof of
+    # retrieval is a phrase only the corpus has: the Acme Renewal page of the `sales-demo` source
+    # (synthetic pages, knowledge.sales) says the purchase order is "reçu, en attente de validation par
+    # la finance". UNIFAI_RAG_EXPECT / UNIFAI_RAG_QUESTION override the defaults in tekos/run_scenarios.py.
+    title: RAG retrieval answers a sales topic from the sales corpus and names the page content
+    type: rag_retrieval_has_citation
+    query: "Quel est le statut du bon de commande de l'opportunité Acme Renewal ?"
 
   - id: 12
     title: MCP Gateway denies a Salesforce tool call outside the caller's allowed groups

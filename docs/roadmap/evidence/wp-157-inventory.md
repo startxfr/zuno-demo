@@ -352,6 +352,36 @@ policy, or give the route fewer limits, and compare; it needs a policy change, s
 the follow-up. WP-157 closes on the group ceiling (written plainly); the per-user ceiling is a
 named follow-up, with this hypothesis as its starting point.
 
+Follow-up 2026-10-25 (v0.5.0 limits live: standard 10M per user, 100M per group). Read-only
+check on the `qwen36-27b-instruct` route, two persona chats (`eval-consultant-01`, group
+`zuno-evaluation`), both 200 via `local-maas`: the per-subscription `ai-gateway` counter moved
+(1000000 to 999859 after 141 tokens) and the `standard-group` counter for that group string did not
+move (29999527 before and after); no `standard-user` counter exists. The live limits of that route
+sort by name as `...ai-gateway`, `...lightspeed`, `...sales`, `...tekos`, `standard-group`,
+`standard-user`, so the group and user pairs are never in the first two. Three consequences: the
+group ceiling is counted only on routes with at most one subscription limit
+(`mistral-large`, `gpt-oss-120b-ovhcloud`; not re-measured here); the user ceiling is counted
+nowhere; and the policy status (Accepted, Enforced) says nothing about either. The Lightspeed
+counter was not exercised (no Lightspeed traffic since the Limitador restart). Existing counters
+keep the `max_value` they were created with (30000000 on the group counters created before the
+100M change), so a limit change reaches them only when their 24 h window ends.
+The evaluation limits are not rendered (`enforceNonStandardClasses` is false): the live policy
+carries `standard-user` and `standard-group` only, so a request of class `evaluation` or
+`stresstest` meets no gateway ceiling.
+
+The hypothesis above is now confirmed by a minimal reproduction on a throwaway Gateway, route and
+TokenRateLimitPolicy (removed afterwards; no live route touched): four limits `l1` to `l4` with
+one header counter each, ten requests carrying the four headers. Limitador counts `l1` and `l2`
+(10 each) and nothing for `l3` and `l4`, and the proxy logs `invalid context_id` ten times.
+Renaming `l1` to `z1` moves the counted set to `l2` and `l3`. The shim therefore completes only
+the first two limits by sorted name, on any route; it is not specific to MaaS or to the order of
+the user pair. The upstream report is drafted and not filed: reporting to the Kuadrant community is deferred and the subject is closed (user decision, 2026-10-25).
+
+V2, V3, V5, V6 and V11 stay not run: V2, V3 and V5 need an ExternalModel with egress
+(`MAAS_EXTERNAL_EGRESS_ENABLED=false`) and the vendor route defect is open; V6 needs a persona
+token on MaaS, which the ai-gateway identity no longer allows; V11 needs a verified project id
+(ADR-0528, not implemented).
+
 ## 5. Proposed design for steps 3-5 (plan, not code)
 
 ### (a) SaaS ExternalModels in `gitops/charts/models`
@@ -516,3 +546,82 @@ named follow-up, with this hypothesis as its starting point.
 - **D11. Credential namespace.** Keep `zuno-ai-run` (Tenant singleton,
   `templates/maas.yaml:33-69`) or a dedicated namespace. **Recommendation:
   keep**; isolation is the gateway pod no longer mounting the keys.
+
+WP-177 live proof on demo333 (2026-10-25, user go). Counters probe before the change:
+`OK: moved ['subscription'] (subscription=+123)`; after: `+144`, same set (group and user still not counted).
+Image `ai-gateway-25` built from devel `2105bd56` (contains the Redis ledger, checked by ancestry); the image trigger rolled it with the
+switch still `memory`, then `quotaLedger.store: redis` was set in the `zuno-ai-gateway-d1` Application values (previous values saved
+outside the repo for a rollback; `zuno_ai_gateway_quota_ledger_store: redis` is in `ansible/clusters/demo333.yml`), Synced/Healthy.
+Durability drill with `eval-consultant-01` signed in through the `zuno-stresstest` client and `X-Zuno-Quota-Class: stresstest` (2000 tokens
+per 5 min per user): chats created `zuno:quota:stresstest:user:<sub>:<bucket>` and `...:group:sha1:<hash>:<bucket>` in the platform Redis
+(value 681 after six chats, matching the usage of those answers; TTL about two windows). The ai-gateway pod was then deleted; the next
+chats were answered 12 times and the 13th returned `429 quota_exceeded`, i.e. the 681 tokens consumed before the restart still counted
+(a reset ledger would have answered about 16 more). Normal service: the standard-class probe chat 200 via `local-maas`, ArgoCD
+Synced/Healthy, no Redis warning in the gateway log. One transient: `local-maas` and `local-gpt-oss-maas` each answered 500 once, within
+half a second, for one request, which fell back to `qwen35-9b-wesh` and was answered 200; the ledger runs before the provider call, so it
+is not the cause, and it did not recur in the next eight calls. Not exercised: Lightspeed traffic, a Redis outage on the live gateway.
+
+
+Outage aftermath on demo333 (2026-10-25). After a cluster outage, MaaS returned intermittent HTTP 500s on every local model.
+
+- **What failed.** Between 11:27 and 11:33 UTC the maas-default-gateway logged `kuadrant_wasm_shim: gRPC status code is not OK`.
+  ai-gateway saw 500s from `qwen36-27b-instruct`, `gpt-oss-20b` and `qwen35-9b-wesh`, then timeouts. The `stresstest` quota class
+  fails closed (no direct sibling), so those requests failed. A tekos stresstest (WP-164 step 7) ended at 56/59: two security checks
+  timed out and the RAG web leg got no citation. In the following ten minutes, about 4 calls in 14 still returned 500.
+- **Cause.** About 30% of Authorino requests returned `UNAVAILABLE` (gRPC code 14) with no logged cause, while maas-api answered 200
+  and Limitador was healthy. Likely cause: Authorino kept stale connections after the outage. This differs from the Limitador
+  pattern of V14.
+- **Fix.** Restarting the gateway pod (11:44) did not help: gpt-oss-20b still returned 500 for 5 calls in 10. Restarting Authorino
+  (11:46, user go) did: SA-token probes then returned 30/30 HTTP 200 on gpt-oss-20b, qwen35-9b and qwen35-9b-wesh. An Authorino
+  restart belongs in the post-outage checklist. Before restarting it, look for `UNAVAILABLE` from the shim, not from Limitador.
+
+Follow-up 2026-10-25 (after the WP-177 live proof), four open points:
+- Redis outage drill (no real outage; the real `app.quota` run with `kubectl exec` in the live ai-gateway pod, Redis unreachable). The first
+  version of the ledger store stalled the first call about 4.4 s, because redis-py retries a failed connection three times with a growing
+  wait by default; fixed in facd34e7 (no retries), built as `ai-gateway-26` and rolled. Re-run through the production client path: first
+  `check`+`consume` 350 ms (imports included), 20 rounds 351 ms, no exception, the local budget still denies at the limit, Redis skipped for
+  5 s after the fault. A drill script that builds its own client does not exercise this path (my first re-run did that and still showed 2.8 s).
+- Lightspeed counter in real use: a question asked in the OpenShift console moved the `lightspeed-gpt-oss-20b-tokens` subscription counter on
+  the `gpt-oss-20b` route (none before; 18,346 tokens after, four MaaS calls answered 200 by the Lightspeed service account). The console showed
+  "Lightspeed stopped the operation because a tool result failed the safety inspection" for the `search_openshift_docs` tool: that is Lightspeed's
+  own tool-result inspection (`Tool-result inspection enabled=True` in its log), not a Zuno component; not investigated.
+- MaaS 500s: the 11:33-11:36Z burst (qwen36, gpt-oss-20b, qwen35-9b-wesh, with `kuadrant_wasm_shim: gRPC status code is not OK`) was stale
+  Authorino connections after the cluster outage of about 10:10Z; the Authorino restart at 11:46Z fixed it (inventory, e546e7ad). The single 500
+  seen on `local-maas` and `local-gpt-oss-maas` during the WP-177 drill (about 02:32Z by the gateway log, request served by the next fallback)
+  is not explained: nobody else ran anything then, the logs and the model pods that served it are gone, and Istio shows one 500 per model
+  service in that minute. Not reproduced; a short repro run is planned once the stack is quiet.
+
+MaaS 500 repro run (2026-10-25, after the Authorino restart and the zuno-unifai roll): 40 short chats through the ai-gateway with
+`eval-consultant-01`, all 40 answered 200 by `local-maas`, no fallback, and the Istio count of 500s from the model services did not move
+(6 before and after). The unexplained 500 of the WP-177 drill stays not reproduced. Other traffic on the gateway during the run (oversized
+prompts failing on every provider) was not mine.
+
+
+Quota ledger reset for a stresstest persona (2026-10-25, 17:46:54Z, user go). The Redis ledger had kept
+`stress-consultant-01` over its `evaluation` budget (20,148,617 tokens counted in the current bucket), so every
+stresstest chat it made returned 429 and masked the checks under test. Exactly one key was deleted,
+`zuno:quota:evaluation:user:<sub>:20751`, through the ai-gateway pod's Redis client; no other key was touched. The
+next stresstest chats were answered. A ledger that survives restarts (WP-177) needs this manual step when a test
+persona exhausts a long window; a per-run reset in the stresstest harness would avoid it.
+
+MaaS access for personas (2026-10-25). Goal: let persona identities call MaaS directly, so the per-group
+subscriptions show their tiers. Today only service accounts call MaaS (the ai-gateway, Lightspeed).
+
+- **OIDC through a `Tenant`: negative.** A `Tenant` with `externalOIDC` (Keycloak realm `zuno`, client
+  `zuno-admin-api`) in `models-as-a-service` (`a5dbd168`, user go) was never reconciled: empty status, and
+  `maas-gateway-auth` kept its two methods (`api-keys`, `openshift-identities`) from 22:08 to 22:13Z. Switched off
+  in `eeb719c8`; Argo CD pruned it. On RHOAI 3.5 GA, maas-controller reads the `AITenant`
+  `ai-tenants/models-as-a-service` (`spec.oidc`, owned by `Config/default`) and the `MaaSTenantConfig`, not the
+  `Tenant` kind. The `AITenant` appears to be derived from `GatewayConfig/default-gateway` `spec.oidc`, which would move
+  the whole RHOAI gateway and dashboard to Keycloak; not pursued.
+- **API keys: chosen path (user decision).** API keys carry OpenShift groups, which have no leading `/`
+  (`agent_tekos`); Keycloak tokens carry `/agent_tekos`. Since `e515508a` every MaaS group subject is declared in
+  both spellings (`models.maasGroupSpellings` in `maas.yaml`): the `<model>-agents` and `<model>-sales`
+  subscriptions and the entitlement policies. Additive: priorities, limits and service accounts unchanged.
+- **OpenShift groups need no sync.** They are created by OAuth at login from the Keycloak IdP `openshift`
+  (claim `groups`, `mappingMethod: add`; annotation `oauth.openshift.io/generated`). Only `agent_tekos` exists so
+  far, because only `paas-dev-01` has logged in; the other groups appear when a persona that holds them logs in,
+  which getting a MaaS key requires anyway. Each login also creates a `User` and an `Identity`, to delete after
+  the test. The persona key test passed on 2026-10-25 (59, recorded in WP-164, `8daee554`), after the
+  maas-api HTTPRoute was admitted by the gateway listener (`59b9be49`): it had been `NotAllowedByListeners`
+  since RHOAI 3.5 moved it to `redhat-ai-gateway-infra`, so no key could be minted.

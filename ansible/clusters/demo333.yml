@@ -43,18 +43,25 @@ zuno_build_git_ref: "devel"
 # UnifAI stack on demo333 (WP-154/WP-168): the non-secret overrides that were
 # only kept in a private vars file until now. They are deep-merged over the
 # role defaults by ansible/roles/unifai (zuno_unifai_values); bundle settings
-# are per agent (zuno_unifai_bundle_settings). Image tags are immutable
-# devel-<sha> builds of this cluster's registry. No secret belongs here.
-# Verification of the UnifAI images (ADR-0586, WP-176). OFF here until the first
-# CI-built, signed images exist and the operator renders digests explicitly: then
-# the stack images below are pinned by digest and these two lines flip together
-# (verify true, accept dev signatures true, because demo333 runs the devel
-# branch). While it is off, check_unifai_pins.py reports it and does not fail.
-zuno_unifai_verify_images: false
+# are per agent (zuno_unifai_bundle_settings). The application images are the
+# CI-built, signed devel-<sha> images, pinned by digest. No secret belongs here.
+# Verification of the UnifAI images (ADR-0586, WP-176): ON. The `unifai` role
+# refuses to apply a stack image whose digest is not signed by the fork's publish
+# workflow (accept dev signatures true, because demo333 runs the devel branch).
+zuno_unifai_verify_images: true
 zuno_unifai_accept_dev_signatures: true
-# The catalog and the operator images (d0) are verified only once the operator
-# release workflow signs them (WP-176 step 6); until then this stays false.
-zuno_unifai_verify_catalog: false
+# Cluster-side admission of the UnifAI images (WP-178): the Sigstore policy-controller REFUSES a pod of
+# quay.io/zuno/unifai-** in zuno-unifai and unifai-operator whose image is not signed by an identity of
+# platform/supply-chain/image-identities.yaml (the third-party services stay `warn`). Applied by `make d1 install
+# rhtas-config`. Back to warn: set this to `warn` and re-run; at once: `oc label namespace zuno-unifai
+# policy.rhtas.com/include-` (docs/platform/operations.md).
+zuno_unifai_admission_mode: enforce
+# The catalog (d0) is verified like the stack images (WP-176 step 6): since operator
+# 0.1.39 the operator, its bundle and its catalog carry the operator release workflow's
+# identity. This cluster's CatalogSource was applied by hand with `:latest`, so the role
+# also pins its spec.image to the verified catalog digest (pin_catalog.yml) and the
+# drift check reads it.
+zuno_unifai_verify_catalog: true
 
 zuno_unifai_bundle_settings:
   advantage:
@@ -122,8 +129,39 @@ zuno_unifai_values:
     - knowledge.tech
     type: confluence
     visibility: shared
+  - name: sales-demo
+    # Synthetic French sales pages ("données de démonstration") for comage's knowledge.sales: the pages live in this
+    # repository (gitops/charts/unifai/files/sales-corpus/) and are read from GitHub raw, because the RAG web connector
+    # refuses cluster-internal addresses on purpose (SSRF guard), so an in-cluster static server cannot be crawled.
+    type: web
+    visibility: public
+    tags:
+    - knowledge.sales
+    syncInterval: 168h
+    web:
+      crawl: none
+      maxPages: 12
+      metadata:
+        family: sales-demo
+        language: fr
+      urls:
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/bon-de-commande.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/calendrier-facturation.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/escalade-validation.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/fiche-formation.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/fiche-support-openshift.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/glossaire-ventes.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/index.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/opportunite-acme-renewal.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/politique-remises.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/processus-renouvellement.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/qualification-opportunite.html
+          - https://raw.githubusercontent.com/startxfr/zuno-demo/devel/gitops/charts/unifai/files/sales-corpus/reponses-objections.html
   retrievers:
   - config:
+      # WEB too: the sales-demo source (knowledge.sales) is a web source.
+      extra_source_types:
+      - WEB
       forward_user_token: true
       source_type: CONFLUENCE
       threshold: 0.3
@@ -136,7 +174,10 @@ zuno_unifai_values:
       - WEB
       source_type: CONFLUENCE
       threshold: 0.3
-      top_k_results: 5
+      # 10, not 5 (2026-10-25): the Red Hat corpus repeats each page across
+      # OCP 4.21/4.22 and two URL forms, so 5 slots held 2-3 distinct
+      # passages and missed definitional ones (tekos scenario #11).
+      top_k_results: 10
     name: knowledge-tekos
     teamRef: agent-tekos
   - config:
@@ -150,18 +191,36 @@ zuno_unifai_values:
     identity:
       oidcClaims: true
     images:
-      backend: quay.io/zuno/unifai-backend:devel-178cbd52b
-      identity: quay.io/zuno/unifai-identity:devel-178cbd52b
-      multiagent: quay.io/zuno/unifai-multiagent:devel-178cbd52b
-      rag: quay.io/zuno/unifai-rag:devel-178cbd52b
-      ui: quay.io/zuno/unifai-ui:devel-178cbd52b
+      # Third-party images (ADR-0586 clause 7): pinned by digest, NOT signed, their
+      # publishers do not sign them. A digest is the manifest list of the tag that
+      # ran when it was pinned (2026-10-25), so the running image does not change.
+      # rabbitmq is bitnamilegacy, which receives no more updates (replacing it is
+      # a separate decision); temporal ran `latest`, now frozen at this digest.
+      docling: quay.io/docling-project/docling-serve-cpu@sha256:6eda9c524992147c1b0b06a1a9be4894bd68b1f43c86d92c32f996c4c60d18a3  # v1.37.0
+      mongodb: docker.io/library/mongo@sha256:8565ecda5b221016d70f7745ac1ba0b97ccb05836157f8a343e987338fdc8350  # 8.0.3
+      qdrant: docker.io/qdrant/qdrant@sha256:1005201498cf927d835383d0f918b17d8c9da7db58550f169f694455e42d78f4  # v1.16.0
+      rabbitmq: docker.io/bitnamilegacy/rabbitmq@sha256:f31a9990bba3aec8bf2948a4a237e3656e54d2d53f4ecd4495ce044191cb5beb  # 4.0.5-debian-12-r0
+      redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
+      redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
+      temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
+      backend: quay.io/zuno/unifai-backend@sha256:fa2731d5880cda5ea8440c226006f776f11b4146308871c6ae2a96b42715d8bb  # devel-b48dea199
+      identity: quay.io/zuno/unifai-identity@sha256:b25acf2f51a2e34b5de7f8d6e5b3b7a7c7302840a84fc6e6d9ba2f18d59d57d7  # devel-b48dea199
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:cd69bff09b151ce5fe62fe88b38f0170cff5a84d12fa42686df201a0bfa59403  # devel-b48dea199
+      rag: quay.io/zuno/unifai-rag@sha256:e26f8b54dad132b01a88fd692b3b7fcbcc23183344306c149ea5a77ebf79c15e  # devel-b48dea199
+      ui: quay.io/zuno/unifai-ui@sha256:a602d924261a6e1f3ce45ebb3d4decee517038a7f5e92f203c371e966e5bdeee  # devel-b48dea199
+    backup:
+      # The CronJobs and restore Jobs (ADR-0586 clause 7): pinned by digest, unsigned,
+      # the manifest list of the tag that ran (aws-cli 2.22.35, mongo 7.0.16).
+      images:
+        awsCli: public.ecr.aws/aws-cli/aws-cli@sha256:71a65c33c30e36dbfdff15707514f3b7b6fc789f2f134722f959b5cd13b93dd5  # 2.22.35
+        mongo: docker.io/library/mongo@sha256:c630c59342c1493d50345136df2af14a76b9e827dd5316bfabee07a0880a5f3a  # 7.0.16
     rag:
       tokenReview: true
     ragClients:
     - namespace: zuno-ai-run
       podLabels:
         zuno.io/rag-client: 'true'
-    version: devel-178cbd52b
+    version: devel-ffb64e335
   redhatDocs:
     enabled: true
     syncInterval: 168h
@@ -184,6 +243,10 @@ zuno_ai_gateway_quota_fail_modes: true
 # rather than answered by a direct SaaS fallback when MaaS fails. Needs the
 # image built from 18cc412e or later (ai-gateway-21).
 zuno_ai_gateway_closed_class_maas_only: true
+# WP-177 (user go 2026-10-25): the ai-gateway's token-budget ledger also keeps
+# its counters in the platform Redis, so a restart no longer resets the
+# budgets. Needs the image built from c5ca1b40 or later (ai-gateway-25).
+zuno_ai_gateway_quota_ledger_store: redis
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,

@@ -187,6 +187,20 @@ spec:
             - name: QUOTA_CLOSED_CLASS_MAAS_ONLY
               value: "true"
             {{- end }}
+            {{- if eq (.Values.quotaLedger.store | default "memory") "redis" }}
+            - name: QUOTA_LEDGER_STORE
+              value: "redis"
+            {{- end }}
+            {{- if .Values.guardrails.modesGenerated }}
+            # ADR-0579: the generated per-agent guardrail modes (configmap-guardrails-modes.yaml).
+            - name: GUARDRAILS_AGENT_MODES_PATH
+              value: /app/config-guardrails/guardrails-modes.yaml
+            {{- end }}
+            {{- if .Values.modelRouting.generated }}
+            # ADR-0581: the generated model-routing policy (configmap-model-routing.yaml).
+            - name: MODEL_ROUTING_POLICY_PATH
+              value: /app/config-model-routing/model-routing-policy.yaml
+            {{- end }}
             # ADR-0104: semantic cache, default off - see
             # components/ai-gateway/app/semantic_cache.py and
             # platform/ai-gateway/provider-routing.yaml's `cache_enabled`
@@ -230,6 +244,16 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            {{- if .Values.modelRouting.generated }}
+            - name: model-routing
+              mountPath: /app/config-model-routing
+              readOnly: true
+            {{- end }}
+            {{- if .Values.guardrails.modesGenerated }}
+            - name: guardrails-modes
+              mountPath: /app/config-guardrails
+              readOnly: true
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -269,3 +293,13 @@ spec:
                   expirationSeconds: 3600
         - name: tmp
           emptyDir: {}
+        {{- if .Values.modelRouting.generated }}
+        - name: model-routing
+          configMap:
+            name: ai-gateway-model-routing
+        {{- end }}
+        {{- if .Values.guardrails.modesGenerated }}
+        - name: guardrails-modes
+          configMap:
+            name: ai-gateway-guardrails-modes
+        {{- end }}

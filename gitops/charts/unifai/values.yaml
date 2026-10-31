@@ -13,9 +13,11 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.30 as
-  # the stable channel head (checked 2026-10-23).
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:8b296b21f723426628c047ec2c2352fb89b97f9d2258c26e7cfaed212f03c7aa
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.43, signed
+  # since 0.1.39 (ADR-0586): its signature, provenance and SBOM verify with the operator
+  # release workflow's identity, without the development one. Move it with
+  # platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z at each release.
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:ba7654c63666616594c65b08e74e5016a1495b03943bc93bd07a049efa29c787
   catalogSourceName: unifai-operator-catalog
   channel: stable
   package: unifai-operator
@@ -84,6 +86,9 @@ stack:
     # Confluence credentials for the Confluence source type (Vault path of
     # the existing technical identity, ADR-0568).
     confluenceVaultPath: confluence/technical
+    # The site those credentials belong to (ADR-0583): the operator limits them to this host;
+    # a source on another host is fetched anonymously. Empty = sent to every source's baseUrl.
+    confluenceUrl: https://startxfr.atlassian.net
   backup:
     enabled: false
     schedule: "0 2 * * *"
@@ -96,6 +101,10 @@ stack:
     credentialsVaultPath: postgresql/backup-s3
     accessKeyProperty: access_key
     secretKeyProperty: secret_key
+    # Images of the backup CronJobs and the restore Jobs (operator >= 0.1.36 takes
+    # repo@sha256:... verbatim): `awsCli` (default public.ecr.aws/aws-cli/aws-cli)
+    # and `mongo` (default docker.io/library/mongo). Pinned per cluster (ADR-0586).
+    images: {}
 
 # Shared LLM of the platform: the ai-gateway, called with the user's own token
 # (ADR-0560, ADR-0563). Agent bundles emit their own per-task copies.
@@ -119,15 +128,11 @@ mcpGateway:
   # of the Lightspeed ceiling. Needs unifai-operator >= 0.1.19 (spec.mcp).
   perTask: true
 
-# Signed OKF agent bundles (ADR-0564). publicKey is the PEM of the frozen
-# Vault Transit key that signed the pre-release bundles
-# (ansible/roles/unifai/files/zuno-platform-signer.pub, the role passes it).
+# Signed OKF agent bundles (ADR-0564), verified keyless (ADR-0578): with
+# bundles set, verify.keyless {issuer, subjectRegExp} (from
+# platform/okf/stack-config.generated.yaml, unifai.verify.keyless) and
+# trustedRoot (platform/okf/sigstore/trusted_root.json content) are required.
 okf:
-  publicKey: ""
-  # Keyless verification (ADR-0578): set verify.keyless {issuer, subjectRegExp}
-  # (from platform/okf/stack-config.generated.yaml, unifai.verify.keyless) and
-  # trustedRoot (platform/okf/sigstore/trusted_root.json content) instead of
-  # publicKey. Empty = the bundles are verified with publicKey.
   verify: {}
   trustedRoot: ""
   bundles: []
@@ -140,6 +145,9 @@ okf:
   #   servePlaceholder: false   # ADR-0007: placeholder agents are not served by default
   #   retrieveFirst: false      # needs a multiagent image with retrieve_first
   #   classificationOverrides: {}
+  #   delegation: {gatewayURL: http://a2a-gateway.zuno-ai-run.svc:8080, maxRounds: 3}   # unifai-operator >= 0.1.43; with
+  #     ceilings.delegationTargets: [<target agents>]. Inert while unset; enable per bundle through GitOps only with the
+  #     user's approval (WP-174), after the 0.1.44 canary.
 
 # Incrementally synced RAG sources (ADR-0568).
 # Retrievers over the RAG sources (ADR-0568). The caller's token is forwarded so

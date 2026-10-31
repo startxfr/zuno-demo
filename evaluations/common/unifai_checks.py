@@ -14,6 +14,7 @@ counted as a pass.
 from __future__ import annotations
 
 import time
+import uuid
 from typing import Any, Callable, Dict, Optional, Sequence
 
 import httpx
@@ -33,17 +34,35 @@ def _reaches(tools: Sequence[str], expect: Sequence[str]) -> bool:
 
 
 def identity_forwarded(
-    CheckResult: Any, unifai: Callable, persona: str, prompt: str, expect_tools: Sequence[str], timeout: float = 150
+    CheckResult: Any,
+    unifai: Callable,
+    persona: str,
+    prompt: str,
+    expect_tools: Sequence[str],
+    timeout: float = 150,
+    attempts: int = 1,
 ) -> Callable[[], Any]:
     """ADR-0032 on UnifAI: the signed-in person's own token must reach the tool gateway. The MCP
     gateway only serves a validated Keycloak JWT, so a tool call that returns a reply is direct
-    evidence the token travelled UnifAI -> mcp-gateway."""
+    evidence the token travelled UnifAI -> mcp-gateway.
+
+    The agent decides whether to call a tool, so a model that answers from its own knowledge
+    proves nothing either way. `attempts` (default 1) allows that many turns; the check passes on
+    the first turn that reaches an expected tool and FAILS when none does, and the detail line
+    names every turn so a pass on a later attempt is never hidden."""
     name = "unifai_forwards_identity_to_the_gateways"
 
     def check() -> Any:
-        run_ = unifai().collect(persona, prompt, deadline_seconds=timeout, stop_on=tuple(expect_tools))
-        ok = _reaches(run_["tools"], expect_tools) and (bool(run_["reply"]) or run_["stopped"])
-        return CheckResult(name, ok, f"tool_calls={run_['tools']} reply_len={len(run_['reply'])}")
+        seen = []
+        for attempt in range(1, max(1, attempts) + 1):
+            run_ = unifai().collect(persona, prompt, deadline_seconds=timeout, stop_on=tuple(expect_tools))
+            ok = _reaches(run_["tools"], expect_tools) and (bool(run_["reply"]) or run_["stopped"])
+            seen.append(f"tool_calls={run_['tools']} reply_len={len(run_['reply'])}")
+            if ok:
+                break
+        if attempts <= 1:
+            return CheckResult(name, ok, seen[0])
+        return CheckResult(name, ok, f"attempt={len(seen)}/{attempts}: " + " | ".join(seen))
 
     check.__name__ = name
     return check
@@ -134,6 +153,74 @@ def marketing_image_boundary(
         mkt = unifai().collect(persona, marketing_prompt, deadline_seconds=timeout, stop_on=("image.generation.create",))
         mkt_ok = mkt["stopped"] or "image/png" in mkt["blob"] or "image.generation.create" in mkt["tools"]
         return CheckResult(name, chart_ok and mkt_ok, f"chart_tools={chart['tools']} marketing_tools={mkt['tools']}")
+
+    check.__name__ = name
+    return check
+
+
+def cross_user_isolation(CheckResult: Any, unifai: Callable, *, owner: str, other: str) -> Callable[[], Any]:
+    """ADR-0583 on UnifAI: object-level authorisation, proven with two real people. `other` (not
+    a member of `owner`'s team workspace, no share) must get the same answer for `owner`'s
+    session, team and blueprint as for an identifier that does not exist, and must not see a
+    team workspace's blueprints through it. A denial that differs from "missing" tells `other`
+    the object exists."""
+    name = "unifai_denies_another_users_objects_like_missing_ones"
+
+    def check() -> Any:
+        u = unifai()
+        ui = u.ui_url
+        co, cx = u.client(owner), u.client(other)
+        problems = []
+        teams = [t for t in u.teams(owner) if t.get("team_id") not in {x.get("team_id") for x in u.teams(other)}]
+        if not teams:
+            return CheckResult(name, False, f"skipped: {owner} has no team workspace {other} is outside of", skipped=True)
+        team_id = teams[0]["team_id"]
+        missing = str(uuid.uuid4())
+
+        def same(label: str, call: Callable[[str], Any]) -> None:
+            denied, absent = call(team_id), call(missing)
+            if denied.status_code != absent.status_code or denied.text != absent.text:
+                problems.append(f"{label}: {denied.status_code} vs {absent.status_code}")
+
+        same("team.get", lambda t: cx.get(f"{ui}/api3/teams/team.get", params={"teamId": t}))
+        same("team.delete", lambda t: cx.delete(f"{ui}/api3/teams/team.delete", params={"teamId": t}))
+        blueprints = co.get(f"{ui}/api2/blueprints/available.blueprints.summary.get", params={"teamId": team_id})
+        first = (blueprints.json() or [{}])[0].get("blueprint_id") if blueprints.status_code == 200 else None
+        if first:
+            r = cx.get(f"{ui}/api2/blueprints/blueprint.info.get", params={"blueprintId": first, "teamId": team_id})
+            if r.status_code not in (403, 404):
+                problems.append(f"blueprint.info.get through the team: {r.status_code}")
+            sid = u.create(owner, first)
+            for ep in ("session.meta", "session.chat.get", "session.state.get"):
+                same(ep, lambda t, ep=ep: cx.get(f"{ui}/api2/sessions/{ep}", params={"sessionId": sid if t == team_id else t}))
+            u.cleanup()
+        return CheckResult(name, not problems, "; ".join(problems) or f"checked as {other} against {owner}")
+
+    check.__name__ = name
+    return check
+
+
+def a2a_gateway_denies_unentitled(
+    CheckResult: Any,
+    *,
+    agent: str,
+    persona: str,
+    a2a_gateway_url: str,
+    auth_headers: Callable[[str], Dict[str, str]],
+) -> Callable[[], Any]:
+    """ADR-0585: the A2A gateway answers with the caller's identity. Anonymous is refused (401) and
+    a persona without the agent's group gets exactly the answer for an agent that does not exist
+    (no tell that the agent is served), and no model call is made for it."""
+    name = "a2a_gateway_denies_unentitled_callers_like_unknown_agents"
+
+    def check() -> Any:
+        body = {"jsonrpc": "2.0", "id": 1, "method": "message/send", "params": {}}
+        base = a2a_gateway_url.rstrip("/")
+        anon = httpx.post(f"{base}/agents/{agent}/", json=body, timeout=20)
+        denied = httpx.post(f"{base}/agents/{agent}/", json=body, headers=auth_headers(persona), timeout=20)
+        unknown = httpx.post(f"{base}/agents/unknown-{uuid.uuid4().hex[:12]}/", json=body, headers=auth_headers(persona), timeout=20)
+        ok = anon.status_code == 401 and denied.status_code == unknown.status_code == 404 and denied.json() == unknown.json()
+        return CheckResult(name, ok, f"anonymous={anon.status_code} denied={denied.status_code} unknown={unknown.status_code}")
 
     check.__name__ = name
     return check

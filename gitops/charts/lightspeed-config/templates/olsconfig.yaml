@@ -44,6 +44,10 @@ spec:
             contextWindowSize: {{ $p.contextWindowSize }}
             parameters:
               maxTokensForResponse: {{ $p.maxTokensForResponse }}
+            {{- if $p.reasoningEffort }}
+              reasoningConfig:
+                effort: {{ $p.reasoningEffort | quote }}
+            {{- end }}
   ols:
     defaultProvider: {{ $p.name }}
     defaultModel: {{ $bodyModel | quote }}

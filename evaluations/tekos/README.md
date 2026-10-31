@@ -139,16 +139,6 @@ checks, not acceptance coverage):
   (Arkos/Advantage/Comage's alone).
 - ADR-0355: the `aap.*` capabilities deny an unauthorized group and serve
   an authorized caller.
-- ADR-0401/0403/0406 (WP-174): the first agent delegation, Tekos to Arkos
-  (`draft-architecture-testimonial`), through the MCP gateway
-  (`evaluations/common/delegation_checks.py`): as `eval-consultant-01` the delegated
-  surface lists only read tools while the direct one lists a write tool; refused when
-  the user lacks `agent_arkos`, for a target Tekos does not declare, beyond the depth
-  limit, on a cycle, with a depth header that disagrees and with half a chain.
-  **They are reported as skipped, never as passes, while the admitted release does not
-  declare Tekos -> Arkos** (release 0.3.1 declares nothing) and while the corp flag
-  `delegation.allow_write` is true. They do not need the A2A server of WP-173; the
-  behavioural proof (a real delegation that runs, the chain in the trace) is WP-174's live pass.
 
 ## Exploratory stress test
 

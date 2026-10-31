@@ -11,6 +11,7 @@ import json
 import pathlib
 import re
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
@@ -101,6 +102,42 @@ class Pinning(unittest.TestCase):
         self.assertEqual(v.repository("localhost:5000/zuno/unifai-ui"), "localhost:5000/zuno/unifai-ui")
 
 
+class ThirdPartyDrift(unittest.TestCase):
+    MONGO = "docker.io/library/mongo@sha256:" + "c" * 64
+    MONGO7 = "docker.io/library/mongo@sha256:" + "d" * 64
+
+    @staticmethod
+    def pods(*images, phase="Running", init=()):
+        return {"items": [{"metadata": {"name": f"p{i}"}, "status": {"phase": phase},
+                           "spec": {"containers": [{"image": img}], "initContainers": [{"image": x} for x in init]}}
+                          for i, img in enumerate(images)]}
+
+    def test_a_pod_running_a_pinned_reference_is_clean(self):
+        self.assertEqual(v.check_third_party(self.pods(self.MONGO, init=[self.MONGO7]), [self.MONGO, self.MONGO7]), [])
+
+    def test_a_tag_or_another_digest_of_a_pinned_repository_is_drift(self):
+        for image in ("docker.io/library/mongo:8.0.3", "docker.io/library/mongo@sha256:" + "e" * 64):
+            findings = v.check_third_party(self.pods(image), [self.MONGO])
+            self.assertEqual(len(findings), 1, image)
+            self.assertIn("drift", findings[0])
+
+    def test_an_unrelated_image_and_ended_pods_are_ignored(self):
+        self.assertEqual(v.check_third_party(self.pods("quay.io/other/x:1"), [self.MONGO]), [])
+        self.assertEqual(v.check_third_party(self.pods("docker.io/library/mongo:old", phase="Succeeded"), [self.MONGO]), [])
+
+    def test_the_cli_reports_third_party_drift(self):
+        fake = FakeCosign({UI: PUBLISH + "@refs/heads/devel"})
+        path = pathlib.Path(tempfile.mkdtemp()) / "pods.json"
+        path.write_text(json.dumps(self.pods("docker.io/library/mongo:8.0.3")))
+        out = io.StringIO()
+        with fake.install(), contextlib.redirect_stdout(out):
+            code = v.main(["--ref", UI, "--accept-dev", "--pods", str(path), "--third-party", self.MONGO])
+        report = json.loads(out.getvalue())
+        self.assertEqual(code, 1)
+        self.assertTrue(report["results"][0]["ok"])
+        self.assertEqual(len(report["pod_findings"]), 1)
+
+
 class Identities(unittest.TestCase):
     def verify(self, ref, signer, accept_dev=False, missing=()):
         fake = FakeCosign({ref: signer}, missing)
@@ -129,11 +166,23 @@ class Identities(unittest.TestCase):
                        PUBLISH.replace("startxfr/UnifAI", "someone/UnifAI") + "@refs/tags/v1.0.0"):
             self.assertFalse(self.verify(UI, signer, accept_dev=True)[0].ok, signer)
 
-    def test_the_operator_images_take_only_the_operator_release_identity(self):
-        for ref in (OPERATOR, CATALOG):
+    def test_the_bundle_and_the_catalog_take_only_the_operator_release_identity(self):
+        bundle = f"quay.io/zuno/unifai-operator-bundle@{D2}"
+        for ref in (bundle, CATALOG):
+            self.assertEqual(v.kind_of(ref), "operator_artifacts")
             self.assertTrue(self.verify(ref, OPERATOR_WF + "@refs/tags/operator-v0.1.35")[0].ok, ref)
             self.assertFalse(self.verify(ref, PUBLISH + "@refs/tags/v1.0.0")[0].ok, ref)
             self.assertFalse(self.verify(ref, OPERATOR_WF + "@refs/heads/devel", accept_dev=True)[0].ok, ref)
+            self.assertFalse(self.verify(ref, PUBLISH + "@refs/heads/devel", accept_dev=True)[0].ok, ref)
+
+    def test_the_operator_image_takes_the_release_identity_or_the_devel_build_only_on_request(self):
+        self.assertEqual(v.kind_of(OPERATOR), "operator")
+        self.assertTrue(self.verify(OPERATOR, OPERATOR_WF + "@refs/tags/operator-v0.1.38")[0].ok)
+        devel = PUBLISH + "@refs/heads/devel"
+        self.assertFalse(self.verify(OPERATOR, devel, accept_dev=False)[0].ok)
+        self.assertTrue(self.verify(OPERATOR, devel, accept_dev=True)[0].ok)
+        self.assertFalse(self.verify(OPERATOR, PUBLISH + "@refs/heads/feature/x", accept_dev=True)[0].ok)
+        self.assertFalse(self.verify(OPERATOR, OPERATOR_WF + "@refs/heads/devel", accept_dev=True)[0].ok)
 
     def test_a_missing_provenance_or_sbom_is_refused_by_name(self):
         signer = PUBLISH + "@refs/tags/v1.0.0"
@@ -156,9 +205,11 @@ class Identities(unittest.TestCase):
 
     def test_the_committed_identities_name_the_forks_workflow(self):
         self.assertEqual(ident["issuer"], "https://token.actions.githubusercontent.com")
-        for section in ("images", "operator"):
+        for section in ("images", "operator", "operator_artifacts"):
             self.assertIn("startxfr/UnifAI", ident[section]["release_subject_regexp"].replace("\\", ""))
-        self.assertNotIn("dev_subject_regexp", ident["operator"])
+        # the operator image is built on devel by the publish workflow; its bundle and catalog never are
+        self.assertIn("publish-images", ident["operator"]["dev_subject_regexp"])
+        self.assertNotIn("dev_subject_regexp", ident["operator_artifacts"])
 
 
 class Pods(unittest.TestCase):

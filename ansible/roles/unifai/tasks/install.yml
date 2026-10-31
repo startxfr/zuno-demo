@@ -43,12 +43,17 @@
          'A unifai-operator Subscription already exists and is not ours: zuno-unifai-d0 renders nothing.' }}
 
 # ADR-0586 / WP-176: the catalog image is verified (digest, signature, provenance, SBOM)
-# before the operator is installed from it. Off until the operator release workflow
-# signs its images (zuno_unifai_verify_catalog, default false).
+# before the operator is installed from it (zuno_unifai_verify_catalog, default false; on
+# since operator 0.1.39, the first release the workflow signs).
 - name: "unifai | verify the operator catalog image"
   ansible.builtin.include_tasks: verify_images.yml
   vars:
     _unifai_verify_scope: catalog
+  when: zuno_unifai_verify_catalog | default(false) | bool
+
+# A catalog applied by hand is moved to the verified digest too (it only runs once verified).
+- name: "unifai | pin the hand-applied CatalogSource to the verified catalog digest"
+  ansible.builtin.include_tasks: pin_catalog.yml
   when: zuno_unifai_verify_catalog | default(false) | bool
 
 - name: "unifai | apply the operator Application (d0)"
@@ -84,12 +89,14 @@
 # (teamId/groupTeam, entitlement, classificationOverrides, retriever) stay in the
 # deployment: zuno_unifai_bundle_settings.<agent>. While the generated list is
 # empty nothing is added and zuno_unifai_values.okf stays the only source;
-# the two lists are never merged. The switch is explicit
-# (zuno_unifai_released_bundles, default false): released artifacts are v2 and
-# keyless, which unifai-operator reads from 0.1.25 on; an older operator leaves
-# every bundle Pending. Set it to true once the operator in the cluster is
-# >= 0.1.25. zuno_unifai_released_bundles_exclude lists agents to leave out
-# (graph shapes the operator has no template for yet: arkos, cognos, soursage).
+# the two lists are never merged. Every bundle is verified keyless: the
+# frozen Vault Transit key of the pre-release bundles is gone (WP-164), so
+# hand-pinned bundles carry okf.verify and okf.trustedRoot too. The switch is
+# explicit (zuno_unifai_released_bundles, default false): released artifacts
+# are v2 and keyless, which unifai-operator reads from 0.1.25 on; an older
+# operator leaves every bundle Pending. Set it to true once the operator in
+# the cluster is >= 0.1.25. zuno_unifai_released_bundles_exclude lists agents
+# to leave out (an agent whose graph shape the operator has no template for).
 - name: "unifai | read the bundles of the pinned agents release"
   ansible.builtin.set_fact:
     _unifai_stack_config: "{{ lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/stack-config.generated.yaml') | from_yaml }}"
@@ -128,8 +135,7 @@
     gitops_app_name: "zuno-unifai-d1"
     gitops_app_extra_helm_values: >-
       {{ {'clusterBaseDomain': cluster_base_domain,
-          'stack': {'enabled': true},
-          'okf': {'publicKey': lookup('ansible.builtin.file', zuno_repo_root + '/ansible/roles/unifai/files/zuno-platform-signer.pub')}}
+          'stack': {'enabled': true}}
          | combine(_unifai_backup_values, recursive=True)
          | combine(zuno_unifai_values | default({}), recursive=True)
          | combine(_unifai_okf_values, recursive=True) }}

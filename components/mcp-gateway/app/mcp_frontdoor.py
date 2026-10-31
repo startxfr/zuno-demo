@@ -149,6 +149,114 @@ def _tool_ok(payload: Any) -> Dict[str, Any]:
     return result
 
 
+# Models often name the search argument differently from the tool's own schema. Only the NAME of the
+# argument is rewritten, and only for search capabilities; which tools the caller may use, the values it
+# sends and the downstream authorization are untouched.
+_QUERY_ALIASES = ("search_query", "q", "text", "query_text", "search_term", "keywords")
+_MAX_ERROR_CHARS = 200
+
+
+def _is_search(names: Any) -> bool:
+    return any(str(n).rsplit(".", 1)[-1] == "search" or str(n).startswith("search_") for n in names)
+
+
+# Arguments a search tool takes besides its text: never turned into the query.
+_NON_QUERY_ARGUMENTS = frozenset({"space", "limit", "top_k", "source_type", "page_id", "id", "cursor", "offset"})
+
+
+_PAGE_ID_ALIASES = ("id", "pageId", "pageid", "page", "content_id", "contentId")
+_NON_PAGE_ARGUMENTS = frozenset({"space", "limit", "query", "version", "expand", "format"})
+
+
+def _is_page_read(names: Any) -> bool:
+    return any(str(n).endswith(".page.read") for n in names)
+
+
+def _page_id_of(value: Any) -> Optional[str]:
+    """A page id given as a number, a numeric string or a page URL (`.../pages/<id>/...`); else None."""
+    import re as _re
+
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, str):
+        text = value.strip()
+        if text.isdigit():
+            return text
+        match = _re.search(r"/pages/(\d+)", text)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _normalise_page_read(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """`page_id` is a string in the tool's schema: accept the id under a common alias or as the one free
+    argument, as a number, a numeric string or a page URL, and send it as a string."""
+    fixed = dict(arguments)
+    if _page_id_of(fixed.get("page_id")) is not None:
+        fixed["page_id"] = _page_id_of(fixed["page_id"])
+        return fixed
+    found = next((_page_id_of(fixed[a]) for a in _PAGE_ID_ALIASES if _page_id_of(fixed.get(a))), None)
+    if found is None:
+        free = [k for k, v in fixed.items() if k != "page_id" and k not in _NON_PAGE_ARGUMENTS and _page_id_of(v)]
+        found = _page_id_of(fixed[free[0]]) if len(free) == 1 else None
+    if found is not None:
+        for alias in _PAGE_ID_ALIASES:
+            fixed.pop(alias, None)
+        fixed = {k: v for k, v in fixed.items() if _page_id_of(v) != found or k == "page_id"}
+        fixed["page_id"] = found
+    return fixed
+
+
+def normalise_arguments(names: Any, arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """Make a search call match its tool's schema when the model named the text argument differently.
+
+    Applies only to search tools and only when `query` is absent or empty:
+    1. the first of a few common aliases (`search_query`, `q`, `text`...) that carries a value becomes `query`;
+    2. failing that, the one string argument that is not a known option (`space`, `limit`...) becomes `query`;
+    3. a numeric string `limit` becomes an integer.
+    Only names and the type of `limit` change; the values a caller sends and every authorization check do not.
+    """
+    if _is_page_read(names):
+        return _normalise_page_read(arguments)
+    if not _is_search(names):
+        return arguments
+    fixed = dict(arguments)
+    if isinstance(fixed.get("limit"), str) and fixed["limit"].strip().isdigit():
+        fixed["limit"] = int(fixed["limit"].strip())
+    if not str(fixed.get("query", "")).strip():
+        chosen = next(
+            (a for a in _QUERY_ALIASES if isinstance(fixed.get(a), str) and fixed[a].strip()), None
+        )
+        if chosen is None:
+            candidates = [
+                k for k, v in fixed.items()
+                if k != "query" and k not in _NON_QUERY_ARGUMENTS and isinstance(v, str) and v.strip()
+            ]
+            chosen = candidates[0] if len(candidates) == 1 else None
+        if chosen is not None:
+            value = fixed.pop(chosen)
+            for alias in _QUERY_ALIASES:
+                fixed.pop(alias, None)
+            fixed["query"] = value
+    return fixed
+
+
+def _short_error(exc: Exception) -> str:
+    """One short, neutral line for a tool failure: no stack, no validator dump, no documentation URL.
+
+    A schema-validation failure becomes a plain instruction: some callers judge a raw validator message
+    suspicious and abort the whole turn, and read an instruction aimed at the model the same way: the text
+    describes what happened, it never tells the model what to do.
+    """
+    lines = [ln.strip() for ln in str(exc).splitlines() if ln.strip() and "errors.pydantic.dev" not in ln]
+    text = lines[0] if lines else "the tool call failed"
+    if "validation error" in text.lower():
+        return "No result: the search arguments did not match the tool's schema."
+    return text if len(text) <= _MAX_ERROR_CHARS else text[: _MAX_ERROR_CHARS - 1] + "\u2026"
+
+
 def _input_schema(binding: Any) -> Dict[str, Any]:
     """Advertise an open object schema.
 
@@ -335,6 +443,20 @@ async def dispatch(
                 ),
             )
 
+        binding_for_names = binding_registry.resolve(name)
+        arguments = normalise_arguments(
+            binding_for_names.all_names() if binding_for_names else [name], arguments
+        )
+        if _is_search(binding_for_names.all_names() if binding_for_names else [name]) and not str(
+            arguments.get("query", "")
+        ).strip():
+            # A search with no text cannot match anything: answer like an empty result instead of an error,
+            # so the caller keeps its turn and decides what to do. The downstream tool is not called.
+            return _result(request_id, _tool_ok("No pages found: the search text was empty."))
+        if _is_page_read(binding_for_names.all_names() if binding_for_names else [name]) and not str(
+            arguments.get("page_id", "")
+        ).strip():
+            return _result(request_id, _tool_ok("No page found: the page id was missing or not a number."))
         try:
             payload = await invoke_tool(tool_name=name, arguments=arguments)
         except PermissionError as exc:
@@ -345,8 +467,17 @@ async def dispatch(
         except LookupError as exc:
             return _result(request_id, _tool_error(f"unknown tool: {exc}"))
         except Exception as exc:  # noqa: BLE001 - surfaced to the client as a tool error
-            logger.warning("mcp frontdoor: tool '%s' failed: %s", name, exc)
-            return _result(request_id, _tool_error(str(exc)))
+            if "validation error" in str(exc).lower():
+                # Arguments that do not match the tool's schema are the model's slip, not a failure of the
+                # platform: answer like an empty result, so the caller does not wrap it as "Tool ... failed:"
+                # and keeps its turn. Argument names only are logged.
+                logger.warning("mcp frontdoor: tool '%s' got arguments that do not match its schema (names: %s)", name, sorted(arguments))
+                return _result(request_id, _tool_ok("No result: the arguments did not match the tool's schema."))
+            # Argument NAMES only, never values: enough to see how a model called the tool.
+            logger.warning(
+                "mcp frontdoor: tool '%s' failed: %s (argument names: %s)", name, exc, sorted(arguments)
+            )
+            return _result(request_id, _tool_error(_short_error(exc)))
         return _result(request_id, _tool_ok(payload))
 
     raise JsonRpcError(METHOD_NOT_FOUND, f"unknown method '{method}'")

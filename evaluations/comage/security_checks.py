@@ -234,8 +234,13 @@ def direct_call_to_salesforce_mcp_denied_without_gateway_token() -> CheckResult:
 # ADR-0032/0033/0040 proven through UnifAI's session API, built from the shared factories in
 # evaluations/common/unifai_checks.py. The checks above reach shared services (MCP gateway,
 # ai-gateway, MCP servers) directly.
+# The model sometimes answers a plain "status of the deal" question without calling a tool (2 misses in 4 runs),
+# which proves nothing about the token. Name the tool, as the tekos check does, and allow one retry; two turns
+# without the call still fail.
 unifai_forwards_identity_to_the_gateways = unifai_checks.identity_forwarded(
-    CheckResult, _unifai, "sale-01", "What's the status of the Acme Renewal deal?", ("salesforce.opportunity.read",)
+    CheckResult, _unifai, "sale-01",
+    "Use the salesforce.opportunity.read tool to look up the Acme Renewal opportunity and tell me its status.",
+    ("salesforce.opportunity.read",), attempts=2,
 )
 unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
 business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(
@@ -252,6 +257,16 @@ unifai_comage_images_only_for_marketing_visual_requests = unifai_checks.marketin
     marketing_prompt="Generate a promotional marketing image of a modern sales team celebrating a big win.",
 )
 
+# Platform-wide checks (ADR-0583 two-user isolation, ADR-0585 A2A gateway identity contract) also run for this
+# agent: `consultant-02` has no `agent_comage` group, `paas-dev-01` is outside `sale-01`'s team workspace.
+A2A_GATEWAY_URL = os.getenv("A2A_GATEWAY_URL", "http://a2a-gateway.zuno-ai-run.svc.cluster.local:8080")
+unifai_denies_another_users_objects_like_missing_ones = unifai_checks.cross_user_isolation(
+    CheckResult, _unifai, owner="sale-01", other="paas-dev-01"
+)
+a2a_gateway_denies_unentitled_callers_like_unknown_agents = unifai_checks.a2a_gateway_denies_unentitled(
+    CheckResult, agent="comage", persona="consultant-02", a2a_gateway_url=A2A_GATEWAY_URL, auth_headers=auth_headers
+)
+
 
 CHECKS = [
     unifai_forwards_identity_to_the_gateways,
@@ -262,6 +277,8 @@ CHECKS = [
     business_role_without_entitlement_denied_by_unifai,
     direct_call_to_salesforce_mcp_denied_without_gateway_token,
     unifai_comage_images_only_for_marketing_visual_requests,
+    unifai_denies_another_users_objects_like_missing_ones,
+    a2a_gateway_denies_unentitled_callers_like_unknown_agents,
 ]
 
 

@@ -1,4 +1,19 @@
 {{- /*
+models.maasGroupSpellings: a list of group names -> JSON list with both spellings of
+each, "/name" (Keycloak token, full path) and "name" (OpenShift group, MaaS API keys),
+first-seen order, no duplicates.
+*/}}
+{{- define "models.maasGroupSpellings" -}}
+{{- $out := list -}}
+{{- range . -}}
+{{- $bare := trimPrefix "/" . -}}
+{{- range (list (printf "/%s" $bare) $bare) -}}
+{{- if not (has . $out) -}}{{- $out = append $out . -}}{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- toJson $out -}}
+{{- end -}}
+{{- /*
 ADR-0201 (WP-27): OpenShift AI Models-as-a-Service governance plane.
 Schema-checked against the maas.opendatahub.io/v1alpha1 and
 serving.kserve.io/v1alpha2 CRDs confirmed installed on the live cluster
@@ -67,6 +82,34 @@ spec:
   gatewayRef:
     name: maas-default-gateway
     namespace: openshift-ingress
+{{- if .Values.maas.externalOIDC.subscriptionNamespaceTenant }}
+---
+# 2026-10-25 test (user decision): MaaS persona tokens. The live maas-gateway-auth
+# AuthPolicy accepts only API keys and ServiceAccount tokens, so a persona's
+# Keycloak JWT gets 401 and the persona-group MaaSSubscriptions are unreachable
+# (WP-164 lot 1 verification). On RHOAI 3.5 GA the Tenant CRD carries
+# spec.externalOIDC, but the Tenant above lives in zuno-ai-run, which
+# maas-controller never reconciles (empty status): it only reads
+# MAAS_SUBSCRIPTION_NAMESPACE. This second Tenant, in that namespace, tests
+# whether externalOIDC there adds a Keycloak method to maas-gateway-auth. If the
+# AuthPolicy does not change, switch it off (maas.externalOIDC.subscriptionNamespaceTenant).
+apiVersion: maas.opendatahub.io/v1alpha1
+kind: Tenant
+metadata:
+  name: default-tenant
+  namespace: {{ .Values.maas.externalOIDC.subscriptionNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  gatewayRef:
+    name: maas-default-gateway
+    namespace: openshift-ingress
+  externalOIDC:
+    issuerUrl: https://keycloak.{{ .Values.clusterBaseDomain }}/realms/zuno
+    clientId: {{ .Values.maas.externalOIDC.clientId }}
+{{- end }}
 {{- if and .Values.maas.externalOIDC.enabled (.Capabilities.APIVersions.Has "components.platform.opendatahub.io/v1alpha1/ModelsAsService") }}
 ---
 # ADR-0517 live finding (demo333, 2026-09-07): a FRESH RHOAI 3.5.0 GA
@@ -136,6 +179,24 @@ spec:
     issuerUrl: https://keycloak.{{ .Values.clusterBaseDomain }}/realms/zuno
     clientId: {{ .Values.maas.externalOIDC.clientId }}
 {{- end }}
+{{- /*
+ADR-0581 clause 2 (WP-164): maas.agentSubscriptions comes from
+values.agents.generated.yaml (the models role passes it). A key naming no
+LLMInferenceService-backed entry below is a stale or mistyped generation:
+fail rather than grant nothing silently. SaaS (ExternalModel) entries never
+take persona groups (WP-157 D5).
+*/}}
+{{- range $published, $_ := .Values.maas.agentSubscriptions }}
+{{- $known := false }}
+{{- range $.Values.maas.models }}
+{{- if and (eq .publishedName $published) (ne (toString .modelRefKind) "ExternalModel") }}
+{{- $known = true }}
+{{- end }}
+{{- end }}
+{{- if not $known }}
+{{- fail (printf "maas.agentSubscriptions[%s]: no local (LLMInferenceService) maas.models entry is published under that name" $published) }}
+{{- end }}
+{{- end }}
 {{- range .Values.maas.models }}
 {{- $model := . }}
 {{- /*
@@ -165,6 +226,11 @@ its service-identity (`user:`) subscriptions - the ai-gateway ServiceAccount -
 and drops the persona-group ones. Off by default (current behaviour).
 */}}
 {{- $subs := .subscriptions }}
+{{- $generated := index $.Values.maas.agentSubscriptions .publishedName }}
+{{- if and $generated (ne (toString .modelRefKind) "ExternalModel") }}
+{{- $tier := $.Values.maas.agentSubscriptionTier }}
+{{- $subs = append $subs (dict "name" (printf "%s-agents" .publishedName) "groups" $generated.groups "tokenRateLimits" $tier.tokenRateLimits "priority" $tier.priority) }}
+{{- end }}
 {{- if and (eq (toString .modelRefKind) "ExternalModel") $.Values.maas.saasSubscriptions.gatewayOnly }}
 {{- $subs = list }}
 {{- range .subscriptions }}
@@ -239,8 +305,15 @@ spec:
     users:
       - {{ .user | quote }}
     {{- else }}
+    # Each group in both spellings: Keycloak tokens carry the full path
+    # ("/agent_tekos", the groups mapper's full.path), while MaaS API keys carry
+    # the OpenShift group, which Keycloak syncs without the slash ("agent_tekos").
+    # ADR-0581 clause 2: .groups are the generated agent groups
+    # (values.agents.generated.yaml); .group a hand-written one (/sales).
     groups:
-      - name: {{ .group }}
+      {{- range include "models.maasGroupSpellings" (.groups | default (list .group)) | fromJsonArray }}
+      - name: {{ . }}
+      {{- end }}
     {{- end }}
   priority: {{ .priority }}
   modelRefs:
@@ -281,7 +354,7 @@ spec:
     {{- if .user }}
     {{- $authUsers = append $authUsers .user }}
     {{- else }}
-    {{- $authGroups = append $authGroups .group }}
+    {{- $authGroups = concat $authGroups (include "models.maasGroupSpellings" (.groups | default (list .group)) | fromJsonArray) }}
     {{- end }}
     {{- end }}
     {{- if $authGroups }}

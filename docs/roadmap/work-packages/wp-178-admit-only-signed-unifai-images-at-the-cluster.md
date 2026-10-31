@@ -1,0 +1,54 @@
+# WP-178: Admit only signed UnifAI images at the cluster
+
+- **State:** Done (2026-10-25)
+- **ADRs:** [ADR-0586](../../adr/0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md)
+- **Depends on:** [WP-176](wp-176-verify-the-unifai-runtime-images-before-deploying-them.md)
+- **Related:** [WP-110](wp-110-rhtas-operator-live-findings.md)
+- **Target:** v0.11
+- **Estimated files touched:** ~9 in `zuno-demo` (`gitops/charts/rhtas-config`, `ansible/roles/rhtas_config`, `platform/supply-chain`, docs) and none in the fork
+
+> Decision of 2026-10-25 (user): the cluster-side admission of ADR-0586 decision 8 is built on the Sigstore `policy-controller` the
+> platform already runs (RHTAS, ADR-0535), with an offline public-Sigstore trust root, `no-match-policy: warn`, and the namespaces
+> `zuno-unifai` and `unifai-operator`. Mode `warn` first; `enforce` is a separate, later decision.
+
+## Goal
+
+A pod of `quay.io/zuno/unifai-**` whose image is not signed by the fork's workflow identity is refused by the cluster itself, not only
+by the `unifai` role, so a hand-applied manifest or a rollout outside the role cannot run an unsigned UnifAI image.
+
+## What was found (demo333, OCP 4.22.8, policy-controller-operator 1.0.2, 2026-10-25)
+
+- OpenShift's `ClusterImagePolicy` (`config.openshift.io/v1`) cannot express the identity: `fulcioSubject` needs a `signedEmail`.
+- The policy-controller (webhook `policy.rhtas.com`, `failurePolicy: Ignore`) only sees namespaces labelled `policy.rhtas.com/include=true`.
+  None was labelled: it admitted nothing. Its `zuno-first-party-images` policy (internal registry, warn) is untouched.
+- A `TrustRoot` with `sigstoreKeys` takes **base64-encoded PEM** (`certChain`, `publicKey`); a bare PEM is refused ("illegal base64 data").
+  Its reconciler rejects any non-ECDSA log key ("public key 1 is not ecdsa.PublicKey"), so the Ed25519 Rekor v2 key of the trusted root is left
+  out: signatures logged only there verify with zuno's own offline verifier but not at admission. Rekor v1 (ECDSA) signs what cosign 2.4.1 produces.
+- An image that matches no policy is **denied** in an opted-in namespace ("no matching policies") whatever the policy mode, which would refuse
+  the unsigned third-party services: `no-match-policy: warn` (`PolicyController` `webhook.configData`, rendered into `config-policy-controller`).
+- Tags are resolved to digests by the defaulting webhook (a tagged image got `repo:tag@sha256:...`).
+- Attestations are not checked at admission: an attestation of an expired Fulcio certificate needs a Rekor lookup ("expected a signed timestamp
+  to verify an expired certificate"). The signature identity is checked; provenance and SBOM stay with zuno's verifier before the stack is applied.
+- Verified in a labelled test namespace with server-side dry-run pods: a CI-signed digest and operator 0.1.40 pass without warning, an unsigned
+  digest is a warning in `warn` and refused in `enforce`, a third-party digest is a warning with `no-match-policy: warn`.
+
+## Steps
+
+1. **Done (repo).** `platform/supply-chain/render_policy_trustroot.py` renders `gitops/charts/rhtas-config/files/public-sigstore-trustroot.yaml` from
+   `platform/okf/sigstore/trusted_root.json` (CI runs `--check`); chart templates `trustroot-public.yaml`, `clusterimagepolicy-unifai.yaml`,
+   `policycontroller.yaml` (`configData`); `ansible/roles/rhtas_config` passes the identities from `image-identities.yaml` (development ones only on a
+   cluster that accepts them), waits for the policy, and labels the namespaces.
+2. **Done 2026-10-25 (demo333).** `make d1 install rhtas-config` (`zuno-unifai-images` Ready in `warn`, TrustRoot `public-sigstore-trust-root`, `config-policy-controller` `no-match-policy: warn`, `zuno-unifai` and `unifai-operator` labelled). On both namespaces, server-side dry-run pods: a CI-signed `unifai-ui` digest and operator 0.1.40 are admitted without a warning, the unsigned digest is a warning, a third-party digest is a `no matching policies` warning; a real pod (redis-insight) was deleted and recreated normally. `make d1 check rhtas-config` and `make d2 check unifai` stay green.
+3. **Warn cycle, done 2026-10-25:** operator 0.1.41 (catalogue moved by the role, new operator pod admitted without a warning), then `unifai-backend`, `unifai-ui`,
+   `unifai-identity` and `unifai-rag-server` recreated by their controllers: no warning in the webhook; the pin preflight validates the five current digests and the three
+   digests of the operator release. (A deliberate restart of `unifai-backend` at 20:49 UTC hit a running tekos stresstest of another session: noted by them.)
+4. **`enforce`, done 2026-10-25 (user's go):** `zuno_unifai_admission_mode: enforce` in `ansible/clusters/demo333.yml`, `make d1 install rhtas-config`. On the real policy, server-side
+   dry-run pods in `zuno-unifai` and `unifai-operator`: the unsigned `unifai-ui` and `unifai-backend` digests and the `unifai-ui:devel-1bb72a84d` tag are **refused**
+   (`admission webhook "policy.rhtas.com" denied the request ... no signatures found`); a CI-signed digest and operator 0.1.41 are admitted; a third-party digest is admitted with a
+   `no matching policies` warning; `unifai-ui` recreated by its controller in `enforce` is `Ready` in 5 s. `make d1 check rhtas-config` and `make d2 check unifai` are green.
+   Only `zuno-unifai-images` is in `enforce`; `zuno-first-party-images` and the third-party services stay `warn`. Break-glass: `docs/platform/operations.md`.
+
+## Acceptance
+
+A pod running an unsigned `quay.io/zuno/unifai-ui` digest is refused in `enforce` and warned in `warn`, a CI-signed one is admitted, and a pod of a
+third-party image is unaffected.

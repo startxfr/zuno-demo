@@ -61,11 +61,21 @@ olsConfig:
     # lightspeed.enabled block (gitops/charts/models/values.yaml
     # lightspeed.enabled: true).
     directEndpoint: https://gpt-oss-20b-kserve-workload-svc.zuno-ai-run.svc:8000/v1
-    # gpt-oss-20b is served with maxModelLen: 32768 (gitops/charts/models/
-    # values.yaml gptOssModel block), well below its 131k native window -
-    # matched here rather than reusing qwen's 128000.
-    contextWindowSize: 32768
+    # gpt-oss-20b is served with maxModelLen: 131072, its native window
+    # (gitops/charts/models/values.yaml gptOssModel block, raised from 32768
+    # on 2026-10-25); matched here.
+    contextWindowSize: 131072
     maxTokensForResponse: 2048
+    # Lightspeed inspects every tool result with a classifier that calls THIS model with a hard-coded
+    # 128-token limit. gpt-oss-20b reasons by default and the reasoning eats the 128 tokens, so every
+    # tool-using question failed with "a tool result failed the safety inspection". Lightspeed sends this
+    # as the request-level `reasoning_effort` (the vLLM server-side default does not take effect on
+    # gpt-oss). Measured in the Lightspeed pod: classifier 5/5 parsed in 44-56 tokens with `low`.
+    # See docs/roadmap/evidence/lightspeed-tool-result-inspection-2026-10-25.md. Empty = not sent.
+    # DISABLED 2026-10-25: with reasoningConfig set, Lightspeed switches to ChatVLLMReasoning and EVERY query
+    # fails ("'dict' object has no attribute 'choices'" in _invoke_llm astream), so the classifier fix below
+    # is not usable as is. Keep empty until Lightspeed fixes that class or another route is chosen.
+    reasoningEffort: ""
 
   # ADR-0524 clause 2: native OpenShift knowledge, untouched. `rag` stays
   # empty and `byokRAGOnly` stays FALSE so the operator's RHOKP sidecar keeps

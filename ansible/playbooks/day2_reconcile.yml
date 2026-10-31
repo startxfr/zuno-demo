@@ -1,0 +1,33 @@
+---
+# Day 2 reconcile (`make day2|d2 reconcile [component]`): targeted remediations
+# only. Unlike Day 0/1, a Day 2 reconcile never falls back to re-installing a
+# component: the Makefile limits it to DAY2_RECONCILE_COMPONENTS (roles with a
+# tasks/reconcile.yml). Today that is `models`, which unwedges a model rollout
+# blocked by the GPU quota (ansible/roles/models/tasks/reconcile.yml, ADR-0201
+# "Rollout hazard"). It asks before taking a model down; `-e confirm=yes` skips
+# the question and `-e model=<llminferenceservice>` limits it to one model.
+- name: "Day 2: reconcile blocked components"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  vars:
+    zuno_day: d2
+    day2_reconcile_components:
+      - models
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: Resolve requested Day 2 component name(s)
+      ansible.builtin.set_fact:
+        selected_components: >-
+          {{ day2_reconcile_components if target_component | default('all') == 'all'
+             else [target_component | replace('-', '_')] }}
+
+    - name: Reconcile Day 2 components
+      ansible.builtin.include_role:
+        name: "{{ item }}"
+        tasks_from: reconcile
+      loop: "{{ selected_components }}"
+      loop_control:
+        label: "{{ item }}"

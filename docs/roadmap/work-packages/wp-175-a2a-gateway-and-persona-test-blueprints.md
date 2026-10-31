@@ -1,6 +1,6 @@
 # WP-175: A2A gateway and persona test blueprints
 
-- **State:** Repo work in review
+- **State:** Done (2026-10-25)
 - **ADRs:** [ADR-0585](../../adr/0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md), [ADR-0402](../../adr/0402-adopt-a2a-as-the-inter-agent-protocol.md), [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md)
 - **Depends on:** [WP-172](wp-172-gateway-enforcement-of-the-delegation-chain.md)
 - **Related:** [WP-173](wp-173-unifai-a2a-identity-server-and-approval.md), [WP-174](wp-174-tekos-to-arkos-delegation-on-demo333.md)
@@ -41,6 +41,23 @@ decision and quota are attributed to that persona, and the mcp-gateway tool surf
   answer once it is active.
 - A persona blueprint carries no delegation chain (it is not an agent), so the chain checks of the gateway are exercised by tests only.
 - Only read-only tools are offered (no approval across hops).
+
+## Validation on demo333 (2026-10-25, read-only)
+
+`blueprint.validate` on the 32 blueprints, signed in as the owner of each set (no session, no model call):
+26 valid, 6 invalid as expected (`ENDPOINT_UNREACHABLE`: the A2A card of a placeholder agent is not served).
+
+| Persona | chat | a2a (target agent) |
+|---|---|---|
+| sale-01, sale-02, recrut-01 | valid | valid (comage) |
+| consultant-01/02/03, ai-dev-01, ai-ops-01, paas-dev-01, paas-ops-01 | valid | valid (tekos) |
+| adv-01, adv-02, board-01, board-02 | valid | invalid (advantage, placeholder) |
+| finance-01, finance-02 | valid | invalid (finage, placeholder) |
+
+Fix of the same day (user decision): the sets of sale-01, consultant-01, adv-01, finance-01 and board-01 were owned by
+their evaluation twins (`eval-<persona>`, WP-169), so the real logins saw none of them. They were created again under the
+real accounts (`EVAL_PERSONAS=0`), the twins kept; the three with an active agent validate, the three placeholders
+(advantage, finage) are saved and wait for their agent. Every business persona now owns its two blueprints.
 
 ## Open questions
 

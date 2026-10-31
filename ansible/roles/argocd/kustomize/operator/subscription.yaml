@@ -6,9 +6,16 @@ metadata:
   labels:
     zuno.io/managed-by: zuno-ansible
 spec:
-  channel: latest
+  # A version channel and Manual approval, not `latest` + Automatic: an upgrade of ArgoCD's own
+  # installer must never start by itself in the middle of a demo. demo333 sat 13 days with a
+  # failed 1.21.4 -> 1.22.0 upgrade (2026-10-12) that nothing reported; `make d0 check argocd`
+  # now does (platform/gitops/check_gitops_operator.py). To upgrade, approve the InstallPlan:
+  #   oc patch installplan <name> -n openshift-gitops-operator --type merge -p '{"spec":{"approved":true}}'
+  # No startingCSV: it must belong to the channel, and a stale one breaks resolution after a
+  # channel change. demo333's Subscription is owned by sxcm (label managed-by: sxcm) and is only
+  # aligned with this file by hand (WP-176 follow-up, 2026-10-25).
+  channel: gitops-1.22
   name: openshift-gitops-operator
   source: redhat-operators
   sourceNamespace: openshift-marketplace
-  installPlanApproval: Automatic
-  startingCSV: openshift-gitops-operator.v1.21.1
+  installPlanApproval: Manual

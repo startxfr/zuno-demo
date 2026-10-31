@@ -71,6 +71,25 @@ policyOperand:
     # image-registry.../zuno-ai-build/<name> covers all 14.
     imageGlob: "image-registry.openshift-image-registry.svc:5000/zuno-ai-build/**"
 
+  # WP-178 / ADR-0586: cluster-side admission of the UnifAI images, with the same policy-controller. A
+  # ClusterImagePolicy verifies the keyless signature of `quay.io/zuno/unifai-**` against the public Sigstore
+  # root (a TrustRoot rendered from platform/okf/sigstore/trusted_root.json, no network access) and the GitHub
+  # workflow identities passed by ansible/roles/rhtas_config from platform/supply-chain/image-identities.yaml.
+  # Mode `warn` first (violations are warnings, nothing is refused); `enforce` is a separate, later decision.
+  # Provenance and SBOM are NOT checked at admission: an attestation of an expired Fulcio certificate needs a Rekor
+  # lookup (live: "expected a signed timestamp to verify an expired certificate"); zuno's own verifier checks them
+  # before the stack is applied. Namespaces opt in with the label policy.rhtas.com/include=true (set by the role).
+  unifai:
+    enabled: false
+    mode: warn
+    imageGlob: "quay.io/zuno/unifai-**"
+    issuer: https://token.actions.githubusercontent.com
+    subjectRegExps: []
+
+  # Images that match no ClusterImagePolicy: the controller denies them by default ("no matching policies"), which
+  # would refuse the third-party services (mongo, qdrant, ...) of an opted-in namespace. `warn` only reports them.
+  noMatchPolicy: warn
+
 signerClientMirror:
   enabled: false
   vaultPath: keycloak/zuno-signer-client

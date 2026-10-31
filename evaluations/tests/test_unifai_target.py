@@ -210,6 +210,63 @@ def test_skip_is_never_a_pass():
     assert r.skipped and not r.passed and "because" in r.detail
 
 
+def _identity_check(turns, attempts):
+    """identity_forwarded over a fake target that answers `turns` in order."""
+    import unifai_checks
+    from dataclasses import dataclass
+
+    @dataclass
+    class CheckResult:
+        name: str
+        passed: bool
+        detail: str = ""
+        skipped: bool = False
+
+    calls = []
+
+    class Target:
+        def collect(self, persona, prompt, deadline_seconds, stop_on):
+            calls.append(prompt)
+            return turns[len(calls) - 1]
+
+    check = unifai_checks.identity_forwarded(
+        CheckResult, lambda: Target(), "p", "ask", ("salesforce.opportunity.read",), attempts=attempts
+    )
+    return check(), calls
+
+
+def _turn(tools, reply="some reply", stopped=False):
+    return {"tools": tools, "reply": reply, "stopped": stopped}
+
+
+def test_identity_check_passes_on_the_first_turn_that_calls_the_tool():
+    r, calls = _identity_check([_turn(["salesforce.opportunity.read"])], attempts=2)
+    assert r.passed and len(calls) == 1 and r.detail.startswith("attempt=1/2")
+
+
+def test_identity_check_retries_once_and_reports_the_attempt():
+    r, calls = _identity_check([_turn([]), _turn(["salesforce.opportunity.read"])], attempts=2)
+    assert r.passed and len(calls) == 2
+    assert r.detail.startswith("attempt=2/2") and "tool_calls=[]" in r.detail
+
+
+def test_identity_check_fails_when_no_turn_calls_the_tool():
+    r, calls = _identity_check([_turn([]), _turn(["other.tool"])], attempts=2)
+    assert not r.passed and len(calls) == 2 and r.detail.startswith("attempt=2/2")
+
+
+def test_identity_check_single_attempt_keeps_its_old_detail():
+    r, calls = _identity_check([_turn([])], attempts=1)
+    assert not r.passed and len(calls) == 1 and r.detail == "tool_calls=[] reply_len=10"
+
+
+def test_identity_check_needs_a_reply_or_a_stop_with_the_tool():
+    r, _ = _identity_check([_turn(["salesforce.opportunity.read"], reply="")], attempts=1)
+    assert not r.passed
+    r, _ = _identity_check([_turn(["salesforce.opportunity.read"], reply="", stopped=True)], attempts=1)
+    assert r.passed
+
+
 AGENTS = ["tekos", "comage", "arkos", "advantage", "finage", "naveo"]
 PLACEHOLDERS = {"advantage", "finage", "naveo"}
 
@@ -448,3 +505,107 @@ def test_rag_retrieval_executed_fails_without_a_reply_or_when_tempo_is_down():
 def test_rag_retrieval_executed_is_skipped_not_passed_without_a_trace_backend():
     out = _rag_executed("", '{"session_id": "s1", "reply": "ok", "tools": []}', '[{"source_type": "WEB", "results": 1}]')
     assert out.startswith("False True") and "TEMPO_URL" in out, out
+
+
+def _triggers_tool(tempo_url: str, tools: str, searches: str) -> str:
+    """Runs tekos's u_chat_triggers_tool (scenario 10, expect_tool search_confluence) with a stubbed
+    turn and a stubbed Tempo helper."""
+    return _probe(
+        "tekos",
+        f"""
+        import run_scenarios as rs
+        os.environ["TEMPO_URL"] = {tempo_url!r}
+        class FakeTarget:
+            def collect(self, *a, **k):
+                return {{"session_id": "s1", "reply": "ok", "tools": {tools}}}
+        rs._unifai_target = FakeTarget()
+        rs._unifai_placeholder_skip = lambda s: False
+        def fake_searches(run_id, url):
+            r = {searches}
+            if isinstance(r, Exception):
+                raise r
+            return r
+        rs._unifai_tempo_rag_searches = fake_searches
+        res = rs.u_chat_triggers_tool({{"id": 10, "title": "t", "persona": "p", "message": "m",
+                                        "expect_tool": "search_confluence"}})
+        print(res.passed, res.detail)
+        """,
+    )
+
+
+def test_triggers_tool_passes_on_the_tool_event_without_reading_the_trace():
+    out = _triggers_tool("", '["docs_rag_retriever_tool"]', "RuntimeError('must not be called')")
+    assert out.startswith("True") and "trace" not in out, out
+
+
+def test_triggers_tool_without_a_tool_event_passes_on_a_confluence_rag_search_span():
+    """retrieve_first emits no tool event (tekos scenario 10, run 3 of 2026-10-25)."""
+    out = _triggers_tool("http://tempo", "[]", '[{"source_type": "WEB", "results": 3}, {"source_type": "CONFLUENCE", "results": 5}]')
+    assert out.startswith("True") and "CONFLUENCE spans=1 of 2" in out, out
+
+
+def test_triggers_tool_without_a_tool_event_fails_on_web_spans_only_or_no_backend():
+    out = _triggers_tool("http://tempo", "[]", '[{"source_type": "WEB", "results": 3}]')
+    assert out.startswith("False") and "spans=0 of 1" in out, out
+    out = _triggers_tool("http://tempo", "[]", "RuntimeError('down')")
+    assert out.startswith("False") and "trace backend" in out, out
+    out = _triggers_tool("", "[]", '[{"source_type": "CONFLUENCE", "results": 5}]')
+    assert out.startswith("False") and "TEMPO_URL unset" in out, out
+
+
+def test_cross_user_isolation_check_passes_on_uniform_denials_and_fails_on_a_tell():
+    from dataclasses import dataclass
+    sys.path.insert(0, str(EVAL / "common"))
+    import unifai_checks
+
+    @dataclass
+    class CR:
+        name: str
+        passed: bool
+        detail: str
+        skipped: bool = False
+
+    class Resp:
+        def __init__(self, status, body):
+            self.status_code, self.text = status, body
+
+        def json(self):
+            return [{"blueprint_id": "bp1"}]
+
+    def fake(tell):
+        class Client:
+            def __init__(self, who):
+                self.who = who
+
+            def get(self, url, params=None, **kw):
+                if "available.blueprints" in url:
+                    return Resp(200, "[]")
+                key = params.get("teamId") or params.get("sessionId")
+                if tell and key in ("TEAM", "SID"):
+                    return Resp(403, "denied")
+                return Resp(404, "not found")
+
+            delete = get
+
+        class U:
+            ui_url = "http://ui"
+
+            def client(self, p):
+                return Client(p)
+
+            def teams(self, p):
+                return [{"team_id": "TEAM"}] if p == "owner" else []
+
+            def create(self, p, bp):
+                return "SID"
+
+            def cleanup(self):
+                return 0, 0
+
+        return U()
+
+    ok = unifai_checks.cross_user_isolation(CR, lambda: fake(False), owner="owner", other="other")()
+    bad = unifai_checks.cross_user_isolation(CR, lambda: fake(True), owner="owner", other="other")()
+    assert ok.passed, ok.detail
+    assert not bad.passed and "team.get" in bad.detail
+    assert "a2a_gateway_denies_unentitled" in dir(unifai_checks)

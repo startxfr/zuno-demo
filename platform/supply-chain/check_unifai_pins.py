@@ -3,8 +3,11 @@
 
 Reads `ansible/clusters/*.yml`. For a cluster whose `zuno_unifai_verify_images` is not
 `false` (the default is on), the five application images of `zuno_unifai_values.stack.images`
-(backend, identity, multiagent, rag, ui) must each be present and written `repo@sha256:...`,
-and any other image listed there (the data services) must be pinned by digest as well. A tag
+(backend, identity, multiagent, rag, ui) and the third-party services (docling, mongodb, qdrant,
+rabbitmq, redis, redisInsight, temporal) and the backup Jobs' two images (stack.backup.images.awsCli, .mongo)
+must each be present and written `repo@sha256:...`; any
+other image listed there must be pinned by digest as well. The third-party ones are pinned, not
+signed: their publishers do not sign them. A tag
 is mutable, so it proves nothing about what a pull returns.
 
 A cluster that switches verification off says so in its own file; it is reported, not
@@ -25,6 +28,10 @@ import yaml
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
 CLUSTERS_DIR = REPO_ROOT / "ansible" / "clusters"
 APPLICATION_IMAGES = ("backend", "identity", "multiagent", "rag", "ui")
+# The images of the backup CronJobs and restore Jobs, `stack.backup.images` (operator >= 0.1.36).
+BACKUP_IMAGES = ("awsCli", "mongo")
+# The third-party services the stack runs (ADR-0586 clause 7): pinned by digest, not signed.
+THIRD_PARTY_IMAGES = ("docling", "mongodb", "qdrant", "rabbitmq", "redis", "redisInsight", "temporal")
 PINNED = re.compile(r"@sha256:[0-9a-f]{64}$")
 
 
@@ -43,8 +50,27 @@ def check_cluster(name: str, doc: dict) -> Tuple[List[str], List[str]]:
                             f"digest while verification is on)")
         elif not PINNED.search(str(ref)):
             findings.append(f"{name}: stack.images.{component} = {ref} is not pinned by digest")
+    for component in THIRD_PARTY_IMAGES:
+        ref = images.get(component)
+        if not ref:
+            findings.append(f"{name}: stack.images.{component} is missing (the third-party services are pinned by "
+                            f"digest, unsigned, while verification is on)")
+        elif not PINNED.search(str(ref)):
+            findings.append(f"{name}: stack.images.{component} = {ref} is not pinned by digest")
+    backup = ((doc.get("zuno_unifai_values") or {}).get("stack") or {}).get("backup") or {}
+    if backup.get("enabled", True) is not False:
+        # the role switches the backup on itself from the PostgreSQL S3 settings, so the
+        # images are required unless the cluster file says `enabled: false`
+        backup_images = backup.get("images") or {}
+        for component in BACKUP_IMAGES:
+            ref = backup_images.get(component)
+            if not ref:
+                findings.append(f"{name}: stack.backup.images.{component} is missing (the backup Jobs are pinned by "
+                                f"digest, unsigned, while verification is on)")
+            elif not PINNED.search(str(ref)):
+                findings.append(f"{name}: stack.backup.images.{component} = {ref} is not pinned by digest")
     for component, ref in sorted(images.items()):
-        if component not in APPLICATION_IMAGES and not PINNED.search(str(ref)):
+        if component not in APPLICATION_IMAGES + THIRD_PARTY_IMAGES and not PINNED.search(str(ref)):
             findings.append(f"{name}: stack.images.{component} = {ref} is not pinned by digest")
     return findings, []
 

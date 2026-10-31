@@ -9,6 +9,32 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Amended (2026-10-25) - ADR-0586 decision 8 is in force
+
+WP-178 is `Done`: the Sigstore policy-controller refuses an unsigned UnifAI image at admission in `enforce` on demo333 (`zuno-unifai`, `unifai-operator`), after a warn cycle with
+the operator 0.1.41 and four recreated application pods without a warning. Limits recorded: fail-open webhook, ECDSA-only transparency-log keys (the pin scripts preflight the
+digests against the webhook), no attestation check at admission, third-party services in `warn`.
+
+## Implemented (2026-10-25) - ADR-0586 verifies the UnifAI runtime images
+
+ADR-0586 is `Implemented` and WP-176 `Done`: the application images, the operator 0.1.40 with its bundle and catalog are signed in the
+fork's CI and verified by zuno before the stack is applied and on what runs (demo333); the release path was rehearsed with a `v0.0.0-rc1` tag. Left
+as written risks: RabbitMQ frozen on `bitnamilegacy`, third-party services pinned but not signed, operator releases 0.1.36 to 0.1.38 unsigned;
+cluster-side admission is WP-178.
+
+## Accepted (2026-10-25) - ADR-0586 verifies the UnifAI runtime images
+
+ADR-0586 is `Accepted`. The operator 0.1.39 is the first release signed end to end: operator, bundle and catalog verify with the
+operator release workflow's identity, and demo333 verifies the catalog (`zuno_unifai_verify_catalog: true`) after the role moved its
+hand-applied CatalogSource to the verified digest. `Implemented` waits for the rehearsal of the application images' release path.
+
+## Amended (2026-10-25) - ADR-0586 records the live proof and its residual risks
+
+The signed images run on demo333: CI-built digests, verified before the stack is applied, drift checked by `make d2 check unifai`. The
+SBOM is a separately signed artifact, not an attestation (Rekor rejected a 25 MB one). Third-party services and the backup Jobs'
+images are pinned by digest, unsigned; RabbitMQ stays frozen on `bitnamilegacy` (accepted risk). The operator, bundle and catalog follow
+with their first signed release; cluster-side admission is WP-178.
+
 ## New record (2026-10-24) - ADR-0586 verifies the UnifAI runtime images
 
 ADR-0586 (Proposed, v0.11) treats the gap ADR-0353 stated: the UnifAI runtime images are built and signed by the fork's CI and

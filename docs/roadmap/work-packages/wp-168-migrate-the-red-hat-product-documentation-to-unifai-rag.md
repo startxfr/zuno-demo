@@ -126,6 +126,32 @@ Confluence page. Details in [the evidence](../evidence/wp-168-red-hat-docs-on-un
 - **ADRs:** the supersessions planned by ADR-0568 are written (see the ADR changelog).
 - **Live:** see the evidence file for what was uninstalled on demo333 and what was purged.
 
+## Update (2026-10-25): corpus scoped to the latest versions
+
+Tekos scenario #11 ("What is a namespace in OpenShift?") cited `docs.redhat.com` in only about one
+run of three. The retriever's top results were the same pages under several versions and URL forms,
+and the definition chunk was not in the index. User decisions: per-source include and exclude
+patterns, and the latest version of each product only.
+
+- **Sources** (`8ac9cf7c`, `gitops/charts/unifai/files/redhat-docs.yaml`): 21 web sources instead
+  of 38. The 17 N-1 sources were deleted with their chunks. Patterns use the `/en/` URL form, and a
+  book that has its own source is excluded from the broader ones. The patterns were checked against
+  the crawler's own `in_scope` function on sample URLs.
+- **Duplicates removed on resync:** 51 pages for OCP, 10 for RHEL, 43 for IdM and 50 for MTC, among
+  others. The corpus went from 1,579 to about 1,100 pages.
+- **Virtualization fix** (`a06882ac`, `95c18652`): this source had never ingested its own chapters.
+  The `redhat-docs` crawl mode caps discovery at 50 links before the include filter runs, and those
+  51 pages were other OCP books. The source is now seeded with the complete `html-single` book. Its
+  first sync got a 503 from `docs.redhat.com`; a metadata change re-triggered it, then it ingested.
+- **Retriever, measured with `query.bearer`:** no duplicates in the results any more. The exact
+  definition sentence ("A project is a Kubernetes namespace with additional annotations") now
+  returns OCP `html-single/authentication_and_authorization` first, at score 1.0. The natural
+  question still returns ten installation-guide chunks and never the definition. That is ranking,
+  not corpus.
+- **Follow-ups (UnifAI operator, a9):** a filter for empty chunks and canonical `/en/` URLs in
+  operator 0.1.42; then ranking work (hybrid weighting, re-ranking), with scenario #11 as the
+  regression case.
+
 ## Open questions
 
 - The embedding model and chunk size of `rag-service` differ from UnifAI's

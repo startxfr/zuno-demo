@@ -1,6 +1,6 @@
 # ADR-0586: Verify the UnifAI runtime images by digest, signature and attestations before deploying them
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
@@ -59,7 +59,20 @@ The state found on 2026-10-24:
    embedding image are written by digest in the cluster file. Their publishers do not sign them, so this is a
    pin and not a proof of origin, and the record says so. The RabbitMQ image comes from `bitnamilegacy`, a
    repository that receives no more updates; replacing it is a separate decision.
-8. **Admission by the cluster is a later step,** not part of this record. OpenShift's `ClusterImagePolicy`
+   *Applied 2026-10-25 on demo333:* the seven services the stack runs are pinned (the manifest list of the tag
+   that ran, so the image does not change), `temporal` leaves `latest`, and `check_unifai_pins.py` requires them
+   while verification is on. Not covered: the `aws-cli` image of the two backup CronJobs, which the operator sets
+   outside `spec.images`, and `embedding`, which this cluster does not run.
+   *Update 2026-10-25:* the backup Jobs' two images are pinned too (`stack.backup.images.awsCli` and `.mongo`, operator
+   0.1.36 takes them verbatim), and `make d2 check unifai` compares what runs to every third-party pin from the pod spec
+   (the runtime reports the platform manifest digest for a pinned manifest list, never the pin). The RabbitMQ image stays
+   `bitnamilegacy`, frozen: its chart is the vendored Bitnami one, so replacing the image means rewriting an upstream
+   chart; the user accepts that residual risk (2026-10-25).
+8. **Admission by the cluster is a later step,** not part of this record (WP-178, 2026-10-25).
+   *Update 2026-10-25:* WP-178 runs it on demo333 in `warn` mode with the Sigstore policy-controller (offline public-Sigstore TrustRoot, the
+   identities of `image-identities.yaml`, `no-match-policy: warn` for the unsigned third-party services). *Update 2026-10-25 (WP-178 Done):* `zuno-unifai-images` is in
+   `enforce` on demo333 (an unsigned UnifAI image is refused at admission in `zuno-unifai` and `unifai-operator`; the third-party services stay `warn`); the pin scripts run an
+   admission preflight; the webhook stays fail-open (`failurePolicy: Ignore`), so it is the second guard after zuno's verifier and drift check. OpenShift's `ClusterImagePolicy`
    (`config.openshift.io/v1`, generally available since 4.20) verifies at pull and has no "digest only" rule
    like `policy-controller`, but it matches a keyless signer by e-mail, which a GitHub workflow identity is not;
    the choice between a public-key policy and keyless needs `oc explain` on the live cluster first.
@@ -85,6 +98,18 @@ The state found on 2026-10-24:
   owner's and comes before any pin is written.
 - Images pushed by hand (`make images-devel`) cannot be pinned on a cluster that verifies.
 
+## Residual risks (2026-10-25)
+
+- **Unsigned operator releases.** Operator 0.1.36 to 0.1.38 (and the catalog the d0 chart pins, 0.1.30) are unsigned and are not
+  re-cut: the first signed release is the first one after the operator image is built and signed in CI (`publish-images.yml`
+  on `devel`, the release workflow retags that digest without rebuilding and the CSV references it by digest) and the
+  bundle and catalog are signed. `zuno_unifai_verify_catalog` stays false until then.
+- **Operator identity.** The operator image is signed by the `devel` identity of `publish-images.yml`, also when it is released
+  (`vX.Y.Z` is that same digest). A cluster that does not accept the development identity needs the release workflow to
+  add its own signature on the digest; written in WP-176 step 6.
+- **RabbitMQ and the third-party services** are pinned, not signed, and RabbitMQ is frozen (decision 7).
+- **No admission at the cluster:** a manifest applied outside the role is not refused until WP-178.
+
 ## Security considerations
 
 The signature proves which workflow, on which ref, built the digest; it does not prove the code is safe. A
@@ -93,13 +118,19 @@ strong as that branch's protections (no force-push, reviewed merges) and is acce
 A production cluster takes release tags only. The verification trusts the committed Sigstore root (no network
 trust), the registry is read but never trusted, and a verification that cannot run refuses.
 
-## Before Implemented
+## Implementation evidence (2026-10-25, demo333)
 
-On demo333, once the first CI-built images exist: the verifier refuses the current unsigned
-`unifai-ui:devel-1bb72a84d` and accepts the CI-built digests; the stack applies only with verified, digest-pinned
-images; pointing `images.ui` at an unsigned image makes the run refuse before applying anything; and `make d1
-check unifai` fails for a pod started with another image. The operator, bundle and catalog follow with their first
-signed release.
+- The verifier refuses the unsigned `unifai-ui:devel-1bb72a84d` (a tag, and its digest `sha256:0b851c4f...` has "no
+  signatures found") and accepts the CI-built digests; the five application images are pinned by digest, verified by
+  `make d2 install unifai` and deployed; the third-party services and the backup Jobs' images are pinned by digest.
+- Pointing `images.ui` at the unsigned digest makes the role stop before applying anything ("The stack images do not
+  verify (ADR-0586), nothing was applied").
+- `make d2 check unifai` (not `d1`: `unifai` is a Day 2 component) failed on the pods that ran other images before the
+  pins were applied, and flags a third-party pod running another image than its pin.
+- The release path ran: `v0.0.0-rc1` built and signed the five images under `quay-release`, accepted WITHOUT
+  `--accept-dev`. Operator 0.1.39 and 0.1.40 (operator, bundle, catalog) verify with the operator release workflow's
+  identity; the catalog digest is pinned in the d0 chart and the hand-applied CatalogSource runs it (checked by the drift
+  check). Residual risks are listed above; cluster-side admission is WP-178.
 
 ## Review evidence
 

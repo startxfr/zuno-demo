@@ -487,9 +487,33 @@ def u_chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     except Exception as exc:  # noqa: BLE001
         return ScenarioResult(s["id"], s["title"], False, str(exc))
     tools = run_["tools"]
-    return ScenarioResult(
-        s["id"], s["title"], any(t in want for t in tools), f"expected one of {list(want)} tool_calls={tools}"
-    )
+    ok = any(t in want for t in tools)
+    detail = f"expected one of {list(want)} tool_calls={tools}"
+    if not ok and any("retriever" in w for w in want):
+        ok, why = _unifai_retrieval_in_trace(run_, "CONFLUENCE")
+        detail += f" {why}"
+    return ScenarioResult(s["id"], s["title"], ok, detail)
+
+
+def _unifai_retrieval_in_trace(run_: Dict[str, Any], source_type: str) -> tuple:
+    """(proven, detail): the run's trace holds a `rag.search` span over `source_type`.
+
+    With retrieve_first the retriever runs before the model and emits no tool event, so a scenario
+    that accepts the retriever can find no call in the stream (tekos scenario 10, 2026-10-25). The
+    span is the proof instead. Without `TEMPO_URL` or a session id nothing is proven, and the check
+    fails as before."""
+    tempo = os.getenv("TEMPO_URL", "").strip()
+    if not tempo:
+        return False, "trace=unchecked (TEMPO_URL unset)"
+    run_id = run_.get("session_id", "")
+    if not run_id:
+        return False, "trace=unchecked (no session id)"
+    try:
+        searches = _unifai_tempo_rag_searches(run_id, tempo)
+    except Exception as exc:  # noqa: BLE001 - an unreachable backend cannot prove anything
+        return False, f"trace backend: {exc}"
+    hits = [x for x in searches if str(x.get("source_type") or "").upper() == source_type]
+    return bool(hits), f"rag.search {source_type} spans={len(hits)} of {len(searches)}"
 
 
 # A page of the tekos RAG sources (space SXSI, tree "Technologie : Satellite"), and what it
@@ -499,8 +523,14 @@ _TEKOS_RAG_QUESTION = (
     "What does the internal procedure S0R42 'Schedule Satellite' describe? "
     "Answer from the internal documentation and name the page."
 )
-_UNIFAI_RAG_QUESTION = os.getenv("UNIFAI_RAG_QUESTION") or (_TEKOS_RAG_QUESTION if AGENT in ("tekos", "arkos") else "")
-_UNIFAI_RAG_EXPECT = os.getenv("UNIFAI_RAG_EXPECT", "S0R42" if AGENT in ("tekos", "arkos") else "")
+# Comage (sales): the synthetic sales pages of the `sales-demo` web source (knowledge.sales, 2026-10-26); the Acme
+# Renewal page says the purchase order is "reçu, en attente de validation par la finance", a phrase only the corpus has.
+_COMAGE_RAG_QUESTION = "Quel est le statut du bon de commande de l'opportunité Acme Renewal ? Réponds d'après la base de connaissances commerciale."
+_UNIFAI_RAG_QUESTION = os.getenv("UNIFAI_RAG_QUESTION") or (
+    _TEKOS_RAG_QUESTION if AGENT in ("tekos", "arkos") else (_COMAGE_RAG_QUESTION if AGENT == "comage" else ""))
+_UNIFAI_RAG_EXPECT = os.getenv(
+    "UNIFAI_RAG_EXPECT",
+    "S0R42" if AGENT in ("tekos", "arkos") else ("en attente de validation" if AGENT == "comage" else ""))
 # Tekos's retriever also searches the Red Hat documentation (WEB sources, knowledge.tech): a basic
 # product question must be answered from it and cite it. Tekos only; override or disable
 # (UNIFAI_RAG_WEB_QUESTION="") for another corpus.
@@ -510,7 +540,12 @@ _TEKOS_RAG_WEB_QUESTION = (
 _UNIFAI_RAG_WEB_QUESTION = os.getenv(
     "UNIFAI_RAG_WEB_QUESTION", _TEKOS_RAG_WEB_QUESTION if AGENT == "tekos" else ""
 )
-_UNIFAI_RAG_WEB_EXPECT = os.getenv("UNIFAI_RAG_WEB_EXPECT", "docs.redhat.com")
+# Comma-separated substrings the reply must ALL contain: the host and the OpenShift documentation path.
+# The bare host is not enough: the former demo web_search returned a fixed docs.redhat.com page for any
+# query (2026-10-25). The corpus holds both /documentation/... and /en/documentation/... URL forms.
+_UNIFAI_RAG_WEB_EXPECT = os.getenv(
+    "UNIFAI_RAG_WEB_EXPECT", "docs.redhat.com,/documentation/openshift_container_platform/"
+)
 # A member of the agent's knowledge groups (override with UNIFAI_RAG_PERSONA).
 _UNIFAI_RAG_PERSONAS = {
     "tekos": "consultant-01", "arkos": "consultant-01", "comage": "sale-01", "advantage": "adv-01", "finage": "finance-01",
@@ -539,7 +574,10 @@ def u_rag_retrieval(s: Dict[str, Any]) -> ScenarioResult:
         # Second leg: the same retriever over the Red Hat documentation. The answer must cite it.
         try:
             web = _unifai().collect(persona, _UNIFAI_RAG_WEB_QUESTION, deadline_seconds=170)
-            cites_docs = _UNIFAI_RAG_WEB_EXPECT in web["reply"]
+            cites_docs = all(part in web["reply"] for part in _UNIFAI_RAG_WEB_EXPECT.split(",") if part)
+            # A run cut by the deadline has an empty reply: say so, it is not "no citation".
+            if web.get("timed_out"):
+                detail += " web_timed_out=True"
         except Exception as exc:  # noqa: BLE001
             cites_docs = False
             detail += f" web_error={exc}"

@@ -55,6 +55,26 @@ not a preparation for it.
 
 Steps 1 to 5 (client identity, classification, limits, A2A server, approval) wait for the user's priority.
 
+## Progress (2026-10-31): the short path through the zuno a2a-gateway
+
+Delivered in the fork (operator 0.1.43, live on demo333): a bundle declaring
+`zuno.delegation.targets` is no longer refused when the stack enables delegation (`spec.delegation`, unset on
+`zuno-unifai` today). The operator emits an orchestrator and, per target, an `a2a_agent_node` whose `base_url` is the
+zuno a2a-gateway (`/agents/<target>`, [WP-175](wp-175-a2a-gateway-and-persona-test-blueprints.md)), with
+`auth_method: forward_user_token` and the headers `X-Zuno-Delegated-By: <agent>:<task>`, `X-Zuno-Delegation-Depth: 1`,
+`X-Zuno-Task: <target task>` and `X-Zuno-Run-Id: {session_id}`; a free-form A2A workflow stays refused. Step 1 is
+covered by the fork's A2A node (`forward_user_token`) and step 4 by the zuno gateway instead of a server in the fork; steps 2, 3 and 5
+(classification return, hop counter and cancel, approval across hops) are not delivered.
+
+What the gateway checks on these calls (component tests, no live traffic yet): the user's token and the target's
+entitlement, the chain headers against the signed declarations (depth, cycle, declared target, active agents), and the
+`X-Zuno-Task` and `X-Zuno-Run-Id` the operator sends (the gateway reads the task from the header when the message names
+none, and keeps the run id for tracing only when it is a plain token).
+
+Not proven: a live delegated call carrying a real user token through the operator-emitted workflow. It needs
+`spec.delegation` enabled on `zuno-unifai` through GitOps (the user's approval) and the full operator canary 0.1.44. Until
+then no delegation traffic flows.
+
 ## Added when ADR-0409 and ADR-0406 were accepted (2026-10-24)
 
 - **Per-target delegated writes.** With the approval, replace `delegation.allow_write` by `delegation.write_allowed: [{agent, task}]` in
