@@ -193,7 +193,10 @@ providers:
     maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen36-27b-instruct/v1
     temperature: 0.2
-    timeout_seconds: 60
+    # A cold model pod compiles its GPU kernels on its first request (vLLM
+    # "JIT compilation during inference", 2026-10-31: qwen35-9b ran past 60 s
+    # and fell back). User decision 2026-10-31: 180 s on the MaaS path.
+    timeout_seconds: 180
     eligible_for: [C1, C2, C3]
 
   # ADR-0521: qwen is an LLMInferenceService now (no more <name>-predictor
@@ -258,7 +261,10 @@ providers:
     maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1
     temperature: 0.2
-    timeout_seconds: 60
+    # A cold model pod compiles its GPU kernels on its first request (vLLM
+    # "JIT compilation during inference", 2026-10-31: qwen35-9b ran past 60 s
+    # and fell back). User decision 2026-10-31: 180 s on the MaaS path.
+    timeout_seconds: 180
     eligible_for: [C1, C2, C3]
 
   - name: local-gpt-oss
@@ -310,7 +316,10 @@ providers:
     maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b-wesh/v1
     temperature: 0.2
-    timeout_seconds: 60
+    # A cold model pod compiles its GPU kernels on its first request (vLLM
+    # "JIT compilation during inference", 2026-10-31: qwen35-9b ran past 60 s
+    # and fell back). User decision 2026-10-31: 180 s on the MaaS path.
+    timeout_seconds: 180
     eligible_for: [C1, C2, C3]
 
   - name: local-wesh
@@ -344,7 +353,10 @@ providers:
     maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b/v1
     temperature: 0.2
-    timeout_seconds: 60
+    # A cold model pod compiles its GPU kernels on its first request (vLLM
+    # "JIT compilation during inference", 2026-10-31: qwen35-9b ran past 60 s
+    # and fell back). User decision 2026-10-31: 180 s on the MaaS path.
+    timeout_seconds: 180
     eligible_for: [C1, C2, C3]
 
   - name: local-qwen35
