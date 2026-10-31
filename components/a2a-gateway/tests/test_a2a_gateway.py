@@ -280,6 +280,37 @@ class DelegationTests(GatewayTestCase):
         self.assertEqual(sent["x-zuno-delegated-by"], "alpha:ask")
         self.assertEqual(sent["x-zuno-delegation-depth"], "1")
 
+    async def test_the_headers_the_unifai_operator_emits_are_accepted_and_traced(self) -> None:
+        # Exactly what unifai-operator puts on its A2A node (fork delegation.go): run id, delegator, depth 1, target task.
+        USERS["tok-both"] = auth.CallerIdentity("u-both", ["agent_alpha", "agent_beta"], {}, "tok-both")
+        self.addCleanup(USERS.pop, "tok-both", None)
+        headers = {
+            "X-Zuno-Run-Id": "5b1c0d6e-session-1", "X-Zuno-Delegated-By": "alpha:ask",
+            "X-Zuno-Delegation-Depth": "1", "X-Zuno-Task": "ask",
+        }
+        task = (await self.send("beta", "tok-both", "delegated question", **headers)).root.result
+        self.assertEqual(task.status.state, TaskState.completed)
+        sent = self.down.llm_calls[0]["headers"]
+        self.assertEqual(sent["x-zuno-run-id"], "5b1c0d6e-session-1")
+        self.assertEqual(sent["x-zuno-task"], "ask")
+        self.assertEqual(sent["x-zuno-agent"], "beta")
+
+    async def test_the_task_header_is_held_to_what_the_delegator_declares(self) -> None:
+        USERS["tok-both"] = auth.CallerIdentity("u-both", ["agent_alpha", "agent_beta"], {}, "tok-both")
+        self.addCleanup(USERS.pop, "tok-both", None)
+        headers = {"X-Zuno-Delegated-By": "alpha:ask", "X-Zuno-Delegation-Depth": "1", "X-Zuno-Task": "not-a-task"}
+        task = (await self.send("beta", "tok-both", "x", **headers)).root.result
+        self.assertEqual(task.status.state, TaskState.failed)
+        self.assertEqual(self.down.llm_calls, [])
+
+    async def test_a_run_id_that_is_not_a_plain_token_is_ignored(self) -> None:
+        USERS["tok-both"] = auth.CallerIdentity("u-both", ["agent_alpha", "agent_beta"], {}, "tok-both")
+        self.addCleanup(USERS.pop, "tok-both", None)
+        headers = {"X-Zuno-Run-Id": "bad id with spaces"}
+        task = (await self.send("beta", "tok-both", "x", **headers)).root.result
+        self.assertEqual(task.status.state, TaskState.completed)
+        self.assertNotEqual(self.down.llm_calls[0]["headers"]["x-zuno-run-id"], "bad id with spaces")
+
     async def test_a_chain_beyond_the_declared_limit_is_refused(self) -> None:
         USERS["tok-both"] = auth.CallerIdentity("u-both", ["agent_alpha", "agent_beta"], {}, "tok-both")
         self.addCleanup(USERS.pop, "tok-both", None)

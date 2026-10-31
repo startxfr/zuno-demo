@@ -43,6 +43,7 @@ for agents that declare no target.
 
 ## Note (2026-10-24)
 
-[WP-175](wp-175-a2a-gateway-and-persona-test-blueprints.md)'s A2A gateway does not serve this work package: a persona blueprint is not an agent of the
-release, so its calls carry no delegation chain, whereas a declared Arkos to Tekos delegation needs the chain headers from the platform and
-the operator to accept `zuno.delegation.targets` (WP-173).
+Update (2026-10-31): the operator now emits the delegation through the zuno a2a-gateway ([WP-173](wp-173-unifai-a2a-identity-server-and-approval.md), short path), so
+[WP-175](wp-175-a2a-gateway-and-persona-test-blueprints.md)'s gateway does serve this work package once `spec.delegation` is enabled: it receives the
+chain headers the operator renders, verifies them against the signed declarations and answers as the user. A persona test blueprint still carries no chain
+(it is not an agent of the release). The live proofs above are still to run.

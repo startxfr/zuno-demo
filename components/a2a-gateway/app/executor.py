@@ -9,6 +9,7 @@ headers of ADR-0401/0403/0406 are checked here and passed on unchanged.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
@@ -28,6 +29,14 @@ from app.config import Settings
 logger = logging.getLogger("a2a_gateway.executor")
 
 CHAIN_HEADERS = ("X-Zuno-Delegated-By", "X-Zuno-Delegation-Depth")
+
+
+_RUN_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
+
+
+def _run_id(value: Optional[str]) -> str:
+    """The caller's run id for tracing (a UnifAI session id), only when it is a plain token."""
+    return value if value and _RUN_ID.match(value) else ""
 
 
 class Refused(Exception):
@@ -81,9 +90,12 @@ class ZunoAgentExecutor(AgentExecutor):
             raise Refused("The caller is not authenticated.")
         return caller
 
-    def _task_name(self, context: RequestContext) -> str:
+    def _task_name(self, context: RequestContext, headers: Optional[Dict[str, str]] = None) -> str:
+        # The message names the task; a delegating UnifAI workflow names it in X-Zuno-Task (the operator's
+        # A2A node); else the agent's primary task. The chain check below holds the result to what the
+        # delegator declares.
         metadata = (context.message.metadata if context.message else None) or {}
-        task = str(metadata.get("task") or self._agent.primary_task)
+        task = str(metadata.get("task") or (headers or {}).get("x-zuno-task") or self._agent.primary_task)
         if task not in self._agent.tasks:
             raise Refused(f"Agent '{self._agent.name}' has no task '{task}'.")
         return task
@@ -97,8 +109,8 @@ class ZunoAgentExecutor(AgentExecutor):
         if len(request_text) > self._settings.max_message_chars:
             raise Refused("The message is too long.")
 
-        task = self._task_name(context)
         lowered = {k.lower(): v for k, v in headers.items()}
+        task = self._task_name(context, lowered)
         chain = parse_chain(lowered.get("x-zuno-delegated-by"), lowered.get("x-zuno-delegation-depth"))
         reason = verify_chain(chain, self._agent.name, task, caller.groups, self._store, self._limits)
         if reason:
@@ -108,7 +120,7 @@ class ZunoAgentExecutor(AgentExecutor):
         classification = raise_classification(
             self._agent.classification or "C1", lowered.get("x-zuno-data-classification", "")
         )
-        run_id = context.task_id or ""
+        run_id = _run_id(lowered.get("x-zuno-run-id")) or context.task_id or ""
         common = dict(
             token=caller.token, agent=self._agent.name, task=task,
             classification=classification, run_id=run_id, chain_headers=chain_headers,
