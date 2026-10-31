@@ -61,3 +61,11 @@ the top 10, and 7, 9 and 19 each lose ranks. The score is now a relevance in 0-1
   which are French Confluence questions (0.15 and 0.00015). The model is trained on English MS MARCO.
 
 A threshold between 8e-5 and 1.5e-4 separates the two groups on this set, but with almost no margin.
+
+`ranking-rerank-mmarco-2026-10-31.json`: DBSF, then the multilingual `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`
+(TEI on CPU) reranks 10 candidates. That takes about 3 s per query at 512 tokens per candidate. Results: hit@1
+0.67, hit@5 0.86, MRR 0.75. The French questions recover (19 goes to rank 1, 21 scores 0.048 instead of
+0.00015), but questions 1, 2 and 12 stay out of the top 10. The no-answer questions top out at 0.004, 0.009
+and 0.083. The last of these is above answered question 21 (0.048), so no threshold separates the two groups.
+By the agreed rule (keep a reranker only if it matches or beats DBSF alone, 0.71 / 0.86 / 0.77), the
+reranker is removed. The stack goes back to DBSF alone and has no relevance threshold.
