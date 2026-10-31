@@ -203,11 +203,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:fa2731d5880cda5ea8440c226006f776f11b4146308871c6ae2a96b42715d8bb  # devel-b48dea199
-      identity: quay.io/zuno/unifai-identity@sha256:b25acf2f51a2e34b5de7f8d6e5b3b7a7c7302840a84fc6e6d9ba2f18d59d57d7  # devel-b48dea199
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:cd69bff09b151ce5fe62fe88b38f0170cff5a84d12fa42686df201a0bfa59403  # devel-b48dea199
-      rag: quay.io/zuno/unifai-rag@sha256:e26f8b54dad132b01a88fd692b3b7fcbcc23183344306c149ea5a77ebf79c15e  # devel-b48dea199
-      ui: quay.io/zuno/unifai-ui@sha256:a602d924261a6e1f3ce45ebb3d4decee517038a7f5e92f203c371e966e5bdeee  # devel-b48dea199
+      backend: quay.io/zuno/unifai-backend@sha256:2fe9438f2cea5bec6a0012a7c53c0623f6cc8b78632d927d6ba42836188666a4  # devel-b144878c6
+      identity: quay.io/zuno/unifai-identity@sha256:00541f4aad22ba630cc1355f375b3a12e6a44512ff4f954ae9d02d0a1c7a2c7e  # devel-b144878c6
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:dee711b68431723e1f0b9d435140f994d5740010065a0c4ab684ea0c42d71a1a  # devel-b144878c6
+      rag: quay.io/zuno/unifai-rag@sha256:7ba9fb42255fc319b463f03802aea1bf7dc0dd9997582ee6d833a4327d2e217e  # devel-b144878c6
+      ui: quay.io/zuno/unifai-ui@sha256:0536e29fd32a5a035a57114876ae1ac588ddb016f546f70e1cab7622a889e687  # devel-b144878c6
     backup:
       # The CronJobs and restore Jobs (ADR-0586 clause 7): pinned by digest, unsigned,
       # the manifest list of the tag that ran (aws-cli 2.22.35, mongo 7.0.16).
