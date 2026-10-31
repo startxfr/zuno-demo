@@ -36,3 +36,10 @@ fusion the default, on the same chunks: hit@1 0.71, hit@5 0.86, MRR 0.77. Still 
 (namespace definition), 2 and 12. Scores now range 0-2 (sum of normalised dense and sparse scores),
 but the no-answer questions (0.95-1.65) overlap the answered ones (1.02-2.30 at rank 1): no
 threshold separates them yet.
+
+`ranking-prefix-2026-10-31.json`: DBSF plus the query instruction for qwen3-embedding
+(`EMBEDDING_QUERY_PREFIX`, operator 0.1.47, same chunks): hit@1 0.67, hit@5 0.71, MRR 0.68, i.e.
+WORSE than DBSF alone. Questions 3, 9 and 11 drop out of the top 10, and 19 goes from 2 to 3. The
+prefix only changes the dense query embedding (the sparse side is untouched), so the dense side
+alone got worse with it. The live prefix ends with "Query: " (trailing space), where the model card
+has "Query:".
