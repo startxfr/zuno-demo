@@ -51,3 +51,7 @@ chain headers the operator renders, verifies them against the signed declaration
 ## Progress (2026-10-31): chart ready, nothing enabled
 
 The `unifai` chart renders `delegation` per bundle (`okf.bundles[].delegation`, with `ceilings.delegationTargets` already passed through) only when set; no bundle sets it today, so the rendered objects are unchanged. Enabling it for Tekos -> Arkos stays a separate GitOps change that needs the user's approval, operator 0.1.44 and its canary.
+
+## Progress (2026-10-31): operators rolled
+
+Operators 0.1.42, 0.1.43, 0.1.44, 0.1.45 and 0.1.47 are live on demo333 (catalog pins by digest, each verified with its release identity and the admission preflight; 0.1.46 was never released). The delegation fields on `zuno-unifai` came from a separate commit and are applied. The application images move once, with the query prefix, as described in [operations](../../platform/operations.md#rolling-a-unifai-release-and-taking-over-a-roll-wp-176-wp-178).

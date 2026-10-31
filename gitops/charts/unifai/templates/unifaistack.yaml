@@ -97,6 +97,10 @@ spec:
       url: {{ $s.rag.embeddingUrl }}
       model: {{ $s.rag.embeddingModel }}
       dimension: {{ $s.rag.embeddingDimension }}
+      {{- with $s.rag.embeddingQueryPrefix }}
+      # Put before every search query, never before documents (unifai-operator >= 0.1.45); no re-index.
+      queryPrefix: {{ . | toJson }}
+      {{- end }}
     hybrid: {{ $s.rag.hybrid }}
     {{- if $s.rag.tokenReview }}
     # The RAG search accepts OpenShift console tokens (Lightspeed users) after a Kubernetes TokenReview.
