@@ -233,8 +233,10 @@ zuno_unifai_values:
         limits: {cpu: '4', memory: 4Gi}
     rag:
       tokenReview: true
-      # Layer 4c (user go 2026-10-31): TEI on CPU in the stack namespace; candidates reranked per query.
-      reranker: {mode: deploy, model: BAAI/bge-reranker-base, candidates: 30}
+      # Layer 4c reranker OFF (2026-10-31): bge-reranker-base on CPU costs ~0.9 s per candidate, so 30 candidates exceed
+      # the rag-server's 10 s timeout on every query (+10 s each, results in the fused order). To retry: a smaller model
+      # or fewer/shorter candidates, e.g. reranker: {mode: deploy, model: <smaller>, candidates: 5}; the image and
+      # resources keys below stay, unused while rag.reranker is unset.
     ragClients:
     - namespace: zuno-ai-run
       podLabels:
