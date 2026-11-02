@@ -54,7 +54,7 @@ def test_probe_failures_are_reported_in_the_body():
 
 
 def test_verify_prefers_the_routing_metadata_without_polling(monkeypatch):
-    monkeypatch.setattr(verify, "_query_provider_counts", lambda agent: (_ for _ in ()).throw(RuntimeError("no prom")))
+    monkeypatch.setattr(verify, "_query_provider_counts", lambda agent, successes_only=True: (_ for _ in ()).throw(RuntimeError("no prom")))
     monkeypatch.setattr(verify, "_run_probe", lambda a, p, m: {"ok": True, "routing": ROUTING, "session_id": "s"})
     r = verify.verify_one_agent("comage", "sale-01", "q", "failover")
     assert r["ok"] and r["provider"] == "local-qwen35" and r["source"] == "routing-metadata"
@@ -62,7 +62,7 @@ def test_verify_prefers_the_routing_metadata_without_polling(monkeypatch):
 
 def test_verify_falls_back_to_the_counter_delta(monkeypatch):
     counts = iter([{"local-wesh": 3.0}, {"local-wesh": 3.0, "local-qwen35": 1.0}])
-    monkeypatch.setattr(verify, "_query_provider_counts", lambda agent: next(counts))
+    monkeypatch.setattr(verify, "_query_provider_counts", lambda agent, successes_only=True: next(counts))
     monkeypatch.setattr(verify, "_run_probe", lambda a, p, m: {"ok": True, "routing": None})
     monkeypatch.setattr(verify.time, "sleep", lambda s: None)
     r = verify.verify_one_agent("comage", "sale-01", "q", "failover")
@@ -70,7 +70,7 @@ def test_verify_falls_back_to_the_counter_delta(monkeypatch):
 
 
 def test_verify_without_routing_or_prometheus_fails_loudly(monkeypatch):
-    monkeypatch.setattr(verify, "_query_provider_counts", lambda agent: (_ for _ in ()).throw(RuntimeError("no prom")))
+    monkeypatch.setattr(verify, "_query_provider_counts", lambda agent, successes_only=True: (_ for _ in ()).throw(RuntimeError("no prom")))
     monkeypatch.setattr(verify, "_run_probe", lambda a, p, m: {"ok": True, "routing": None})
     r = verify.verify_one_agent("tekos", "consultant-01", "q", "baseline")
     assert not r["ok"] and r["provider"] is None and "Prometheus" in r["detail"]
