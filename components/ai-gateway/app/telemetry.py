@@ -458,6 +458,13 @@ def model_call_span(
         if project_id:
             span.set_attribute("zuno.project_id", project_id)
         recorder = ModelCallRecorder(provider=provider)
+        # Set before the try: a client that drops a stream cancels the task
+        # (asyncio.CancelledError, a BaseException the `except Exception`
+        # below never sees). The `finally` then read an unbound `outcome`,
+        # and the UnboundLocalError it raised replaced the cancellation - the
+        # streaming loop counted it as a provider failure (demo333,
+        # 2026-11-02, `openai` after an Open WebUI disconnect).
+        outcome = "cancelled"
         try:
             yield recorder
             outcome = "success"

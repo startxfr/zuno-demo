@@ -154,7 +154,24 @@ def test_a_malformed_traceparent_is_ignored() -> None:
     assert _span_via_http({"traceparent": "00-not-a-trace-id-01"}).parent is None
 
 
+
+def test_a_cancelled_call_keeps_its_cancellation() -> None:
+    """A client that drops a stream cancels the task: model_call_span must let
+    the CancelledError through with outcome "cancelled", not replace it with
+    an UnboundLocalError (demo333, 2026-11-02)."""
+    def _run():
+        try:
+            with telemetry.model_call_span("openai", "gpt-4o-mini", "C1"):
+                raise asyncio.CancelledError()
+        except asyncio.CancelledError:
+            return
+        raise AssertionError("the CancelledError did not propagate")
+
+    span = _recorded_span(_run)
+    assert span.attributes.get("zuno.outcome") == "cancelled"
+
 TESTS = [
+    test_a_cancelled_call_keeps_its_cancellation,
     test_model_call_span_joins_the_callers_trace,
     test_streaming_path_joins_the_callers_trace,
     test_without_traceparent_the_span_is_its_own_root,
