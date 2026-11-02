@@ -15,7 +15,7 @@ import time
 import uuid
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ChatMessage(BaseModel):
@@ -37,6 +37,36 @@ class ChatMessage(BaseModel):
     # Present only on a role="tool" message (the tool's result being fed
     # back for a follow-up turn) - which tool_calls[].id this answers.
     tool_call_id: Optional[str] = None
+
+    # ADR-0587 (experience clients): two current OpenAI wire shapes that
+    # OpenClaw sends (and Open WebUI may), both refused with a 422 until
+    # 2026-11-02. Normalised here, before anything reads a message, so every
+    # consumer downstream (LangChain conversion, guardrails prompt, cache
+    # key, prompt-size estimate) keeps seeing a plain string and one of the
+    # four roles.
+    @field_validator("role", mode="before")
+    @classmethod
+    def _developer_is_system(cls, value: Any) -> Any:
+        """OpenAI's `developer` role replaces `system` for newer models."""
+        return "system" if value == "developer" else value
+
+    @field_validator("content", mode="before")
+    @classmethod
+    def _join_text_parts(cls, value: Any) -> Any:
+        """`content` as a list of parts: the text parts are joined with a
+        newline. Any other part (image, audio, file) is refused by name -
+        this gateway routes text models and its guardrails read text only,
+        so silently dropping a part would answer a question nobody asked."""
+        if not isinstance(value, list):
+            return value
+        texts = []
+        for part in value:
+            kind = part.get("type") if isinstance(part, dict) else type(part).__name__
+            if kind == "text" and isinstance(part.get("text"), str):
+                texts.append(part["text"])
+            else:
+                raise ValueError(f"content part of type {kind!r} is not supported; only text parts are")
+        return "\n".join(texts)
 
 
 class ChatCompletionRequest(BaseModel):
