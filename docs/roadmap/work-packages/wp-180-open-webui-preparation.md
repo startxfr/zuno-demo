@@ -1,6 +1,6 @@
 # WP-180: Open WebUI preparation
 
-- **State:** Not started
+- **State:** Done (2026-11-02: no relay needed, the upstream image runs under `restricted-v2`, values for WP-181 fixed; see [the evidence](../evidence/wp-180-open-webui-spike.md))
 - **ADRs:** [ADR-0588](../../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md) (its interfaces only; this spike can start once they are written)
 - **Related:** [WP-181](wp-181-install-open-webui-on-demo333.md), [WP-182](wp-182-openclaw-preparation.md)
