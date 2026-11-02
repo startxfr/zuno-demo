@@ -329,6 +329,15 @@
                     "ADR-0418/WP-103 AAP launch-RBAC: maps team to aap-reader-team (view-only on gated Phase 3/4 Templates and zuno-demo Project). NOT reconciled by ADR-0530 - see wp-103-aap-launch-rbac.md."
                 ]
             }
+        },
+        {
+            "name": "openwebui_admin",
+            "path": "/openwebui_admin",
+            "attributes": {
+                "description": [
+                    "ADR-0588/WP-181: Open WebUI admin role (OAUTH_ADMIN_ROLES=/openwebui_admin). NOT reconciled by ADR-0530 (create-only): the open_webui role creates it and its members live."
+                ]
+            }
         }
     ],
     "users": [
@@ -686,7 +695,8 @@
             },
             "groups": [
                 "/ocp-ai-ops",
-                "/agent_tekos"
+                "/agent_tekos",
+                "/openwebui_admin"
             ],
             "credentials": [
                 {
@@ -736,7 +746,8 @@
             "groups": [
                 "/ocp-paas-ops",
                 "/agent_tekos",
-                "/aap_admin"
+                "/aap_admin",
+                "/openwebui_admin"
             ],
             "credentials": [
                 {
@@ -1081,6 +1092,69 @@
             ],
             "attributes": {
                 "post.logout.redirect.uris": "https://unifai-ui-zuno-unifai.apps.mycluster.example.com/*"
+            }
+        }, {
+            "clientId": "open-webui",
+            "name": "Open WebUI general-purpose chat",
+            "description": "Confidential client of Open WebUI (ADR-0588): sign-in for the chat UI; Open WebUI forwards the user's access token to the ai-gateway and mcp-gateway (system_oauth)",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "${vault.open_webui_client_secret}",
+            "redirectUris": [
+                "https://open-webui.apps.mycluster.example.com/oauth/oidc/callback"
+            ],
+            "webOrigins": [
+                "https://open-webui.apps.mycluster.example.com"
+            ],
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": false,
+            "protocolMappers": [
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
+                    }
+                },
+                {
+                    "name": "audience-self",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "open-webui",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                },
+                {
+                    "name": "maas-gateway-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-admin-api",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                }
+            ],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ],
+            "attributes": {
+                "post.logout.redirect.uris": "https://open-webui.apps.mycluster.example.com/*"
             }
         }, {
             "clientId": "openshift",
