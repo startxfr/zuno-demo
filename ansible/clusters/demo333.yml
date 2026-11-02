@@ -218,7 +218,7 @@ zuno_unifai_values:
       identity: quay.io/zuno/unifai-identity@sha256:4a68541949850543d9e8fc85ec96d34ba6e7889b501190e64fe9a1752a9dd741  # devel-be4821358
       multiagent: quay.io/zuno/unifai-multiagent@sha256:39b3843a32a342cd3e35c6160553b44817df87e3cd99a14836b6730be5127253  # devel-d5d4f936c (tool errors logged, tool-result context fix)
       rag: quay.io/zuno/unifai-rag@sha256:24a509279b56937b9c38a78efa257fecc9378dc2a3ff3e5949ba97dd0bdb793d  # devel-be4821358
-      ui: quay.io/zuno/unifai-ui@sha256:7341541e6fae972f1dc1ddb2dfca2a3970cc1d6d5a6b9d74bd543f9b7c0d21b8  # devel-742d4cdac (mermaid diagrams)
+      ui: quay.io/zuno/unifai-ui@sha256:64891466197c48d118945876edebba4e56d804bb917136bf4197b1febfbe395a  # devel-c33f19799 (mermaid error graphic fix)
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
