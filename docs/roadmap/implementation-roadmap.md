@@ -992,7 +992,7 @@ the old stack. The comparison found three behaviours that the retirement dropped
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Repo work merged | on zuno-demo-agents devel (98a0cb9); ships in agents release 0.9.0, then admission by 59; then the user's call on restoring the 310,000-document record |
+| WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Repo work merged | steps 1 to 3 done and live (agents v0.9.0, no live bundle declares the domain); the live comage question waits for the GPU nodes; ADR notes, then the user's call on restoring the 310,000-document record |
 | WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Repo work merged | records corrected and ten French questions added; the French run (and the 0.7 decision) waits on the embedding model |
 | WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | operator pending | steps 1 and 2 done and proved (the label is not the leak; five Confluence-reading tasks are local only since agents v0.8.1); next: the source classification field (operator 0.1.50 plus a rag image), waiting for the user's go |
 

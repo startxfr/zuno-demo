@@ -1,6 +1,6 @@
 # WP-185: Retire the undeclared sxa-legacy domain, then decide whether to restore it
 
-- **State:** Repo work merged (steps 2 and 3 are on zuno-demo-agents devel, `98a0cb9`, 2026-11-02, and ride in agents release 0.9.0; the release, its admission, and steps 1, 4, 5 and the gate remain)
+- **State:** Repo work merged (steps 1 to 3 done 2026-11-02: the cleanup is on zuno-demo-agents devel and live in release v0.9.0, see [evidence](../evidence/wp-185-live-bundles.md); the live question to comage waits for the GPU nodes; steps 4 to 6 remain)
 - **ADRs:** [ADR-0219](../../adr/0219-serve-sxa-only-as-a-historical-rag-corpus.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)
 - **Depends on:** none
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)
@@ -39,7 +39,7 @@ reversed by a chosen, costed route or recorded as a decision.
 
 ## Steps
 
-1. **Live exposure.** List every bundle, task and ceiling that names the domain. On demo333, ask one real question per affected agent
+1. **Live exposure** (done for the bundles on 2026-11-02, [evidence](../evidence/wp-185-live-bundles.md); the question to comage waits for the GPU nodes). List every bundle, task and ceiling that names the domain. On demo333, ask one real question per affected agent
    (as a persona holding the group) and record what comes back.
 2. **Remove the declarations** in `zuno-demo-agents`: the four agent bundles and seven tasks. Release and promote through the usual chain
    (the user merges the pull request, then the release workflows and `make d3 admit agents`, run by the session that owns admissions).
