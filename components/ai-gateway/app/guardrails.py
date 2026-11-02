@@ -53,6 +53,16 @@ GUARDRAILS_TIMEOUT_SECONDS = float(os.getenv("GUARDRAILS_TIMEOUT_SECONDS", "10")
 GUARDRAILS_BACKEND = os.getenv("GUARDRAILS_BACKEND", "builtin").strip().lower()
 GUARDRAILS_NEMO_URL = os.getenv("GUARDRAILS_NEMO_URL", "")
 GUARDRAILS_CONFIG_ID = os.getenv("GUARDRAILS_CONFIG_ID", "zuno-observe")
+# ADR-0591 decision 8: NeMo loads its rails configuration on the first request
+# a new pod serves (about 17 s on demo333, 2026-11-02), above the per-request
+# timeout. The warm-up evaluation runs with this longer timeout, off the request
+# path, at start and after each "unavailable".
+GUARDRAILS_WARMUP_TIMEOUT_SECONDS = float(os.getenv("GUARDRAILS_WARMUP_TIMEOUT_SECONDS", "60"))
+# A warm-up at the gateway's own start does not cover a NeMo pod restarted
+# while the gateway runs: its first evaluation would hit the cold load again.
+# So the warm-up repeats on this interval (pattern-only rails, no LLM call, no
+# metric); a restarted NeMo is warm again within one interval. 0 = start only.
+GUARDRAILS_WARMUP_INTERVAL_SECONDS = float(os.getenv("GUARDRAILS_WARMUP_INTERVAL_SECONDS", "60"))
 
 MODES = ("off", "observe", "block")
 DEFAULT_MODE = "observe"
@@ -193,7 +203,7 @@ async def _detect_builtin(contents: List[str]) -> List[Dict[str, Any]]:
     ]
 
 
-async def _detect_nemo(contents: List[str]) -> List[Dict[str, Any]]:
+async def _detect_nemo(contents: List[str], timeout: Optional[float] = None) -> List[Dict[str, Any]]:
     """One request per content against the NemoGuardrails server.
 
     The rails are pattern-only (no `models:` block) so this costs no LLM
@@ -203,7 +213,7 @@ async def _detect_nemo(contents: List[str]) -> List[Dict[str, Any]]:
     rejected), and `model` is required by the schema though no rail uses it.
     """
     detections: List[Dict[str, Any]] = []
-    async with httpx.AsyncClient(timeout=GUARDRAILS_TIMEOUT_SECONDS) as client:
+    async with httpx.AsyncClient(timeout=timeout or GUARDRAILS_TIMEOUT_SECONDS) as client:
         for index, content in enumerate(contents):
             resp = await client.post(
                 f"{GUARDRAILS_NEMO_URL}/v1/chat/completions",
@@ -267,15 +277,67 @@ async def evaluate(
         try:
             detections = await backend(contents)
         except Exception as exc:  # noqa: BLE001 - a detector outage never breaks a request
+            # The type, not only str(exc): an httpx timeout has an empty
+            # message, which is how the cold start of 2026-11-02 logged nothing.
             logger.warning(
                 "guardrails evaluation unavailable (response unaffected): "
-                "backend=%s mode=%s agent=%s run_id=%s: %s",
-                GUARDRAILS_BACKEND, mode, agent, run_id, exc,
+                "backend=%s mode=%s agent=%s run_id=%s: %s: %s",
+                GUARDRAILS_BACKEND, mode, agent, run_id, type(exc).__name__, exc,
             )
             record_guardrails_evaluation(agent, "unavailable")
+            schedule_warm_up()
             return None
         _report(detections, contents, agent=agent, run_id=run_id, mode=mode)
         return detections
+
+
+_warm_up_task: Optional["asyncio.Task"] = None
+
+
+_warm: Optional[bool] = None  # last warm-up outcome (None: never tried), so only changes are logged
+
+
+async def warm_up() -> bool:
+    """ADR-0591 decision 8: one evaluation with the longer timeout, so NeMo
+    loads its rails before a user's request needs them. Records no metric and
+    no span (it is not an evaluation of anyone's content); never raises.
+    Logs only when the outcome changes, so the keepalive stays quiet."""
+    global _warm
+    if GUARDRAILS_BACKEND != "nemo" or not GUARDRAILS_NEMO_URL:
+        return False
+    try:
+        await _detect_nemo(["warm-up"], timeout=GUARDRAILS_WARMUP_TIMEOUT_SECONDS)
+    except Exception as exc:  # noqa: BLE001
+        if _warm is not False:  # first failure after a success, or the first attempt
+            logger.warning("guardrails warm-up failed: %s: %s", type(exc).__name__, exc)
+        _warm = False
+        return False
+    if not _warm:
+        logger.info("guardrails warm-up done (config_id=%s)", GUARDRAILS_CONFIG_ID)
+    _warm = True
+    return True
+
+
+async def keep_warm() -> None:
+    """Background loop: warm up now, then every GUARDRAILS_WARMUP_INTERVAL_SECONDS."""
+    while True:
+        await warm_up()
+        if GUARDRAILS_WARMUP_INTERVAL_SECONDS <= 0:
+            return
+        await asyncio.sleep(GUARDRAILS_WARMUP_INTERVAL_SECONDS)
+
+
+def schedule_warm_up() -> None:
+    """Start a warm-up in the background unless one is already running."""
+    global _warm_up_task
+    if GUARDRAILS_BACKEND != "nemo" or not GUARDRAILS_NEMO_URL:
+        return
+    if _warm_up_task is not None and not _warm_up_task.done():
+        return
+    try:
+        _warm_up_task = asyncio.get_running_loop().create_task(warm_up())
+    except RuntimeError:  # no running loop (sync tests)
+        _warm_up_task = None
 
 
 def _report(

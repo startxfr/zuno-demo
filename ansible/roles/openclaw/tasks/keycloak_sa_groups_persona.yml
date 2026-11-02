@@ -1,0 +1,57 @@
+---
+- name: "openclaw | set the admin API facts ({{ _openclaw_persona.name }})"
+  ansible.builtin.set_fact:
+    _kc_api: "https://keycloak.{{ cluster_base_domain }}/admin/realms/{{ _openclaw.keycloak.realm }}"
+    _kc_headers:
+      Authorization: "Bearer {{ _openclaw_kc_token.json.access_token }}"
+  no_log: true
+
+- name: "openclaw | find client openclaw-{{ _openclaw_persona.name }}"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/clients?clientId=openclaw-{{ _openclaw_persona.name }}"
+    headers: "{{ _kc_headers }}"
+    validate_certs: false
+  register: _kc_client
+  no_log: true
+
+- name: "openclaw | fail when the client is not in the live realm yet"
+  ansible.builtin.fail:
+    msg: >-
+      Keycloak client openclaw-{{ _openclaw_persona.name }} does not exist in realm
+      {{ _openclaw.keycloak.realm }}: sync zuno-keycloak-d1 (its client reconcile Job
+      creates it from realm-zuno.json), or run `make d0 install keycloak`.
+  when: _kc_client.json | length == 0
+
+- name: "openclaw | read the service-account user and the persona ({{ _openclaw_persona.name }})"
+  ansible.builtin.uri:
+    url: "{{ item }}"
+    headers: "{{ _kc_headers }}"
+    validate_certs: false
+  loop:
+    - "{{ _kc_api }}/clients/{{ _kc_client.json[0].id }}/service-account-user"
+    - "{{ _kc_api }}/users?username={{ _openclaw_persona.name }}&exact=true"
+  register: _kc_users
+  no_log: true
+
+- name: "openclaw | read both group memberships ({{ _openclaw_persona.name }})"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/users/{{ item }}/groups?max=500"
+    headers: "{{ _kc_headers }}"
+    validate_certs: false
+  loop:
+    - "{{ _kc_users.results[0].json.id }}"
+    - "{{ _kc_users.results[1].json[0].id }}"
+  register: _kc_groups
+  no_log: true
+
+- name: "openclaw | add the missing groups to service-account-openclaw-{{ _openclaw_persona.name }}"
+  ansible.builtin.uri:
+    url: "{{ _kc_api }}/users/{{ _kc_users.results[0].json.id }}/groups/{{ item.id }}"
+    method: PUT
+    headers: "{{ _kc_headers }}"
+    status_code: [204]
+    validate_certs: false
+  loop: "{{ _kc_groups.results[1].json | rejectattr('id', 'in', _kc_groups.results[0].json | map(attribute='id') | list) | list }}"
+  loop_control:
+    label: "{{ item.path }}"
+  changed_when: true

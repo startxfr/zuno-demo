@@ -1,0 +1,41 @@
+# ADR-0588 security considerations: the user's token leaves Open WebUI for two
+# in-cluster services only, and egress is limited to them and to Keycloak.
+# In the cluster: DNS and the two gateways. Outside it: HTTPS, narrowed to
+# Keycloak's DNS name by the EgressFirewall (templates/egressfirewall.yaml);
+# NetworkPolicies cannot name a DNS name. Model weights are not downloaded
+# (OFFLINE_MODE).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: open-webui-egress
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.egress.gatewayNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.egress.gatewayPort }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml .Values.egress.clusterCIDRs | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 443

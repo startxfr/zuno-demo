@@ -533,6 +533,129 @@ spec:
               ]
             }
           ]
+        },
+        {
+          "id": 1014,
+          "type": "row",
+          "title": "By experience client",
+          "collapsed": true,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 27
+          },
+          "panels": [
+            {
+              "id": 12,
+              "title": "Model calls (by client, over range)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 0
+              },
+              "description": "ADR-0587 (WP-179): `client` is the token's azp (unifai, open-webui, openclaw-<persona>; other for an undeclared client, empty before the ai-gateway image carries the label). One point per group, like the user panels: a multi-group user counts once per group.",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (client) (increase(zuno_model_calls_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
+                  "legendFormat": "{{`{{client}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 13,
+              "title": "Tokens consumed (by client/kind, over range)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 0
+              },
+              "description": "ADR-0587 (WP-179): `client` is the token's azp (unifai, open-webui, openclaw-<persona>; other for an undeclared client, empty before the ai-gateway image carries the label). One point per group, like the user panels: a multi-group user counts once per group.",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (client, kind) (increase(zuno_model_tokens_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
+                  "legendFormat": "{{`{{client}}`}} ({{`{{kind}}`}})"
+                }
+              ]
+            },
+            {
+              "id": 14,
+              "title": "Estimated cost (by client, over range)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 0,
+                "y": 8
+              },
+              "description": "ADR-0587 (WP-179): `client` is the token's azp (unifai, open-webui, openclaw-<persona>; other for an undeclared client, empty before the ai-gateway image carries the label). One point per group, like the user panels: a multi-group user counts once per group.",
+              "fieldConfig": {
+                "defaults": {
+                  "unit": "currencyUSD"
+                }
+              },
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (client) (increase(zuno_model_cost_usd_total{user=~\"$user\", model=~\"$model\", provider=~\"$provider\"}[$__range]))",
+                  "legendFormat": "{{`{{client}}`}}"
+                }
+              ]
+            },
+            {
+              "id": 15,
+              "title": "Guardrails evaluations (by client/outcome, over range)",
+              "type": "timeseries",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "gridPos": {
+                "h": 8,
+                "w": 12,
+                "x": 12,
+                "y": 8
+              },
+              "description": "ADR-0587 (WP-179): `client` is the token's azp (unifai, open-webui, openclaw-<persona>; other for an undeclared client, empty before the ai-gateway image carries the label). One point per group, like the user panels: a multi-group user counts once per group.",
+              "targets": [
+                {
+                  "datasource": {
+                    "type": "prometheus",
+                    "uid": "prometheus"
+                  },
+                  "expr": "sum by (client, outcome) (increase(zuno_guardrails_evaluations_total[$__range]))",
+                  "legendFormat": "{{`{{client}}`}} ({{`{{outcome}}`}})"
+                }
+              ]
+            }
+          ]
         }
       ]
     }

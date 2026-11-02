@@ -229,6 +229,15 @@ Beyond the Standard clauses:
 See [Standard clauses](README.md#standard-clauses) for Alternatives considered,
 Migration/evolution and Review evidence.
 
+## Update 2026-11-02: what the Tekos control proves now
+
+The "decoupling control" of Decision 3 assumed Tekos's chat task routes off-cluster to `ovhcloud-gpt-oss-120b` in every phase. That stopped being true
+with tekos 0.4.3 (local model first), and since the agents release v0.8.1 (zuno-demo WP-187) the task is local only at every level, because it reads Confluence.
+The control in `evaluations/scenario_failover_verify.py` now asserts the opposite guarantee: Tekos is **never served by an external provider**. At baseline
+and after the restore it must be answered by a local provider (`answered-local`); during the failover it may also be refused cleanly (`refused`: the
+ai-gateway answers 503 "no eligible provider" while no local model is ready, and no external attempt appears in `zuno_model_calls_total` for the agent). An external
+provider, or an outcome that cannot be established, fails it. Comage's fallback check is unchanged.
+
 ## Related ADRs
 
 - [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) - names the untested fallback gap this ADR closes

@@ -22,9 +22,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 
 | Version | ADRs | Open ADRs | WPs | Open WPs |
 |---|---|---|---|---|
-| v0 | 72 | — | 7 | — |
-| v0.1 | 29 | — | 18 | — |
-| v0.2 | 14 | — | 17 | WP-098 |
+| v0 | 72 | — | 8 | WP-187 |
+| v0.1 | 29 | 1 | 19 | WP-186 |
+| v0.2 | 14 | — | 19 | WP-098, WP-186 |
 | v0.3 | 15 | — | 19 | — |
 | v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
 | v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
@@ -33,8 +33,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 18 | 23 | WP-166, WP-171, WP-172, WP-173, WP-174 |
+| v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-186, WP-187 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
+| v0.13 | 6 | 2 | 8 | WP-184, WP-188 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -957,11 +958,43 @@ frozen mirror.
 | WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Repo work merged | merged on zuno-demo-agents devel (PR #9); a release and its promotion into agents.lock are the maintainer's |
 | WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Repo work merged | live once the release carrying the delegation fields and tool `access` is promoted |
 | WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | step 6 (the operator refuses A2A and delegation targets) is live in operator 0.1.35; steps 1 to 5 wait for the user's priority |
-| WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Not started | demo333 is powered off - live steps wait for the user to power it on |
+| WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | operator pending | wiring live (agents v0.8.0, operator 0.1.49); behavioural proof waits for the GPU models |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Done (2026-10-25) | zuno-side A2A gateway live on demo333, 32 test blueprints (26 valid, 6 wait for placeholder agents), real delegated turns and the denial check proven |
 | WP-176 | [wp-176](work-packages/wp-176-verify-the-unifai-runtime-images-before-deploying-them.md) | 0586, 0353, 0574 | none | Done (2026-10-25) | live on demo333: the five application images (CI-signed, digest-pinned, verified before applying, drift checked), the third-party services and backup Jobs (pinned, unsigned), the operator 0.1.40 with its bundle and catalog (release identity, catalog pinned), the release path rehearsed with a `v0.0.0-rc1` tag; cluster-side admission is WP-178 |
 | WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Done (2026-10-25) | works with the Kuadrant two-limit ceiling: counters probe and Redis-backed quota ledger live on demo333 (budgets survive an ai-gateway restart); removing quota.py deferred until Kuadrant is fixed |
 | WP-178 | [wp-178](work-packages/wp-178-admit-only-signed-unifai-images-at-the-cluster.md) | 0586 | WP-176 | Done (2026-10-25) | cluster-side admission of the UnifAI images with the Sigstore `policy-controller`, in `enforce` on demo333 (`zuno-unifai-images`, namespaces `zuno-unifai` and `unifai-operator`; third-party services stay `warn`); offline public-Sigstore TrustRoot, pin preflight, runbook in `docs/platform/operations.md`; limits recorded (fail-open webhook, ECDSA-only log keys, no attestation check at admission) |
+
+### Phase 46 — three user experiences over one governed backend (added 2026-11-02)
+
+Opened by a user request to add OpenClaw and Open WebUI next to UnifAI, on the
+same MaaS backend and RHOAI tooling. ADR-0587 admits experience clients that
+own no model access, policy or knowledge; ADR-0588 (Open WebUI) and ADR-0589
+(OpenClaw via claw-operator) are two **independent tracks** run by two
+sessions in parallel after the shared WP-179, under its coordination protocol;
+WP-184 closes them together.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-179 | [wp-179](work-packages/wp-179-common-preparation-for-experience-clients.md) | 0587 | none | Done (2026-11-02) | shared groundwork, one session, before both tracks: client label, label-based ingress, namespaces, Make/AAP stubs, Keycloak client pattern, coordination protocol |
+| WP-180 | [wp-180](work-packages/wp-180-open-webui-preparation.md) | 0588, 0587 | WP-179 | Done | track Open WebUI: spike (user-token forwarding, MCP headers, SCC, lockdown switches, pins) |
+| WP-181 | [wp-181](work-packages/wp-181-install-open-webui-on-demo333.md) | 0588, 0587 | WP-179, WP-180 | Done | track Open WebUI: chart, role, Keycloak client, install on demo333 (user's go) |
+| WP-182 | [wp-182](work-packages/wp-182-openclaw-preparation.md) | 0589, 0587 | WP-179 | Done | track OpenClaw: spike on claw-operator (custom provider, refreshable credential, egress, lockdown), operator or openclaw-kube fallback |
+| WP-183 | [wp-183](work-packages/wp-183-install-openclaw-on-demo333.md) | 0590, 0589, 0587 | WP-179, WP-182 | Done | track OpenClaw: catalog pin, one Claw per persona, oauth2-proxy, install on demo333 (user's go) |
+| WP-184 | [wp-184](work-packages/wp-184-three-experiences-demonstration.md) | 0587, 0588, 0589 | WP-181, WP-183 | Repo work in review | joint close: dashboard, demo script, shared-quota proof across the three experiences |
+| WP-188 | [wp-188](work-packages/wp-188-route-only-to-ready-local-models.md) | 0591 | WP-179 | Operator pending | ai-gateway: skip local models their controller reports not ready, per-provider circuit breaker, no SDK retries, immediate 503 when nothing is left, NeMo warm-up; build and roll after the user's go |
+| WP-189 | [wp-189](work-packages/wp-189-experience-clients-in-the-agents-release.md) | 0592 | WP-181 | Done | experience clients (Open WebUI, OpenClaw) declared in their own layer of the agents release, read by the mcp-gateway only, C1 read-only tools; release, promotion and roll by the user |
+
+### Phase 47 — gaps left by the retirement of the old RAG stack (added 2026-11-02)
+
+Opened by a comparison of an archive of leftover files (`zuno-demo-untracked-archive-20261102.tar.gz`) with `origin/devel`.
+The archive held nothing unpublished: its source files are byte-identical to the last commit before WP-156 and WP-168 removed
+the old stack. The comparison found three behaviours that the retirement dropped without a recorded decision, one work package each.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Done (2026-11-02) | cleanup live in agents v0.9.0, ADR-0219 Deprecated, domain left dropped by decision; leftovers: descriptor removal with the next agents release, live comage question when the GPU nodes return |
+| WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Repo work merged | records corrected and ten French questions added; the French run (and the 0.7 decision) waits on the embedding model |
+| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | operator pending | steps 1 and 2 done and proved (the label is not the leak; five Confluence-reading tasks are local only since agents v0.8.1); next: the source classification field (operator 0.1.50 plus a rag image), waiting for the user's go |
 
 ### OKF stream phases
 
@@ -1106,6 +1139,20 @@ moving.
 10. **Autonomy sign-off** after one observed cycle (WP-42).
 
 ## Change log
+
+- 2026-11-02 — ADR-0588 and ADR-0592 Implemented (WP-181 and WP-189 Done, proven live on
+  demo333); v0.13 open ADRs: ADR-0587 (closes with WP-184) and ADR-0591 (WP-188).
+- 2026-11-02 — ADR-0592 and WP-189 added to phase 46: the experience clients
+  get their tools from a declaration of their own in the agents release, so
+  they never become UnifAI bundles, Keycloak groups or delegation targets.
+- 2026-11-02 — ADR-0591 and WP-188 added to phase 46: with the GPU nodes
+  down, every `*-maas` candidate waited 180 s on its llm-d scheduler, so the
+  experience clients timed out before any SaaS provider; routing now skips
+  models that are not ready, behind a circuit breaker.
+
+- 2026-11-02 — Phase 46 added: three user experiences over one governed
+  backend, ADR-0587 – ADR-0589 (new v0.13 band) and WP-179 – WP-184; two
+  parallel tracks (Open WebUI, OpenClaw) after a shared WP-179.
 
 - 2026-10-22 — Phase 45 added: agents extracted to `zuno-demo-agents`,
   ADR-0576 – ADR-0581 (new v0.12 band) and WP-158 – WP-165; ADR-0506,

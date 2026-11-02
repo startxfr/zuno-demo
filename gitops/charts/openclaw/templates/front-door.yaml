@@ -1,0 +1,144 @@
+{{- if .Values.assistants.enabled }}
+{{- range .Values.personas }}
+{{- $ns := printf "%s%s" $.Values.namespacePrefix .name }}
+{{- $host := printf "%s-%s.%s" $.Values.clawName $ns $.Values.clusterBaseDomain }}
+---
+# ADR-0590: OpenClaw has no OIDC and the operator forbids its trusted-proxy mode,
+# so oauth2-proxy (realm zuno) admits the persona's email only; OpenClaw's own
+# password stays behind it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: front-door-allowed
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+data:
+  emails: |
+    {{ .email }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: front-door
+  namespace: {{ $ns }}
+  labels: {app: openclaw-front-door}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: openclaw-front-door}
+  template:
+    metadata:
+      labels: {app: openclaw-front-door}
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: {{ $.Values.images.oauth2Proxy }}
+          args:
+            - --provider=oidc
+            - --oidc-issuer-url={{ include "openclaw.issuer" $ }}
+            - --client-id=openclaw-{{ .name }}
+            - --redirect-url=https://{{ $host }}/oauth2/callback
+            - --upstream=http://{{ $.Values.clawName }}.{{ $ns }}.svc:18789
+            - --http-address=0.0.0.0:4180
+            - --authenticated-emails-file=/etc/front-door/emails
+            - --scope=openid email profile
+            - --code-challenge-method=S256
+            - --reverse-proxy=true
+            - --skip-provider-button=true
+            - --cookie-name=_openclaw_{{ .name | replace "-" "_" }}
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: openclaw-client, key: client-secret}}
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom: {secretKeyRef: {name: openclaw-ui, key: cookie-secret}}
+          ports:
+            - {name: http, containerPort: 4180}
+          readinessProbe:
+            httpGet: {path: /ping, port: 4180}
+          livenessProbe:
+            httpGet: {path: /ping, port: 4180}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          volumeMounts:
+            - {name: allowed, mountPath: /etc/front-door}
+      volumes:
+        - name: allowed
+          configMap: {name: front-door-allowed}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: front-door
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  selector: {app: openclaw-front-door}
+  ports:
+    - {name: http, port: 4180, targetPort: 4180}
+---
+# The operator always applies its own Route to the Control UI on this same host.
+# This Route is created first (lower wave than the Claw), so the router admits it
+# and rejects the operator's (HostAlreadyClaimed): there is no way around the
+# front door (WP-182 step 6).
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: front-door
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  host: {{ $host }}
+  to: {kind: Service, name: front-door}
+  port: {targetPort: http}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: front-door-ingress
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  podSelector:
+    matchLabels: {app: openclaw-front-door}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {policy-group.network.openshift.io/ingress: ""}
+      ports: [{port: 4180}]
+---
+# The operator's ingress policy admits the router only; the Control UI is reached
+# through oauth2-proxy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gateway-from-front-door
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  podSelector:
+    matchLabels:
+      app: claw
+      claw.sandbox.redhat.com/instance: {{ $.Values.clawName }}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: openclaw-front-door}
+      ports: [{port: 18789}]
+{{- end }}
+{{- end }}

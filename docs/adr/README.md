@@ -159,8 +159,8 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0106](0106-enforce-okf-bundle-signing-and-validation.md) | Superseded in part by ADR-0564 and ADR-0578 | Enforce OKF bundle signing and validation |
 | [ADR-0107](0107-introduce-automated-model-quality-gates.md) | Implemented | Introduce automated model quality gates |
 | [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | Implemented | Automate model evaluation with LM-Eval |
-| [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | Implemented | Implement source freshness and trust scoring |
-| [ADR-0110](0110-automate-document-acl-synchronization.md) | Implemented | Automate document ACL synchronization |
+| [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | Superseded in part by ADR-0568 | Implement source freshness and trust scoring |
+| [ADR-0110](0110-automate-document-acl-synchronization.md) | Partially implemented | Automate document ACL synchronization |
 | [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) | Implemented | Implement production-grade backup and recovery |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | Implemented | Decouple logical tool capabilities from physical backend bindings |
 | [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | Implemented | Implement Confluence as the first real external MCP integration |
@@ -186,7 +186,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | Implemented | Prefer indexed knowledge for read and live tools for freshness and write |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | Implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0211](0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md) | Implemented | Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01 |
-| [ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md) | Implemented | Serve SXA only as a pre-2021 historical RAG corpus |
 | [ADR-0354](0354-add-ansible-automation-platform-as-a-day-1-component.md) | Implemented | Add Ansible Automation Platform as a new Day 1 component |
 
 ## v0.3
@@ -342,6 +341,17 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Implemented | Require group visibility and object-level authorisation before per-agent entries |
 | [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
 
+## v0.13
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-0587](0587-admit-additional-user-experiences-over-the-one-governed-backend.md) | Accepted | Admit additional user experiences over the one governed backend |
+| [ADR-0588](0588-serve-a-general-purpose-chat-experience-with-open-webui.md) | Implemented | Serve a general-purpose chat experience with Open WebUI |
+| [ADR-0589](0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md) | Superseded in part by ADR-0590 | Serve per-persona OpenClaw assistants via claw-operator behind a token-injecting egress proxy |
+| [ADR-0590](0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md) | Implemented | Front OpenClaw with oauth2-proxy and an egress firewall, one claw-operator per persona namespace |
+| [ADR-0591](0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md) | Accepted | Route only to ready local models and fail fast on stalled candidates |
+| [ADR-0592](0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md) | Implemented | Declare experience clients in the agents release, apart from agents |
+
 ## OKF v0.1
 
 | ADR | Status | Decision |
@@ -384,6 +394,7 @@ part of its decision is still in force.
 | [ADR-0215](0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md) | v0.2 | Superseded by ADR-0569 | Carry conversation history into agent prompts with budgeted compaction |
 | [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) | v0.2 | Superseded by ADR-0219 | Import real SXA content via S3 into MariaDB, served through MCP and RAG |
 | [ADR-0217](0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md) | v0.2 | Superseded by ADR-0219 | Ingest a weekly SXA corpus as a new RAG domain |
+| [ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md) | v0.2 | Deprecated | Serve SXA only as a pre-2021 historical RAG corpus |
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Superseded by ADR-0526 | Support dynamic LoRA adapter loading |
 | [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.9 | Superseded by ADR-0582, ADR-0583 and ADR-0584 | Support self-service agent onboarding |
 | [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v0.3 | Superseded by ADR-0564 | Expand agent lifecycle management through the AIAgent Operator |

@@ -1,0 +1,260 @@
+{{- if .Values.perses.enabled }}
+# ADR-0587 (WP-184): typed-schema translation of
+# gitops/charts/grafana/templates/dashboard-three-experiences.yaml - same panels,
+# same PromQL; same Perses conventions and caveats as dashboard-usage-cost.yaml
+# (units dropped, rows as Grid sections, ListVariable best-effort).
+apiVersion: perses.dev/v1alpha2
+kind: PersesDashboard
+metadata:
+  name: zuno-three-experiences
+  namespace: redhat-ods-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      platform.opendatahub.io/part-of: monitoring
+  config:
+    display:
+      name: "Three experiences"
+      description: "ADR-0587/WP-184: UnifAI, Open WebUI and OpenClaw on one governed backend - calls, tokens, cost, guardrails, routing and the shared per-user budget, by experience client."
+    duration: 24h
+    refreshInterval: 30s
+    variables:
+      - kind: ListVariable
+        spec:
+          name: client
+          display:
+            name: client
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: client
+              matchers:
+                - "zuno_model_calls_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+      - kind: ListVariable
+        spec:
+          name: user
+          display:
+            name: user
+          allowAllValue: true
+          allowMultiple: true
+          plugin:
+            kind: PrometheusLabelValuesVariable
+            spec:
+              labelName: user
+              matchers:
+                - "zuno_model_calls_total"
+              datasource:
+                kind: PrometheusDatasource
+                name: prometheus
+    panels:
+      callsByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Model calls by experience (over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client) (increase(zuno_model_calls_total{client=~"$client", user=~"$user"}[$__range]))
+                    seriesNameFormat: "{{`{{client}}`}}"
+      tokensByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Tokens by experience (over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client, kind) (increase(zuno_model_tokens_total{client=~"$client", user=~"$user"}[$__range]))
+                    seriesNameFormat: "{{`{{client}}`}} ({{`{{kind}}`}})"
+      costByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Estimated cost by experience (over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client) (increase(zuno_model_cost_usd_total{client=~"$client", user=~"$user"}[$__range]))
+                    seriesNameFormat: "{{`{{client}}`}}"
+      guardrailsByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Guardrails evaluations by experience (over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client, outcome) (increase(zuno_guardrails_evaluations_total{client=~"$client"}[$__range]))
+                    seriesNameFormat: "{{`{{client}}`}} ({{`{{outcome}}`}})"
+      providerByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Which provider served each experience (over range)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client, provider, outcome) (increase(zuno_model_calls_total{client=~"$client", user=~"$user"}[$__range]))
+      skippedByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Candidates skipped for availability (over range)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client, provider, reason) (increase(zuno_model_candidates_skipped_total{client=~"$client"}[$__range]))
+      userAcrossClients:
+        kind: Panel
+        spec:
+          display:
+            name: "One user across the experiences: tokens (over range)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (user, client) (increase(zuno_model_tokens_total{client=~"$client", user=~"$user"}[$__range]))
+    layouts:
+      - kind: Grid
+        spec:
+          display:
+            title: "Same backend, three experiences"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/callsByClient"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/tokensByClient"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/costByClient"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/guardrailsByClient"
+      - kind: Grid
+        spec:
+          display:
+            title: "Same models, same routing"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/providerByClient"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/skippedByClient"
+      - kind: Grid
+        spec:
+          display:
+            title: "Same user, one budget"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 24
+              height: 8
+              content:
+                $ref: "#/spec/panels/userAcrossClients"
+{{- end }}

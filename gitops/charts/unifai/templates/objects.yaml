@@ -18,6 +18,9 @@ spec:
     base_url: {{ .Values.gatewayLLM.baseUrl }}
     api_key: EMPTY
     forward_user_token: true
+    {{- with .Values.gatewayLLM.timeoutSeconds }}
+    timeout_seconds: {{ . }}
+    {{- end }}
     default_headers:
       X-Zuno-Run-Id: "{session_id}"
     {{- if .Values.gatewayLLM.routingLookup }}
@@ -124,6 +127,9 @@ spec:
       base_url: {{ $.Values.gatewayLLM.baseUrl }}
       api_key: EMPTY
       forward_user_token: true
+      {{- with $.Values.gatewayLLM.timeoutSeconds }}
+      timeout_seconds: {{ . }}
+      {{- end }}
       {{- if $.Values.gatewayLLM.routingLookup }}
       request_id_header: X-Zuno-Request-Id
       metadata_lookup_url: {{ $.Values.gatewayLLM.baseUrl }}/routing-decisions/{request_id}

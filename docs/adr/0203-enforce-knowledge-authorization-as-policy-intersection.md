@@ -1,6 +1,6 @@
 # ADR-0203: Enforce knowledge authorization as policy intersection
 
-- **Status:** Implemented - see `policies/knowledge/`, `components/rag-service/app/search.py`.
+- **Status:** Implemented - the knowledge policy is carried by the corp policies of the agents release (`policies/knowledge/knowledge-policy.yaml` in `zuno-demo-agents`), each agent's domains are the `ceilings.knowledgeDomains` of its `UnifaiAgentBundle`, and at query time UnifAI's RAG applies the source's `aclGroups` and the `knowledge.*` tags ([ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)); `components/rag-service` was retired in WP-168.
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

@@ -190,6 +190,59 @@ def tempo_rag_searches(
             http.close()
 
 
+def tempo_run_spans(
+    run_id: str, tempo_url: str, *, wait_seconds: float = 25, client: Optional[httpx.Client] = None
+) -> List[Dict[str, Any]]:
+    """Every span of the trace of run `run_id` (name and attributes), from Tempo; [] when none appears
+    within `wait_seconds`. Used to observe nodes that emit no tool event, such as an A2A delegation
+    node (WP-174). Raises `UnifaiError` when Tempo cannot be reached."""
+    http = client or httpx.Client(timeout=20)
+    base = tempo_url.rstrip("/")
+    deadline = time.monotonic() + wait_seconds
+    try:
+        while True:
+            now = int(time.time())
+            found = http.get(
+                f"{base}/api/search",
+                params={"q": f'{{ span.mas.run.id = "{run_id}" }}', "limit": 1, "start": now - 3600, "end": now + 60},
+            )
+            if found.status_code != 200:
+                raise UnifaiError(f"tempo search failed: {found.status_code}")
+            traces = found.json().get("traces") or []
+            if traces:
+                trace = http.get(f"{base}/api/traces/{traces[0]['traceID']}")
+                if trace.status_code == 200:
+                    spans = [
+                        {"name": sp.get("name", ""), "attrs": _span_attrs(sp)}
+                        for batch in trace.json().get("batches", [])
+                        for scope in batch.get("scopeSpans", [])
+                        for sp in scope.get("spans", [])
+                    ]
+                    if spans:
+                        return spans
+            if time.monotonic() >= deadline:
+                return []
+            time.sleep(2)
+    except httpx.HTTPError as exc:
+        raise UnifaiError(f"tempo unreachable: {exc}") from exc
+    finally:
+        if client is None:
+            http.close()
+
+
+def delegation_spans(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The spans that show an A2A delegation attempt: the span name or any attribute value mentions `a2a`,
+    `delegat`. Each item is `{"name", "ok"}`; `ok` is True only when the span says `mas.success` is true.
+    A failed attempt (`mas.success=False`) is an attempt, not a delegation: the caller must not count it."""
+    out = []
+    for sp in spans:
+        attrs = sp.get("attrs") or {}
+        text = " ".join([str(sp.get("name", ""))] + [str(v) for v in attrs.values()]).lower()
+        if "a2a" in text or "delegat" in text:
+            out.append({"name": sp.get("name", ""), "ok": str(attrs.get("mas.success", "")).lower() == "true"})
+    return out
+
+
 class UnifaiTarget:
     def __init__(
         self,

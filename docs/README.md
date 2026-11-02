@@ -17,6 +17,7 @@ This directory is the canonical documentation set for the Zuno Demo platform.
 11. [Platform prerequisites](platform/prerequisites.md)
 12. [Installation](platform/installation.md)
 13. [Roadmap](roadmap/README.md)
+14. [Demo script: three experiences, one governed backend](demo/three-experiences.md)
 
 ## Documentation policy
 

@@ -22,6 +22,12 @@
 # corpus gap to report, not a ranking miss.
 #
 # Persona: a member of agent_tekos with knowledge.tech (consultant-01 or its eval/stress twin).
+#
+# Entries 25 to 34 (WP-186, `lang: fr`) are French reformulations of entries that rank 1 on the English set, with the same
+# `expect`; `pair` names the English entry. They measure French-language queries, which the first 24 never did. The
+# Red Hat books are English content (a French query is cross-lingual: the dense side carries it); the Confluence pages
+# are French content (a French query also exercises the sparse side). Read the French subset on its own: the baseline
+# of the first 24 (hit@1 0.71, hit@5 0.86, MRR 0.77) is not a figure for the whole file.
 
 - id: 1
   query: What is a namespace in OpenShift?
@@ -167,3 +173,83 @@
   sourceType: CONFLUENCE
   tags: knowledge.tech
   expect_none: true
+- id: 25
+  query: Comment demander un stockage persistant pour mon pod ?
+  sourceType: WEB
+  tags: knowledge.tech
+  lang: fr
+  pair: 4
+  expect: [openshift_container_platform/4.22/html-single/storage]
+  granularity: book
+- id: 26
+  query: Comment exposer le registre d'images interne en dehors du cluster ?
+  sourceType: WEB
+  tags: knowledge.tech
+  lang: fr
+  pair: 5
+  expect: [openshift_container_platform/4.22/html-single/registry]
+  granularity: book
+- id: 27
+  query: Qu'est-ce qu'un canal de mise à jour et lequel choisir pour mettre à niveau mon cluster ?
+  sourceType: WEB
+  tags: knowledge.tech
+  lang: fr
+  pair: 6
+  expect: [openshift_container_platform/4.22/html-single/updating_clusters]
+  granularity: book
+- id: 28
+  query: Comment sauvegarder etcd avant un changement risqué ?
+  sourceType: WEB
+  tags: knowledge.tech
+  lang: fr
+  pair: 7
+  expect: [openshift_container_platform/4.22/html-single/backup_and_restore]
+  granularity: book
+- id: 29
+  query: Comment bloquer le trafic entre deux namespaces ?
+  sourceType: WEB
+  tags: knowledge.tech
+  lang: fr
+  pair: 8
+  expect: [openshift_container_platform/4.22/html-single/network_security]
+  granularity: book
+- id: 30
+  query: Comment copier les images de release pour installer un cluster sans accès à internet ?
+  sourceType: WEB
+  tags: knowledge.tech
+  lang: fr
+  pair: 13
+  expect: [openshift_container_platform/4.22/html-single/disconnected_environments]
+  granularity: book
+- id: 31
+  query: Comment enregistrer un serveur RHEL auprès de Satellite ?
+  sourceType: WEB
+  tags: knowledge.tech
+  lang: fr
+  pair: 17
+  expect: [red_hat_satellite/6.17]
+  granularity: product
+- id: 32
+  query: Que décrit la procédure interne S0R42 « Schedule Satellite » ?
+  sourceType: CONFLUENCE
+  tags: knowledge.tech
+  lang: fr
+  pair: 18
+  expect: [S0R42]
+  granularity: page
+- id: 33
+  query: Comment restaurer un projet supprimé avec OADP ?
+  sourceType: CONFLUENCE
+  tags: knowledge.tech
+  lang: fr
+  pair: 19
+  expect: [O0R62-RSNSO]
+  granularity: page
+- id: 34
+  query: Quel est notre processus pour préparer une mise à niveau de cluster ?
+  sourceType: CONFLUENCE
+  tags: knowledge.tech
+  lang: fr
+  pair: 20
+  expect: [O0R41-RDUPG]
+  granularity: page

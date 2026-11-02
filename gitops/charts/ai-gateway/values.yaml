@@ -168,6 +168,12 @@ maasAdapter:
 quotaLedger:
   store: memory
 
+# Reply cap when a caller sets none (no body max_tokens/max_completion_tokens,
+# no X-Zuno-Max-Tokens): an uncapped arkos reply ran to ~40k tokens on
+# gpt-oss-20b on 2026-10-31. Each candidate still gets at most the room left
+# in its max_model_len. 0 disables it. Needs ai-gateway-29 or later.
+maxTokensDefault: 8192
+
 # ADR-0581 (WP-164 lot 2): mount the model-routing policy generated from the
 # admitted agents release (files/model-routing.generated.yaml, written by
 # platform/okf/generate_stack_config.py) instead of reading only the copy
@@ -183,6 +189,26 @@ modelRouting:
 # (X-Zuno-Project-Id). Any other caller runs under `standard` with no
 # project. Empty = no client is trusted.
 trustedPlatformClients: []
+
+# WP-184: Keycloak group whose members run under the tight `stresstest` budget
+# (2000 tokens / 5 min per user), for the shared-quota rehearsal. Empty = off.
+# Set it only for a rehearsal and clear it afterwards.
+quotaRehearsalGroup: ""
+# Class those members run under; empty = the image default (stresstest). The
+# fail-open `rehearsal` class (agents release 0.9.1+) lets SaaS answer without GPUs.
+quotaRehearsalClass: ""
+
+# ADR-0587 (WP-179): allowed values of the `client` label on zuno_model_* and
+# zuno_guardrails_* (the token's `azp`, the user experience the call came
+# from). An entry ending in `*` is a prefix (one OpenClaw client per persona).
+# Any other client is counted as `other`, so a new Keycloak client cannot add
+# series. Experience clients are never trusted platform clients (above).
+experienceClients:
+  - unifai
+  - open-webui
+  - "openclaw-*"
+  - zuno-evaluations
+  - zuno-stresstest
 
 # ADR-0104: opt-in semantic cache in the existing platform Redis
 # (gitops/charts/redis, zuno-auth namespace - same instance
@@ -206,6 +232,23 @@ unifaiNamespace: zuno-unifai
 # ADR-0567/WP-153: TrustyAI guardrails evaluated on every
 # /v1/chat/completions exchange. Same detector Services and backend switch
 # the retired agent-runtime hook used.
+# ADR-0591 (WP-188): skip candidates that cannot answer instead of waiting for
+# them. With the GPU nodes down on 2026-11-02, every *-maas candidate waited its
+# 180 s timeout on the model's llm-d scheduler (never a 503).
+# readiness: poll the LLMInferenceService objects of this namespace (read-only
+#   Role in templates/role-model-readiness.yaml) and skip the local providers
+#   whose `inference_service:` is not Ready; fails open.
+# circuitBreaker: skip a provider for openSeconds after a timeout, connection
+#   error or 5xx (never a 429 or 4xx), then let one call through.
+# Off by default: an image without app/model_readiness.py ignores both.
+availability:
+  readiness:
+    enabled: false
+    pollSeconds: 10
+  circuitBreaker:
+    enabled: false
+    openSeconds: 60
+
 guardrails:
   # false = hook off. The gateway hook is live-proven (WP-153 step 7,
   # 2026-10-22) and, since WP-156 retired the agent-runtime hook, the

@@ -61,6 +61,13 @@ class CallerIdentity:
     token: str
 
     @property
+    def client(self) -> str:
+        """The Keycloak client the token was issued to (`azp`), "" if absent.
+        ADR-0587: names the user experience (unifai, open-webui,
+        openclaw-<persona>) on the metrics; never an authorisation input."""
+        return str((self.raw_claims or {}).get("azp") or "")
+
+    @property
     def is_trusted_platform_client(self) -> bool:
         client = (self.raw_claims or {}).get("azp")
         return bool(client) and client in trusted_platform_clients()

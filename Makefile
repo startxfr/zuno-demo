@@ -67,14 +67,14 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (the /mcp front-door plus the NetworkPolicy admitting
 # openshift-lightspeed) and "agents" all already live, plus the Day 1
 # "lightspeed" operator installed before any of it.
-# "install" operate on the 11 deployable components. "supply-chain"
+# "install" operate on the deployable components below. "supply-chain"
 # (ADR-0420/WP-070) is check-only - it has no install/build of its own,
 # only a signature-verification gate (ansible/roles/supply_chain) - so it
 # lives in its own list, same split Day 3 already uses
 # (DAY3_CHECK_ONLY_COMPONENTS): "check" accepts it, every mutating verb
 # rejects it cleanly instead of dying inside Ansible on a missing
 # tasks/install.yml.
-DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai
+DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
 DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval
 DAY2_VERBS := check install build uninstall reconcile all reinstall

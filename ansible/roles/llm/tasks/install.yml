@@ -53,12 +53,22 @@
       trustedPlatformClients: "{{ zuno_ai_gateway_trusted_platform_clients | default([]) }}"
       quotaLedger:
         store: "{{ zuno_ai_gateway_quota_ledger_store | default('memory') }}"
+      # WP-184: empty outside a shared-quota rehearsal.
+      quotaRehearsalGroup: "{{ zuno_ai_gateway_quota_rehearsal_group | default('') }}"
+      quotaRehearsalClass: "{{ zuno_ai_gateway_quota_rehearsal_class | default('') }}"
       # ADR-0581 (WP-164 lot 2): mount the generated model-routing policy.
       modelRouting:
         generated: "{{ zuno_ai_gateway_model_routing_generated | default(false) | bool }}"
       # ADR-0579 (WP-164 lot 3): mount the generated per-agent guardrail modes.
       guardrails:
         modesGenerated: "{{ zuno_ai_gateway_guardrails_modes_generated | default(false) | bool }}"
+      # ADR-0591 (WP-188): skip not-ready local models / open breakers.
+      # Turned on per cluster after the image carrying them is rolled.
+      availability:
+        readiness:
+          enabled: "{{ zuno_ai_gateway_model_readiness | default(false) | bool }}"
+        circuitBreaker:
+          enabled: "{{ zuno_ai_gateway_circuit_breaker | default(false) | bool }}"
       maasAdapter:
         gatewayIdentity:
           enabled: "{{ zuno_ai_gateway_maas_gateway_identity | default(false) | bool }}"

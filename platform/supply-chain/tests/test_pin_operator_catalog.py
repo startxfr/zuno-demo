@@ -70,6 +70,19 @@ class Pin(unittest.TestCase):
               admission=lambda refs: [v.Result(r, True, "admitted") for r in refs])
         self.assertIn(NEW, self.path.read_text(encoding="utf-8"))
 
+    def test_a_catalog_digest_without_its_version_tag_is_warned_about(self):
+        seen = []
+        p.pin("latest", "0.1.40", self.path, dry_run=True, resolver=resolver, verifier=ok, warn=seen.append)
+        self.assertEqual(len(seen), 1)
+        self.assertIn("v0.1.40", seen[0])
+
+        def tagged(repo, tag):
+            return NEW if repo.endswith("catalog") else resolver(repo, tag)
+
+        seen.clear()
+        p.pin("latest", "0.1.40", self.path, dry_run=True, resolver=tagged, verifier=ok, warn=seen.append)
+        self.assertEqual(seen, [])
+
     def test_bad_arguments_are_refused(self):
         for target, version in (("sha256:abc", None), ("latest", "0.1"), ("v1", None)):
             with self.assertRaises(p.PinError):

@@ -12,6 +12,9 @@
     # in the shared blocked-findings tasks (ADR-0201 follow-up).
     zuno_day: d2
     day2_components:
+      # ADR-0587 (WP-179): experience clients first, they consume the rest.
+      - openclaw
+      - open_webui
       - unifai
       - lightspeed_config
       - trustyai_config

@@ -79,7 +79,8 @@ def rewrite(text: str, digest: str, version: Optional[str]) -> str:
 def pin(target: str, version: Optional[str], values: pathlib.Path = CHART_VALUES, dry_run: bool = False,
         resolver: Callable[[str, str], str] = resolve,
         verifier: Optional[Callable[[List[str]], List[v.Result]]] = None,
-        admission: Optional[Callable[[List[str]], List[v.Result]]] = None) -> dict:
+        admission: Optional[Callable[[List[str]], List[v.Result]]] = None,
+        warn: Callable[[str], None] = lambda m: print(f"warning: {m}", file=sys.stderr)) -> dict:
     if version is not None and not VERSION_RE.match(version):
         raise PinError(f"{version}: expected X.Y.Z")
     digest = resolver(CATALOG, "latest") if target == "latest" else target
@@ -89,6 +90,16 @@ def pin(target: str, version: Optional[str], values: pathlib.Path = CHART_VALUES
     if version:
         refs["operator"] = f"{OPERATOR}@{resolver(OPERATOR, 'v' + version)}"
         refs["bundle"] = f"{BUNDLE}@{resolver(BUNDLE, 'v' + version)}"
+    if version:
+        # A digest that only carries `latest` is garbage-collected by quay, signatures included, when `latest` moves
+        # on (found 2026-10-31): without a v<version> tag on it no rollback is possible later. A warning, not a refusal.
+        try:
+            tagged = resolver(CATALOG, "v" + version)
+        except PinError:
+            tagged = None
+        if tagged != digest:
+            warn(f"{CATALOG}@{digest} has no v{version} tag: quay will garbage-collect it, with its signatures, "
+                 f"when `latest` moves; ask for the tag (docs/platform/operations.md, catalog tags)")
     results = (verifier or (lambda r: v.verify_all(r, accept_dev=False)))(list(refs.values()))
     refused = [r for r in results if not r.ok]
     if refused:

@@ -379,6 +379,88 @@ spec:
                       name: prometheus
                     query: 'sum by (provider) (increase(zuno_model_cost_usd_total{provider=~"$provider"}[1h]))'
                     seriesNameFormat: "{{`{{provider}}`}}"
+      # ADR-0587 (WP-179): the experience client (token azp), same caveats as
+      # the Grafana row of the same name.
+      modelCallsByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Model calls (by client, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client) (increase(zuno_model_calls_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range]))
+                    seriesNameFormat: "{{`{{client}}`}}"
+      tokensConsumedByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Tokens consumed (by client/kind, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client, kind) (increase(zuno_model_tokens_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range]))
+                    seriesNameFormat: "{{`{{client}}`}} ({{`{{kind}}`}})"
+      estimatedCostByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Estimated cost (by client, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client) (increase(zuno_model_cost_usd_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range]))
+                    seriesNameFormat: "{{`{{client}}`}}"
+      guardrailsEvaluationsByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Guardrails evaluations (by client/outcome, over range)"
+          plugin:
+            kind: TimeSeriesChart
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client, outcome) (increase(zuno_guardrails_evaluations_total[$__range]))
+                    seriesNameFormat: "{{`{{client}}`}} ({{`{{outcome}}`}})"
     layouts:
       - kind: Grid
         spec:
@@ -467,4 +549,35 @@ spec:
               height: 8
               content:
                 $ref: "#/spec/panels/hourlySpendByProvider"
+      - kind: Grid
+        spec:
+          display:
+            title: "By experience client"
+            collapse:
+              open: false
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/modelCallsByClient"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/tokensConsumedByClient"
+            - x: 0
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/estimatedCostByClient"
+            - x: 12
+              y: 8
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/guardrailsEvaluationsByClient"
 {{- end }}

@@ -1,0 +1,14 @@
+apiVersion: v2
+name: open-webui
+description: >-
+  Open WebUI, the general-purpose chat experience (ADR-0588): the upstream
+  open-webui chart at a pinned version and image digest, signed in through
+  Keycloak, with one OpenAI connection to the ai-gateway and one MCP
+  connection to the mcp-gateway, both carrying the user's own token.
+type: application
+version: 0.1.0
+appVersion: "0.12.5"
+dependencies:
+  - name: open-webui
+    version: "17.5.0"
+    repository: "https://helm.openwebui.com"

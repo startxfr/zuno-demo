@@ -117,12 +117,14 @@ _model_call_duration_histogram = None
 _guardrails_eval_counter = None
 _guardrails_detection_counter = None
 _empty_response_counter = None
+_candidates_skipped_counter = None
 
 
 def init_telemetry(service_name: str = "ai-gateway") -> None:
     global _tracer, _model_call_counter, _token_counter, _cost_counter, _cache_lookup_counter
     global _model_call_duration_histogram
     global _guardrails_eval_counter, _guardrails_detection_counter, _empty_response_counter
+    global _candidates_skipped_counter
 
     resource = Resource.create({"service.name": service_name})
 
@@ -175,6 +177,11 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
         "name - ADR-0534/ADR-0567",
     )
 
+    _candidates_skipped_counter = meter.create_counter(
+        "zuno.model_candidates_skipped",
+        description="Candidates skipped before any call (ADR-0591): reason is not_ready "
+        "(the LLMInferenceService is not Ready) or circuit_open (the provider just failed)",
+    )
     _empty_response_counter = meter.create_counter(
         "zuno.model_empty_responses",
         description="Model answers whose content was blank (no tool call), by provider/model "
@@ -192,10 +199,12 @@ def record_guardrails_evaluation(agent: str, outcome: str, detections: Iterable[
     names = list(detections)
     try:
         if _guardrails_eval_counter is not None:
-            _guardrails_eval_counter.add(1, {"agent": agent, "outcome": outcome})
+            _guardrails_eval_counter.add(1, {"agent": agent, "outcome": outcome, "client": _caller_client.get()})
         if _guardrails_detection_counter is not None:
             for name in names:
-                _guardrails_detection_counter.add(1, {"agent": agent, "detection": name or "unknown"})
+                _guardrails_detection_counter.add(
+                    1, {"agent": agent, "detection": name or "unknown", "client": _caller_client.get()}
+                )
     except Exception:  # noqa: BLE001
         logger.debug("guardrails metric recording failed", exc_info=True)
     try:
@@ -217,6 +226,44 @@ def record_guardrails_evaluation(agent: str, outcome: str, detections: Iterable[
 _incoming_trace_context: ContextVar[Optional[otel_context.Context]] = ContextVar(
     "zuno_incoming_trace_context", default=None
 )
+
+
+# ADR-0587 (WP-179): the user experience a call came from - the token's `azp`
+# (unifai, open-webui, openclaw-<persona>), so one dashboard compares the
+# experiences on the same users, models, quotas and guardrails. A ContextVar for
+# the same reason as the trace context above; set by the handlers, which hold the
+# validated identity (`validate_token` is a sync dependency, run in a worker
+# thread on a copied context, so it cannot set it).
+_caller_client: ContextVar[str] = ContextVar("zuno_caller_client", default="")
+
+
+def experience_clients() -> List[str]:
+    """Allowed values of the `client` metric label: comma-separated
+    EXPERIENCE_CLIENTS, an entry ending in `*` is a prefix (`openclaw-*`).
+    Read per call, like TRUSTED_PLATFORM_CLIENTS."""
+    raw = os.getenv("EXPERIENCE_CLIENTS", "")
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+
+def client_label(azp: Optional[str]) -> str:
+    """Bounded `client` label: the `azp` when it is a declared experience
+    client, "other" for any other client, "" without one. Bounded because
+    Keycloak clients are not ours to count: an unbounded label would let any
+    new client add series."""
+    if not azp:
+        return ""
+    for entry in experience_clients():
+        if entry.endswith("*") and azp.startswith(entry[:-1]):
+            return azp
+        if azp == entry:
+            return azp
+    return "other"
+
+
+def set_caller_client(azp: Optional[str]) -> None:
+    """Remember this request's experience client for model_call_span and the
+    guardrails counters. Called once per handler, after token validation."""
+    _caller_client.set(client_label(azp))
 
 
 async def adopt_incoming_trace_context(request: Request) -> None:
@@ -259,6 +306,17 @@ def guardrails_observe_span(
             yield
         finally:
             span.set_attribute("zuno.latency_ms", (time.monotonic() - start) * 1000.0)
+
+
+def record_candidate_skipped(provider: str, reason: str) -> None:
+    """ADR-0591: one candidate skipped for availability. Never raises."""
+    try:
+        if _candidates_skipped_counter is not None:
+            _candidates_skipped_counter.add(
+                1, {"provider": provider, "reason": reason, "client": _caller_client.get()}
+            )
+    except Exception:  # noqa: BLE001
+        logger.debug("candidate-skipped metric recording failed", exc_info=True)
 
 
 def record_empty_response(provider: str, model: str, recovered: bool) -> None:
@@ -352,6 +410,11 @@ def model_call_span(
     `group` label sometimes held an `agent_<name>` placeholder for
     service-account callers, but that's a different, unrelated fallback).
 
+    ADR-0587 (WP-179): `client` is read from `_caller_client`, not passed
+    in: the experience (unifai, open-webui, openclaw-<persona>) the token was
+    issued to, bounded by EXPERIENCE_CLIENTS (see client_label), on the span
+    and on every counter above.
+
     ADR-0543: `run_id` (distinct from request_id - the whole conversation
     turn, not just this one HTTP call) and `model_kind` (candidate.kind,
     "local"/"saas" - app/routing.py) are span attributes only, never added
@@ -385,6 +448,9 @@ def model_call_span(
             span.set_attribute("zuno.groups", groups)
         if agent:
             span.set_attribute("zuno.agent", agent)
+        client = _caller_client.get()
+        if client:
+            span.set_attribute("zuno.client", client)
         if run_id:
             span.set_attribute("zuno.run_id", run_id)
         if model_kind:
@@ -392,6 +458,13 @@ def model_call_span(
         if project_id:
             span.set_attribute("zuno.project_id", project_id)
         recorder = ModelCallRecorder(provider=provider)
+        # Set before the try: a client that drops a stream cancels the task
+        # (asyncio.CancelledError, a BaseException the `except Exception`
+        # below never sees). The `finally` then read an unbound `outcome`,
+        # and the UnboundLocalError it raised replaced the cancellation - the
+        # streaming loop counted it as a provider failure (demo333,
+        # 2026-11-02, `openai` after an Open WebUI disconnect).
+        outcome = "cancelled"
         try:
             yield recorder
             outcome = "success"
@@ -404,7 +477,8 @@ def model_call_span(
             latency_ms = (time.monotonic() - start) * 1000.0
             span.set_attribute("zuno.latency_ms", latency_ms)
             span.set_attribute("zuno.outcome", outcome)
-            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": caller_sub or "", "agent": agent or ""}
+            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": caller_sub or "", "agent": agent or "",
+                     "client": client}
             group_list = groups or [""]
             for attrs_per_group in ({**attrs, "group": g} for g in group_list):
                 if _model_call_counter is not None:

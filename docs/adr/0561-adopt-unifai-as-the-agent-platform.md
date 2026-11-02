@@ -123,6 +123,8 @@ Three properties get weaker, and this record accepts each one:
 - Star, reorder and hard-delete of conversations disappear.
 - The per-agent frontend Route (ADR-0008) becomes one shared UI.
 
+> **Correction note (2026-11-02).** "One shared UI" is the rule for **agent** UIs. [ADR-0587](0587-admit-additional-user-experiences-over-the-one-governed-backend.md) admits other user experiences (Open WebUI, OpenClaw) as presentation layers over the governed chain; they serve no agent, so this record's decisions all stand.
+
 The fork becomes a dependency with its own rebase cost on upstream `main`
 (ADR-0575).
 

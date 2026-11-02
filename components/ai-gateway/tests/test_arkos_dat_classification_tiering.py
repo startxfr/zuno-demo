@@ -48,9 +48,13 @@ def _candidates(agent: str, task: str, classification: str, header_local_only: b
     return routing_table.candidates_for(classification, local_only=local_only, prefer=prefer, strict=strict)
 
 
-def test_dat_c1_reaches_ovhcloud_first() -> None:
+def test_dat_c1_never_reaches_an_external_provider() -> None:
+    """Agents release v0.8.1 (zuno-demo WP-187): the DAT task reads Confluence and the technical docs, and
+    UnifAI sets the turn level from the declaration, not from what was retrieved, so ADR-0550's C1 external
+    tier is closed. C1 is local only like C2 and C3."""
     names = [c.name for c in _candidates("arkos", "draft-architecture-testimonial", "C1")]
-    assert names[0] == "ovhcloud-gpt-oss-120b", names
+    assert "ovhcloud-gpt-oss-120b" not in names, names
+    assert names, "a C1 DAT turn must still have at least one local candidate"
 
 
 def test_dat_c2_never_reaches_an_external_provider() -> None:
@@ -90,31 +94,49 @@ def test_dat_c2_c3_local_loss_fails_closed_rather_than_externalizing() -> None:
         raise AssertionError("a strict preference naming only an ineligible-at-local-only provider must raise")
 
 
-def test_workshop_presentation_is_unaffected_at_c2() -> None:
-    """ADR-0550 is scoped to the DAT task only - workshop-presentation's
-    own preference entry must not carry local_only_for, so a C2 workshop
-    turn (reachable only via its own C3 agent seed + fixed C2 reflect
-    ceiling, never the DAT baseline) still reaches ovhcloud-gpt-oss-120b."""
-    names = [c.name for c in _candidates("arkos", "workshop-presentation", "C2")]
-    assert "ovhcloud-gpt-oss-120b" in names, names
+def test_workshop_presentation_is_local_only_at_every_level() -> None:
+    """Agents release v0.8.1 (zuno-demo WP-187): workshop-presentation allows knowledge.tech, so it is local
+    only at every level. It used to reach ovhcloud-gpt-oss-120b through its fixed C2 reflect ceiling
+    (ADR-0514); that exception is closed."""
+    for level in ("C1", "C2", "C3"):
+        names = [c.name for c in _candidates("arkos", "workshop-presentation", level)]
+        assert "ovhcloud-gpt-oss-120b" not in names, (level, names)
+        assert names, level
 
 
-def test_comage_compare_historical_deals_is_unaffected_at_c2() -> None:
-    """Regression guard: Comage's own, unrelated C2 use of
-    ovhcloud-gpt-oss-120b (its own preference entry, no local_only_for)
-    must be completely untouched by Arkos DAT's new field."""
-    names = [c.name for c in _candidates("comage", "compare-historical-deals", "C2")]
-    assert "ovhcloud-gpt-oss-120b" in names, names
+def test_confluence_reading_tasks_are_local_only_at_every_level() -> None:
+    """Zuno-demo WP-187: every task that allows search_confluence or knowledge.tech reaches no external
+    provider at C1, C2 or C3 (the rule is enforced by the agents repository's own test too)."""
+    external = {c.name for c in RoutingTable(_PROVIDER_ROUTING_PATH).candidates_for("C1") if getattr(c, "kind", "") == "saas"}
+    assert external, "the provider table must hold at least one external provider for this test to mean anything"
+    for agent, task in (("tekos", "answer-technical-question"), ("tekos", "find-relevant-docs"),
+                        ("arkos", "draft-architecture-testimonial"), ("arkos", "workshop-presentation"),
+                        ("naveo", "answer-onboarding-question")):
+        for level in ("C1", "C2", "C3"):
+            names = {c.name for c in _candidates(agent, task, level)}
+            assert not (names & external), (agent, task, level, names & external)
+
+
+def test_tasks_that_do_not_read_confluence_keep_their_external_providers() -> None:
+    """The local-only rule is scoped to the tasks that read Confluence or the technical docs (WP-187). A
+    task that does not (tekos check-my-drive-docs, arkos write-code) keeps the external providers of its own
+    preference entry, so the rule is not applied wider than intended. (This replaces the guard on Comage's
+    compare-historical-deals, removed from the agents release with knowledge.sxa-legacy, WP-185.)"""
+    drive = [c.name for c in _candidates("tekos", "check-my-drive-docs", "C1")]
+    assert "ovhcloud-gpt-oss-120b" in drive, drive
+    code = [c.name for c in _candidates("arkos", "write-code", "C1")]
+    assert "mistral-codestral" in code, code
 
 
 TESTS = [
-    test_dat_c1_reaches_ovhcloud_first,
+    test_dat_c1_never_reaches_an_external_provider,
     test_dat_c2_never_reaches_an_external_provider,
     test_dat_c3_never_reaches_an_external_provider,
     test_dat_c2_still_prefers_local_gpt_oss_first,
     test_dat_c2_c3_local_loss_fails_closed_rather_than_externalizing,
-    test_workshop_presentation_is_unaffected_at_c2,
-    test_comage_compare_historical_deals_is_unaffected_at_c2,
+    test_workshop_presentation_is_local_only_at_every_level,
+    test_confluence_reading_tasks_are_local_only_at_every_level,
+    test_tasks_that_do_not_read_confluence_keep_their_external_providers,
 ]
 
 

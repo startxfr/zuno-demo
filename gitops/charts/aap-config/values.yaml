@@ -114,7 +114,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, supply-chain]
+    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, supply-chain]
   - name: zuno-day2-build
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
@@ -125,7 +125,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai]
+    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw]
 
   - name: zuno-day3-test
     playbook: ansible/playbooks/day3_test.yml
@@ -352,9 +352,15 @@ workflowTemplates:
         successNodes: [lightspeed-config]
       - id: lightspeed-config
         successNodes: [unifai]
-      # ADR-0574/WP-151: UnifAI stack (operator, UnifaiStack, CRs) last -
-      # it consumes the ai-gateway, mcp-gateway and embeddings set up above.
+      # ADR-0574/WP-151: UnifAI stack (operator, UnifaiStack, CRs) after the
+      # gateways - it consumes the ai-gateway, mcp-gateway and embeddings set up above.
       - id: unifai
+        successNodes: [open-webui, openclaw]
+      # ADR-0587 (WP-179): the experience clients, two independent branches
+      # so one track's failure never blocks the other.
+      - id: open-webui
+        successNodes: []
+      - id: openclaw
         successNodes: []
   - name: zuno-day2-check-workflow
     jobTemplate: zuno-day2-check
@@ -382,7 +388,12 @@ workflowTemplates:
       - id: lightspeed-config
         successNodes: [unifai]
       - id: unifai
-        successNodes: [supply-chain]
+        successNodes: [open-webui, openclaw, supply-chain]
+      # ADR-0587 (WP-179): experience clients, independent leaves.
+      - id: open-webui
+        successNodes: []
+      - id: openclaw
+        successNodes: []
       - id: supply-chain
         successNodes: []
 

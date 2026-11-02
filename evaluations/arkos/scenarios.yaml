@@ -186,3 +186,19 @@ scenarios:
     # health, still checked below, is the honest proxy for "can this
     # agent's traffic reach it".
     services: [unifai-ui, mcp-gateway, ai-gateway]
+
+  - id: 21
+    title: Arkos delegates a technical question to Tekos and the answer comes back
+    type: chat_delegates
+    # ADR-0401/0403 (WP-174): skipped, never passed, until the admitted release declares
+    # arkos -> tekos/answer-technical-question and TEMPO_URL is set. The proof is the answer plus an
+    # A2A delegation span in the run's trace; refusals and chain headers are in security_checks.py.
+    persona: eval-consultant-01
+    delegator: arkos
+    target: tekos
+    target_task: answer-technical-question
+    timeout_seconds: 190
+    message: >-
+      For the architecture testimonial I am drafting, ask the technical consultant what the difference
+      is between a Route and an Ingress on OpenShift, and include that answer in your reply.
+    expect_any: ["route", "ingress"]

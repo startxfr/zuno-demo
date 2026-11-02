@@ -311,6 +311,13 @@ class DelegationTests(GatewayTestCase):
         self.assertEqual(task.status.state, TaskState.completed)
         self.assertNotEqual(self.down.llm_calls[0]["headers"]["x-zuno-run-id"], "bad id with spaces")
 
+    async def test_the_callers_reply_cap_crosses_the_hop_only_when_valid(self) -> None:
+        for sent, expected in (("4096", "4096"), ("0", None), ("-5", None), ("many", None), ("99999999", None)):
+            self.down.llm_calls.clear()
+            task = (await self.send("alpha", "tok-consultant", "q", **{"X-Zuno-Max-Tokens": sent})).root.result
+            self.assertEqual(task.status.state, TaskState.completed, sent)
+            self.assertEqual(self.down.llm_calls[0]["headers"].get("x-zuno-max-tokens"), expected, sent)
+
     async def test_a_chain_beyond_the_declared_limit_is_refused(self) -> None:
         USERS["tok-both"] = auth.CallerIdentity("u-both", ["agent_alpha", "agent_beta"], {}, "tok-both")
         self.addCleanup(USERS.pop, "tok-both", None)

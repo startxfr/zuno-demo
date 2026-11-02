@@ -1,9 +1,10 @@
 ---
 # `make day3|d3 scenario-failover-node` (inject half). WP-105/ADR-0536: cordon
 # the node carrying qwen3.5-9b-wesh's KServe pod, delete that pod, and prove
-# live that Comage fails over to local-qwen35 while Tekos (routed
-# off-cluster to ovhcloud-gpt-oss-120b for its one chat-reachable task) is
-# unaffected - a decoupling control, not the other half of the fallback.
+# live that Comage fails over to local-qwen35 while Tekos - local only at every
+# level since agents v0.8.1 (zuno-demo WP-187) - is never served by an external
+# provider: answered locally, or in the failover phase refused cleanly. It is a
+# control, not the other half of the fallback.
 # Revision 2026-08-30: originally scoped the other direction (kill
 # qwen3.5-9b, prove Tekos fails over to local-wesh) - found live to be
 # unprovable through real chat traffic, see ADR-0536's Context section for
@@ -95,21 +96,21 @@
       # local-wesh-maas is the legitimate MaaS-preferred sibling tried first
       # (provider-routing.yaml file order) - a healthy baseline naming either
       # the -maas or the direct provider is correct for Comage. Tekos is a
-      # decoupling control - its reflexional task routes off-cluster to OVH
-      # and is never expected to touch local-wesh/local-qwen35 at all.
+      # local-only control (WP-187): at baseline its task must be answered by a
+      # local provider, never an external one.
       ansible.builtin.fail:
         msg: >-
           Baseline probe did not match ADR-0536's expected routing
           (comage.provider={{ scenario_failover_baseline.comage.provider }},
-          expected local-wesh(-maas); tekos.provider={{ scenario_failover_baseline.tekos.provider }},
-          expected ovhcloud-gpt-oss-120b) - stop before touching the cluster
+          expected local-wesh(-maas); tekos.outcome={{ scenario_failover_baseline.tekos.outcome }}
+          (provider {{ scenario_failover_baseline.tekos.provider }}), expected answered-local) - stop before touching the cluster
           and re-check platform/ai-gateway/provider-routing.yaml and
           policies/model-routing/model-routing-policy.yaml.
       when: >-
         not scenario_failover_baseline.comage.ok or
         not scenario_failover_baseline.tekos.ok or
         scenario_failover_baseline.comage.provider not in ['local-wesh', 'local-wesh-maas'] or
-        scenario_failover_baseline.tekos.provider != 'ovhcloud-gpt-oss-120b'
+        scenario_failover_baseline.tekos.outcome != 'answered-local'
 
     - name: "Cordon {{ scenario_failover_node_name }}"
       ansible.builtin.command:
@@ -157,15 +158,15 @@
       ansible.builtin.debug:
         msg: >-
           WARNING: expected comage.provider=local-qwen35(-maas) and
-          tekos.provider unchanged (ovhcloud-gpt-oss-120b) during the failure
-          window; got comage={{ scenario_failover_failover.comage }},
+          tekos never served by an external provider (outcome answered-local
+          or refused) during the failure window; got comage={{ scenario_failover_failover.comage }},
           tekos={{ scenario_failover_failover.tekos }}. The node is left
           cordoned for inspection - do not restore until this is understood.
       when: >-
         not scenario_failover_failover.comage.ok or
         scenario_failover_failover.comage.provider not in ['local-qwen35', 'local-qwen35-maas'] or
         not scenario_failover_failover.tekos.ok or
-        scenario_failover_failover.tekos.provider != 'ovhcloud-gpt-oss-120b'
+        scenario_failover_failover.tekos.outcome not in ['answered-local', 'refused']
 
     - name: Print the inject-phase verdict (this is what the Makefile shows before the human validation pause)
       ansible.builtin.debug:

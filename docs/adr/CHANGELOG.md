@@ -9,6 +9,29 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition (2026-11-02) - ADR-0592 joins v0.13
+
+Open WebUI and OpenClaw need tools under a logical agent name, but an agent in
+the release becomes a UnifAI bundle, a Keycloak group and a delegation target.
+ADR-0592 declares them as experience clients in their own layer of the agents
+release, read only by the mcp-gateway, at C1.
+
+## Addition (2026-11-02) - ADR-0591 joins v0.13
+
+The experience clients' first live calls (WP-180, WP-182) found every `*-maas`
+candidate held 180 s by the llm-d scheduler of a model that was not ready.
+ADR-0591 has the ai-gateway skip such models and stalled providers; ADR-0590
+is reserved for the OpenClaw track's change to ADR-0589.
+
+## New band (2026-11-02) - v0.13 added with ADR-0587 to ADR-0589
+
+A user request to add OpenClaw and Open WebUI next to UnifAI on the same MaaS
+backend produced three decisions in a new v0.13 band: ADR-0587 admits
+experience clients over the governed chain, ADR-0588 (Open WebUI) and
+ADR-0589 (OpenClaw via claw-operator). ADR-0561 and ADR-0582 carry a dated
+correction note (their single UI is the agent platform's); no clause is
+retired, so neither is superseded.
+
 ## Amended (2026-10-25) - ADR-0586 decision 8 is in force
 
 WP-178 is `Done`: the Sigstore policy-controller refuses an unsigned UnifAI image at admission in `enforce` on demo333 (`zuno-unifai`, `unifai-operator`), after a warn cycle with

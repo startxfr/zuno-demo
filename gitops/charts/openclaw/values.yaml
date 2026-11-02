@@ -1,0 +1,76 @@
+# ADR-0589 / ADR-0590 (WP-182 evidence: docs/roadmap/evidence/wp-182-openclaw-spike.md).
+# Two Applications render this chart: zuno-openclaw-d0 (operator.enabled: the
+# catalog, then per persona its namespace, operator and egress firewall) and
+# zuno-openclaw-d1 (assistants.enabled: secrets, front door and the Claw).
+clusterBaseDomain: apps.mycluster.example.com
+
+operator:
+  enabled: false
+  # claw-operator publishes no releases: the catalog is rebuilt on every upstream
+  # commit. Pinned by digest (nothing is signed, ADR-0586 decision 7); an upgrade
+  # is a deliberate change of these four values together.
+  catalogSourceName: claw-operator-catalog
+  catalogImage: quay.io/codeready-toolchain/claw-operator-catalog@sha256:847abf9c9d697cc0069656819920e48a355c3852c6c033f5dd28c956e9b8cd25
+  package: claw-operator
+  channel: staging
+  startingCSV: claw-operator.v0.0.227-commit-f5aa592
+  # The bundle references its images by tag; `make d2 check openclaw` compares the
+  # running image IDs with these digests.
+  pinnedImageDigests:
+    manager: sha256:4a8363da3ec484b4437ddf4e5beac158219aa6d17bca6f58694e4cb21bde44cd
+    proxy: sha256:b3ad798c7364f79075a1049ea2b87126dbba2bec092497928ac8546597e59f5a
+
+assistants:
+  enabled: false
+
+# One namespace and one operator per persona (the operator supports OwnNamespace
+# only for this purpose). The namespace carries the experience-client label, the
+# ingress grant of the ai-gateway and mcp-gateway (ADR-0587, WP-179).
+namespacePrefix: zuno-claw-
+clawName: assistant
+
+images:
+  openclaw: ghcr.io/openclaw/openclaw@sha256:1a2a3ce113e435039dbeac5ae261759bb4759908563d91c81059e896b38c5d98
+  oauth2Proxy: quay.io/oauth2-proxy/oauth2-proxy@sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
+
+keycloak:
+  realm: zuno
+
+gateways:
+  aiDomain: ai-gateway.zuno-ai-run.svc
+  aiBaseUrl: http://ai-gateway.zuno-ai-run.svc:8080/v1
+  mcpDomain: mcp-gateway.zuno-ai-run.svc
+  mcpUrl: http://mcp-gateway.zuno-ai-run.svc:8080/mcp
+  # The `openclaw` experience-client declaration (ADR-0592, zuno-demo-agents
+  # v0.9.0 experience-clients/openclaw: task `chat`, C1, groups /consultant and
+  # /sales, the same scope as open-webui) is admitted: the MCP credential sends
+  # X-Zuno-Agent, X-Zuno-Task (an agent-scoped call without a task is refused)
+  # and the classification, also sent to the ai-gateway. Setting mcpAgentHeader
+  # to false falls back to the persona's front-door tools.
+  dataClassification: C1
+  mcpAgentHeader: true
+  mcpTask: chat
+
+# config.raw merged into openclaw.json. ClawHub has no off switch: the egress
+# firewall is what blocks it; this narrows the rest (WP-182 step 5).
+lockdown:
+  skills:
+    allowBundled: []
+    install:
+      allowUploadedArchives: false
+  plugins:
+    allow: [memory-core]
+  browser:
+    enabled: false
+  tools:
+    elevated:
+      enabled: false
+
+# Vault (KV zuno/): keycloak/openclaw-<persona> {client_secret} is seeded by the
+# vault role with the Keycloak client; openclaw/<persona> {ui_password,
+# cookie_secret} by the openclaw role.
+personas:
+  - name: consultant-02
+    email: dev+zuno-consultant02@startx.fr
+  - name: sale-01
+    email: dev+zuno-sale01@startx.fr

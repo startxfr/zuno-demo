@@ -1,0 +1,84 @@
+---
+# `make d2 check open-webui` runs this file. State detection first (the
+# Application Synced and Healthy), then, when installed, the chain WP-181 relies
+# on, probed from inside the pod with real HTTP requests (TCP probes lie behind
+# NetworkPolicies): Keycloak's discovery document (EgressFirewall allow), both
+# gateways reachable (401 without a token), the internet unreachable.
+- name: "open-webui | check the Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-open-webui-d1"
+
+- name: "open-webui | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ _state_check_result }}"
+
+- name: "open-webui | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+- name: "open-webui | probe the chain"
+  when: _state_is_installed | bool
+  block:
+    - name: "open-webui | resolve the cluster base domain"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "open-webui | find the running pod"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ open_webui_namespace }}"
+        label_selectors:
+          - "app.kubernetes.io/component=open-webui"
+        field_selectors:
+          - status.phase=Running
+      register: _open_webui_pods
+
+    - name: "open-webui | fail without a running pod"
+      ansible.builtin.fail:
+        msg: "No running Open WebUI pod in {{ open_webui_namespace }}."
+      when: (_open_webui_pods.resources | default([]) | length) == 0
+
+    - name: "open-webui | probe Keycloak, the gateways and the internet from the pod"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ open_webui_namespace }}"
+        pod: "{{ _open_webui_pods.resources[0].metadata.name }}"
+        container: open-webui
+        command: >-
+          sh -c '
+          c() { curl -s -o /dev/null -m 10 -w "%{http_code}" "$@" || true; };
+          echo "keycloak=$(c https://keycloak.{{ cluster_base_domain }}/realms/zuno/.well-known/openid-configuration)";
+          echo "ai_gateway=$(c http://ai-gateway.zuno-ai-run.svc:8080/v1/models)";
+          echo "mcp_gateway=$(c -X POST -H "Content-Type: application/json"
+          -d "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}" http://mcp-gateway.zuno-ai-run.svc:8080/mcp)";
+          echo "internet=$(c https://huggingface.co)"'
+      register: _open_webui_probe
+      changed_when: false
+
+    - name: "open-webui | parse the probe"
+      ansible.builtin.set_fact:
+        _open_webui_codes: "{{ dict(_open_webui_probe.stdout_lines | map('split', '=') | list) }}"
+
+    - name: "open-webui | report the probe"
+      ansible.builtin.debug:
+        msg: "{{ _open_webui_codes }}"
+
+    - name: "open-webui | probe the Route"
+      ansible.builtin.uri:
+        url: "https://open-webui.{{ cluster_base_domain }}/health"
+        validate_certs: false
+        status_code: 200
+      register: _open_webui_route
+      failed_when: false
+
+    - name: "open-webui | fail on a broken chain"
+      ansible.builtin.fail:
+        msg: >-
+          Open WebUI chain check failed: {{ _open_webui_codes }}, Route /health
+          {{ _open_webui_route.status | default('unreachable') }}. Expected keycloak=200,
+          ai_gateway=401 and mcp_gateway=401 (reached, no token), internet=000 (egress
+          denied), Route 200.
+      when: >-
+        _open_webui_codes.keycloak | default('') != '200' or
+        _open_webui_codes.ai_gateway | default('') != '401' or
+        _open_webui_codes.mcp_gateway | default('') != '401' or
+        _open_webui_codes.internet | default('') != '000' or
+        (_open_webui_route.status | default(0)) != 200

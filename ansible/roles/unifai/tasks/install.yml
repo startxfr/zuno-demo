@@ -108,7 +108,7 @@
       {%- if (zuno_unifai_released_bundles | default(false) | bool) and released | length > 0 -%}
       {%- set merged = [] -%}
       {%- for b in released if b.name not in (zuno_unifai_released_bundles_exclude | default([])) -%}
-      {%- set _ = merged.append(b | combine((zuno_unifai_bundle_settings | default({}))[b.name] | default({}))) -%}
+      {%- set _ = merged.append(b | combine((zuno_unifai_bundle_settings | default({}))[b.name] | default({}), recursive=True)) -%}
       {%- endfor -%}
       {{ {'okf': {'verify': _unifai_stack_config.unifai.verify,
                   'trustedRoot': lookup('ansible.builtin.file', zuno_repo_root + '/platform/okf/sigstore/trusted_root.json'),

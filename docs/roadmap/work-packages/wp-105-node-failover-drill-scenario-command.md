@@ -430,3 +430,10 @@ failure and fix) in `docs/roadmap/evidence/adr-0536-node-failover-drill.md`.
   is dropped well before the frontend, per ADR-0536 Decision 4) - a separate,
   larger change across agent-runtime/agent-bff/frontend, not needed to prove
   the fallback mechanism itself.
+
+## Update 2026-11-02: the Tekos control
+
+Tekos is no longer expected to stay on `ovhcloud-gpt-oss-120b`: its chat task is local only since agents v0.8.1 (zuno-demo WP-187). The control in
+`scenario_failover_verify.py` now passes when Tekos is answered by a local provider (baseline and restore) or refused cleanly (failover phase), and fails when any external
+provider was reached or the outcome is unknown. The inject and restore playbooks read `tekos.outcome` instead of `tekos.provider`. The unit tests are in
+`evaluations/tests/test_scenario_failover_control.py` (run by the lint workflow). The drill has not been replayed live since this change; it needs the GPU models.

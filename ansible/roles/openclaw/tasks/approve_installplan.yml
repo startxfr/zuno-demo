@@ -1,0 +1,52 @@
+---
+- name: "openclaw | wait for the Subscription's InstallPlan in {{ _openclaw_ns }}"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    namespace: "{{ _openclaw_ns }}"
+    name: "{{ _openclaw.operator.package }}"
+  register: _openclaw_sub
+  until: >-
+    (_openclaw_sub.resources | default([]) | length) > 0 and
+    (_openclaw_sub.resources[0].status.installPlanRef.name | default('')) | length > 0
+  retries: 60
+  delay: 10
+
+- name: "openclaw | read the InstallPlan in {{ _openclaw_ns }}"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    namespace: "{{ _openclaw_ns }}"
+    name: "{{ _openclaw_sub.resources[0].status.installPlanRef.name }}"
+  register: _openclaw_ip
+
+- name: "openclaw | refuse an InstallPlan for another CSV in {{ _openclaw_ns }}"
+  ansible.builtin.assert:
+    that: "_openclaw_ip.resources[0].spec.clusterServiceVersionNames == [_openclaw.operator.startingCSV]"
+    fail_msg: >-
+      InstallPlan {{ _openclaw_ip.resources[0].metadata.name }} installs
+      {{ _openclaw_ip.resources[0].spec.clusterServiceVersionNames }}, not the pinned
+      {{ _openclaw.operator.startingCSV }}: not approved.
+
+- name: "openclaw | approve the InstallPlan in {{ _openclaw_ns }}"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    namespace: "{{ _openclaw_ns }}"
+    name: "{{ _openclaw_ip.resources[0].metadata.name }}"
+    definition:
+      spec:
+        approved: true
+  when: not (_openclaw_ip.resources[0].spec.approved | bool)
+
+- name: "openclaw | wait for the operator CSV to succeed in {{ _openclaw_ns }}"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ _openclaw_ns }}"
+    name: "{{ _openclaw.operator.startingCSV }}"
+  register: _openclaw_csv
+  until: (_openclaw_csv.resources | default([{}]))[0].status.phase | default('') == 'Succeeded'
+  retries: 60
+  delay: 10

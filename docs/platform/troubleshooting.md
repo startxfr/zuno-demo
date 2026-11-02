@@ -96,3 +96,37 @@ With nothing wedged, the command changes nothing.
 
 Tell the other sessions before you run it.
 
+
+## The first request to a model after a restart is very slow
+
+**Symptom.** Right after a qwen model pod restarts, its first request takes a minute or more, or
+the ai-gateway logs `provider 'local-...-maas' failed ... Request timed out` and falls back. The
+model's log shows `Triton kernel JIT compilation during inference ... latency spike`.
+
+**Cause.** The qwen models run `--enforce-eager` (ADR-0518), so vLLM compiles its GPU kernels on
+the first request instead of at start.
+
+**What prevents it.** A model with `warmup.enabled: true` in `gitops/charts/models/values.yaml`
+gets a `postStart` hook (`templates/_warmup.tpl`). The hook warms the model before the pod
+becomes Ready, so no user pays the compilation. Its progress is in the container log:
+
+```bash
+oc -n zuno-ai-run logs deploy/qwen35-9b-wesh-kserve -c main | grep '\[warmup\]'
+```
+
+`done in Ns` means the warm-up ran. `skipping` means vLLM was not healthy in time: the pod still
+starts, cold. The ai-gateway's MaaS timeout is 180 s for the local models, so a cold first request
+still gets an answer, only slowly.
+
+Proven on demo333 on 2026-10-31, one model at a time. Each time, KServe kept the hook next to its own
+`preStop`. The first warm-up request compiled the same 4 Triton kernels and took 82-83 s, longer than the
+former 60 s MaaS timeout. The pod became Ready only after `[warmup] done`, with 0 restarts. The first real
+calls from the ai-gateway then got their first token fast:
+
+| Model | Warm-up | First token via MaaS | First token direct |
+|---|---|---|---|
+| qwen35-9b-wesh | 85 s | 0.21 s | 0.08 s |
+| qwen35-9b | 85 s | 0.16 s | 0.09 s |
+| qwen36-27b-instruct | 86 s | 0.24 s | 0.16 s |
+
+Each roll took 7-9 minutes of downtime for that model, through `make d2 reconcile models`.

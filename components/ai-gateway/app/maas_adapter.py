@@ -331,13 +331,11 @@ def chat_model_via_maas(
                 "MaaS adapter - refusing an unattested call"
             )
         default_headers = {**(default_headers or {}), **attested_headers(context)}
-    extra: Dict[str, Any] = {}
-    if quota_429_passthrough_enabled():
-        # A 429 is answered to the caller at once (app/main.py), so the SDK
-        # must not retry it first; this also drops the SDK's retries of
-        # 5xx/connection errors on MaaS calls, which the candidate loop's own
-        # fallback already covers.
-        extra["max_retries"] = 0
+    # ADR-0591 decision 4 (was WP-157, only with the 429 pass-through): no SDK
+    # retries on MaaS calls, ever. A 429 is answered to the caller at once
+    # (app/main.py), and a 5xx/connection error or timeout is the candidate
+    # loop's to handle - a retried 180 s timeout was 360 s or more per pair.
+    extra: Dict[str, Any] = {"max_retries": 0}
 
     # ADR-0521 (WP-076) step 4, live incident 2026-08-26: maas-default-
     # gateway's TLS cert is issued by the same cluster

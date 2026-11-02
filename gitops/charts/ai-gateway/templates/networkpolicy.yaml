@@ -1,5 +1,5 @@
 # Precise ingress allow-list, not a namespace-wide baseline: UnifAI (below),
-# the acceptance-gate test Job, and MCP Gateway (ADR-0415's
+# the experience clients (ADR-0587), the acceptance-gate test Job, and MCP Gateway (ADR-0415's
 # generate_image handler calls POST /v1/images/generations directly,
 # components/mcp-gateway/app/handlers/image_gen.py) may call this
 # service. mcp-gateway was missing here from ADR-0415's original
@@ -65,6 +65,14 @@ spec:
             matchLabels:
               app.kubernetes.io/name: multiagent
         {{- end }}
+        # ADR-0587 (WP-179): user experiences other than UnifAI (Open WebUI,
+        # OpenClaw) call this gateway with their users' (or persona's) token.
+        # Admitted by namespace LABEL, not by name, so a new experience adds
+        # no line here; the label is set only by the namespaces chart and the
+        # openclaw chart. Their namespaces hold nothing but the experience.
+        - namespaceSelector:
+            matchLabels:
+              zuno.io/experience-client: "true"
       ports:
         - protocol: TCP
           port: 8080

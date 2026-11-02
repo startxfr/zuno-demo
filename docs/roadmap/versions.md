@@ -22,7 +22,7 @@ Industrialization: HA shared services, resumable workflows, automated
 ingestion and evaluation, stronger signing, source freshness, ACL
 synchronization and SecNumCloud-oriented hardening.
 
-**29 ADRs, all closed. No open work packages.**
+**29 ADRs, 28 closed.** Open: ADR-0110 (partially implemented, see WP-186); WP-186.
 
 ## v0.2
 
@@ -32,7 +32,7 @@ standardized enterprise tool authentication, project-scoped agent memory. Also
 carries ADR-0354, which installs Ansible Automation Platform as a Day 1
 component (`aap`) plus an `aap-config` companion.
 
-**14 ADRs, all closed.** Open: WP-098.
+**14 ADRs, all closed.** Open: WP-098, WP-186.
 
 ## v0.3
 
@@ -237,7 +237,7 @@ stays the model policy router and is slimmed onto MaaS. Piloted on demo333
 with tekos; demo222 cuts over only after full validation.
 
 **24 ADRs: 21 `Accepted`, 1 `Implemented` (ADR-0586), ADR-0564 superseded in part by ADR-0577 and
-ADR-0578, ADR-0353 `Proposed`.** Open: ADR-0353, ADR-0401, ADR-0402, ADR-0403, ADR-0406, ADR-0409, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575, ADR-0585; WP-146 – WP-157, WP-166, WP-171 – WP-175.
+ADR-0578, ADR-0353 `Proposed`.** Open: ADR-0353, ADR-0401, ADR-0402, ADR-0403, ADR-0406, ADR-0409, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575, ADR-0585; WP-146 – WP-157, WP-166, WP-171 – WP-175, WP-185 – WP-187.
 
 ## v0.12
 
@@ -253,6 +253,18 @@ of baking it into images, and generates Keycloak groups, MaaS subscriptions,
 Kuadrant policies, ai-gateway inputs and UnifAI bundles from the release.
 
 **9 ADRs.** Implemented: ADR-0576, ADR-0577, ADR-0578 (2026-10-23, the cutover of WP-165) and ADR-0580 (2026-10-24, first full promotion cycle). Open: ADR-0579, ADR-0581 – ADR-0584; WP-161, WP-163, WP-164, WP-167.
+
+## v0.13
+
+Show that the platform is the governed chain, not the UI: three user
+experiences on the same Keycloak identity, ai-gateway policy (routing,
+guardrails, per-user quotas, telemetry), MaaS models and mcp-gateway tools.
+UnifAI stays the agent platform; Open WebUI is a general-purpose chat;
+OpenClaw gives each persona a personal assistant, deployed by Red Hat's
+claw-operator behind a token-injecting egress proxy. Neither new experience
+owns a model key, a guardrail or a knowledge store.
+
+**6 ADRs: 2 `Accepted`, 3 `Implemented` (ADR-0588, ADR-0590, ADR-0592; 2026-11-02), ADR-0589 superseded in part by ADR-0590.** Open: ADR-0587, ADR-0591; WP-184, WP-188.
 
 ## OKF stream
 

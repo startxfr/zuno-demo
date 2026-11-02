@@ -33,6 +33,9 @@
       - mlflow
       - lightspeed_config
       - unifai
+      # ADR-0587 (WP-179): experience clients, stubs until WP-181/WP-183.
+      - open_webui
+      - openclaw
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
