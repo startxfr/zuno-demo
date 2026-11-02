@@ -23,8 +23,15 @@ Day 2 component `openclaw`: one OpenClaw personal assistant per demo persona
 **Upgrading the operator or OpenClaw** is a deliberate pin change, made by
 `python3 platform/supply-chain/pin_claw_catalog.py` (`--dry-run` first; `--catalog sha256:...` and
 `--openclaw <tag>` to choose). It resolves the newest catalog, reads its single bundle in memory, resolves the
-manager and proxy digests and the newest stable OpenClaw tag, and rewrites `operator.catalogImage`,
+manager and proxy digests, keeps the OpenClaw pin unless `--openclaw` names a tag, and rewrites `operator.catalogImage`,
 `operator.startingCSV`, `operator.pinnedImageDigests`, `images.openclaw` and the chart's `appVersion` together.
 When it reports a new CSV, re-read the operator source at the bundle's commit (passthrough domains, owned config
 keys, Route) before installing. Then push and run `make d2 install openclaw` (the role approves only the
 InstallPlan naming the new CSV) and `make d2 check openclaw`.
+
+**OpenClaw follows the operator.** The operator writes and owns `openclaw.json`; a newer OpenClaw may refuse it.
+On 2026-11-02 OpenClaw 2026.10.9 under operator f5aa592 first asked for a state-database migration
+(`openclaw doctor --fix`), then refused the operator's config (`agents.list`, `agents.defaults.models`,
+`memorySearch` moved; `gateway.controlUi.dangerouslyDisableDeviceAuth` retired). Pin the image the operator's CRD
+defaults to (`oc explain claw.spec.image`), and change it only with a new operator. Moving OpenClaw across a state
+schema change needs `openclaw doctor --fix` on the volume, or an empty volume.

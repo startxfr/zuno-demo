@@ -45,8 +45,11 @@ from the commit read above. Every new upstream commit replaces the catalog conte
 **OpenClaw image.** The CRD default is `ghcr.io/openclaw/openclaw:2026.7.1-2`
 (`sha256:8789721d2e9b24b780a1504b56deb4c6bd5c7dbf96a1dd117e7c45c2ed72c8ac`, 2026-08-04). The latest stable release
 is `2026.10.9` (`sha256:1a2a3ce113e435039dbeac5ae261759bb4759908563d91c81059e896b38c5d98`, 2026-10-29). The spike
-starts on the operator's default (the version it is tested with) and records whether `spec.image` with `2026.10.9`
-works.
+starts on the operator's default (the version it is tested with). **Tested 2026-11-02 (WP-183): `2026.10.9` does not
+work with operator f5aa592.** It first asks for a state-database migration (`audit-events-v2`, `openclaw doctor
+--fix`), then, on an empty volume, refuses the operator's `openclaw.json` (`agents.list`, `agents.defaults.models`,
+`memorySearch` moved; `gateway.controlUi.dangerouslyDisableDeviceAuth` retired). The operator owns those keys: the
+OpenClaw image follows the operator's default.
 
 **Signatures.** No cosign signature exists for the catalog, the manager or the OpenClaw image (no
 `sha256-<digest>.sig` tag). ADR-0586's signature and attestation verification cannot apply; the pin is by digest
