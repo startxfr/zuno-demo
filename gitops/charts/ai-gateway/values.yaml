@@ -224,6 +224,23 @@ unifaiNamespace: zuno-unifai
 # ADR-0567/WP-153: TrustyAI guardrails evaluated on every
 # /v1/chat/completions exchange. Same detector Services and backend switch
 # the retired agent-runtime hook used.
+# ADR-0591 (WP-188): skip candidates that cannot answer instead of waiting for
+# them. With the GPU nodes down on 2026-11-02, every *-maas candidate waited its
+# 180 s timeout on the model's llm-d scheduler (never a 503).
+# readiness: poll the LLMInferenceService objects of this namespace (read-only
+#   Role in templates/role-model-readiness.yaml) and skip the local providers
+#   whose `inference_service:` is not Ready; fails open.
+# circuitBreaker: skip a provider for openSeconds after a timeout, connection
+#   error or 5xx (never a 429 or 4xx), then let one call through.
+# Off by default: an image without app/model_readiness.py ignores both.
+availability:
+  readiness:
+    enabled: false
+    pollSeconds: 10
+  circuitBreaker:
+    enabled: false
+    openSeconds: 60
+
 guardrails:
   # false = hook off. The gateway hook is live-proven (WP-153 step 7,
   # 2026-10-22) and, since WP-156 retired the agent-runtime hook, the

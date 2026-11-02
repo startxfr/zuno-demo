@@ -44,7 +44,9 @@ from app.schemas import (
     RoutingDecision,
 )
 from app.routing_watch import ROUTING_RELOAD_INTERVAL_SECONDS, RoutingWatcher
-from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_empty_response, set_caller_client
+from app.circuit_breaker import breaker
+from app.model_readiness import readiness
+from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_candidate_skipped, record_empty_response, set_caller_client
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ai_gateway")
@@ -80,6 +82,11 @@ routing_watcher = RoutingWatcher({
 async def _start_routing_watch() -> None:
     if ROUTING_RELOAD_INTERVAL_SECONDS > 0:
         asyncio.create_task(routing_watcher.run(ROUTING_RELOAD_INTERVAL_SECONDS))
+    # ADR-0591: model readiness (inert unless MODEL_READINESS_ENABLED) and the
+    # NeMo warm-up (only with the nemo backend), both off the request path.
+    if os.getenv("MODEL_READINESS_ENABLED", "false").strip().lower() == "true":
+        asyncio.create_task(readiness.run())
+    guardrails.schedule_warm_up()
 
 _ROLE_TO_MESSAGE = {"system": SystemMessage, "user": HumanMessage, "assistant": AIMessage}
 
@@ -453,6 +460,22 @@ async def chat_completions(
             return await _guardrails_refusal(
                 "prompt", found, request_id=request_id, classification=classification,
             )
+
+    # ADR-0591 decision 6: every eligible candidate is unavailable - answer now,
+    # with the reasons, instead of a stream that can only end in error.
+    unavailable = _nothing_available(candidates)
+    if unavailable:
+        for candidate in candidates:
+            record_candidate_skipped(
+                candidate.name,
+                "not_ready" if not readiness.is_ready(
+                    routing_table.provider_config(candidate.name).get("inference_service")
+                ) else "circuit_open",
+            )
+        raise HTTPException(
+            status_code=503,
+            detail=f"no eligible provider is available for classification {classification}: {unavailable}",
+        )
 
     if payload.stream:
         stream = _stream_completion(
@@ -841,6 +864,39 @@ def _usage_tokens(result: Any) -> tuple[int, int]:
     return usage.get("input_tokens", 0), usage.get("output_tokens", 0)
 
 
+def _availability_skip(candidate: ProviderCandidate, cfg: Dict[str, Any]) -> Optional[str]:
+    """ADR-0591: "not_ready" when the candidate's LLMInferenceService reports
+    Ready=False, "circuit_open" when its breaker is open, else None. Claims
+    the breaker's half-open trial: call it only right before the call."""
+    if not readiness.is_ready(cfg.get("inference_service")):
+        return "not_ready"
+    if breaker.is_open(candidate.name):
+        return "circuit_open"
+    return None
+
+
+def _only_availability_skips(errors: List[str]) -> bool:
+    return bool(errors) and all(
+        e.endswith(": skipped (not_ready)") or e.endswith(": skipped (circuit_open)") for e in errors
+    )
+
+
+def _nothing_available(candidates: List[ProviderCandidate]) -> Optional[str]:
+    """ADR-0591 decision 6, before a stream sends its 200: the per-candidate
+    reasons when not one candidate is available, else None. Uses the breaker's
+    peek (no trial claimed), so the loop still gets the half-open trial."""
+    reasons = []
+    for candidate in candidates:
+        cfg = routing_table.provider_config(candidate.name)
+        if not readiness.is_ready(cfg.get("inference_service")):
+            reasons.append(f"{candidate.name}: not ready")
+        elif breaker.peek_open(candidate.name):
+            reasons.append(f"{candidate.name}: circuit open")
+        else:
+            return None
+    return "; ".join(reasons) if reasons else None
+
+
 async def _invoke_with_fallback(
     candidates: List[ProviderCandidate],
     classification: str,
@@ -977,6 +1033,16 @@ async def _invoke_with_fallback(
             )
             errors.append(f"{candidate.name}: not reached through MaaS, skipped for closed quota class {quota_class!r}")
             continue
+        # ADR-0591: availability, after every policy skip above - a model its
+        # controller reports not ready, or a provider whose breaker is open,
+        # is skipped instead of waited for (a *-maas candidate of a down model
+        # waited its full 180 s on the llm-d scheduler, 2026-11-02).
+        availability = _availability_skip(candidate, cfg)
+        if availability:
+            logger.info("skipping candidate %s: %s (ADR-0591)", candidate.name, availability)
+            record_candidate_skipped(candidate.name, availability)
+            errors.append(f"{candidate.name}: skipped ({availability})")
+            continue
         model_name = cfg.get("model", candidate.name)
         # ADR-0303 (WP-39): adapter_name is None unless this candidate is
         # local AND a declaration exists - effective_model_name is what
@@ -1024,12 +1090,14 @@ async def _invoke_with_fallback(
                     "exceeded, not falling back", candidate.name, caller_sub,
                 )
                 raise quota_denial from exc
+            breaker.record_failure(candidate.name, exc)
             logger.warning(
-                "provider '%s' failed for caller=%s, trying next fallback: %s",
-                candidate.name, caller_sub, exc,
+                "provider '%s' failed for caller=%s, trying next fallback: %s: %s",
+                candidate.name, caller_sub, type(exc).__name__, exc,
             )
             errors.append(f"{candidate.name}: {exc}")
             continue
+        breaker.record_success(candidate.name)
 
         content = result.content if hasattr(result, "content") else str(result)
         # ADR-0415: serialize LangChain's normalized tool_calls
@@ -1099,7 +1167,9 @@ async def _invoke_with_fallback(
         return response
 
     raise HTTPException(
-        status_code=502,
+        # ADR-0591 decision 6: nothing was even tried - every candidate was
+        # skipped for availability - is a 503, distinct from real failures.
+        status_code=503 if _only_availability_skips(errors) else 502,
         detail=f"all eligible providers failed for classification {classification}: {'; '.join(errors)}",
     )
 
@@ -1199,6 +1269,16 @@ async def _stream_completion(
             )
             errors.append(f"{candidate.name}: not reached through MaaS, skipped for closed quota class {quota_class!r}")
             continue
+        # ADR-0591: availability, after every policy skip above - a model its
+        # controller reports not ready, or a provider whose breaker is open,
+        # is skipped instead of waited for (a *-maas candidate of a down model
+        # waited its full 180 s on the llm-d scheduler, 2026-11-02).
+        availability = _availability_skip(candidate, cfg)
+        if availability:
+            logger.info("skipping candidate %s: %s (ADR-0591)", candidate.name, availability)
+            record_candidate_skipped(candidate.name, availability)
+            errors.append(f"{candidate.name}: skipped ({availability})")
+            continue
         model_name = cfg.get("model", candidate.name)
         adapter_name = _resolve_adapter(candidate, cfg, adapter_decl)
         effective_model_name = adapter_name or model_name
@@ -1283,7 +1363,10 @@ async def _stream_completion(
                     "falling back", candidate.name,
                 )
                 raise quota_denial from exc
-            logger.warning("provider '%s' failed mid-stream-setup: %s", candidate.name, exc)
+            breaker.record_failure(candidate.name, exc)
+            logger.warning(
+                "provider '%s' failed mid-stream-setup: %s: %s", candidate.name, type(exc).__name__, exc,
+            )
             errors.append(f"{candidate.name}: {exc}")
             if sent_any:
                 yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="error")
@@ -1291,6 +1374,7 @@ async def _stream_completion(
                 return
             continue
 
+        breaker.record_success(candidate.name)
         # ADR-0550 (WP-135): this is the ONLY routing-attribution channel
         # for a streaming call - see schemas.py's own ChatCompletionResponse
         # docstring ("streaming responses do not carry an equivalent

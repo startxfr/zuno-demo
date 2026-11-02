@@ -996,6 +996,15 @@ def check_model_roles() -> List[Finding]:
         name = provider.get("name")
         role = provider.get("role")
         by_name[name] = provider
+        # ADR-0591: a local provider names the LLMInferenceService behind it,
+        # or the ai-gateway cannot skip it when that model is not ready.
+        if provider.get("kind") == "local" and not provider.get("inference_service"):
+            findings.append(Finding(
+                "model_roles",
+                f"provider-routing.yaml's local provider '{name}' declares no "
+                f"inference_service (ADR-0591: the LLMInferenceService whose Ready "
+                f"condition the ai-gateway reads)",
+            ))
         if role not in MODEL_ROLES:
             findings.append(Finding(
                 "model_roles",

@@ -117,12 +117,14 @@ _model_call_duration_histogram = None
 _guardrails_eval_counter = None
 _guardrails_detection_counter = None
 _empty_response_counter = None
+_candidates_skipped_counter = None
 
 
 def init_telemetry(service_name: str = "ai-gateway") -> None:
     global _tracer, _model_call_counter, _token_counter, _cost_counter, _cache_lookup_counter
     global _model_call_duration_histogram
     global _guardrails_eval_counter, _guardrails_detection_counter, _empty_response_counter
+    global _candidates_skipped_counter
 
     resource = Resource.create({"service.name": service_name})
 
@@ -175,6 +177,11 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
         "name - ADR-0534/ADR-0567",
     )
 
+    _candidates_skipped_counter = meter.create_counter(
+        "zuno.model_candidates_skipped",
+        description="Candidates skipped before any call (ADR-0591): reason is not_ready "
+        "(the LLMInferenceService is not Ready) or circuit_open (the provider just failed)",
+    )
     _empty_response_counter = meter.create_counter(
         "zuno.model_empty_responses",
         description="Model answers whose content was blank (no tool call), by provider/model "
@@ -299,6 +306,17 @@ def guardrails_observe_span(
             yield
         finally:
             span.set_attribute("zuno.latency_ms", (time.monotonic() - start) * 1000.0)
+
+
+def record_candidate_skipped(provider: str, reason: str) -> None:
+    """ADR-0591: one candidate skipped for availability. Never raises."""
+    try:
+        if _candidates_skipped_counter is not None:
+            _candidates_skipped_counter.add(
+                1, {"provider": provider, "reason": reason, "client": _caller_client.get()}
+            )
+    except Exception:  # noqa: BLE001
+        logger.debug("candidate-skipped metric recording failed", exc_info=True)
 
 
 def record_empty_response(provider: str, model: str, recovered: bool) -> None:

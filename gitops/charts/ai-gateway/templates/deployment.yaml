@@ -96,6 +96,30 @@ spec:
               value: {{ .Values.guardrails.configId | quote }}
             - name: GUARDRAILS_TIMEOUT_SECONDS
               value: {{ .Values.guardrails.timeoutSeconds | quote }}
+            # ADR-0591 decision 8: NeMo's first request after a restart loads
+            # its rails (~17 s); the warm-up runs with this timeout.
+            - name: GUARDRAILS_WARMUP_TIMEOUT_SECONDS
+              value: {{ .Values.guardrails.warmUpTimeoutSeconds | default 60 | quote }}
+            {{- if .Values.availability.readiness.enabled }}
+            # ADR-0591 decisions 1-2: skip local models whose
+            # LLMInferenceService is not Ready (polled with the projected
+            # token below, read-only Role), fail open.
+            - name: MODEL_READINESS_ENABLED
+              value: "true"
+            - name: MODEL_READINESS_NAMESPACE
+              value: {{ .Values.namespace | quote }}
+            - name: MODEL_READINESS_POLL_SECONDS
+              value: {{ .Values.availability.readiness.pollSeconds | quote }}
+            - name: MODEL_READINESS_CA_PATH
+              value: /etc/kube-root-ca/ca.crt
+            {{- end }}
+            {{- if .Values.availability.circuitBreaker.enabled }}
+            # ADR-0591 decision 3: per-provider breaker, per replica.
+            - name: CIRCUIT_BREAKER_ENABLED
+              value: "true"
+            - name: CIRCUIT_OPEN_SECONDS
+              value: {{ .Values.availability.circuitBreaker.openSeconds | quote }}
+            {{- end }}
             - name: GUARDRAILS_MODE_BY_CLASSIFICATION
               value: {{ .Values.guardrails.modeByClassification | toJson | quote }}
             - name: OPENAI_API_KEY
@@ -248,6 +272,15 @@ spec:
             - name: maas-sa-token
               mountPath: /var/run/secrets/maas
               readOnly: true
+            {{- if .Values.availability.readiness.enabled }}
+            # ADR-0591: the API server's CA, for the readiness poll. The
+            # token is the projected one above (audience
+            # https://kubernetes.default.svc); the pod's default SA mount
+            # stays off.
+            - name: kube-root-ca
+              mountPath: /etc/kube-root-ca
+              readOnly: true
+            {{- end }}
             - name: tmp
               mountPath: /tmp
             {{- if .Values.modelRouting.generated }}
@@ -290,6 +323,11 @@ spec:
         # matches maas-gateway-auth's kubernetesTokenReview.audiences
         # exactly (`oc get authpolicy maas-gateway-auth -n
         # openshift-ingress` - live-confirmed 2026-08-26).
+        {{- if .Values.availability.readiness.enabled }}
+        - name: kube-root-ca
+          configMap:
+            name: kube-root-ca.crt
+        {{- end }}
         - name: maas-sa-token
           projected:
             sources:

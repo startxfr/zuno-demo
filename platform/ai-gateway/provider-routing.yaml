@@ -183,6 +183,7 @@ providers:
   # them on the direct `local` entry below instead.
   - name: local-maas
     kind: local
+    inference_service: qwen36-27b-instruct  # ADR-0591: readiness of the model behind it
     role: quality
     model: qwen3.6-27b-instruct
     max_model_len: 32768
@@ -206,6 +207,7 @@ providers:
   # local candidate, not just gpt-oss, despite the env var's name).
   - name: local
     kind: local
+    inference_service: qwen36-27b-instruct  # ADR-0591: readiness of the model behind it
     role: quality
     model: qwen3.6-27b-instruct
     max_model_len: 32768
@@ -251,6 +253,7 @@ providers:
   # MaaSSubscription/MaaSAuthPolicy grant this depends on.
   - name: local-gpt-oss-maas
     kind: local
+    inference_service: gpt-oss-20b  # ADR-0591: readiness of the model behind it
     role: reasoning
     model: gpt-oss-20b
     max_model_len: 131072
@@ -269,6 +272,7 @@ providers:
 
   - name: local-gpt-oss
     kind: local
+    inference_service: gpt-oss-20b  # ADR-0591: readiness of the model behind it
     role: reasoning
     model: gpt-oss-20b
     max_model_len: 131072
@@ -306,6 +310,7 @@ providers:
   # eligible but it is not exercised here.
   - name: local-wesh-maas
     kind: local
+    inference_service: qwen35-9b-wesh  # ADR-0591: readiness of the model behind it
     role: specialized
     model: qwen3.5-9b-wesh
     max_model_len: 32768
@@ -324,6 +329,7 @@ providers:
 
   - name: local-wesh
     kind: local
+    inference_service: qwen35-9b-wesh  # ADR-0591: readiness of the model behind it
     role: specialized
     model: qwen3.5-9b-wesh
     max_model_len: 32768
@@ -343,6 +349,7 @@ providers:
   # reduced --max-model-len that makes 19.3GB of bf16 weights fit.
   - name: local-qwen35-maas
     kind: local
+    inference_service: qwen35-9b  # ADR-0591: readiness of the model behind it
     role: default
     model: qwen3.5-9b
     max_model_len: 32768
@@ -361,6 +368,7 @@ providers:
 
   - name: local-qwen35
     kind: local
+    inference_service: qwen35-9b  # ADR-0591: readiness of the model behind it
     role: default
     model: qwen3.5-9b
     max_model_len: 32768

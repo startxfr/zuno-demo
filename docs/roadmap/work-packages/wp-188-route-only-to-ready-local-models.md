@@ -1,6 +1,6 @@
 # WP-188: Route only to ready local models and fail fast on stalled candidates
 
-- **State:** Not started
+- **State:** Repo work in review (steps 1 to 6 in the repository, 2026-11-02; step 7 is live and waits for the user's go)
 - **ADRs:** [ADR-0591](../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md)
 - **Related:** [WP-180](wp-180-open-webui-preparation.md), [WP-182](wp-182-openclaw-preparation.md)
@@ -55,6 +55,35 @@ first evaluation `unavailable`.
    request gets an immediate 503, `zuno_model_candidates_skipped{reason="not_ready"}` counts the pairs. Restart the NeMo pod:
    its first evaluation through the gateway is `clean`, not `unavailable`. When the GPU nodes come back: the models
    are used again without a gateway restart.
+
+## Implementation notes (2026-11-02)
+
+- **Step 1.** `inference_service:` on the eight local providers (four pairs), each checked against its endpoint;
+  `check_docs.py`'s model-role check now requires it on `kind: local`. `generate_stack_config.py` is not touched: it reads
+  `provider-routing.yaml` for the MaaS subscriptions only, and an extra key is ignored there.
+- **Step 2.** `app/model_readiness.py` polls (every 10 s, no watch) `serving.kserve.io/v1alpha2` LLMInferenceService objects
+  with the existing projected token (`/var/run/secrets/maas/token`, audience `https://kubernetes.default.svc`); the pod's
+  default ServiceAccount mount stays off. CA from the `kube-root-ca.crt` ConfigMap. Fails open: never polled, stale after
+  three polls, unknown object, or switched off. Chart: `templates/role-model-readiness.yaml` (Role + RoleBinding, get, list,
+  watch), values `availability.readiness`, passed by the `llm` role (`zuno_ai_gateway_model_readiness`, default false).
+- **Step 3.** `app/circuit_breaker.py`: opened by timeout, connection error or 5xx; a 429 or any 4xx closes it (the provider
+  answered); one half-open trial after `openSeconds` (60), and a trial that never reports back expires after the same window.
+  Values `availability.circuitBreaker`, role variable `zuno_ai_gateway_circuit_breaker`, default false.
+- **Step 4.** Both candidate loops skip `not_ready` and `circuit_open` after every policy skip, count
+  `zuno_model_candidates_skipped{provider,reason,client}`, and record success or failure on the breaker.
+  `chat_completions` answers 503 with the per-candidate reasons before a stream starts when nothing is available (the breaker
+  is peeked, so the loop still gets its trial); the non-streaming loop answers 503 instead of 502 when every entry was an
+  availability skip. `max_retries=0` on the seven direct clients and, always, on MaaS (it was only with the 429 pass-through).
+- **Step 5.** `oc explain nemoguardrails.spec.template`: only pod-level scheduling, no container probe. So the ai-gateway warms
+  NeMo up itself: one evaluation with `GUARDRAILS_WARMUP_TIMEOUT_SECONDS` (60) at start and after each `unavailable`, in the
+  background, recording no metric. An `unavailable` now logs the exception type.
+- **Step 6.** `tests/test_wp188_availability.py` (13), including the `local_only_for` case asked by the agents-routing
+  session: with no ready local model, a local-only request ends in 503 and never reaches a SaaS provider.
+  `test_wp157_maas_switches.py` now expects `max_retries=0` without the pass-through. Suite 313/313.
+- **Rollout order (step 7).** Push (the ai-gateway pod rolls once for the new `GUARDRAILS_WARMUP_TIMEOUT_SECONDS`, still on
+  the old image; the mounted routing gains a key the current loader ignores), build with `-e day1_verb=build`, then set
+  `zuno_ai_gateway_model_readiness: true` and `zuno_ai_gateway_circuit_breaker: true` in `ansible/clusters/demo333.yml` and
+  apply the `llm` role.
 
 ## Acceptance
 
