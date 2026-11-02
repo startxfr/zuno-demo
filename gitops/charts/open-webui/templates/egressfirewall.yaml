@@ -1,0 +1,24 @@
+# ADR-0588 security considerations: no egress outside the cluster but Keycloak.
+# Open WebUI signs users in through Keycloak's public https issuer (the gateways
+# accept no other), which resolves to the cluster's external load balancer: the
+# in-cluster router cannot be used instead, because it expects the PROXY protocol
+# the load balancer adds (ROUTER_USE_PROXY_PROTOCOL on AWS). OVN's EgressFirewall
+# admits that one DNS name and denies every other external destination; in-cluster
+# traffic (DNS, the gateways) is not affected by it. One per namespace, named default.
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  egress:
+    - type: Allow
+      to:
+        dnsName: keycloak.{{ .Values.global.zuno.clusterBaseDomain }}
+      ports:
+        - protocol: TCP
+          port: 443
+    - type: Deny
+      to:
+        cidrSelector: 0.0.0.0/0

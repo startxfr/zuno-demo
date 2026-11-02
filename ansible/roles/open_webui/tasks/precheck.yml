@@ -2,7 +2,7 @@
 # `make d2 check open-webui` runs this file. State detection first (the
 # Application Synced and Healthy), then, when installed, the chain WP-181 relies
 # on, probed from inside the pod with real HTTP requests (TCP probes lie behind
-# NetworkPolicies): Keycloak's discovery document through the router, both
+# NetworkPolicies): Keycloak's discovery document (EgressFirewall allow), both
 # gateways reachable (401 without a token), the internet unreachable.
 - name: "open-webui | check the Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"

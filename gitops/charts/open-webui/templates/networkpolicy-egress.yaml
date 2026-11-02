@@ -1,8 +1,9 @@
 # ADR-0588 security considerations: the user's token leaves Open WebUI for two
 # in-cluster services only, and egress is limited to them and to Keycloak.
-# Keycloak is reached by its public issuer through the in-cluster router
-# (hostAliases to router-internal-default, set by the role), so no internet
-# egress is needed: model weights are not downloaded (OFFLINE_MODE).
+# In the cluster: DNS and the two gateways. Outside it: HTTPS, narrowed to
+# Keycloak's DNS name by the EgressFirewall (templates/egressfirewall.yaml);
+# NetworkPolicies cannot name a DNS name. Model weights are not downloaded
+# (OFFLINE_MODE).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -31,9 +32,10 @@ spec:
         - protocol: TCP
           port: {{ .Values.egress.gatewayPort }}
     - to:
-        - namespaceSelector:
-            matchLabels:
-              policy-group.network.openshift.io/ingress: ""
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml .Values.egress.clusterCIDRs | nindent 14 }}
       ports:
         - protocol: TCP
           port: 443

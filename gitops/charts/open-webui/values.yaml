@@ -1,11 +1,6 @@
 # ADR-0588 (WP-181). Every value comes from the WP-180 spike
 # (docs/roadmap/evidence/wp-180-open-webui-spike.md). The role
-# (ansible/roles/open_webui) passes global.zuno and open-webui.hostAliases.
-#
-# Keycloak is reached by its public https issuer (the gateways accept no other
-# issuer) through the in-cluster router: the role sets open-webui.hostAliases
-# to the ClusterIP of openshift-ingress/router-internal-default, so egress stays
-# closed to the internet (templates/networkpolicy-egress.yaml).
+# (ansible/roles/open_webui) passes global.zuno and egress.clusterCIDRs.
 
 # Read by the upstream subchart's tpl-rendered commonEnvVars; the role sets
 # both from the cluster base domain.
@@ -27,6 +22,11 @@ egress:
   # The two gateways' namespace and pod port (WP-179 ingress peers).
   gatewayNamespace: zuno-ai-run
   gatewayPort: 8080
+  # Pod and Service networks, excluded from the HTTPS-out rule (the role reads
+  # them from Network.config.openshift.io/cluster).
+  clusterCIDRs:
+    - 10.128.0.0/14
+    - 172.30.0.0/16
 
 open-webui:
   # Stable object names whatever the release name (the Route targets the Service).

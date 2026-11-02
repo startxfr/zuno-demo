@@ -43,11 +43,14 @@
 - **Chart** `gitops/charts/open-webui`: upstream `open-webui` 17.5.0 as a dependency, image by digest, values of the
   WP-180 evidence. The upstream default `openaiApiKey` is a shared key: it is set empty, so no `OPENAI_API_KEY` is rendered.
   Own templates: two ExternalSecrets (`open-webui-oidc` from `keycloak/open-webui`, `open-webui-app` from
-  `open-webui/app`), the Route (edge, wildcard ACME certificate, timeout 5m), an egress NetworkPolicy (DNS, the gateways
-  on 8080, the router on 443).
-- **Keycloak through the router.** The gateways accept only the public https issuer, and the egress policy closes the
-  internet: the role adds a `hostAliases` entry mapping `keycloak.<apps domain>` to the ClusterIP of
-  `openshift-ingress/router-internal-default`, so the sign-in and the token refresh go through the in-cluster router.
+  `open-webui/app`), the Route (edge, wildcard ACME certificate, timeout 5m), an egress NetworkPolicy and an EgressFirewall
+  (below).
+- **Keycloak egress.** The gateways accept only the public https issuer, so Open WebUI reaches Keycloak through the
+  external load balancer. A first design mapped the Keycloak hostname to the in-cluster router
+  (`router-internal-default`): the TLS handshake was reset, because the AWS router expects the PROXY protocol
+  (`ROUTER_USE_PROXY_PROTOCOL=true`) that only the load balancer adds. Final design: the NetworkPolicy admits HTTPS out
+  of the pod and Service networks, and an OVN `EgressFirewall` allows only `keycloak.<apps domain>`:443 and denies
+  every other external destination.
 - **Role** `ansible/roles/open_webui`: install seeds the missing Vault paths (`seed_vault.yml`), creates the group
   `openwebui_admin` and its members live (`keycloak_admin_group.yml`, create-only), applies `zuno-open-webui-d1`, waits
   for the Deployment. `precheck.yml` is the `make d2 check open-webui` (HTTP probes from the pod: Keycloak 200, both

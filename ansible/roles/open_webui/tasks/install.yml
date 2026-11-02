@@ -10,20 +10,22 @@
 - name: "open-webui | create the Keycloak admin group"
   ansible.builtin.include_tasks: keycloak_admin_group.yml
 
-# Open WebUI signs users in through Keycloak's public https issuer (the gateways
-# accept no other), and its egress policy admits the router but not the internet:
-# the Keycloak hostname resolves to the in-cluster router Service instead.
-- name: "open-webui | read the in-cluster router Service"
+# The egress NetworkPolicy lets HTTPS out of the cluster but not into the pod
+# and Service networks (the EgressFirewall then narrows "out" to Keycloak).
+- name: "open-webui | read the cluster networks"
   kubernetes.core.k8s_info:
-    kind: Service
-    namespace: openshift-ingress
-    name: router-internal-default
-  register: _open_webui_router_svc
+    api_version: config.openshift.io/v1
+    kind: Network
+    name: cluster
+  register: _open_webui_network
 
-- name: "open-webui | fail if the in-cluster router Service is missing"
+- name: "open-webui | fail if the cluster networks are unknown"
   ansible.builtin.fail:
-    msg: "Service openshift-ingress/router-internal-default not found: Open WebUI could not reach Keycloak behind its egress policy."
-  when: (_open_webui_router_svc.resources | default([]) | length) == 0
+    msg: "Network.config.openshift.io/cluster has no clusterNetwork/serviceNetwork: the egress policy cannot exclude them."
+  when: >-
+    (_open_webui_network.resources | default([]) | length) == 0 or
+    (_open_webui_network.resources[0].spec.clusterNetwork | default([]) | length) == 0 or
+    (_open_webui_network.resources[0].spec.serviceNetwork | default([]) | length) == 0
 
 - name: "open-webui | apply the Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -36,11 +38,10 @@
         zuno:
           clusterBaseDomain: "{{ cluster_base_domain }}"
           routeHost: "open-webui.{{ cluster_base_domain }}"
-      open-webui:
-        hostAliases:
-          - ip: "{{ _open_webui_router_svc.resources[0].spec.clusterIP }}"
-            hostnames:
-              - "keycloak.{{ cluster_base_domain }}"
+      egress:
+        clusterCIDRs: >-
+          {{ (_open_webui_network.resources[0].spec.clusterNetwork | map(attribute='cidr') | list)
+             + _open_webui_network.resources[0].spec.serviceNetwork }}
 
 - name: "open-webui | wait for the Deployment to be available"
   kubernetes.core.k8s_info:
