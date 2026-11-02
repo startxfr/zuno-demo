@@ -153,6 +153,15 @@ contracts and policy that this record implements); ADR-0050 (already
 superseded by ADR-0322); ADR-0209, whose project-memory persistence is
 ADR-0569's to settle, not this record's.
 
+## Update 2026-11-02 (WP-186): what the cutover did not carry
+
+Measured against the live fork while closing WP-186, behaviours of the retired rag-service were not carried over, and the records that cited it are corrected:
+
+- **ADR-0109 (freshness and trust scoring) is superseded in part by this record.** The payload contract above names `source_modified_at`, `indexed_at` and
+  `stale_after`; the fork writes only `last_modified` (Confluence and web), ranks by no date, and keeps no stale flag. Its sync deletes changed and vanished pages instead.
+- **The language boost** (+0.01) is not carried. The sparse side is a hashing BM25 encoder with accent folding and English and French stop words, without stemming. French queries
+  are measured by WP-186.
+
 ## Consequences
 
 The platform stops maintaining about 5,000 lines of RAG service and
