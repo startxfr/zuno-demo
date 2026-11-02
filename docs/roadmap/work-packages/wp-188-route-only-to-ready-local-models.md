@@ -1,6 +1,6 @@
 # WP-188: Route only to ready local models and fail fast on stalled candidates
 
-- **State:** Operator pending (live on demo333 2026-11-02; two acceptance checks wait for the GPU nodes and a NeMo restart)
+- **State:** Operator pending (live on demo333 2026-11-02; one acceptance check waits for the GPU nodes)
 - **ADRs:** [ADR-0591](../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md)
 - **Related:** [WP-180](wp-180-open-webui-preparation.md), [WP-182](wp-182-openclaw-preparation.md)
@@ -103,8 +103,10 @@ first evaluation `unavailable`.
 - **Keepalive (Build 33).** A warm-up only at the gateway's start would leave the first evaluation after a NeMo restart
   `unavailable` (the restart test would have failed by construction): the warm-up now repeats every 60 s
   (`GUARDRAILS_WARMUP_INTERVAL_SECONDS`), logging only when its outcome changes.
-- **Still to check.** With the GPU nodes back, the local candidates serve again without a gateway restart; a NeMo pod restart
-  followed by a first evaluation `clean`.
+- **NeMo restart (Build 33, b20fd6f0, image `sha256:aaf1936d...`).** NeMo pod deleted at 18:52:36; its replacement was
+  Running at about 18:52:58 and loaded its rails at 18:53:23 on the gateway's keepalive warm-up (one `POST`, 200, no LLM call),
+  before any user request; no `unavailable` logged by the gateway. The 2026-11-02 cold-start gap is closed for restarts.
+- **Still to check.** With the GPU nodes back, the local candidates serve again without a gateway restart.
 - **Found during the rollout, fixed in the same component** (Build 32, waiting for the user's go): a client that drops a stream
   turned into an `UnboundLocalError` in `model_call_span`, counted as a provider failure (385f7d73); OpenClaw's turns got 422
   for `content` as a list of parts and the `developer` role (5ae5af58).
