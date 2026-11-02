@@ -7,7 +7,7 @@ Day 2 component `openclaw`: one OpenClaw personal assistant per demo persona
 - **Chart** `gitops/charts/openclaw`, two Applications: `zuno-openclaw-d0` (the
   claw-operator catalog pinned by digest; per persona the namespace with
   `zuno.io/experience-client`, an OwnNamespace operator with a Manual Subscription,
-  and an EgressFirewall letting only Keycloak out) and `zuno-openclaw-d1` (per
+  and an EgressFirewall letting only Keycloak and the Kubernetes API out) and `zuno-openclaw-d1` (per
   persona the ExternalSecrets, the oauth2-proxy front door and the `Claw`).
 - **Personas, pins and names** live in the chart's `values.yaml`; the role reads them.
 - **install**: Vault paths (fails if `keycloak/openclaw-<persona>` is missing; seeds

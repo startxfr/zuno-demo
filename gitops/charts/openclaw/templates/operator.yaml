@@ -59,7 +59,9 @@ spec:
 # The operator's proxy always passes clawhub.ai, github.com, npm and openrouter.ai
 # through, and its NetworkPolicy allows TCP 443 anywhere (WP-182 step 4). Traffic
 # leaving the cluster is therefore cut here: only Keycloak's Route (token
-# exchange, oauth2-proxy) may leave. In-cluster services are not affected.
+# exchange, oauth2-proxy) and the Kubernetes API may leave. In-cluster services
+# are not affected; the API is: its Service DNATs to the control-plane node IPs,
+# which the firewall sees, and the operator runs in this namespace.
 apiVersion: k8s.ovn.org/v1
 kind: EgressFirewall
 metadata:
@@ -69,6 +71,13 @@ metadata:
     argocd.argoproj.io/sync-wave: "-6"
 spec:
   egress:
+    - type: Allow
+      to:
+        nodeSelector:
+          matchLabels:
+            node-role.kubernetes.io/control-plane: ""
+      ports:
+        - {protocol: TCP, port: 6443}
     - type: Allow
       to:
         dnsName: {{ include "openclaw.keycloakHost" $ }}

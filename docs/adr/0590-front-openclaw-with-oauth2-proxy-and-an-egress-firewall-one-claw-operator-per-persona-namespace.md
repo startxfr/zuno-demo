@@ -30,7 +30,8 @@ assumptions:
    Subscription with `installPlanApproval: Manual` on the pinned CSV; the role approves only the InstallPlan
    naming that CSV. Personas: `consultant-02` and `sale-01`.
 2. **Egress firewall.** Each persona namespace carries an OVN `EgressFirewall` that allows Keycloak's Route host
-   and denies `0.0.0.0/0`. It closes the hard-coded passthrough domains, which NetworkPolicies cannot subtract.
+   and the control-plane nodes on 6443 (the operator runs in the namespace and the API Service resolves to
+   those node IPs), and denies `0.0.0.0/0`. It closes the hard-coded passthrough domains, which NetworkPolicies cannot subtract.
    In-cluster services (ai-gateway, mcp-gateway) are not affected.
 3. **Front door.** oauth2-proxy (realm `zuno`, client `openclaw-<persona>`, browser flow with PKCE) admits the
    persona's email only, in front of OpenClaw's `password` mode (secret from Vault). Its Route **claims the
