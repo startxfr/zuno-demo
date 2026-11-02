@@ -40,6 +40,13 @@
   injection prompt answers 200 in `observe` mode. Raw Prometheus (thanos-querier, after the 22:31 pod restart reset the
   counters): `zuno_model_calls_total{client="open-webui",provider="openai"}` 2 and
   `zuno_guardrails_evaluations_total{client="open-webui",outcome="detected"}` 1, the export lagging by about a minute.
+- OpenClaw pass of 2026-11-02 (steps 1, 2 and 6 on sale-01's assistant, run by the OpenClaw session as the assistant itself,
+  standard class): the short chat answered "pong" through the gateway path (model fetch HTTP 200 in 1.3 s, provider `openai`
+  gpt-4o-mini, C1); `tools/list` returned `drive.document.search`, `gmail.message.read` and `diagram.generation.create`, and
+  `tools/call confluence.page.search` returned `isError=true` (not exposed through the MCP endpoint, ADR-0524 front-door
+  allowlist / ADR-0571 agent declaration). Raw Prometheus: `zuno_model_tokens_total{client="openclaw-sale-01",provider="openai"}`
+  42 at query time, the pong turn not yet scraped. Not yet rehearsed: the UnifAI steps (sale-01 has no chat session and the
+  script does not name the agent to ask) and the 429 of step 8.
 
 ## Acceptance
 
