@@ -20,11 +20,17 @@ python3 evaluations/redhat-docs/compare.py --persona consultant-02 --top-k 5
 
 ## Ranking set
 
-`ranking.yaml` (24 questions) measures the retriever's ranking (hit@1, hit@5, MRR) before and after a
+`ranking.yaml` (34 questions: the 24 English ones below, and 10 French ones, ids 25 to 34) measures the retriever's ranking (hit@1, hit@5, MRR) before and after a
 change to UnifAI's search: natural questions with the book or Confluence page that answers them,
 and three questions with no answer in the corpus, to calibrate the relevance threshold. Query
 `query.bearer` with each entry's `sourceType` and `tags` and `top_k_results` (not `top_k`), as a
 member of `agent_tekos`. See the file header for the matching rule.
+
+**French subset (WP-186).** Entries 25 to 34 (`lang: fr`) are French reformulations of English entries that rank 1 (`pair` names the English one), with the same `expect`.
+Run them on their own, with a copy of the file that keeps only the entries whose `lang` is `fr`, so that the 24-question figures below stay comparable. The rule
+agreed for WP-186: a French hit@1 of at least 0.7 means French retrieval is accepted as it is (and ADR-0568 states that the bilingual handling is English and French stop words
+plus accent folding, with no language boost); below 0.7 opens a follow-up for a French suffix stemmer in the fork (sparse encoder version 3, full re-index) with this figure as its
+baseline. The measurement needs the embedding model, which was down on 2026-11-02 (GPU nodes `NotReady`).
 
 Results are kept in `results/`, one JSON report per run (per-question rank, top score and top URL).
 `ranking-before-2026-10-31.json` is the baseline before UnifAI operator 0.1.44: hit@1 0.52, hit@5
