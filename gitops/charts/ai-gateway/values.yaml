@@ -194,6 +194,9 @@ trustedPlatformClients: []
 # (2000 tokens / 5 min per user), for the shared-quota rehearsal. Empty = off.
 # Set it only for a rehearsal and clear it afterwards.
 quotaRehearsalGroup: ""
+# Class those members run under; empty = the image default (stresstest). The
+# fail-open `rehearsal` class (agents release 0.9.1+) lets SaaS answer without GPUs.
+quotaRehearsalClass: ""
 
 # ADR-0587 (WP-179): allowed values of the `client` label on zuno_model_* and
 # zuno_guardrails_* (the token's `azp`, the user experience the call came

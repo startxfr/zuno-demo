@@ -214,6 +214,10 @@ spec:
             {{- if .Values.quotaRehearsalGroup }}
             - name: QUOTA_REHEARSAL_GROUP
               value: {{ .Values.quotaRehearsalGroup | quote }}
+            {{- if .Values.quotaRehearsalClass }}
+            - name: QUOTA_REHEARSAL_CLASS
+              value: {{ .Values.quotaRehearsalClass | quote }}
+            {{- end }}
             {{- end }}
             {{- if .Values.experienceClients }}
             - name: EXPERIENCE_CLIENTS
