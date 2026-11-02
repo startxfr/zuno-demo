@@ -1021,6 +1021,33 @@
                     "query-groups"
                 ]
             }
+        },
+        {
+            "username": "service-account-openclaw-consultant-02",
+            "enabled": true,
+            "serviceAccountClientId": "openclaw-consultant-02",
+            "groups": [
+                "/consultant",
+                "/consultant/confluence-build-openshift",
+                "/consultant/confluence-build-openshift-ai",
+                "/consultant/confluence-archi-satellite",
+                "/consultant/confluence-archi-openshift",
+                "/consultant/confluence-archi-openshift-ai",
+                "/consultant/confluence-archi-keycloak",
+                "/agent_tekos",
+                "/agent_arkos",
+                "/aap_ops"
+            ]
+        },
+        {
+            "username": "service-account-openclaw-sale-01",
+            "enabled": true,
+            "serviceAccountClientId": "openclaw-sale-01",
+            "groups": [
+                "/sales",
+                "/agent_comage",
+                "/agent_finage"
+            ]
         }
     ],
     "clients": [{
@@ -1156,6 +1183,84 @@
             "attributes": {
                 "post.logout.redirect.uris": "https://open-webui.apps.mycluster.example.com/*"
             }
+        }, {
+            "clientId": "openclaw-consultant-02",
+            "name": "OpenClaw assistant of consultant-02",
+            "description": "Confidential client of consultant-02's OpenClaw assistant (ADR-0589, ADR-0590): client credentials for the assistant's model and tool calls (claw-operator proxy), browser flow for its oauth2-proxy front door",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "${vault.openclaw_consultant_02_client_secret}",
+            "redirectUris": [
+                "https://assistant-zuno-claw-consultant-02.apps.mycluster.example.com/oauth2/callback"
+            ],
+            "webOrigins": [
+                "https://assistant-zuno-claw-consultant-02.apps.mycluster.example.com"
+            ],
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": true,
+            "protocolMappers": [
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
+                    }
+                }
+            ],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ]
+        }, {
+            "clientId": "openclaw-sale-01",
+            "name": "OpenClaw assistant of sale-01",
+            "description": "Confidential client of sale-01's OpenClaw assistant (ADR-0589, ADR-0590): client credentials for the assistant's model and tool calls (claw-operator proxy), browser flow for its oauth2-proxy front door",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "${vault.openclaw_sale_01_client_secret}",
+            "redirectUris": [
+                "https://assistant-zuno-claw-sale-01.apps.mycluster.example.com/oauth2/callback"
+            ],
+            "webOrigins": [
+                "https://assistant-zuno-claw-sale-01.apps.mycluster.example.com"
+            ],
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": true,
+            "protocolMappers": [
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
+                    }
+                }
+            ],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ]
         }, {
             "clientId": "openshift",
             "name": "OpenShift Console/oc OIDC identity provider client (ADR-0320)",

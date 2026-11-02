@@ -116,6 +116,22 @@ spec:
                       - key: client_secret
                         path: zuno_open__webui__client__secret
                 - secret:
+                    # ADR-0589/0590 (WP-183): consultant-02's OpenClaw assistant,
+                    # ${vault.openclaw_consultant_02_client_secret}.
+                    name: openclaw-consultant-02-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_openclaw__consultant__02__client__secret
+                - secret:
+                    # ADR-0589/0590 (WP-183): sale-01's OpenClaw assistant,
+                    # ${vault.openclaw_sale_01_client_secret}.
+                    name: openclaw-sale-01-client-secret
+                    optional: true
+                    items:
+                      - key: client_secret
+                        path: zuno_openclaw__sale__01__client__secret
+                - secret:
                     name: demo-personas-password
                     optional: true
                     items:

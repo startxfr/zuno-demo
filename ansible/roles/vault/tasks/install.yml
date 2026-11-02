@@ -488,6 +488,18 @@
     vault_seed_fields:
       client_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
 
+# ADR-0589/0590 (WP-183): the confidential client of each OpenClaw assistant,
+# same shape as unifai above. Read by Keycloak (KC_VAULT) and by the assistant's
+# proxy and front door (gitops/charts/openclaw ExternalSecret).
+- name: "vault | generate and seed the openclaw-<persona> confidential OIDC client secrets (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  loop: ["consultant-02", "sale-01"]
+  vars:
+    vault_seed_path: "keycloak/openclaw-{{ item }}"
+    vault_seed_fields:
+      client_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+
 # ADR-0320: the "openshift" client backing the cluster OAuth identity
 # provider - a single generated client_secret, same shape as unifai above.
 - name: "vault | generate and seed the openshift OIDC client secret (idempotent)"
