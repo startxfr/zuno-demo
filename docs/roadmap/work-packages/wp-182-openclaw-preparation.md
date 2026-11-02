@@ -1,10 +1,11 @@
 # WP-182: OpenClaw preparation
 
-- **State:** Not started
+- **State:** Done (2026-11-02: steps 1 to 8 answered live on demo333, decision: claw-operator; scratch namespace removed)
 - **ADRs:** [ADR-0589](../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md) (its interfaces only; this spike can start once they are written)
 - **Related:** [WP-183](wp-183-install-openclaw-on-demo333.md), [WP-180](wp-180-open-webui-preparation.md)
 - **Target:** v0.13
+- **Evidence:** [wp-182-openclaw-spike.md](../evidence/wp-182-openclaw-spike.md)
 - **Estimated files touched:** one evidence file `docs/roadmap/evidence/wp-182-openclaw-spike.md`; no shared file
 
 > Track OpenClaw. Runs in parallel with WP-180 under WP-179's coordination protocol. No cluster action except, with the
