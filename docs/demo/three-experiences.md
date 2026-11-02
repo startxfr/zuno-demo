@@ -64,7 +64,9 @@ flowchart LR
    (`injection-ignore-instructions`, `injection-persona-override`; a fake card number works too). The guardrails run in
    `observe` mode (user decision 2026-11-02): recorded, the reply is not blocked - say so.
 8. **One user, one budget.** Row *Same user, one budget*: sale-01's tokens, per experience, add up to one per-user budget
-   in the ai-gateway's quota. Spending it in one UI spends it in all of them.
+   in the ai-gateway's token ledger (durable in Redis). Its counter is keyed by user and quota class, never by client, so
+   spending it in one UI spends it in all of them. The per-user ceiling is enforced by this ledger, not by MaaS: Kuadrant
+   counts only the per-subscription budgets (ADR-0570, WP-177).
 
 ## If something goes wrong
 
@@ -75,5 +77,7 @@ flowchart LR
 
 ## Not shown live (yet)
 
-The shared quota ending in a 429 in all three experiences needs a lowered ceiling for one persona and calls from the three
-UIs; it is planned for a rehearsal, not run in this script (WP-184).
+The shared quota ending in a 429 in all three experiences needs a tight ceiling for one persona and calls from the three
+UIs. The ai-gateway can put the members of one group (`QUOTA_REHEARSAL_GROUP`, off by default) under the tight `stresstest`
+class (2,000 tokens per user per 5 minutes), so the proof needs no budget change and ends when the persona leaves the
+group. It is planned for a rehearsal, not run in this script (WP-184).
