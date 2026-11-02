@@ -197,6 +197,9 @@ jobs:
           python3 tests/test_render_policy_trustroot.py
           python3 render_policy_trustroot.py --check
           python3 check_unifai_pins.py
+      - name: supply-chain OpenClaw pins (ADR-0590)
+        working-directory: platform/supply-chain
+        run: python3 tests/test_pin_claw_catalog.py
       - name: OpenShift GitOps operator health check (WP-176 follow-up)
         run: python3 platform/gitops/tests/test_check_gitops_operator.py
       - name: confluence MCP server tests

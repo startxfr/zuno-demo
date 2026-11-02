@@ -20,10 +20,11 @@ Day 2 component `openclaw`: one OpenClaw personal assistant per demo persona
   from clawhub.ai or the internet.
 - **uninstall**: d1 then d0. The CRDs and the Vault paths stay.
 
-**Upgrading the operator** is a deliberate pin change: resolve the catalog digest
-(`skopeo inspect docker://quay.io/codeready-toolchain/claw-operator-catalog:latest`),
-read its single bundle's CSV name and image tags (`opm render` or the catalog's
-`configs/claw-operator/bundle.yaml`), resolve the manager and proxy digests, re-check
-the operator source at the bundle's commit (passthrough domains, owned config keys,
-Route), then change `operator.catalogImage`, `startingCSV` and `pinnedImageDigests`
-together.
+**Upgrading the operator or OpenClaw** is a deliberate pin change, made by
+`python3 platform/supply-chain/pin_claw_catalog.py` (`--dry-run` first; `--catalog sha256:...` and
+`--openclaw <tag>` to choose). It resolves the newest catalog, reads its single bundle in memory, resolves the
+manager and proxy digests and the newest stable OpenClaw tag, and rewrites `operator.catalogImage`,
+`operator.startingCSV`, `operator.pinnedImageDigests`, `images.openclaw` and the chart's `appVersion` together.
+When it reports a new CSV, re-read the operator source at the bundle's commit (passthrough domains, owned config
+keys, Route) before installing. Then push and run `make d2 install openclaw` (the role approves only the
+InstallPlan naming the new CSV) and `make d2 check openclaw`.
