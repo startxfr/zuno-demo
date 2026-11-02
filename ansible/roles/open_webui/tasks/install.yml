@@ -1,6 +1,61 @@
 ---
-# Stub (WP-179): WP-181 replaces this file. A no-op, never a failure, so a full
-# `make d2 install` stays green until the Open WebUI track lands.
-- name: "open-webui | not implemented yet"
+# ADR-0588 (WP-181): Open WebUI, the general-purpose chat experience.
+# Order: secrets in Vault, the admin group in Keycloak, then the Application.
+- name: "open-webui | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "open-webui | seed the Vault paths"
+  ansible.builtin.include_tasks: seed_vault.yml
+
+- name: "open-webui | create the Keycloak admin group"
+  ansible.builtin.include_tasks: keycloak_admin_group.yml
+
+# Open WebUI signs users in through Keycloak's public https issuer (the gateways
+# accept no other), and its egress policy admits the router but not the internet:
+# the Keycloak hostname resolves to the in-cluster router Service instead.
+- name: "open-webui | read the in-cluster router Service"
+  kubernetes.core.k8s_info:
+    kind: Service
+    namespace: openshift-ingress
+    name: router-internal-default
+  register: _open_webui_router_svc
+
+- name: "open-webui | fail if the in-cluster router Service is missing"
+  ansible.builtin.fail:
+    msg: "Service openshift-ingress/router-internal-default not found: Open WebUI could not reach Keycloak behind its egress policy."
+  when: (_open_webui_router_svc.resources | default([]) | length) == 0
+
+- name: "open-webui | apply the Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "open-webui"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-open-webui-d1"
+    gitops_app_extra_helm_values:
+      global:
+        zuno:
+          clusterBaseDomain: "{{ cluster_base_domain }}"
+          routeHost: "open-webui.{{ cluster_base_domain }}"
+      open-webui:
+        hostAliases:
+          - ip: "{{ _open_webui_router_svc.resources[0].spec.clusterIP }}"
+            hostnames:
+              - "keycloak.{{ cluster_base_domain }}"
+
+- name: "open-webui | wait for the Deployment to be available"
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    namespace: "{{ open_webui_namespace }}"
+    name: open-webui
+  register: _open_webui_deploy
+  until: >-
+    (_open_webui_deploy.resources | default([]) | length > 0) and
+    ((_open_webui_deploy.resources[0].status.availableReplicas | default(0)) >= 1)
+  retries: 60
+  delay: 15
+
+- name: "open-webui | installed"
   ansible.builtin.debug:
-    msg: "open-webui is declared but not implemented yet (WP-181, ADR-0588); nothing was applied."
+    msg: >-
+      Open WebUI is at https://open-webui.{{ cluster_base_domain }} - sign in with
+      a realm zuno user; `make d2 check open-webui` verifies the chain.

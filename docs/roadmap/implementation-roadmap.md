@@ -977,7 +977,7 @@ WP-184 closes them together.
 |---|---|---|---|---|---|
 | WP-179 | [wp-179](work-packages/wp-179-common-preparation-for-experience-clients.md) | 0587 | none | Done (2026-11-02) | shared groundwork, one session, before both tracks: client label, label-based ingress, namespaces, Make/AAP stubs, Keycloak client pattern, coordination protocol |
 | WP-180 | [wp-180](work-packages/wp-180-open-webui-preparation.md) | 0588, 0587 | WP-179 | Done | track Open WebUI: spike (user-token forwarding, MCP headers, SCC, lockdown switches, pins) |
-| WP-181 | [wp-181](work-packages/wp-181-install-open-webui-on-demo333.md) | 0588, 0587 | WP-179, WP-180 | Not started | track Open WebUI: chart, role, Keycloak client, install on demo333 (user's go) |
+| WP-181 | [wp-181](work-packages/wp-181-install-open-webui-on-demo333.md) | 0588, 0587 | WP-179, WP-180 | Repo work in review | track Open WebUI: chart, role, Keycloak client, install on demo333 (user's go) |
 | WP-182 | [wp-182](work-packages/wp-182-openclaw-preparation.md) | 0589, 0587 | WP-179 | Done | track OpenClaw: spike on claw-operator (custom provider, refreshable credential, egress, lockdown), operator or openclaw-kube fallback |
 | WP-183 | [wp-183](work-packages/wp-183-install-openclaw-on-demo333.md) | 0589, 0587 | WP-179, WP-182 | Not started | track OpenClaw: catalog pin, one Claw per persona, token proxy, oauth2-proxy, install on demo333 (user's go) |
 | WP-184 | [wp-184](work-packages/wp-184-three-experiences-demonstration.md) | 0587, 0588, 0589 | WP-181, WP-183 | Not started | joint close: dashboard, demo script, shared-quota proof across the three experiences |

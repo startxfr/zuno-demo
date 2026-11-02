@@ -1,0 +1,9 @@
+---
+# Members of the Keycloak group openwebui_admin (Open WebUI admin role), kept in
+# step with realm-zuno.json: the role adds them live (create-only, never removes).
+open_webui_admin_users:
+  - ai-ops-01
+  - paas-ops-01
+# The Keycloak pod the kcadm calls run in (keycloakCRName zuno, one instance).
+open_webui_keycloak_pod: zuno-0
+open_webui_namespace: zuno-openwebui
