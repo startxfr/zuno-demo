@@ -33,15 +33,35 @@ def test_an_openclaw_turn_validates() -> None:
     req = ChatCompletionRequest.model_validate(_OPENCLAW_TURN)
     assert [m.role for m in req.messages] == ["system", "user"]
     assert req.messages[0].content == "You are the assistant."
-    assert req.messages[1].content == "Hello\nagain"
+    assert req.messages[1].content == "Hello\n\nagain"
 
 
 def test_it_reaches_langchain_as_plain_messages() -> None:
     req = ChatCompletionRequest.model_validate(_OPENCLAW_TURN)
     converted = app_main._to_langchain_messages(req.messages)
     assert isinstance(converted[0], SystemMessage) and converted[0].content == "You are the assistant."
-    assert isinstance(converted[1], HumanMessage) and converted[1].content == "Hello\nagain"
-    assert app_main._last_user_text(req.messages) == "Hello\nagain"
+    assert isinstance(converted[1], HumanMessage) and converted[1].content == "Hello\n\nagain"
+    assert app_main._last_user_text(req.messages) == "Hello\n\nagain"
+
+
+def test_openclaw_gateway_path_conversation_validates() -> None:
+    """The shape captured from OpenClaw's Control UI path (zuno-demo-13,
+    2026-11-02): parts on the user and assistant turns, a string again on a
+    follow-up, no image part."""
+    req = ChatCompletionRequest.model_validate({
+        "model": "auto", "stream": True, "stream_options": {"include_usage": True},
+        "tool_choice": "auto", "max_completion_tokens": 8192,
+        "messages": [
+            {"role": "system", "content": "You are a personal assistant running inside OpenClaw."},
+            {"role": "user", "content": [{"type": "text", "text": "<bootstrap>"}, {"type": "text", "text": "<context>"},
+                                         {"type": "text", "text": "what is Kubernetes?"}]},
+            {"role": "assistant", "content": [{"type": "text", "text": "A container orchestrator."}]},
+            {"role": "user", "content": "and OpenShift?"},
+        ],
+    })
+    assert req.messages[1].content == "<bootstrap>\n\n<context>\n\nwhat is Kubernetes?"
+    assert req.messages[2].content == "A container orchestrator."
+    assert app_main._last_user_text(req.messages) == "and OpenShift?"
 
 
 def test_string_content_and_the_four_roles_are_unchanged() -> None:

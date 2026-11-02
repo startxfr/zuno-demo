@@ -53,8 +53,9 @@ class ChatMessage(BaseModel):
     @field_validator("content", mode="before")
     @classmethod
     def _join_text_parts(cls, value: Any) -> Any:
-        """`content` as a list of parts: the text parts are joined with a
-        newline. Any other part (image, audio, file) is refused by name -
+        """`content` as a list of parts (OpenClaw's gateway path sends its
+        user and assistant turns this way): the text parts are joined with a
+        blank line, as the separate blocks they are. Any other part (image, audio, file) is refused by name -
         this gateway routes text models and its guardrails read text only,
         so silently dropping a part would answer a question nobody asked."""
         if not isinstance(value, list):
@@ -66,7 +67,7 @@ class ChatMessage(BaseModel):
                 texts.append(part["text"])
             else:
                 raise ValueError(f"content part of type {kind!r} is not supported; only text parts are")
-        return "\n".join(texts)
+        return "\n\n".join(texts)
 
 
 class ChatCompletionRequest(BaseModel):
