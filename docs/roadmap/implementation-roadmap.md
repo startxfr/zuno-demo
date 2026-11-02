@@ -35,6 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 18 | 23 | WP-166, WP-171, WP-172, WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
+| v0.13 | 3 | 3 | 6 | WP-179, WP-180, WP-181, WP-182, WP-183, WP-184 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -963,6 +964,24 @@ frozen mirror.
 | WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Done (2026-10-25) | works with the Kuadrant two-limit ceiling: counters probe and Redis-backed quota ledger live on demo333 (budgets survive an ai-gateway restart); removing quota.py deferred until Kuadrant is fixed |
 | WP-178 | [wp-178](work-packages/wp-178-admit-only-signed-unifai-images-at-the-cluster.md) | 0586 | WP-176 | Done (2026-10-25) | cluster-side admission of the UnifAI images with the Sigstore `policy-controller`, in `enforce` on demo333 (`zuno-unifai-images`, namespaces `zuno-unifai` and `unifai-operator`; third-party services stay `warn`); offline public-Sigstore TrustRoot, pin preflight, runbook in `docs/platform/operations.md`; limits recorded (fail-open webhook, ECDSA-only log keys, no attestation check at admission) |
 
+### Phase 46 — three user experiences over one governed backend (added 2026-11-02)
+
+Opened by a user request to add OpenClaw and Open WebUI next to UnifAI, on the
+same MaaS backend and RHOAI tooling. ADR-0587 admits experience clients that
+own no model access, policy or knowledge; ADR-0588 (Open WebUI) and ADR-0589
+(OpenClaw via claw-operator) are two **independent tracks** run by two
+sessions in parallel after the shared WP-179, under its coordination protocol;
+WP-184 closes them together.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-179 | [wp-179](work-packages/wp-179-common-preparation-for-experience-clients.md) | 0587 | none | Not started | shared groundwork, one session, before both tracks: client label, label-based ingress, namespaces, Make/AAP stubs, Keycloak client pattern, coordination protocol |
+| WP-180 | [wp-180](work-packages/wp-180-open-webui-preparation.md) | 0588, 0587 | WP-179 | Not started | track Open WebUI: spike (user-token forwarding, MCP headers, SCC, lockdown switches, pins) |
+| WP-181 | [wp-181](work-packages/wp-181-install-open-webui-on-demo333.md) | 0588, 0587 | WP-179, WP-180 | Not started | track Open WebUI: chart, role, Keycloak client, install on demo333 (user's go) |
+| WP-182 | [wp-182](work-packages/wp-182-openclaw-preparation.md) | 0589, 0587 | WP-179 | Not started | track OpenClaw: spike on claw-operator (custom provider, refreshable credential, egress, lockdown), operator or openclaw-kube fallback |
+| WP-183 | [wp-183](work-packages/wp-183-install-openclaw-on-demo333.md) | 0589, 0587 | WP-179, WP-182 | Not started | track OpenClaw: catalog pin, one Claw per persona, token proxy, oauth2-proxy, install on demo333 (user's go) |
+| WP-184 | [wp-184](work-packages/wp-184-three-experiences-demonstration.md) | 0587, 0588, 0589 | WP-181, WP-183 | Not started | joint close: dashboard, demo script, shared-quota proof across the three experiences |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1106,6 +1125,10 @@ moving.
 10. **Autonomy sign-off** after one observed cycle (WP-42).
 
 ## Change log
+
+- 2026-11-02 — Phase 46 added: three user experiences over one governed
+  backend, ADR-0587 – ADR-0589 (new v0.13 band) and WP-179 – WP-184; two
+  parallel tracks (Open WebUI, OpenClaw) after a shared WP-179.
 
 - 2026-10-22 — Phase 45 added: agents extracted to `zuno-demo-agents`,
   ADR-0576 – ADR-0581 (new v0.12 band) and WP-158 – WP-165; ADR-0506,

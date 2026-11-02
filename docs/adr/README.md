@@ -342,6 +342,14 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Implemented | Require group visibility and object-level authorisation before per-agent entries |
 | [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
 
+## v0.13
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-0587](0587-admit-additional-user-experiences-over-the-one-governed-backend.md) | Accepted | Admit additional user experiences over the one governed backend |
+| [ADR-0588](0588-serve-a-general-purpose-chat-experience-with-open-webui.md) | Accepted | Serve a general-purpose chat experience with Open WebUI |
+| [ADR-0589](0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md) | Accepted | Serve per-persona OpenClaw assistants via claw-operator behind a token-injecting egress proxy |
+
 ## OKF v0.1
 
 | ADR | Status | Decision |

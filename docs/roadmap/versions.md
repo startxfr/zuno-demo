@@ -254,6 +254,18 @@ Kuadrant policies, ai-gateway inputs and UnifAI bundles from the release.
 
 **9 ADRs.** Implemented: ADR-0576, ADR-0577, ADR-0578 (2026-10-23, the cutover of WP-165) and ADR-0580 (2026-10-24, first full promotion cycle). Open: ADR-0579, ADR-0581 – ADR-0584; WP-161, WP-163, WP-164, WP-167.
 
+## v0.13
+
+Show that the platform is the governed chain, not the UI: three user
+experiences on the same Keycloak identity, ai-gateway policy (routing,
+guardrails, per-user quotas, telemetry), MaaS models and mcp-gateway tools.
+UnifAI stays the agent platform; Open WebUI is a general-purpose chat;
+OpenClaw gives each persona a personal assistant, deployed by Red Hat's
+claw-operator behind a token-injecting egress proxy. Neither new experience
+owns a model key, a guardrail or a knowledge store.
+
+**3 ADRs, all `Accepted`.** Open: ADR-0587 – ADR-0589; WP-179 – WP-184.
+
 ## OKF stream
 
 A standalone version line for the Open Knowledge Format initiative, decoupled
