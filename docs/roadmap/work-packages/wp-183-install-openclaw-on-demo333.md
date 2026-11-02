@@ -1,6 +1,6 @@
 # WP-183: Install OpenClaw on demo333
 
-- **State:** Repo work in review (2026-11-02: chart, Applications, role, Keycloak clients, ADR-0590 in the repository; the install waits for the user's go)
+- **State:** Operator pending (2026-11-02: installed on demo333, `make d2 check openclaw` green; the browser acceptance and the `openclaw` entitlement remain)
 - **ADRs:** [ADR-0590](../../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md), [ADR-0589](../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-182](wp-182-openclaw-preparation.md)
 - **Related:** [WP-181](wp-181-install-open-webui-on-demo333.md), [WP-184](wp-184-three-experiences-demonstration.md)
@@ -67,4 +67,28 @@ the spike changed in ADR-0589.
 - **Install order on demo333:** push (the Keycloak volume change rolls Keycloak, `zuno-keycloak-d1` follows
   `devel`), `make d0 install vault` (seeds the two client secrets), wait for the client reconcile Job, then
   `make d2 install openclaw`.
+
+## Live results (demo333, 2026-11-02)
+
+- **Install** (`make d2 install openclaw`, user's go) after `make d0 install vault` seeded `keycloak/openclaw-*` (seed
+  **before** pushing the Keycloak change, or `zuno-keycloak-d1` stops on the missing ExternalSecret). Two fixes found by
+  the first runs: the role waited for `zuno-openclaw-d0` Healthy before approving the InstallPlans, which keep it
+  Progressing (af53c134); and the EgressFirewall's `Deny 0.0.0.0/0` cut the in-namespace operator from the API server,
+  whose Service resolves to the control-plane node IPs (`dial tcp 172.30.0.1:443: i/o timeout`, crash loop), now allowed
+  on 6443 by `nodeSelector` (030953fe).
+- **State:** `zuno-openclaw-d0` and `-d1` Synced and Healthy; per persona the CSV `claw-operator.v0.0.227-commit-f5aa592`
+  Succeeded, the `Claw` Ready, the operator's Route `HostAlreadyClaimed` behind the front door.
+- **`make d2 check openclaw`:** all assertions pass for both personas: running image IDs equal the pins, front door
+  admitted, 302 to Keycloak without a session, from the assistant's pod 200 from the ai-gateway through the proxy and
+  nothing when bypassed, nothing from clawhub.ai or the internet.
+- **Tools through the proxy** (`tools/list`, no `X-Zuno-Agent`): consultant-02's assistant gets
+  `confluence.page.search`, `confluence.page.read`, `knowledge.tech.search`, `aap.platform.audit`,
+  `aap.cluster.audit`; sale-01's gets none. The service accounts carry the persona's groups.
+- **Metrics:** `zuno_model_calls_total{client="openclaw-consultant-02"}` in raw Prometheus.
+- **Chat:** still times out with the GPU nodes down (the ai-gateway walks the local providers first); WP-188
+  (ADR-0591) addresses it. Not a WP-183 defect.
+
+**Remaining acceptance:** browser sign-in (consultant-02 reaches its UI, sale-01 is refused there, and the reverse);
+the entitled-tool proof once the `openclaw` experience-client declaration is admitted (the Open WebUI track's WP,
+then `gateways.mcpAgentHeader: true`).
 
