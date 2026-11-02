@@ -100,18 +100,6 @@ preferences:
   - local-qwen35-maas
   - local-qwen35
 - agent: comage
-  task: compare-historical-deals
-  preferred:
-  - ovhcloud-gpt-oss-120b
-  - local-gpt-oss-maas
-  - local-gpt-oss
-  - local-wesh-maas
-  - local-wesh
-  - local-qwen35-maas
-  - local-qwen35
-  - local-maas
-  - local
-- agent: comage
   task: check-deal-status
   preferred:
   - local-wesh-maas
@@ -226,15 +214,6 @@ preferences:
   - local-gpt-oss
   - local-maas
   - local
-- agent: cognos
-  task: review-historical-commercial-data
-  preferred:
-  - local-qwen35-maas
-  - local-qwen35
-  - local-gpt-oss-maas
-  - local-gpt-oss
-  - local-maas
-  - local
 - agent: naveo
   task: answer-onboarding-question
   preferred:
@@ -273,9 +252,6 @@ preferences:
   - local-maas
   - local
 objectives:
-- agent: comage
-  task: compare-historical-deals
-  quality_floor: 0.75
 - agent: comage
   task: check-deal-status
   quality_floor: 0.75
