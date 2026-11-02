@@ -1,6 +1,6 @@
 # WP-188: Route only to ready local models and fail fast on stalled candidates
 
-- **State:** Repo work in review (steps 1 to 6 in the repository, 2026-11-02; step 7 is live and waits for the user's go)
+- **State:** Operator pending (live on demo333 2026-11-02; two acceptance checks wait for the GPU nodes and a NeMo restart)
 - **ADRs:** [ADR-0591](../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md)
 - **Related:** [WP-180](wp-180-open-webui-preparation.md), [WP-182](wp-182-openclaw-preparation.md)
@@ -84,6 +84,27 @@ first evaluation `unavailable`.
   the old image; the mounted routing gains a key the current loader ignores), build with `-e day1_verb=build`, then set
   `zuno_ai_gateway_model_readiness: true` and `zuno_ai_gateway_circuit_breaker: true` in `ansible/clusters/demo333.yml` and
   apply the `llm` role.
+
+## Live evidence (2026-11-02, demo333, user's go)
+
+- **Rollout.** cf774982 pushed; ai-gateway Build 31 (commit cf774982), image `sha256:f5824822...`; switches on in
+  `ansible/clusters/demo333.yml` (a27809cb). `make d2 install llm` routed to AAP and job 1264 never started (no execution pod in
+  about 50 minutes, `aap-controller-task` silent), so the day 2 playbook ran directly from a worktree whose
+  `ansible/confidential.yml` links to the shared checkout's. Role and RoleBinding present, six environment variables set.
+- **Readiness.** An in-pod poll read the four LLMInferenceService `Ready=False`; no poll failure logged.
+- **NeMo warm-up.** `guardrails warm-up done (config_id=zuno-observe)` at the pod's start.
+- **C1 from Open WebUI** (sale-01, zuno-demo-78): 200 from `openai`, the chat itself a few seconds (about 12 minutes before);
+  raw Prometheus: `zuno_model_candidates_skipped_total{client="open-webui",reason="not_ready"}` on all eight local providers.
+- **C2 from OpenClaw** (consultant-02 assistant, zuno-demo-13): 200 in 1.7 s from `openai`, the eight local providers skipped
+  `not_ready`.
+- **Local-only** (stress-consultant-01, tekos, zuno-demo-08, recorded in `docs/roadmap/evidence/wp-187-exposure-measurement.md`):
+  three `local_only_for` requests answered 503 in 0.01 to 0.06 s with the per-candidate reasons and no `model_call` span; the
+  control task without `local_only_for` answered 200 in 1.03 s from `ovhcloud-gpt-oss-120b`.
+- **Still to check.** With the GPU nodes back, the local candidates serve again without a gateway restart; a NeMo pod restart
+  followed by a first evaluation `clean`.
+- **Found during the rollout, fixed in the same component** (Build 32, waiting for the user's go): a client that drops a stream
+  turned into an `UnboundLocalError` in `model_call_span`, counted as a provider failure (385f7d73); OpenClaw's turns got 422
+  for `content` as a list of parts and the `developer` role (5ae5af58).
 
 ## Acceptance
 
