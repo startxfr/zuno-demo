@@ -7,11 +7,17 @@ Comage's `check-deal-status` task is the actual fallback under test
 (local-wesh -> local-qwen35 when the wesh pod is cordoned/killed - see
 ADR-0536's Context section for why the original direction, killing
 qwen3.5-9b to prove Tekos fails over, turned out to be unprovable through
-real chat traffic). Tekos is included as a decoupling control: its one
-chat-reachable task is reflexional (WP-096/ADR-0531) and routes off-cluster
-to ovhcloud-gpt-oss-120b regardless of on-prem GPU node health, so it is
-expected to report the SAME provider across all three phases
-(baseline/failover/restore).
+real chat traffic). Tekos is the control, and what it controls changed on
+2026-11-02 (zuno-demo WP-187, agents release v0.8.1): its chat-reachable task
+`answer-technical-question` reads Confluence, so it is local only at every
+level and must NEVER be served by an external provider. It used to be the
+"decoupling control" that stayed on ovhcloud-gpt-oss-120b in all three phases;
+that premise ended with tekos 0.4.3 (local first) and is now forbidden. The
+control passes when the turn is answered by a local provider, or - only in the
+failover phase - when it is refused cleanly (the ai-gateway answers 503 "no
+eligible provider" while no local model is ready). It fails when any external
+provider was reached, and it is reported "unknown" (not ok) when neither can
+be established, so a broken probe never reads as a pass.
 
 Runs as the in-cluster Job's entrypoint (ansible/tasks/
 scenario_failover_probe_job.yml). WP-156: the agents are served by UnifAI
@@ -50,10 +56,11 @@ Usage (inside the Job container):
 Prints one JSON object to stdout:
     {"phase": "baseline",
      "comage": {"provider": "local-wesh", "ok": true, "source": "routing-metadata"},
-     "tekos": {"provider": "ovhcloud-gpt-oss-120b", "ok": true, "source": "prometheus"}}
+     "tekos": {"provider": "local-gpt-oss-maas", "ok": true, "outcome": "answered-local", "source": "routing-metadata"}}
 `provider` is null if the answer carried no routing decision AND no
 candidate's counter moved within the poll window - a real failure, not
-swallowed silently.
+swallowed silently. Tekos's entry also carries `outcome`: answered-local,
+refused, external or unknown (see above).
 """
 from __future__ import annotations
 
@@ -81,22 +88,23 @@ _AGENTS = [
     # leads with local-wesh(-maas) then local-qwen35(-maas), non-reflexional.
     # This is the actual fallback under test.
     {"agent": "comage", "persona": "sale-01", "message": "Peux-tu me faire un point rapide sur nos opportunités en cours ?"},
-    # answer-technical-question is Tekos's primary (only chat-reachable)
-    # task, and it is reflexional (WP-096/ADR-0531) - ANY plain-text message
-    # here resolves to ovhcloud-gpt-oss-120b regardless of content, which is
-    # exactly why Tekos serves as the decoupling control rather than the
-    # other half of the fallback (see ADR-0536's Context section). The exact
-    # message doesn't matter for the assertion; kept as a real, previously
-    # live-tested question from evaluations/tekos/scenarios.yaml.
-    {"agent": "tekos", "persona": "consultant-01", "message": "What GPU does the local model run on?"},
+    # answer-technical-question is Tekos's primary (only chat-reachable) task. It reads Confluence, so
+    # since agents v0.8.1 (zuno-demo WP-187) it is local only at every level: the control checks that
+    # it is answered locally or refused cleanly, never served by an external provider. The exact message
+    # doesn't matter for the assertion; kept as a real, previously live-tested question from
+    # evaluations/tekos/scenarios.yaml.
+    {"agent": "tekos", "persona": "consultant-01", "message": "What GPU does the local model run on?", "control": "local-only"},
 ]
 
 
-def _query_provider_counts(agent: str) -> dict:
-    """Returns {provider: count} for zuno_model_calls_total{agent=..., outcome="success"}."""
+def _query_provider_counts(agent: str, successes_only: bool = True) -> dict:
+    """Returns {provider: count} for zuno_model_calls_total{agent=...}. Comage's check keeps counting
+    successful calls; the local-only control counts every attempt, because a call that fails at an
+    external provider has still sent the context there."""
+    outcome = ', outcome="success"' if successes_only else ""
     resp = httpx.get(
         f"{PROM_URL}/api/v1/query",
-        params={"query": f'sum by (provider) (zuno_model_calls_total{{agent="{agent}", outcome="success"}})'},
+        params={"query": f'sum by (provider) (zuno_model_calls_total{{agent="{agent}"{outcome}}})'},
         headers={"Authorization": f"Bearer {PROM_BEARER_TOKEN}"},
         timeout=15,
         verify=False,  # thanos-querier's serving cert - same demo-scope shortcut as gitops/charts/grafana's datasource (tlsSkipVerify: true)
@@ -146,11 +154,78 @@ def _run_probe(agent: str, persona: str, message: str) -> dict:
         return {"agent": agent, "persona": persona, "ok": False, "detail": f"probe subprocess failed: stdout={proc.stdout!r} stderr={proc.stderr!r}"}
 
 
-def _query_provider_counts_or_none(agent: str):
+# What the ai-gateway answers when a local-only task finds no ready local model
+# (WP-188): HTTP 503 "no eligible provider is available for classification ...: <name>: not ready".
+_REFUSAL_MARKERS = ("no eligible provider", "503", "service unavailable", "not ready")
+
+
+def _is_local(provider: str) -> bool:
+    return provider == "local" or provider.startswith("local-")
+
+
+def _looks_like_refusal(detail) -> bool:
+    text = str(detail or "").lower()
+    return any(marker in text for marker in _REFUSAL_MARKERS)
+
+
+def _moved_since(agent: str, before: dict, timeout_seconds: float) -> dict:
+    """Providers whose attempt counter (any outcome) rose since `before`. Polls until one moves or the
+    timeout ends: the counter reaches Prometheus up to ~100s late (see the module docstring)."""
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        after = _query_provider_counts(agent, successes_only=False)
+        moved = {p: after.get(p, 0) - before.get(p, 0) for p in after}
+        moved = {p: d for p, d in moved.items() if d > 0}
+        if moved or time.monotonic() >= deadline:
+            return moved
+        time.sleep(POLL_INTERVAL_SECONDS)
+
+
+def _control_verdict(providers: set, source: str, detail: str) -> dict:
+    external = sorted(p for p in providers if not _is_local(p))
+    if external:
+        return {"provider": external[0], "ok": False, "outcome": "external", "source": source,
+                "detail": f"an external provider was reached by a local-only task: {external}; {detail}"}
+    return {"provider": sorted(providers)[0], "ok": True, "outcome": "answered-local", "source": source, "detail": detail}
+
+
+def verify_local_only_control(agent: str, persona: str, message: str, phase: str) -> dict:
+    """Tekos's local-only control. Passes (ok) when the turn was answered by a local provider or refused
+    cleanly with no external attempt; fails when any external provider was reached or the outcome cannot
+    be established."""
+    before = _query_provider_counts_or_none(agent, successes_only=False)
+    probe_result = _run_probe(agent, persona, message)
+    unknown = {"provider": None, "ok": False, "outcome": "unknown", "source": None}
+
+    if probe_result.get("ok"):
+        provider = (probe_result.get("routing") or {}).get("provider")
+        if provider:
+            return _control_verdict({provider}, "routing-metadata", f"phase={phase} session={probe_result.get('session_id')}")
+        if before is None:
+            return dict(unknown, detail="the answer carried no routing decision and Prometheus could not be read")
+        moved = _moved_since(agent, before, POLL_TIMEOUT_SECONDS)
+        if not moved:
+            return dict(unknown, detail=f"no routing decision on the answer and no provider counter moved within {POLL_TIMEOUT_SECONDS}s")
+        return _control_verdict(set(moved), "prometheus", f"phase={phase} moved={moved}")
+
+    if not _looks_like_refusal(probe_result.get("detail")):
+        return dict(unknown, detail=f"the turn failed without the ai-gateway's refusal: {probe_result.get('detail')}")
+    if before is None:
+        return dict(unknown, detail="the turn was refused but Prometheus could not be read, so a missing external attempt is unproved")
+    moved = _moved_since(agent, before, POLL_TIMEOUT_SECONDS)
+    external = sorted(p for p in moved if not _is_local(p))
+    if external:
+        return {"provider": external[0], "ok": False, "outcome": "external", "source": "prometheus",
+                "detail": f"the turn was refused yet an external provider was attempted: {external}"}
+    return {"provider": None, "ok": True, "outcome": "refused", "source": "prometheus",
+            "detail": f"phase={phase} refused cleanly, no external attempt in {POLL_TIMEOUT_SECONDS}s: {probe_result.get('detail')}"}
+
+
+def _query_provider_counts_or_none(agent: str, successes_only: bool = True):
     """Counter snapshot, or None when Prometheus cannot be read: the
     routing-metadata path must not fail because the fallback is unavailable."""
     try:
-        return _query_provider_counts(agent)
+        return _query_provider_counts(agent, successes_only)
     except Exception:  # noqa: BLE001 - reported through the fallback's own detail
         return None
 
@@ -201,7 +276,8 @@ def main() -> int:
 
     result = {"phase": args.phase}
     for spec in _AGENTS:
-        result[spec["agent"]] = verify_one_agent(spec["agent"], spec["persona"], spec["message"], args.phase)
+        verify = verify_local_only_control if spec.get("control") == "local-only" else verify_one_agent
+        result[spec["agent"]] = verify(spec["agent"], spec["persona"], spec["message"], args.phase)
 
     print(json.dumps(result))
     return 0

@@ -233,6 +233,9 @@ jobs:
       - name: evaluations routing report tests (ADR-0304)
         working-directory: evaluations
         run: python3 tests/test_routing_report.py
+      - name: evaluations failover drill local-only control tests (WP-105, WP-187)
+        working-directory: evaluations
+        run: python3 tests/test_scenario_failover_control.py
       - name: evaluations PEFT regression gate tests (ADR-0534/WP-109)
         working-directory: evaluations
         run: python3 tests/test_peft_regression.py
