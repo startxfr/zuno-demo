@@ -1,0 +1,6 @@
+---
+# Stub (WP-179): WP-181 replaces this file. A no-op, never a failure, so a full
+# `make d2 install` stays green until the Open WebUI track lands.
+- name: "open-webui | not implemented yet"
+  ansible.builtin.debug:
+    msg: "open-webui is declared but not implemented yet (WP-181, ADR-0588); nothing was applied."

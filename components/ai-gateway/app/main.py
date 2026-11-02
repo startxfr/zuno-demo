@@ -44,7 +44,7 @@ from app.schemas import (
     RoutingDecision,
 )
 from app.routing_watch import ROUTING_RELOAD_INTERVAL_SECONDS, RoutingWatcher
-from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_empty_response
+from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_empty_response, set_caller_client
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ai_gateway")
@@ -374,6 +374,7 @@ async def chat_completions(
     # default. Optional; absent means no cap, today's exact behavior.
     x_zuno_max_tokens: str = Header(default="", alias="X-Zuno-Max-Tokens"),
 ):
+    set_caller_client(identity.client)  # ADR-0587: experience client on the metrics
     classification = x_zuno_data_classification.upper()
     # ADR-0550: a per-(agent,task) local_only_for declaration ORs into the
     # caller's own X-Zuno-Local-Only flag - it can only ever add a
@@ -589,6 +590,7 @@ async def images_generations(
     x_zuno_data_classification: str = Header(default="C1", alias="X-Zuno-Data-Classification"),
     x_zuno_request_id: str = Header(default="", alias="X-Zuno-Request-Id"),
 ):
+    set_caller_client(identity.client)  # ADR-0587
     classification = x_zuno_data_classification.upper()
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
 

@@ -1,0 +1,5 @@
+---
+# Stub (WP-179): WP-183 replaces this file. Nothing was ever installed by it.
+- name: "openclaw | not implemented yet"
+  ansible.builtin.debug:
+    msg: "openclaw is declared but not implemented yet (WP-183, ADR-0589); nothing to remove."

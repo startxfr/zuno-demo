@@ -1,0 +1,9 @@
+---
+# Stub (WP-179): WP-181 replaces this file. State detection, never fails:
+# the component is reported as not installed.
+- name: "open-webui | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: false
+
+- name: "open-webui | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

@@ -190,6 +190,18 @@ modelRouting:
 # project. Empty = no client is trusted.
 trustedPlatformClients: []
 
+# ADR-0587 (WP-179): allowed values of the `client` label on zuno_model_* and
+# zuno_guardrails_* (the token's `azp`, the user experience the call came
+# from). An entry ending in `*` is a prefix (one OpenClaw client per persona).
+# Any other client is counted as `other`, so a new Keycloak client cannot add
+# series. Experience clients are never trusted platform clients (above).
+experienceClients:
+  - unifai
+  - open-webui
+  - "openclaw-*"
+  - zuno-evaluations
+  - zuno-stresstest
+
 # ADR-0104: opt-in semantic cache in the existing platform Redis
 # (gitops/charts/redis, zuno-auth namespace - same instance
 # gitops/charts/tekos already uses for sessions). Disabled by default;

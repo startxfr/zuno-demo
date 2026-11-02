@@ -31,6 +31,9 @@
       - mlflow
       - lightspeed_config
       - unifai
+      # ADR-0587 (WP-179): experience clients, stubs until WP-181/WP-183.
+      - open_webui
+      - openclaw
       - supply_chain
   tasks:
     - name: Resolve cluster API credentials

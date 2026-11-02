@@ -1,6 +1,6 @@
 # WP-179: Common preparation for experience clients
 
-- **State:** Not started
+- **State:** Repo work in review (steps 1 to 6 in the repository, 2026-11-02; step 7 is live and waits for the user's go)
 - **ADRs:** [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** none
 - **Related:** [WP-180](wp-180-open-webui-preparation.md), [WP-182](wp-182-openclaw-preparation.md), [WP-184](wp-184-three-experiences-demonstration.md)
@@ -40,6 +40,42 @@ changed here, and the rules for the rest are written down.
    cost, calls, guardrail hits); WP-184 builds the dedicated dashboard on them.
 7. **One build and roll of the ai-gateway and the mcp-gateway**, after the user's go in this session; push first, check
    the Build's commit, then verify a UnifAI chat gives `zuno_model_tokens{client="unifai"}` in raw Prometheus.
+
+## Implementation notes (2026-11-02)
+
+- **Step 1.** `CallerIdentity.client` (`app/auth.py`) is the `azp`. The handlers of `/v1/chat/completions` and
+  `/v1/images/generations` call `set_caller_client()` (`app/telemetry.py`) after token validation: a ContextVar, like the trace
+  context of ADR-0566, because `validate_token` is a sync dependency run on a copied context. `model_call_span` puts
+  `zuno.client` on the span and `client` on `zuno_model_calls`, `zuno_model_call_duration_ms`, `zuno_model_tokens` and
+  `zuno_model_cost_usd`; `record_guardrails_evaluation` puts it on both guardrails counters. The label is bounded by
+  `EXPERIENCE_CLIENTS` (chart value `experienceClients`: `unifai`, `open-webui`, `openclaw-*`, `zuno-evaluations`,
+  `zuno-stresstest`); any other client is `other`. Tests: `tests/test_experience_client.py` (8, including the propagation
+  through a real FastAPI request); the suite is 300/300.
+- **Step 2.** Both NetworkPolicies admit `namespaceSelector: zuno.io/experience-client: "true"` on port 8080. Keycloak is not
+  touched: experience clients reach it through its Route, like UnifAI, never through the in-cluster `http` service (its
+  issuer would be `http://`, see the UnifAI 401 of 2026-10).
+- **Step 3.** `zuno-openwebui` in `gitops/charts/namespaces/values.yaml`: label, default-deny baseline, outside the mesh.
+- **Step 4.** `open-webui` and `openclaw` in `DAY2_RUN_COMPONENTS`, the Day 2 install, check and uninstall playbooks and both
+  AAP Day 2 DAGs (independent leaves after `unifai`). The stub roles are **no-ops that say so**, not failures, so a full
+  `make d2 install` and `make d2 check` stay green until the tracks replace `tasks/`.
+- **Step 5, Keycloak client pattern.** The mechanism exists (ADR-0530): the `zuno-keycloak-client-reconcile` Job creates or
+  merges every client of `gitops/charts/keycloak/files/realm-zuno.json` on each sync, so a client added there reaches the
+  live realm. A confidential client touches four places, each an append, in one commit of its own track, announced to the
+  other session:
+  1. the client in `realm-zuno.json` (shape of `unifai`: `secret: "${vault.<name>_client_secret}"`, redirect URIs on
+     `apps.mycluster.example.com`, the `groups` mapper; a client-credentials client sets `serviceAccountsEnabled` and,
+     for its groups, a `users` entry with `serviceAccountClientId` - users are create-only, so a persona's service-account
+     groups are checked live after the first sync);
+  2. an ExternalSecret in `gitops/charts/keycloak/templates/` (shape of `externalsecret-unifai-client.yaml`, Vault key
+     `keycloak/<name>`);
+  3. an item of the `vault-secrets` projected volume in `gitops/charts/keycloak/templates/keycloak.yaml` (path
+     `zuno_<name>__client__secret`, `optional: true`);
+  4. a `vault_seed_if_missing.yml` call in `ansible/roles/vault/tasks/install.yml` (shape of `keycloak/unifai`).
+  The consumer side (the experience's own ExternalSecret on `keycloak/<name>`) stays in the track's chart.
+- **Step 6.** A collapsed "By experience client" row in both `dashboard-usage-cost.yaml` (Grafana and Perses): calls, tokens,
+  cost and guardrails evaluations by `client`. Like the user panels, a multi-group user counts once per group.
+- **Push.** Some demo333 Applications follow `devel`: pushing these commits may apply the namespace, the NetworkPolicies and
+  the ai-gateway environment on demo333 at the next sync. The push is therefore a cluster action and waits for the user's go.
 
 ## Coordination protocol (both tracks)
 

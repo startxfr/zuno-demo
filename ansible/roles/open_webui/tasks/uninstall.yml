@@ -1,0 +1,5 @@
+---
+# Stub (WP-179): WP-181 replaces this file. Nothing was ever installed by it.
+- name: "open-webui | not implemented yet"
+  ansible.builtin.debug:
+    msg: "open-webui is declared but not implemented yet (WP-181, ADR-0588); nothing to remove."

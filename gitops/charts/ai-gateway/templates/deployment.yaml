@@ -183,6 +183,10 @@ spec:
             - name: TRUSTED_PLATFORM_CLIENTS
               value: {{ join "," .Values.trustedPlatformClients | quote }}
             {{- end }}
+            {{- if .Values.experienceClients }}
+            - name: EXPERIENCE_CLIENTS
+              value: {{ join "," .Values.experienceClients | quote }}
+            {{- end }}
             {{- if .Values.maasAdapter.closedClassMaasOnly.enabled }}
             - name: QUOTA_CLOSED_CLASS_MAAS_ONLY
               value: "true"

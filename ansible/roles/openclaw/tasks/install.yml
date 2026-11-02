@@ -1,0 +1,6 @@
+---
+# Stub (WP-179): WP-183 replaces this file. A no-op, never a failure, so a full
+# `make d2 install` stays green until the OpenClaw track lands.
+- name: "openclaw | not implemented yet"
+  ansible.builtin.debug:
+    msg: "openclaw is declared but not implemented yet (WP-183, ADR-0589); nothing was applied."

@@ -975,7 +975,7 @@ WP-184 closes them together.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-179 | [wp-179](work-packages/wp-179-common-preparation-for-experience-clients.md) | 0587 | none | Not started | shared groundwork, one session, before both tracks: client label, label-based ingress, namespaces, Make/AAP stubs, Keycloak client pattern, coordination protocol |
+| WP-179 | [wp-179](work-packages/wp-179-common-preparation-for-experience-clients.md) | 0587 | none | Repo work in review | shared groundwork, one session, before both tracks: client label, label-based ingress, namespaces, Make/AAP stubs, Keycloak client pattern, coordination protocol |
 | WP-180 | [wp-180](work-packages/wp-180-open-webui-preparation.md) | 0588, 0587 | WP-179 | Not started | track Open WebUI: spike (user-token forwarding, MCP headers, SCC, lockdown switches, pins) |
 | WP-181 | [wp-181](work-packages/wp-181-install-open-webui-on-demo333.md) | 0588, 0587 | WP-179, WP-180 | Not started | track Open WebUI: chart, role, Keycloak client, install on demo333 (user's go) |
 | WP-182 | [wp-182](work-packages/wp-182-openclaw-preparation.md) | 0589, 0587 | WP-179 | Not started | track OpenClaw: spike on claw-operator (custom provider, refreshable credential, egress, lockdown), operator or openclaw-kube fallback |
