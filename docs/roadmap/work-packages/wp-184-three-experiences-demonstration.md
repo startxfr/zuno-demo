@@ -29,6 +29,11 @@
 - Script: [docs/demo/three-experiences.md](../../demo/three-experiences.md), one persona (sale-01) through the three
   experiences, eight steps, with the GPU-down case.
 - User decision of 2026-11-02: repository only for now; the shared-quota proof (step 3) waits for a rehearsal.
+- Rehearsal attempt of 2026-11-02 (GPU nodes down): `QUOTA_REHEARSAL_GROUP` (ai-gateway build 34) put sale-01 in the tight
+  `stresstest` class; three Open WebUI chats returned 502, 502, 200 (the 200 after the pod rolled and the group env was gone).
+  The gateway skipped every SaaS candidate and every direct local sibling because `stresstest` is `fail_mode: closed`, and the
+  MaaS local models were not ready, so no token was counted. Reverted the same evening. Step 3 needs the local models back,
+  or a tight class with `fail_mode: open`; it stays open.
 
 ## Acceptance
 

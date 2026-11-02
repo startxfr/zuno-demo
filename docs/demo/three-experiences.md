@@ -80,4 +80,7 @@ flowchart LR
 The shared quota ending in a 429 in all three experiences needs a tight ceiling for one persona and calls from the three
 UIs. The ai-gateway can put the members of one group (`QUOTA_REHEARSAL_GROUP`, off by default) under the tight `stresstest`
 class (2,000 tokens per user per 5 minutes), so the proof needs no budget change and ends when the persona leaves the
-group. It is planned for a rehearsal, not run in this script (WP-184).
+group. A first attempt on 2026-11-02 (GPU nodes down) ended in a 502 for sale-01 before any token was counted, not in a
+429: the `stresstest` class is `fail_mode: closed`, so the ai-gateway skips every SaaS candidate (not reached through
+MaaS) and every direct local sibling (ADR-0570 clause 7), and the MaaS-served local models were not ready. The proof needs
+either the local models back or a tight class with `fail_mode: open`. It is not run in this script (WP-184).
