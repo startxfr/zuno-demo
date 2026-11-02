@@ -1,6 +1,6 @@
 # WP-185: Retire the undeclared sxa-legacy domain, then decide whether to restore it
 
-- **State:** Repo work merged (steps 1 to 3 done 2026-11-02: the cleanup is on zuno-demo-agents devel and live in release v0.9.0, see [evidence](../evidence/wp-185-live-bundles.md); the live question to comage waits for the GPU nodes; steps 4 to 6 remain)
+- **State:** Repo work merged (steps 1 to 4 done 2026-11-02: the cleanup is live in agents release v0.9.0 ([evidence](../evidence/wp-185-live-bundles.md)), the ADR-0219 and ADR-0568 notes are written; the live question to comage waits for the GPU nodes; steps 5 and 6, the S3 check and the restoration decision, remain)
 - **ADRs:** [ADR-0219](../../adr/0219-serve-sxa-only-as-a-historical-rag-corpus.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)
 - **Depends on:** none
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)
@@ -45,7 +45,7 @@ reversed by a chosen, costed route or recorded as a decision.
    (the user merges the pull request, then the release workflows and `make d3 admit agents`, run by the session that owns admissions).
 3. **Regenerate** in `zuno-demo`: the stack configuration and the other generated files from the new corp release. Touch
    `classification.yaml` and `knowledge/sxa-legacy/domain.yaml` only as far as the decision of step 6 allows.
-4. **ADR notes.** Dated notes in ADR-0219 and ADR-0568: the domain is not served, why, and the state of the `sql-dump` precondition.
+4. **ADR notes** (done 2026-11-02). Dated notes in ADR-0219 and ADR-0568: the domain is not served, why, and the state of the `sql-dump` precondition.
    No new ADR.
 5. **Verify the data.** Without changing anything, check that the dump objects still exist in the source bucket and note who can read them.
    Re-creating read access (Vault, IAM) needs the user's go.
