@@ -58,6 +58,11 @@ GUARDRAILS_CONFIG_ID = os.getenv("GUARDRAILS_CONFIG_ID", "zuno-observe")
 # timeout. The warm-up evaluation runs with this longer timeout, off the request
 # path, at start and after each "unavailable".
 GUARDRAILS_WARMUP_TIMEOUT_SECONDS = float(os.getenv("GUARDRAILS_WARMUP_TIMEOUT_SECONDS", "60"))
+# A warm-up at the gateway's own start does not cover a NeMo pod restarted
+# while the gateway runs: its first evaluation would hit the cold load again.
+# So the warm-up repeats on this interval (pattern-only rails, no LLM call, no
+# metric); a restarted NeMo is warm again within one interval. 0 = start only.
+GUARDRAILS_WARMUP_INTERVAL_SECONDS = float(os.getenv("GUARDRAILS_WARMUP_INTERVAL_SECONDS", "60"))
 
 MODES = ("off", "observe", "block")
 DEFAULT_MODE = "observe"
@@ -289,19 +294,37 @@ async def evaluate(
 _warm_up_task: Optional["asyncio.Task"] = None
 
 
+_warm: Optional[bool] = None  # last warm-up outcome (None: never tried), so only changes are logged
+
+
 async def warm_up() -> bool:
     """ADR-0591 decision 8: one evaluation with the longer timeout, so NeMo
     loads its rails before a user's request needs them. Records no metric and
-    no span (it is not an evaluation of anyone's content); never raises."""
+    no span (it is not an evaluation of anyone's content); never raises.
+    Logs only when the outcome changes, so the keepalive stays quiet."""
+    global _warm
     if GUARDRAILS_BACKEND != "nemo" or not GUARDRAILS_NEMO_URL:
         return False
     try:
         await _detect_nemo(["warm-up"], timeout=GUARDRAILS_WARMUP_TIMEOUT_SECONDS)
     except Exception as exc:  # noqa: BLE001
-        logger.warning("guardrails warm-up failed: %s: %s", type(exc).__name__, exc)
+        if _warm is not False:  # first failure after a success, or the first attempt
+            logger.warning("guardrails warm-up failed: %s: %s", type(exc).__name__, exc)
+        _warm = False
         return False
-    logger.info("guardrails warm-up done (config_id=%s)", GUARDRAILS_CONFIG_ID)
+    if not _warm:
+        logger.info("guardrails warm-up done (config_id=%s)", GUARDRAILS_CONFIG_ID)
+    _warm = True
     return True
+
+
+async def keep_warm() -> None:
+    """Background loop: warm up now, then every GUARDRAILS_WARMUP_INTERVAL_SECONDS."""
+    while True:
+        await warm_up()
+        if GUARDRAILS_WARMUP_INTERVAL_SECONDS <= 0:
+            return
+        await asyncio.sleep(GUARDRAILS_WARMUP_INTERVAL_SECONDS)
 
 
 def schedule_warm_up() -> None:

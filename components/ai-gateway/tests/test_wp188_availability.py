@@ -250,6 +250,41 @@ def test_warm_up_uses_the_longer_timeout_and_records_nothing() -> None:
     assert seen["timeout"] == guardrails.GUARDRAILS_WARMUP_TIMEOUT_SECONDS
 
 
+def test_keep_warm_repeats_on_its_interval() -> None:
+    calls = []
+
+    async def fake_warm_up():
+        calls.append(1)
+        if len(calls) == 3:
+            raise asyncio.CancelledError()
+        return True
+
+    async def no_sleep(_seconds):
+        return None
+
+    with mock.patch.object(guardrails, "warm_up", side_effect=fake_warm_up), \
+         mock.patch.object(guardrails, "GUARDRAILS_WARMUP_INTERVAL_SECONDS", 60.0), \
+         mock.patch.object(guardrails.asyncio, "sleep", side_effect=no_sleep):
+        try:
+            asyncio.run(guardrails.keep_warm())
+        except asyncio.CancelledError:
+            pass
+    assert len(calls) == 3
+
+
+def test_keep_warm_runs_once_when_the_interval_is_zero() -> None:
+    calls = []
+
+    async def fake_warm_up():
+        calls.append(1)
+        return True
+
+    with mock.patch.object(guardrails, "warm_up", side_effect=fake_warm_up), \
+         mock.patch.object(guardrails, "GUARDRAILS_WARMUP_INTERVAL_SECONDS", 0.0):
+        asyncio.run(guardrails.keep_warm())
+    assert len(calls) == 1
+
+
 def test_warm_up_is_a_no_op_without_nemo() -> None:
     with mock.patch.object(guardrails, "GUARDRAILS_BACKEND", "builtin"):
         assert asyncio.run(guardrails.warm_up()) is False

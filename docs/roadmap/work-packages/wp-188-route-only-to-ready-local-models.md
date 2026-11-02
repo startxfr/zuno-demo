@@ -100,6 +100,9 @@ first evaluation `unavailable`.
 - **Local-only** (stress-consultant-01, tekos, zuno-demo-08, recorded in `docs/roadmap/evidence/wp-187-exposure-measurement.md`):
   three `local_only_for` requests answered 503 in 0.01 to 0.06 s with the per-candidate reasons and no `model_call` span; the
   control task without `local_only_for` answered 200 in 1.03 s from `ovhcloud-gpt-oss-120b`.
+- **Keepalive (Build 33).** A warm-up only at the gateway's start would leave the first evaluation after a NeMo restart
+  `unavailable` (the restart test would have failed by construction): the warm-up now repeats every 60 s
+  (`GUARDRAILS_WARMUP_INTERVAL_SECONDS`), logging only when its outcome changes.
 - **Still to check.** With the GPU nodes back, the local candidates serve again without a gateway restart; a NeMo pod restart
   followed by a first evaluation `clean`.
 - **Found during the rollout, fixed in the same component** (Build 32, waiting for the user's go): a client that drops a stream

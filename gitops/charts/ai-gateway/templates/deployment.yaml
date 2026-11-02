@@ -100,6 +100,10 @@ spec:
             # its rails (~17 s); the warm-up runs with this timeout.
             - name: GUARDRAILS_WARMUP_TIMEOUT_SECONDS
               value: {{ .Values.guardrails.warmUpTimeoutSeconds | default 60 | quote }}
+            # Repeated, so a NeMo pod restarted while the gateway runs is warm
+            # again within one interval (0 = at start only).
+            - name: GUARDRAILS_WARMUP_INTERVAL_SECONDS
+              value: {{ .Values.guardrails.warmUpIntervalSeconds | default 60 | quote }}
             {{- if .Values.availability.readiness.enabled }}
             # ADR-0591 decisions 1-2: skip local models whose
             # LLMInferenceService is not Ready (polled with the projected

@@ -86,7 +86,8 @@ async def _start_routing_watch() -> None:
     # NeMo warm-up (only with the nemo backend), both off the request path.
     if os.getenv("MODEL_READINESS_ENABLED", "false").strip().lower() == "true":
         asyncio.create_task(readiness.run())
-    guardrails.schedule_warm_up()
+    if guardrails.GUARDRAILS_BACKEND == "nemo" and guardrails.GUARDRAILS_NEMO_URL:
+        asyncio.create_task(guardrails.keep_warm())
 
 _ROLE_TO_MESSAGE = {"system": SystemMessage, "user": HumanMessage, "assistant": AIMessage}
 

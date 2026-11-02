@@ -57,6 +57,9 @@ of waiting for each to time out.**
    check that runs one evaluation of the configured `config_id`, so the Service never routes to a cold NeMo. Where
    the operator does not let the pod template carry it, the ai-gateway runs one warm-up evaluation at its own start
    and after each `unavailable`. The gateway logs the exception type of an `unavailable`, never an empty message.
+   *Update 2026-11-02:* the `NemoGuardrails` pod template carries no container probe, so the gateway path applies, and a
+   warm-up at the gateway's start does not cover a NeMo pod restarted while the gateway runs. The warm-up therefore
+   repeats every `GUARDRAILS_WARMUP_INTERVAL_SECONDS` (60): a restarted NeMo is warm again within one interval.
 
 ## Alternatives considered
 
