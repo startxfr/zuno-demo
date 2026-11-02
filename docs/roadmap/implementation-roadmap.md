@@ -22,9 +22,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 
 | Version | ADRs | Open ADRs | WPs | Open WPs |
 |---|---|---|---|---|
-| v0 | 72 | — | 7 | — |
-| v0.1 | 29 | — | 18 | — |
-| v0.2 | 14 | — | 17 | WP-098 |
+| v0 | 72 | — | 8 | WP-187 |
+| v0.1 | 29 | — | 19 | WP-186 |
+| v0.2 | 14 | — | 19 | WP-098, WP-185, WP-186 |
 | v0.3 | 15 | — | 19 | — |
 | v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
 | v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 18 | 23 | WP-166, WP-171, WP-172, WP-173, WP-174 |
+| v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-185, WP-186, WP-187 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 3 | 3 | 6 | WP-179, WP-180, WP-181, WP-182, WP-183, WP-184 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -981,6 +981,18 @@ WP-184 closes them together.
 | WP-182 | [wp-182](work-packages/wp-182-openclaw-preparation.md) | 0589, 0587 | WP-179 | Not started | track OpenClaw: spike on claw-operator (custom provider, refreshable credential, egress, lockdown), operator or openclaw-kube fallback |
 | WP-183 | [wp-183](work-packages/wp-183-install-openclaw-on-demo333.md) | 0589, 0587 | WP-179, WP-182 | Not started | track OpenClaw: catalog pin, one Claw per persona, token proxy, oauth2-proxy, install on demo333 (user's go) |
 | WP-184 | [wp-184](work-packages/wp-184-three-experiences-demonstration.md) | 0587, 0588, 0589 | WP-181, WP-183 | Not started | joint close: dashboard, demo script, shared-quota proof across the three experiences |
+
+### Phase 47 — gaps left by the retirement of the old RAG stack (added 2026-11-02)
+
+Opened by a comparison of an archive of leftover files (`zuno-demo-untracked-archive-20261102.tar.gz`) with `origin/devel`.
+The archive held nothing unpublished: its source files are byte-identical to the last commit before WP-156 and WP-168 removed
+the old stack. The comparison found three behaviours that the retirement dropped without a recorded decision, one work package each.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Not started | clean the declarations first (zuno-demo-agents release and admission), then the user's call on restoring the 310,000-document record |
+| WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Not started | ten French questions run against the live RAG; a French stemmer in the fork only if hit@1 is below 0.7 |
+| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | Not started | a source classification field needs a UnifAI operator release; step 1 measures the Lightspeed exposure first |
 
 ### OKF stream phases
 
