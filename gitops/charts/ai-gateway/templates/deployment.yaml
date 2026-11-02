@@ -211,6 +211,10 @@ spec:
             - name: TRUSTED_PLATFORM_CLIENTS
               value: {{ join "," .Values.trustedPlatformClients | quote }}
             {{- end }}
+            {{- if .Values.quotaRehearsalGroup }}
+            - name: QUOTA_REHEARSAL_GROUP
+              value: {{ .Values.quotaRehearsalGroup | quote }}
+            {{- end }}
             {{- if .Values.experienceClients }}
             - name: EXPERIENCE_CLIENTS
               value: {{ join "," .Values.experienceClients | quote }}
