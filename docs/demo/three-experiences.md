@@ -79,8 +79,9 @@ flowchart LR
 
 ## Shown live once (2026-11-03 rehearsal)
 
-With the persona's accounts put under a tight quota class, a user budget spent in one experience ends in a 429 in that
-experience's next call, with the same body everywhere: `{"error":"quota_exceeded","quota_class":"stresstest","dimension":"user",
+With the persona put under a tight quota class, a user budget spent in Open WebUI ended in a 429 in UnifAI (the chat shows
+"Rate limit reached - quota_exceeded - You can retry in 50s"): both call with sale-01's own token. OpenClaw also got its 429, on
+its own counter. The 429 body is the same everywhere: `{"error":"quota_exceeded","quota_class":"stresstest","dimension":"user",
 "budget_tokens":2000,"window":"5m"}`. The rehearsal ran with the GPU models back; with them down, the `stresstest` class
 (`fail_mode: closed`) skips every SaaS candidate and the call ends in a 502 before any token is counted (2026-11-02). The
 fail-open `rehearsal` class (agents release 0.9.1, `QUOTA_REHEARSAL_GROUP`, `QUOTA_REHEARSAL_CLASS`) exists for that case. The

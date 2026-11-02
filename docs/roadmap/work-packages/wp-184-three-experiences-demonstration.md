@@ -1,6 +1,6 @@
 # WP-184: Three-experiences demonstration
 
-- **State:** Repo work in review (dashboard and script in the repository 2026-11-02; the live run and the shared-quota proof are not done)
+- **State:** Done (2026-11-03)
 - **ADRs:** [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md), [ADR-0588](../../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md), [ADR-0589](../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md)
 - **Depends on:** [WP-181](wp-181-install-open-webui-on-demo333.md), [WP-183](wp-183-install-openclaw-on-demo333.md)
 - **Related:** [WP-179](wp-179-common-preparation-for-experience-clients.md)
@@ -51,7 +51,10 @@
 ## Acceptance
 
 The script runs end to end on demo333 and the evidence shows, from raw Prometheus, one series per client for the same
-persona, a guardrail hit and a 429 in each experience.
+persona, a guardrail hit and a 429 in each experience. Reworded on 2026-11-03 after the rehearsal (user decision): the
+per-user budget is shared by Open WebUI and UnifAI (they call with the persona's own token), the group budget by the three
+experiences, and OpenClaw has its own per-user counter (it calls as a service account, ADR-0589); a 429 is shown in Open
+WebUI, UnifAI and OpenClaw.
 
 - Shared-quota rehearsal of 2026-11-03 (GPU models back; sale-01 and `service-account-openclaw-sale-01` in the group
   `zuno-quota-rehearsal`, `QUOTA_REHEARSAL_GROUP` set live, class `stresstest`, 2,000 tokens per user per 5 minutes; reverted
@@ -65,3 +68,10 @@ persona, a guardrail hit and a 429 in each experience.
   platform does for the user dimension; the group dimension is common to the persona's accounts. UnifAI was not exercised.
   Raw Prometheus (cumulative since the pod roll): `zuno_model_tokens_total` open-webui 146 (openai) + 12,188 (local-maas),
   openclaw-sale-01 57,507 (openai) + 2,664 (local-maas), unifai 2,116,676 (local-gpt-oss-maas); one series per client.
+- Shared-quota rerun of 2026-11-03, UnifAI-only (sale-01 alone in `zuno-quota-rehearsal`, class `stresstest`, 2,000 tokens per
+  user per 5 minutes, window 23:40-23:45 UTC, reverted afterwards): four parallel 500-word Open WebUI chats answered 200
+  (23:41:44-23:42:21), the next Open WebUI call returned 429 `quota_exceeded` (dimension `user`) at 23:43:26, and a UnifAI chat
+  (Team `agent-comage`, workflow `comage-check-my-drive-and-mail`, fresh SSO login as sale-01) at 23:43:36 showed the card
+  "Rate limit reached - quota_exceeded - You can retry in 50s". The user counter spent in Open WebUI refused UnifAI: both call
+  with sale-01's own token. Notes: the check runs before the consume, so concurrent calls all pass, and 1,200-word turns hung up
+  at about 70 s on the Open WebUI side without tripping the budget. Closed: a 429 was shown in Open WebUI, UnifAI and OpenClaw.
