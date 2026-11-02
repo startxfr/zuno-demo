@@ -1,6 +1,6 @@
 # WP-183: Install OpenClaw on demo333
 
-- **State:** Operator pending (2026-11-02: installed on demo333, `make d2 check openclaw` green, browser acceptance passed; the `openclaw` entitlement and a Control UI chat (ai-gateway build 32) remain)
+- **State:** Operator pending (2026-11-02: installed on demo333, `make d2 check openclaw` green, browser acceptance passed, chat through the gateway path working; the `openclaw` entitlement remains)
 - **ADRs:** [ADR-0590](../../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md), [ADR-0589](../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-182](wp-182-openclaw-preparation.md)
 - **Related:** [WP-181](wp-181-install-open-webui-on-demo333.md), [WP-184](wp-184-three-experiences-demonstration.md)
@@ -97,7 +97,11 @@ the spike changed in ADR-0589.
   the operator's terminal. The gateway token was rotated (operator Secret recreated, pod restarted); the UI password
   rotation in Vault (`openclaw/consultant-02`) is left to the user.
 
-**Remaining acceptance:** a Control UI chat once ai-gateway build 32 is live;
-the entitled-tool proof once the `openclaw` experience-client declaration is admitted (the Open WebUI track's WP,
+- **Gateway path after ai-gateway build 32** (3b300fe2, content parts accepted): `openclaw agent --agent default` (the
+  Control UI's path) answers for both personas, model fetch 200 in 1.2 to 2.7 s from openai `gpt-4o-mini`;
+  `zuno_model_calls_total` / `zuno_model_tokens_total` carry `client="openclaw-consultant-02"` and
+  `client="openclaw-sale-01"` in raw Prometheus.
+
+**Remaining acceptance:** the entitled-tool proof once the `openclaw` experience-client declaration is admitted (the Open WebUI track's WP,
 then `gateways.mcpAgentHeader: true`).
 
