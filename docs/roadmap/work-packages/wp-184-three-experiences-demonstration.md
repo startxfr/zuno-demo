@@ -52,3 +52,16 @@
 
 The script runs end to end on demo333 and the evidence shows, from raw Prometheus, one series per client for the same
 persona, a guardrail hit and a 429 in each experience.
+
+- Shared-quota rehearsal of 2026-11-03 (GPU models back; sale-01 and `service-account-openclaw-sale-01` in the group
+  `zuno-quota-rehearsal`, `QUOTA_REHEARSAL_GROUP` set live, class `stresstest`, 2,000 tokens per user per 5 minutes; reverted
+  after the run, an empty group left in Keycloak). OpenClaw (azp `openclaw-sale-01`): 3 turns 200 (666 tokens, 23:15:15-39), a
+  big turn 200 at 23:17:13 (1,520 tokens, total 2,186 of 2,000), then 429 at 23:18:41-42 (3 calls). Open WebUI as sale-01
+  (fresh sign-in): 429 at about 23:18:40 with the same body `{"error":"quota_exceeded","quota_class":"stresstest","dimension":"user",
+  "budget_tokens":2000,"window":"5m"}`. **Caveat:** the ledger keys the user budget by the token's `sub`
+  (`components/ai-gateway/app/quota.py`, `check`/`consume`), and OpenClaw calls as a service account, a different `sub`. The
+  Open WebUI 429 therefore proves that sale-01's own counter was spent (by my earlier chats of 23:15-23:18, whose status I did
+  not capture), not that OpenClaw's spending drained it. One counter shared by the three experiences is not what the
+  platform does for the user dimension; the group dimension is common to the persona's accounts. UnifAI was not exercised.
+  Raw Prometheus (cumulative since the pod roll): `zuno_model_tokens_total` open-webui 146 (openai) + 12,188 (local-maas),
+  openclaw-sale-01 57,507 (openai) + 2,664 (local-maas), unifai 2,116,676 (local-gpt-oss-maas); one series per client.
