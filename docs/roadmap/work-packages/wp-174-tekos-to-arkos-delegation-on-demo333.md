@@ -1,6 +1,6 @@
 # WP-174: Arkos to Tekos delegation on demo333 (the file keeps its first name; direction reversed 2026-11-01)
 
-- **State:** Not started
+- **State:** operator pending
 - **ADRs:** [ADR-0401](../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md), [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md)
 - **Depends on:** [WP-171](wp-171-okf-delegation-fields-and-conformance-cases.md), [WP-172](wp-172-gateway-enforcement-of-the-delegation-chain.md), [WP-173](wp-173-unifai-a2a-identity-server-and-approval.md)
 - **Related:** [WP-154](wp-154-tekos-pilot-on-demo333.md), [WP-169](wp-169-dedicated-evaluation-personas.md)
@@ -55,3 +55,7 @@ The `unifai` chart renders `delegation` per bundle (`okf.bundles[].delegation`, 
 ## Progress (2026-10-31): operators rolled
 
 Operators 0.1.42, 0.1.43, 0.1.44, 0.1.45 and 0.1.47 are live on demo333 (catalog pins by digest, each verified with its release identity and the admission preflight; 0.1.46 was never released). The delegation fields on `zuno-unifai` came from a separate commit and are applied. The application images move once, with the query prefix, as described in [operations](../../platform/operations.md#rolling-a-unifai-release-and-taking-over-a-roll-wp-176-wp-178).
+
+## Progress (2026-11-02)
+
+Wiring is live on demo333 (agents v0.8.0 admitted, bundles repinned, operator 0.1.49 fixing the node uid); the behavioural proof waits for the GPU models. See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md).
