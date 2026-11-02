@@ -1,6 +1,6 @@
 # WP-183: Install OpenClaw on demo333
 
-- **State:** Operator pending (2026-11-02: installed on demo333, `make d2 check openclaw` green, browser acceptance passed, chat through the gateway path working; the `openclaw` entitlement remains)
+- **State:** Done (2026-11-02: every acceptance point proven live on demo333)
 - **ADRs:** [ADR-0590](../../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md), [ADR-0589](../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-182](wp-182-openclaw-preparation.md)
 - **Related:** [WP-181](wp-181-install-open-webui-on-demo333.md), [WP-184](wp-184-three-experiences-demonstration.md)
@@ -102,6 +102,13 @@ the spike changed in ADR-0589.
   `zuno_model_calls_total` / `zuno_model_tokens_total` carry `client="openclaw-consultant-02"` and
   `client="openclaw-sale-01"` in raw Prometheus.
 
-**Remaining acceptance:** the entitled-tool proof once the `openclaw` experience-client declaration is admitted (the Open WebUI track's WP,
-then `gateways.mcpAgentHeader: true`).
+- **Entitlement** (agents v0.9.0, `experience-clients/openclaw`: task `chat`, C1, groups `/consultant` and `/sales`;
+  2a1bb4ca sets `mcpAgentHeader: true` and C1): through the proxy, both assistants list `drive.document.search`,
+  `gmail.message.read`, `diagram.generation.create`; `diagram.generation.create` returns an SVG; `confluence.page.search`
+  is refused ("not exposed through this MCP endpoint"). `openclaw mcp probe`: 3 tools. `make d2 check openclaw` green
+  after the change.
+
+**Acceptance:** all six points hold. The UI password of `openclaw/consultant-02` in Vault is rotated by the user (the
+agent's write to Vault was refused by its permission classifier).
+
 

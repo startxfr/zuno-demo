@@ -1,6 +1,6 @@
 # ADR-0590: Front OpenClaw with oauth2-proxy and an egress firewall, one claw-operator per persona namespace
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-02, WP-183: installed on demo333, `make d2 check openclaw` green)
 - **Target:** v0.13
 - **Date:** 2026-11-02
 - **Decision owners:** Zuno Demo architecture team
