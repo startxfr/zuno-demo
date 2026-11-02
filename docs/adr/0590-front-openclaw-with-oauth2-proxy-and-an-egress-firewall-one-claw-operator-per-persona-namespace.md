@@ -51,7 +51,8 @@ not needed.
 - **One namespace and one operator for both personas** (`SingleNamespace`): fewer pods, but both personas'
   secrets in one namespace, against ADR-0589's one-namespace-per-persona bound. Rejected (user, 2026-11-02).
 - **Fork the operator** to allow trusted-proxy mode and drop the passthrough list: one login, no firewall, but a
-  maintained fork of an alpha operator. Rejected; the two gaps are reported upstream instead.
+  maintained fork of an alpha operator. Rejected. The two gaps are not reported upstream (user, 2026-11-02); the
+  egress firewall and the front door of decisions 2 and 3 compensate for them in this deployment.
 - **The `openclaw-kube` chart:** no proxy, no NetworkPolicy, no Route, last commit 2026-03-13. Rejected.
 - **Re-enable device pairing** (`disableDevicePairing: false`): a third barrier and an approval step per browser
   during the demo. Not taken; see Security considerations.
