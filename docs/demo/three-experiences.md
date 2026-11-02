@@ -83,4 +83,11 @@ class (2,000 tokens per user per 5 minutes), so the proof needs no budget change
 group. A first attempt on 2026-11-02 (GPU nodes down) ended in a 502 for sale-01 before any token was counted, not in a
 429: the `stresstest` class is `fail_mode: closed`, so the ai-gateway skips every SaaS candidate (not reached through
 MaaS) and every direct local sibling (ADR-0570 clause 7), and the MaaS-served local models were not ready. The proof needs
-either the local models back or a tight class with `fail_mode: open`. It is not run in this script (WP-184).
+either the local models back or a tight class with `fail_mode: open`.
+
+That class now exists in the agents release (`rehearsal`, from release 0.9.1): `fail_mode: open`, tokens per user 2,000 /
+5 min (group 100,000, project 50,000), requests per user 60 / 5 min (group 600, project 300). The ai-gateway puts the members
+of one Keycloak group under it: `QUOTA_REHEARSAL_GROUP=zuno-quota-rehearsal` (chart value `quotaRehearsalGroup`, cluster
+variable `zuno_ai_gateway_quota_rehearsal_group`) and `QUOTA_REHEARSAL_CLASS=rehearsal` (default `stresstest`). The group holds
+sale-01 and `service-account-openclaw-sale-01` for the length of the run only. The run waits for the release 0.9.1
+promotion, regenerated quota files and an ai-gateway build 35. It is not run in this script (WP-184).
