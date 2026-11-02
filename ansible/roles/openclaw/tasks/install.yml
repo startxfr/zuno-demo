@@ -1,6 +1,65 @@
 ---
-# Stub (WP-179): WP-183 replaces this file. A no-op, never a failure, so a full
-# `make d2 install` stays green until the OpenClaw track lands.
-- name: "openclaw | not implemented yet"
-  ansible.builtin.debug:
-    msg: "openclaw is declared but not implemented yet (WP-183, ADR-0589); nothing was applied."
+# ADR-0589/0590 (WP-183): one OpenClaw assistant per persona, deployed by a
+# claw-operator per persona namespace from a catalog pinned by digest.
+- name: "openclaw | load the chart values"
+  ansible.builtin.include_tasks: load_values.yml
+
+- name: "openclaw | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "openclaw | refuse a catalog that is not pinned by digest"
+  ansible.builtin.assert:
+    that: "'@sha256:' in _openclaw.operator.catalogImage"
+    fail_msg: "operator.catalogImage must be pinned by digest (ADR-0590): {{ _openclaw.operator.catalogImage }}"
+
+- name: "openclaw | Vault paths"
+  ansible.builtin.include_tasks: vault.yml
+
+# Before the assistants exist, their service accounts carry the persona's groups.
+- name: "openclaw | service-account groups"
+  ansible.builtin.include_tasks: keycloak_sa_groups.yml
+
+- name: "openclaw | apply the operator Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "openclaw"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-openclaw-d0"
+    gitops_app_extra_helm_values:
+      clusterBaseDomain: "{{ cluster_base_domain }}"
+      operator:
+        enabled: true
+
+# Manual approval (ADR-0590): only the InstallPlan that installs exactly the
+# pinned CSV is approved, so a catalog content change can never roll the
+# operator on its own.
+- name: "openclaw | approve the pinned InstallPlan per persona namespace"
+  ansible.builtin.include_tasks: approve_installplan.yml
+  loop: "{{ _openclaw_namespaces }}"
+  loop_control:
+    loop_var: _openclaw_ns
+
+- name: "openclaw | apply the assistants Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "openclaw"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-openclaw-d1"
+    gitops_app_extra_helm_values:
+      clusterBaseDomain: "{{ cluster_base_domain }}"
+      assistants:
+        enabled: true
+
+# ArgoCD has no health check for Claw: wait on the operator's Ready condition.
+- name: "openclaw | wait for each Claw to be Ready"
+  kubernetes.core.k8s_info:
+    api_version: claw.sandbox.redhat.com/v1alpha1
+    kind: Claw
+    namespace: "{{ item }}"
+    name: "{{ _openclaw.clawName }}"
+    wait: true
+    wait_condition:
+      type: Ready
+      status: "True"
+    wait_timeout: 600
+  loop: "{{ _openclaw_namespaces }}"

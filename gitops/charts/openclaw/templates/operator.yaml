@@ -1,0 +1,79 @@
+{{- if .Values.operator.enabled }}
+# ADR-0589/0590: claw-operator from its catalog pinned by digest, with an
+# explicit source on each Subscription (ADR-0559).
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: {{ .Values.operator.catalogSourceName }}
+  namespace: openshift-marketplace
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  sourceType: grpc
+  image: {{ .Values.operator.catalogImage }}
+  displayName: claw-operator (pinned)
+  publisher: codeready-toolchain
+{{- range .Values.personas }}
+{{- $ns := printf "%s%s" $.Values.namespacePrefix .name }}
+---
+# The operator creates no namespace; this chart does, with the label that
+# admits it to the ai-gateway and mcp-gateway (WP-179). Outside the mesh.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ns }}
+  labels:
+    zuno.io/experience-client: "true"
+    zuno.io/persona: {{ .name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-8"
+---
+# The claw-operator bundle supports OwnNamespace and SingleNamespace only: one
+# operator per persona namespace (WP-182 step 1).
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: claw-operator
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-7"
+spec:
+  targetNamespaces: [{{ $ns }}]
+---
+# Manual approval: the role approves only the InstallPlan naming startingCSV.
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: {{ $.Values.operator.package }}
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+spec:
+  name: {{ $.Values.operator.package }}
+  channel: {{ $.Values.operator.channel }}
+  source: {{ $.Values.operator.catalogSourceName }}
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Manual
+  startingCSV: {{ $.Values.operator.startingCSV }}
+---
+# The operator's proxy always passes clawhub.ai, github.com, npm and openrouter.ai
+# through, and its NetworkPolicy allows TCP 443 anywhere (WP-182 step 4). Traffic
+# leaving the cluster is therefore cut here: only Keycloak's Route (token
+# exchange, oauth2-proxy) may leave. In-cluster services are not affected.
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  namespace: {{ $ns }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "-6"
+spec:
+  egress:
+    - type: Allow
+      to:
+        dnsName: {{ include "openclaw.keycloakHost" $ }}
+    - type: Deny
+      to:
+        cidrSelector: 0.0.0.0/0
+{{- end }}
+{{- end }}

@@ -1,0 +1,99 @@
+---
+- name: "openclaw | set the persona facts"
+  ansible.builtin.set_fact:
+    _oc_ns: "{{ _openclaw.namespacePrefix }}{{ _openclaw_persona.name }}"
+
+- name: "openclaw | read the operator CSV in {{ _oc_ns }}"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ _oc_ns }}"
+    name: "{{ _openclaw.operator.startingCSV }}"
+  register: _oc_csv
+
+- name: "openclaw | read the Claw in {{ _oc_ns }}"
+  kubernetes.core.k8s_info:
+    api_version: claw.sandbox.redhat.com/v1alpha1
+    kind: Claw
+    namespace: "{{ _oc_ns }}"
+    name: "{{ _openclaw.clawName }}"
+  register: _oc_claw
+
+- name: "openclaw | read the pods in {{ _oc_ns }}"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ _oc_ns }}"
+    field_selectors: ["status.phase=Running"]
+  register: _oc_pods
+
+- name: "openclaw | read the Routes in {{ _oc_ns }}"
+  kubernetes.core.k8s_info:
+    api_version: route.openshift.io/v1
+    kind: Route
+    namespace: "{{ _oc_ns }}"
+  register: _oc_routes
+
+- name: "openclaw | collect the running image IDs in {{ _oc_ns }}"
+  ansible.builtin.set_fact:
+    _oc_image_ids: "{{ _oc_pods.resources | map(attribute='status.containerStatuses') | flatten | map(attribute='imageID') | list }}"
+    _oc_front_route: "{{ _oc_routes.resources | selectattr('metadata.name', 'equalto', 'front-door') | list }}"
+    _oc_other_routes: "{{ _oc_routes.resources | rejectattr('metadata.name', 'equalto', 'front-door') | list }}"
+
+- name: "openclaw | assert operator, Claw, pins and front door in {{ _oc_ns }}"
+  ansible.builtin.assert:
+    that:
+      - (_oc_csv.resources | default([{}]))[0].status.phase | default('') == 'Succeeded'
+      - (_oc_claw.resources | default([{}]))[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | selectattr('status', 'equalto', 'True') | list | length == 1
+      - _oc_image_ids | select('search', _openclaw.operator.pinnedImageDigests.manager) | list | length > 0
+      - _oc_image_ids | select('search', _openclaw.operator.pinnedImageDigests.proxy) | list | length > 0
+      - _oc_image_ids | select('search', _openclaw.images.openclaw.split('@')[1]) | list | length > 0
+      - _oc_front_route | length == 1
+      - (_oc_front_route[0].status.ingress | default([{}]))[0].conditions | default([]) | selectattr('type', 'equalto', 'Admitted') | selectattr('status', 'equalto', 'True') | list | length == 1
+      # Any other Route on the host (the operator's) must be rejected by the router.
+      - _oc_other_routes | map(attribute='status.ingress') | flatten | map(attribute='conditions') | flatten | selectattr('type', 'equalto', 'Admitted') | selectattr('status', 'equalto', 'True') | list | length == 0
+    fail_msg: >-
+      {{ _oc_ns }}: CSV {{ (_oc_csv.resources | default([{}]))[0].status.phase | default('absent') }},
+      Claw Ready {{ (_oc_claw.resources | default([{}]))[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list }},
+      front-door Route {{ _oc_front_route | length }}, other admitted Routes
+      {{ _oc_other_routes | map(attribute='metadata.name') | list }}; image IDs {{ _oc_image_ids }}
+
+- name: "openclaw | the front door redirects to Keycloak without a session ({{ _oc_ns }})"
+  ansible.builtin.uri:
+    url: "https://{{ _oc_front_route[0].spec.host }}/"
+    follow_redirects: none
+    status_code: [302]
+    validate_certs: false
+  register: _oc_front
+
+- name: "openclaw | assert the redirect goes to the zuno realm ({{ _oc_ns }})"
+  ansible.builtin.assert:
+    that: "'/realms/' ~ _openclaw.keycloak.realm ~ '/protocol/openid-connect/auth' in _oc_front.location"
+    fail_msg: "front door redirects to {{ _oc_front.location }}"
+
+- name: "openclaw | find the gateway pod in {{ _oc_ns }}"
+  ansible.builtin.set_fact:
+    _oc_gw_pod: "{{ _oc_pods.resources | selectattr('metadata.labels.app', 'defined') | selectattr('metadata.labels.app', 'equalto', 'claw') | map(attribute='metadata.name') | first }}"
+
+# 200 through the proxy (token injected), no answer when the proxy is bypassed,
+# and no internet: http codes printed by curl, 000 when nothing answers.
+- name: "openclaw | probe the bounds from the gateway pod ({{ _oc_ns }})"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ _oc_ns }}"
+    pod: "{{ _oc_gw_pod }}"
+    container: gateway
+    command: >-
+      sh -c 'printf "%s %s %s %s"
+      $(curl -s -m 20 -o /dev/null -w "%{http_code}" {{ _openclaw.gateways.aiBaseUrl }}/models)
+      $(curl -s -m 8 --noproxy "*" -o /dev/null -w "%{http_code}" {{ _openclaw.gateways.aiBaseUrl }}/models)
+      $(curl -s -m 12 -o /dev/null -w "%{http_code}" https://clawhub.ai)
+      $(curl -s -m 8 --noproxy "*" -o /dev/null -w "%{http_code}" https://example.com)'
+  register: _oc_probe
+  changed_when: false
+  failed_when: false
+
+- name: "openclaw | assert the bounds ({{ _oc_ns }})"
+  ansible.builtin.assert:
+    that: "_oc_probe.stdout.split() == ['200', '000', '000', '000']"
+    fail_msg: >-
+      {{ _oc_ns }}: expected 200 (ai-gateway via proxy), 000 (proxy bypassed), 000 (clawhub.ai),
+      000 (internet); got {{ _oc_probe.stdout }}

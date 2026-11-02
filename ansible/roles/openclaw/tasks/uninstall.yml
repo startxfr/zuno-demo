@@ -1,5 +1,13 @@
 ---
-# Stub (WP-179): WP-183 replaces this file. Nothing was ever installed by it.
-- name: "openclaw | not implemented yet"
-  ansible.builtin.debug:
-    msg: "openclaw is declared but not implemented yet (WP-183, ADR-0589); nothing to remove."
+# Deletes the assistants, then the operators, namespaces and catalog. Kept: the
+# claw.sandbox.redhat.com CRDs (OLM never deletes CRDs) and the Vault paths
+# keycloak/openclaw-<persona> and openclaw/<persona>.
+- name: "openclaw | delete the assistants Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-openclaw-d1"
+
+- name: "openclaw | delete the operator Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-openclaw-d0"

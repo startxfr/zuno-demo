@@ -1,0 +1,67 @@
+---
+# keycloak/openclaw-<persona> (the client secret) is seeded by the vault role with
+# the Keycloak client (WP-179's four-place pattern); this role seeds only its own
+# openclaw/<persona> path, and only when it is missing.
+- name: "openclaw | find the Vault pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _vault_pod
+
+- name: "openclaw | read the Vault bootstrap credentials"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-vault
+    name: vault-bootstrap-credentials
+  register: _openclaw_vault_creds
+  no_log: true
+
+- name: "openclaw | fail if Vault isn't bootstrapped"
+  ansible.builtin.fail:
+    msg: "vault-bootstrap-credentials not found in zuno-vault - run `make d0 install vault` first."
+  when: >-
+    (_vault_pod.resources | default([]) | length) == 0 or
+    (_openclaw_vault_creds.resources | default([]) | length) == 0
+
+- name: "openclaw | set the Vault connection fact"
+  ansible.builtin.set_fact:
+    _vault_root_token: "{{ _openclaw_vault_creds.resources[0].data.root_token | b64decode }}"
+  no_log: true
+
+- name: "openclaw | check the Keycloak client secrets exist"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv get -field=client_secret zuno/keycloak/openclaw-{{ item.name }} >/dev/null"
+  loop: "{{ _openclaw.personas }}"
+  loop_control:
+    label: "keycloak/openclaw-{{ item.name }}"
+  register: _openclaw_client_secrets
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: "openclaw | fail when a Keycloak client secret is missing"
+  ansible.builtin.fail:
+    msg: >-
+      Vault keycloak/openclaw-<persona> is missing for
+      {{ _openclaw_client_secrets.results | rejectattr('rc', 'equalto', 0) | map(attribute='item.name') | list }}:
+      run `make d0 install vault` (it seeds only missing paths), then
+      `make d0 install keycloak` so the client reconcile Job creates the clients.
+  when: _openclaw_client_secrets.results | rejectattr('rc', 'equalto', 0) | list | length > 0
+
+- name: "openclaw | seed openclaw/<persona> (Control UI password, oauth2-proxy cookie secret)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  loop: "{{ _openclaw.personas }}"
+  vars:
+    vault_seed_path: "openclaw/{{ item.name }}"
+    vault_seed_fields:
+      ui_password: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+      # oauth2-proxy accepts a 16, 24 or 32 byte cookie secret.
+      cookie_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
