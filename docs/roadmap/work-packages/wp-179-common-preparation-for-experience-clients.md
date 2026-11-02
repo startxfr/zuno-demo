@@ -1,6 +1,6 @@
 # WP-179: Common preparation for experience clients
 
-- **State:** Repo work in review (steps 1 to 6 in the repository, 2026-11-02; step 7 is live and waits for the user's go)
+- **State:** Done (2026-11-02)
 - **ADRs:** [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** none
 - **Related:** [WP-180](wp-180-open-webui-preparation.md), [WP-182](wp-182-openclaw-preparation.md), [WP-184](wp-184-three-experiences-demonstration.md)
@@ -76,6 +76,26 @@ changed here, and the rules for the rest are written down.
   cost and guardrails evaluations by `client`. Like the user panels, a multi-group user counts once per group.
 - **Push.** Some demo333 Applications follow `devel`: pushing these commits may apply the namespace, the NetworkPolicies and
   the ai-gateway environment on demo333 at the next sync. The push is therefore a cluster action and waits for the user's go.
+
+## Live evidence (2026-11-02, demo333, user's go)
+
+- **Push and sync.** 9dd8df9f pushed to `devel`; the seven Applications concerned follow `devel` with automated sync and applied
+  it (`zuno-ai-gateway-d1`, `zuno-mcp-d1`, `zuno-namespaces-d1`, `zuno-llm-d1` Synced/Healthy). `zuno-openwebui` exists with
+  `zuno.io/experience-client=true`; both NetworkPolicies carry the namespace-label peer.
+- **Build and roll.** ai-gateway Build 30 (commit 590b920d, which contains 9dd8df9f), image `sha256:9021fe15...`, rolled 1/1;
+  `EXPERIENCE_CLIENTS` set in the pod, the new code present. Rollback image: `sha256:9c044b06...` (Build 29). A build of one
+  component needs `-e day1_verb=build`: without it `apply_openshift_build.yml` only ensures the image exists (green, no Build).
+- **Network.** Unauthenticated HTTP from a pod in `zuno-openwebui`: ai-gateway `/v1/models` 401, mcp-gateway `/mcp` 405
+  (reached). From an unlabelled pod in `zuno-mlops`: no answer from either (blocked). Probe pods deleted.
+- **Label, from raw Prometheus (thanos-querier).** `zuno_model_calls_total{client="openclaw-spike",agent="openclaw"}` (WP-182's
+  spike, through claw-operator's oauth2 proxy) and `{client="other"}` (WP-180's spike, Keycloak client `owui-scratch`, outside
+  `EXPERIENCE_CLIENTS`, so bounded to `other` as designed), on error and success outcomes;
+  `zuno_guardrails_evaluations_total{client="other"}` too. No `client="unifai"` series yet: no UnifAI call since the roll;
+  same code path.
+- **Platform findings, not part of this package.** With the GPU nodes NotReady, the fallback walks every local pair and each
+  `*-maas` candidate costs about 60 s before the next one: a C1 chat reached `openai` after about 10 minutes, and
+  claw-operator's proxy cuts at 300 s (WP-188). The NeMo guardrails backend answered `unavailable` (observe mode, response
+  unaffected), under investigation.
 
 ## Coordination protocol (both tracks)
 
