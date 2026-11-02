@@ -1,6 +1,6 @@
 # WP-183: Install OpenClaw on demo333
 
-- **State:** Operator pending (2026-11-02: installed on demo333, `make d2 check openclaw` green; the browser acceptance and the `openclaw` entitlement remain)
+- **State:** Operator pending (2026-11-02: installed on demo333, `make d2 check openclaw` green, browser acceptance passed; the `openclaw` entitlement and a Control UI chat (ai-gateway build 32) remain)
 - **ADRs:** [ADR-0590](../../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md), [ADR-0589](../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-182](wp-182-openclaw-preparation.md)
 - **Related:** [WP-181](wp-181-install-open-webui-on-demo333.md), [WP-184](wp-184-three-experiences-demonstration.md)
@@ -88,7 +88,16 @@ the spike changed in ADR-0589.
 - **Chat:** still times out with the GPU nodes down (the ai-gateway walks the local providers first); WP-188
   (ADR-0591) addresses it. Not a WP-183 defect.
 
-**Remaining acceptance:** browser sign-in (consultant-02 reaches its UI, sale-01 is refused there, and the reverse);
+- **Browser acceptance** (user, 2026-11-02): consultant-02 reaches its assistant's Control UI through Keycloak and its
+  password; sale-01 is refused there; and the reverse on sale-01's assistant.
+- **OpenClaw end to end:** `openclaw agent --local` in consultant-02's pod answers through the proxy, the ai-gateway and
+  openai `gpt-4o-mini` (after WP-188). The gateway path (Control UI) gets 422: it sends message `content` as a list of
+  text parts, which the ai-gateway schema refused; fixed in the ai-gateway (WP-179 session, build 32).
+- **Secret exposure and rotation:** an over-broad `env` filter printed consultant-02's gateway token and UI password in
+  the operator's terminal. The gateway token was rotated (operator Secret recreated, pod restarted); the UI password
+  rotation in Vault (`openclaw/consultant-02`) is left to the user.
+
+**Remaining acceptance:** a Control UI chat once ai-gateway build 32 is live;
 the entitled-tool proof once the `openclaw` experience-client declaration is admitted (the Open WebUI track's WP,
 then `gateways.mcpAgentHeader: true`).
 
