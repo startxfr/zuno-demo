@@ -1,6 +1,6 @@
 # ADR-0588: Serve a general-purpose chat experience with Open WebUI
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-02, WP-181: installed on demo333, `make d2 check open-webui` green)
 - **Target:** v0.13
 - **Date:** 2026-11-02
 - **Decision owners:** Zuno Demo architecture team

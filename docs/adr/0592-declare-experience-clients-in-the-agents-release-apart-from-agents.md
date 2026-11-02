@@ -1,6 +1,6 @@
 # ADR-0592: Declare experience clients in the agents release, apart from agents
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-02, WP-189: agents release v0.9.0 promoted, clients loaded by the mcp-gateway, tools proven live for open-webui and openclaw)
 - **Target:** v0.13
 - **Date:** 2026-11-02
 - **Decision owners:** Zuno Demo architecture team

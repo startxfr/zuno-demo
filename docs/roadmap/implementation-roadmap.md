@@ -35,7 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-186, WP-187 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 6 | 4 | 8 | WP-184, WP-188 |
+| v0.13 | 6 | 2 | 8 | WP-184, WP-188 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1140,6 +1140,8 @@ moving.
 
 ## Change log
 
+- 2026-11-02 — ADR-0588 and ADR-0592 Implemented (WP-181 and WP-189 Done, proven live on
+  demo333); v0.13 open ADRs: ADR-0587 (closes with WP-184) and ADR-0591 (WP-188).
 - 2026-11-02 — ADR-0592 and WP-189 added to phase 46: the experience clients
   get their tools from a declaration of their own in the agents release, so
   they never become UnifAI bundles, Keycloak groups or delegation targets.
