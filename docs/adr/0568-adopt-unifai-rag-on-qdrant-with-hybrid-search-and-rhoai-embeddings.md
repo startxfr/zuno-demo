@@ -164,6 +164,9 @@ Measured against the live fork while closing WP-186, behaviours of the retired r
 - **The language boost** (+0.01) is not carried. The sparse side is a hashing BM25 encoder with accent folding and English and French stop words, without stemming. French queries
   are measured by WP-186.
 
+ADR-0203 and ADR-0205 stay in force, as the table above says; only their "see" references to deleted code are updated. ADR-0205 no longer has a test that asserts its read-only
+invariant for the indexed path (WP-186).
+
 ## Consequences
 
 The platform stops maintaining about 5,000 lines of RAG service and
