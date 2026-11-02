@@ -138,9 +138,10 @@ open-webui:
     - name: OPENAI_API_CONFIGS
       value: '{"0":{"enable":true,"auth_type":"system_oauth","headers":{"X-Zuno-Data-Classification":"C1","X-Zuno-Agent":"open-webui","X-Zuno-Task":"chat"}}}'
     # access_grants: a tool connection without grants is admin-only (WP-180);
-    # the mcp-gateway decides what each user sees.
+    # the mcp-gateway decides what each user sees. C1 like the model connection
+    # (ADR-0592): the chat may go to SaaS models, so only C1 tools are allowed.
     - name: TOOL_SERVER_CONNECTIONS
-      value: '[{"type":"mcp","url":"http://mcp-gateway.zuno-ai-run.svc:8080/mcp","path":"","auth_type":"system_oauth","key":"","headers":{"X-Zuno-Agent":"open-webui","X-Zuno-Task":"chat"},"config":{"enable":true,"access_grants":[{"principal_type":"user","principal_id":"*","permission":"read"}]},"info":{"id":"zuno-mcp","name":"Zuno tools","description":"Governed tools through the zuno mcp-gateway"}}]'
+      value: '[{"type":"mcp","url":"http://mcp-gateway.zuno-ai-run.svc:8080/mcp","path":"","auth_type":"system_oauth","key":"","headers":{"X-Zuno-Agent":"open-webui","X-Zuno-Task":"chat","X-Zuno-Data-Classification":"C1"},"config":{"enable":true,"access_grants":[{"principal_type":"user","principal_id":"*","permission":"read"}]},"info":{"id":"zuno-mcp","name":"Zuno tools","description":"Governed tools through the zuno mcp-gateway"}}]'
     - name: BYPASS_EMBEDDING_AND_RETRIEVAL
       value: "True"
     - name: USER_PERMISSIONS_CHAT_FILE_UPLOAD

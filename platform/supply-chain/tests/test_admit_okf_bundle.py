@@ -169,6 +169,32 @@ class ValidateTest(AdmitTestCase):
         self.assertFalse(any("knowledge.tech" in w for w in warnings), warnings)
 
 
+class ExperienceClientValidateTest(AdmitTestCase):
+    """ADR-0592: an experience client's tools must be served, and its name is
+    never an agent's."""
+
+    def client(self, name: str, tool: str) -> None:
+        write(self.release / f"experience-clients/{name}/client.okf.md",
+              "---\nokf_version: v0.3\ntype: experience-client\nzuno:\n  name: " + name
+              + "\n  tasks: [chat]\n  access: {groups: [sales]}\n---\n")
+        write(self.release / f"experience-clients/{name}/tasks/chat.md",
+              "---\nokf_version: v0.3\ntype: task\nzuno:\n  allowed_tools: [" + tool + "]\n---\n")
+
+    def test_a_served_client_is_admitted(self) -> None:
+        self.client("chat-ui", "search_docs")
+        self.assertEqual(admit.validate(self.release)[0], [])
+        self.assertEqual(admit.clients_view(self.release),
+                         {"chat-ui": {"groups": ["sales"], "tasks": {"chat": ["search_docs"]}}})
+
+    def test_a_client_tool_absent_from_the_policy_is_refused(self) -> None:
+        self.client("chat-ui", "ghost")
+        self.assertIn("(experience client) allows tool 'ghost', absent", admit.validate(self.release)[0][0])
+
+    def test_a_client_named_like_an_agent_is_refused(self) -> None:
+        self.client("demo", "search_docs")
+        self.assertIn("has the name of an agent", " ".join(admit.validate(self.release)[0]))
+
+
 class DiffTest(AdmitTestCase):
     def test_first_admission_lists_agents(self) -> None:
         self.assertIn("**demo** added", admit.diff(None, self.release))
@@ -238,13 +264,16 @@ class ConformanceLayerExtractTest(unittest.TestCase):
                 tar.addfile(info, io.BytesIO(data))
         return buf.getvalue()
 
-    def _extract(self, layers: list):
+    def _extract(self, layers: list, clients: list = ()):
         index = {"agents": []}
         blobs = {"sha256:p": self._tar({"tools/x.yaml": b"a: 1\n"})}
         manifest_layers = [{"mediaType": "application/vnd.zuno.okf.policies.v1.tar+gzip", "digest": "sha256:p"}]
         for i, files in enumerate(layers):
             blobs[f"sha256:c{i}"] = self._tar(files)
             manifest_layers.append({"mediaType": admit.CONFORMANCE_MEDIA_TYPE, "digest": f"sha256:c{i}"})
+        for i, files in enumerate(clients):
+            blobs[f"sha256:x{i}"] = self._tar(files)
+            manifest_layers.append({"mediaType": admit.CLIENTS_MEDIA_TYPE, "digest": f"sha256:x{i}"})
         saved = (admit.verify, admit.manifest, admit.fetch_blob)
         admit.verify = lambda reference, dev=False: index
         admit.manifest = lambda reference: {"layers": manifest_layers}
@@ -264,6 +293,13 @@ class ConformanceLayerExtractTest(unittest.TestCase):
     def test_a_release_without_the_layer_still_extracts(self) -> None:
         files = self._extract([])
         self.assertEqual(files, ["okf-index.json", "policies/tools/x.yaml"])
+
+    def test_the_clients_land_under_experience_clients(self) -> None:
+        # ADR-0592: the optional clients layer of the corp artifact.
+        files = self._extract([], clients=[{"open-webui/client.okf.md": b"---\n---\n",
+                                            "open-webui/tasks/chat.md": b"---\n---\n"}])
+        self.assertIn("experience-clients/open-webui/client.okf.md", files)
+        self.assertIn("experience-clients/open-webui/tasks/chat.md", files)
 
     def test_two_conformance_layers_are_refused(self) -> None:
         with self.assertRaises(admit.AdmissionError):

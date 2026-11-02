@@ -9,6 +9,13 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition (2026-11-02) - ADR-0592 joins v0.13
+
+Open WebUI and OpenClaw need tools under a logical agent name, but an agent in
+the release becomes a UnifAI bundle, a Keycloak group and a delegation target.
+ADR-0592 declares them as experience clients in their own layer of the agents
+release, read only by the mcp-gateway, at C1.
+
 ## Addition (2026-11-02) - ADR-0591 joins v0.13
 
 The experience clients' first live calls (WP-180, WP-182) found every `*-maas`

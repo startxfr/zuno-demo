@@ -153,6 +153,8 @@ jobs:
           python3 tests/test_auth_mode_enforcement.py
           # ADR-0401/0403/0406 (WP-172): the agent delegation chain, on synthetic agents.
           python3 tests/test_agent_chain.py
+          # ADR-0592 (WP-189): experience clients loaded next to the agents.
+          python3 tests/test_experience_clients.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
