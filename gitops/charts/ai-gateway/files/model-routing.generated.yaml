@@ -7,6 +7,10 @@ adapters: []
 preferences:
 - agent: tekos
   task: answer-technical-question
+  local_only_for:
+  - C1
+  - C2
+  - C3
   prefer:
   - local-gpt-oss-maas
   - local-gpt-oss
@@ -38,6 +42,10 @@ preferences:
   - gemini
   - anthropic
   - mistral
+  local_only_for:
+  - C1
+  - C2
+  - C3
 - agent: tekos
   task: check-my-drive-docs
   preferred:
@@ -64,6 +72,7 @@ preferences:
   - local-maas
   - local
   local_only_for:
+  - C1
   - C2
   - C3
 - agent: arkos
@@ -74,6 +83,10 @@ preferences:
   - local-gpt-oss
   - local-maas
   - local
+  local_only_for:
+  - C1
+  - C2
+  - C3
 - agent: arkos
   task: structure-demo
   preferred:
@@ -231,6 +244,10 @@ preferences:
   - local-gpt-oss
   - local-maas
   - local
+  local_only_for:
+  - C1
+  - C2
+  - C3
 - agent: soursage
   task: coming-soon
   preferred:

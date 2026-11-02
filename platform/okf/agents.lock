@@ -2,5 +2,5 @@
 # file that names an agents version; change it through a promotion PR
 # (.github/workflows/okf-promote.yml) or `make d3 admit agents
 # RELEASE=vX.Y.Z UPDATE_LOCK=1`, never by hand.
-# release v0.8.0
-quay.io/zuno/okf-corp@sha256:b789c523126579c1183cf9cc4ac501f219ed7b0b1bd53f67b40421abfaf54587
+# release v0.8.1
+quay.io/zuno/okf-corp@sha256:8ef499c4489ccede8b3624062c418e6ff4f10f39ca3709856c0c4b7a4a5c694e
