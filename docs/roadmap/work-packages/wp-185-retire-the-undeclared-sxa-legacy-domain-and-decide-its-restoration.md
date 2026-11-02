@@ -1,6 +1,6 @@
 # WP-185: Retire the undeclared sxa-legacy domain, then decide whether to restore it
 
-- **State:** Not started
+- **State:** Repo work in review (steps 2 and 3 prepared 2026-11-02 on the zuno-demo-agents branch `sxa-legacy/undeclare`; steps 1, 4, 5 and the gate remain)
 - **ADRs:** [ADR-0219](../../adr/0219-serve-sxa-only-as-a-historical-rag-corpus.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)
 - **Depends on:** none
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)
@@ -69,3 +69,9 @@ reversed by a chosen, costed route or recorded as a decision.
 ## Decisions
 
 - **2026-11-02 (user):** clean up first, decide on restoration after, and open no fork work until the user says yes.
+- **2026-11-02 (user):** the two tasks whose only knowledge source is the domain are removed, not kept with a notice: comage `compare-historical-deals` (the one served agent)
+  and cognos `review-historical-commercial-data`. All four agents are cleaned now, although advantage, cognos and finage are placeholders that no bundle serves.
+- **2026-11-02 (user):** finage's two invoice tasks stay, without the domain and with their text rewritten, because they are the only `project_required: true` tasks of the
+  repository (the exemplars of ADR-0512).
+- Versions chosen for the branch: comage, cognos, advantage and finage go from 0.1.0 to 0.2.0. These agents are 0.x and unverified, so a breaking change bumps the
+  minor; RELEASING.md says "major" for a removed task, and a jump to 1.0.0 would mislabel agents that are not stable. The repository `VERSION` is left for the release.
