@@ -34,6 +34,12 @@
   The gateway skipped every SaaS candidate and every direct local sibling because `stresstest` is `fail_mode: closed`, and the
   MaaS local models were not ready, so no token was counted. Reverted the same evening. Step 3 needs the local models back,
   or a tight class with `fail_mode: open`; it stays open.
+- Open WebUI pass of 2026-11-02 22:37 UTC (steps 1, 2, 6 and 7 as sale-01 and finance-01, fresh Keycloak sessions, SaaS at C1):
+  both personas sign in with role `user` and see the 11 models; the tool lists are sale-01 `drive.document.search`,
+  `gmail.message.read`, `diagram.generation.create` and finance-01 the first two; a short chat answers in 1 s for both; the
+  injection prompt answers 200 in `observe` mode. Raw Prometheus (thanos-querier, after the 22:31 pod restart reset the
+  counters): `zuno_model_calls_total{client="open-webui",provider="openai"}` 2 and
+  `zuno_guardrails_evaluations_total{client="open-webui",outcome="detected"}` 1, the export lagging by about a minute.
 
 ## Acceptance
 
