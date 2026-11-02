@@ -1,6 +1,6 @@
 # ADR-0589: Serve per-persona OpenClaw assistants via claw-operator behind a token-injecting egress proxy
 
-- **Status:** Accepted
+- **Status:** Superseded in part by [ADR-0590](0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md) (2026-11-02, WP-182/WP-183) - the namespaces (created by the openclaw chart, one operator each) and the exposure (oauth2-proxy + password, EgressFirewall) moved; the operator, identity, token injection, tools and fallback stay. Previously: Accepted
 - **Target:** v0.13
 - **Date:** 2026-11-02
 - **Decision owners:** Zuno Demo architecture team

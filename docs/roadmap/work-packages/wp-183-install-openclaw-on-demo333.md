@@ -1,7 +1,7 @@
 # WP-183: Install OpenClaw on demo333
 
-- **State:** Not started
-- **ADRs:** [ADR-0589](../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
+- **State:** Repo work in review (2026-11-02: chart, Applications, role, Keycloak clients, ADR-0590 in the repository; the install waits for the user's go)
+- **ADRs:** [ADR-0590](../../adr/0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md), [ADR-0589](../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-182](wp-182-openclaw-preparation.md)
 - **Related:** [WP-181](wp-181-install-open-webui-on-demo333.md), [WP-184](wp-184-three-experiences-demonstration.md)
 - **Target:** v0.13
@@ -35,3 +35,36 @@
 - An HTTP request from the assistant's pod to the internet fails.
 - Installing a ClawHub skill is refused.
 - An entitled tool works through the mcp-gateway; a non-entitled one is refused.
+
+## Implementation notes (2026-11-02)
+
+The values come from [WP-182's evidence](../evidence/wp-182-openclaw-spike.md), step 8; ADR-0590 records what
+the spike changed in ADR-0589.
+
+- **Step 1, chart** `gitops/charts/openclaw`. `operator.enabled` renders the CatalogSource (digest) and, per persona,
+  the namespace `zuno-claw-<persona>` (label `zuno.io/experience-client`), an `OwnNamespace` OperatorGroup, a Manual
+  Subscription on `startingCSV` and the EgressFirewall. `assistants.enabled` renders the ExternalSecrets, the
+  oauth2-proxy front door (its Route on the operator's host, wave -10, before the `Claw`) and the `Claw` (oauth2
+  credentials on the Keycloak Route, provider `zuno`, MCP `zuno`, lockdown). Personas and pins live in `values.yaml`.
+- **Step 2, Applications** `zuno-openclaw-d0` (wave -58) and `zuno-openclaw-d1` (wave -57).
+- **Step 3, identity.** Clients `openclaw-consultant-02` and `openclaw-sale-01` with WP-179's four-place pattern,
+  appended after Open WebUI's (bba139b7): client credentials and browser flow, groups mapper. Their service-account
+  users with the persona's groups are in `realm-zuno.json` for a fresh import; on a live realm the role copies the
+  persona's groups to the service account through the admin API (users are create-only).
+- **Step 4, token proxy:** not built. The operator's `oauth2` credential exchanges and refreshes the token and sets
+  the headers (WP-182 steps 2 and 3).
+- **Step 5, front door:** oauth2-proxy v7.15.5 by digest, the persona's email only, OpenClaw `password` mode behind
+  it (ADR-0590 decision 3). The Route uses the router's certificate (edge), like the other Routes.
+- **Step 6, role** `ansible/roles/openclaw`: `install` checks the catalog digest, checks
+  `keycloak/openclaw-<persona>` and seeds `openclaw/<persona>` in Vault, sets the service-account groups, applies d0,
+  approves only the InstallPlan naming the pinned CSV, applies d1 and waits for each `Claw` Ready. `check` asserts
+  the CSV, the `Claw`, the running image IDs, the Routes, the 302 to Keycloak, and from each assistant's pod: 200
+  through the proxy, nothing when bypassed, nothing from clawhub.ai or the internet. `make d2 check openclaw` runs
+  `check` once `day2_check.yml` lists `openclaw` (shared file, requested from the WP-179 session).
+- **Step 7, entitlement:** open. Until the `openclaw` agent is admitted in zuno-demo-agents, the MCP credential sends
+  no `X-Zuno-Agent` (`gateways.mcpAgentHeader: false`) and the assistant gets the front-door read-only tools of its
+  persona (consultant-02: five, sale-01: none).
+- **Install order on demo333:** push (the Keycloak volume change rolls Keycloak, `zuno-keycloak-d1` follows
+  `devel`), `make d0 install vault` (seeds the two client secrets), wait for the client reconcile Job, then
+  `make d2 install openclaw`.
+
