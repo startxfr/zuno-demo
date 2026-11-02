@@ -187,6 +187,18 @@ cluster. WP-084 carries a one-time operator teardown checklist to be run
 See [Standard clauses](README.md#standard-clauses) for Alternatives
 considered, Migration/evolution and Review evidence.
 
+## Update 2026-11-02 (WP-185): the domain is not served today
+
+`knowledge.sxa-legacy` has had no backing store since the old RAG stack was retired (WP-168, 2026-10-24). The `rag-sxa-legacy` database (319,841 rows) was dropped with the other
+RAG databases; the pg_dump kept outside the repository for it was a few KB, so the embedded rows were not preserved. UnifAI's RAG has no source for the domain: [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)
+required a `sql-dump` source type before the old ingestion was retired, and it was not built. No record accepted that loss; it was found on 2026-11-02 and recorded as WP-185.
+
+The agents stopped declaring the domain in the agents release v0.9.0: comage `compare-historical-deals` and cognos `review-historical-commercial-data`, whose only knowledge source it was,
+are removed, and advantage and finage no longer list it. No live bundle names it (see the [evidence](../roadmap/evidence/wp-185-live-bundles.md)). The decision of this record, to serve the closed
+pre-2021 SXA record by retrieval only, is therefore not implemented. Whether to restore it is the user's call, with two costed routes in WP-185 (a `sql-dump` source type in the fork, or a conversion
+Job to uploaded documents); until that call the descriptor `knowledge/sxa-legacy/domain.yaml`, the `knowledge.sxa-legacy` entry of the knowledge policy and the C2 classification stay in place so that a
+restoration needs no policy work. If the answer is to drop the domain, this record is superseded and those entries are removed.
+
 ## Related ADRs
 
 - [ADR-0016](0016-migrate-the-legacy-sxa-schema-to-postgresql.md) (fully superseded by this record)
