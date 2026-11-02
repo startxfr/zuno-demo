@@ -117,12 +117,15 @@ def test_confluence_reading_tasks_are_local_only_at_every_level() -> None:
             assert not (names & external), (agent, task, level, names & external)
 
 
-def test_comage_compare_historical_deals_is_unaffected_at_c2() -> None:
-    """Regression guard: Comage's own, unrelated C2 use of
-    ovhcloud-gpt-oss-120b (its own preference entry, no local_only_for)
-    must be completely untouched by Arkos DAT's new field."""
-    names = [c.name for c in _candidates("comage", "compare-historical-deals", "C2")]
-    assert "ovhcloud-gpt-oss-120b" in names, names
+def test_tasks_that_do_not_read_confluence_keep_their_external_providers() -> None:
+    """The local-only rule is scoped to the tasks that read Confluence or the technical docs (WP-187). A
+    task that does not (tekos check-my-drive-docs, arkos write-code) keeps the external providers of its own
+    preference entry, so the rule is not applied wider than intended. (This replaces the guard on Comage's
+    compare-historical-deals, removed from the agents release with knowledge.sxa-legacy, WP-185.)"""
+    drive = [c.name for c in _candidates("tekos", "check-my-drive-docs", "C1")]
+    assert "ovhcloud-gpt-oss-120b" in drive, drive
+    code = [c.name for c in _candidates("arkos", "write-code", "C1")]
+    assert "mistral-codestral" in code, code
 
 
 TESTS = [
@@ -133,7 +136,7 @@ TESTS = [
     test_dat_c2_c3_local_loss_fails_closed_rather_than_externalizing,
     test_workshop_presentation_is_local_only_at_every_level,
     test_confluence_reading_tasks_are_local_only_at_every_level,
-    test_comage_compare_historical_deals_is_unaffected_at_c2,
+    test_tasks_that_do_not_read_confluence_keep_their_external_providers,
 ]
 
 
