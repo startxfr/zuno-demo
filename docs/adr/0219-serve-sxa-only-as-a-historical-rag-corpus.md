@@ -196,7 +196,7 @@ required a `sql-dump` source type before the old ingestion was retired, and it w
 The agents stopped declaring the domain in the agents release v0.9.0: comage `compare-historical-deals` and cognos `review-historical-commercial-data`, whose only knowledge source it was,
 are removed, and advantage and finage no longer list it. No live bundle names it (see the [evidence](../roadmap/evidence/wp-185-live-bundles.md)). The decision of this record, to serve the closed
 pre-2021 SXA record by retrieval only, is therefore not implemented. On 2026-11-02 the user decided to leave the domain dropped. The decision of this record, to serve the closed pre-2021 SXA record by retrieval only, is withdrawn with no
-successor record, and the status is Deprecated. The descriptor `knowledge/sxa-legacy/domain.yaml` and the `sxa-legacy` classification entry are removed with the next agents release, which also drops the three remaining references to the domain in the corp policies (WP-185).
+successor record, and the status is Deprecated. The descriptor `knowledge/sxa-legacy/domain.yaml` and the `sxa-legacy` classification entry were removed on 2026-11-03, once agents release v0.9.2 had dropped the last references to the domain from the corp policies and agent notes (WP-185).
 The source dump (`sxa.schema.sql`, `sxa.data.sql` in `zuno-demo-sources/sxa-dump/`) is kept and was not re-checked. The domain is reopened if a demo scenario needs the historical record; the cheapest
 route is then a conversion Job to uploaded documents (WP-185), the `sql-dump` source type of the fork being the costlier one.
 
