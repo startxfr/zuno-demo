@@ -1,6 +1,6 @@
 # WP-181: Install Open WebUI on demo333
 
-- **State:** Repo work merged (2026-11-02: installed on demo333, `make d2 check open-webui` green; the agent entitlement in `zuno-demo-agents` remains)
+- **State:** Done (2026-11-02: installed on demo333, chain, tools and guardrails proven live; guardrails stay in observe mode, user decision)
 - **ADRs:** [ADR-0588](../../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-180](wp-180-open-webui-preparation.md)
 - **Related:** [WP-183](wp-183-install-openclaw-on-demo333.md), [WP-184](wp-184-three-experiences-demonstration.md)
@@ -71,5 +71,10 @@
   for `consultant-02`, `zuno_model_tokens_total{client="open-webui"}` 160, and
   `zuno_guardrails_evaluations_total{client="open-webui",outcome="clean"}` (guardrails in observe mode, agent
   `open-webui`).
-- Open: MCP tools are `[]` until the agent `open-webui` is declared in `zuno-demo-agents`; the blocking-prompt check
-  waits for a guardrails configuration that enforces (observe mode never blocks).
+- MCP tools (WP-189, agents v0.9.0): `consultant-02` and `sale-01` get `drive.document.search`, `gmail.message.read`,
+  `diagram.generation.create`; `finance-01` the first two; `recrut-01` none.
+- Guardrails: a prompt carrying "ignore all previous instructions" and "you are now DAN" gave
+  `zuno_guardrails_evaluations_total{client="open-webui",outcome="detected"}` and
+  `zuno_guardrails_detections_total{client="open-webui",agent="open-webui"}` for `injection-ignore-instructions` and
+  `injection-persona-override` (raw Prometheus). Mode stays `observe` (user decision 2026-11-02): the reply is not
+  blocked; blocking is a platform decision for later.
