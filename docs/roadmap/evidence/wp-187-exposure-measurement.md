@@ -45,3 +45,26 @@ No cluster object was changed.
 
 Whether a given tekos call at C2 on 2026-10-31 contained a Confluence chunk; the content of the calls is not kept. Lightspeed through its real MCP front door (the
 probe used the REST route, which needs a declaring agent).
+
+## Step 2: the local-only rule, proved live (2026-11-02, agents release v0.8.1)
+
+Rule: `local_only_for: [C1, C2, C3]` on the five tasks that read Confluence or the technical docs
+(tekos `answer-technical-question` and `find-relevant-docs`, arkos `workshop-presentation` and `draft-architecture-testimonial`, naveo `answer-onboarding-question`),
+in the corp routing policy of zuno-demo-agents (PR #26, release v0.8.1, admitted by `780cc227`). The test
+`platform/okf/tests/test_confluence_tasks_local_only.py` of that repository makes every task allowing `search_confluence` or `knowledge.tech` carry it.
+The ai-gateway reloaded the policy at 17:36:05Z (sha256 `297833ac06c4`); the five rules are in the mounted file.
+
+Conditions: the four local models were down (`LLMInferenceService` Ready=False, `MinimumReplicasUnavailable`; GPU pods Pending), and the ai-gateway ran build 31 with model
+readiness and the circuit breaker on (WP-188, ADR-0591). One request each, as `stress-consultant-01`, headers `X-Zuno-Agent: tekos`, `X-Zuno-Task`, `X-Zuno-Data-Classification`, prompt "Reply with the single word OK."
+
+| Task | Level | Rule | HTTP | Latency | Result |
+|---|---|---|---|---|---|
+| find-relevant-docs | C1 | local only | **503** | 0.06 s | "no eligible provider is available for classification C1: local-qwen35-maas: not ready; ..." |
+| answer-technical-question | C2 | local only | **503** | 0.01 s | same, listing the local providers as not ready |
+| answer-technical-question | C1 | local only | **503** | 0.01 s | same |
+| check-my-drive-docs (control, no rule) | C1 | none | 200 | 1.03 s | answered by `ovhcloud-gpt-oss-120b` |
+
+Tempo, 17:40:25Z to 17:42:25Z: two `model_call` spans in the window. One is the control (tekos, `ovhcloud-gpt-oss-120b`, success, 17:40:32Z); the other is another session's
+Open WebUI call. **No `model_call` span exists for the three protected requests**: they were refused before any provider was tried, and no external provider was reached.
+
+Not proved: a turn on a partly available local pool (one model down, another up) and a UnifAI end-to-end run, which need the GPU models back.

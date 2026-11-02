@@ -1,6 +1,6 @@
 # WP-187: Carry the source classification through UnifAI RAG results, and keep Confluence content off external models
 
-- **State:** Not started
+- **State:** Operator pending (steps 1 and 2 done 2026-11-02; the rest waits on a UnifAI operator release)
 - **ADRs:** [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0034](../../adr/0034-compute-effective-classification-from-the-complete-context.md)
 - **Depends on:** none (step 3 needs a UnifAI operator release)
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [ADR-0206](../../adr/0206-separate-current-salesforce-knowledge-from-legacy-sxa.md)
@@ -46,7 +46,7 @@ reads Confluence can send that content to an external model.
 ## Steps
 
 1. **Measure the exposure** (done, [evidence](../evidence/wp-187-exposure-measurement.md)).
-2. **Close the external-model path for Confluence-reading tasks.** For tekos `answer-technical-question`, `find-relevant-docs` and `check-my-drive-docs` (and any
+2. **Close the external-model path for Confluence-reading tasks (done and proved live on 2026-11-02, [evidence](../evidence/wp-187-exposure-measurement.md); agents release v0.8.1).** For tekos `answer-technical-question`, `find-relevant-docs` and `check-my-drive-docs` (and any
    arkos task that allows `knowledge.tech`), no external provider is reachable once Confluence content may be in the context. Two mechanisms; the brief records the
    choice with the user: (a) `local_only_for: [C2, C3]` for these tasks in the corp `preferences:` of the ai-gateway routing policy, which an agent cannot loosen
    (what arkos's `draft-architecture-testimonial` has); (b) `forbidden` roles in the task's OKF. Prove it live with a stresstest of tekos plus a forced local failure:

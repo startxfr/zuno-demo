@@ -994,7 +994,7 @@ the old stack. The comparison found three behaviours that the retirement dropped
 |---|---|---|---|---|---|
 | WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Not started | clean the declarations first (zuno-demo-agents release and admission), then the user's call on restoring the 310,000-document record |
 | WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Not started | ten French questions run against the live RAG; a French stemmer in the fork only if hit@1 is below 0.7 |
-| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | Not started | step 1 done (the label is not the leak); next: keep Confluence-reading tekos tasks off external models, then the source classification field (operator 0.1.50 plus a rag image) |
+| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | operator pending | steps 1 and 2 done and proved (the label is not the leak; five Confluence-reading tasks are local only since agents v0.8.1); next: the source classification field (operator 0.1.50 plus a rag image), waiting for the user's go |
 
 ### OKF stream phases
 
