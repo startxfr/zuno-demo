@@ -63,10 +63,12 @@ flowchart LR
    the evaluation shows up in the dashboard for that experience with outcome `detected`
    (`injection-ignore-instructions`, `injection-persona-override`; a fake card number works too). The guardrails run in
    `observe` mode (user decision 2026-11-02): recorded, the reply is not blocked - say so.
-8. **One user, one budget.** Row *Same user, one budget*: sale-01's tokens, per experience, add up to one per-user budget
-   in the ai-gateway's token ledger (durable in Redis). Its counter is keyed by user and quota class, never by client, so
-   spending it in one UI spends it in all of them. The per-user ceiling is enforced by this ledger, not by MaaS: Kuadrant
-   counts only the per-subscription budgets (ADR-0570, WP-177).
+8. **One identity, one budget.** Row *Same user, one budget*: the per-user token budget lives in the ai-gateway's token
+   ledger (durable in Redis), and its counter is keyed by the token's `sub` and the quota class, never by client. Open WebUI
+   and UnifAI call with sale-01's own token, so they spend the same sale-01 budget. OpenClaw calls as the persona's assistant
+   (a service account with sale-01's groups, ADR-0589), so it has its own per-user counter; what it shares with sale-01 is the
+   group budget, which counts by group. The per-user ceiling is enforced by this ledger, not by MaaS: Kuadrant counts only the
+   per-subscription budgets (ADR-0570, WP-177).
 
 ## If something goes wrong
 
@@ -75,19 +77,12 @@ flowchart LR
 - No series for an experience on the dashboard: the export and scrape take about a minute; widen the time range.
 - OpenClaw shows an old error: its assistant may still be starting (`oc get claw -A`).
 
-## Not shown live (yet)
+## Shown live once (2026-11-03 rehearsal)
 
-The shared quota ending in a 429 in all three experiences needs a tight ceiling for one persona and calls from the three
-UIs. The ai-gateway can put the members of one group (`QUOTA_REHEARSAL_GROUP`, off by default) under the tight `stresstest`
-class (2,000 tokens per user per 5 minutes), so the proof needs no budget change and ends when the persona leaves the
-group. A first attempt on 2026-11-02 (GPU nodes down) ended in a 502 for sale-01 before any token was counted, not in a
-429: the `stresstest` class is `fail_mode: closed`, so the ai-gateway skips every SaaS candidate (not reached through
-MaaS) and every direct local sibling (ADR-0570 clause 7), and the MaaS-served local models were not ready. The proof needs
-either the local models back or a tight class with `fail_mode: open`.
-
-That class now exists in the agents release (`rehearsal`, from release 0.9.1): `fail_mode: open`, tokens per user 2,000 /
-5 min (group 100,000, project 50,000), requests per user 60 / 5 min (group 600, project 300). The ai-gateway puts the members
-of one Keycloak group under it: `QUOTA_REHEARSAL_GROUP=zuno-quota-rehearsal` (chart value `quotaRehearsalGroup`, cluster
-variable `zuno_ai_gateway_quota_rehearsal_group`) and `QUOTA_REHEARSAL_CLASS=rehearsal` (default `stresstest`). The group holds
-sale-01 and `service-account-openclaw-sale-01` for the length of the run only. The run waits for the release 0.9.1
-promotion, regenerated quota files and an ai-gateway build 35. It is not run in this script (WP-184).
+With the persona put under a tight quota class, a user budget spent in Open WebUI ended in a 429 in UnifAI (the chat shows
+"Rate limit reached - quota_exceeded - You can retry in 50s"): both call with sale-01's own token. OpenClaw also got its 429, on
+its own counter. The 429 body is the same everywhere: `{"error":"quota_exceeded","quota_class":"stresstest","dimension":"user",
+"budget_tokens":2000,"window":"5m"}`. The rehearsal ran with the GPU models back; with them down, the `stresstest` class
+(`fail_mode: closed`) skips every SaaS candidate and the call ends in a 502 before any token is counted (2026-11-02). The
+fail-open `rehearsal` class (agents release 0.9.1, `QUOTA_REHEARSAL_GROUP`, `QUOTA_REHEARSAL_CLASS`) exists for that case. The
+run is not part of this script: it needs a group for the persona, an ai-gateway setting and a revert, and a 5-minute window.

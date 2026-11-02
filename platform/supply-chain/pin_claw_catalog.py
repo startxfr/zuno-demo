@@ -12,9 +12,14 @@ This resolves the catalog digest, reads the catalog's file-based config in memor
 nothing from the image is run or written to disk), checks it has exactly one entry on the pinned channel,
 resolves the manager and proxy tags to digests, resolves the OpenClaw image, and only then rewrites the chart.
 
-    python3 platform/supply-chain/pin_claw_catalog.py                       # newest catalog, newest stable OpenClaw
-    python3 platform/supply-chain/pin_claw_catalog.py --openclaw 2026.10.9  # a given OpenClaw tag
-    python3 platform/supply-chain/pin_claw_catalog.py --catalog sha256:... --dry-run
+    python3 platform/supply-chain/pin_claw_catalog.py --dry-run             # newest catalog, OpenClaw pin kept
+    python3 platform/supply-chain/pin_claw_catalog.py --openclaw 2026.7.1-2 # a given OpenClaw tag
+    python3 platform/supply-chain/pin_claw_catalog.py --catalog sha256:... --openclaw latest-stable
+
+OpenClaw follows the operator, not its own release train: the operator writes and owns openclaw.json, and a newer
+OpenClaw can refuse that config (2026.10.9 against operator f5aa592: moved and retired keys, plus a state-database
+migration; tested on demo333 2026-11-02). So the OpenClaw pin is kept unless `--openclaw` names a tag, normally the
+image the operator's CRD defaults to (`oc explain claw.spec.image`); `latest-stable` is for a deliberate test.
 
 When the CSV changes, re-read the operator source at the new commit before installing (owned config keys,
 passthrough domains, Route; see ansible/roles/openclaw/README.md). Exit 0 on success, 1 when something cannot be
@@ -142,7 +147,7 @@ def rewrite_values(text: str, pins: dict) -> str:
     return text
 
 
-def pin(catalog: str = "latest", openclaw: str = "latest-stable", chart: pathlib.Path = CHART,
+def pin(catalog: str = "latest", openclaw: str = "keep", chart: pathlib.Path = CHART,
         dry_run: bool = False, resolver: Callable[[str, str], str] = resolve,
         tags: Callable[[str], List[str]] = list_tags,
         configs: Callable[[str], List[dict]] = read_catalog_configs) -> dict:
@@ -158,9 +163,16 @@ def pin(catalog: str = "latest", openclaw: str = "latest-stable", chart: pathlib
         repo, tag, ref_digest = split_ref(ref)
         pins[role] = ref_digest or resolver(repo, tag)
         pins[f"{role}_ref"] = ref
-    oc_tag = newest_stable(tags(OPENCLAW)) if openclaw == "latest-stable" else openclaw
-    pins["openclaw_tag"] = oc_tag
-    pins["openclaw"] = resolver(OPENCLAW, oc_tag)
+    if openclaw == "keep":
+        current = values["images"]["openclaw"]
+        if not current.startswith(OPENCLAW + "@sha256:"):
+            raise PinError(f"images.openclaw is not pinned by digest: {current}")
+        pins["openclaw_tag"] = None
+        pins["openclaw"] = current.split("@", 1)[1]
+    else:
+        oc_tag = newest_stable(tags(OPENCLAW)) if openclaw == "latest-stable" else openclaw
+        pins["openclaw_tag"] = oc_tag
+        pins["openclaw"] = resolver(OPENCLAW, oc_tag)
     version = next((p["value"]["version"] for p in bundle.get("properties", []) if p.get("type") == "olm.package"), None)
     new_values = rewrite_values(values_path.read_text(encoding="utf-8"), pins)
     yaml.safe_load(new_values)
@@ -177,7 +189,8 @@ def pin(catalog: str = "latest", openclaw: str = "latest-stable", chart: pathlib
 def main(argv: Optional[List[str]] = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--catalog", default="latest", help="`latest` (default) or the catalog digest sha256:...")
-    parser.add_argument("--openclaw", default="latest-stable", help="OpenClaw tag, default the newest stable one")
+    parser.add_argument("--openclaw", default="keep",
+                        help="OpenClaw tag, `latest-stable`, or `keep` (default: the current pin)")
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
     try:

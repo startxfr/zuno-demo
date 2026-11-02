@@ -50,7 +50,7 @@ class Pin(unittest.TestCase):
         self.before = (self.chart / "values.yaml").read_text(encoding="utf-8")
 
     def test_newest_catalog_and_stable_openclaw_are_written_together(self):
-        pins = p.pin(chart=self.chart, resolver=resolver, tags=tags, configs=lambda ref: docs())
+        pins = p.pin(openclaw="latest-stable", chart=self.chart, resolver=resolver, tags=tags, configs=lambda ref: docs())
         values = (self.chart / "values.yaml").read_text(encoding="utf-8")
         self.assertIn(f"catalogImage: {p.CATALOG}@{CAT}\n", values)
         self.assertIn(f"startingCSV: {CSV}\n", values)
@@ -82,6 +82,14 @@ class Pin(unittest.TestCase):
                    ("proxy", "quay.io/codeready-toolchain/claw-proxy:abc1234"))
         pins = p.pin(chart=self.chart, resolver=resolver, tags=tags, configs=lambda ref: docs(related=related))
         self.assertEqual(pins["manager"], MGR)
+
+    def test_the_openclaw_pin_is_kept_by_default(self):
+        pins = p.pin(chart=self.chart, resolver=resolver, tags=tags, configs=lambda ref: docs())
+        values = (self.chart / "values.yaml").read_text(encoding="utf-8")
+        current = [l for l in self.before.splitlines() if l.strip().startswith("openclaw: ghcr.io")][0]
+        self.assertIn(current + "\n", values)
+        self.assertIsNone(pins["openclaw_tag"])
+        self.assertIn(f"manager: {MGR}\n", values)
 
     def test_newest_stable_ignores_betas_and_variants(self):
         self.assertEqual(p.newest_stable(tags(None)), "2026.10.9")

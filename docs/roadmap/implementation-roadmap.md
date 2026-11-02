@@ -35,7 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-186, WP-187 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 6 | 2 | 8 | WP-184, WP-188 |
+| v0.13 | 6 | 1 | 8 | WP-188 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -980,7 +980,7 @@ WP-184 closes them together.
 | WP-181 | [wp-181](work-packages/wp-181-install-open-webui-on-demo333.md) | 0588, 0587 | WP-179, WP-180 | Done | track Open WebUI: chart, role, Keycloak client, install on demo333 (user's go) |
 | WP-182 | [wp-182](work-packages/wp-182-openclaw-preparation.md) | 0589, 0587 | WP-179 | Done | track OpenClaw: spike on claw-operator (custom provider, refreshable credential, egress, lockdown), operator or openclaw-kube fallback |
 | WP-183 | [wp-183](work-packages/wp-183-install-openclaw-on-demo333.md) | 0590, 0589, 0587 | WP-179, WP-182 | Done | track OpenClaw: catalog pin, one Claw per persona, oauth2-proxy, install on demo333 (user's go) |
-| WP-184 | [wp-184](work-packages/wp-184-three-experiences-demonstration.md) | 0587, 0588, 0589 | WP-181, WP-183 | Repo work in review | joint close: dashboard, demo script, shared-quota proof across the three experiences |
+| WP-184 | [wp-184](work-packages/wp-184-three-experiences-demonstration.md) | 0587, 0588, 0589 | WP-181, WP-183 | Done (2026-11-03) | joint close: dashboard, demo script, shared-quota proof across the three experiences |
 | WP-188 | [wp-188](work-packages/wp-188-route-only-to-ready-local-models.md) | 0591 | WP-179 | Operator pending | ai-gateway: skip local models their controller reports not ready, per-provider circuit breaker, no SDK retries, immediate 503 when nothing is left, NeMo warm-up; build and roll after the user's go |
 | WP-189 | [wp-189](work-packages/wp-189-experience-clients-in-the-agents-release.md) | 0592 | WP-181 | Done | experience clients (Open WebUI, OpenClaw) declared in their own layer of the agents release, read by the mcp-gateway only, C1 read-only tools; release, promotion and roll by the user |
 
@@ -992,7 +992,7 @@ the old stack. The comparison found three behaviours that the retirement dropped
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Done (2026-11-02) | cleanup live in agents v0.9.0, ADR-0219 Deprecated, domain left dropped by decision; leftovers: descriptor removal with the next agents release, live comage question when the GPU nodes return |
+| WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Done (2026-11-02) | cleanup live in agents v0.9.0, ADR-0219 Deprecated, domain left dropped by decision; descriptor removed with agents v0.9.2; leftover: live comage question when the GPU nodes return |
 | WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Repo work merged | records corrected and ten French questions added; the French run (and the 0.7 decision) waits on the embedding model |
 | WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | operator pending | steps 1 and 2 done and proved (the label is not the leak; five Confluence-reading tasks are local only since agents v0.8.1); next: the source classification field (operator 0.1.50 plus a rag image), waiting for the user's go |
 
@@ -1142,6 +1142,8 @@ moving.
 
 - 2026-11-02 — ADR-0588 and ADR-0592 Implemented (WP-181 and WP-189 Done, proven live on
   demo333); v0.13 open ADRs: ADR-0587 (closes with WP-184) and ADR-0591 (WP-188).
+- 2026-11-03 — WP-184 Done and ADR-0587 Implemented: the three experiences, the dashboard and the script are proved live; the
+  shared-quota proof is reworded (user budget shared by Open WebUI and UnifAI, group budget by the three, OpenClaw own counter).
 - 2026-11-02 — ADR-0592 and WP-189 added to phase 46: the experience clients
   get their tools from a declaration of their own in the agents release, so
   they never become UnifAI bundles, Keycloak groups or delegation targets.

@@ -66,6 +66,9 @@ not needed.
   harmless, visible in its log.
 - An EgressFirewall is a namespace object on OVN-Kubernetes; another network plugin would need another egress
   control.
+- The OpenClaw version follows the operator, which writes and owns `openclaw.json`: OpenClaw 2026.10.9 refuses the
+  config of operator f5aa592 (tested 2026-11-02). `platform/supply-chain/pin_claw_catalog.py` moves the operator
+  pins together and keeps the OpenClaw pin unless a tag is named.
 
 ## Security considerations
 

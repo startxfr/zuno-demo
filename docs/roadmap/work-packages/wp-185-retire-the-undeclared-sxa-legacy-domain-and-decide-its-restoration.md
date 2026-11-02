@@ -1,6 +1,6 @@
 # WP-185: Retire the undeclared sxa-legacy domain, then decide whether to restore it
 
-- **State:** Done (2026-11-02: the cleanup is live in agents release v0.9.0 ([evidence](../evidence/wp-185-live-bundles.md)), the ADR notes are written, and the user decided to leave the domain dropped; two non-blocking leftovers are listed under Decisions)
+- **State:** Done (2026-11-02: the cleanup is live in agents release v0.9.0 ([evidence](../evidence/wp-185-live-bundles.md)), the ADR notes are written, and the user decided to leave the domain dropped; one non-blocking leftover, the live question to comage, is listed under Decisions)
 - **ADRs:** [ADR-0219](../../adr/0219-serve-sxa-only-as-a-historical-rag-corpus.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)
 - **Depends on:** none
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)
@@ -78,7 +78,6 @@ reversed by a chosen, costed route or recorded as a decision.
   minor; RELEASING.md says "major" for a removed task, and a jump to 1.0.0 would mislabel agents that are not stable. The repository `VERSION` is left for the release.
 - **2026-11-02 (user):** leave the domain dropped and keep the source dump in S3 (not re-checked). ADR-0219 is Deprecated with no successor, and ADR-0568 records that its `sql-dump` condition is
   withdrawn for this domain. The domain is reopened only if a demo scenario needs the historical record; the cheapest route is then the conversion Job.
-- **Leftover 1, descriptor and classification entry.** `knowledge/sxa-legacy/domain.yaml` and the `sxa-legacy: C2` entry of `policies/data-classification/classification.yaml` stay for now: removing the descriptor fails
-  `check_knowledge_refs.py`, because the pinned corp release still names the domain in `policies/knowledge/knowledge-policy.yaml` (line 92), `policies/tools/tool-policy.yaml` (line 268) and a note of finage
-  `monthly-invoice-report.md` (line 26). They go together with those three references in the next agents release.
+- **Leftover 1, descriptor and classification entry (done 2026-11-03).** Agents release v0.9.2 dropped the last references (the domain entry of the knowledge policy, a tool-policy comment and six notes in agent files), and
+  `knowledge/sxa-legacy/domain.yaml` and the `sxa-legacy: C2` classification entry were removed with the admission of that release.
 - **Leftover 2, live question to comage.** Step 1 asks one real question to comage on demo333; it waits for the GPU nodes. The static proof (no live bundle names the domain) is recorded.

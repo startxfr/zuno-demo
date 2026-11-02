@@ -1,6 +1,6 @@
 # ADR-0587: Admit additional user experiences over the one governed backend
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-03, WP-184: the three experiences run on one identity and one governed backend on demo333)
 - **Target:** v0.13
 - **Date:** 2026-11-02
 - **Decision owners:** Zuno Demo architecture team
