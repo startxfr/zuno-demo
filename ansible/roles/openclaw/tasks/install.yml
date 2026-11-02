@@ -25,6 +25,9 @@
     gitops_component_name: "openclaw"
     gitops_app_phase: "d0"
     gitops_app_name: "zuno-openclaw-d0"
+    # The Manual Subscriptions keep d0 Progressing until their InstallPlan is
+    # approved below: waiting for Healthy here would never end.
+    gitops_app_wait: false
     gitops_app_extra_helm_values:
       clusterBaseDomain: "{{ cluster_base_domain }}"
       operator:
@@ -38,6 +41,19 @@
   loop: "{{ _openclaw_namespaces }}"
   loop_control:
     loop_var: _openclaw_ns
+
+- name: "openclaw | wait for zuno-openclaw-d0 to be Synced and Healthy"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: zuno-openclaw-d0
+  register: _openclaw_d0
+  until: >-
+    (_openclaw_d0.resources | default([{}]))[0].status.sync.status | default('') == 'Synced' and
+    (_openclaw_d0.resources | default([{}]))[0].status.health.status | default('') == 'Healthy'
+  retries: 30
+  delay: 10
 
 - name: "openclaw | apply the assistants Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
