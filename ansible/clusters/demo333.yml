@@ -282,6 +282,12 @@ zuno_ai_gateway_guardrails_modes_generated: true
 # `evaluation` class from their group. User-facing clients are never listed.
 zuno_ai_gateway_trusted_platform_clients:
   - zuno-stresstest
+# ADR-0591 (WP-188, user go 2026-11-02): skip local models whose
+# LLMInferenceService is not Ready, and providers that just failed, instead of
+# waiting 180 s per *-maas candidate (GPU nodes down that day). Needs
+# ai-gateway build 31 (cf774982) or later.
+zuno_ai_gateway_model_readiness: true
+zuno_ai_gateway_circuit_breaker: true
 # Step C (user go 2026-10-24, after step B verified): the SaaS models'
 # MaaS subscriptions and auth policies keep only the ai-gateway
 # ServiceAccount; the /agent_tekos and /sales persona grants go (inventory
