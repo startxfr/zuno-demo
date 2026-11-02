@@ -28,9 +28,13 @@ Release v0.8.1 (tekos 0.4.5, arkos 0.2.2, naveo 0.1.1) adds `local_only_for: [C1
 
 Offline checks on devel after the admission: `check_docs.py` passes; the evaluation tests pass except `test_scenario_failover.py::test_verify_falls_back_to_the_counter_delta` (the test mocks `_query_provider_counts` while `verify_one_agent` first calls `_query_provider_counts_or_none`, since `4d059a51`; not related to the release). No Arkos or Tekos scenario expects a remote route.
 
+## Live attempt with the models back (2026-11-03)
+
+One GPU node came back (three of the four models Ready). Arkos scenario 21 as `eval-consultant-01` failed: both `iem.delegate_task` spans failed with "Node a2a-tekos is not adjacent, or the uid is wrong" and, on a retry, "Node agent-2 is not adjacent" (Tempo trace `2634004a…`, calls made by the `orchestrate` node). The uid is right and the A2A node is in the plan (`after: orchestrate`). Cause found by a9 reading the runtime: the orchestrator's delegation policy drops every adjacent node that has a path to the finalizer, and the operator's blueprint puts both workers (`agent-2`, `a2a-tekos`) before the write stage and `finish`, so neither is delegable (`topology.list_adjacent` omits them too). This is an operator blueprint bug introduced with the delegating shape (0.1.43 to 0.1.49): the workers must be leaves of the orchestrator. The fix ships in the next operator release; the proof is rerun after it.
+
 ## What remains
 
-1. GPU nodes and the four models back (on 2026-11-02 both GPU nodes were NotReady).
+1. The operator release that makes the workers leaves of the orchestrator, pinned on demo333 (the GPU models are back: three of four, `qwen35-9b-wesh` waits for the second node).
 2. Behavioural proof as `eval-consultant-01`: SSO chat in the UI (Team agent-arkos, workflow arkos) and arkos scenario 21 (`TEMPO_URL` set): a `delegate_task` span with `mas.success` true, a `POST /agents/tekos/ 200` at the a2a-gateway, Tekos content in the answer, then the read-only check `platform/testing/a2a_delegation_check.py` (cc) and the refusal checks of `evaluations/common/delegation_checks.py` on the gateway.
 3. The cost of an Arkos turn that delegates (the traces carry no token counts: use the ai-gateway counters).
 4. Then WP-174 Done and ADR-0401, ADR-0403, ADR-0406 to Implemented.
