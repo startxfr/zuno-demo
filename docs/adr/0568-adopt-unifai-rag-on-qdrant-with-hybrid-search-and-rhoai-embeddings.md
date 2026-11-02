@@ -162,7 +162,7 @@ Measured against the live fork while closing WP-186, behaviours of the retired r
 - **ADR-0110 (document ACL synchronization) is partially implemented.** Access is the source's `aclGroups`, applied fail-closed at query time. The per-page reconciliation
   of the retired ingestion (re-reading each page's live restrictions, deleting vanished pages) is not replaced.
 - **The `sql-dump` source type was not built**, although this record made it a condition of retiring the old ingestion, so `knowledge.sxa-legacy` (about 310,000 documents) has no source and the
-  agents stopped declaring it in release v0.9.0 ([ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md), WP-185).
+  agents stopped declaring it in release v0.9.0 ([ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md), WP-185). On 2026-11-02 the user decided to leave the domain dropped, so the `sql-dump` condition is withdrawn for it.
 - **The language boost** (+0.01) is not carried. The sparse side is a hashing BM25 encoder with accent folding and English and French stop words, without stemming. French queries
   are measured by WP-186.
 

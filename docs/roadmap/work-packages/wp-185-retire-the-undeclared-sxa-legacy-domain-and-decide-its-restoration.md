@@ -1,6 +1,6 @@
 # WP-185: Retire the undeclared sxa-legacy domain, then decide whether to restore it
 
-- **State:** Repo work merged (steps 1 to 4 done 2026-11-02: the cleanup is live in agents release v0.9.0 ([evidence](../evidence/wp-185-live-bundles.md)), the ADR-0219 and ADR-0568 notes are written; the live question to comage waits for the GPU nodes; steps 5 and 6, the S3 check and the restoration decision, remain)
+- **State:** Done (2026-11-02: the cleanup is live in agents release v0.9.0 ([evidence](../evidence/wp-185-live-bundles.md)), the ADR notes are written, and the user decided to leave the domain dropped; two non-blocking leftovers are listed under Decisions)
 - **ADRs:** [ADR-0219](../../adr/0219-serve-sxa-only-as-a-historical-rag-corpus.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)
 - **Depends on:** none
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md)
@@ -47,9 +47,9 @@ reversed by a chosen, costed route or recorded as a decision.
    `classification.yaml` and `knowledge/sxa-legacy/domain.yaml` only as far as the decision of step 6 allows.
 4. **ADR notes** (done 2026-11-02). Dated notes in ADR-0219 and ADR-0568: the domain is not served, why, and the state of the `sql-dump` precondition.
    No new ADR.
-5. **Verify the data.** Without changing anything, check that the dump objects still exist in the source bucket and note who can read them.
+5. **Verify the data** (not done, by decision: the check only prices a restoration, and the domain stays dropped). Without changing anything, check that the dump objects still exist in the source bucket and note who can read them.
    Re-creating read access (Vault, IAM) needs the user's go.
-6. **Decision gate (user).** Does the SXA record matter for the demo? The brief carries this table, filled in with the findings of step 5:
+6. **Decision gate (user, answered 2026-11-02: leave it dropped).** Does the SXA record matter for the demo? The brief carries this table, filled in with the findings of step 5:
 
    | Route | Work | Keeps | Cost and risk |
    |---|---|---|---|
@@ -76,3 +76,9 @@ reversed by a chosen, costed route or recorded as a decision.
   repository (the exemplars of ADR-0512).
 - Versions chosen for the branch: comage, cognos, advantage and finage go from 0.1.0 to 0.2.0. These agents are 0.x and unverified, so a breaking change bumps the
   minor; RELEASING.md says "major" for a removed task, and a jump to 1.0.0 would mislabel agents that are not stable. The repository `VERSION` is left for the release.
+- **2026-11-02 (user):** leave the domain dropped and keep the source dump in S3 (not re-checked). ADR-0219 is Deprecated with no successor, and ADR-0568 records that its `sql-dump` condition is
+  withdrawn for this domain. The domain is reopened only if a demo scenario needs the historical record; the cheapest route is then the conversion Job.
+- **Leftover 1, descriptor and classification entry.** `knowledge/sxa-legacy/domain.yaml` and the `sxa-legacy: C2` entry of `policies/data-classification/classification.yaml` stay for now: removing the descriptor fails
+  `check_knowledge_refs.py`, because the pinned corp release still names the domain in `policies/knowledge/knowledge-policy.yaml` (line 92), `policies/tools/tool-policy.yaml` (line 268) and a note of finage
+  `monthly-invoice-report.md` (line 26). They go together with those three references in the next agents release.
+- **Leftover 2, live question to comage.** Step 1 asks one real question to comage on demo333; it waits for the GPU nodes. The static proof (no live bundle names the domain) is recorded.

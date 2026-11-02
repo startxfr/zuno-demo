@@ -32,7 +32,7 @@ standardized enterprise tool authentication, project-scoped agent memory. Also
 carries ADR-0354, which installs Ansible Automation Platform as a Day 1
 component (`aap`) plus an `aap-config` companion.
 
-**14 ADRs, all closed.** Open: WP-098, WP-185, WP-186.
+**14 ADRs, all closed.** Open: WP-098, WP-186.
 
 ## v0.3
 

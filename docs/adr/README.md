@@ -186,7 +186,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md) | Implemented | Prefer indexed knowledge for read and live tools for freshness and write |
 | [ADR-0208](0208-standardize-enterprise-tool-authentication-and-delegation.md) | Implemented | Standardize enterprise tool authentication and delegation |
 | [ADR-0211](0211-publicly-trusted-wildcard-tls-via-lets-encrypt-and-route53.md) | Implemented | Publicly-trusted wildcard TLS via cert-manager, Let's Encrypt and Route53 DNS-01 |
-| [ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md) | Implemented | Serve SXA only as a pre-2021 historical RAG corpus |
 | [ADR-0354](0354-add-ansible-automation-platform-as-a-day-1-component.md) | Implemented | Add Ansible Automation Platform as a new Day 1 component |
 
 ## v0.3
@@ -395,6 +394,7 @@ part of its decision is still in force.
 | [ADR-0215](0215-carry-conversation-history-into-agent-prompts-with-budgeted-compaction.md) | v0.2 | Superseded by ADR-0569 | Carry conversation history into agent prompts with budgeted compaction |
 | [ADR-0216](0216-import-real-sxa-content-via-s3-into-mariadb-served-through-mcp-and-rag.md) | v0.2 | Superseded by ADR-0219 | Import real SXA content via S3 into MariaDB, served through MCP and RAG |
 | [ADR-0217](0217-ingest-a-weekly-sxa-corpus-as-a-new-rag-domain.md) | v0.2 | Superseded by ADR-0219 | Ingest a weekly SXA corpus as a new RAG domain |
+| [ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md) | v0.2 | Deprecated | Serve SXA only as a pre-2021 historical RAG corpus |
 | [ADR-0303](0303-support-dynamic-lora-adapter-loading.md) | v0.3 | Superseded by ADR-0526 | Support dynamic LoRA adapter loading |
 | [ADR-0307](0307-support-self-service-agent-onboarding.md) | v0.9 | Superseded by ADR-0582, ADR-0583 and ADR-0584 | Support self-service agent onboarding |
 | [ADR-0308](0308-expand-agent-lifecycle-management-through-the-aiagent-operator.md) | v0.3 | Superseded by ADR-0564 | Expand agent lifecycle management through the AIAgent Operator |
