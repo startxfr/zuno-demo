@@ -159,6 +159,8 @@ Measured against the live fork while closing WP-186, behaviours of the retired r
 
 - **ADR-0109 (freshness and trust scoring) is superseded in part by this record.** The payload contract above names `source_modified_at`, `indexed_at` and
   `stale_after`; the fork writes only `last_modified` (Confluence and web), ranks by no date, and keeps no stale flag. Its sync deletes changed and vanished pages instead.
+- **ADR-0110 (document ACL synchronization) is partially implemented.** Access is the source's `aclGroups`, applied fail-closed at query time. The per-page reconciliation
+  of the retired ingestion (re-reading each page's live restrictions, deleting vanished pages) is not replaced.
 - **The language boost** (+0.01) is not carried. The sparse side is a hashing BM25 encoder with accent folding and English and French stop words, without stemming. French queries
   are measured by WP-186.
 

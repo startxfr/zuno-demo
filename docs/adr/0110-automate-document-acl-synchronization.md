@@ -1,6 +1,6 @@
 # ADR-0110: Automate document ACL synchronization
 
-- **Status:** Implemented - see `components/rag-ingestion/src/rag_ingestion.py`. Live-verified against the real Postgres primary and real Confluence content 2026-08-23 (see the dated note below).
+- **Status:** Partially implemented - access is the source's `aclGroups`, applied fail-closed at query time by UnifAI's RAG ([ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)); the per-page reconciliation implemented in `components/rag-ingestion` (live-verified 2026-08-23, see the dated notes below) was retired with it (WP-168) and is not replaced.
 - **Target:** v0.1
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
@@ -157,6 +157,16 @@ index (and all of those are either the mechanism's own real behavior or
 fully reverted).
 
 Status: **Implemented**.
+
+## Update 2026-11-02 (WP-186): the reconciliation is gone, the source-level ACL stays
+
+The reconciliation stage described and verified above (`stage_reconcile_acls` in `components/rag-ingestion`) ran over every indexed Confluence chunk: it re-read each
+page's live group restrictions, rewrote `acl_groups` when they differed, and deleted the chunks of pages that were gone or out of scope, failing closed. That code
+was retired with rag-ingestion (WP-168). UnifAI's RAG applies one `aclGroups` list per source (`UnifaiRAGSource`), fail-closed against the caller's groups at query
+time, and its sync deletes vanished pages. The aim of this record, keeping the indexes aligned with source authorization, is therefore met at the level of the source and
+not at the level of the page: a page restricted inside a space, or a restriction changed after ingestion, is not reflected. The old code and its tests are in git history
+(`git show 877d8c83^:components/rag-ingestion/src/rag_ingestion.py`, the reconcile stage, and `tests/test_reconcile_acls.py`) if page-level reconciliation is wanted again; it would
+be a change to the fork's Confluence connector.
 
 ## Related ADRs
 

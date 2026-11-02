@@ -160,7 +160,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0107](0107-introduce-automated-model-quality-gates.md) | Implemented | Introduce automated model quality gates |
 | [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | Implemented | Automate model evaluation with LM-Eval |
 | [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | Superseded in part by ADR-0568 | Implement source freshness and trust scoring |
-| [ADR-0110](0110-automate-document-acl-synchronization.md) | Implemented | Automate document ACL synchronization |
+| [ADR-0110](0110-automate-document-acl-synchronization.md) | Partially implemented | Automate document ACL synchronization |
 | [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) | Implemented | Implement production-grade backup and recovery |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | Implemented | Decouple logical tool capabilities from physical backend bindings |
 | [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | Implemented | Implement Confluence as the first real external MCP integration |

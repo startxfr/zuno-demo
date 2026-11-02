@@ -23,7 +23,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | Version | ADRs | Open ADRs | WPs | Open WPs |
 |---|---|---|---|---|
 | v0 | 72 | — | 8 | WP-187 |
-| v0.1 | 29 | — | 19 | WP-186 |
+| v0.1 | 29 | 1 | 19 | WP-186 |
 | v0.2 | 14 | — | 19 | WP-098, WP-185, WP-186 |
 | v0.3 | 15 | — | 19 | — |
 | v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
