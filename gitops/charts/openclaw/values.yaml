@@ -41,15 +41,14 @@ gateways:
   aiBaseUrl: http://ai-gateway.zuno-ai-run.svc:8080/v1
   mcpDomain: mcp-gateway.zuno-ai-run.svc
   mcpUrl: http://mcp-gateway.zuno-ai-run.svc:8080/mcp
-  dataClassification: C2
-  # Once the `openclaw` experience-client declaration is admitted (ADR-0592,
-  # zuno-demo-agents experience-clients/openclaw: task `chat`, C1, groups
-  # /consultant and /sales, the same scope as open-webui), set mcpAgentHeader
-  # true and dataClassification C1: the MCP credential then sends X-Zuno-Agent,
-  # X-Zuno-Task (an agent-scoped call without a task is refused) and the
-  # classification. Before that, an unknown agent gets an empty tool list, so the
-  # assistant uses the persona's front-door tools.
-  mcpAgentHeader: false
+  # The `openclaw` experience-client declaration (ADR-0592, zuno-demo-agents
+  # v0.9.0 experience-clients/openclaw: task `chat`, C1, groups /consultant and
+  # /sales, the same scope as open-webui) is admitted: the MCP credential sends
+  # X-Zuno-Agent, X-Zuno-Task (an agent-scoped call without a task is refused)
+  # and the classification, also sent to the ai-gateway. Setting mcpAgentHeader
+  # to false falls back to the persona's front-door tools.
+  dataClassification: C1
+  mcpAgentHeader: true
   mcpTask: chat
 
 # config.raw merged into openclaw.json. ClawHub has no off switch: the egress
