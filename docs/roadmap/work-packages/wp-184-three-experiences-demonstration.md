@@ -1,6 +1,6 @@
 # WP-184: Three-experiences demonstration
 
-- **State:** Not started
+- **State:** Repo work in review (dashboard and script in the repository 2026-11-02; the live run and the shared-quota proof are not done)
 - **ADRs:** [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md), [ADR-0588](../../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md), [ADR-0589](../../adr/0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md)
 - **Depends on:** [WP-181](wp-181-install-open-webui-on-demo333.md), [WP-183](wp-183-install-openclaw-on-demo333.md)
 - **Related:** [WP-179](wp-179-common-preparation-for-experience-clients.md)
@@ -19,6 +19,16 @@
 3. **Shared quota.** With a persona whose ceiling is lowered for the run, spend the budget in one experience and get 429 in
    the other two (for OpenClaw, the persona's assistant identity, ADR-0589 consequences); restore the ceiling.
 4. **Close.** Evidence file; ADR-0587, ADR-0588, ADR-0589 to `Implemented`; WP-179 to WP-184 to Done.
+
+## Repository work (2026-11-02)
+
+- Dashboard **Three experiences**: `gitops/charts/grafana/templates/dashboard-three-experiences.yaml` and its Perses
+  translation `gitops/charts/perses/templates/dashboard-three-experiences.yaml`; variables `client` and `user`; rows *Same
+  backend, three experiences* (calls, tokens, cost, guardrails by client), *Same models, same routing* (provider per client,
+  candidates skipped for availability, ADR-0591), *Same user, one budget* (a user's tokens across clients).
+- Script: [docs/demo/three-experiences.md](../../demo/three-experiences.md), one persona (sale-01) through the three
+  experiences, eight steps, with the GPU-down case.
+- User decision of 2026-11-02: repository only for now; the shared-quota proof (step 3) waits for a rehearsal.
 
 ## Acceptance
 
