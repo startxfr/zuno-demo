@@ -35,7 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-185, WP-186, WP-187 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 6 | 5 | 8 | WP-181, WP-183, WP-184, WP-188, WP-189 |
+| v0.13 | 6 | 5 | 8 | WP-181, WP-183, WP-184, WP-188 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -982,7 +982,7 @@ WP-184 closes them together.
 | WP-183 | [wp-183](work-packages/wp-183-install-openclaw-on-demo333.md) | 0590, 0589, 0587 | WP-179, WP-182 | Operator pending | track OpenClaw: catalog pin, one Claw per persona, oauth2-proxy, install on demo333 (user's go) |
 | WP-184 | [wp-184](work-packages/wp-184-three-experiences-demonstration.md) | 0587, 0588, 0589 | WP-181, WP-183 | Repo work in review | joint close: dashboard, demo script, shared-quota proof across the three experiences |
 | WP-188 | [wp-188](work-packages/wp-188-route-only-to-ready-local-models.md) | 0591 | WP-179 | Operator pending | ai-gateway: skip local models their controller reports not ready, per-provider circuit breaker, no SDK retries, immediate 503 when nothing is left, NeMo warm-up; build and roll after the user's go |
-| WP-189 | [wp-189](work-packages/wp-189-experience-clients-in-the-agents-release.md) | 0592 | WP-181 | Repo work in review | experience clients (Open WebUI, OpenClaw) declared in their own layer of the agents release, read by the mcp-gateway only, C1 read-only tools; release, promotion and roll by the user |
+| WP-189 | [wp-189](work-packages/wp-189-experience-clients-in-the-agents-release.md) | 0592 | WP-181 | Done | experience clients (Open WebUI, OpenClaw) declared in their own layer of the agents release, read by the mcp-gateway only, C1 read-only tools; release, promotion and roll by the user |
 
 ### Phase 47 — gaps left by the retirement of the old RAG stack (added 2026-11-02)
 

@@ -1,6 +1,6 @@
 # WP-189: Experience clients in the agents release
 
-- **State:** Repo work in review (2026-11-02: both repositories; the agents release, its promotion and the mcp-gateway roll wait for the user)
+- **State:** Done (2026-11-02: agents v0.9.0 released and promoted, the mcp-gateway reads the clients layer, tool lists proven through Open WebUI; OpenClaw switches its agent header in its own track)
 - **ADRs:** [ADR-0592](../../adr/0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md)
 - **Depends on:** [WP-181](wp-181-install-open-webui-on-demo333.md)
 - **Related:** [WP-183](wp-183-install-openclaw-on-demo333.md), [WP-184](wp-184-three-experiences-demonstration.md)
@@ -33,3 +33,17 @@
 On demo333, `/mcp` `tools/list` with `X-Zuno-Agent: open-webui`, `X-Zuno-Task: chat`, `X-Zuno-Data-Classification: C1`:
 `consultant-02` and `sale-01` see the tools of the task their groups allow, and no C2 tool; a caller outside the
 access groups is refused; the same through Open WebUI's tool list.
+
+## Live results (demo333, 2026-11-02)
+
+- zuno-demo-agents PR #28 merged, release `v0.9.0` (with 08's sxa-legacy change), promoted in zuno-demo (`0dbbb190`,
+  `okf-corp@sha256:0ff7385a…`).
+- mcp-gateway built on `e43da20d` (contains the loader), image `sha256:62dba725…`.
+- **Trap:** the okf-fetch init container runs `admit_okf_bundle.py` from the `supply-chain-signer` image, built
+  2026-10-23: the first pod on v0.9.0 had no `/okf/experience-clients`. Rebuilt `supply-chain-signer` (build 16,
+  `b20fd6f0`, `sha256:84608310…`) and recreated the pod: `/okf/experience-clients/{open-webui,openclaw}` present, no
+  load error. Any change to `admit_okf_bundle.py` that the runtime needs requires that image rebuilt.
+- Through Open WebUI (Playwright sign-in, `/api/v1/tools/id/server:mcp:zuno-mcp/specs`, agent `open-webui`, task
+  `chat`, C1): `consultant-02` and `sale-01` get `drive.document.search`, `gmail.message.read`,
+  `diagram.generation.create`; `finance-01` gets the first two; `recrut-01` none. Same as the local dry run of the
+  release, which also gave `openclaw`: consultant and sales entitled, other groups refused.
