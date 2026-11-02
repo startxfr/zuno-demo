@@ -1,6 +1,6 @@
 # WP-181: Install Open WebUI on demo333
 
-- **State:** Repo work in review (2026-11-02: chart, Application, role and Keycloak client in the repository; the install on demo333 and the agent entitlement remain)
+- **State:** Repo work merged (2026-11-02: installed on demo333, `make d2 check open-webui` green; the agent entitlement in `zuno-demo-agents` remains)
 - **ADRs:** [ADR-0588](../../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-180](wp-180-open-webui-preparation.md)
 - **Related:** [WP-183](wp-183-install-openclaw-on-demo333.md), [WP-184](wp-184-three-experiences-demonstration.md)
@@ -57,3 +57,19 @@
   gateways 401 without a token, internet unreachable; Route `/health` 200).
 - **Model list.** The ai-gateway's `/v1/models` is filtered by classification, not per user: the acceptance below
   reads "the model list equals the ai-gateway's `/v1/models`" (WP-180 section 2).
+
+## Live results (demo333, 2026-11-02)
+
+- `make d2 install open-webui`: Vault `open-webui/app` seeded (`keycloak/open-webui` was already seeded by the vault
+  role), group `openwebui_admin` created with `ai-ops-01` and `paas-ops-01`, `zuno-open-webui-d1` Synced and Healthy.
+  The OIDC client secret is identical on both sides (Open WebUI and Keycloak's KC_VAULT file, compared by hash).
+- `make d2 check open-webui`: Keycloak discovery 200 through the EgressFirewall, ai-gateway and mcp-gateway 401 without
+  a token, `https://huggingface.co` unreachable (000), Route `/health` 200.
+- Browser sign-in (Playwright): `ai-ops-01` gets role `admin`, `consultant-02` role `user`; sign-up and password
+  sign-in refused (403); 11 models listed.
+- Raw Prometheus (thanos-querier): `zuno_model_calls_total{client="open-webui",provider="openai",outcome="success"}`
+  for `consultant-02`, `zuno_model_tokens_total{client="open-webui"}` 160, and
+  `zuno_guardrails_evaluations_total{client="open-webui",outcome="clean"}` (guardrails in observe mode, agent
+  `open-webui`).
+- Open: MCP tools are `[]` until the agent `open-webui` is declared in `zuno-demo-agents`; the blocking-prompt check
+  waits for a guardrails configuration that enforces (observe mode never blocks).
