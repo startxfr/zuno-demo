@@ -35,7 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-185, WP-186, WP-187 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 4 | 3 | 6 | WP-181, WP-183, WP-184 |
+| v0.13 | 5 | 4 | 7 | WP-181, WP-183, WP-184, WP-188 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -981,6 +981,7 @@ WP-184 closes them together.
 | WP-182 | [wp-182](work-packages/wp-182-openclaw-preparation.md) | 0589, 0587 | WP-179 | Done | track OpenClaw: spike on claw-operator (custom provider, refreshable credential, egress, lockdown), operator or openclaw-kube fallback |
 | WP-183 | [wp-183](work-packages/wp-183-install-openclaw-on-demo333.md) | 0590, 0589, 0587 | WP-179, WP-182 | Repo work in review | track OpenClaw: catalog pin, one Claw per persona, oauth2-proxy, install on demo333 (user's go) |
 | WP-184 | [wp-184](work-packages/wp-184-three-experiences-demonstration.md) | 0587, 0588, 0589 | WP-181, WP-183 | Not started | joint close: dashboard, demo script, shared-quota proof across the three experiences |
+| WP-188 | [wp-188](work-packages/wp-188-route-only-to-ready-local-models.md) | 0591 | WP-179 | Not started | ai-gateway: skip local models their controller reports not ready, per-provider circuit breaker, no SDK retries, immediate 503 when nothing is left, NeMo warm-up; build and roll after the user's go |
 
 ### Phase 47 — gaps left by the retirement of the old RAG stack (added 2026-11-02)
 
@@ -1137,6 +1138,11 @@ moving.
 10. **Autonomy sign-off** after one observed cycle (WP-42).
 
 ## Change log
+
+- 2026-11-02 — ADR-0591 and WP-188 added to phase 46: with the GPU nodes
+  down, every `*-maas` candidate waited 180 s on its llm-d scheduler, so the
+  experience clients timed out before any SaaS provider; routing now skips
+  models that are not ready, behind a circuit breaker.
 
 - 2026-11-02 — Phase 46 added: three user experiences over one governed
   backend, ADR-0587 – ADR-0589 (new v0.13 band) and WP-179 – WP-184; two

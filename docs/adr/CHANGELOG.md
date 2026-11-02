@@ -9,6 +9,13 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition (2026-11-02) - ADR-0591 joins v0.13
+
+The experience clients' first live calls (WP-180, WP-182) found every `*-maas`
+candidate held 180 s by the llm-d scheduler of a model that was not ready.
+ADR-0591 has the ai-gateway skip such models and stalled providers; ADR-0590
+is reserved for the OpenClaw track's change to ADR-0589.
+
 ## New band (2026-11-02) - v0.13 added with ADR-0587 to ADR-0589
 
 A user request to add OpenClaw and Open WebUI next to UnifAI on the same MaaS

@@ -264,7 +264,7 @@ OpenClaw gives each persona a personal assistant, deployed by Red Hat's
 claw-operator behind a token-injecting egress proxy. Neither new experience
 owns a model key, a guardrail or a knowledge store.
 
-**3 ADRs, all `Accepted`.** Open: ADR-0587 – ADR-0589; WP-179 – WP-184.
+**5 ADRs: 4 `Accepted`, ADR-0589 superseded in part by ADR-0590.** Open: ADR-0587, ADR-0588, ADR-0590, ADR-0591; WP-181, WP-183, WP-184, WP-188.
 
 ## OKF stream
 

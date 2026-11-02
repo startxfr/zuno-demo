@@ -350,6 +350,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0588](0588-serve-a-general-purpose-chat-experience-with-open-webui.md) | Accepted | Serve a general-purpose chat experience with Open WebUI |
 | [ADR-0589](0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md) | Superseded in part by ADR-0590 | Serve per-persona OpenClaw assistants via claw-operator behind a token-injecting egress proxy |
 | [ADR-0590](0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md) | Accepted | Front OpenClaw with oauth2-proxy and an egress firewall, one claw-operator per persona namespace |
+| [ADR-0591](0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md) | Accepted | Route only to ready local models and fail fast on stalled candidates |
 
 ## OKF v0.1
 
