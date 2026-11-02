@@ -1,6 +1,6 @@
 # WP-186: Close the freshness and language gaps of the UnifAI RAG migration
 
-- **State:** Not started
+- **State:** Repo work merged (steps 1 and 2 written 2026-11-02; the French run of steps 2 and 3 waits on the embedding model, down with the GPU nodes)
 - **ADRs:** [ADR-0109](../../adr/0109-implement-source-freshness-and-trust-scoring.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0205](../../adr/0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md)
 - **Depends on:** none
 - **Related:** [WP-24](wp-24-freshness-trust-scoring.md), [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md), [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [ADR-0110](../../adr/0110-automate-document-acl-synchronization.md), [ADR-0203](../../adr/0203-enforce-knowledge-authorization-as-policy-intersection.md)
