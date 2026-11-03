@@ -249,6 +249,9 @@ zuno_unifai_values:
     enabled: true
     syncInterval: 168h
     classification: C1   # WP-187: public Red Hat documentation
+    # Suspended 2026-11-03 (user decision): docs.redhat.com answers 403 Access Denied (Akamai) to the crawler on every page, probably after
+    # two full crawls in 75 minutes. No crawl and no resync of any Red Hat source until the user lifts this (remove the line, then make d2 install unifai).
+    suspend: true
 
 # WP-157 live enable sequence (user go 2026-10-24, one step at a time, each
 # verified before the next; brief "Decisions of 2026-10-24" and Progress).

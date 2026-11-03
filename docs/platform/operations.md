@@ -87,6 +87,17 @@ at a time, with the cluster owner's go for each:
 5. Refresh the consumer ExternalSecret in the other namespace, then confirm the consumers reconnect and that
    `pg_authid.rolpassword` changed once and stays put.
 
-Not covered here: MariaDB, Redis and the AAP databases follow their own procedures (not verified for this scheme); on demo333
-they keep their current passwords. The `zunoapp` and Keycloak roles are the riskiest: Keycloak's own database connection and
-PgBouncer logins break together if step 5 is skipped.
+Done live on demo333 on 2026-11-03 (eleven roles, then Redis): `mlflow` first as the canary, then OGX, MaaS and the six AAP roles,
+then `keycloak` and `zunoapp`. Traps seen on the way:
+
+- Removing the verifier too early leaves it derived from the OLD password: the ExternalSecret may not have rewritten `password` yet
+  when PGO regenerates it (`aapcontroller` kept its old hash). Wait until `password` carries the new value, then remove the
+  verifier; if `pg_authid.rolpassword` did not change, remove it a second time.
+- The AAP operators keep their own copies, `aap-*-postgres-configuration` (controller, eda, eda-event-stream, hub, metrics),
+  and do not refresh them when `aap-*-postgres-config` changes. Patch their `password` from the source Secret, then restart the
+  AAP workloads, or the pods fail with `password authentication failed`.
+- Keycloak reads its database Secret at start: delete `zuno-0` after the role changed. Redis (`zuno-redis-master`) and the
+  ai-gateway read theirs at start too: refresh both ExternalSecrets, restart Redis, then the ai-gateway.
+
+Not rotated: the MariaDB users (`mlpipeline`, `mlops`, `trillian`) live on the simulated external instance `zuno-ext-sim/ext-mariadb`
+of the frozen WP-143 pilot, whose credentials are not ours (ADR-0352); `aap/admin` is an AAP console password, not a database.

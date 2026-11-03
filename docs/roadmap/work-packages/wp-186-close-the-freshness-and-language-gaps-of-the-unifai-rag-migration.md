@@ -68,7 +68,7 @@ The records say what the UnifAI RAG does about freshness and language, and Frenc
 - **2026-11-03 (user, after the fork's stemmer v3 shipped off in operator 0.1.50/0.1.51):** compare the sparse encoders on the live stack before deciding about v3.
   Result ([README](../../../evaluations/redhat-docs/README.md), `results/ranking-sparse-v1-v2-v3-2026-11-03.json`): French hit@1 v1 0.80, v2 0.60, v3 0.60; all 31
   v1 0.68, v2 0.48, v3 0.52. By the rule above v3 is not needed (v1 French hit@1 is above 0.7) and it stays off; the stack reads v1 again. The `_v2` and `_v3`
-  collections stay in Qdrant (dropping them is a separate decision). Corrected below: the v2 and v3 figures are on an incomplete corpus.
+  collections were dropped from Qdrant on 2026-11-03 (user decision; they held an incomplete corpus and nothing read them). Corrected below: the v2 and v3 figures are on an incomplete corpus.
 - **2026-11-03 (rerun, user's go, after the second GPU node and operator 0.1.51):** the 0.62 is reproduced exactly
   (`results/ranking-v1-rerun-2026-11-03.json`): all 31 0.68 / 0.81 / 0.74, English 21 0.62 / 0.76 / 0.69, French 10 0.80 / 0.90 / 0.85.
   - Four English entries moved since the 0.71 run: 7 and 10 from rank 1 to 2; 9 and 11 from ranks 4 and 3 to out of the top 10.
