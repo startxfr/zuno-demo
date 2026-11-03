@@ -65,3 +65,7 @@ The records say what the UnifAI RAG does about freshness and language, and Frenc
   is English and French stop words plus accent folding, with no language boost. One question misses (26, registry exposure), watched rather than fixed: a single miss of ten does not
   justify a sparse encoder version 3 and a full re-index.
 - **2026-11-03 (written):** the read-only test of ADR-0205 exists again in `components/mcp-gateway/tests/test_rag_query.py` (GET and empty body for an answer, a refusal and a server error; no write call in the handler source).
+- **2026-11-03 (user, after the fork's stemmer v3 shipped off in operator 0.1.50/0.1.51):** compare the sparse encoders on the live stack before deciding about v3.
+  Result ([README](../../../evaluations/redhat-docs/README.md), `results/ranking-sparse-v1-v2-v3-2026-11-03.json`): French hit@1 v1 0.80, v2 0.60, v3 0.60; all 31
+  v1 0.68, v2 0.48, v3 0.52. By the rule above v3 is not needed (v1 French hit@1 is above 0.7) and it stays off; the stack reads v1 again. The `_v2` and `_v3`
+  collections stay in Qdrant (dropping them is a separate decision). Open, not acted on: v1 reads 0.62 on the English 21 against 0.71 earlier the same day.

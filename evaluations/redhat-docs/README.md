@@ -36,6 +36,19 @@ Run on 2026-11-03 (`results/ranking-fr-2026-11-03.json`, the 24 English and the 
 so French retrieval is accepted as it is. The one miss is 26 (the internal registry exposed outside the cluster), which lands on the images book instead of the registry book;
 28 ranks 2 (etcd backup lands on the updating book first), and 33 ranks 1 where its English twin ranks 2. The 24-question figures are unchanged by the run (0.71 / 0.86 / 0.77).
 
+**Sparse encoder versions (WP-186, 2026-11-03).** `results/ranking-sparse-v1-v2-v3-2026-11-03.json` compares the three sparse encoders of the UnifAI RAG on the 34-entry set (31 with an
+expected book; operator 0.1.50, DBSF; stack written `[2,3]`, every source re-embedded once, then read 2, read 3 and read 1 again). hit@1 / hit@5 / MRR:
+
+| Set | v1 (live) | v2 | v3 (v2 + French suffix stemmer) |
+|---|---|---|---|
+| all 31 | 0.68 / 0.81 / 0.74 | 0.48 / 0.68 / 0.58 | 0.52 / 0.68 / 0.61 |
+| English 21 | 0.62 / 0.76 / 0.69 | 0.43 / 0.62 / 0.53 | 0.48 / 0.62 / 0.56 |
+| French 10 | 0.80 / 0.90 / 0.83 | 0.60 / 0.80 / 0.68 | 0.60 / 0.80 / 0.71 |
+
+v3 is slightly better than v2 (it recovers French entry 26) and both are below v1 on this corpus, so v3 stays off and the stack reads v1. Two caveats: the v2 and v3
+collections hold 14,489 web chunks against 15,687 in v1 (a different corpus state, v1 keeps a stale tail), and v1 itself reads 0.62 on the English 21 against 0.71 on the
+same day's earlier run (entry 9 now missed). A fair v1/v2 comparison would need v1 rewritten by a fresh resync too. The `_v2` and `_v3` collections are left in Qdrant.
+
 Results are kept in `results/`, one JSON report per run (per-question rank, top score and top URL).
 `ranking-before-2026-10-31.json` is the baseline before UnifAI operator 0.1.44: hit@1 0.52, hit@5
 0.76, MRR 0.63 over the 21 answerable questions, and every no-answer question still gets a top
