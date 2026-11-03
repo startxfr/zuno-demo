@@ -56,7 +56,11 @@ open with the fork). v3 stays off by the French rule on v1 (0.80). The `_v2` and
 English 21 0.62 / 0.76 / 0.69, French 10 0.80 / 0.90 / 0.85.
 - Against the earlier 0.71 run, entries 7 and 10 move from rank 1 to 2. Entries 9 and 11 leave the top 10.
 - Asked for 50 results, 9 ranks 7 and 11 ranks 4: the books are indexed, and the fused order depends on `top_k_results`.
-  Compare runs at the same `top_k`. Both runs of that day used `top_k` 10, so `top_k` does not explain the move from 0.71 to 0.62; the cause between the two runs is unknown.
+  Compare runs at the same `top_k`. Both runs of that day used `top_k` 10, so `top_k` does not explain the move from 0.71 to 0.62; the cause between the two runs was unknown until 2026-11-03 (third run, operator 0.1.53, same figures 0.68 / 0.81 / 0.74).
+- **Cause found (2026-11-03, read-only scroll of `web_data_hybrid`).** Three books of the OpenShift Container Platform source hold 5 chunks each: `distributed_tracing`, `logging`, `monitoring`
+  (the median book holds 179; `backup_and_restore` 577, `machine_management` 405). They are the last three URLs of the source, which fits a crawl cut short at its tail by docs.redhat.com's
+  403 (Akamai). Entry 11 (Splunk log forwarding, expects `logging`) therefore has almost no book to find; entry 9 (expects `machine_management`, 405 chunks) is displaced by `nodes` (632).
+  The ranking itself did not drift: the corpus did. Repair needs ONE resync of that source once docs.redhat.com answers 200 (a plain GET of a sub-page from the rag pod still returned 403 on 2026-11-03, so it was not run).
 
 Results are kept in `results/`, one JSON report per run (per-question rank, top score and top URL).
 `ranking-before-2026-10-31.json` is the baseline before UnifAI operator 0.1.44: hit@1 0.52, hit@5
