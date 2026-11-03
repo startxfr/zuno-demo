@@ -1213,6 +1213,20 @@
                         "userinfo.token.claim": "true",
                         "claim.name": "groups"
                     }
+                },
+                {
+                    "name": "persona",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-hardcoded-claim-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "claim.name": "persona",
+                        "claim.value": "consultant-02",
+                        "jsonType.label": "String",
+                        "access.token.claim": "true",
+                        "id.token.claim": "false",
+                        "userinfo.token.claim": "false"
+                    }
                 }
             ],
             "defaultClientScopes": [
@@ -1251,6 +1265,20 @@
                         "access.token.claim": "true",
                         "userinfo.token.claim": "true",
                         "claim.name": "groups"
+                    }
+                },
+                {
+                    "name": "persona",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-hardcoded-claim-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "claim.name": "persona",
+                        "claim.value": "sale-01",
+                        "jsonType.label": "String",
+                        "access.token.claim": "true",
+                        "id.token.claim": "false",
+                        "userinfo.token.claim": "false"
                     }
                 }
             ],

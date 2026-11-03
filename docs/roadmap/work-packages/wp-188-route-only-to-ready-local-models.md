@@ -1,6 +1,6 @@
 # WP-188: Route only to ready local models and fail fast on stalled candidates
 
-- **State:** Operator pending (live on demo333 2026-11-02; one acceptance check waits for the GPU nodes)
+- **State:** Done (2026-11-03: every acceptance point proven live on demo333, the last one when the GPU node came back)
 - **ADRs:** [ADR-0591](../../adr/0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md)
 - **Depends on:** [WP-179](wp-179-common-preparation-for-experience-clients.md)
 - **Related:** [WP-180](wp-180-open-webui-preparation.md), [WP-182](wp-182-openclaw-preparation.md)
@@ -106,7 +106,15 @@ first evaluation `unavailable`.
 - **NeMo restart (Build 33, b20fd6f0, image `sha256:aaf1936d...`).** NeMo pod deleted at 18:52:36; its replacement was
   Running at about 18:52:58 and loaded its rails at 18:53:23 on the gateway's keepalive warm-up (one `POST`, 200, no LLM call),
   before any user request; no `unavailable` logged by the gateway. The 2026-11-02 cold-start gap is closed for restarts.
-- **Still to check.** With the GPU nodes back, the local candidates serve again without a gateway restart.
+- **Models back, no gateway restart (2026-11-03, raw Prometheus and kube-state-metrics).** The ai-gateway pod
+  `ai-gateway-7d4c9f5f4-jg9dd` started at 22:31:04 UTC on 2026-11-02 with every local model `Ready=False` and ran until 23:15
+  (`kube_pod_start_time`, no other pod in between). Until 22:58 it skipped the local candidates as `not_ready`
+  (`zuno_model_candidates_skipped_total{reason="not_ready"}`, 2 to 4 per provider over 25 minutes). The GPU node came back and
+  `gpt-oss-20b`, `qwen35-9b` and `qwen36-27b-instruct` turned `Ready=True` at 22:59:33, 23:01:50 and 23:05:50. Between 23:00 and
+  23:13 the same pod served 615 successful calls on `local-gpt-oss-maas` (`zuno_model_calls_total{outcome="success"}`, client
+  `unifai`, a peer session's delegation tests), and the OpenClaw rehearsal turns of 23:15 were answered by `local-maas`.
+  `qwen35-9b-wesh` stayed `Ready=False` (one GPU node) and its candidates stayed skipped. The readiness poll picked the change up
+  on its own; nothing was restarted for it.
 - **Found during the rollout, fixed in the same component** (Build 32, waiting for the user's go): a client that drops a stream
   turned into an `UnboundLocalError` in `model_call_span`, counted as a provider failure (385f7d73); OpenClaw's turns got 422
   for `content` as a list of parts and the `developer` role (5ae5af58).
