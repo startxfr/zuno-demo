@@ -662,7 +662,7 @@ def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
     content_ok = not expect or any(e in reply.lower() for e in expect)
     sent = a2a_calls(spans)
     max_calls = int(s.get("max_a2a_calls", 3))
-    detail = (f"delegation spans={[x['name'] + (' ok' if x['ok'] else ' FAILED') for x in found[:6]]} "
+    detail = (f"delegation spans={[x['name'] + (' ok' if x['ok'] else ' FAILED' if x['verdict'] == 'false' else ' (no verdict)') for x in found[:6]]} "
               f"succeeded={len(succeeded)} a2a_calls={sent} (max {max_calls}) spans_total={len(spans)} "
               f"reply_chars={len(reply)} expected_content={content_ok}")
     # A reply that merely contains the topic is not a delegation, and a `delegate_task` span alone may be an
