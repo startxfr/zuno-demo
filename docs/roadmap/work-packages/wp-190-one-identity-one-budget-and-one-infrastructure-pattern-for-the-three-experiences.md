@@ -43,10 +43,28 @@
    `zuno-monitoring`; UnifAI keeps its operator ServiceMonitor and its OTel wiring, ADR-0566); log collection is not
    codified in this repository (no ClusterLogForwarder or LokiStack), a platform gap outside this WP; a quota refusal is not
    a model call, so no dashboard counts the 429s (an ai-gateway metric for them would be a separate change).
-4. **Phase 3, mesh, network, automation, RHOAI.** Decide and record: UnifAI under the label-based ingress grant or kept a
-   platform client; an EgressFirewall for `zuno-unifai` or the reason not to; the mesh stays outside for all three unless
-   an audit says otherwise; the same Day 2 node shape in the AAP workflows and the `-d0`/`-d1` split for Open WebUI; backup
-   or retention for the Open WebUI volume and the OpenClaw volume; the ai-gateway as the only model path.
+4. **Phase 3, mesh, network, automation, RHOAI (done 2026-11-03, decisions recorded).**
+   - *Gateway admission:* UnifAI stays a platform client. The ai-gateway and mcp-gateway admit it by namespace name AND the pod
+     label `app.kubernetes.io/name: multiagent` (an intersection), while Open WebUI and OpenClaw come in by the namespace label
+     `zuno.io/experience-client`. The label on `zuno-unifai` would admit every pod of the namespace (Mongo, Qdrant, RAG,
+     backend) and would still not cover the a2a-gateway or the embedding model, which keep the name peer.
+   - *Egress:* no EgressFirewall for `zuno-unifai`. Its legitimate internet egress is broad and operator-driven (Confluence,
+     the Red Hat docs sync, S3 backups, the Kubernetes API for the rag TokenReview); the Open WebUI pattern (Allow the Keycloak
+     name, Deny the rest) would break them. If one is wanted later: Allow Keycloak, the Atlassian and docs hosts, the S3
+     endpoint and the control plane on 6443, Deny `0.0.0.0/0`. Its operator-made NetworkPolicies are not in this repository:
+     check them live with `oc get netpol,egressfirewall -n zuno-unifai`.
+   - *Mesh:* the three stay outside the mesh (no sidecar, no PeerAuthentication).
+   - *Automation:* the Day 2 nodes already have the same shape (install `unifai -> [open-webui, openclaw]`, check
+     `unifai -> [open-webui, openclaw, supply-chain]`, uninstall in reverse). Open WebUI has no `-d0` Application because it has
+     no operator; neither the Makefile nor `check_docs.py` requires one. Its check runs from `precheck.yml`.
+   - *Backup:* only PostgreSQL and UnifAI have Day 3 backup and restore. The Open WebUI volume (5Gi, chats in SQLite) and the
+     OpenClaw volume (operator-made, not described in the repository) hold demo data and are not backed up; a CronJob would
+     need S3 egress, which their EgressFirewalls forbid.
+   - *Images:* no ClusterImagePolicy for Open WebUI and OpenClaw: they are third-party images Zuno does not sign (ADR-0586
+     decision 7), so the keyless policy cannot cover them, and their namespaces must not carry `policy.rhtas.com/include`
+     (harmless in `warn`, a refusal in `enforce`). The integrity check is the digest pin, now compared with the running image by
+     `make d2 check` for both (`ansible/roles/open_webui/tasks/precheck.yml`, `check_persona.yml`).
+   - *RHOAI:* the ai-gateway is the only model path for the three; no change.
 5. **Phase 4, common chart and role base.** One shared helper for the near-identical Keycloak client plumbing
    (`externalsecret-*-client.yaml`, KC_VAULT entry, Vault seed), the precheck conventions of
    `ansible/roles/open_webui/tasks/precheck.yml` (probe the chain from the pod) and the `make d2 check` shape.
