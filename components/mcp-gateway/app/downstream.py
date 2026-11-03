@@ -223,6 +223,12 @@ SCHEMA_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_SCHEMA_TIMEOUT_SECONDS", "3
 _SCHEMA_CACHE: Dict[str, Tuple[float, Dict[str, Dict[str, Any]]]] = {}
 
 
+def _tool_input_schema(tool: Any) -> Optional[Dict[str, Any]]:
+    """The SDK names the field `input_schema` (mcp 2.x); `inputSchema` is the wire name."""
+    schema = getattr(tool, "input_schema", None) or getattr(tool, "inputSchema", None)
+    return schema if isinstance(schema, dict) else None
+
+
 async def _fetch_endpoint_schemas(endpoint: str) -> Dict[str, Dict[str, Any]]:
     headers = {"X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN}
     http_client = httpx2.AsyncClient(timeout=SCHEMA_TIMEOUT_SECONDS, headers=headers)
@@ -231,7 +237,7 @@ async def _fetch_endpoint_schemas(endpoint: str) -> Dict[str, Dict[str, Any]]:
             await session.initialize()
             listed = await session.list_tools()
     return {
-        tool.name: {"inputSchema": getattr(tool, "inputSchema", None), "description": getattr(tool, "description", None)}
+        tool.name: {"inputSchema": _tool_input_schema(tool), "description": getattr(tool, "description", None)}
         for tool in listed.tools
     }
 

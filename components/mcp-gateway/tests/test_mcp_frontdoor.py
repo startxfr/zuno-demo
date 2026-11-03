@@ -214,6 +214,16 @@ def test_without_a_published_schema_the_open_schema_is_advertised() -> None:
         assert tools[0]["inputSchema"] == {"type": "object", "properties": {}, "additionalProperties": True}, published
 
 
+def test_the_sdk_tool_object_yields_its_input_schema() -> None:
+    from mcp.types import Tool
+
+    from app import downstream
+
+    tool = Tool(name="list_repositories", description="d", input_schema=_GIT_SCHEMA)
+    assert downstream._tool_input_schema(tool) == _GIT_SCHEMA
+    assert downstream._tool_input_schema(object()) is None
+
+
 def test_schemas_for_reads_each_endpoint_once_and_survives_a_failing_backend() -> None:
     import asyncio
 
@@ -254,6 +264,7 @@ TESTS = [
     test_cluster_audit_is_not_read_only_others_are,
     test_the_backends_own_schema_and_description_are_advertised,
     test_without_a_published_schema_the_open_schema_is_advertised,
+    test_the_sdk_tool_object_yields_its_input_schema,
     test_schemas_for_reads_each_endpoint_once_and_survives_a_failing_backend,
 ]
 
