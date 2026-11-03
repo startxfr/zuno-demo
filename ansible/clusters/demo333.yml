@@ -216,11 +216,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:18c16c87b722bdb7a90102b5429366c38d10d35058b889987a4903e01658e744  # v0.1.54 (first unified release; same code as devel-851331422)
-      identity: quay.io/zuno/unifai-identity@sha256:5c1a127e7613ceaa7da19eda33f75b767df40254a97b7978bb0e2179a2c02b55  # v0.1.54 (first unified release; same code as devel-851331422)
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:5dc6defef1cba0f61391a0f30932bc83f619b0527fdf83570d02979f152e5148  # v0.1.54 (first unified release; same code as devel-851331422)
-      rag: quay.io/zuno/unifai-rag@sha256:17307b19d6c33c48b64af8158f250f3df84027c9f9a46a5ef011ac491d8139fa  # v0.1.54 (first unified release; same code as devel-851331422)
-      ui: quay.io/zuno/unifai-ui@sha256:235b62cd3b0c51c83df3c40432026d70135eee74216bc152e58fee296d4187b1  # v0.1.54 (first unified release; same code as devel-851331422)
+      backend: quay.io/zuno/unifai-backend@sha256:7e8ee1783249209bf240217def8867650f765e422f34b67d696f0b5ddc2c558a  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
+      identity: quay.io/zuno/unifai-identity@sha256:8fcfb6ed366e82a9557da7dbe95589de83146d54937b90d50bf7aadc8e0c1aee  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:dbbe479cb7183567f123399d4d3089bf4bd311c48d484d11e26a1b910511be8e  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
+      rag: quay.io/zuno/unifai-rag@sha256:f7437ce0cb8a45140ae052f0907941256c7778ec0fa9ced1940a4b0589d0e428  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
+      ui: quay.io/zuno/unifai-ui@sha256:b0ab4e85184441b3394b03cf725e9cea7e42460a2fa0b6722613cb44114b86d3  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
