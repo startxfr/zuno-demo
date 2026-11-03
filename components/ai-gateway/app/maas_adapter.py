@@ -102,7 +102,9 @@ def _env_flag(name: str) -> bool:
 # repeats them (lower-cased, ATTESTED_HEADERS) for the policy it generates;
 # tests/test_maas_gateway_identity.py fails if the two sets drift.
 ATTESTED_HEADERS: Dict[str, str] = {
-    # The caller's validated JWT `sub` (CallerIdentity.sub).
+    # The caller's persona (CallerIdentity.persona, ADR-0593): the validated
+    # `persona` claim of an OpenClaw client, else the person's username, else
+    # the JWT `sub`. The header name stays, so no Kuadrant policy changes.
     "user": "X-Zuno-User-Sub",
     # The caller's groups claim, sorted and joined with "|", "(none)" when
     # empty - the same key app/quota.py's group dimension uses, so the

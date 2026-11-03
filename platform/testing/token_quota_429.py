@@ -38,6 +38,15 @@ its own security review, not a side effect of a stresstest scenario - left
 as a known, documented gap (ADR-0555's "Known out-of-scope gaps") rather
 than silently claimed as covered.
 
+ADR-0593 (WP-190): the budget is the persona's, not the token's. With
+TOKEN_QUOTA_SHARED_TOKEN set to an access token of ANOTHER identity of the
+same persona (the OpenClaw assistant of that persona: client
+`openclaw-<persona>`, service account, `persona` claim), one more call is sent
+with it after the first 429 and must be refused too. That identity is not a
+trusted platform client, so its class comes from its groups: run it inside the
+proof window (QUOTA_STRESSTEST_GROUP holding the persona, whose groups the
+assistant's service account copies), otherwise it runs under `standard`.
+
 Prints a JSON array of Day2Result rows to stdout, same convention as
 day2_stresstest.py, day2_bulk.py and quota_429.py.
 """
@@ -131,6 +140,26 @@ def _burst(headers: Dict[str, str]) -> Tuple[Optional[int], List[int], Optional[
     return first_429, statuses, first_429_body
 
 
+def _shared_persona_call(token: str) -> Day2Result:
+    """ADR-0593: one call from another identity of the same persona, right
+    after the budget ran out; a 429 proves one counter for the persona."""
+    try:
+        with httpx.Client(timeout=TOKEN_QUOTA_TIMEOUT_SECONDS) as client:
+            resp = client.post(
+                f"{AI_GATEWAY_URL}/v1/chat/completions",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"model": "zuno-auto", "messages": [{"role": "user", "content": "ping"}], "max_tokens": 8},
+            )
+        status = resp.status_code
+    except Exception as exc:  # noqa: BLE001 - a transport error is a datapoint, not a crash
+        return Day2Result(AGENT, "token_quota", "shared-persona-429", "quota", False, f"error: {exc} status=0")
+    return Day2Result(
+        AGENT, "token_quota", "shared-persona-429", "quota", status == 429,
+        f"the second identity of persona {PERSONA} got status={status} after the budget ran out "
+        "(429 expected: one budget per persona, ADR-0593)",
+    )
+
+
 def run() -> List[Day2Result]:
     # advantage/finage/naveo are still placeholders with no real chat
     # backend - same coverage no-op as quota_429.py's own gate.
@@ -168,6 +197,10 @@ def run() -> List[Day2Result]:
         f"{len(server_errors)} 5xx across {len(statuses)} calls"
         + (f" (first status={server_errors[0]})" if server_errors else ""),
     ))
+
+    shared_token = os.getenv("TOKEN_QUOTA_SHARED_TOKEN")
+    if shared_token and first_429 is not None:
+        results.append(_shared_persona_call(shared_token))
 
     if body is not None:
         log_test_line(AGENT, "token_quota", "429-body", "quota error body", True, body.replace("\n", " ")[:120])

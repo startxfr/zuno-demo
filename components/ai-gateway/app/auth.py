@@ -43,6 +43,28 @@ def trusted_platform_clients() -> set:
     raw = os.getenv("TRUSTED_PLATFORM_CLIENTS", "")
     return {c.strip() for c in raw.split(",") if c.strip()}
 
+# ADR-0593: the token claim that names the persona a client acts for, and the
+# clients allowed to carry it (an entry ending in `*` is a prefix). Read per
+# call; only the OpenClaw clients by default.
+PERSONA_CLAIM = "persona"
+SERVICE_ACCOUNT_PREFIX = "service-account-"
+
+
+def persona_claim_clients() -> List[str]:
+    raw = os.getenv("PERSONA_CLAIM_CLIENTS", "openclaw-*")
+    return [c.strip() for c in raw.split(",") if c.strip()]
+
+
+def _client_matches(azp: str, patterns: List[str]) -> bool:
+    for pattern in patterns:
+        if pattern.endswith("*"):
+            if azp.startswith(pattern[:-1]) and len(azp) > len(pattern) - 1:
+                return True
+        elif azp == pattern:
+            return True
+    return False
+
+
 _jwks_client: Optional[PyJWKClient] = None
 
 
@@ -66,6 +88,24 @@ class CallerIdentity:
         ADR-0587: names the user experience (unifai, open-webui,
         openclaw-<persona>) on the metrics; never an authorisation input."""
         return str((self.raw_claims or {}).get("azp") or "")
+
+    @property
+    def persona(self) -> str:
+        """ADR-0593: whose per-user budget and `user` label this call counts
+        against, from validated claims only - never a header. In order: the
+        `persona` claim, honoured only when `azp` is one of
+        PERSONA_CLAIM_CLIENTS (the OpenClaw clients, whose tokens belong to a
+        service account acting for one persona); else `preferred_username` of
+        a person's token (unique and not user-editable in realm zuno); else
+        `sub`. A `service-account-*` username is never a persona."""
+        claims = self.raw_claims or {}
+        claim = claims.get(PERSONA_CLAIM)
+        if isinstance(claim, str) and claim.strip() and _client_matches(self.client, persona_claim_clients()):
+            return claim.strip()
+        username = claims.get("preferred_username")
+        if isinstance(username, str) and username.strip() and not username.startswith(SERVICE_ACCOUNT_PREFIX):
+            return username.strip()
+        return self.sub
 
     @property
     def is_trusted_platform_client(self) -> bool:

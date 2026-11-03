@@ -321,6 +321,75 @@ spec:
             }
           ],
           "description": "The per-user ceilings of the ai-gateway's quota are one budget for all experiences (ADR-0587 decision 5): a user's tokens add up across clients."
+        },
+        {
+          "id": 103,
+          "type": "row",
+          "title": "Same health, three experiences",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 35
+          },
+          "panels": []
+        },
+        {
+          "id": 8,
+          "title": "Model call error rate by experience (over range)",
+          "type": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 36
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", user=~\"$user\", outcome=\"error\"}[$__range])) / sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "legendFormat": "",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "description": "Share of calls that ended in error, per client, from the ai-gateway for the three experiences; a quota refusal is not a model call and is not counted here."
+        },
+        {
+          "id": 9,
+          "title": "Model call latency p95 by experience (over range)",
+          "type": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 36
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "histogram_quantile(0.95, sum by (le, client) (increase(zuno_model_call_duration_ms_milliseconds_bucket{client=~\"$client\", user=~\"$user\"}[$__range])))",
+              "legendFormat": "",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "description": "95th percentile of the ai-gateway's model-call latency in milliseconds, per client."
         }
       ]
     }

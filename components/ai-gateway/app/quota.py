@@ -214,7 +214,9 @@ class TokenBudgetLedger:
 
     def check(self, quota_class: str, sub: str, groups: Optional[List[str]],
               project_id: Optional[str], now: Optional[float] = None) -> Optional[QuotaDenial]:
-        """Return a QuotaDenial if this request must be refused, else None."""
+        """Return a QuotaDenial if this request must be refused, else None.
+        `sub` is the caller's persona (CallerIdentity.persona, ADR-0593), so
+        every identity of one person draws on one user budget."""
         now = now or time.time()
         cls = self._classes.get(quota_class)
         if cls is None:

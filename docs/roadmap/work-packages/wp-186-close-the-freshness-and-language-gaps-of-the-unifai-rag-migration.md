@@ -1,6 +1,6 @@
 # WP-186: Close the freshness and language gaps of the UnifAI RAG migration
 
-- **State:** Repo work merged (steps 1 and 2 written 2026-11-02; the French run of steps 2 and 3 waits on the embedding model, down with the GPU nodes)
+- **State:** Done (2026-11-03: the four ADRs and WP-24 are corrected, the ten French questions are measured at hit@1 0.80, so French retrieval is accepted as it is)
 - **ADRs:** [ADR-0109](../../adr/0109-implement-source-freshness-and-trust-scoring.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0205](../../adr/0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md)
 - **Depends on:** none
 - **Related:** [WP-24](wp-24-freshness-trust-scoring.md), [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md), [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [ADR-0110](../../adr/0110-automate-document-acl-synchronization.md), [ADR-0203](../../adr/0203-enforce-knowledge-authorization-as-policy-intersection.md)
@@ -60,3 +60,8 @@ The records say what the UnifAI RAG does about freshness and language, and Frenc
 
 - **2026-11-02 (user):** fix the four ADRs together with WP-24, not only ADR-0109; ten French questions, not six, because a 0.7 threshold on six
   is decided by one question; no new `check_docs.py` check in this work package.
+- **2026-11-03 (measured):** the French run, with the embedding model back, gave hit@1 0.80 (8 of 10), hit@5 0.90, MRR 0.85 (`evaluations/redhat-docs/results/ranking-fr-2026-11-03.json`); the
+  24-question baseline stayed at 0.71 / 0.86 / 0.77. Rule of step 3: at least 0.7, so the result is accepted, no stemmer follow-up is opened, and ADR-0568 records that the bilingual handling
+  is English and French stop words plus accent folding, with no language boost. One question misses (26, registry exposure), watched rather than fixed: a single miss of ten does not
+  justify a sparse encoder version 3 and a full re-index.
+- **2026-11-03 (written):** the read-only test of ADR-0205 exists again in `components/mcp-gateway/tests/test_rag_query.py` (GET and empty body for an answer, a refusal and a server error; no write call in the handler source).

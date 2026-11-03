@@ -176,3 +176,13 @@ evalPersonas:
     copyOf: finance-01
   - username: stress-board-01
     copyOf: board-01
+
+# WP-190 phase 4: the confidential clients of the user experiences, declared once. Each entry renders its Vault-backed
+# ExternalSecret `<name>-client-secret` (key keycloak/<name>, templates/externalsecret-experience-clients.yaml) and its
+# KC_VAULT file in templates/keycloak.yaml, and the vault role seeds keycloak/<name> from the same list. The client
+# definition itself (redirects, mappers, `${vault.<name with - as _>_client_secret}`) stays in files/realm-zuno.json.
+experienceClients:
+  - name: unifai
+  - name: open-webui
+  - name: openclaw-consultant-02
+  - name: openclaw-sale-01

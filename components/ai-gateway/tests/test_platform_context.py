@@ -110,23 +110,16 @@ def test_trusted_client_header_still_wins_for_a_member() -> None:
         assert app_main._platform_context(_member("zuno-evaluations"), "", "") == ("evaluation", None)
 
 
-def test_rehearsal_group_member_runs_under_the_tight_class() -> None:
-    """WP-184: members of QUOTA_REHEARSAL_GROUP get a tight existing class, even
+def test_stresstest_group_member_runs_under_the_tight_class() -> None:
+    """WP-184: members of QUOTA_STRESSTEST_GROUP get the tight stresstest class, even
     when they are also evaluation members and whatever header they send."""
-    env = {"QUOTA_REHEARSAL_GROUP": "zuno-quota-rehearsal"}
-    who = CallerIdentity(sub="u", groups=["sales", "zuno-quota-rehearsal"], raw_claims={"azp": "open-webui"}, token="t")
+    env = {"QUOTA_STRESSTEST_GROUP": "zuno-quota-stresstest"}
+    who = CallerIdentity(sub="u", groups=["sales", "zuno-quota-stresstest"], raw_claims={"azp": "open-webui"}, token="t")
     with mock.patch.dict(os.environ, env):
         assert app_main._platform_context(who, "", "") == ("stresstest", None)
         assert app_main._platform_context(who, "standard", "p-1") == ("stresstest", None)
         assert app_main._platform_context(_identity("open-webui"), "", "") == ("standard", None)
     assert app_main._platform_context(who, "", "") == ("standard", None)  # off by default
-
-
-def test_rehearsal_class_unknown_to_the_budgets_is_ignored() -> None:
-    env = {"QUOTA_REHEARSAL_GROUP": "g", "QUOTA_REHEARSAL_CLASS": "no-such-class"}
-    who = CallerIdentity(sub="u", groups=["g"], raw_claims={}, token="t")
-    with mock.patch.dict(os.environ, env):
-        assert app_main._platform_context(who, "", "") == ("standard", None)
 
 
 if __name__ == "__main__":

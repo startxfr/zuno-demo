@@ -193,6 +193,44 @@ spec:
                       name: prometheus
                     query: >-
                       sum by (user, client) (increase(zuno_model_tokens_total{client=~"$client", user=~"$user"}[$__range]))
+      errorRateByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Model call error rate by experience (over range)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (client) (increase(zuno_model_calls_total{client=~"$client", user=~"$user", outcome="error"}[$__range])) / sum by (client) (increase(zuno_model_calls_total{client=~"$client", user=~"$user"}[$__range]))
+      latencyP95ByClient:
+        kind: Panel
+        spec:
+          display:
+            name: "Model call latency p95 by experience (over range)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      histogram_quantile(0.95, sum by (le, client) (increase(zuno_model_call_duration_ms_milliseconds_bucket{client=~"$client", user=~"$user"}[$__range])))
     layouts:
       - kind: Grid
         spec:
@@ -257,4 +295,23 @@ spec:
               height: 8
               content:
                 $ref: "#/spec/panels/userAcrossClients"
+      - kind: Grid
+        spec:
+          display:
+            title: "Same health, three experiences"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/errorRateByClient"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/latencyP95ByClient"
 {{- end }}

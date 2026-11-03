@@ -8,9 +8,10 @@ comparison is on hits, not scores.
 
     RAG_SERVICE_URL=http://localhost:18080 UNIFAI_RAG_URL=http://localhost:13456 \
     KEYCLOAK_URL=https://keycloak.apps.<domain> EVAL_CLIENT_SECRET=... DEMO_PERSONA_PASSWORD=... \
-    python3 compare.py [--persona consultant-02] [--top-k 5] [--engines rag-service,unifai]
+    python3 compare.py [--persona consultant-02] [--top-k 5] [--engines unifai]
 
-rag-service and UnifAI are usually reached through `oc port-forward` from the workstation.
+rag-service was retired (WP-168), so `--engines` defaults to `unifai`; the old engine stays selectable for an archived copy of the service.
+UnifAI is usually reached through `oc port-forward` from the workstation.
 """
 from __future__ import annotations
 
@@ -77,7 +78,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--persona", default="consultant-02")
     parser.add_argument("--top-k", type=int, default=5)
-    parser.add_argument("--engines", default="rag-service,unifai")
+    parser.add_argument("--engines", default="unifai")
     parser.add_argument("--json", action="store_true", help="print the raw results as JSON")
     args = parser.parse_args()
     engines = args.engines.split(",")
