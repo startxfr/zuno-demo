@@ -349,7 +349,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0588](0588-serve-a-general-purpose-chat-experience-with-open-webui.md) | Implemented | Serve a general-purpose chat experience with Open WebUI |
 | [ADR-0589](0589-serve-per-persona-openclaw-assistants-via-claw-operator-behind-a-token-injecting-egress-proxy.md) | Superseded in part by ADR-0590 | Serve per-persona OpenClaw assistants via claw-operator behind a token-injecting egress proxy |
 | [ADR-0590](0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md) | Implemented | Front OpenClaw with oauth2-proxy and an egress firewall, one claw-operator per persona namespace |
-| [ADR-0591](0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md) | Accepted | Route only to ready local models and fail fast on stalled candidates |
+| [ADR-0591](0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md) | Implemented | Route only to ready local models and fail fast on stalled candidates |
 | [ADR-0592](0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md) | Implemented | Declare experience clients in the agents release, apart from agents |
 | [ADR-0593](0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md) | Accepted | Key the per-user quota and telemetry by persona across experiences |
 

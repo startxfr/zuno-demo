@@ -1,6 +1,6 @@
 # ADR-0591: Route only to ready local models and fail fast on stalled candidates
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-03, WP-188: proven live on demo333, models skipped while not ready and served again without a gateway restart)
 - **Target:** v0.13
 - **Date:** 2026-11-02
 - **Decision owners:** Zuno Demo architecture team
