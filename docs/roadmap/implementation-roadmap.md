@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 16 | 26 | WP-166, WP-173, WP-174 |
+| v0.11 | 24 | 16 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 9 | — | 12 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -919,7 +919,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-155 | [wp-155](work-packages/wp-155-migrate-remaining-agents-and-cut-demo222-over.md) | 0573, 0561 | WP-154 | Done | demo333 is powered off - live steps wait for the user to power it on |
 | WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Done | phase 2 landed 2026-10-23 (agent stack uninstalled and removed, frontend Keycloak clients and agent PGO databases dropped, ADR-0042/0214/0411 superseded); step-6 chain green on demo333 2026-10-24; rag-service and rag-ingestion stay for WP-168 |
 | WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Done (2026-10-24) | local models through MaaS with the per-subscription budgets, the 429 pass-through and closed-class refusal; the user, group and cross-model ceilings stay in the ai-gateway's quota.py (Kuadrant counts two limits per route); follow-up in WP-177 |
-| WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Repo work in review | split out of WP-156 by user decision 2026-10-23 |
+| WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Done (2026-11-03) | split out of WP-156 by user decision 2026-10-23; every rebuilt panel returns series on demo333 |
 | WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Repo work merged | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |
 
 ### Phase 45 — agents in their own repository, delivered as signed OCI releases (added 2026-10-22)
