@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 18 | 26 | WP-166, WP-172, WP-173, WP-174 |
+| v0.11 | 24 | 16 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 9 | — | 12 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -919,7 +919,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-155 | [wp-155](work-packages/wp-155-migrate-remaining-agents-and-cut-demo222-over.md) | 0573, 0561 | WP-154 | Done | demo333 is powered off - live steps wait for the user to power it on |
 | WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Done | phase 2 landed 2026-10-23 (agent stack uninstalled and removed, frontend Keycloak clients and agent PGO databases dropped, ADR-0042/0214/0411 superseded); step-6 chain green on demo333 2026-10-24; rag-service and rag-ingestion stay for WP-168 |
 | WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Done (2026-10-24) | local models through MaaS with the per-subscription budgets, the 429 pass-through and closed-class refusal; the user, group and cross-model ceilings stay in the ai-gateway's quota.py (Kuadrant counts two limits per route); follow-up in WP-177 |
-| WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Repo work in review | split out of WP-156 by user decision 2026-10-23 |
+| WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Done (2026-11-03) | split out of WP-156 by user decision 2026-10-23; every rebuilt panel returns series on demo333 |
 | WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Repo work merged | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |
 
 ### Phase 45 — agents in their own repository, delivered as signed OCI releases (added 2026-10-22)
@@ -956,9 +956,9 @@ frozen mirror.
 | WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Done | live on demo333 2026-10-23 (89ec9fba): five eval-* personas; harnesses switched (86ef03e4); platform/keycloak/tests now run in CI |
 | WP-170 | [wp-170](work-packages/wp-170-agent-delegation-contract-and-adrs.md) | 0401, 0402, 0403, 0406, 0409 | none | Done | the four records accepted 2026-10-24 (Implemented after WP-174's live proofs) |
 | WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Done (2026-11-03) | merged on zuno-demo-agents devel (PR #9), released and admitted; fields and `access` live in the mcp-gateway |
-| WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Repo work merged | release admitted and enforcement deployed; no delegated call proven live yet (WP-174) |
+| WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Done (2026-11-03) | the gateway enforces the chain; delegated calls proven live on operator 0.1.53 (`delegated_by` in the audit) |
 | WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | step 6 (the operator refuses A2A and delegation targets) is live in operator 0.1.35; steps 1 to 5 wait for the user's priority |
-| WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | operator pending | wiring live (agents v0.8.0, operator 0.1.49); behavioural proof waits for the GPU models |
+| WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Repo work merged | Arkos to Tekos works on operator 0.1.53 (scenario 21 3/3, at most 3 A2A per turn); refusals, cost and cancellation not proven yet |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Done (2026-10-25) | zuno-side A2A gateway live on demo333, 32 test blueprints (26 valid, 6 wait for placeholder agents), real delegated turns and the denial check proven |
 | WP-176 | [wp-176](work-packages/wp-176-verify-the-unifai-runtime-images-before-deploying-them.md) | 0586, 0353, 0574 | none | Done (2026-10-25) | live on demo333: the five application images (CI-signed, digest-pinned, verified before applying, drift checked), the third-party services and backup Jobs (pinned, unsigned), the operator 0.1.40 with its bundle and catalog (release identity, catalog pinned), the release path rehearsed with a `v0.0.0-rc1` tag; cluster-side admission is WP-178 |
 | WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Done (2026-10-25) | works with the Kuadrant two-limit ceiling: counters probe and Redis-backed quota ledger live on demo333 (budgets survive an ai-gateway restart); removing quota.py deferred until Kuadrant is fixed |
@@ -1144,6 +1144,11 @@ moving.
 
 ## Change log
 
+- 2026-11-03 — WP-172 Done: delegated calls reach the mcp-gateway live on operator 0.1.53 and the audit carries the
+  chain. WP-174 records the working Arkos to Tekos delegation (scenario 21 3/3, the cap of 3 delegations fired). The
+  refusals hold, so ADR-0401 and ADR-0403 are Implemented. ADR-0406 stays Accepted: the cancellation of a delegation no
+  longer awaited and `X-Zuno-Max-Tokens` end to end are not proven. A delegating turn costs about 65,000 tokens (an
+  earlier 839,000 was the ai-gateway counters counting each call once per group of the caller, 13 times).
 - 2026-11-03 — WP-191 and WP-193 Done, ADR-0594 Implemented. The three experiences list the same read MCP tools, filtered
   by groups. Signed markers raise OpenClaw tool turns to C2 and local. Open WebUI rewrites tool results, so its markers
   never verify and every tool turn there is C2 and local (the fail-closed case, accepted by the user). Open WebUI shows

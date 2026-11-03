@@ -13,13 +13,13 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.53, signed
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.54, signed
   # since 0.1.39 (ADR-0586): its signature, provenance and SBOM verify with the operator
   # release workflow's identity, without the development one. Move it with
   # platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z at each release.
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:8279a9bb8ee6de6604c38c6aff75015d7f6949412b9c2817a2b851dd3bc1f3d2
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:df4b99ed1a88636beaed83c15b7eabb8e3966db3c4253953d4365c5537b4d8c4
   catalogSourceName: unifai-operator-catalog
-  channel: stable
+  channel: alpha
   package: unifai-operator
   # Own namespace + global OperatorGroup (created by the chart), as on demo333
   # since operator 0.1.21; openshift-operators is still accepted (no namespace or

@@ -12,9 +12,11 @@ depend on; no name ever falls through to a default backend.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 import httpx2  # the mcp SDK's own httpx fork/client type, required by streamable_http_client
@@ -206,3 +208,72 @@ async def _invoke_streamable_http(
         return result.structured_content
     text_blocks = [block.text for block in result.content if hasattr(block, "text")]
     return {"raw": "\n".join(text_blocks)}
+
+
+# The schema a backend publishes for its own tools, advertised to the model on tools/list so that it knows
+# the required arguments (a tool listed with an open schema made the model omit them: git-forge's
+# list_repositories got 502 "Field required" for provider/owner/owner_type, WP-174 traces of 2026-11-03).
+# The backend stays the only contract: nothing is restated here, it is read from the backend itself, cached,
+# and any failure falls back to the open schema (listing must never fail or wait on a backend).
+SCHEMA_TTL_SECONDS = float(os.getenv("DOWNSTREAM_SCHEMA_TTL_SECONDS", "300"))
+SCHEMA_FAILURE_TTL_SECONDS = float(os.getenv("DOWNSTREAM_SCHEMA_FAILURE_TTL_SECONDS", "30"))
+SCHEMA_TIMEOUT_SECONDS = float(os.getenv("DOWNSTREAM_SCHEMA_TIMEOUT_SECONDS", "3"))
+
+# endpoint -> (expires_at, {backend tool name: {"inputSchema", "description"}})
+_SCHEMA_CACHE: Dict[str, Tuple[float, Dict[str, Dict[str, Any]]]] = {}
+
+
+def _tool_input_schema(tool: Any) -> Optional[Dict[str, Any]]:
+    """The SDK names the field `input_schema` (mcp 2.x); `inputSchema` is the wire name."""
+    schema = getattr(tool, "input_schema", None) or getattr(tool, "inputSchema", None)
+    return schema if isinstance(schema, dict) else None
+
+
+async def _fetch_endpoint_schemas(endpoint: str) -> Dict[str, Dict[str, Any]]:
+    headers = {"X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN}
+    http_client = httpx2.AsyncClient(timeout=SCHEMA_TIMEOUT_SECONDS, headers=headers)
+    async with streamable_http_client(endpoint, http_client=http_client) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            listed = await session.list_tools()
+    return {
+        tool.name: {"inputSchema": _tool_input_schema(tool), "description": getattr(tool, "description", None)}
+        for tool in listed.tools
+    }
+
+
+async def _endpoint_schemas(endpoint: str) -> Dict[str, Dict[str, Any]]:
+    cached = _SCHEMA_CACHE.get(endpoint)
+    if cached and cached[0] > time.monotonic():
+        return cached[1]
+    try:
+        schemas = await asyncio.wait_for(_fetch_endpoint_schemas(endpoint), SCHEMA_TIMEOUT_SECONDS + 1)
+        _SCHEMA_CACHE[endpoint] = (time.monotonic() + SCHEMA_TTL_SECONDS, schemas)
+    except BaseException as exc:  # noqa: BLE001 - includes the SDK's ExceptionGroup; never break a listing
+        if isinstance(exc, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
+            raise
+        logger.warning("could not read the tool schemas of %s: %s", endpoint, exc)
+        schemas = {}
+        _SCHEMA_CACHE[endpoint] = (time.monotonic() + SCHEMA_FAILURE_TTL_SECONDS, schemas)
+    return schemas
+
+
+async def schemas_for(bindings: List[Binding]) -> Dict[str, Dict[str, Any]]:
+    """capability -> {"inputSchema", "description"} published by its streamable-http backend; capabilities
+    whose backend cannot be read, or that are not backed by one, are absent (the caller keeps its default)."""
+    wanted: Dict[str, List[Binding]] = {}
+    for binding in bindings:
+        if binding is None or binding.transport != "streamable-http" or not binding.provider_tool:
+            continue
+        try:
+            wanted.setdefault(binding.endpoint_url(), []).append(binding)
+        except ValueError:
+            continue
+    fetched = await asyncio.gather(*(_endpoint_schemas(endpoint) for endpoint in wanted))
+    out: Dict[str, Dict[str, Any]] = {}
+    for (endpoint, group), schemas in zip(wanted.items(), fetched):
+        for binding in group:
+            found = schemas.get(binding.provider_tool)
+            if found:
+                out[binding.capability] = found
+    return out

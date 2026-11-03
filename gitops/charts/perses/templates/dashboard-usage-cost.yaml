@@ -80,7 +80,7 @@ spec:
             spec:
               labelName: user
               matchers:
-                - "zuno_model_calls_total"
+                - "zuno_model_calls_by_group_total"
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
@@ -96,7 +96,7 @@ spec:
             spec:
               labelName: group
               matchers:
-                - "zuno_model_calls_total"
+                - "zuno_model_calls_by_group_total"
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
@@ -112,7 +112,7 @@ spec:
             spec:
               labelName: agent
               matchers:
-                - "zuno_model_calls_total"
+                - "zuno_model_calls_by_group_total"
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
@@ -128,7 +128,7 @@ spec:
             spec:
               labelName: model
               matchers:
-                - "zuno_model_calls_total"
+                - "zuno_model_calls_by_group_total"
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
@@ -144,7 +144,7 @@ spec:
             spec:
               labelName: provider
               matchers:
-                - "zuno_model_calls_total"
+                - "zuno_model_calls_by_group_total"
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
@@ -251,7 +251,7 @@ spec:
                       name: prometheus
                     query: >-
                       sum by (group)
-                      (increase(zuno_model_calls_total{group=~"$group", model=~"$model", provider=~"$provider"}[$__range]))
+                      (increase(zuno_model_calls_by_group_total{group=~"$group", model=~"$model", provider=~"$provider"}[$__range]))
                     seriesNameFormat: "{{`{{group}}`}}"
       tokensConsumedByGroup:
         kind: Panel
@@ -272,7 +272,7 @@ spec:
                       name: prometheus
                     query: >-
                       sum by (group, kind)
-                      (increase(zuno_model_tokens_total{group=~"$group", model=~"$model", provider=~"$provider"}[$__range]))
+                      (increase(zuno_model_tokens_by_group_total{group=~"$group", model=~"$model", provider=~"$provider"}[$__range]))
                     seriesNameFormat: "{{`{{group}}`}} ({{`{{kind}}`}})"
       apiRequestsByGroupAgent:
         kind: Panel
@@ -293,7 +293,7 @@ spec:
                       name: prometheus
                     query: >-
                       sum by (group, agent)
-                      (increase(zuno_model_calls_total{group=~"$group", agent=~"$agent"}[$__range]))
+                      (increase(zuno_model_calls_by_group_total{group=~"$group", agent=~"$agent"}[$__range]))
                     seriesNameFormat: "{{`{{group}}`}} / {{`{{agent}}`}}"
       modelCostByUserAgent:
         kind: Panel

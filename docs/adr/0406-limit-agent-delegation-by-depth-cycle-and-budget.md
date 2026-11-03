@@ -68,6 +68,21 @@ On demo333: a depth-2 chain and a cycle are refused; a delegated call is charged
 its chain; a delegation that stops being awaited cancels the remote task; and the number of calls an agent makes in a turn
 is read from real traces to confirm the indirect bound or trigger the cap above.
 
+## Progress (2026-11-03)
+
+These proofs were made on demo333 on operator 0.1.53, as `eval-consultant-01` ([evidence](../roadmap/evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#cost-levers-git-forge-schema-and-what-the-fork-does-not-do-2026-11-03-evening)):
+- a depth-2 chain and a cycle are refused (`bde97594`);
+- a delegated call is traced to its chain (`delegated_by` in the mcp-gateway audit);
+- its cost is counted on the initiating user's ai-gateway counters;
+- the calls per turn were read from real traces: 10 to 11 delegations per turn on 0.1.52 triggered the cap, at 3 per work
+  item in 0.1.53, then at 1 on demo333 (`bf128167`).
+
+Two points are still open, so the status stays `Accepted`:
+- **Cancellation:** a delegation no longer awaited does not cancel the remote task. The UnifAI client never calls
+  `cancel_task` as of 0.1.53, on a timeout, a user abort or a cancelled Temporal run. The fix is planned in 0.1.55.
+- **`X-Zuno-Max-Tokens`:** the ai-gateway enforces it, but it is not proven end to end. No delegated call reaches the
+  8192-token ceiling Arkos declares, and the value sent is not logged.
+
 ## Alternatives considered
 
 - **Free depth up to a higher ceiling with a budget per agent:** rejected for now. It breaks

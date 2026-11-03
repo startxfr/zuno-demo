@@ -128,7 +128,7 @@ spec:
               "legendFormat": "{{`{{client}}`}}"
             }
           ],
-          "description": "One point per Keycloak group, like the usage-cost dashboard: a multi-group user counts once per group. `client` is the token's azp (ADR-0587)."
+          "description": "One point per call: a multi-group user counts once. `client` is the token's azp (ADR-0587)."
         },
         {
           "id": 2,
@@ -154,7 +154,7 @@ spec:
               "legendFormat": "{{`{{client}}`}} ({{`{{kind}}`}})"
             }
           ],
-          "description": "One point per Keycloak group, like the usage-cost dashboard: a multi-group user counts once per group. `client` is the token's azp (ADR-0587)."
+          "description": "One point per call: a multi-group user counts once. `client` is the token's azp (ADR-0587)."
         },
         {
           "id": 3,
@@ -185,7 +185,7 @@ spec:
               "unit": "currencyUSD"
             }
           },
-          "description": "One point per Keycloak group, like the usage-cost dashboard: a multi-group user counts once per group. `client` is the token's azp (ADR-0587)."
+          "description": "One point per call: a multi-group user counts once. `client` is the token's azp (ADR-0587)."
         },
         {
           "id": 4,

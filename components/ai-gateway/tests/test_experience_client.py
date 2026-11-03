@@ -174,3 +174,45 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
+def _counted(groups):
+    """Every counter and the histogram, for one call by a caller in `groups`."""
+    rec = {name: _Recorder() for name in ("calls", "tokens", "cost", "durations", "calls_by_group", "tokens_by_group")}
+    token = telemetry._caller_client.set("")
+    try:
+        with mock.patch.object(telemetry, "_model_call_counter", rec["calls"]), \
+             mock.patch.object(telemetry, "_token_counter", rec["tokens"]), \
+             mock.patch.object(telemetry, "_cost_counter", rec["cost"]), \
+             mock.patch.object(telemetry, "_model_call_duration_histogram", rec["durations"]), \
+             mock.patch.object(telemetry, "_model_call_by_group_counter", rec["calls_by_group"]), \
+             mock.patch.object(telemetry, "_token_by_group_counter", rec["tokens_by_group"]):
+            with telemetry.model_call_span("local", "qwen3.5-9b", "C1", caller_sub="u-1", groups=groups) as call:
+                call.record_usage(100, 7)
+    finally:
+        telemetry._caller_client.reset(token)
+    return {name: r.points for name, r in rec.items()}
+
+
+def test_a_call_counts_once_whatever_the_number_of_groups() -> None:
+    """WP-174: a caller in 13 groups made every per-user sum 13 times too high."""
+    points = _counted([f"g{i}" for i in range(13)])
+    assert len(points["calls"]) == 1
+    assert len(points["durations"]) == 1
+    assert len(points["tokens"]) == 2  # prompt and completion
+    assert len(points["cost"]) == 1
+    for name in ("calls", "tokens", "cost", "durations"):
+        assert all("group" not in p for p in points[name]), name
+
+
+def test_the_group_breakdown_has_its_own_counters() -> None:
+    points = _counted(["sales", "consultant"])
+    assert sorted(p["group"] for p in points["calls_by_group"]) == ["consultant", "sales"]
+    assert sorted((p["group"], p["kind"]) for p in points["tokens_by_group"]) == [
+        ("consultant", "completion"), ("consultant", "prompt"), ("sales", "completion"), ("sales", "prompt")]
+
+
+def test_a_caller_without_groups_has_one_empty_group_point() -> None:
+    points = _counted([])
+    assert [p["group"] for p in points["calls_by_group"]] == [""]
+    assert len(points["calls"]) == 1

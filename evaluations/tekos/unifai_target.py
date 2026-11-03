@@ -28,3 +28,4 @@ login_name = _shared.login_name
 tempo_rag_searches = _shared.tempo_rag_searches
 tempo_run_spans = _shared.tempo_run_spans
 delegation_spans = _shared.delegation_spans
+tempo_gateway_tool_invoked = _shared.tempo_gateway_tool_invoked

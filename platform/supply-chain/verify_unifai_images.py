@@ -107,6 +107,8 @@ def sbom_reference(reference: str) -> str:
 def subject_regexp(identities: dict, kind: str, accept_dev: bool) -> str:
     section = identities[kind]
     parts = [section["release_subject_regexp"]]
+    if section.get("unified_release_subject_regexp"):
+        parts.append(section["unified_release_subject_regexp"])
     if accept_dev and section.get("dev_subject_regexp"):
         parts.append(section["dev_subject_regexp"])
     return "|".join(f"(?:{p})" for p in parts)

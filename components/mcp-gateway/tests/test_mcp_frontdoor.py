@@ -166,11 +166,106 @@ def test_cluster_audit_is_not_read_only_others_are() -> None:
         assert by_name[name]["annotations"]["readOnlyHint"] is True, name
 
 
+def _list_with(published):
+    policy_path = _tmp_policy(
+        """
+tools:
+  - tool: git.repository.list
+    capability: git.repository.list
+    mcp_server: git-forge
+    min_classification: C2
+    allowed_groups:
+      - ocp-ai-ops
+"""
+    )
+    try:
+        store = PolicyStore(tool_policy_path=policy_path, classification_path=REAL_CLASSIFICATION_PATH)
+        registry = BindingRegistry(path=REAL_BINDINGS_PATH)
+        os.environ["MCP_FRONTDOOR_CAPABILITIES"] = "git.repository.list"
+        try:
+            return mcp_frontdoor.list_tools(
+                policy_store=store, binding_registry=registry, identity=_IDENTITY, classification="C2",
+                published=published,
+            )
+        finally:
+            del os.environ["MCP_FRONTDOOR_CAPABILITIES"]
+    finally:
+        os.unlink(policy_path)
+
+
+_GIT_SCHEMA = {
+    "type": "object",
+    "properties": {"provider": {"type": "string"}, "owner": {"type": "string"}, "owner_type": {"type": "string"}},
+    "required": ["provider", "owner", "owner_type"],
+}
+
+
+def test_the_backends_own_schema_and_description_are_advertised() -> None:
+    tools = _list_with({"git.repository.list": {"inputSchema": _GIT_SCHEMA, "description": "List public repositories."}})
+    assert len(tools) == 1, tools
+    assert tools[0]["inputSchema"] == _GIT_SCHEMA
+    assert tools[0]["description"] == "List public repositories."
+
+
+def test_without_a_published_schema_the_open_schema_is_advertised() -> None:
+    for published in (None, {}, {"git.repository.list": {"inputSchema": None, "description": None}},
+                      {"git.repository.list": {"inputSchema": {"type": "array"}, "description": None}}):
+        tools = _list_with(published)
+        assert tools[0]["inputSchema"] == {"type": "object", "properties": {}, "additionalProperties": True}, published
+
+
+def test_the_sdk_tool_object_yields_its_input_schema() -> None:
+    from mcp.types import Tool
+
+    from app import downstream
+
+    tool = Tool(name="list_repositories", description="d", input_schema=_GIT_SCHEMA)
+    assert downstream._tool_input_schema(tool) == _GIT_SCHEMA
+    assert downstream._tool_input_schema(object()) is None
+
+
+def test_schemas_for_reads_each_endpoint_once_and_survives_a_failing_backend() -> None:
+    import asyncio
+
+    from app import downstream
+
+    registry = BindingRegistry(path=REAL_BINDINGS_PATH)
+    binding = registry.resolve("git.repository.list")
+    calls = []
+
+    async def fake_fetch(endpoint):
+        calls.append(endpoint)
+        return {binding.provider_tool: {"inputSchema": _GIT_SCHEMA, "description": "d"}}
+
+    downstream._SCHEMA_CACHE.clear()
+    original = downstream._fetch_endpoint_schemas
+    downstream._fetch_endpoint_schemas = fake_fetch
+    try:
+        first = asyncio.run(downstream.schemas_for([binding, binding]))
+        asyncio.run(downstream.schemas_for([binding]))
+        assert first == {"git.repository.list": {"inputSchema": _GIT_SCHEMA, "description": "d"}}
+        assert len(calls) == 1, calls  # cached
+
+        async def failing(endpoint):
+            raise OSError("backend down")
+
+        downstream._SCHEMA_CACHE.clear()
+        downstream._fetch_endpoint_schemas = failing
+        assert asyncio.run(downstream.schemas_for([binding])) == {}
+    finally:
+        downstream._fetch_endpoint_schemas = original
+        downstream._SCHEMA_CACHE.clear()
+
+
 TESTS = [
     test_description_field_propagates_verbatim,
     test_missing_description_falls_back_to_generic_sentence,
     test_real_frontdoor_capabilities_have_real_descriptions,
     test_cluster_audit_is_not_read_only_others_are,
+    test_the_backends_own_schema_and_description_are_advertised,
+    test_without_a_published_schema_the_open_schema_is_advertised,
+    test_the_sdk_tool_object_yields_its_input_schema,
+    test_schemas_for_reads_each_endpoint_once_and_survives_a_failing_backend,
 ]
 
 

@@ -212,6 +212,13 @@ regardless of real traffic). `gemini`/`anthropic`/`mistral` candidates
 still record no usage either way - those LangChain classes have no
 equivalent flag.
 
+Every model call adds exactly one point to `zuno.model_calls`, `zuno.model_tokens` (one per kind),
+`zuno.model_cost_usd` and `zuno.model_call_duration_ms`. Those metrics carry no `group` label, so a sum over a user, an
+agent or a client is exact. The Keycloak group breakdown is in `zuno.model_calls_by_group` and
+`zuno.model_tokens_by_group`, which record one point per group of the caller. Sum them by group only: summed over a user,
+they count each call once per group. Before 2026-11-03, the main counters took one point per group, which made the WP-174
+cost read 13 times too high.
+
 `zuno.model_empty_responses` (labels `provider`, `model`, `recovered`)
 counts answers with blank content and no tool call; `recovered=true` means
 the reasoning-block fallback served them, `false` means there was nothing
