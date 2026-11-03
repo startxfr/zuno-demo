@@ -25,7 +25,20 @@ The 24 chunks without a label are the `sales-demo` source, which is left unclass
 (`4b7349b6`). The 21 Red Hat documentation sources are C1 and the two Confluence sources (`tekos-satellite` 90 pages,
 `tekos-openshift` 411 pages) are C2. The two Red Hat sources that were `Failed` since 2026-11-02 synced again with the change.
 
-## Still to prove
+## Live check through the mcp-gateway (session zuno-demo 40, about 09:16 to 09:18 UTC)
 
-A question through the mcp-gateway search tool shows C2 for Confluence and C1 for Red Hat documentation (audit label and marker level):
-owned by the session that built the mcp-gateway change. Result to be added here.
+Run as the OpenClaw persona `consultant-02` through its egress proxy; mcp-gateway with agents v0.10.0 and the marker key, ai-gateway build 38.
+
+| Check | Result |
+|---|---|
+| `tools/list` | `consultant-02` sees 6 tools (drive, gmail, diagram, `confluence.page.search`, `confluence.page.read`, `knowledge.tech.search`); `sale-01` sees only the 3 C1 tools |
+| `confluence.page.search "onboarding"` | real SXSI pages, marker `level=C2 external=0`, signature verified by the ai-gateway |
+| ai-gateway on that turn | "classification raised by tool results: C1 -> C2, local_only False -> True (marker C2, marker external=0)", client `openclaw-consultant-02` |
+| Forged marker (rewritten to C1, external=1) | signature fails, counted as unmarked: C2, local |
+| `knowledge.tech.search` | **401** from the rag-server `query.bearer` endpoint: "Bearer token rejected: Audience doesn't match" |
+
+## Not proven yet
+
+The per-chunk label on `knowledge.tech.search` results is not proven live from an experience client: the forwarded OpenClaw token does not carry
+the audience the rag-server accepts, so the search never reaches the chunks. The payload counts above stand on their own. The question of the
+accepted audience is with the UnifAI operator session (b9). WP-187 step 7 and the ADR notes wait on that.
