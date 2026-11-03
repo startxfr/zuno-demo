@@ -1,6 +1,6 @@
 # WP-190: One identity, one budget and one infrastructure pattern for the three experiences
 
-- **State:** In progress (phases 0 to 3 done 2026-11-03, phase 4 open)
+- **State:** Repo work merged (phases 0 to 3 done 2026-11-03, phase 4 open)
 - **ADRs:** [ADR-0593](../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md)
 - **Depends on:** [WP-184](wp-184-three-experiences-demonstration.md), [WP-183](wp-183-install-openclaw-on-demo333.md), [WP-181](wp-181-install-open-webui-on-demo333.md)
 - **Related:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-177](wp-177-finish-the-maas-quota-delegation.md)
