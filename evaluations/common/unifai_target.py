@@ -239,7 +239,8 @@ def delegation_spans(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         attrs = sp.get("attrs") or {}
         text = " ".join([str(sp.get("name", ""))] + [str(v) for v in attrs.values()]).lower()
         if "a2a" in text or "delegat" in text:
-            out.append({"name": sp.get("name", ""), "ok": str(attrs.get("mas.success", "")).lower() == "true"})
+            verdict = str(attrs.get("mas.success", "")).lower()
+            out.append({"name": sp.get("name", ""), "ok": verdict == "true", "verdict": verdict})
     return out
 
 
