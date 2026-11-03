@@ -996,7 +996,7 @@ the old stack. The comparison found three behaviours that the retirement dropped
 |---|---|---|---|---|---|
 | WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Done (2026-11-02) | cleanup live in agents v0.9.0, ADR-0219 Deprecated, domain left dropped by decision; descriptor removed with agents v0.9.2; live question to comage answered without fallback (2026-11-03) |
 | WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Done (2026-11-03) | records corrected; French run hit@1 0.80 (10 questions), accepted as is, no stemmer follow-up |
-| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | operator pending | steps 1 and 2 done and proved (the label is not the leak; five Confluence-reading tasks are local only since agents v0.8.1); next: the source classification field (operator 0.1.50 plus a rag image), waiting for the user's go |
+| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | repo work merged | steps 1 to 6 done; operator 0.1.50, the images and the source labels are live on demo333 (Confluence 501 chunks C2, Red Hat 15,663 chunks C1); next: the live proof through the mcp-gateway and the ADR notes |
 
 ### OKF stream phases
 
