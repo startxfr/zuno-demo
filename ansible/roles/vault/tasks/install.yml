@@ -362,6 +362,14 @@
         username: admin
         password: "{{ zuno_admin_keycloak_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      # ADR-0595: the permanent master-realm accounts. keycloak/admin above is
+      # the bootstrap account only.
+      keycloak/console:
+        username: zuno-admin
+        password: "{{ zuno_admin_keycloak_console_password }}"
+      keycloak/automation:
+        username: zuno-automation
+        password: "{{ zuno_admin_keycloak_automation_password }}"
       postgresql/app:
         # Lowercase letters/digits only: PGO derives an RFC 1123 Secret name
         # from this, and unquoted PostgreSQL identifiers reject hyphens.

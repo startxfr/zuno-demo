@@ -36,6 +36,28 @@ Run on 2026-11-03 (`results/ranking-fr-2026-11-03.json`, the 24 English and the 
 so French retrieval is accepted as it is. The one miss is 26 (the internal registry exposed outside the cluster), which lands on the images book instead of the registry book;
 28 ranks 2 (etcd backup lands on the updating book first), and 33 ranks 1 where its English twin ranks 2. The 24-question figures are unchanged by the run (0.71 / 0.86 / 0.77).
 
+**Sparse encoder versions (WP-186, 2026-11-03).** `results/ranking-sparse-v1-v2-v3-2026-11-03.json` compares the three sparse encoders of the UnifAI RAG on the 34-entry set (31 with an
+expected book; operator 0.1.50, DBSF; stack written `[2,3]`, every source re-embedded once, then read 2, read 3 and read 1 again). hit@1 / hit@5 / MRR:
+
+| Set | v1 (live) | v2 | v3 (v2 + French suffix stemmer) |
+|---|---|---|---|
+| all 31 | 0.68 / 0.81 / 0.74 | 0.48 / 0.68 / 0.58 | 0.52 / 0.68 / 0.61 |
+| English 21 | 0.62 / 0.76 / 0.69 | 0.43 / 0.62 / 0.53 | 0.48 / 0.62 / 0.56 |
+| French 10 | 0.80 / 0.90 / 0.83 | 0.60 / 0.80 / 0.68 | 0.60 / 0.80 / 0.71 |
+
+**The v2 and v3 columns are not reliable.** A facet on `metadata.source_id` of `web_data_hybrid` against `web_data_hybrid_v2` shows the `[2,3]` resync filled only 11 of the 23
+sources: 11 sources have no chunk at all in v2 and v3 (OpenShift Virtualization 632, ACS 211, OpenShift AI 84, Satellite 51, ACM 45, Quay 37, and five smaller ones) and five are
+partial; the large OpenShift Container Platform source is complete. Per the fork, the first sync at a new write version re-ingests every page, so the run did not complete for those sources (cause not investigated: a Qdrant write, an embedding timeout or a time
+budget; a plain resync would now be incremental). v2 and v3 were measured on an incomplete corpus (14,489 web chunks against 15,687). v1 is complete (its only stale rows are 4 chunks of a deleted source). The comparison above says
+nothing reliable about v2 against v1; v3 against v2 is meaningful only on the sources both hold. Redoing it needs a forced full ingest of every page into the new version (question
+open with the fork). v3 stays off by the French rule on v1 (0.80). The `_v2` and `_v3` collections are left in Qdrant.
+
+**v1 rerun (2026-11-03, operator 0.1.51).** `results/ranking-v1-rerun-2026-11-03.json` reproduces the v1 figures exactly: all 31 0.68 / 0.81 / 0.74,
+English 21 0.62 / 0.76 / 0.69, French 10 0.80 / 0.90 / 0.85.
+- Against the earlier 0.71 run, entries 7 and 10 move from rank 1 to 2. Entries 9 and 11 leave the top 10.
+- Asked for 50 results, 9 ranks 7 and 11 ranks 4: the books are indexed, and the fused order depends on `top_k_results`.
+  Compare runs at the same `top_k`. Both runs of that day used `top_k` 10, so `top_k` does not explain the move from 0.71 to 0.62; the cause between the two runs is unknown.
+
 Results are kept in `results/`, one JSON report per run (per-question rank, top score and top URL).
 `ranking-before-2026-10-31.json` is the baseline before UnifAI operator 0.1.44: hit@1 0.52, hit@5
 0.76, MRR 0.63 over the 21 answerable questions, and every no-answer question still gets a top

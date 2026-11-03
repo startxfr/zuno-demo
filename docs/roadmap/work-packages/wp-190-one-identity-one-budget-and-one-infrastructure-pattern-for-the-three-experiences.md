@@ -100,7 +100,6 @@ phase 3 touches `zuno-unifai`. Every cluster action needs the user's go in the s
 The `rehearsal` quota class (agents release 0.9.1, kept in 0.9.2) was never used: the shared-quota proof ran with the existing
 `stresstest` class once the GPU models were back. It is removed from the agents policy (branch `quota/remove-rehearsal-class`,
 VERSION 0.9.3), and the ai-gateway switch is renamed `QUOTA_STRESSTEST_GROUP` (chart value `quotaStresstestGroup`, cluster variable
-`zuno_ai_gateway_quota_stresstest_group`; the class is always `stresstest`, no class override). After the agents release 0.9.3 is
-promoted, the quota files are regenerated (`python3 platform/okf/generate_quota_enforcement.py`), which drops `rehearsal` from
-`components/ai-gateway/app/quota_{budgets,fail_modes,windows}.yaml` and from the connectivity-link quota policy templates; until
-then those generated files still carry it, inert (no task and no group selects it).
+`zuno_ai_gateway_quota_stresstest_group`; the class is always `stresstest`, no class override). The change shipped in the agents release 0.9.3, then in v0.10.0 (promotion PR #19, 2026-11-03, `agents.lock` on v0.10.0). The
+generated quota files no longer carry `rehearsal` and `python3 platform/okf/generate_quota_enforcement.py --check` passes on devel.
+The v0.9.3 promotion PR #18 was closed unmerged, superseded by v0.10.0. The Keycloak group `zuno-quota-rehearsal` was deleted.

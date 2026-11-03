@@ -43,6 +43,11 @@ clusterBaseDomain: apps.mycluster.example.com
 # Kubernetes Secret names populated by ExternalSecrets resolving against the
 # vault-backend ClusterSecretStore. Never hardcode values here.
 adminSecretName: keycloak-admin
+# ADR-0595: the two permanent master-realm accounts that replace the temporary
+# bootstrap admin. automation: every Job and role (kcadm). console: the named
+# administrator humans sign in with. Both are Vault-seeded by the vault role.
+automationSecretName: keycloak-automation
+consoleSecretName: keycloak-console
 
 # ADR-0530/WP-091: templates/job-client-reconcile.yaml. The image is the same
 # RHBK server image the operator runs (kcadm.sh ships in it; nothing else in

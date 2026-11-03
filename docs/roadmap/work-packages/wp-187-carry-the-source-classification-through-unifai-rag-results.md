@@ -1,6 +1,6 @@
 # WP-187: Carry the source classification through UnifAI RAG results, and keep Confluence content off external models
 
-- **State:** Operator pending (steps 1 and 2 done 2026-11-02; step 3 set aside 2026-11-03; step 4 pushed to the fork, not released; the rest waits on operator 0.1.50)
+- **State:** Done (2026-11-03: operator 0.1.50 and the source labels are live on demo333; a Confluence result is C2 and a Red Hat documentation result is C1 through the mcp-gateway)
 - **ADRs:** [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0034](../../adr/0034-compute-effective-classification-from-the-complete-context.md)
 - **Depends on:** none (step 3 needs a UnifAI operator release)
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [ADR-0206](../../adr/0206-separate-current-salesforce-knowledge-from-legacy-sxa.md)
@@ -63,6 +63,14 @@ reads Confluence can send that content to an external model.
   - The demo333 Confluence sources are set to C2 right after the catalog pin; the re-embedding of their pages is announced to the
     peers first. The Red Hat web sources are set to C1 explicitly, since a chunk without a level is returned as C2.
   - This session (zuno-demo 40) does the mcp-gateway change, its build and the live proof.
+
+- **2026-11-03 (done, [evidence](../evidence/wp-187-live-labels.md)):** operator 0.1.50 pinned (`bd0fd5df`), the five images moved to
+  `devel-042c793d1` (`fec63456`), and the sources classified (`b1629fc6`: the two Confluence sources C2, the 21 Red Hat sources C1, `sales-demo`
+  unclassified = C2 for the mcp-gateway). After the re-embed every Confluence chunk (501) is C2 and 15,663 web chunks are C1.
+  The chart passes `classification` to `UnifaiRAGSource` for `ragSources` and for `redhatDocs`.
+- **2026-11-03 (closed):** the live proof of step 7 passed ([evidence](../evidence/wp-187-live-labels.md)). It first met a 401 on `query.bearer`
+  (OpenClaw tokens had no `zuno-admin-api` audience), fixed by `325f9c28` in the Keycloak realm; then five results came back with 3 C2 (Confluence)
+  and 2 C1 (Red Hat) and the marker `level=C2`. ADR-0565 and ADR-0568 carry dated notes.
 
 ## Steps
 

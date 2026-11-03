@@ -254,6 +254,31 @@ def test_the_reconcile_script_is_valid_bash() -> None:
     )
 
 
+def test_the_jobs_sign_in_as_the_automation_account_and_create_the_admins() -> None:
+    """ADR-0595: no helm needed, the templates are read as text.
+
+    The bootstrap admin is flagged temporary by Keycloak and must be disableable
+    without breaking anything: both Jobs prefer the permanent automation account
+    (optional Secret, so a cluster whose Vault is not seeded yet still runs on the
+    bootstrap account), and the reconcile Job creates the two permanent users.
+    """
+    templates = CHART / "templates"
+    reconcile = (templates / "job-client-reconcile.yaml").read_text()
+    personas = (templates / "job-eval-personas.yaml").read_text()
+    for name, text in (("client-reconcile", reconcile), ("eval-personas", personas)):
+        assert ".Values.automationSecretName" in text, f"{name} does not read the automation Secret"
+        assert "optional: true" in text, f"{name}: the automation Secret must be optional (first run)"
+        assert "kc_login()" in text, f"{name} has no automation-first login"
+        assert text.index("KC_AUTOMATION_USER") < text.index("KC_ADMIN_USER", text.index("kc_login()")), (
+            f"{name}: the automation account must be tried before the bootstrap admin"
+        )
+    assert "ensure_master_admin" in reconcile and "--rolename admin" in reconcile
+    assert ".Values.consoleSecretName" in reconcile
+    for es, path in (("externalsecret-automation.yaml", "keycloak/automation"),
+                     ("externalsecret-console.yaml", "keycloak/console")):
+        assert path in (templates / es).read_text(), f"{es} does not read Vault {path}"
+
+
 TESTS = [
     test_the_realm_file_is_valid_json_and_declares_the_admin_client,
     test_client_text_fields_fit_keycloak_s_columns,
@@ -264,6 +289,7 @@ TESTS = [
     test_the_job_mounts_what_the_configmap_publishes,
     test_the_admin_client_secret_reaches_both_sides,
     test_the_reconcile_script_is_valid_bash,
+    test_the_jobs_sign_in_as_the_automation_account_and_create_the_admins,
 ]
 
 

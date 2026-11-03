@@ -160,6 +160,19 @@ def test_stream_with_content_never_leaks_reasoning() -> None:
     env.metric.assert_not_called()
 
 
+def test_streamed_tool_calls_carry_their_index() -> None:
+    # Open WebUI drops a streamed tool_call delta without `index` (WP-191).
+    chunk = AIMessageChunk(content="", tool_call_chunks=[
+        {"name": "a", "args": '{"q": 1}', "id": "c1", "index": 0},
+        {"name": "b", "args": "{}", "id": "c2", "index": 1},
+    ])
+    with _Env(_Model(chunks=[chunk])):
+        events = _sse(_post(stream=True))
+    calls = [tc for e in events for tc in e["choices"][0]["delta"].get("tool_calls") or []]
+    assert [(tc["index"], tc["id"], tc["function"]["name"]) for tc in calls] == [(0, "c1", "a"), (1, "c2", "b")]
+    assert events[-1]["choices"][0]["finish_reason"] == "tool_calls"
+
+
 # --- ChatOpenAI subclass keeps the raw reasoning field --------------------
 
 
@@ -196,7 +209,7 @@ providers:
 """
 
 
-def _models(headers=None, auth=True):
+def _models(headers=None, auth=True, identity=_IDENTITY):
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         fh.write(_ROUTING)
     try:
@@ -205,7 +218,7 @@ def _models(headers=None, auth=True):
         os.unlink(fh.name)
     with mock.patch.object(app_main, "routing_table", table):
         if auth:
-            app_main.app.dependency_overrides[validate_token] = lambda: _IDENTITY
+            app_main.app.dependency_overrides[validate_token] = lambda: identity
         try:
             return TestClient(app_main.app).get("/v1/models", headers=headers or {})
         finally:
@@ -229,3 +242,19 @@ def test_models_filtered_by_classification_and_local_only() -> None:
     assert [m["id"] for m in _models({"X-Zuno-Data-Classification": "C3"}).json()["data"]] == ["auto", "model-a"]
     assert [m["id"] for m in _models({"X-Zuno-Local-Only": "true"}).json()["data"]] == ["auto", "model-a"]
     assert _models({"X-Zuno-Data-Classification": "C9"}).status_code == 422
+
+
+def test_auto_is_named_zuno() -> None:
+    data = _models().json()["data"]
+    assert data[0]["id"] == "auto" and data[0]["name"] == "Zuno"
+    assert all(m.get("name") is None for m in data[1:])
+
+
+def test_an_experience_client_only_gets_auto() -> None:
+    # WP-193: routing ignores the model name, so an experience client's menu offers auto alone.
+    for client in ("open-webui", "openclaw-sale-01"):
+        identity = CallerIdentity(sub="u", groups=["consultant"], raw_claims={"azp": client}, token="t")
+        data = _models(identity=identity).json()["data"]
+        assert [(m["id"], m["name"]) for m in data] == [("auto", "Zuno")], client
+    unifai = CallerIdentity(sub="u", groups=["consultant"], raw_claims={"azp": "unifai"}, token="t")
+    assert [m["id"] for m in _models(identity=unifai).json()["data"]] == ["auto", "model-a", "model-b"]

@@ -1,0 +1,258 @@
+{
+  "date": "2026-11-03",
+  "stack": "unifai-operator 0.1.51, sparse read v1, DBSF, 24 sources Ready, second GPU node up",
+  "method": "probe pod as stress-consultant-01, query.bearer, ranking.yaml 34 entries (31 with an expected book)",
+  "summary": {
+    "all31": "0.68/0.81/0.74",
+    "en21": "0.62/0.76/0.69",
+    "fr10": "0.80/0.90/0.85",
+    "format": "hit@1/hit@5/MRR"
+  },
+  "top_k_10": {
+    "hit@1": 0.6774193548387096,
+    "hit@5": 0.8064516129032258,
+    "mrr": 0.7419354838709677,
+    "missed": [
+      1,
+      2,
+      9,
+      11,
+      12,
+      26
+    ],
+    "expect_none_top_scores": [
+      1.1372055,
+      1.49711,
+      0.955351
+    ],
+    "rows": [
+      {
+        "id": 1,
+        "rank": null,
+        "top_score": 0.9726978,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/index"
+      },
+      {
+        "id": 2,
+        "rank": null,
+        "top_score": 1.2074535,
+        "top_url": "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/server_administration_guide/"
+      },
+      {
+        "id": 3,
+        "rank": 1,
+        "top_score": 1.3346288,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/authentication_and_authorization/index"
+      },
+      {
+        "id": 4,
+        "rank": 1,
+        "top_score": 1.4932871,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/storage/index"
+      },
+      {
+        "id": 5,
+        "rank": 1,
+        "top_score": 1.7653873,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/registry/index"
+      },
+      {
+        "id": 6,
+        "rank": 1,
+        "top_score": 1.6531949,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index"
+      },
+      {
+        "id": 7,
+        "rank": 2,
+        "top_score": 1.8076566,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/etcd/index"
+      },
+      {
+        "id": 8,
+        "rank": 1,
+        "top_score": 1.2699263,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/network_security/index"
+      },
+      {
+        "id": 9,
+        "rank": null,
+        "top_score": 1.553342,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/index"
+      },
+      {
+        "id": 10,
+        "rank": 2,
+        "top_score": 0.9873806,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/postinstallation_configuration/index"
+      },
+      {
+        "id": 11,
+        "rank": null,
+        "top_score": 1.1310431,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/networking_operators/index"
+      },
+      {
+        "id": 12,
+        "rank": null,
+        "top_score": 1.6833897,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/postinstallation_configuration/index"
+      },
+      {
+        "id": 13,
+        "rank": 1,
+        "top_score": 1.6424305,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/index"
+      },
+      {
+        "id": 14,
+        "rank": 1,
+        "top_score": 1.5984652,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/virtualization/index"
+      },
+      {
+        "id": 15,
+        "rank": 1,
+        "top_score": 2.0426388,
+        "top_url": "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5"
+      },
+      {
+        "id": 16,
+        "rank": 1,
+        "top_score": 2.315525,
+        "top_url": "https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.17/html-single/understanding_openshift_gitops/index"
+      },
+      {
+        "id": 17,
+        "rank": 1,
+        "top_score": 1.7517419,
+        "top_url": "https://docs.redhat.com/en/documentation/red_hat_satellite/6.17"
+      },
+      {
+        "id": 18,
+        "rank": 1,
+        "top_score": 2.219192,
+        "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675670604/S0R42+Schedule+Satellite"
+      },
+      {
+        "id": 19,
+        "rank": 2,
+        "top_score": 1.8626552,
+        "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675665332/O0B81-BDTBO+Construction+des+tests+de+backup+restore+OADP"
+      },
+      {
+        "id": 20,
+        "rank": 1,
+        "top_score": 2.052693,
+        "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675765260/O0R41-RDUPG+R+daction+du+process+d+upgrade+de+cluster"
+      },
+      {
+        "id": 21,
+        "rank": 1,
+        "top_score": 1.5049398,
+        "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675796818/O0R62-EXONS+Correction+d+un+namespace+instable"
+      },
+      {
+        "id": 22,
+        "expect_none": true,
+        "top_score": 1.1372055
+      },
+      {
+        "id": 23,
+        "expect_none": true,
+        "top_score": 1.49711
+      },
+      {
+        "id": 24,
+        "expect_none": true,
+        "top_score": 0.955351
+      },
+      {
+        "id": 25,
+        "rank": 1,
+        "top_score": 1.2002219,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/storage/index"
+      },
+      {
+        "id": 26,
+        "rank": null,
+        "top_score": 1.0851853,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/images/index"
+      },
+      {
+        "id": 27,
+        "rank": 1,
+        "top_score": 1.3520079,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index"
+      },
+      {
+        "id": 28,
+        "rank": 2,
+        "top_score": 1.2210114,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index"
+      },
+      {
+        "id": 29,
+        "rank": 1,
+        "top_score": 1.1620579,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/network_security/index"
+      },
+      {
+        "id": 30,
+        "rank": 1,
+        "top_score": 1.7244341,
+        "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/index"
+      },
+      {
+        "id": 31,
+        "rank": 1,
+        "top_score": 1.6596227,
+        "top_url": "https://docs.redhat.com/en/documentation/red_hat_satellite/6.17"
+      },
+      {
+        "id": 32,
+        "rank": 1,
+        "top_score": 2.1554286,
+        "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675670604/S0R42+Schedule+Satellite"
+      },
+      {
+        "id": 33,
+        "rank": 1,
+        "top_score": 2.1032467,
+        "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675765491/O0R62-RSNSO+Restauration+d+un+projet+via+OADP"
+      },
+      {
+        "id": 34,
+        "rank": 1,
+        "top_score": 1.4691114,
+        "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675765260/O0R41-RDUPG+R+daction+du+process+d+upgrade+de+cluster"
+      }
+    ]
+  },
+  "top_k_50_dropped_questions": [
+    {
+      "id": 7,
+      "rank": 2,
+      "top_score": 2.3011756,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/etcd/index"
+    },
+    {
+      "id": 9,
+      "rank": 7,
+      "top_score": 2.0875647,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/index"
+    },
+    {
+      "id": 10,
+      "rank": 2,
+      "top_score": 1.2728337,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/postinstallation_configuration/index"
+    },
+    {
+      "id": 11,
+      "rank": 4,
+      "top_score": 1.8585037,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_ansible_automation_platform/2.7"
+    }
+  ]
+}

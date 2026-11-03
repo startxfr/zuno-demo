@@ -219,7 +219,7 @@ zuno_unifai_values:
       backend: quay.io/zuno/unifai-backend@sha256:5527daeb3341cf4afa4ee34148c84efe2cc618a8a4bfc7e765e763f986dfa89a  # devel-042c793d1 (operator 0.1.50 e2e tag)
       identity: quay.io/zuno/unifai-identity@sha256:29d002700b376b61da185550a8c1734f26c8f9260255fc768e8592105766d24f  # devel-042c793d1 (operator 0.1.50 e2e tag)
       multiagent: quay.io/zuno/unifai-multiagent@sha256:e2be8ee0c4983032959f50955279d30d912d0b5a89f092a903b2517ea237284f  # devel-042c793d1 (operator 0.1.50 e2e tag)
-      rag: quay.io/zuno/unifai-rag@sha256:3fc8df7fb3f669ace66d659e02eb420530e7de15a696204469e60a700b7bc8e9  # devel-042c793d1 (operator 0.1.50 e2e tag)
+      rag: quay.io/zuno/unifai-rag@sha256:406bd70022c618cba03fc8679a636e846e1a868b03e75867b4a3902980197ad9  # devel-66105c780 (web sync guard: a crawl that would delete over half of a source fails, 429/503 retried; R-527)
       ui: quay.io/zuno/unifai-ui@sha256:e03f9f81435ccd81ec0f6e29c77c27da9b0a800ddd840953815ca09f429e7e5c  # devel-042c793d1 (operator 0.1.50 e2e tag)
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9

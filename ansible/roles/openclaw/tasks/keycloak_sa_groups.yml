@@ -3,13 +3,8 @@
 # client reconcile Job creates clients, not users): the service account of
 # openclaw-<persona> is given the persona's groups here, live and idempotently, so
 # the mcp-gateway and the ai-gateway quotas see the persona's groups (ADR-0589).
-- name: "openclaw | read the Keycloak admin credentials"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-auth
-    name: keycloak-admin
-  register: _openclaw_kc_admin
-  no_log: true
+- name: "openclaw | read the Keycloak automation credentials (ADR-0595)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/read_keycloak_automation_credentials.yml"
 
 - name: "openclaw | get a Keycloak admin token"
   ansible.builtin.uri:
@@ -19,8 +14,8 @@
     body:
       grant_type: password
       client_id: admin-cli
-      username: "{{ _openclaw_kc_admin.resources[0].data.username | b64decode }}"
-      password: "{{ _openclaw_kc_admin.resources[0].data.password | b64decode }}"
+      username: "{{ _kc_automation_user }}"
+      password: "{{ _kc_automation_password }}"
     validate_certs: false
   register: _openclaw_kc_token
   no_log: true

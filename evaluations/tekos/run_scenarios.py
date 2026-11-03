@@ -293,6 +293,11 @@ def agent_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
     from kubernetes import client as k8s_client
     from kubernetes import config as k8s_config
 
+    # Outside a pod (a workstation run against the cluster) there is no ServiceAccount to read: the scenario
+    # cannot observe the cluster there, which is not a failure of the placeholders. Inside a pod the variable
+    # is always set, so the gate Job still fails closed when its config cannot load.
+    if not os.getenv("KUBERNETES_SERVICE_HOST"):
+        return _skip(s, "not running in a pod (no KUBERNETES_SERVICE_HOST): the cluster state cannot be read from here")
     try:
         k8s_config.load_incluster_config()
     except Exception as exc:
@@ -629,7 +634,7 @@ def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
             sys.path.insert(0, str(candidate))
     from okf_release import okf_root
     import delegation_checks
-    from unifai_target import delegation_spans, tempo_run_spans
+    from unifai_target import a2a_calls, delegation_spans, tempo_run_spans
 
     delegator, target, target_task = s["delegator"], s["target"], s["target_task"]
     root = [okf_root(pathlib.Path(__file__).resolve().parents[2]), pathlib.Path("/gate"), pathlib.Path("/")]
@@ -655,10 +660,17 @@ def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
     reply = str(run_.get("reply") or "")
     expect = [e.lower() for e in s.get("expect_any", [])]
     content_ok = not expect or any(e in reply.lower() for e in expect)
+    sent = a2a_calls(spans)
+    max_calls = int(s.get("max_a2a_calls", 3))
     detail = (f"delegation spans={[x['name'] + (' ok' if x['ok'] else ' FAILED') for x in found[:6]]} "
-              f"succeeded={len(succeeded)} spans_total={len(spans)} reply_chars={len(reply)} expected_content={content_ok}")
-    # A reply that merely contains the topic is not a delegation: only a delegation span that succeeded proves it.
-    return ScenarioResult(s["id"], s["title"], bool(succeeded) and bool(reply) and content_ok, detail)
+              f"succeeded={len(succeeded)} a2a_calls={sent} (max {max_calls}) spans_total={len(spans)} "
+              f"reply_chars={len(reply)} expected_content={content_ok}")
+    # A reply that merely contains the topic is not a delegation, and a `delegate_task` span alone may be an
+    # internal worker of the agent: the proof is a delegation span that succeeded, at least one A2A message
+    # sent to the target, no more than `max_a2a_calls` (a delegation that repeats itself is a defect, it
+    # costs one model turn of the target each time), and a reply that carries the answer.
+    ok = bool(succeeded) and 1 <= sent <= max_calls and bool(reply) and content_ok
+    return ScenarioResult(s["id"], s["title"], ok, detail)
 
 
 def u_chat_blocked_for_placeholder_agent(s: Dict[str, Any]) -> ScenarioResult:

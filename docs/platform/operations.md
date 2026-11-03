@@ -71,3 +71,22 @@ Operator and application images move in two separate steps, always in this order
 4. **Rollback.** Re-pin the previous digests and run `make d2 install unifai` again; a stack field added in the roll is removed by dropping it from the chart values.
 
 When the session that owned a roll has disappeared (no entry in the session list), nothing was handed over unless it is committed on `origin/devel`: re-derive the pins with the dry-run, ask the release owner for the CR fields and the settings that must stay unset, and take the user's go again before touching the cluster. A peer's message is information, not the user's approval.
+
+## Moving a PostgreSQL role onto the shared demo password (ADR-0595, ADR-0529)
+
+A new value of `zuno_admin_*_postgresql_*_password` reaches a fresh install only. On a running cluster the Vault path already
+exists (ADR-0345 seeds only missing paths) and PGO keeps the SCRAM verifier it derived from the old password (ADR-0529). One role
+at a time, with the cluster owner's go for each:
+
+1. Set the new value in `ansible/confidential.yml` (the per-component variable, or the shared `zuno_admin_mainpwd`).
+2. Overwrite the Vault path, not delete it: `vault kv put zuno/<path> username=<user> password=<value>` (the paths are the keys of
+   `_vault_generated_secrets` in `ansible/roles/vault/tasks/install.yml`; keep the existing `username`).
+3. `ansible/tasks/force_externalsecret_refresh.yml` on the ExternalSecret that reads the path.
+4. Remove the verifier so PGO re-derives it and issues the `ALTER ROLE`:
+   `oc patch secret zuno-postgresql-pguser-<user> -n zuno-data --type=json -p '[{"op":"remove","path":"/data/verifier"}]'`.
+5. Refresh the consumer ExternalSecret in the other namespace, then confirm the consumers reconnect and that
+   `pg_authid.rolpassword` changed once and stays put.
+
+Not covered here: MariaDB, Redis and the AAP databases follow their own procedures (not verified for this scheme); on demo333
+they keep their current passwords. The `zunoapp` and Keycloak roles are the riskiest: Keycloak's own database connection and
+PgBouncer logins break together if step 5 is skipped.

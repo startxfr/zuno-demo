@@ -112,6 +112,11 @@ keeps local ones only) - the same eligibility filter as chat completions.
 `Cache-Control: private, max-age=30`. `422` on an unknown classification,
 `401` without a valid JWT.
 
+`auto` carries `"name": "Zuno"` (`AUTO_MODEL_NAME`). An experience client
+(the token's `azp` matches `MARKER_FAIL_CLOSED_CLIENTS`, default
+`open-webui,openclaw-*`) gets `auto` alone (WP-193). Routing never follows
+the model name, so its menu offers no model the gateway would not serve.
+
 ### `GET /healthz` / `GET /readyz`
 
 Liveness always `200`. Readiness returns `503` until
