@@ -1147,8 +1147,8 @@ moving.
 - 2026-11-03 — WP-172 Done: delegated calls reach the mcp-gateway live on operator 0.1.53 and the audit carries the
   chain. WP-174 records the working Arkos to Tekos delegation (scenario 21 3/3, the cap of 3 delegations fired). The
   refusals hold, so ADR-0401 and ADR-0403 are Implemented. ADR-0406 stays Accepted: the cancellation of a delegation no
-  longer awaited and `X-Zuno-Max-Tokens` end to end are not proven. The cost of a delegating turn (about 839,000 tokens)
-  is a decision still open.
+  longer awaited and `X-Zuno-Max-Tokens` end to end are not proven. A delegating turn costs about 65,000 tokens (an
+  earlier 839,000 was the ai-gateway counters counting each call once per group of the caller, 13 times).
 - 2026-11-03 — WP-191 and WP-193 Done, ADR-0594 Implemented. The three experiences list the same read MCP tools, filtered
   by groups. Signed markers raise OpenClaw tool turns to C2 and local. Open WebUI rewrites tool results, so its markers
   never verify and every tool turn there is C2 and local (the fail-closed case, accepted by the user). Open WebUI shows
