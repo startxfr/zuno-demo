@@ -10,6 +10,10 @@
 > is the routing principle; ADR-0109 (v0.1 carve-out completing here) is the
 > scoring/trigger mechanism — implement them together.
 
+> **Update 2026-11-02 (WP-186).** The code this work package delivered was retired with `rag-service` (WP-168) and `agent-runtime` (WP-156), and ADR-0109 is now superseded in
+> part by ADR-0568: the freshness ranking, the stale flag and the freshness-lag alert are gone, and UnifAI keeps content fresh by sync cadence and by deleting changed and vanished
+> pages. The state below stays `Done`: it records what was delivered and proved on 2026-08-15.
+
 ## Goal
 
 Enforce freshness metadata on every operational chunk, define per-domain

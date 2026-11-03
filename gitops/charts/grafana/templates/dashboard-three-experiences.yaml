@@ -1,0 +1,327 @@
+{{- if .Values.grafana.enabled }}
+# ADR-0587 (WP-184): the demonstration dashboard of the three user experiences
+# (UnifAI, Open WebUI, OpenClaw) on one governed backend. Built on the bounded
+# `client` label of WP-179 and the skipped-candidate counter of ADR-0591; the
+# classic row schema, for the reason dashboard-usage-cost.yaml's header gives.
+apiVersion: grafana.integreatly.org/v1beta1
+kind: GrafanaDashboard
+metadata:
+  name: three-experiences
+  namespace: {{ .Values.monitoringNamespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "26"
+spec:
+  instanceSelector:
+    matchLabels:
+      dashboards: "grafana"
+  uid: zuno-three-experiences
+  folder: "Zuno Platform"
+  json: |
+    {
+      "uid": "zuno-three-experiences",
+      "title": "Three experiences",
+      "description": "ADR-0587/WP-184: UnifAI, Open WebUI and OpenClaw on one governed backend - calls, tokens, cost, guardrails, routing and the shared per-user budget, by experience client.",
+      "tags": [
+        "zuno",
+        "usage",
+        "experiences"
+      ],
+      "timezone": "browser",
+      "schemaVersion": 39,
+      "time": {
+        "from": "now-24h",
+        "to": "now"
+      },
+      "refresh": "30s",
+      "links": [
+        {
+          "type": "dashboards",
+          "tags": [
+            "zuno"
+          ],
+          "asDropdown": true,
+          "keepTime": true,
+          "title": "Zuno dashboards"
+        }
+      ],
+      "templating": {
+        "list": [
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(zuno_model_calls_total, client)",
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "client",
+            "label": "client",
+            "query": "label_values(zuno_model_calls_total, client)",
+            "refresh": 2,
+            "type": "query",
+            "sort": 1
+          },
+          {
+            "current": {
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "prometheus"
+            },
+            "definition": "label_values(zuno_model_calls_total, user)",
+            "includeAll": true,
+            "allValue": ".*",
+            "multi": true,
+            "name": "user",
+            "label": "user",
+            "query": "label_values(zuno_model_calls_total, user)",
+            "refresh": 2,
+            "type": "query",
+            "sort": 1
+          }
+        ]
+      },
+      "panels": [
+        {
+          "id": 100,
+          "type": "row",
+          "title": "Same backend, three experiences",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 0
+          },
+          "panels": []
+        },
+        {
+          "id": 1,
+          "title": "Model calls by experience (over range)",
+          "type": "timeseries",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 1
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "legendFormat": "{{`{{client}}`}}"
+            }
+          ],
+          "description": "One point per Keycloak group, like the usage-cost dashboard: a multi-group user counts once per group. `client` is the token's azp (ADR-0587)."
+        },
+        {
+          "id": 2,
+          "title": "Tokens by experience (over range)",
+          "type": "timeseries",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 1
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (client, kind) (increase(zuno_model_tokens_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "legendFormat": "{{`{{client}}`}} ({{`{{kind}}`}})"
+            }
+          ],
+          "description": "One point per Keycloak group, like the usage-cost dashboard: a multi-group user counts once per group. `client` is the token's azp (ADR-0587)."
+        },
+        {
+          "id": 3,
+          "title": "Estimated cost by experience (over range)",
+          "type": "timeseries",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 9
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (client) (increase(zuno_model_cost_usd_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "legendFormat": "{{`{{client}}`}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "currencyUSD"
+            }
+          },
+          "description": "One point per Keycloak group, like the usage-cost dashboard: a multi-group user counts once per group. `client` is the token's azp (ADR-0587)."
+        },
+        {
+          "id": 4,
+          "title": "Guardrails evaluations by experience (over range)",
+          "type": "timeseries",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 9
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (client, outcome) (increase(zuno_guardrails_evaluations_total{client=~\"$client\"}[$__range]))",
+              "legendFormat": "{{`{{client}}`}} ({{`{{outcome}}`}})"
+            }
+          ]
+        },
+        {
+          "id": 101,
+          "type": "row",
+          "title": "Same models, same routing",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 17
+          },
+          "panels": []
+        },
+        {
+          "id": 5,
+          "title": "Which provider served each experience (over range)",
+          "type": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 18
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (client, provider, outcome) (increase(zuno_model_calls_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "legendFormat": "",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "description": "Same routing for every experience: classification decides the eligible providers (ADR-0560)."
+        },
+        {
+          "id": 6,
+          "title": "Candidates skipped for availability (over range)",
+          "type": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 18
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (client, provider, reason) (increase(zuno_model_candidates_skipped_total{client=~\"$client\"}[$__range]))",
+              "legendFormat": "",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "description": "ADR-0591: not_ready (the model's LLMInferenceService is not Ready) or circuit_open."
+        },
+        {
+          "id": 102,
+          "type": "row",
+          "title": "Same user, one budget",
+          "collapsed": false,
+          "gridPos": {
+            "h": 1,
+            "w": 24,
+            "x": 0,
+            "y": 26
+          },
+          "panels": []
+        },
+        {
+          "id": 7,
+          "title": "One user across the experiences: tokens (over range)",
+          "type": "table",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 24,
+            "x": 0,
+            "y": 27
+          },
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "prometheus"
+              },
+              "expr": "sum by (user, client) (increase(zuno_model_tokens_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "legendFormat": "",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "description": "The per-user ceilings of the ai-gateway's quota are one budget for all experiences (ADR-0587 decision 5): a user's tokens add up across clients."
+        }
+      ]
+    }
+{{- end }}

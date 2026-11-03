@@ -1,0 +1,158 @@
+{
+  "hit@1": 0.6666666666666666,
+  "hit@5": 0.8571428571428571,
+  "mrr": 0.75,
+  "missed": [
+    1,
+    2,
+    12
+  ],
+  "expect_none_top_scores": [
+    0.008906239,
+    0.08342431,
+    0.004475625
+  ],
+  "rows": [
+    {
+      "id": 1,
+      "rank": null,
+      "top_score": 0.88889414,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/security_and_compliance/index"
+    },
+    {
+      "id": 2,
+      "rank": null,
+      "top_score": 0.98486394,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_build_of_keycloak/26.6/html-single/server_administration_guide/"
+    },
+    {
+      "id": 3,
+      "rank": 2,
+      "top_score": 0.330162,
+      "top_url": "https://argo-cd.readthedocs.io/en/stable/operator-manual/rbac/"
+    },
+    {
+      "id": 4,
+      "rank": 1,
+      "top_score": 0.9926058,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/storage/index"
+    },
+    {
+      "id": 5,
+      "rank": 1,
+      "top_score": 0.999877,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/registry/index"
+    },
+    {
+      "id": 6,
+      "rank": 1,
+      "top_score": 0.9990088,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index"
+    },
+    {
+      "id": 7,
+      "rank": 2,
+      "top_score": 0.9938612,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/updating_clusters/index"
+    },
+    {
+      "id": 8,
+      "rank": 1,
+      "top_score": 0.90111554,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/network_security/index"
+    },
+    {
+      "id": 9,
+      "rank": 2,
+      "top_score": 0.9992754,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/index"
+    },
+    {
+      "id": 10,
+      "rank": 1,
+      "top_score": 0.5742771,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/nodes/index"
+    },
+    {
+      "id": 11,
+      "rank": 4,
+      "top_score": 0.9978258,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/networking_operators/index"
+    },
+    {
+      "id": 12,
+      "rank": null,
+      "top_score": 0.8877749,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/backup_and_restore/index"
+    },
+    {
+      "id": 13,
+      "rank": 1,
+      "top_score": 0.99992394,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/disconnected_environments/index"
+    },
+    {
+      "id": 14,
+      "rank": 1,
+      "top_score": 0.9998665,
+      "top_url": "https://docs.redhat.com/en/documentation/openshift_container_platform/4.22/html-single/virtualization/index"
+    },
+    {
+      "id": 15,
+      "rank": 1,
+      "top_score": 0.9976399,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_openshift_ai_self-managed/3.5"
+    },
+    {
+      "id": 16,
+      "rank": 1,
+      "top_score": 0.99990404,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_openshift_gitops/1.17/html-single/understanding_openshift_gitops/index"
+    },
+    {
+      "id": 17,
+      "rank": 1,
+      "top_score": 0.9788036,
+      "top_url": "https://docs.redhat.com/en/documentation/red_hat_satellite/6.17"
+    },
+    {
+      "id": 18,
+      "rank": 1,
+      "top_score": 0.9983821,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675670604/S0R42+Schedule+Satellite"
+    },
+    {
+      "id": 19,
+      "rank": 1,
+      "top_score": 0.91657037,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675765491/O0R62-RSNSO+Restauration+d+un+projet+via+OADP"
+    },
+    {
+      "id": 20,
+      "rank": 1,
+      "top_score": 0.96170264,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675765260/O0R41-RDUPG+R+daction+du+process+d+upgrade+de+cluster"
+    },
+    {
+      "id": 21,
+      "rank": 1,
+      "top_score": 0.048108213,
+      "top_url": "https://startxfr.atlassian.net/spaces/SXSI/pages/675796818/O0R62-EXONS+Correction+d+un+namespace+instable"
+    },
+    {
+      "id": 22,
+      "expect_none": true,
+      "top_score": 0.008906239
+    },
+    {
+      "id": 23,
+      "expect_none": true,
+      "top_score": 0.08342431
+    },
+    {
+      "id": 24,
+      "expect_none": true,
+      "top_score": 0.004475625
+    }
+  ]
+}

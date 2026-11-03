@@ -42,6 +42,19 @@ platformNamespaces:
     allowedFromNamespaces: []
     extraLabels:
       zuno.io/managed: "true"
+  # ADR-0587/ADR-0588 (WP-179): Open WebUI, a user experience over the
+  # governed chain. Outside the mesh like zuno-unifai. It reaches the
+  # ai-gateway and the mcp-gateway through their NetworkPolicy peer on the
+  # zuno.io/experience-client label (this label is the grant: set it only on
+  # a namespace that holds nothing but an experience client), Keycloak through
+  # its Route, and users through the router (always allowed by the baseline).
+  - name: zuno-openwebui
+    displayName: Zuno Open WebUI
+    description: Open WebUI, the general-purpose chat experience (ADR-0588).
+    allowedFromNamespaces: []
+    extraLabels:
+      zuno.io/managed: "true"
+      zuno.io/experience-client: "true"
   - name: zuno-auth
     displayName: Zuno Authentication
     description: Keycloak, the platform's central identity provider.

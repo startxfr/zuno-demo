@@ -73,6 +73,15 @@ zuno_unifai_bundle_settings:
     groupTeam: true
     retrieveFirst: true
     retriever: knowledge-arkos
+    # WP-174: Arkos asks Tekos for a technical answer through the zuno a2a-gateway (unifai-operator
+    # >= 0.1.44, plan_draft_write shape). Inert until the agents release declares
+    # zuno.delegation.targets; the target is bounded here and re-checked by the gateway.
+    delegation:
+      gatewayURL: http://a2a-gateway.zuno-ai-run.svc:8080
+      maxRounds: 5
+    ceilings:
+      delegationTargets:
+      - tekos/answer-technical-question
   comage:
     entitlement: Enforced
     groupTeam: true
@@ -96,6 +105,8 @@ zuno_unifai_bundle_settings:
 zuno_unifai_released_bundles: true
 zuno_unifai_released_bundles_exclude: []
 zuno_unifai_values:
+  gatewayLLM:
+    timeoutSeconds: 200
   ragSources:
   - aclGroups:
     - consultant/confluence-archi-satellite
@@ -203,19 +214,30 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:fa2731d5880cda5ea8440c226006f776f11b4146308871c6ae2a96b42715d8bb  # devel-b48dea199
-      identity: quay.io/zuno/unifai-identity@sha256:b25acf2f51a2e34b5de7f8d6e5b3b7a7c7302840a84fc6e6d9ba2f18d59d57d7  # devel-b48dea199
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:cd69bff09b151ce5fe62fe88b38f0170cff5a84d12fa42686df201a0bfa59403  # devel-b48dea199
-      rag: quay.io/zuno/unifai-rag@sha256:e26f8b54dad132b01a88fd692b3b7fcbcc23183344306c149ea5a77ebf79c15e  # devel-b48dea199
-      ui: quay.io/zuno/unifai-ui@sha256:a602d924261a6e1f3ce45ebb3d4decee517038a7f5e92f203c371e966e5bdeee  # devel-b48dea199
+      backend: quay.io/zuno/unifai-backend@sha256:23635466a7eead52c6c4b2cbb915147f91d0d1ef4600261eb4611e87b78e7568  # devel-be4821358
+      identity: quay.io/zuno/unifai-identity@sha256:4a68541949850543d9e8fc85ec96d34ba6e7889b501190e64fe9a1752a9dd741  # devel-be4821358
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:39b3843a32a342cd3e35c6160553b44817df87e3cd99a14836b6730be5127253  # devel-d5d4f936c (tool errors logged, tool-result context fix)
+      rag: quay.io/zuno/unifai-rag@sha256:24a509279b56937b9c38a78efa257fecc9378dc2a3ff3e5949ba97dd0bdb793d  # devel-be4821358
+      ui: quay.io/zuno/unifai-ui@sha256:64891466197c48d118945876edebba4e56d804bb917136bf4197b1febfbe395a  # devel-c33f19799 (mermaid error graphic fix)
+      # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
+      reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
       # The CronJobs and restore Jobs (ADR-0586 clause 7): pinned by digest, unsigned,
       # the manifest list of the tag that ran (aws-cli 2.22.35, mongo 7.0.16).
       images:
         awsCli: public.ecr.aws/aws-cli/aws-cli@sha256:71a65c33c30e36dbfdff15707514f3b7b6fc789f2f134722f959b5cd13b93dd5  # 2.22.35
         mongo: docker.io/library/mongo@sha256:c630c59342c1493d50345136df2af14a76b9e827dd5316bfabee07a0880a5f3a  # 7.0.16
+    resources:
+      reranker:
+        requests: {cpu: '1', memory: 1Gi}
+        limits: {cpu: '4', memory: 4Gi}
     rag:
       tokenReview: true
+      # Layer 4c reranker OFF (2026-10-31, closed): three CPU rerankers were tried on the French Red Hat set and none matched
+      # DBSF alone (0.71/0.86/0.77): bge-reranker-base timed out (~0.9 s per candidate), the English MiniLM got 0.62/0.86/0.70,
+      # the multilingual mmarco-mMiniLMv2 got 0.67/0.86/0.75 (2.9 s for 10 candidates, no score threshold separates the
+      # unanswerable questions). To retry: reranker: {mode: deploy, model: <model>, candidates: <n>}; the image and
+      # resources keys stay, unused while rag.reranker is unset.
     ragClients:
     - namespace: zuno-ai-run
       podLabels:
@@ -247,6 +269,11 @@ zuno_ai_gateway_closed_class_maas_only: true
 # its counters in the platform Redis, so a restart no longer resets the
 # budgets. Needs the image built from c5ca1b40 or later (ai-gateway-25).
 zuno_ai_gateway_quota_ledger_store: redis
+# WP-164 lots 2 and 3 (user go 2026-10-31): mount the model-routing policy and
+# the per-agent guardrail modes generated from the agents release. Needs the
+# image built from b1facfc2 or later (ai-gateway-28).
+zuno_ai_gateway_model_routing_generated: true
+zuno_ai_gateway_guardrails_modes_generated: true
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,
@@ -255,6 +282,12 @@ zuno_ai_gateway_quota_ledger_store: redis
 # `evaluation` class from their group. User-facing clients are never listed.
 zuno_ai_gateway_trusted_platform_clients:
   - zuno-stresstest
+# ADR-0591 (WP-188, user go 2026-11-02): skip local models whose
+# LLMInferenceService is not Ready, and providers that just failed, instead of
+# waiting 180 s per *-maas candidate (GPU nodes down that day). Needs
+# ai-gateway build 31 (cf774982) or later.
+zuno_ai_gateway_model_readiness: true
+zuno_ai_gateway_circuit_breaker: true
 # Step C (user go 2026-10-24, after step B verified): the SaaS models'
 # MaaS subscriptions and auth policies keep only the ai-gateway
 # ServiceAccount; the /agent_tekos and /sales persona grants go (inventory

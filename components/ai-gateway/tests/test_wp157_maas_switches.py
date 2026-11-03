@@ -218,7 +218,9 @@ def test_identity_off_forwards_the_caller_token_and_no_quota_headers() -> None:
     kwargs = _via_maas_kwargs({}, ctx)
     assert kwargs["api_key"] == "caller-bearer"
     assert kwargs["default_headers"] == {"X-Zuno-Request-Id": "req-1"}
-    assert "max_retries" not in kwargs
+    # ADR-0591 decision 4: no SDK retries on MaaS calls, with or without the
+    # 429 pass-through (was: only with it).
+    assert kwargs["max_retries"] == 0
 
 
 def test_identity_on_uses_the_sa_token_and_attests_the_context() -> None:

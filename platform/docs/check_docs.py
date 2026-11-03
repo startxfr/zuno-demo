@@ -757,7 +757,7 @@ def _wp_governing_adrs(wp_path: pathlib.Path) -> List[str]:
 
 
 ADR_VERSIONS = ["v0", "v0.1", "v0.2", "v0.3", "v0.4", "v0.5", "v0.6",
-                "v0.7", "v0.8", "v0.9", "v0.10", "v0.11", "v0.12", "OKF v0.1"]
+                "v0.7", "v0.8", "v0.9", "v0.10", "v0.11", "v0.12", "v0.13", "OKF v0.1"]
 WP_OPEN_EXCLUDED = {"done", "abandoned", "cancelled", "closed — deferred"}
 
 
@@ -996,6 +996,15 @@ def check_model_roles() -> List[Finding]:
         name = provider.get("name")
         role = provider.get("role")
         by_name[name] = provider
+        # ADR-0591: a local provider names the LLMInferenceService behind it,
+        # or the ai-gateway cannot skip it when that model is not ready.
+        if provider.get("kind") == "local" and not provider.get("inference_service"):
+            findings.append(Finding(
+                "model_roles",
+                f"provider-routing.yaml's local provider '{name}' declares no "
+                f"inference_service (ADR-0591: the LLMInferenceService whose Ready "
+                f"condition the ai-gateway reads)",
+            ))
         if role not in MODEL_ROLES:
             findings.append(Finding(
                 "model_roles",

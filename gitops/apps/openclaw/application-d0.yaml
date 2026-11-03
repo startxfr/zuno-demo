@@ -1,0 +1,32 @@
+---
+# ADR-0589/0590 (WP-183): the pinned claw-operator catalog and, per persona, its
+# namespace (experience-client label), OwnNamespace operator and egress firewall.
+# The Subscriptions are Manual: the openclaw role approves the pinned CSV.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-openclaw-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-58"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/openclaw
+    helm:
+      releaseName: zuno-openclaw-d0
+      values: |
+        clusterBaseDomain: apps.mycluster.example.com
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-gitops
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -183,6 +183,7 @@ providers:
   # them on the direct `local` entry below instead.
   - name: local-maas
     kind: local
+    inference_service: qwen36-27b-instruct  # ADR-0591: readiness of the model behind it
     role: quality
     model: qwen3.6-27b-instruct
     max_model_len: 32768
@@ -193,7 +194,10 @@ providers:
     maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen36-27b-instruct/v1
     temperature: 0.2
-    timeout_seconds: 60
+    # A cold model pod compiles its GPU kernels on its first request (vLLM
+    # "JIT compilation during inference", 2026-10-31: qwen35-9b ran past 60 s
+    # and fell back). User decision 2026-10-31: 180 s on the MaaS path.
+    timeout_seconds: 180
     eligible_for: [C1, C2, C3]
 
   # ADR-0521: qwen is an LLMInferenceService now (no more <name>-predictor
@@ -203,6 +207,7 @@ providers:
   # local candidate, not just gpt-oss, despite the env var's name).
   - name: local
     kind: local
+    inference_service: qwen36-27b-instruct  # ADR-0591: readiness of the model behind it
     role: quality
     model: qwen3.6-27b-instruct
     max_model_len: 32768
@@ -248,6 +253,7 @@ providers:
   # MaaSSubscription/MaaSAuthPolicy grant this depends on.
   - name: local-gpt-oss-maas
     kind: local
+    inference_service: gpt-oss-20b  # ADR-0591: readiness of the model behind it
     role: reasoning
     model: gpt-oss-20b
     max_model_len: 131072
@@ -258,11 +264,15 @@ providers:
     maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/gpt-oss-20b/v1
     temperature: 0.2
-    timeout_seconds: 60
+    # A cold model pod compiles its GPU kernels on its first request (vLLM
+    # "JIT compilation during inference", 2026-10-31: qwen35-9b ran past 60 s
+    # and fell back). User decision 2026-10-31: 180 s on the MaaS path.
+    timeout_seconds: 180
     eligible_for: [C1, C2, C3]
 
   - name: local-gpt-oss
     kind: local
+    inference_service: gpt-oss-20b  # ADR-0591: readiness of the model behind it
     role: reasoning
     model: gpt-oss-20b
     max_model_len: 131072
@@ -300,6 +310,7 @@ providers:
   # eligible but it is not exercised here.
   - name: local-wesh-maas
     kind: local
+    inference_service: qwen35-9b-wesh  # ADR-0591: readiness of the model behind it
     role: specialized
     model: qwen3.5-9b-wesh
     max_model_len: 32768
@@ -310,11 +321,15 @@ providers:
     maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b-wesh/v1
     temperature: 0.2
-    timeout_seconds: 60
+    # A cold model pod compiles its GPU kernels on its first request (vLLM
+    # "JIT compilation during inference", 2026-10-31: qwen35-9b ran past 60 s
+    # and fell back). User decision 2026-10-31: 180 s on the MaaS path.
+    timeout_seconds: 180
     eligible_for: [C1, C2, C3]
 
   - name: local-wesh
     kind: local
+    inference_service: qwen35-9b-wesh  # ADR-0591: readiness of the model behind it
     role: specialized
     model: qwen3.5-9b-wesh
     max_model_len: 32768
@@ -334,6 +349,7 @@ providers:
   # reduced --max-model-len that makes 19.3GB of bf16 weights fit.
   - name: local-qwen35-maas
     kind: local
+    inference_service: qwen35-9b  # ADR-0591: readiness of the model behind it
     role: default
     model: qwen3.5-9b
     max_model_len: 32768
@@ -344,11 +360,15 @@ providers:
     maas_quota_window: 1h
     endpoint: https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/qwen35-9b/v1
     temperature: 0.2
-    timeout_seconds: 60
+    # A cold model pod compiles its GPU kernels on its first request (vLLM
+    # "JIT compilation during inference", 2026-10-31: qwen35-9b ran past 60 s
+    # and fell back). User decision 2026-10-31: 180 s on the MaaS path.
+    timeout_seconds: 180
     eligible_for: [C1, C2, C3]
 
   - name: local-qwen35
     kind: local
+    inference_service: qwen35-9b  # ADR-0591: readiness of the model behind it
     role: default
     model: qwen3.5-9b
     max_model_len: 32768

@@ -146,6 +146,8 @@ def verify_chain(
         declaration = agents.get(name)
         if declaration is None:
             return f"unknown agent '{name}' in the delegation chain"
+        if declaration.kind != "agent":
+            return f"'{name}' is an experience client, never part of a delegation chain (ADR-0592)"
         if declaration.status != "active":
             return f"agent '{name}' is '{declaration.status}', not active (ADR-0584)"
         if task not in declaration.tasks:

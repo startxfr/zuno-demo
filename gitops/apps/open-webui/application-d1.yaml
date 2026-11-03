@@ -1,0 +1,34 @@
+---
+# ADR-0588 (WP-181): Open WebUI in zuno-openwebui (namespace, label and
+# baseline from gitops/charts/namespaces). No operator, so no d0. The role
+# (ansible/roles/open_webui) passes the cluster values: global.zuno and the
+# Keycloak hostAlias to the in-cluster router.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-open-webui-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-58"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/open-webui
+    helm:
+      releaseName: zuno-open-webui-d1
+      values: |
+        global:
+          zuno:
+            clusterBaseDomain: apps.mycluster.example.com
+            routeHost: open-webui.apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-openwebui
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

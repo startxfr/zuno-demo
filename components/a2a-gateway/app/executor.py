@@ -39,6 +39,12 @@ def _run_id(value: Optional[str]) -> str:
     return value if value and _RUN_ID.match(value) else ""
 
 
+def _max_tokens(value: Optional[str]) -> str:
+    """The caller's X-Zuno-Max-Tokens when it is a positive integer within the ai-gateway's range, else empty."""
+    text = (value or "").strip()
+    return text if text.isdigit() and 0 < int(text) <= 1_000_000 else ""
+
+
 class Refused(Exception):
     """The request is not acceptable; the message is shown to the caller."""
 
@@ -116,6 +122,10 @@ class ZunoAgentExecutor(AgentExecutor):
         if reason:
             raise Refused(reason)
         chain_headers = {h: lowered[h.lower()] for h in CHAIN_HEADERS if lowered.get(h.lower())}
+        # The caller's reply cap crosses the hop (the ai-gateway keeps the smallest of it and its own default).
+        max_tokens = _max_tokens(lowered.get("x-zuno-max-tokens"))
+        if max_tokens:
+            chain_headers["X-Zuno-Max-Tokens"] = max_tokens
 
         classification = raise_classification(
             self._agent.classification or "C1", lowered.get("x-zuno-data-classification", "")

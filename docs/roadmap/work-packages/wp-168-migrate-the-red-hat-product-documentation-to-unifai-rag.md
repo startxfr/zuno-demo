@@ -94,9 +94,14 @@ Confluence pages, with the caller's group rules, and `rag-service`,
   the pages are already structured HTML.
 - **Search:** `query.bearer` takes one `sourceType`, so the mcp-gateway handler queries `CONFLUENCE` and
   `WEB` and merges (replacing the rag-service merge).
-- **Generation:** `platform/knowledge/generate_redhat_web_sources.py` writes
+- **Generation (retired 2026-11-02):** `platform/knowledge/generate_redhat_web_sources.py` wrote
   `gitops/charts/unifai/files/redhat-docs.yaml` from the rag-ingestion catalogue; the chart renders it when
-  `redhatDocs.enabled`.
+  `redhatDocs.enabled`. The script was never committed and read a chart (`gitops/charts/rag-ingestion`) that this WP
+  retired; `redhat-docs.yaml` was then scoped by hand on 2026-10-25 (latest version of each product, own
+  product and version, `/en/` form) and says it is "maintained here ... edit it by hand". Re-running the script on the
+  catalogue of the parent of the retirement commit (`877d8c83^`, 112 entries) no longer reproduces the file, so it is
+  obsolete: edit `redhat-docs.yaml` directly. A copy of the script is in the local archive
+  `~/zuno-demo-untracked-archive-20261102.tar.gz` (not in the repository).
 - **Ownership:** zuno-demo-68 codes the fork RAG side on `feat/rag-web-source`
   (from `main`, in a worktree, merged `--no-ff` into fork `devel`, pushed by a9
   with a release) and the operator side (`ragsource_*`).

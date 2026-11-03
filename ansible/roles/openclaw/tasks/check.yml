@@ -1,0 +1,20 @@
+---
+# `make d2 check openclaw`: the bounds of ADR-0589/0590, live. Each assertion is
+# one of WP-183's acceptance points that does not need a browser.
+- name: "openclaw | precheck"
+  ansible.builtin.include_tasks: precheck.yml
+
+- name: "openclaw | load the chart values"
+  ansible.builtin.include_tasks: load_values.yml
+
+- name: "openclaw | check the Applications are Synced and Healthy"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  loop: ["zuno-openclaw-d0", "zuno-openclaw-d1"]
+  loop_control:
+    loop_var: gitops_app_name
+
+- name: "openclaw | check each persona"
+  ansible.builtin.include_tasks: check_persona.yml
+  loop: "{{ _openclaw.personas }}"
+  loop_control:
+    loop_var: _openclaw_persona

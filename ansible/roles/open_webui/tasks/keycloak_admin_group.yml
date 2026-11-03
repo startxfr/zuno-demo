@@ -1,0 +1,50 @@
+---
+# ADR-0588 decision 2: Open WebUI's admin role comes from the Keycloak group
+# openwebui_admin (OAUTH_ADMIN_ROLES=/openwebui_admin). realm-zuno.json declares
+# the group and its members, but groups and users are create-only on a live realm
+# (the client-reconcile Job only creates agent_* groups), so they are created here:
+# the group when missing, and each member added when missing. Nothing is removed.
+- name: "open-webui | read the Keycloak admin credentials"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: keycloak-admin
+  register: _open_webui_kc_admin
+  no_log: true
+
+- name: "open-webui | fail if the Keycloak admin credentials are missing"
+  ansible.builtin.fail:
+    msg: "Secret zuno-auth/keycloak-admin not found - run `make d0 install keycloak` first."
+  when: (_open_webui_kc_admin.resources | default([]) | length) == 0
+
+- name: "open-webui | create the openwebui_admin group and its members (create-only)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-auth
+    pod: "{{ open_webui_keycloak_pod }}"
+    command: >-
+      bash -c '
+      K=/opt/keycloak/bin/kcadm.sh; C="--config /tmp/kcadm-open-webui.config";
+      trap "rm -f /tmp/kcadm-open-webui.config" EXIT;
+      $K config credentials $C --server http://localhost:8080 --realm master
+      --user {{ _open_webui_kc_admin.resources[0].data.username | b64decode | quote }}
+      --password {{ _open_webui_kc_admin.resources[0].data.password | b64decode | quote }} >/dev/null || exit 1;
+      gid=$($K get groups -r zuno $C -q search=openwebui_admin -q exact=true --fields id,name --format csv --noquotes | grep ",openwebui_admin$" | cut -d, -f1);
+      if [ -z "$gid" ]; then
+        gid=$($K create groups -r zuno $C -s name=openwebui_admin -i) && echo "created group openwebui_admin";
+      fi;
+      for u in {{ open_webui_admin_users | join(" ") }}; do
+        uid=$($K get users -r zuno $C -q username=$u -q exact=true --fields id --format csv --noquotes | head -1);
+        if [ -z "$uid" ]; then echo "user $u absent, skipped"; continue; fi;
+        if $K get users/$uid/groups -r zuno $C --fields name --format csv --noquotes | grep -qx openwebui_admin; then
+          echo "member $u present";
+        else
+          $K update users/$uid/groups/$gid -r zuno $C -n && echo "added member $u";
+        fi;
+      done'
+  register: _open_webui_kc_group
+  changed_when: "'created group' in _open_webui_kc_group.stdout or 'added member' in _open_webui_kc_group.stdout"
+  no_log: true
+
+- name: "open-webui | report the openwebui_admin group"
+  ansible.builtin.debug:
+    msg: "{{ _open_webui_kc_group.stdout_lines | default([]) }}"

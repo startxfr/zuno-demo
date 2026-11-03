@@ -1,6 +1,6 @@
 # Precise ingress allow-list, not a namespace-wide baseline: only UnifAI
-# (below), the acceptance-gate test Job and (optionally) OpenShift Lightspeed
-# may call this service. The agent-runtime peer left with it (WP-156).
+# (below), the acceptance-gate test Job, the experience clients (ADR-0587)
+# and (optionally) OpenShift Lightspeed may call this service. The agent-runtime peer left with it (WP-156).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -54,6 +54,14 @@ spec:
             matchLabels:
               app.kubernetes.io/name: multiagent
         {{- end }}
+        # ADR-0587 (WP-179): user experiences other than UnifAI (Open WebUI,
+        # OpenClaw) call this gateway with their users' (or persona's) token.
+        # Admitted by namespace LABEL, not by name, so a new experience adds
+        # no line here; the label is set only by the namespaces chart and the
+        # openclaw chart. Their namespaces hold nothing but the experience.
+        - namespaceSelector:
+            matchLabels:
+              zuno.io/experience-client: "true"
       ports:
         - protocol: TCP
           port: 8080

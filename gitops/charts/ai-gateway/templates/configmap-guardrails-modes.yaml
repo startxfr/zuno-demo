@@ -12,7 +12,9 @@ metadata:
     app.kubernetes.io/name: ai-gateway
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "65"
+    # Before the Deployment (wave 60), which mounts it: a later wave never
+    # comes, since Argo CD waits for the Deployment to be healthy first.
+    argocd.argoproj.io/sync-wave: "55"
 data:
   guardrails-modes.yaml: |
 {{ .Files.Get "files/guardrails-modes.generated.yaml" | indent 4 }}

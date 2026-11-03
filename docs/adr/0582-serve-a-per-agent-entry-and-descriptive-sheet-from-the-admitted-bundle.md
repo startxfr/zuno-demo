@@ -31,6 +31,7 @@ resources.**
 
 1. **No new Kubernetes Route.** The entry is a path of the shared UI
    (`/agents/<agent>`), so ADR-0561's single UI and single Route stand.
+   > **Correction note (2026-11-02).** The single UI and single Route are those of the **agent** platform; [ADR-0587](0587-admit-additional-user-experiences-over-the-one-governed-backend.md) admits other experience clients with their own Route, which serve no agent.
 2. **Single source.** The sheet is built from the bundle the operator verified
    and admitted (ADR-0564, ADR-0578, ADR-0580). The operator maps the display
    fields into a typed `status` block of `UnifaiAgentBundle`; the UI reads that

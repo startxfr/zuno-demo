@@ -1,0 +1,38 @@
+{{- if .Values.availability.readiness.enabled }}
+# ADR-0591 (WP-188): the ai-gateway reads the Ready condition of the local
+# models' LLMInferenceService objects to skip the ones that are not ready.
+# Read-only, this namespace only; the only RBAC this ServiceAccount holds.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: ai-gateway-model-readiness
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: ai-gateway
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "50"
+rules:
+  - apiGroups: ["serving.kserve.io"]
+    resources: ["llminferenceservices"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ai-gateway-model-readiness
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: ai-gateway
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "50"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ai-gateway-model-readiness
+subjects:
+  - kind: ServiceAccount
+    name: ai-gateway
+    namespace: {{ .Values.namespace }}
+{{- end }}

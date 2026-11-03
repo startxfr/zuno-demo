@@ -7,17 +7,20 @@ adapters: []
 preferences:
 - agent: tekos
   task: answer-technical-question
-  preferred:
-  - ovhcloud-gpt-oss-120b
+  local_only_for:
+  - C1
+  - C2
+  - C3
+  prefer:
   - local-gpt-oss-maas
   - local-gpt-oss
+  - ovhcloud-gpt-oss-120b
   - local-qwen35-maas
   - local-qwen35
   - local-wesh-maas
   - local-wesh
   - local-maas
   - local
-  fallback:
   - openai
   - gemini
   - anthropic
@@ -39,6 +42,10 @@ preferences:
   - gemini
   - anthropic
   - mistral
+  local_only_for:
+  - C1
+  - C2
+  - C3
 - agent: tekos
   task: check-my-drive-docs
   preferred:
@@ -65,6 +72,7 @@ preferences:
   - local-maas
   - local
   local_only_for:
+  - C1
   - C2
   - C3
 - agent: arkos
@@ -75,6 +83,10 @@ preferences:
   - local-gpt-oss
   - local-maas
   - local
+  local_only_for:
+  - C1
+  - C2
+  - C3
 - agent: arkos
   task: structure-demo
   preferred:
@@ -87,18 +99,6 @@ preferences:
   - local-wesh
   - local-qwen35-maas
   - local-qwen35
-- agent: comage
-  task: compare-historical-deals
-  preferred:
-  - ovhcloud-gpt-oss-120b
-  - local-gpt-oss-maas
-  - local-gpt-oss
-  - local-wesh-maas
-  - local-wesh
-  - local-qwen35-maas
-  - local-qwen35
-  - local-maas
-  - local
 - agent: comage
   task: check-deal-status
   preferred:
@@ -214,15 +214,6 @@ preferences:
   - local-gpt-oss
   - local-maas
   - local
-- agent: cognos
-  task: review-historical-commercial-data
-  preferred:
-  - local-qwen35-maas
-  - local-qwen35
-  - local-gpt-oss-maas
-  - local-gpt-oss
-  - local-maas
-  - local
 - agent: naveo
   task: answer-onboarding-question
   preferred:
@@ -232,6 +223,10 @@ preferences:
   - local-gpt-oss
   - local-maas
   - local
+  local_only_for:
+  - C1
+  - C2
+  - C3
 - agent: soursage
   task: coming-soon
   preferred:
@@ -257,9 +252,6 @@ preferences:
   - local-maas
   - local
 objectives:
-- agent: comage
-  task: compare-historical-deals
-  quality_floor: 0.75
 - agent: comage
   task: check-deal-status
   quality_floor: 0.75

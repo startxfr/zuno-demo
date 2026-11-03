@@ -1,0 +1,23 @@
+---
+# State detection, never fails: installed when both Applications exist and are
+# Synced and Healthy.
+- name: "openclaw | check zuno-openclaw-d0"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: zuno-openclaw-d0
+
+- name: "openclaw | keep the d0 state"
+  ansible.builtin.set_fact:
+    _openclaw_d0_ok: "{{ _state_check_result | bool }}"
+
+- name: "openclaw | check zuno-openclaw-d1"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: zuno-openclaw-d1
+
+- name: "openclaw | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ (_openclaw_d0_ok | bool) and (_state_check_result | bool) }}"
+
+- name: "openclaw | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

@@ -26,3 +26,5 @@ wanted_tools = _shared.wanted_tools
 routing_of = _shared.routing_of
 login_name = _shared.login_name
 tempo_rag_searches = _shared.tempo_rag_searches
+tempo_run_spans = _shared.tempo_run_spans
+delegation_spans = _shared.delegation_spans

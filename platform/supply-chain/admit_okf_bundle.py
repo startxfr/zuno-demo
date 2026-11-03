@@ -200,6 +200,9 @@ def _layer(reference: str, media_type: str) -> bytes:
 
 
 CONFORMANCE_MEDIA_TYPE = "application/vnd.zuno.okf.conformance.v1.tar+gzip"
+# ADR-0592: experience clients (experience-clients/<name>), an optional layer
+# of the corp artifact, signed with it. A release without it declares none.
+CLIENTS_MEDIA_TYPE = "application/vnd.zuno.okf.clients.v1.tar+gzip"
 
 
 def _optional_layer(reference: str, media_type: str) -> Optional[bytes]:
@@ -254,6 +257,11 @@ def extract(reference: str, out: pathlib.Path, dev: bool = False) -> dict:
     cases = _optional_layer(reference, CONFORMANCE_MEDIA_TYPE)
     if cases is not None:
         _untar(cases, out / "conformance")
+    # ADR-0592: extracted as out/experience-clients/<name>/ (read by the
+    # mcp-gateway, EXPERIENCE_CLIENTS_DIR).
+    clients = _optional_layer(reference, CLIENTS_MEDIA_TYPE)
+    if clients is not None:
+        _untar(clients, out / "experience-clients")
     (out / "okf-index.json").write_text(json.dumps(index, indent=2, sort_keys=True) + "\n")
     return index
 
@@ -334,6 +342,21 @@ def preferred_models(release: pathlib.Path) -> Dict[Tuple[str, str], List[str]]:
 
 # --- validate -------------------------------------------------------------------
 
+def clients_view(release: pathlib.Path) -> Dict[str, dict]:
+    """ADR-0592: name -> {groups, tasks: {task: tools}} of every experience
+    client in the release (experience-clients/<name>/client.okf.md)."""
+    out: Dict[str, dict] = {}
+    for path in sorted((release / "experience-clients").glob("*/client.okf.md")):
+        zuno = frontmatter(path).get("zuno") or {}
+        tasks = {}
+        for task in zuno.get("tasks") or []:
+            task_path = path.parent / "tasks" / f"{task}.md"
+            tz = (frontmatter(task_path).get("zuno") or {}) if task_path.is_file() else {}
+            tasks[task] = list(tz.get("allowed_tools") or [])
+        out[path.parent.name] = {"groups": list((zuno.get("access") or {}).get("groups") or []), "tasks": tasks}
+    return out
+
+
 def validate(release: pathlib.Path) -> Tuple[List[str], List[str]]:
     """(errors, warnings): what the platform cannot serve, and what it may not need."""
     errors: List[str] = []
@@ -373,6 +396,20 @@ def validate(release: pathlib.Path) -> Tuple[List[str], List[str]]:
                 if domain not in domains:
                     warnings.append(f"{agent}/{task} allows knowledge domain {domain!r}, "
                                     f"which no UnifAI RAG source serves (no source tagged with it)")
+    # ADR-0592: an experience client's tools must be served like an agent's,
+    # and its name is never an agent's (the mcp-gateway would refuse to load).
+    agent_names = set(agents_view(release))
+    for client, c in sorted(clients_view(release).items()):
+        if client in agent_names:
+            errors.append(f"experience client {client!r} has the name of an agent")
+        for task, tools in sorted(c["tasks"].items()):
+            for tool in tools:
+                entry = tool_policy.get(tool) or by_capability.get(tool)
+                if entry is None:
+                    errors.append(f"{client}/{task} (experience client) allows tool {tool!r}, absent from the release's tool policy")
+                elif entry.get("capability") not in bound and tool not in bound:
+                    errors.append(f"{client}/{task} (experience client) allows tool {tool!r} ({entry.get('capability')}), "
+                                  f"which has no backend binding in tool-bindings.yaml")
     # OKF v0.3: the release's bundles may only narrow its own corp policies
     # (ADR-0579 clause 5), re-checked here after the agents repository's CI.
     errors += okf_narrowing.check_release(release)

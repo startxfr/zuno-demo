@@ -609,3 +609,31 @@ def test_cross_user_isolation_check_passes_on_uniform_denials_and_fails_on_a_tel
     assert ok.passed, ok.detail
     assert not bad.passed and "team.get" in bad.detail
     assert "a2a_gateway_denies_unentitled" in dir(unifai_checks)
+
+
+def _plain_span(name, **attrs):
+    return {"name": name, "attributes": [{"key": k, "value": {"stringValue": v}} for k, v in attrs.items()]}
+
+
+def test_tempo_run_spans_returns_every_span_of_the_run():
+    spans = [_plain_span("mas.session"), _plain_span("a2a.call", target="tekos")]
+    got = ut.tempo_run_spans("run-1", TEMPO, wait_seconds=0, client=_tempo_client([{"traceID": "t1"}], spans))
+    assert [s["name"] for s in got] == ["mas.session", "a2a.call"]
+    assert got[1]["attrs"] == {"target": "tekos"}
+
+
+def test_tempo_run_spans_is_empty_when_no_trace_matches_the_run():
+    assert ut.tempo_run_spans("run-1", TEMPO, wait_seconds=0, client=_tempo_client([], [])) == []
+
+
+def test_delegation_spans_report_success_and_a_failed_attempt_is_not_a_delegation():
+    spans = [
+        {"name": "mas.session", "attrs": {}},
+        {"name": "execute_tool iem.delegate_task", "attrs": {"mas.success": "False", "error.type": "error"}},
+        {"name": "execute_tool iem.delegate_task", "attrs": {"mas.success": "True"}},
+        {"name": "node.run", "attrs": {"node": "arkos-structure-demo-a2a-tekos"}},
+        {"name": "rag.search", "attrs": {"rag.source_type": "WEB"}},
+    ]
+    got = ut.delegation_spans(spans)
+    assert [(x["name"], x["ok"]) for x in got] == [
+        ("execute_tool iem.delegate_task", False), ("execute_tool iem.delegate_task", True), ("node.run", False)]

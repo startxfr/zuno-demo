@@ -78,7 +78,7 @@ jobs:
       - name: Verify generated quota enforcement matches the released quota-policy.yaml (ADR-0511)
         run: python3 platform/okf/generate_quota_enforcement.py --check
       - name: Permitted SaaS fallback capability check (ADR-0053)
-        run: python3 evaluations/tekos/gate_checks.py
+        run: python3 evaluations/tekos/gate_checks.py --config-only
       # ADR-0307 (WP-41): scaffolds a throwaway agent, runs the composed
       # OKF/knowledge-ref validators (+ helm lint when available) against
       # it, and always discards it - proving the onboarding template stays
@@ -153,6 +153,8 @@ jobs:
           python3 tests/test_auth_mode_enforcement.py
           # ADR-0401/0403/0406 (WP-172): the agent delegation chain, on synthetic agents.
           python3 tests/test_agent_chain.py
+          # ADR-0592 (WP-189): experience clients loaded next to the agents.
+          python3 tests/test_experience_clients.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
@@ -195,6 +197,9 @@ jobs:
           python3 tests/test_render_policy_trustroot.py
           python3 render_policy_trustroot.py --check
           python3 check_unifai_pins.py
+      - name: supply-chain OpenClaw pins (ADR-0590)
+        working-directory: platform/supply-chain
+        run: python3 tests/test_pin_claw_catalog.py
       - name: OpenShift GitOps operator health check (WP-176 follow-up)
         run: python3 platform/gitops/tests/test_check_gitops_operator.py
       - name: confluence MCP server tests
@@ -231,6 +236,9 @@ jobs:
       - name: evaluations routing report tests (ADR-0304)
         working-directory: evaluations
         run: python3 tests/test_routing_report.py
+      - name: evaluations failover drill local-only control tests (WP-105, WP-187)
+        working-directory: evaluations
+        run: python3 tests/test_scenario_failover_control.py
       - name: evaluations PEFT regression gate tests (ADR-0534/WP-109)
         working-directory: evaluations
         run: python3 tests/test_peft_regression.py

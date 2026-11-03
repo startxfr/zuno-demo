@@ -1,8 +1,8 @@
 ---
 # `make day3|d3 scenario-failover-node` (restore half). WP-105/ADR-0536:
 # uncordon the node, reschedule qwen3.5-9b-wesh, and prove live that Comage
-# returns to local-wesh (Tekos, the decoupling control, is expected to have
-# stayed on ovhcloud-gpt-oss-120b throughout). Run only after
+# returns to local-wesh (Tekos, the local-only control of agents v0.8.1, is
+# expected to be answered by a local provider again and never by an external one). Run only after
 # day3_scenario_failover_node_inject.yml and its interactive human
 # validation pause (Makefile) - re-derives node/pod state from scratch
 # rather than trusting anything carried over from that separate
@@ -133,11 +133,11 @@
       ansible.builtin.set_fact:
         scenario_failover_restore: "{{ scenario_failover_probe_result }}"
 
-    - name: Fail if Comage did not return to local-wesh, or Tekos moved off ovhcloud-gpt-oss-120b
+    - name: Fail if Comage did not return to local-wesh, or Tekos is not answered locally
       ansible.builtin.fail:
         msg: >-
           Expected comage.provider=local-wesh(-maas) and
-          tekos.provider=ovhcloud-gpt-oss-120b (unchanged) after restore, got
+          tekos.outcome=answered-local (never an external provider) after restore, got
           comage={{ scenario_failover_restore.comage }},
           tekos={{ scenario_failover_restore.tekos }}. The node is uncordoned
           and the pod is Running, so a Comage mismatch is a routing/probe
@@ -147,7 +147,7 @@
         not scenario_failover_restore.comage.ok or
         scenario_failover_restore.comage.provider not in ['local-wesh', 'local-wesh-maas'] or
         not scenario_failover_restore.tekos.ok or
-        scenario_failover_restore.tekos.provider != 'ovhcloud-gpt-oss-120b'
+        scenario_failover_restore.tekos.outcome != 'answered-local'
 
     - name: Print the restore-phase verdict
       ansible.builtin.debug:

@@ -230,6 +230,7 @@ re-queried until the run timed out. Fixes, in order:
 | | 2 | 57/59 | fail | first token 16.9 s; unifai-backend restarted at 20:49Z mid-run |
 | | 3 | partial | pass | the report kept only 9 results; the Job log shows #11 passing |
 | Quiet stack (2026-10-31) | 1 | 51/52 | pass | first token 9.7 s; #10 passes via the Tempo `rag.search` fallback |
+| Local reasoning first (agents v0.8.0, 2026-10-31) | 1 | 52/52 | pass | first token 2.0 s; reranker off; all 44 model calls local |
 
 - **The loop is fixed:** no timeout since 0.6.3.
 - **#11 is a ranking problem now:** on the misses tekos answers in time, names the Confluence page and
@@ -238,6 +239,11 @@ re-queried until the run timed out. Fixes, in order:
 - **First-token latency** is above the 6 s target in every run (8-45 s). On a quiet stack
   (2026-10-31: no other test, GPU nodes at 7% CPU, no restart) it is still 9.7 s, so it is not
   load. The bulk pass gives p50 23.8 s and p95 62.8 s per full answer (10 interactions, 0 errors).
+  Cause: `answer-technical-question` listed `reasoning-external` (ovhcloud-gpt-oss-120b) first. Tekos
+  0.4.3 puts local `reasoning` first (zuno-demo-agents v0.8.0, with tekos 0.4.4's history window). The rerun
+  (2026-10-31 20:17-20:22Z, no other load) gives first token 2.0 s, under the 6 s target, and bulk p50
+  4.1 s, p95 7.2 s (10 interactions, 0 errors). Tempo shows the 44 `model_call` spans of the window on
+  `local-gpt-oss-maas` (29) and `local-maas` (15), none external.
 - **Harness:** with retrieval done before reasoning, the retriever call does not always appear as a
   tool event (`tool_calls=[]` on a passing answer). The check that expects that call needs to accept
   either.
@@ -264,4 +270,76 @@ re-queried until the run timed out. Fixes, in order:
   the cluster is back to its earlier user and group list. Not covered: `sale-02`-style users that
   hold only `agent_*` groups of other agents, and the 429 behaviour at the tier ceiling (the sales
   tier is 5,000 tokens/h; not exhausted on purpose).
+
+## Update (2026-10-31): lots 2 and 3 live on demo333
+
+User go 2026-10-31, coordinated with 68, 59, cc and a0.
+
+- **Build:** `ai-gateway-28` from devel `8b9338d9`, which contains the lot 2 (`91a0e333`) and lot 3
+  (`b1facfc2`) code.
+- **Switches:** `zuno_ai_gateway_model_routing_generated` and
+  `zuno_ai_gateway_guardrails_modes_generated` set to true in `ansible/clusters/demo333.yml`, then
+  `make d2 install llm`.
+- **One rollout:** the Deployment was paused during the build and the values change, then resumed.
+  New pod at 11:27Z, Ready, 0 restarts; `zuno-ai-gateway-d1` Synced/Healthy.
+- **Snag, fixed:** the generated ConfigMaps were in wave 65, after the Deployment (60). Enabling the
+  switches made the new pod wait for volumes that Argo CD only creates once that pod is healthy.
+  - The fix (`9f8d18b1`) moves them to wave 55.
+  - The stuck sync operation, started by the llm role run, was terminated.
+  - The old pod served throughout.
+- **Proof:**
+  - The gateway logged `loaded model-routing policy from /app/config-model-routing/... (24
+    preference(s))`.
+  - An in-pod check shows the guardrail modes loaded: minimum `observe` on C1, C2 and C3, tekos
+    `observe`.
+  - A tekos `find-relevant-docs` chat answered 200 from qwen3.5-9b, the first candidate as before, and
+    logged `guardrails clean (mode=observe) agent=tekos`.
+  - Routing and guardrail behaviour are unchanged, as expected with release 0.6.3.
+- **Cosmetic follow-up:** the guardrails module loads its modes at import time, before logging is
+  configured, so its `loaded guardrails agent modes` line is not printed. The modes are loaded.
+- **Seen in the proof call, not caused by this change:** `local-qwen35-maas` timed out (about 60 s),
+  and the direct `local-qwen35` answered in 26 s for 40 tokens. The MaaS path to qwen35-9b is a
+  first-token latency lead, to investigate.
+
+## Update (2026-10-31): lot 4, the arkos history window proven end to end
+
+Arkos declares `limits.memory.history {enabled: true, max_turns: 6, token_budget: 6000}`. The proof
+uses one 9-turn conversation (`stress-consultant-01`, team `agent-arkos`) and reads `zuno.prompt_tokens`
+on the run's `model_call` spans in Tempo.
+
+- **Operator 0.1.45 (first run, 15:34Z): not enforced.** The first call of each turn grew from 633 to
+  30,027 tokens, and later calls reached 34,234. Cause, found by a9: the window bounded the conversation
+  messages, but not the "previous agent results" block, where a whole DAT was added every turn.
+- **Second run (17:47Z): stalled.** An arkos reply ran to ~40k tokens on gpt-oss-20b. The ai-gateway
+  dropped the UnifAI client's `max_completion_tokens` (4096), because its request schema had no such
+  field.
+  - Cleared by recreating the UnifAI temporal worker pod (user go). `session.cancel` answered 409.
+  - Fixed in the ai-gateway (`28c23755`, `1193a092`, image `ai-gateway-29`): body caps are honoured,
+    and a call that sets none gets a default of 8192. Proof: `max_tokens` 20 gave `completion_tokens` 20.
+- **Operator 0.1.47 + ai-gateway-29 (18:35Z): enforced.** The first call of each turn: 633, 4216, 4301,
+  7943, 7932, 8163, 10362, 9442, 11309, flat at 8-12k from turn 4. This is about two 6000-token blocks
+  plus the system prompt and the RAG context. The longest reply over 60 model calls was 4096 tokens.
+  - One single call in turn 6 had 30,318 prompt tokens; the calls after it were back at ~10k.
+    Content produced inside a turn (tool results, RAG context) is not windowed.
+  - **Cause of that call (traced in Tempo):** node `arkos-draft-architecture-testimonial-draft`,
+    iteration 7, right after its third `diagram.generation.create` call. `generate_diagram` returns the whole
+    rendered SVG as `data_base64` (57,646 bytes from the mcp-gateway), and UnifAI put that tool result into
+    the model context as is: 11,320 → 30,318 prompt tokens. That call ran 62 s and stopped at the 4096 cap.
+    Turn 1 shows the same pattern: a 40,278-byte diagram result, then a 16,150-token call. `generate_image`
+    returns the same shape with a base64 PNG.
+  - **Fix (user decision, UnifAI fork, a9):** binary payloads leave the model context and become a short
+    marker (type, size, alt), and the payload is kept as a run attachment for the UI. A size cap on tool
+    results is a safety net.
+  - **Fixed (2026-10-31, multiagent `devel-d5d4f936c`, live 21:05Z):** UnifAI replaces base64 payloads in a tool
+    result with a short marker, and caps a tool result at `MAS_TOOL_RESULT_MAX_TOKENS` (default 8000).
+    - Diagram turn (21:18Z): a 51,710-byte `diagram.generation.create` result moved the next call from 1,767
+      to 1,982 prompt tokens (+215, against +19,000 before). The highest prompt in the run was 3,368.
+    - Same 9-turn conversation as the proof (21:12-21:16Z): 104 model calls, highest prompt 6,159, all on
+      `local-gpt-oss-maas`. arkos drew no diagram in that run.
+    - Not checked yet: whether the diagram still shows in the UI. The fix keeps the full output on the
+      observation step.
+- **Follow-ups:**
+  - tekos 0.4.4 gets the same window, and arkos 0.2.1 caps its three uncapped tasks at 8192: released in
+    zuno-demo-agents v0.8.0 and live on demo333.
+  - Operator 0.1.48 sends the task limits as `X-Zuno-Max-Tokens` (live).
 

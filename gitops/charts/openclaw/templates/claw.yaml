@@ -1,0 +1,64 @@
+{{- if .Values.assistants.enabled }}
+{{- range .Values.personas }}
+{{- $ns := printf "%s%s" $.Values.namespacePrefix .name }}
+{{- $tokenURL := printf "%s/protocol/openid-connect/token" (include "openclaw.issuer" $) }}
+---
+# ADR-0589/0590: the persona's assistant. Its only model and tool paths are the
+# ai-gateway and the mcp-gateway, through the operator's proxy, which exchanges the
+# client openclaw-<persona> for a short-lived token (client credentials on
+# Keycloak's Route, never the in-cluster http service: its issuer would be http://)
+# and refreshes it. The pod holds only a placeholder key.
+apiVersion: claw.sandbox.redhat.com/v1alpha1
+kind: Claw
+metadata:
+  name: {{ $.Values.clawName }}
+  namespace: {{ $ns }}
+spec:
+  image: {{ $.Values.images.openclaw }}
+  auth:
+    mode: password
+    passwordSecretRef: {name: openclaw-ui, key: password}
+  credentials:
+    - name: zuno-ai
+      type: oauth2
+      domain: {{ $.Values.gateways.aiDomain }}
+      oauth2:
+        clientID: openclaw-{{ .name }}
+        tokenURL: {{ $tokenURL }}
+      secretRef:
+        - {name: openclaw-client, key: client-secret}
+      defaultHeaders:
+        X-Zuno-Agent: openclaw
+        X-Zuno-Data-Classification: {{ $.Values.gateways.dataClassification | quote }}
+    - name: zuno-mcp
+      type: oauth2
+      domain: {{ $.Values.gateways.mcpDomain }}
+      oauth2:
+        clientID: openclaw-{{ .name }}
+        tokenURL: {{ $tokenURL }}
+      secretRef:
+        - {name: openclaw-client, key: client-secret}
+      {{- if $.Values.gateways.mcpAgentHeader }}
+      defaultHeaders:
+        X-Zuno-Agent: openclaw
+        X-Zuno-Task: {{ $.Values.gateways.mcpTask | quote }}
+        X-Zuno-Data-Classification: {{ $.Values.gateways.dataClassification | quote }}
+      {{- end }}
+  customProviders:
+    - name: zuno
+      api: openai-completions
+      baseUrl: {{ $.Values.gateways.aiBaseUrl }}
+      credentialRef: zuno-ai
+      models:
+        - {name: auto, alias: zuno}
+  mcpServers:
+    zuno:
+      url: {{ $.Values.gateways.mcpUrl }}
+      transport: streamable-http
+      credentialRef: zuno-mcp
+  config:
+    mergeMode: merge
+    raw:
+      {{- toYaml $.Values.lockdown | nindent 6 }}
+{{- end }}
+{{- end }}

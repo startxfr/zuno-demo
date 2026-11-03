@@ -20,3 +20,7 @@ classes:
     user: 5m
     group: 5m
     project: 5m
+  rehearsal:
+    user: 5m
+    group: 5m
+    project: 5m

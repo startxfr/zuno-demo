@@ -143,6 +143,7 @@ def chat_model_for(
             # non-streaming .ainvoke() path.
             stream_usage=True,
             max_tokens=max_tokens,
+            max_retries=0,  # ADR-0591: the candidate loop is the only retry
         )
 
     if candidate.name == "openai":
@@ -154,6 +155,7 @@ def chat_model_for(
             temperature=cfg.get("temperature", 0.2),
             stream_usage=True,
             max_tokens=max_tokens,
+            max_retries=0,
         )
     if candidate.name == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
@@ -166,6 +168,7 @@ def chat_model_for(
             # max_tokens - the one real per-vendor translation this
             # factory needs.
             max_output_tokens=max_tokens,
+            max_retries=0,
         )
     if candidate.name == "anthropic":
         from langchain_anthropic import ChatAnthropic
@@ -179,6 +182,7 @@ def chat_model_for(
             # candidate that never declares max_tokens - noted since every
             # other branch here is a true no-op on None.
             max_tokens=max_tokens,
+            max_retries=0,
         )
     if candidate.name == "mistral":
         from langchain_mistralai import ChatMistralAI
@@ -188,6 +192,7 @@ def chat_model_for(
             api_key=os.getenv(cfg.get("api_key_env", "MISTRAL_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
             max_tokens=max_tokens,
+            max_retries=0,
         )
     if candidate.name == "mistral-codestral":
         from langchain_mistralai import ChatMistralAI
@@ -199,6 +204,7 @@ def chat_model_for(
             api_key=os.getenv(cfg.get("api_key_env", "MISTRAL_CODESTRAL_API_KEY")),
             temperature=cfg.get("temperature", 0.2),
             max_tokens=max_tokens,
+            max_retries=0,
         )
     if candidate.name == "ovhcloud-gpt-oss-120b":
         from langchain_openai import ChatOpenAI
@@ -214,6 +220,7 @@ def chat_model_for(
             temperature=cfg.get("temperature", 0.2),
             stream_usage=True,
             max_tokens=max_tokens,
+            max_retries=0,
         )
 
     raise ProviderFactoryError(f"no chat model factory registered for provider '{candidate.name}'")

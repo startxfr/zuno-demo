@@ -1,6 +1,6 @@
 # ADR-0109: Implement source freshness and trust scoring
 
-- **Status:** Implemented - see `components/rag-service/app/search.py`, `components/agent-runtime/app/graph/nodes.py`.
+- **Status:** Superseded in part by [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) (2026-11-02, WP-186) - the freshness ranking, the stale flag, the provenance weight, the live-read trigger in agent-runtime and the freshness-lag alert went with rag-service and agent-runtime (WP-156, WP-168). The per-domain freshness policy in `knowledge/<domain>/domain.yaml` and the live read of current state ([ADR-0205](0205-prefer-indexed-knowledge-for-read-and-live-tools-for-freshness-and-write.md)) stay in force
 - **Target:** v0.1
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
@@ -23,6 +23,15 @@ code.
 See [Standard clauses](README.md#standard-clauses) for Alternatives
 considered, Consequences, Security/Operational considerations,
 Acceptance criteria and Review evidence.
+
+## Update 2026-11-02 (WP-186): what the UnifAI RAG does about freshness
+
+The code this record pointed to is gone: `components/rag-service` (WP-168) and `components/agent-runtime` (WP-156). UnifAI's RAG does not rank by date and has
+no stale flag, provenance weight or freshness-lag metric. What it does instead is part of the sync: a changed or vanished Confluence page or web page has its points
+deleted before the new content is stored (`core/pipeline/executor.py` of the fork), which is stronger than the old down-ranking. Confluence and web chunks carry
+`last_modified` (often empty for web, which takes it from the HTTP header); none carries `indexed_at` or `stale_after`. So freshness is now the sync cadence
+(`syncInterval`) plus deletion, and the decay and flag clauses of this record are retired. An older procedure that stays in the source next to its replacement is
+not preferred by anything; the demo corpus is live-synced, so the cost is small (see WP-186).
 
 ## Related ADRs
 

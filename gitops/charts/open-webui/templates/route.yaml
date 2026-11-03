@@ -1,0 +1,21 @@
+# ADR-0588 decision 6: one Route; TLS from the router's ACME wildcard
+# certificate (cert-manager, router-wildcard-tls). The upstream chart's `route`
+# is a Gateway API HTTPRoute, so the Route is ours.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: open-webui
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    haproxy.router.openshift.io/timeout: {{ .Values.route.timeout | quote }}
+spec:
+  host: {{ .Values.global.zuno.routeHost }}
+  to:
+    kind: Service
+    name: open-webui
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

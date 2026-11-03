@@ -1,0 +1,55 @@
+---
+# ADR-0588 (WP-181): Open WebUI's Vault paths, seeded only when missing
+# (vault_seed_if_missing.yml never overwrites a value a consumer may cache).
+# keycloak/open-webui is also seeded by the vault role; whichever runs first wins.
+- name: "open-webui | locate the Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _vault_pod
+
+- name: "open-webui | read the Vault bootstrap credentials"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-vault
+    name: vault-bootstrap-credentials
+  register: _open_webui_vault_creds
+  no_log: true
+
+- name: "open-webui | fail if Vault isn't bootstrapped"
+  ansible.builtin.fail:
+    msg: >-
+      vault-bootstrap-credentials not found in zuno-vault - run
+      `make d0 install vault` first.
+  when: >-
+    (_vault_pod.resources | default([]) | length) == 0 or
+    (_open_webui_vault_creds.resources | default([]) | length) == 0
+
+- name: "open-webui | set the Vault connection fact"
+  ansible.builtin.set_fact:
+    _vault_root_token: "{{ _open_webui_vault_creds.resources[0].data.root_token | b64decode }}"
+  no_log: true
+
+- name: "open-webui | seed the OIDC client secret (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: keycloak/open-webui
+    vault_seed_fields:
+      client_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+
+# webui_secret_key signs Open WebUI sessions; session_encryption_key encrypts the
+# stored OAuth tokens; bootstrap_admin_password belongs to the inert local account
+# that takes user slot 1 (password login is off, nobody can use it).
+- name: "open-webui | seed the application secrets (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: open-webui/app
+    vault_seed_fields:
+      webui_secret_key: "{{ lookup('ansible.builtin.password', '/dev/null', length=48, chars=['ascii_letters', 'digits']) }}"
+      session_encryption_key: "{{ lookup('ansible.builtin.password', '/dev/null', length=48, chars=['ascii_letters', 'digits']) }}"
+      bootstrap_admin_password: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"

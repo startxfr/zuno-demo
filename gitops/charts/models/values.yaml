@@ -145,6 +145,12 @@ modelId: Qwen/Qwen3.6-27B-FP8
 # ("The model `qwen2.5-7b-instruct` does not exist") - the two ids are
 # different concerns.
 servedModelName: qwen3.6-27b-instruct
+# Warm-up before traffic (templates/_warmup.tpl), proven on qwen35-9b-wesh and
+# qwen35-9b 2026-10-31 (82-83 s of kernel compilation absorbed before Ready).
+warmup:
+  enabled: true
+  waitSeconds: 900
+  maxSeconds: 300
 # ADR-0546/WP-131: which bucket this model's weights are read from -
 # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
 # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
@@ -805,6 +811,13 @@ weshModel:
   # (<prefix>/<servedModelName>/) - the exact prefix components/mlops's
   # merge-export stage uploads the merged bf16 checkpoint to.
   servedModelName: qwen3.5-9b-wesh
+  # Warm the model before it takes traffic (templates/_warmup.tpl): a cold
+  # --enforce-eager pod compiles its kernels on its first request, which ran
+  # past the MaaS timeout on 2026-10-31. Rolled to this model first.
+  warmup:
+    enabled: true
+    waitSeconds: 900
+    maxSeconds: 300
   # ADR-0546/WP-131: which bucket this model's weights are read from -
   # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
   # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.
@@ -875,6 +888,12 @@ weshModel:
 qwen35Model:
   inferenceServiceName: qwen35-9b
   servedModelName: qwen3.5-9b
+  # Warm-up before traffic (templates/_warmup.tpl), proven on qwen35-9b-wesh
+  # 2026-10-31: the first request after a restart compiled 4 kernels in 82 s.
+  warmup:
+    enabled: true
+    waitSeconds: 900
+    maxSeconds: 300
   # ADR-0546/WP-131: which bucket this model's weights are read from -
   # "models" (the per-cluster bucket, unchanged) or "sources" (the shared
   # cross-cluster bucket). One model at a time; see templates/_models-s3.tpl.

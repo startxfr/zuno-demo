@@ -27,6 +27,13 @@ import yaml
 logger = logging.getLogger("mcp_gateway.agent_declarations")
 
 AGENTS_DIR = os.getenv("AGENTS_DIR", "/app/agents")
+# ADR-0592: experience clients (Open WebUI, OpenClaw), extracted next to the
+# agents from the clients layer of the admitted corp artifact. Optional: a
+# release without that layer simply declares no client.
+EXPERIENCE_CLIENTS_DIR = os.getenv("EXPERIENCE_CLIENTS_DIR", "/app/experience-clients")
+
+KIND_AGENT = "agent"
+KIND_EXPERIENCE_CLIENT = "experience-client"
 
 
 # ADR-0508 clause 3 / ADR-0579 clause 6: the OKF schema versions this reader
@@ -65,6 +72,10 @@ class AgentDeclaration:
     # may not delegate. ADR-0406: zuno.limits.delegation.max_depth, default 1.
     delegation_targets: List[Tuple[str, str]] = field(default_factory=list)
     max_depth: int = 1
+    # ADR-0592: "agent", or "experience-client" for a user interface calling
+    # under a logical agent name. A client has tasks and access groups like an
+    # agent, but never delegates and is never a delegation target (agent_chain).
+    kind: str = KIND_AGENT
 
     def declared_tools(self) -> List[str]:
         tools: List[str] = []
@@ -76,8 +87,9 @@ class AgentDeclaration:
 
 
 class AgentDeclarationStore:
-    def __init__(self, agents_dir: str = AGENTS_DIR):
+    def __init__(self, agents_dir: str = AGENTS_DIR, clients_dir: str = EXPERIENCE_CLIENTS_DIR):
         self._agents_dir = Path(agents_dir)
+        self._clients_dir = Path(clients_dir)
         self._agents: Dict[str, AgentDeclaration] = {}
         self.load_error: Optional[str] = None
         self.reload()
@@ -94,6 +106,15 @@ class AgentDeclarationStore:
                 if not index_path.is_file():
                     continue
                 agents[entry.name] = self._load_agent(entry.name, index_path)
+            for entry in sorted(self._clients_dir.iterdir()) if self._clients_dir.is_dir() else []:
+                index_path = entry / "client.okf.md"
+                if not index_path.is_file():
+                    continue
+                # A logical name is either an agent or a client: a collision
+                # fails the whole load closed rather than picking one.
+                if entry.name in agents:
+                    raise ValueError(f"experience client '{entry.name}' has the name of an agent")
+                agents[entry.name] = self._load_client(entry.name, index_path)
         except Exception as exc:  # malformed bundle, missing keys, etc.
             self.load_error = f"failed to load OKF bundles from {self._agents_dir}: {exc}"
             logger.error(self.load_error)
@@ -128,6 +149,27 @@ class AgentDeclarationStore:
             classification=str((zuno.get("model") or {}).get("preferred_classification") or ""),
             delegation_targets=targets,
             max_depth=depth if isinstance(depth, int) and not isinstance(depth, bool) and depth >= 1 else 1,
+        )
+
+    def _load_client(self, name: str, index_path: Path) -> AgentDeclaration:
+        """ADR-0592: experience-clients/<name>/client.okf.md. Only the name,
+        the tasks' allowed_tools, the access groups and the classification are
+        read; a client has no delegation and is always active."""
+        frontmatter = _split_frontmatter(index_path)
+        if frontmatter.get("type") != KIND_EXPERIENCE_CLIENT:
+            raise ValueError(f"{index_path}: type must be '{KIND_EXPERIENCE_CLIENT}', got {frontmatter.get('type')!r}")
+        zuno = frontmatter.get("zuno") or {}
+        tasks: Dict[str, List[str]] = {}
+        for task_name in zuno.get("tasks", []):
+            task_frontmatter = _split_frontmatter(index_path.parent / "tasks" / f"{task_name}.md")
+            tasks[task_name] = list((task_frontmatter.get("zuno") or {}).get("allowed_tools", []))
+        return AgentDeclaration(
+            name=name,
+            status="active",
+            tasks=tasks,
+            access_groups=list((zuno.get("access") or {}).get("groups") or []),
+            classification=str(zuno.get("classification") or ""),
+            kind=KIND_EXPERIENCE_CLIENT,
         )
 
     @property

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: openclaw
+description: Per-persona OpenClaw assistants for Zuno (ADR-0589, ADR-0590) - pinned claw-operator, one namespace per persona, egress firewall, oauth2-proxy front door
+type: application
+version: 0.1.0
+appVersion: "0.0.227-commit-f5aa592"

@@ -127,6 +127,9 @@ spec:
 {{- if .Values.okf.fetch.enabled }}
             - name: AGENTS_DIR
               value: /okf/agents
+            # ADR-0592: experience clients from the corp artifact's clients layer.
+            - name: EXPERIENCE_CLIENTS_DIR
+              value: /okf/experience-clients
             - name: TOOL_POLICY_PATH
               value: /okf/policies/tools/tool-policy.yaml
             # ADR-0406: the corp delegation ceiling and the delegated-write flag.

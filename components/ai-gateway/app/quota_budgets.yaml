@@ -52,6 +52,18 @@ classes:
       project:
         budget: 4000
         window: 5m
+  rehearsal:
+    fail_mode: open
+    tokens:
+      user:
+        budget: 2000
+        window: 5m
+      group:
+        budget: 100000
+        window: 5m
+      project:
+        budget: 50000
+        window: 5m
 precedence:
   in_project_context:
   - project

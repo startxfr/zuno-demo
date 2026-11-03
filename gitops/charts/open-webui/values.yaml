@@ -1,0 +1,164 @@
+# ADR-0588 (WP-181). Every value comes from the WP-180 spike
+# (docs/roadmap/evidence/wp-180-open-webui-spike.md). The role
+# (ansible/roles/open_webui) passes global.zuno and egress.clusterCIDRs.
+
+# Read by the upstream subchart's tpl-rendered commonEnvVars; the role sets
+# both from the cluster base domain.
+global:
+  zuno:
+    clusterBaseDomain: apps.mycluster.example.com
+    routeHost: open-webui.apps.mycluster.example.com
+
+route:
+  # Non-streamed completions outlast the router's 30 s default while the
+  # ai-gateway walks its fallback chain (WP-180 L3).
+  timeout: 5m
+
+externalSecrets:
+  refreshInterval: 1h
+  secretStore: vault-backend
+
+egress:
+  # The two gateways' namespace and pod port (WP-179 ingress peers).
+  gatewayNamespace: zuno-ai-run
+  gatewayPort: 8080
+  # Pod and Service networks, excluded from the HTTPS-out rule (the role reads
+  # them from Network.config.openshift.io/cluster).
+  clusterCIDRs:
+    - 10.128.0.0/14
+    - 172.30.0.0/16
+
+open-webui:
+  # Stable object names whatever the release name (the Route targets the Service).
+  fullnameOverride: open-webui
+  ollama:
+    enabled: false
+  pipelines:
+    enabled: false
+  tika:
+    enabled: false
+  # One replica, in-memory websocket manager: no Redis.
+  websocket:
+    enabled: false
+  replicaCount: 1
+  workload:
+    kind: Deployment
+  strategy:
+    type: Recreate
+  image:
+    repository: ghcr.io/open-webui/open-webui
+    # 0.12.5, multi-arch index digest (WP-180).
+    tag: "0.12.5@sha256:03443b8de6b617da9d900edd09b4bf1cb0ddbfdcba6afb42c548336a0b821ded"
+    pullPolicy: IfNotPresent
+  # Security contexts are left to the restricted-v2 SCC (ADR-0588, WP-180 L1).
+  podSecurityContext: {}
+  containerSecurityContext: {}
+  persistence:
+    enabled: true
+    size: 5Gi
+    accessModes: ["ReadWriteOnce"]
+    storageClass: ""  # the cluster default
+  resources:
+    requests:
+      cpu: 200m
+      memory: 1Gi
+    limits:
+      memory: 3Gi
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: http
+    periodSeconds: 10
+    failureThreshold: 6
+  startupProbe:
+    httpGet:
+      path: /health
+      port: http
+    periodSeconds: 10
+    failureThreshold: 60
+  # The one model connection: the ai-gateway, with no key. The user's token is
+  # sent instead (OPENAI_API_CONFIGS auth_type system_oauth). The upstream
+  # default openaiApiKey is a shared key and must stay empty.
+  enableOpenaiApi: true
+  openaiBaseApiUrl: ""
+  openaiBaseApiUrls:
+    - http://ai-gateway.zuno-ai-run.svc:8080/v1
+  openaiApiKey: ""
+  openaiApiKeys: []
+  extraEnvFrom:
+    - secretRef:
+        name: open-webui-app
+    - secretRef:
+        name: open-webui-oidc
+  # tpl-rendered by the upstream chart: .Values.global.zuno is set by the role.
+  commonEnvVars:
+    - name: WEBUI_URL
+      value: 'https://{{ .Values.global.zuno.routeHost }}'
+    - name: HOME
+      value: /app/backend/data/home
+    - name: ENABLE_PERSISTENT_CONFIG
+      value: "False"
+    - name: OFFLINE_MODE
+      value: "True"
+    - name: ENABLE_VERSION_UPDATE_CHECK
+      value: "False"
+    # Inert local account taking user slot 1, so no persona becomes admin by
+    # being first (WP-180 section 6). Password login is off.
+    - name: WEBUI_ADMIN_EMAIL
+      value: open-webui-bootstrap@invalid.zuno
+    - name: ENABLE_SIGNUP
+      value: "False"
+    - name: ENABLE_LOGIN_FORM
+      value: "False"
+    - name: ENABLE_PASSWORD_AUTH
+      value: "False"
+    - name: ENABLE_OAUTH_SIGNUP
+      value: "True"
+    - name: OAUTH_PROVIDER_NAME
+      value: Zuno Keycloak
+    - name: OPENID_PROVIDER_URL
+      value: 'https://keycloak.{{ .Values.global.zuno.clusterBaseDomain }}/realms/zuno/.well-known/openid-configuration'
+    - name: OAUTH_CLIENT_ID
+      value: open-webui
+    - name: OAUTH_SCOPES
+      value: openid email profile
+    - name: ENABLE_OAUTH_ROLE_MANAGEMENT
+      value: "True"
+    - name: OAUTH_ROLES_CLAIM
+      value: groups
+    - name: OAUTH_ALLOWED_ROLES
+      value: "*"
+    - name: OAUTH_ADMIN_ROLES
+      value: /openwebui_admin
+    - name: ENABLE_OAUTH_ID_TOKEN_COOKIE
+      value: "False"
+    # The ai-gateway is the authority on models (WP-180 section 2).
+    - name: BYPASS_MODEL_ACCESS_CONTROL
+      value: "True"
+    - name: OPENAI_API_CONFIGS
+      value: '{"0":{"enable":true,"auth_type":"system_oauth","headers":{"X-Zuno-Data-Classification":"C1","X-Zuno-Agent":"open-webui","X-Zuno-Task":"chat"}}}'
+    # access_grants: a tool connection without grants is admin-only (WP-180);
+    # the mcp-gateway decides what each user sees. C1 like the model connection
+    # (ADR-0592): the chat may go to SaaS models, so only C1 tools are allowed.
+    - name: TOOL_SERVER_CONNECTIONS
+      value: '[{"type":"mcp","url":"http://mcp-gateway.zuno-ai-run.svc:8080/mcp","path":"","auth_type":"system_oauth","key":"","headers":{"X-Zuno-Agent":"open-webui","X-Zuno-Task":"chat","X-Zuno-Data-Classification":"C1"},"config":{"enable":true,"access_grants":[{"principal_type":"user","principal_id":"*","permission":"read"}]},"info":{"id":"zuno-mcp","name":"Zuno tools","description":"Governed tools through the zuno mcp-gateway"}}]'
+    - name: BYPASS_EMBEDDING_AND_RETRIEVAL
+      value: "True"
+    - name: USER_PERMISSIONS_CHAT_FILE_UPLOAD
+      value: "False"
+    - name: USER_PERMISSIONS_CHAT_WEB_UPLOAD
+      value: "False"
+    - name: ENABLE_WEB_SEARCH
+      value: "False"
+    - name: ENABLE_IMAGE_GENERATION
+      value: "False"
+    - name: ENABLE_COMMUNITY_SHARING
+      value: "False"
+    - name: ENABLE_DIRECT_CONNECTIONS
+      value: "False"
+    - name: ENABLE_DIRECT_INTEGRATIONS
+      value: "False"
+    - name: ENABLE_CODE_EXECUTION
+      value: "False"
+    - name: ENABLE_CODE_INTERPRETER
+      value: "False"

@@ -1,6 +1,6 @@
 # ADR-0219: Serve SXA only as a pre-2021 historical RAG corpus
 
-- **Status:** Implemented
+- **Status:** Deprecated
 - **Target:** v0.2
 - **Date:** 2026-08-26
 - **Decision owners:** Zuno Demo architecture team
@@ -186,6 +186,19 @@ cluster. WP-084 carries a one-time operator teardown checklist to be run
 
 See [Standard clauses](README.md#standard-clauses) for Alternatives
 considered, Migration/evolution and Review evidence.
+
+## Update 2026-11-02 (WP-185): the domain is not served today
+
+`knowledge.sxa-legacy` has had no backing store since the old RAG stack was retired (WP-168, 2026-10-24). The `rag-sxa-legacy` database (319,841 rows) was dropped with the other
+RAG databases; the pg_dump kept outside the repository for it was a few KB, so the embedded rows were not preserved. UnifAI's RAG has no source for the domain: [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)
+required a `sql-dump` source type before the old ingestion was retired, and it was not built. No record accepted that loss; it was found on 2026-11-02 and recorded as WP-185.
+
+The agents stopped declaring the domain in the agents release v0.9.0: comage `compare-historical-deals` and cognos `review-historical-commercial-data`, whose only knowledge source it was,
+are removed, and advantage and finage no longer list it. No live bundle names it (see the [evidence](../roadmap/evidence/wp-185-live-bundles.md)). The decision of this record, to serve the closed
+pre-2021 SXA record by retrieval only, is therefore not implemented. On 2026-11-02 the user decided to leave the domain dropped. The decision of this record, to serve the closed pre-2021 SXA record by retrieval only, is withdrawn with no
+successor record, and the status is Deprecated. The descriptor `knowledge/sxa-legacy/domain.yaml` and the `sxa-legacy` classification entry were removed on 2026-11-03, once agents release v0.9.2 had dropped the last references to the domain from the corp policies and agent notes (WP-185).
+The source dump (`sxa.schema.sql`, `sxa.data.sql` in `zuno-demo-sources/sxa-dump/`) is kept and was not re-checked. The domain is reopened if a demo scenario needs the historical record; the cheapest
+route is then a conversion Job to uploaded documents (WP-185), the `sql-dump` source type of the fork being the costlier one.
 
 ## Related ADRs
 

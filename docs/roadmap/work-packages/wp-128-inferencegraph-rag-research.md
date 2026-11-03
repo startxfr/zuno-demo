@@ -115,3 +115,20 @@ a follow-up ADR is needed only if a reranker is adopted later.
 
 Any InferenceGraph use for agent-runtime's own draft/reflect/guardrails chaining (ADR-0545
 decision 3 explicitly keeps that in agent-runtime). Actual reranker deployment, if recommended.
+
+## Note (2026-10-31): a reranker measured on the UnifAI RAG, and not adopted
+
+The question "do we want a reranker" was tested on the UnifAI RAG server (operator spec `rag.reranker`),
+with the 24-question ranking set in `evaluations/redhat-docs/ranking.yaml` (WP-164 lot 4, layer 4c).
+The baseline is DBSF fusion alone: hit@1 0.71, hit@5 0.86, MRR 0.77.
+
+| Reranker (TEI on CPU) | Candidates | Time per query | hit@1 / hit@5 / MRR |
+|---|---|---|---|
+| `BAAI/bge-reranker-base` | 30 | ~27 s; timed out every query | n/a |
+| `cross-encoder/ms-marco-MiniLM-L-6-v2` | 10 | ~1.5 s | 0.62 / 0.86 / 0.70 |
+| `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` | 10 | ~3 s | 0.67 / 0.86 / 0.75 |
+
+None matched DBSF alone. Neither score separated the no-answer questions from the answered ones well
+enough to set a relevance threshold. The reranker was removed (zuno-demo-a0, `d86cf442`). The DBSF
+confirmation afterwards gave 0.71 / 0.86 / 0.77 again. Reports are in `evaluations/redhat-docs/results/`.
+A GPU reranker was not tried because the GPU quota is full.
