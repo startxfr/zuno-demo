@@ -54,7 +54,8 @@ The script runs end to end on demo333 and the evidence shows, from raw Prometheu
 persona, a guardrail hit and a 429 in each experience. Reworded on 2026-11-03 after the rehearsal (user decision): the
 per-user budget is shared by Open WebUI and UnifAI (they call with the persona's own token), the group budget by the three
 experiences, and OpenClaw has its own per-user counter (it calls as a service account, ADR-0589); a 429 is shown in Open
-WebUI, UnifAI and OpenClaw.
+WebUI, UnifAI and OpenClaw. *Superseded on 2026-11-03 by WP-190 (ADR-0593): the counter is keyed by persona, so the budget is
+one for the three experiences, proved live.*
 
 - Shared-quota rehearsal of 2026-11-03 (GPU models back; sale-01 and `service-account-openclaw-sale-01` in the group
   `zuno-quota-rehearsal`, `QUOTA_REHEARSAL_GROUP` set live, class `stresstest`, 2,000 tokens per user per 5 minutes; reverted

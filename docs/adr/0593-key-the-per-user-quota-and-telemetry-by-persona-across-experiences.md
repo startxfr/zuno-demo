@@ -1,6 +1,6 @@
 # ADR-0593: Key the per-user quota and telemetry by persona across experiences
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-03, WP-190 phase 1: persona claim live, build 36, one budget proved across the three experiences)
 - **Target:** v0.13
 - **Date:** 2026-11-03
 - **Decision owners:** Zuno Demo architecture team

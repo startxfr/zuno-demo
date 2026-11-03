@@ -64,11 +64,11 @@ flowchart LR
    (`injection-ignore-instructions`, `injection-persona-override`; a fake card number works too). The guardrails run in
    `observe` mode (user decision 2026-11-02): recorded, the reply is not blocked - say so.
 8. **One identity, one budget.** Row *Same user, one budget*: the per-user token budget lives in the ai-gateway's token
-   ledger (durable in Redis), and its counter is keyed by the token's `sub` and the quota class, never by client. Open WebUI
-   and UnifAI call with sale-01's own token, so they spend the same sale-01 budget. OpenClaw calls as the persona's assistant
-   (a service account with sale-01's groups, ADR-0589), so it has its own per-user counter; what it shares with sale-01 is the
-   group budget, which counts by group. The per-user ceiling is enforced by this ledger, not by MaaS: Kuadrant counts only the
-   per-subscription budgets (ADR-0570, WP-177).
+   ledger (durable in Redis), and its counter is keyed by the persona and the quota class, never by client (ADR-0593).
+   Open WebUI and UnifAI call with sale-01's own token and OpenClaw calls as the persona's assistant (a service account whose
+   tokens carry a signed `persona` claim), so the three spend one sale-01 budget: spent in one, refused in the others. The
+   per-user ceiling is enforced by this ledger, not by MaaS: Kuadrant counts only the per-subscription budgets (ADR-0570,
+   WP-177).
 
 ## If something goes wrong
 
@@ -77,12 +77,13 @@ flowchart LR
 - No series for an experience on the dashboard: the export and scrape take about a minute; widen the time range.
 - OpenClaw shows an old error: its assistant may still be starting (`oc get claw -A`).
 
-## Shown live once (2026-11-03 rehearsal)
+## Shown live (2026-11-03 rehearsal)
 
-With the persona put under a tight quota class, a user budget spent in Open WebUI ended in a 429 in UnifAI (the chat shows
-"Rate limit reached - quota_exceeded - You can retry in 50s"): both call with sale-01's own token. OpenClaw also got its 429, on
-its own counter. The 429 body is the same everywhere: `{"error":"quota_exceeded","quota_class":"stresstest","dimension":"user",
-"budget_tokens":2000,"window":"5m"}`. The rehearsal ran with the GPU models back; with them down, the `stresstest` class
-(`fail_mode: closed`) skips every SaaS candidate and the call ends in a 502 before any token is counted (2026-11-02). The
-fail-open `rehearsal` class (agents release 0.9.1, `QUOTA_REHEARSAL_GROUP`, `QUOTA_REHEARSAL_CLASS`) exists for that case. The
-run is not part of this script: it needs a group for the persona, an ai-gateway setting and a revert, and a 5-minute window.
+With the persona put under the tight `stresstest` class (2,000 tokens per user per 5 minutes), sale-01's OpenClaw assistant
+spent the budget in one turn (2,124 tokens); then Open WebUI, UnifAI (the card "Rate limit reached - quota_exceeded") and
+OpenClaw itself were refused with the same body: `{"error":"quota_exceeded","quota_class":"stresstest","dimension":"user",
+"budget_tokens":2000,"window":"5m"}`. One budget per persona across the three. The rehearsal needs the GPU models: with them
+down, `stresstest` (`fail_mode: closed`) skips every SaaS candidate and the call ends in a 502 before any token is counted
+(2026-11-02); the fail-open `rehearsal` class (agents release 0.9.1) exists for that case. The run is not part of this script:
+it needs a group holding the persona and its OpenClaw service account, an ai-gateway setting, a revert and a 5-minute window.
+Concurrent calls all pass the check before any consumption is counted, so a budget is spent with one large turn, not a burst.

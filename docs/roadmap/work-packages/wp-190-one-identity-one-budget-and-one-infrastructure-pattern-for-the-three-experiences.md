@@ -1,6 +1,6 @@
 # WP-190: One identity, one budget and one infrastructure pattern for the three experiences
 
-- **State:** Not started (ADR and brief 2026-11-03)
+- **State:** In progress (phases 0 to 3 done 2026-11-03, phase 4 open)
 - **ADRs:** [ADR-0593](../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md)
 - **Depends on:** [WP-184](wp-184-three-experiences-demonstration.md), [WP-183](wp-183-install-openclaw-on-demo333.md), [WP-181](wp-181-install-open-webui-on-demo333.md)
 - **Related:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-177](wp-177-finish-the-maas-quota-delegation.md)
@@ -17,7 +17,7 @@
 ## Steps
 
 1. **Phase 0, documents.** ADR-0593, this brief, index, roadmap, versions; `check_docs.py` green.
-2. **Phase 1, identity and quota per persona (first).**
+2. **Phase 1, identity and quota per persona (done 2026-11-03, [evidence](../evidence/wp-190-persona-quota-proof.md); the OpenClaw own-token spike is a no-go, [note](../evidence/wp-190-openclaw-user-token-spike.md)).**
    - *Keycloak (this track):* a hardcoded-claim mapper `persona=<id>` in the `protocolMappers` of `openclaw-consultant-02`
      and `openclaw-sale-01` in `gitops/charts/keycloak/files/realm-zuno.json`; the client-reconcile Job applies it on the
      next sync (it re-applies each client with `kcadm update -m`). Check live that the token carries the claim.
