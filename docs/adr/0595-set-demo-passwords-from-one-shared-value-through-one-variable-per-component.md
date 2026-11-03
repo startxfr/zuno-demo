@@ -4,7 +4,7 @@
 - **Target:** v0.13
 - **Date:** 2026-11-03
 - **Decision owners:** Zuno Demo architecture team
-- **Related:** [ADR-0349](0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) (amended in part: section 3, the persona password), [ADR-0345](0345-make-self-generated-vault-credentials-idempotent.md) (seed-only-missing stays), [ADR-0529](0529-stop-pgo-and-eso-writing-the-same-pguser-secret.md) (database rotation stays out of scope), [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md), [ADR-0025](0025-keep-sensitive-and-real-commercial-data-outside-the-public-repository.md)
+- **Related:** [ADR-0349](0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) (amended in part: section 3, the persona password), [ADR-0345](0345-make-self-generated-vault-credentials-idempotent.md) (seed-only-missing stays), [ADR-0529](0529-stop-the-pgo-external-secrets-write-loop-on-pguser-secrets.md) (database rotation stays out of scope), [ADR-0041](0041-remove-nominative-demo-identities-and-static-passwords-from-git.md), [ADR-0025](0025-keep-sensitive-and-real-commercial-data-outside-the-public-repository.md)
 
 ## Context
 
