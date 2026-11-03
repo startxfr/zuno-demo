@@ -52,6 +52,9 @@ from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_ca
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ai_gateway")
 
+# WP-193: the display name of the `auto` model in GET /v1/models.
+AUTO_MODEL_NAME = os.getenv("AUTO_MODEL_NAME", "Zuno")
+
 init_telemetry("ai-gateway")  # ADR-0029: traces/metrics to the shared OTel Collector
 
 app = FastAPI(
@@ -580,7 +583,14 @@ async def list_models(
     providers eligible for the caller's classification (same eligibility
     filter as chat completions, `candidates_for`), plus the `auto` alias
     clients send (routing is classification-driven, never model-name-driven).
-    Cheap (in-memory table) and short-cacheable."""
+    Cheap (in-memory table) and short-cacheable.
+
+    WP-193: an experience client (Open WebUI, OpenClaw: the same list as
+    MARKER_FAIL_CLOSED_CLIENTS) gets `auto` alone. Its menu would otherwise
+    offer models that routing ignores; the gateway keeps the choice."""
+    response.headers["Cache-Control"] = "private, max-age=30"
+    if tool_markers.is_fail_closed_client(identity.client or ""):
+        return ModelList(data=[ModelObject(id="auto", name=AUTO_MODEL_NAME)])
     classification = x_zuno_data_classification.upper()
     try:
         candidates = routing_table.candidates_for(
@@ -593,8 +603,7 @@ async def list_models(
         model_id = routing_table.provider_config(candidate.name).get("model", candidate.name)
         if model_id not in ids:
             ids.append(model_id)
-    response.headers["Cache-Control"] = "private, max-age=30"
-    return ModelList(data=[ModelObject(id=i) for i in ids])
+    return ModelList(data=[ModelObject(id=i, name=AUTO_MODEL_NAME if i == "auto" else None) for i in ids])
 
 
 @app.get("/v1/routing-decisions/{request_id}")
