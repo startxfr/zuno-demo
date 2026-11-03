@@ -243,6 +243,10 @@ spec:
   web:
     {{- toYaml .web | nindent 4 }}
   syncInterval: {{ $.Values.redhatDocs.syncInterval }}
+  {{- if $.Values.redhatDocs.suspend }}
+  # Scheduled syncs stopped (spec.suspend); see redhatDocs.suspend in values.yaml.
+  suspend: true
+  {{- end }}
 ---
 {{- end }}
 {{- end }}
