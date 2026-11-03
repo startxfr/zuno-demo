@@ -23,8 +23,8 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | Version | ADRs | Open ADRs | WPs | Open WPs |
 |---|---|---|---|---|
 | v0 | 72 | — | 8 | WP-187 |
-| v0.1 | 29 | 1 | 19 | WP-186 |
-| v0.2 | 14 | — | 19 | WP-098, WP-186 |
+| v0.1 | 29 | 1 | 19 | — |
+| v0.2 | 14 | — | 19 | WP-098 |
 | v0.3 | 15 | — | 19 | — |
 | v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
 | v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-186, WP-187 |
+| v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-187 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 7 | 1 | 9 | WP-190 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -994,7 +994,7 @@ the old stack. The comparison found three behaviours that the retirement dropped
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Done (2026-11-02) | cleanup live in agents v0.9.0, ADR-0219 Deprecated, domain left dropped by decision; descriptor removed with agents v0.9.2; leftover: live comage question when the GPU nodes return |
-| WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Repo work merged | records corrected and ten French questions added; the French run (and the 0.7 decision) waits on the embedding model |
+| WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Done (2026-11-03) | records corrected; French run hit@1 0.80 (10 questions), accepted as is, no stemmer follow-up |
 | WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | operator pending | steps 1 and 2 done and proved (the label is not the leak; five Confluence-reading tasks are local only since agents v0.8.1); next: the source classification field (operator 0.1.50 plus a rag image), waiting for the user's go |
 
 ### OKF stream phases

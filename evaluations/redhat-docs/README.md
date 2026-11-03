@@ -30,7 +30,11 @@ member of `agent_tekos`. See the file header for the matching rule.
 Run them on their own, with a copy of the file that keeps only the entries whose `lang` is `fr`, so that the 24-question figures below stay comparable. The rule
 agreed for WP-186: a French hit@1 of at least 0.7 means French retrieval is accepted as it is (and ADR-0568 states that the bilingual handling is English and French stop words
 plus accent folding, with no language boost); below 0.7 opens a follow-up for a French suffix stemmer in the fork (sparse encoder version 3, full re-index) with this figure as its
-baseline. The measurement needs the embedding model, which was down on 2026-11-02 (GPU nodes `NotReady`).
+baseline.
+
+Run on 2026-11-03 (`results/ranking-fr-2026-11-03.json`, the 24 English and the 10 French entries in one run, top_k 10): French **hit@1 0.80** (8 of 10), hit@5 0.90, MRR 0.85,
+so French retrieval is accepted as it is. The one miss is 26 (the internal registry exposed outside the cluster), which lands on the images book instead of the registry book;
+28 ranks 2 (etcd backup lands on the updating book first), and 33 ranks 1 where its English twin ranks 2. The 24-question figures are unchanged by the run (0.71 / 0.86 / 0.77).
 
 Results are kept in `results/`, one JSON report per run (per-question rank, top score and top URL).
 `ranking-before-2026-10-31.json` is the baseline before UnifAI operator 0.1.44: hit@1 0.52, hit@5

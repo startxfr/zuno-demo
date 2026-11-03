@@ -22,7 +22,7 @@ Industrialization: HA shared services, resumable workflows, automated
 ingestion and evaluation, stronger signing, source freshness, ACL
 synchronization and SecNumCloud-oriented hardening.
 
-**29 ADRs, 28 closed.** Open: ADR-0110 (partially implemented, see WP-186); WP-186.
+**29 ADRs, 28 closed.** Open: ADR-0110 (partially implemented).
 
 ## v0.2
 
@@ -32,7 +32,7 @@ standardized enterprise tool authentication, project-scoped agent memory. Also
 carries ADR-0354, which installs Ansible Automation Platform as a Day 1
 component (`aap`) plus an `aap-config` companion.
 
-**14 ADRs, all closed.** Open: WP-098, WP-186.
+**14 ADRs, all closed.** Open: WP-098.
 
 ## v0.3
 
