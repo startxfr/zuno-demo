@@ -35,9 +35,14 @@
      `client` values.
    - *Spike:* OpenClaw with the person's own token for the interactive session (oauth2-proxy forward and refresh): note and
      go/no-go, no commitment.
-3. **Phase 2, observability and logs.** Same pattern for the three: a per-experience ServiceMonitor or a recorded decision
-   for Open WebUI and OpenClaw (none today), log forwarding labels, a health row in the Three experiences dashboards
-   (Grafana and Perses), modelled on UnifAI's OTel wiring (ADR-0566).
+3. **Phase 2, observability and logs (done 2026-11-03).** The `client` label of the ai-gateway is the common vantage
+   point for the three, so the work is on the Three experiences dashboards (Grafana and Perses): a row *Same health, three
+   experiences* with the model-call error rate and the p95 latency by client, from `zuno_model_calls_total` (outcome
+   `error`) and `zuno_model_call_duration_ms_milliseconds_bucket`. Decisions: no OpenTelemetry export and no ServiceMonitor
+   for Open WebUI and OpenClaw (they expose no metrics of their own, and OTel would open their closed egress to
+   `zuno-monitoring`; UnifAI keeps its operator ServiceMonitor and its OTel wiring, ADR-0566); log collection is not
+   codified in this repository (no ClusterLogForwarder or LokiStack), a platform gap outside this WP; a quota refusal is not
+   a model call, so no dashboard counts the 429s (an ai-gateway metric for them would be a separate change).
 4. **Phase 3, mesh, network, automation, RHOAI.** Decide and record: UnifAI under the label-based ingress grant or kept a
    platform client; an EgressFirewall for `zuno-unifai` or the reason not to; the mesh stays outside for all three unless
    an audit says otherwise; the same Day 2 node shape in the AAP workflows and the `-d0`/`-d1` split for Open WebUI; backup
