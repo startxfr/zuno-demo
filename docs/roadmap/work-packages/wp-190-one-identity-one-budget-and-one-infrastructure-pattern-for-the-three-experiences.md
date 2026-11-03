@@ -43,6 +43,10 @@
    `zuno-monitoring`; UnifAI keeps its operator ServiceMonitor and its OTel wiring, ADR-0566); log collection is not
    codified in this repository (no ClusterLogForwarder or LokiStack), a platform gap outside this WP; a quota refusal is not
    a model call, so no dashboard counts the 429s (an ai-gateway metric for them would be a separate change).
+   The latency panel needed finer buckets: the SDK default histogram ends at 10 s, so every client read a flat 10,000 ms and 22 %
+   of UnifAI calls fell in `+Inf`. The ai-gateway build 37 (commit `5d771977`, `tests/test_duration_buckets.py`) adds buckets up to
+   300,000 ms; on build-37 series the UnifAI p95 reads 17,250 ms. A panel range that still holds the old series mixes the two bucket
+   sets until they age out (read it about an hour after the roll).
 4. **Phase 3, mesh, network, automation, RHOAI (done 2026-11-03, decisions recorded).**
    - *Gateway admission:* UnifAI stays a platform client. The ai-gateway and mcp-gateway admit it by namespace name AND the pod
      label `app.kubernetes.io/name: multiagent` (an intersection), while Open WebUI and OpenClaw come in by the namespace label
