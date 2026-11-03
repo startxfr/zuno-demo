@@ -337,10 +337,42 @@ def arkos_can_read_aap_platform_status() -> CheckResult:
 # ADR-0032/0033/0040 proven through UnifAI's session API, built from the shared factories in
 # evaluations/common/unifai_checks.py. The checks above reach shared services (MCP gateway,
 # ai-gateway, MCP servers) directly.
+def _gateway_saw_the_callers_own_token(run_id: str) -> bool:
+    """The orchestrator delegates to a worker, so the tool is never in its stream (WP-174). The mcp-gateway
+    records a `tool_invoke` span per call with the `zuno.run_id` of the run, the `zuno.user_sub` of the
+    token it served and its `zuno.outcome`; these spans are not always in the workflow's own trace, so they
+    are searched by run id. Proof = an allowed call served for the persona's own subject. Needs TEMPO_URL."""
+    import base64
+    import json as _json
+    import time as _time
+
+    tempo = os.getenv("TEMPO_URL", "").rstrip("/")
+    if not tempo:
+        raise RuntimeError("TEMPO_URL unset")
+    token = auth_headers("consultant-01")["Authorization"].split(" ", 1)[1]
+    payload = token.split(".")[1]
+    sub = _json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))["sub"]
+    query = (f'{{ name="tool_invoke" && span.zuno.run_id="{run_id}" && span.zuno.outcome="allowed" '
+             f'&& span.zuno.user_sub="{sub}" }}')
+    deadline = _time.monotonic() + 30
+    while True:
+        now = int(_time.time())
+        resp = httpx.get(f"{tempo}/api/search", params={"q": query, "limit": 1, "start": now - 3600, "end": now + 60},
+                         timeout=20)
+        if resp.status_code != 200:
+            raise RuntimeError(f"tempo search failed: {resp.status_code}")
+        if resp.json().get("traces"):
+            return True
+        if _time.monotonic() >= deadline:
+            return False
+        _time.sleep(3)
+
+
 unifai_forwards_identity_to_the_gateways = unifai_checks.identity_forwarded(
     CheckResult, _unifai, "consultant-01", "Draft a Design & Architecture Testimonial for the Satellite scheduling project S0R42, using the Confluence documentation.",
         # Any call through the MCP gateway proves the caller's token reached it; the model may read a page or list a repository.
-        ("confluence.page.search", "confluence.page.read", "git.repository.list")
+        ("confluence.page.search", "confluence.page.read", "git.repository.list"),
+    trace_proof=_gateway_saw_the_callers_own_token,
 )
 unifai_ignores_a_client_supplied_identity_header = unifai_checks.client_identity_header_refused(CheckResult, _unifai)
 business_role_without_entitlement_denied_by_unifai = unifai_checks.entitlement_denied(

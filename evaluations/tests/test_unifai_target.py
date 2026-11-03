@@ -648,3 +648,54 @@ def test_a2a_calls_counts_only_the_a2a_client_send_message_spans():
     ]
     assert ut.a2a_calls(spans) == 2
     assert ut.a2a_calls([]) == 0
+
+
+def _identity_check_with_proof(turn, proof):
+    import unifai_checks
+    from dataclasses import dataclass
+
+    @dataclass
+    class CheckResult:
+        name: str
+        passed: bool
+        detail: str = ""
+        skipped: bool = False
+
+    class Target:
+        def collect(self, persona, prompt, deadline_seconds, stop_on):
+            return turn
+
+    return unifai_checks.identity_forwarded(
+        CheckResult, lambda: Target(), "p", "ask", ("confluence.page.read",), trace_proof=proof
+    )()
+
+
+def test_identity_check_accepts_a_trace_proof_when_the_orchestrator_delegates():
+    turn = {"tools": ["iem.delegate_task"], "reply": "an answer", "stopped": False, "session_id": "run-1"}
+    seen = []
+    r = _identity_check_with_proof(turn, lambda run_id: seen.append(run_id) or True)
+    assert r.passed and seen == ["run-1"] and "token_reached_gateway_in_trace=True" in r.detail
+
+
+def test_identity_check_still_fails_when_the_trace_does_not_show_the_token():
+    turn = {"tools": ["iem.delegate_task"], "reply": "an answer", "stopped": False, "session_id": "run-1"}
+    assert not _identity_check_with_proof(turn, lambda run_id: False).passed
+
+
+def test_identity_check_reports_a_trace_backend_error_and_fails():
+    turn = {"tools": [], "reply": "an answer", "stopped": False, "session_id": "run-1"}
+
+    def boom(run_id):
+        raise RuntimeError("TEMPO_URL unset")
+
+    r = _identity_check_with_proof(turn, boom)
+    assert not r.passed and "trace_proof_error=TEMPO_URL unset" in r.detail
+
+
+def test_identity_check_does_not_ask_the_trace_when_the_stream_already_shows_the_tool():
+    turn = {"tools": ["confluence.page.read"], "reply": "an answer", "stopped": False, "session_id": "run-1"}
+
+    def never(run_id):
+        raise AssertionError("not needed")
+
+    assert _identity_check_with_proof(turn, never).passed

@@ -41,6 +41,7 @@ def identity_forwarded(
     expect_tools: Sequence[str],
     timeout: float = 150,
     attempts: int = 1,
+    trace_proof: Optional[Callable[[str], bool]] = None,
 ) -> Callable[[], Any]:
     """ADR-0032 on UnifAI: the signed-in person's own token must reach the tool gateway. The MCP
     gateway only serves a validated Keycloak JWT, so a tool call that returns a reply is direct
@@ -49,7 +50,12 @@ def identity_forwarded(
     The agent decides whether to call a tool, so a model that answers from its own knowledge
     proves nothing either way. `attempts` (default 1) allows that many turns; the check passes on
     the first turn that reaches an expected tool and FAILS when none does, and the detail line
-    names every turn so a pass on a later attempt is never hidden."""
+    names every turn so a pass on a later attempt is never hidden.
+
+    An orchestrator that delegates (WP-174) calls no gateway tool itself: its worker does, so the
+    stream never shows the tool. `trace_proof(run_id)` then decides from the run's trace whether the
+    caller's own token reached the gateway (it returns True, or False/raises when it cannot show it);
+    it is only asked when the stream did not already show an expected tool."""
     name = "unifai_forwards_identity_to_the_gateways"
 
     def check() -> Any:
@@ -58,6 +64,15 @@ def identity_forwarded(
             run_ = unifai().collect(persona, prompt, deadline_seconds=timeout, stop_on=tuple(expect_tools))
             ok = _reaches(run_["tools"], expect_tools) and (bool(run_["reply"]) or run_["stopped"])
             seen.append(f"tool_calls={run_['tools']} reply_len={len(run_['reply'])}")
+            if not ok and trace_proof is not None and run_.get("session_id") and (run_["reply"] or run_["stopped"]):
+                try:
+                    proven = bool(trace_proof(run_["session_id"]))
+                except Exception as exc:  # noqa: BLE001 - an unreachable trace backend proves nothing
+                    proven = False
+                    seen[-1] += f" trace_proof_error={str(exc)[:80]}"
+                if proven:
+                    ok = True
+                    seen[-1] += " token_reached_gateway_in_trace=True"
             if ok:
                 break
         if attempts <= 1:
