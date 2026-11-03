@@ -32,9 +32,19 @@ UNIFAI_RAG_TAG = os.getenv("UNIFAI_RAG_TAG", "knowledge.tech")
 SOURCE_TYPES = [t for t in os.getenv("UNIFAI_RAG_SOURCE_TYPES", "CONFLUENCE,WEB").split(",") if t]
 RAG_QUERY_TIMEOUT_SECONDS = float(os.getenv("RAG_QUERY_TIMEOUT_SECONDS", "15"))
 
-# The `technical-docs` classification (policies/data-classification/
-# classification.yaml), the value the retired rag-service reported for this domain.
-_CLASSIFICATION = "C1"
+# WP-187 (ADR-0568): each chunk carries its source's classification in its
+# metadata (UnifaiRAGSource spec.classification, UnifAI operator 0.1.50). A
+# chunk without one, or with a value outside the four levels, is returned as C2: fail
+# closed, user decision 2026-11-02. The label is for audit and for callers that
+# raise their own level; the external-model block is the routing policy's
+# local_only_for, not this field.
+_CLASSIFICATIONS = tuple(f"C{level}" for level in range(1, 5))
+_CLASSIFICATION_WHEN_MISSING = "C2"
+
+
+def _classification(metadata: Dict[str, Any]) -> str:
+    value = str(metadata.get("classification") or "").strip().upper()
+    return value if value in _CLASSIFICATIONS else _CLASSIFICATION_WHEN_MISSING
 
 
 def _from_unifai(match: Dict[str, Any]) -> Dict[str, Any]:
@@ -47,7 +57,7 @@ def _from_unifai(match: Dict[str, Any]) -> Dict[str, Any]:
         "title": metadata.get("title") or "",
         "snippet": match.get("content") or "",
         "score": float(match.get("score") or 0.0),
-        "classification": _CLASSIFICATION,
+        "classification": _classification(metadata),
     }
 
 
