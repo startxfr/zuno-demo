@@ -506,3 +506,46 @@ class UnifaiTarget:
                 failed += 1
         self._sessions.clear()
         return deleted, failed
+
+
+def tempo_gateway_tool_invoked(
+    run_id: str,
+    tempo_url: str,
+    tools: Optional[List[str]] = None,
+    *,
+    user_sub: str = "",
+    wait_seconds: float = 30,
+    client: Optional[httpx.Client] = None,
+) -> bool:
+    """True when the mcp-gateway served an allowed `tool_invoke` for run `run_id`, optionally for one of
+    `tools` (capability names) and for the token of `user_sub`.
+
+    An orchestrator that delegates (WP-174) calls no gateway tool itself, its worker does, so the tool is
+    never in the chat stream. The mcp-gateway records every call with the run id (`zuno.run_id`), the
+    capability (`zuno.tool`), the token's subject (`zuno.user_sub`) and the outcome (`zuno.outcome`); these
+    spans are not always in the workflow's own trace, so they are searched by run id. Raises `UnifaiError`
+    when Tempo cannot be reached."""
+    http = client or httpx.Client(timeout=20)
+    conds = ['name="tool_invoke"', f'span.zuno.run_id="{run_id}"', 'span.zuno.outcome="allowed"']
+    if user_sub:
+        conds.append(f'span.zuno.user_sub="{user_sub}"')
+    if tools:
+        conds.append("(" + " || ".join(f'span.zuno.tool="{t}"' for t in tools) + ")")
+    query = "{ " + " && ".join(conds) + " }"
+    deadline = time.monotonic() + wait_seconds
+    try:
+        while True:
+            now = int(time.time())
+            found = http.get(
+                f"{tempo_url.rstrip('/')}/api/search",
+                params={"q": query, "limit": 1, "start": now - 3600, "end": now + 60},
+            )
+            if found.status_code != 200:
+                raise UnifaiError(f"tempo search failed: {found.status_code}")
+            if found.json().get("traces"):
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(3)
+    except httpx.HTTPError as exc:
+        raise UnifaiError(f"tempo unreachable: {exc}") from exc

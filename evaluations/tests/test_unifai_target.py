@@ -699,3 +699,43 @@ def test_identity_check_does_not_ask_the_trace_when_the_stream_already_shows_the
         raise AssertionError("not needed")
 
     assert _identity_check_with_proof(turn, never).passed
+
+
+def test_gateway_tool_invoked_builds_the_query_and_reads_the_result():
+    from unittest import mock
+
+    import unifai_target
+
+    seen = {}
+
+    class Client:
+        def get(self, url, params=None):
+            seen["q"] = params["q"]
+            return mock.Mock(status_code=200, json=lambda: {"traces": [{"traceID": "t"}]})
+
+    assert unifai_target.tempo_gateway_tool_invoked(
+        "run-1", "http://tempo", ["confluence.page.search"], user_sub="sub-1", client=Client()
+    )
+    q = seen["q"]
+    assert 'span.zuno.run_id="run-1"' in q and 'span.zuno.outcome="allowed"' in q
+    assert 'span.zuno.user_sub="sub-1"' in q and 'span.zuno.tool="confluence.page.search"' in q
+
+
+def test_gateway_tool_invoked_is_false_when_nothing_is_found_and_raises_when_tempo_fails():
+    from unittest import mock
+
+    import pytest
+    import unifai_target
+
+    class Empty:
+        def get(self, url, params=None):
+            return mock.Mock(status_code=200, json=lambda: {"traces": []})
+
+    assert not unifai_target.tempo_gateway_tool_invoked("r", "http://tempo", wait_seconds=0, client=Empty())
+
+    class Broken:
+        def get(self, url, params=None):
+            return mock.Mock(status_code=500)
+
+    with pytest.raises(unifai_target.UnifaiError):
+        unifai_target.tempo_gateway_tool_invoked("r", "http://tempo", wait_seconds=0, client=Broken())

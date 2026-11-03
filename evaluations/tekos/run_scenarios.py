@@ -497,7 +497,28 @@ def u_chat_triggers_tool(s: Dict[str, Any]) -> ScenarioResult:
     if not ok and any("retriever" in w for w in want):
         ok, why = _unifai_retrieval_in_trace(run_, "CONFLUENCE")
         detail += f" {why}"
+    if not ok:
+        ok, why = _unifai_gateway_call_in_trace(run_, want)
+        detail += f" {why}"
     return ScenarioResult(s["id"], s["title"], ok, detail)
+
+
+def _unifai_gateway_call_in_trace(run_: Dict[str, Any], tools: Any) -> tuple:
+    """(proven, detail): the mcp-gateway served an allowed call to one of `tools` for this run. An
+    orchestrator that delegates has its worker call the tool, so the chat stream does not show it
+    (WP-174). Without `TEMPO_URL` or a session id nothing is proven."""
+    tempo = os.getenv("TEMPO_URL", "").strip()
+    run_id = run_.get("session_id", "")
+    if not tempo or not run_id:
+        return False, "gateway_trace=unchecked"
+    from unifai_target import tempo_gateway_tool_invoked
+
+    capabilities = [t for t in tools if "." in t and "retriever" not in t]
+    try:
+        seen = tempo_gateway_tool_invoked(run_id, tempo, capabilities)
+    except Exception as exc:  # noqa: BLE001 - an unreachable trace backend proves nothing
+        return False, f"gateway_trace=error {str(exc)[:80]}"
+    return seen, f"gateway_trace={'allowed call seen' if seen else 'no allowed call'}"
 
 
 def _unifai_retrieval_in_trace(run_: Dict[str, Any], source_type: str) -> tuple:
