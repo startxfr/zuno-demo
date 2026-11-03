@@ -1,6 +1,6 @@
 # WP-192: One demo password, one variable per component, and named Keycloak administrators
 
-- **State:** Repo work in review (2026-11-03: phase 1, the variable scheme, is pushed; phase 2 Keycloak accounts and phase 3 live rollout follow)
+- **State:** Repo work in review (2026-11-03: phase 1, the variable scheme, is pushed; phase 2 Keycloak accounts in the repo; phase 3 live rollout follows)
 - **ADRs:** [ADR-0595](../../adr/0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md)
 - **Depends on:** none
 - **Related:** [ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) (section 3 amended), [WP-190](wp-190-one-identity-one-budget-and-one-infrastructure-pattern-for-the-three-experiences.md) (the Keycloak plumbing it declared once)
@@ -25,8 +25,9 @@ One shared password reaches every admin, persona family and database through its
    and `auto.yml`; `confidential.example.yml` documented; `platform/vault/tests/test_password_scheme.py` renders it with ansible.
 2. **Keycloak accounts (phase 2).** New Vault paths `keycloak/console` and `keycloak/automation`, their ExternalSecrets, the
    client-reconcile Job ensures the two master users (login as `zuno-automation`, else the bootstrap account), the other Job and
-   both roles switch to `keycloak-automation`; persona families read their own keys, new paths `keycloak/demo-personas-eval`
-   and `-stress`.
+   both roles switch to `keycloak-automation` (shared task `ansible/tasks/read_keycloak_automation_credentials.yml`, bootstrap
+   admin as fallback); the OpenClaw Control UI password reads its own variable. The `eval-*`/`stress-*` twins keep sharing
+   `demo-personas-password` (five consumers); splitting them is a follow-up.
 3. **Live on demo333 (phase 3).** Each cluster action with the user's go: seed the new paths, wait for the Secrets, check the
    Jobs and roles as `zuno-automation`, sign in as `zuno-admin`, disable the bootstrap `admin`, re-seed the personas path.
    Databases are not rotated live (ADR-0529).

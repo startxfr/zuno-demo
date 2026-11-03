@@ -27,7 +27,8 @@ another value later without a refactoring.
 2. **One variable per component, inheriting.** `ansible/inventories/demo/group_vars/all/passwords.yml` defines a variable for
    every Vault-seeded password in scope (Keycloak bootstrap, console and automation accounts; AAP; the PostgreSQL roles;
    MariaDB; Redis; the MLOps and Trillian databases) as `{{ zuno_admin_password | default(<generated>, true) }}`, and one per
-   demo-persona family (humans, `eval-*`, `stress-*`, OpenClaw UI) as `{{ zuno_personas_password | default(<generated>, true) }}`.
+   demo-persona family (the humans, who also cover the `eval-*` and `stress-*` twins, and the OpenClaw Control UI) as
+   `{{ zuno_personas_password | default(<generated>, true) }}`.
    A component is changed by setting its own variable in `confidential.yml`; nothing else moves.
 3. **A generated fallback, never a literal.** With no shared value (or an empty one) the default is the first 22 hexadecimal
    characters of `md5("<org>:<env>:<extra>:<component>")`. It is the same on every run, so a play never disagrees with the
@@ -39,8 +40,10 @@ another value later without a refactoring.
    `zuno-admin` (humans, console) and `zuno-automation` (every Job and role, via the Secret `keycloak-automation`). The
    bootstrap `admin` stays only as the first-run fallback and is disabled, not deleted, once the Jobs run as `zuno-automation`.
 6. **Seeding is unchanged.** Vault paths are still seeded only when missing (ADR-0345). A new value reaches a seeded cluster
-   after its path is deleted and re-seeded; a database also needs the ADR-0529 runbook. Persona families that need a new
-   Vault field use a new path (`keycloak/demo-personas-eval`, `-stress`), because an existing path never gets new fields.
+   after its path is deleted and re-seeded; a database also needs the ADR-0529 runbook. The twins
+   share the humans' Secret `demo-personas-password` because five consumers read it (the persona Job, the stresstest Job, the
+   acceptance gate, the mlops probe, the RAGAS ExternalSecret); giving them their own family means changing all five together
+   and is a follow-up.
 
 ## Alternatives considered
 

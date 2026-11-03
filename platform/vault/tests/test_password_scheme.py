@@ -53,8 +53,6 @@ ADMIN_VARS = [
 PERSONA_VARS = [
     "zuno_personas_password",
     "zuno_personas_humans_password",
-    "zuno_personas_eval_password",
-    "zuno_personas_stress_password",
     "zuno_personas_openclaw_ui_password",
     "zuno_admin_demo_personas_root_password",
 ]

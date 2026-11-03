@@ -76,6 +76,33 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.adminSecretName }}
                   key: password
+            # ADR-0595: the permanent accounts. Optional, so the first run on a
+            # cluster whose Vault paths are not seeded yet still works with the
+            # bootstrap admin above; the Job then skips creating them.
+            - name: KC_AUTOMATION_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.automationSecretName }}
+                  key: username
+                  optional: true
+            - name: KC_AUTOMATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.automationSecretName }}
+                  key: password
+                  optional: true
+            - name: KC_CONSOLE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.consoleSecretName }}
+                  key: username
+                  optional: true
+            - name: KC_CONSOLE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.consoleSecretName }}
+                  key: password
+                  optional: true
           volumeMounts:
             - name: realm
               mountPath: /realm
@@ -106,11 +133,26 @@ spec:
               # The realm import is applied by the operator asynchronously, so
               # on a fresh install the realm may not exist yet when this hook
               # runs. Wait for it rather than racing it.
+              #
+              # ADR-0595: sign in as the permanent automation account when it
+              # exists, else as the bootstrap admin (first run, or Vault not
+              # seeded yet). Once the bootstrap admin is disabled, only the
+              # first path works, and a wrong password fails loudly below.
+              kc_login() {
+                if [ -n "${KC_AUTOMATION_USER:-}" ] && [ -n "${KC_AUTOMATION_PASSWORD:-}" ] \
+                   && $KCADM config credentials $CFG --server "$KC_SERVER" \
+                        --realm master --user "$KC_AUTOMATION_USER" \
+                        --password "$KC_AUTOMATION_PASSWORD" >/dev/null 2>&1; then
+                  return 0
+                fi
+                $KCADM config credentials $CFG --server "$KC_SERVER" \
+                  --realm master --user "$KC_ADMIN_USER" \
+                  --password "$KC_ADMIN_PASSWORD" >/dev/null 2>&1
+              }
+
               ready=""
               for attempt in $(seq 1 60); do
-                if $KCADM config credentials $CFG --server "$KC_SERVER" \
-                     --realm master --user "$KC_ADMIN_USER" \
-                     --password "$KC_ADMIN_PASSWORD" >/dev/null 2>&1 \
+                if kc_login \
                    && $KCADM get "realms/$KC_REALM" $CFG --fields realm >/dev/null 2>&1; then
                   ready="yes"
                   break
@@ -122,6 +164,30 @@ spec:
                 echo "ERROR: keycloak or realm '$KC_REALM' never became reachable" >&2
                 exit 1
               fi
+
+              # ADR-0595: the two permanent master-realm administrators. Created
+              # when missing, password and the `admin` role re-applied on every
+              # run so a rotated Vault value follows. Nothing is ever deleted,
+              # and the bootstrap admin is left alone (disabled by hand once the
+              # Jobs run as the automation account).
+              ensure_master_admin() {
+                user="$1"; pass="$2"
+                if [ -z "$user" ] || [ -z "$pass" ]; then
+                  echo "master admin: no credentials for this account yet (Vault not seeded), skipped"
+                  return 0
+                fi
+                uid=$($KCADM get users -r master $CFG -q "username=$user" -q exact=true \
+                        --fields id --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+                if [ -z "$uid" ]; then
+                  $KCADM create users -r master $CFG -s "username=$user" -s enabled=true \
+                    -s emailVerified=true
+                  echo "master admin: created $user"
+                fi
+                $KCADM set-password -r master $CFG --username "$user" --new-password "$pass"
+                $KCADM add-roles -r master $CFG --uusername "$user" --rolename admin
+              }
+              ensure_master_admin "${KC_AUTOMATION_USER:-}" "${KC_AUTOMATION_PASSWORD:-}"
+              ensure_master_admin "${KC_CONSOLE_USER:-}" "${KC_CONSOLE_PASSWORD:-}"
 
               created=0
               updated=0

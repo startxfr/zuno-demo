@@ -65,6 +65,19 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.adminSecretName }}
                   key: password
+            # ADR-0595: the permanent automation account, preferred when present.
+            - name: KC_AUTOMATION_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.automationSecretName }}
+                  key: username
+                  optional: true
+            - name: KC_AUTOMATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.automationSecretName }}
+                  key: password
+                  optional: true
             - name: PERSONA_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -96,11 +109,23 @@ spec:
               KCADM="/opt/keycloak/bin/kcadm.sh"
               CFG="--config /tmp/kcadm.config"
 
+              # ADR-0595: the permanent automation account when it exists, else the
+              # bootstrap admin (same rule as the client reconcile Job).
+              kc_login() {
+                if [ -n "${KC_AUTOMATION_USER:-}" ] && [ -n "${KC_AUTOMATION_PASSWORD:-}" ] \
+                   && $KCADM config credentials $CFG --server "$KC_SERVER" \
+                        --realm master --user "$KC_AUTOMATION_USER" \
+                        --password "$KC_AUTOMATION_PASSWORD" >/dev/null 2>&1; then
+                  return 0
+                fi
+                $KCADM config credentials $CFG --server "$KC_SERVER" \
+                  --realm master --user "$KC_ADMIN_USER" \
+                  --password "$KC_ADMIN_PASSWORD" >/dev/null 2>&1
+              }
+
               ready=""
               for attempt in $(seq 1 60); do
-                if $KCADM config credentials $CFG --server "$KC_SERVER" \
-                     --realm master --user "$KC_ADMIN_USER" \
-                     --password "$KC_ADMIN_PASSWORD" >/dev/null 2>&1 \
+                if kc_login \
                    && $KCADM get "realms/$KC_REALM" $CFG --fields realm >/dev/null 2>&1; then
                   ready="yes"
                   break

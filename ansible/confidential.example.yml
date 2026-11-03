@@ -467,7 +467,7 @@ zuno_llm_provider_ovhcloud_api_key: "xxxxxx"
 # so any single one can be overridden below without touching anything else:
 #   zuno_admin_keycloak_console_password: "..."
 #   zuno_admin_aap_root_password: "..."
-#   zuno_personas_eval_password: "..."
+#   zuno_personas_openclaw_ui_password: "..."
 # Left unset, each falls back to a generated 22-character value (deterministic
 # per component), never to a literal. A cluster that is already seeded keeps its
 # Vault values until the path is deleted and re-seeded (ADR-0345).

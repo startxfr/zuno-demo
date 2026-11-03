@@ -2,6 +2,21 @@
 # keycloak/openclaw-<persona> (the client secret) is seeded by the vault role with
 # the Keycloak client (WP-179's four-place pattern); this role seeds only its own
 # openclaw/<persona> path, and only when it is missing.
+# ADR-0595: the Control UI password reads zuno_personas_openclaw_ui_password, which
+# inherits zuno_personas_mainpwd from ansible/confidential.yml.
+- name: "openclaw | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
+- name: "openclaw | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _openclaw_confidential_file
+
+- name: "openclaw | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _openclaw_confidential_file.stat.exists
+
 - name: "openclaw | find the Vault pod"
   kubernetes.core.k8s_info:
     kind: Pod
@@ -62,6 +77,6 @@
   vars:
     vault_seed_path: "openclaw/{{ item.name }}"
     vault_seed_fields:
-      ui_password: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+      ui_password: "{{ zuno_personas_openclaw_ui_password }}"
       # oauth2-proxy accepts a 16, 24 or 32 byte cookie secret.
       cookie_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
