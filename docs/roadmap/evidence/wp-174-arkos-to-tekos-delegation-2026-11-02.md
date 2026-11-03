@@ -45,9 +45,21 @@ One GPU node came back (three of the four models Ready). Arkos scenario 21 as `e
 - **Not proven**: the final reply of the turn is empty (`reply_chars=0`), so the Tekos content does not reach the user, and no mcp-gateway audit line with `delegated_by` was seen. The orchestrator runs a single cycle (it ends with the A2A item waiting) and no second cycle starts after `a2a.delegated`: the A2A result does not come back to `orchestrate`, and `finish` runs with nothing collected. Suspected cause: the 0.1.50 blueprint change, which removed the path by which a worker result reached the finalizer. Reported to the operator owner; scenario 7 returns an empty reply intermittently since 0.1.50 for the same reason, probably.
 - Arkos scenarios on 0.1.51: 14 of 19 on the last pass (7, 10, 11, 19 and 21 failed; 19 cannot run from a workstation). Cost of a working delegating turn: not measured.
 
+## Operator 0.1.52 and 0.1.53 on demo333 (2026-11-03)
+
+- **0.1.52** (catalog pin `7ba9072b`): the A2A answer returns to the orchestrator (R-525), but the model re-delegated the same question to Tekos 10 to 11 times per turn, because it never marked the work item done (22 `POST /agents/tekos/` 200 for two delegating runs, traces `a8a0351de8e780dbc478f6a499f027f2` and `66ab22fff98b5c5671acf8b4dfce199c`). A run could end with an empty reply (scenario 11 failed twice).
+- **0.1.53** (catalog pin `90146463`, catalog `sha256:8279a9bb8ee6de6604c38c6aff75015d7f6949412b9c2817a2b851dd3bc1f3d2`; application images `devel-8c86d4f19` rolled in `a2cbb665`): R-528 tells the orchestrator that an agent's answer is final, and the multiagent image caps a work item at 3 delegations (past the cap `delegate_task` returns "was already delegated 3 times and is marked done"). Live on demo333 on 2026-11-03 (18:17 to 18:30 local):
+  - Scenario 21 (hardened: 1 to 3 A2A messages, a non-empty reply carrying the Tekos content) passed 3 of 3 as `eval-consultant-01`: A2A sends 3, 2 and 1; replies of 6074, 3489 and 2691 characters.
+  - The full Arkos suite: 18 of 18 (6, 17 and 19 skipped as not applicable).
+  - `platform/testing/a2a_delegation_check.py --delegator arkos --target tekos --since 40m`: 9 calls served to `tekos`, 9 x 200, 0 x 404.
+  - mcp-gateway audit: 16 lines with `delegated_by=arkos:draft-architecture-testimonial`.
+  - The cap fired in traces `b9c9982da9e180eb911c30250668e8e3`, `e3661c262d1e9d97192b53231634f4d3` and `a391670119861d02335fe0e388c1a0d5`.
+  - The `FAILED` labels printed by the scenario were a harness label (a span without `mas.success`), fixed in `0b55200e`. No `mas.session` or `send_message` span has an error status.
+- **Unrelated defect seen**: Tekos calls git-forge `list_repositories` without `provider`, `owner` and `repo`, which returns a 502 (traces `8e160bd26cda4688485f4315ccbe69fb`, `a695d489fb4297e09daa9af30d05dc90`, `a28c1c212a58f0cde28f1843b9b34e1b`).
+- **Not proven**: the cost of an Arkos turn that delegates (not measured), `X-Zuno-Max-Tokens` end to end, and the refusal checks of `evaluations/common/delegation_checks.py` (unentitled user, undeclared target, depth 2, cycle, write refused) on this operator.
+
 ## What remains
 
-1. An operator release that routes the A2A result back to the orchestrator (the final reply is empty on 0.1.51), pinned on demo333.
-2. Behavioural proof as `eval-consultant-01`: SSO chat in the UI (Team agent-arkos, workflow arkos) and arkos scenario 21 (`TEMPO_URL` set): a `delegate_task` span with `mas.success` true, a `POST /agents/tekos/ 200` at the a2a-gateway, Tekos content in the answer, then the read-only check `platform/testing/a2a_delegation_check.py` (cc) and the refusal checks of `evaluations/common/delegation_checks.py` on the gateway.
-3. The cost of an Arkos turn that delegates (the traces carry no token counts: use the ai-gateway counters).
-4. Then WP-174 Done and ADR-0401, ADR-0403, ADR-0406 to Implemented.
+1. The cost of an Arkos turn that delegates (use the ai-gateway counters, the traces carry no token counts).
+2. `X-Zuno-Max-Tokens` proven end to end, and the refusal checks of `evaluations/common/delegation_checks.py`.
+3. Then WP-174 Done and ADR-0401, ADR-0403, ADR-0406 to Implemented only for the proofs above that are made.
