@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-187 |
+| v0.11 | 24 | 18 | 26 | WP-166, WP-172, WP-173, WP-174, WP-187 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 8 | 1 | 10 | WP-191 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -955,8 +955,8 @@ frozen mirror.
 | WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Done (2026-10-24) | Red Hat docs on UnifAI (38 web sources, 16/18 vs 13/18), rag-service and rag-ingestion retired on demo333 and in the repository; corpus scoped to 21 latest-version sources 2026-10-25 |
 | WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Done | live on demo333 2026-10-23 (89ec9fba): five eval-* personas; harnesses switched (86ef03e4); platform/keycloak/tests now run in CI |
 | WP-170 | [wp-170](work-packages/wp-170-agent-delegation-contract-and-adrs.md) | 0401, 0402, 0403, 0406, 0409 | none | Done | the four records accepted 2026-10-24 (Implemented after WP-174's live proofs) |
-| WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Repo work merged | merged on zuno-demo-agents devel (PR #9); a release and its promotion into agents.lock are the maintainer's |
-| WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Repo work merged | live once the release carrying the delegation fields and tool `access` is promoted |
+| WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Done (2026-11-03) | merged on zuno-demo-agents devel (PR #9), released and admitted; fields and `access` live in the mcp-gateway |
+| WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Repo work merged | release admitted and enforcement deployed; no delegated call proven live yet (WP-174) |
 | WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | step 6 (the operator refuses A2A and delegation targets) is live in operator 0.1.35; steps 1 to 5 wait for the user's priority |
 | WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | operator pending | wiring live (agents v0.8.0, operator 0.1.49); behavioural proof waits for the GPU models |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Done (2026-10-25) | zuno-side A2A gateway live on demo333, 32 test blueprints (26 valid, 6 wait for placeholder agents), real delegated turns and the denial check proven |

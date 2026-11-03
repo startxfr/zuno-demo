@@ -1,6 +1,6 @@
 # WP-171: OKF delegation fields and conformance cases
 
-- **State:** Repo work merged
+- **State:** Done (2026-11-03)
 - **ADRs:** [ADR-0401](../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md)
 - **Depends on:** [WP-170](wp-170-agent-delegation-contract-and-adrs.md)
 - **Related:** [ADR-0579](../../adr/0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md), [WP-163](wp-163-okf-v0-3-schema-and-consumers.md), [WP-51](wp-51-adaptation-hooks-conformance.md)
@@ -40,6 +40,7 @@ Merged on `zuno-demo-agents` `devel` (PR #9, `d78a610`, CI green): the two optio
 of `tool-policy.yaml`, the narrowing checks, two conformance cases, and the validator now accepting v0.2 and v0.3
 content notes (requested by the Tekos v0.3 migration). The admission side in `zuno-demo` was merged earlier (WP-172).
 
-Not live: no release carries it yet (`VERSION` is still 0.3.1). The next release, its promotion into `platform/okf/agents.lock`
-and the Tekos v0.3 migration (session on branch `wp-163/tekos-okf-v03`) are the maintainer's to group and cut; until
-then the delegation fields exist in no admitted bundle and every delegated call is refused.
+Live, verified 2026-11-03: the delegation fields and `access` ship in the admitted agents release, the mcp-gateway image carries
+`agent_chain.py`, `/okf/agents/arkos` returns the delegation block, the limits policy is mounted and 16 tool entries declare
+`access: read`. Acceptance for this WP is repo-side, so it is closed; the first delegated call end to end is tracked by WP-172 and
+WP-174.
