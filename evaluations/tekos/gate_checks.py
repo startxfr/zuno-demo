@@ -235,9 +235,16 @@ CHECKS = [
 ]
 
 
-def run() -> list[CheckResult]:
+# The checks that need a live cluster (a persona token, the rag server). CI has neither, so the lint
+# workflow runs the file with --config-only; the day-3 gate pod runs every check.
+LIVE_CHECKS = {tekos_retriever_finds_red_hat_docs_for_a_basic_openshift_question}
+
+
+def run(config_only: bool = False) -> list[CheckResult]:
     results = []
     for check in CHECKS:
+        if config_only and check in LIVE_CHECKS:
+            continue
         try:
             result = check()
         except Exception as exc:  # noqa: BLE001 - a check erroring is a fail, not a crash
@@ -248,7 +255,9 @@ def run() -> list[CheckResult]:
 
 
 def main() -> int:
-    results = run()
+    import sys
+
+    results = run(config_only="--config-only" in sys.argv[1:])
     print(f"{'PASS':<6}{'CHECK'}")
     for r in results:
         print(f"{'✓' if r.passed else '✗':<6}{r.name}")
