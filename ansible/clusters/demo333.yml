@@ -216,11 +216,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:5527daeb3341cf4afa4ee34148c84efe2cc618a8a4bfc7e765e763f986dfa89a  # devel-042c793d1 (operator 0.1.50 e2e tag)
-      identity: quay.io/zuno/unifai-identity@sha256:29d002700b376b61da185550a8c1734f26c8f9260255fc768e8592105766d24f  # devel-042c793d1 (operator 0.1.50 e2e tag)
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:e2be8ee0c4983032959f50955279d30d912d0b5a89f092a903b2517ea237284f  # devel-042c793d1 (operator 0.1.50 e2e tag)
-      rag: quay.io/zuno/unifai-rag@sha256:406bd70022c618cba03fc8679a636e846e1a868b03e75867b4a3902980197ad9  # devel-66105c780 (web sync guard: a crawl that would delete over half of a source fails, 429/503 retried; R-527)
-      ui: quay.io/zuno/unifai-ui@sha256:e03f9f81435ccd81ec0f6e29c77c27da9b0a800ddd840953815ca09f429e7e5c  # devel-042c793d1 (operator 0.1.50 e2e tag)
+      backend: quay.io/zuno/unifai-backend@sha256:13a7aee4e4424fafda01cb580fe3e2f98a31ea11d1b6d0b3af339c4b290a17d2  # devel-8c86d4f19 (R-528 delegation cap in multiagent; R-527 RAG guard)
+      identity: quay.io/zuno/unifai-identity@sha256:42d92cd1a85eae2f50c34be1a410142b2a282a7526628cc8189348fd9935b429  # devel-8c86d4f19 (R-528 delegation cap in multiagent; R-527 RAG guard)
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:f58fac9e1570de12b31e8ba7ca25ab33865ac737db7e4826a4e511ce0d9a1b06  # devel-8c86d4f19 (R-528 delegation cap in multiagent; R-527 RAG guard)
+      rag: quay.io/zuno/unifai-rag@sha256:8626c21b32306e287a13db90c0c16a806599f7483d15a5eb490f705370e64c6c  # devel-8c86d4f19 (R-528 delegation cap in multiagent; R-527 RAG guard)
+      ui: quay.io/zuno/unifai-ui@sha256:ac32bbbcddf17830a7740b7d8f6040c18e699e1f44c06fd8664386b4f155b4f1  # devel-8c86d4f19 (R-528 delegation cap in multiagent; R-527 RAG guard)
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
