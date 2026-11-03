@@ -200,6 +200,11 @@ spec:
     {{- toYaml . | nindent 4 }}
   {{- end }}
   visibility: {{ default "private" .visibility }}
+  {{- with .classification }}
+  # WP-187 (unifai-operator >= 0.1.50): written on every chunk and returned in search results, so the
+  # mcp-gateway can raise the data level of a turn. Changing it embeds every page again at the next sync.
+  classification: {{ . }}
+  {{- end }}
   {{- with .aclGroups }}
   aclGroups:
     {{- toYaml . | nindent 4 }}
@@ -230,6 +235,9 @@ spec:
   owner: {{ $owner }}
   type: web
   visibility: public
+  {{- with $.Values.redhatDocs.classification }}
+  classification: {{ . }}
+  {{- end }}
   tags:
     {{- toYaml .tags | nindent 4 }}
   web:
