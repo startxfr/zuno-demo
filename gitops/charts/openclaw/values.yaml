@@ -42,12 +42,17 @@ gateways:
   mcpDomain: mcp-gateway.zuno-ai-run.svc
   mcpUrl: http://mcp-gateway.zuno-ai-run.svc:8080/mcp
   # The `openclaw` experience-client declaration (ADR-0592, zuno-demo-agents
-  # v0.9.0 experience-clients/openclaw: task `chat`, C1, groups /consultant and
-  # /sales, the same scope as open-webui) is admitted: the MCP credential sends
-  # X-Zuno-Agent, X-Zuno-Task (an agent-scoped call without a task is refused)
-  # and the classification, also sent to the ai-gateway. Setting mcpAgentHeader
-  # to false falls back to the persona's front-door tools.
+  # experience-clients/openclaw: task `chat`, groups /consultant and /sales, the
+  # same scope as open-webui) is admitted: the MCP credential sends X-Zuno-Agent,
+  # X-Zuno-Task (an agent-scoped call without a task is refused) and
+  # mcpDataClassification. Setting mcpAgentHeader to false falls back to the
+  # persona's front-door tools.
+  # ADR-0594 (WP-191, agents >= v0.10.0): the model connection stays C1, the MCP
+  # connection calls at C2 so Confluence and the technical docs are listed; the
+  # ai-gateway keeps a turn that used a C2 tool on local models, from the signed
+  # markers on the tool results.
   dataClassification: C1
+  mcpDataClassification: C2
   mcpAgentHeader: true
   mcpTask: chat
 

@@ -119,6 +119,7 @@ zuno_unifai_values:
       rootTitle: 'Technologie : Satellite'
       spaceKey: SXSI
     name: tekos-satellite
+    classification: C2   # WP-187: Confluence content stays at C2
     syncInterval: 6h
     tags:
     - knowledge.tech
@@ -135,6 +136,7 @@ zuno_unifai_values:
       rootTitle: 'Technologie : Openshift'
       spaceKey: SXSI
     name: tekos-openshift
+    classification: C2   # WP-187: Confluence content stays at C2
     syncInterval: 6h
     tags:
     - knowledge.tech
@@ -246,6 +248,7 @@ zuno_unifai_values:
   redhatDocs:
     enabled: true
     syncInterval: 168h
+    classification: C1   # WP-187: public Red Hat documentation
 
 # WP-157 live enable sequence (user go 2026-10-24, one step at a time, each
 # verified before the next; brief "Decisions of 2026-10-24" and Progress).

@@ -42,7 +42,7 @@ spec:
       defaultHeaders:
         X-Zuno-Agent: openclaw
         X-Zuno-Task: {{ $.Values.gateways.mcpTask | quote }}
-        X-Zuno-Data-Classification: {{ $.Values.gateways.dataClassification | quote }}
+        X-Zuno-Data-Classification: {{ $.Values.gateways.mcpDataClassification | default $.Values.gateways.dataClassification | quote }}
       {{- end }}
   customProviders:
     - name: zuno
