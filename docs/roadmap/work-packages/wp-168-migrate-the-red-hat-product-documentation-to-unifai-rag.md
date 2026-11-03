@@ -96,7 +96,7 @@ Confluence pages, with the caller's group rules, and `rag-service`,
   `WEB` and merges (replacing the rag-service merge).
 - **Generation (retired 2026-11-02):** `platform/knowledge/generate_redhat_web_sources.py` wrote
   `gitops/charts/unifai/files/redhat-docs.yaml` from the rag-ingestion catalogue; the chart renders it when
-  `redhatDocs.enabled`. The script was never committed and read a chart (`gitops/charts/rag-ingestion`) that this WP
+  `redhatDocs.enabled`. The script was committed in `0dd343b1` (and removed with the retirement `877d8c83`; the history keeps it) and read a chart (`gitops/charts/rag-ingestion`) that this WP
   retired; `redhat-docs.yaml` was then scoped by hand on 2026-10-25 (latest version of each product, own
   product and version, `/en/` form) and says it is "maintained here ... edit it by hand". Re-running the script on the
   catalogue of the parent of the retirement commit (`877d8c83^`, 112 entries) no longer reproduces the file, so it is
