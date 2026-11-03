@@ -86,7 +86,8 @@ def test_a_keycloak_jwt_queries_both_source_types_with_the_callers_token(monkeyp
         "title": "S0R42 : Schedule Satellite",
         "snippet": "# S0R42 : Schedule Satellite",
         "score": 0.7,
-        "classification": "C1",
+        # No classification in the chunk metadata: C2, fail closed (WP-187).
+        "classification": "C2",
     }
 
 
@@ -149,3 +150,27 @@ def test_the_handler_source_has_no_write_call():
     source = open(rag_query.__file__, encoding="utf-8").read()
     for verb in (".post(", ".put(", ".patch(", ".delete("):
         assert verb not in source, f"rag_query.py calls {verb}: the retrieval path must stay read only"
+
+
+def test_the_chunk_classification_is_returned(monkeypatch):
+    """WP-187: the source's classification, written on every chunk by UnifAI
+    (operator 0.1.50), is what the tool returns: Confluence C2, Red Hat docs C1."""
+    confluence = dict(UNIFAI_MATCH, metadata=dict(UNIFAI_MATCH["metadata"], classification="C2"))
+    web = [dict(m, metadata=dict(m["metadata"], classification="C1")) for m in WEB_MATCHES]
+    result, _ = _run(monkeypatch, JWT, _by_type(
+        httpx.Response(200, json={"matches": [confluence]}),
+        httpx.Response(200, json={"matches": web}),
+    ))
+    assert [(r["id"], r["classification"]) for r in result["results"]] == [("c1", "C2"), ("w1", "C1"), ("w2", "C1")]
+
+
+def test_a_missing_or_invalid_classification_is_c2():
+    from app.handlers import rag_query
+
+    assert rag_query._classification({}) == "C2"
+    assert rag_query._classification({"classification": ""}) == "C2"
+    assert rag_query._classification({"classification": "secret"}) == "C2"
+    assert rag_query._classification({"classification": "C9"}) == "C2"
+    assert rag_query._classification({"classification": "c3"}) == "C3"
+    assert rag_query._classification({"classification": "C4"}) == "C4"
+    assert rag_query._classification({"classification": "C1"}) == "C1"

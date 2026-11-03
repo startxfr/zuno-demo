@@ -100,6 +100,16 @@ spec:
             - name: http
               containerPort: 8080
           env:
+{{- if .Values.toolMarker.enabled }}
+            # ADR-0594: key of the signed tool-result classification markers
+            # (externalsecret-tool-marker.yaml of the mcp-gateway chart).
+            - name: ZUNO_MARKER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.toolMarker.secretName }}
+                  key: ZUNO_MARKER_KEY
+                  optional: true
+{{- end }}
 {{- if .Values.lightspeed.enabled }}
             # ADR-0524: the /mcp front-door's capability ceiling. Comma-separated;
             # an empty string disables the front-door's tool surface entirely

@@ -273,3 +273,13 @@ guardrails:
   # minimum and the calling agent's `zuno.guardrails.mode`. Needs an image
   # with app/guardrails.py's AgentModes (ai-gateway after WP-164 lot 3).
   modesGenerated: false
+
+# ADR-0594 (WP-191): signed classification markers on MCP tool results. The key
+# Secret is generated in zuno-ai-run by the mcp-gateway chart; both gateways read it.
+toolMarker:
+  enabled: true
+  secretName: zuno-tool-marker-key
+  # Experience clients whose unmarked tool results count as C2 and local-only.
+  failClosedClients:
+    - open-webui
+    - openclaw-*
