@@ -1441,13 +1441,17 @@ async def _stream_completion(
                     {"content": reasoning_text.strip(), "zuno_reasoning_fallback": True},
                 )
         if final_tool_calls:
+            # `index` is required on a streamed tool_call delta (OpenAI wire
+            # format): Open WebUI drops a delta without one, so the tool call
+            # was lost and the turn showed blank (WP-191, 2026-11-03).
             wire_tool_calls = [
                 {
+                    "index": i,
                     "id": tc.get("id") or f"call_{uuid.uuid4().hex[:24]}",
                     "type": "function",
                     "function": {"name": tc["name"], "arguments": json.dumps(tc["args"])},
                 }
-                for tc in final_tool_calls
+                for i, tc in enumerate(final_tool_calls)
             ]
             yield _sse_chunk(completion_id, created, effective_model_name, {"tool_calls": wire_tool_calls})
             yield _sse_chunk(completion_id, created, effective_model_name, {}, finish_reason="tool_calls")

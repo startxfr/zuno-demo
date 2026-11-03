@@ -160,6 +160,19 @@ def test_stream_with_content_never_leaks_reasoning() -> None:
     env.metric.assert_not_called()
 
 
+def test_streamed_tool_calls_carry_their_index() -> None:
+    # Open WebUI drops a streamed tool_call delta without `index` (WP-191).
+    chunk = AIMessageChunk(content="", tool_call_chunks=[
+        {"name": "a", "args": '{"q": 1}', "id": "c1", "index": 0},
+        {"name": "b", "args": "{}", "id": "c2", "index": 1},
+    ])
+    with _Env(_Model(chunks=[chunk])):
+        events = _sse(_post(stream=True))
+    calls = [tc for e in events for tc in e["choices"][0]["delta"].get("tool_calls") or []]
+    assert [(tc["index"], tc["id"], tc["function"]["name"]) for tc in calls] == [(0, "c1", "a"), (1, "c2", "b")]
+    assert events[-1]["choices"][0]["finish_reason"] == "tool_calls"
+
+
 # --- ChatOpenAI subclass keeps the raw reasoning field --------------------
 
 
