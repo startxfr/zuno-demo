@@ -1,6 +1,6 @@
 # WP-193: Open WebUI user experience: one Zuno model, the tools on by default, a quiet chat
 
-- **State:** Not started (2026-11-03: decisions recorded; ai-gateway code next)
+- **State:** Done (2026-11-03, [evidence](../evidence/wp-193-open-webui-user-experience.md))
 - **ADRs:** [ADR-0588](../../adr/0588-serve-a-general-purpose-chat-experience-with-open-webui.md), [ADR-0594](../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md)
 - **Depends on:** [WP-191](wp-191-same-mcp-tools-in-the-three-experiences.md)
 - **Target:** v0.13
@@ -58,6 +58,11 @@ On demo333, all of the following hold:
 - a Confluence question is answered with pages by a local model;
 - no background generation other than the title reaches the ai-gateway;
 - the ai-gateway test suite has no new failure.
+
+> **Closure note (2026-11-03).** Met live, with one precision. The background generations are off by configuration (the
+> `ENABLE_*_GENERATION` flags are `False` in the pod's environment), but this run did not count them call by call. One
+> more fix was needed: Open WebUI's built-in tools are off (`builtin_tools: false`), otherwise the model chose them over
+> the Zuno tools.
 
 ## Coordination
 

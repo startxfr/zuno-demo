@@ -35,7 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 18 | 26 | WP-166, WP-172, WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 9 | 2 | 12 | WP-191, WP-192, WP-193 |
+| v0.13 | 9 | 1 | 12 | WP-192 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -984,9 +984,9 @@ WP-184 closes them together.
 | WP-188 | [wp-188](work-packages/wp-188-route-only-to-ready-local-models.md) | 0591 | WP-179 | Done | ai-gateway: skip local models their controller reports not ready, per-provider circuit breaker, no SDK retries, immediate 503 when nothing is left, NeMo warm-up; build and roll after the user's go |
 | WP-189 | [wp-189](work-packages/wp-189-experience-clients-in-the-agents-release.md) | 0592 | WP-181 | Done | experience clients (Open WebUI, OpenClaw) declared in their own layer of the agents release, read by the mcp-gateway only, C1 read-only tools; release, promotion and roll by the user |
 | WP-190 | [wp-190](work-packages/wp-190-one-identity-one-budget-and-one-infrastructure-pattern-for-the-three-experiences.md) | 0593, 0587, 0589 | WP-184 | Done (2026-11-03) | one per-user budget across Open WebUI, UnifAI and OpenClaw (persona claim on the OpenClaw service accounts, `user` label = persona), then the same observability, network, automation and chart/role pattern for the three; ai-gateway build and live proof need the owners' go |
-| WP-191 | [wp-191](work-packages/wp-191-same-mcp-tools-in-the-three-experiences.md) | 0594, 0592 | WP-189, WP-190 | Not started | the same read MCP tools (Confluence, technical docs) in the three experiences; signed classification markers on tool results, raised by the ai-gateway to local-only |
+| WP-191 | [wp-191](work-packages/wp-191-same-mcp-tools-in-the-three-experiences.md) | 0594, 0592 | WP-189, WP-190 | Done (2026-11-03) | the same read MCP tools (Confluence, technical docs) in the three experiences; signed classification markers on tool results, raised by the ai-gateway to local-only |
 | WP-192 | [wp-192](work-packages/wp-192-one-demo-password-and-named-keycloak-administrators.md) | 0595 | — | Repo work merged | one shared demo password through one variable per component; named `zuno-admin` and `zuno-automation` Keycloak accounts replace the temporary bootstrap admin |
-| WP-193 | [wp-193](work-packages/wp-193-open-webui-user-experience.md) | 0588, 0594 | WP-191 | Not started | Open WebUI: one model shown as Zuno (the ai-gateway lists `auto` alone to experience clients), the tools on by default, the title as the only background task, a banner and Zuno suggestions |
+| WP-193 | [wp-193](work-packages/wp-193-open-webui-user-experience.md) | 0588, 0594 | WP-191 | Done (2026-11-03) | Open WebUI: one model shown as Zuno (the ai-gateway lists `auto` alone to experience clients), the tools on by default, the title as the only background task, a banner and Zuno suggestions |
 
 ### Phase 47 — gaps left by the retirement of the old RAG stack (added 2026-11-02)
 
@@ -1144,6 +1144,10 @@ moving.
 
 ## Change log
 
+- 2026-11-03 — WP-191 and WP-193 Done, ADR-0594 Implemented. The three experiences list the same read MCP tools, filtered
+  by groups. Signed markers raise OpenClaw tool turns to C2 and local. Open WebUI rewrites tool results, so its markers
+  never verify and every tool turn there is C2 and local (the fail-closed case, accepted by the user). Open WebUI shows
+  one "Zuno" model, with its tools on by default.
 - 2026-11-03 — WP-193 added to phase 46: Open WebUI shows one model, "Zuno", since the ai-gateway routes on the
   classification and never on the model name; the tools are on by default and the title is the only background task.
 - 2026-11-03 — ADR-0595 and WP-192 added to phase 46: one shared demo password through one variable per component,

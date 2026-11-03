@@ -1,6 +1,6 @@
 # ADR-0594: Give the three experiences the same MCP tools behind signed classification markers
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-03, WP-191: same tools in the three experiences, markers verified from OpenClaw, Open WebUI fail-closed)
 - **Target:** v0.13
 - **Date:** 2026-11-03
 - **Decision owners:** Zuno Demo architecture team
@@ -50,6 +50,12 @@ classification marker, and the ai-gateway raises the call from the markers it fi
 > **Note (2026-11-03, WP-193):** the same experience-client list (`MARKER_FAIL_CLOSED_CLIENTS`) also narrows the
 > ai-gateway's `GET /v1/models` to `auto` alone, named "Zuno". Live testing also showed that a streamed tool call needs an
 > `index` for Open WebUI to run it; the ai-gateway now sends one.
+
+> **Note (2026-11-03, WP-191 live proof):** Open WebUI rewrites MCP results before the next model call. When the text is
+> not JSON it adds the structured content beside it, then dumps the list as indented JSON. The signed text never reaches
+> the ai-gateway, so in Open WebUI no marker verifies: every tool turn counts as unmarked, C2 and local. That is the
+> fail-closed case of the Consequences. The user accepted it on 2026-11-03. OpenClaw passes the text through and its
+> markers verify.
 
 ## Alternatives considered
 

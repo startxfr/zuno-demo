@@ -1,6 +1,6 @@
 # WP-191: The same MCP tools in the three experiences, behind signed classification markers
 
-- **State:** Not started (2026-11-03: decision recorded; gateway code next)
+- **State:** Done (2026-11-03, [evidence](../evidence/wp-191-same-mcp-tools-live-proof.md))
 - **ADRs:** [ADR-0594](../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md), [ADR-0592](../../adr/0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md), [ADR-0034](../../adr/0034-compute-effective-classification-from-the-complete-context.md), [ADR-0035](../../adr/0035-prevent-restricted-internal-context-from-reaching-external-models.md)
 - **Depends on:** [WP-189](wp-189-experience-clients-in-the-agents-release.md), [WP-190](wp-190-one-identity-one-budget-and-one-infrastructure-pattern-for-the-three-experiences.md)
 - **Related:** [WP-187](wp-187-carry-the-source-classification-through-unifai-rag-results.md), [WP-152](wp-152-mcp-gateway-evaluation-and-mcp-north-side.md)
@@ -48,6 +48,15 @@ knowledge-base result fetched in Open WebUI or OpenClaw is only ever answered by
 On demo333, the same user sees the same read tools in the three experiences; a turn after a Confluence or knowledge-base
 call in Open WebUI or OpenClaw is answered by a local model, live; a tool message without a valid marker from an experience
 client is answered locally; the mcp-gateway and ai-gateway test suites are green.
+
+> **Closure note (2026-11-03).** The acceptance is met, with three precisions:
+> - Open WebUI rewrites tool results, so its markers never verify there. Every tool turn counts as unmarked: C2 and local.
+>   The user accepted this limit; a Drive turn served by a SaaS model is only possible from OpenClaw.
+> - "Green" means no new failure. The ai-gateway suite has 17 failures that also fail on a clean `devel` in this
+>   workstation's environment, and the mcp-gateway suite has 12 failures and 4 errors, also present on a clean `devel`.
+>   The new marker tests pass.
+> - Three gaps found live were fixed on the way: the `zuno-admin-api` audience for the OpenClaw clients, the streamed
+>   tool-call `index`, and Open WebUI's built-in tools (WP-193).
 
 ## Coordination
 
