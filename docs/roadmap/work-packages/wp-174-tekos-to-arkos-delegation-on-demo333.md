@@ -115,7 +115,9 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#co
   - The Arkos suite passed 17 of 18 at the cap of 1. Scenario 10 is flaky, and the cap's effect on it is not shown.
 - **Counter defect**: the ai-gateway adds each model call, its tokens and its cost once per Keycloak group of the caller
   (`components/ai-gateway/app/telemetry.py`, three `for g in group_list` loops). Any sum over a user or an agent is
-  multiplied by the number of groups. It is still to fix.
+  multiplied by the number of groups. Fixed the same night (`cc000ec3`, build `ai-gateway-40`): these metrics take one
+  point per call, and the group panels read `zuno_model_calls_by_group_total` and `zuno_model_tokens_by_group_total`.
+  Live control: 3 calls by consultant-02, who holds 10 groups, counted 3 calls and 87 tokens.
 - **git-forge**: the 502s came from `tools/list` advertising an open schema. The mcp-gateway now advertises the backend's
   schema (`8625492f`, `4c6bef54`, verified on `tools/list`). No real Tekos call through the new schema has been seen yet.
 - **Still open, both waiting for operator 0.1.55**: the cancellation of a delegation no longer awaited (not implemented
