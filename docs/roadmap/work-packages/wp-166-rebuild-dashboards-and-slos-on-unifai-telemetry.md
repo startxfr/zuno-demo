@@ -65,3 +65,10 @@ so that dashboard needs its own redesign. Live on demo333 after the ArgoCD sync 
 and Healthy): the `zuno-agent-path-slo` rule carries the UnifAI session expressions and evaluates
 (one series), the freshness rule is gone, and all the rebuilt PromQL returns series against the
 cluster's Prometheus. Not done: a visual check of each rebuilt panel in the Grafana UI.
+
+## Closing pass (2026-11-03)
+
+- **Run-trace dashboard:** already rebuilt by WP-147 (`1b05531f`): its queries use `mas.run.id` (with `zuno.run_id` kept as an alternative), no `bff_request` panel remains, and no chart under `gitops/charts/{grafana,perses,observability}` references `zuno_bff_*`, `zuno_rag_*` or `agent_graph_run`. The "Left" item above is closed.
+- **Panel check against live data (no browser login: Grafana has its login form disabled, access is through oauth-proxy):** the 152 PromQL expressions of the 11 Grafana dashboards (126 panels) were run on the cluster's two Prometheus instances (platform and user-workload), template variables replaced by `.*`. All parse and 105 panels return series. The 21 empty ones are expected or out of scope: semantic cache off, no GPU exporter series, MariaDB exporter absent, no pod restarts, istio and Authorino series in the mesh datasource, no skipped candidates, RAG error ratio with no error. Not done: a pixel-level look at the rendered panels.
+- **Still empty and in scope:** the three `usage-cost` panels by group (`zuno_model_calls_by_group_total`, `zuno_model_tokens_by_group_total`): no such series exists yet because the ai-gateway running image predates `cc000ec3`, which introduces them (its roll is the ai-gateway counter fan-out fix). Close this work package once those three panels return series after that roll.
+
