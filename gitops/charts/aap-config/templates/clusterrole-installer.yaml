@@ -47,6 +47,11 @@ rules:
   - apiGroups: ["operators.coreos.com"]
     resources: ["subscriptions", "operatorgroups", "installplans", "clusterserviceversions", "operatorconditions"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # ADR-0586/WP-176: `make d2 install unifai` points the existing operator CatalogSource at the verified
+  # catalog digest (ansible/roles/unifai/tasks/pin_catalog.yml). Read and patch only, never create or delete.
+  - apiGroups: ["operators.coreos.com"]
+    resources: ["catalogsources"]
+    verbs: ["get", "list", "watch", "patch"]
   # Vault-backed secret delivery every component's install.yml relies on.
   - apiGroups: ["external-secrets.io"]
     resources: ["externalsecrets", "clustersecretstores", "secretstores"]
