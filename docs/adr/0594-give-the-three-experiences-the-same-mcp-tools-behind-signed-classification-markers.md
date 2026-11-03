@@ -47,6 +47,10 @@ classification marker, and the ai-gateway raises the call from the markers it fi
 5. **Scope.** UnifAI agents are not changed by this ADR: their routing stays per task (`local_only_for`, ADR-0565). The
    markers they receive are read the same way, so a marked C2 result can only raise their call, never lower it.
 
+> **Note (2026-11-03, WP-193):** the same experience-client list (`MARKER_FAIL_CLOSED_CLIENTS`) also narrows the
+> ai-gateway's `GET /v1/models` to `auto` alone, named "Zuno". Live testing also showed that a streamed tool call needs an
+> `index` for Open WebUI to run it; the ai-gateway now sends one.
+
 ## Alternatives considered
 
 - **A dedicated local model per UI that alone receives the C2 tools:** little code, but nothing stops a user from using the

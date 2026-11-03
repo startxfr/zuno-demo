@@ -48,7 +48,8 @@ flowchart LR
 3. **Same backend.** On the dashboard, row *Same backend, three experiences*: one series per experience (`unifai`,
    `open-webui`, `openclaw-sale-01`) for calls, tokens, cost and guardrail evaluations - one gateway counted them all.
 4. **Same routing.** Row *Same models, same routing*, table *Which provider served each experience*: the provider is
-   chosen by the request's data classification, not by the UI.
+   chosen by the request's data classification, not by the UI. Open WebUI shows a single model, "Zuno", with a banner saying
+   so, and its tools are on in every new chat (WP-193).
 5. **Resilience, the same for all.** Table *Candidates skipped for availability*: when local models are not ready, every
    experience skips them (`not_ready`) instead of waiting; a local-only task gets an immediate refusal, never a SaaS
    answer. Before ADR-0591 the same situation cost each experience up to fifteen minutes.
