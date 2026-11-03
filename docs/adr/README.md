@@ -351,6 +351,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0590](0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md) | Implemented | Front OpenClaw with oauth2-proxy and an egress firewall, one claw-operator per persona namespace |
 | [ADR-0591](0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md) | Accepted | Route only to ready local models and fail fast on stalled candidates |
 | [ADR-0592](0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md) | Implemented | Declare experience clients in the agents release, apart from agents |
+| [ADR-0593](0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md) | Accepted | Key the per-user quota and telemetry by persona across experiences |
 
 ## OKF v0.1
 

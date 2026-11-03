@@ -70,6 +70,9 @@ the ai-gateway and the mcp-gateway, reached through an egress proxy that injects
   `openclaw-<persona>`, shared across the person's sessions in OpenClaw but not with their UnifAI and Open WebUI
   usage. The shared-quota demonstration of ADR-0587 decision 5 therefore uses the same identity on purpose
   (WP-184 sets the persona's groups so the ceilings apply).
+- *Correction note (2026-11-03, [ADR-0593](0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md)):
+  the quota counter and the `user` metric label of the assistant are now the persona's, shared with the person's UnifAI
+  and Open WebUI usage. The identity of the calls is still the service account; only the key of the budget changes.*
 - The operator is alpha: an upgrade is a deliberate catalog pin change, never a channel follow.
 
 ## Security considerations
