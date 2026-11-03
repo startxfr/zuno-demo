@@ -49,6 +49,12 @@ v3 is slightly better than v2 (it recovers French entry 26) and both are below v
 collections hold 14,489 web chunks against 15,687 in v1 (a different corpus state, v1 keeps a stale tail), and v1 itself reads 0.62 on the English 21 against 0.71 on the
 same day's earlier run (entry 9 now missed). A fair v1/v2 comparison would need v1 rewritten by a fresh resync too. The `_v2` and `_v3` collections are left in Qdrant.
 
+**v1 rerun (2026-11-03, operator 0.1.51).** `results/ranking-v1-rerun-2026-11-03.json` reproduces the v1 figures exactly: all 31 0.68 / 0.81 / 0.74,
+English 21 0.62 / 0.76 / 0.69, French 10 0.80 / 0.90 / 0.85.
+- Against the earlier 0.71 run, entries 7 and 10 move from rank 1 to 2. Entries 9 and 11 leave the top 10.
+- Asked for 50 results, 9 ranks 7 and 11 ranks 4: the books are indexed, and the fused order depends on `top_k_results`.
+  Compare runs at the same `top_k`.
+
 Results are kept in `results/`, one JSON report per run (per-question rank, top score and top URL).
 `ranking-before-2026-10-31.json` is the baseline before UnifAI operator 0.1.44: hit@1 0.52, hit@5
 0.76, MRR 0.63 over the 21 answerable questions, and every no-answer question still gets a top

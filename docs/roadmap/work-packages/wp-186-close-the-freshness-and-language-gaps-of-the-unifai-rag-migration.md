@@ -69,3 +69,9 @@ The records say what the UnifAI RAG does about freshness and language, and Frenc
   Result ([README](../../../evaluations/redhat-docs/README.md), `results/ranking-sparse-v1-v2-v3-2026-11-03.json`): French hit@1 v1 0.80, v2 0.60, v3 0.60; all 31
   v1 0.68, v2 0.48, v3 0.52. By the rule above v3 is not needed (v1 French hit@1 is above 0.7) and it stays off; the stack reads v1 again. The `_v2` and `_v3`
   collections stay in Qdrant (dropping them is a separate decision). Open, not acted on: v1 reads 0.62 on the English 21 against 0.71 earlier the same day.
+- **2026-11-03 (rerun, user's go, after the second GPU node and operator 0.1.51):** the 0.62 is reproduced exactly
+  (`results/ranking-v1-rerun-2026-11-03.json`): all 31 0.68 / 0.81 / 0.74, English 21 0.62 / 0.76 / 0.69, French 10 0.80 / 0.90 / 0.85.
+  - Four English entries moved since the 0.71 run: 7 and 10 from rank 1 to 2; 9 and 11 from ranks 4 and 3 to out of the top 10.
+  - Their books are still indexed. Asked for 50 results, 9 ranks 7 and 11 ranks 4, so the fused order depends on `top_k_results`.
+  - The drop follows the corpus change between the two runs (WP-187 re-embed and the v2/v3 rewrites; v1 keeps a stale tail),
+    not missing content. The French rule still holds. A fresh v1 resync would be the clean way to compare again.
