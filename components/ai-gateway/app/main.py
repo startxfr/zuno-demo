@@ -46,7 +46,7 @@ from app.schemas import (
 from app.routing_watch import ROUTING_RELOAD_INTERVAL_SECONDS, RoutingWatcher
 from app.circuit_breaker import breaker
 from app.model_readiness import readiness
-from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_candidate_skipped, record_empty_response, set_caller_client
+from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_candidate_skipped, record_empty_response, set_caller_client, set_caller_persona
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ai_gateway")
@@ -383,6 +383,7 @@ async def chat_completions(
     x_zuno_max_tokens: str = Header(default="", alias="X-Zuno-Max-Tokens"),
 ):
     set_caller_client(identity.client)  # ADR-0587: experience client on the metrics
+    set_caller_persona(identity.persona)  # ADR-0593: the `user` label and the per-user budget
     classification = x_zuno_data_classification.upper()
     # ADR-0550: a per-(agent,task) local_only_for declaration ORs into the
     # caller's own X-Zuno-Local-Only flag - it can only ever add a
@@ -401,7 +402,7 @@ async def chat_completions(
     # ADR-0511: token-budget check BEFORE dispatch, on top of (never
     # instead of) the classification/eligibility intersection below.
     # Exhaustion is an explicit 429, never silent degradation.
-    denial = quota.ledger.check(quota_class, identity.sub, identity.groups, project_id)
+    denial = quota.ledger.check(quota_class, identity.persona, identity.groups, project_id)
     if denial is not None and _budget_fault_rides_through(denial, quota_class):
         logger.warning("quota budget config fault: class %r is fail_mode open, admitting", quota_class)
         denial = None
@@ -514,6 +515,7 @@ async def chat_completions(
             classification,
             messages,
             caller_sub=identity.sub,
+            quota_subject=identity.persona,
             groups=identity.groups,
             caller_bearer_token=identity.token,
             local_only=local_only,
@@ -615,6 +617,7 @@ async def images_generations(
     x_zuno_request_id: str = Header(default="", alias="X-Zuno-Request-Id"),
 ):
     set_caller_client(identity.client)  # ADR-0587
+    set_caller_persona(identity.persona)  # ADR-0593
     classification = x_zuno_data_classification.upper()
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
 
@@ -832,7 +835,7 @@ def _maas_quota_response(
             model_window = None
         denial.retry_after = quota_windows.clock.retry_after(
             quota_class,
-            identity.sub if identity else None,
+            identity.persona if identity else None,
             maas_adapter.groups_key(identity.groups if identity else None),
             project_id,
             provider=denial.provider,
@@ -931,7 +934,12 @@ async def _invoke_with_fallback(
     # maas_adapter._maas_bearer_token's own docstring.
     caller_bearer_token: Optional[str] = None,
     max_tokens: Optional[int] = None,
+    # ADR-0593: the persona the per-user budget, the quota windows and the
+    # MaaS attestation are keyed by; `caller_sub` stays the raw token subject
+    # (logs, span, semantic cache). None = the sub, the behaviour before.
+    quota_subject: Optional[str] = None,
 ) -> ChatCompletionResponse:
+    quota_subject = quota_subject or caller_sub
     # ADR-0104: cache check happens strictly AFTER routing_table.candidates_for()
     # already ran in chat_completions() above - a cache hit can never bypass
     # an eligibility/policy denial, only ever short-circuit an already-authorized
@@ -1070,12 +1078,12 @@ async def _invoke_with_fallback(
                 # ledger already; this is the first time it reaches a trace.
                 project_id=project_id,
             ) as call:
-                _note_maas_call(candidate, cfg, quota_class, caller_sub, groups, project_id)
+                _note_maas_call(candidate, cfg, quota_class, quota_subject, groups, project_id)
                 model = chat_model_for(
                     candidate, cfg, request_id=request_id, adapter=adapter_name,
                     caller_bearer_token=caller_bearer_token,
                     max_tokens=_candidate_max_tokens(max_tokens, cfg, messages, tools),
-                    **_maas_call_kwargs(caller_sub, groups, quota_class, project_id),
+                    **_maas_call_kwargs(quota_subject, groups, quota_class, project_id),
                 )
                 if tools:
                     model = model.bind_tools(tools)
@@ -1090,7 +1098,7 @@ async def _invoke_with_fallback(
                 # separate gap from record_usage's own streaming coverage
                 # below (ADR-0029) - tracked as a follow-up, not fixed here.
                 quota.ledger.consume(
-                    quota_class, caller_sub, groups, project_id,
+                    quota_class, quota_subject, groups, project_id,
                     prompt_tokens + completion_tokens,
                 )
         except Exception as exc:
@@ -1306,7 +1314,7 @@ async def _stream_completion(
             ) as call:
                 _note_maas_call(
                     candidate, cfg, quota_class,
-                    identity.sub if identity else None,
+                    identity.persona if identity else None,
                     identity.groups if identity else None,
                     project_id,
                 )
@@ -1315,7 +1323,7 @@ async def _stream_completion(
                     caller_bearer_token=identity.token if identity else None,
                     max_tokens=_candidate_max_tokens(max_tokens, cfg, messages, tools),
                     **_maas_call_kwargs(
-                        identity.sub if identity else None,
+                        identity.persona if identity else None,
                         identity.groups if identity else None,
                         quota_class, project_id,
                     ),
@@ -1361,7 +1369,7 @@ async def _stream_completion(
                 # was missing until now.
                 if identity is not None:
                     quota.ledger.consume(
-                        quota_class, identity.sub, identity.groups, project_id,
+                        quota_class, identity.persona, identity.groups, project_id,
                         prompt_tokens + completion_tokens,
                     )
         except Exception as exc:

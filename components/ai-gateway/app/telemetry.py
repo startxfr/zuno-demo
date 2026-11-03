@@ -260,6 +260,17 @@ def client_label(azp: Optional[str]) -> str:
     return "other"
 
 
+# ADR-0593: the persona of the request (CallerIdentity.persona), the value of
+# the `user` label. The raw token `sub` stays in the span (zuno.user_sub).
+_caller_persona: ContextVar[str] = ContextVar("zuno_caller_persona", default="")
+
+
+def set_caller_persona(persona: Optional[str]) -> None:
+    """Remember this request's persona for the `user` label of model_call_span.
+    Called once per handler, after token validation."""
+    _caller_persona.set(persona or "")
+
+
 def set_caller_client(azp: Optional[str]) -> None:
     """Remember this request's experience client for model_call_span and the
     guardrails counters. Called once per handler, after token validation."""
@@ -477,7 +488,7 @@ def model_call_span(
             latency_ms = (time.monotonic() - start) * 1000.0
             span.set_attribute("zuno.latency_ms", latency_ms)
             span.set_attribute("zuno.outcome", outcome)
-            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": caller_sub or "", "agent": agent or "",
+            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": _caller_persona.get() or caller_sub or "", "agent": agent or "",
                      "client": client}
             group_list = groups or [""]
             for attrs_per_group in ({**attrs, "group": g} for g in group_list):
