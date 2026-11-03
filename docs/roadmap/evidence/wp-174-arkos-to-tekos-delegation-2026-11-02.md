@@ -56,10 +56,12 @@ One GPU node came back (three of the four models Ready). Arkos scenario 21 as `e
   - The cap fired in traces `b9c9982da9e180eb911c30250668e8e3`, `e3661c262d1e9d97192b53231634f4d3` and `a391670119861d02335fe0e388c1a0d5`.
   - The `FAILED` labels printed by the scenario were a harness label (a span without `mas.success`), fixed in `0b55200e`. No `mas.session` or `send_message` span has an error status.
 - **Unrelated defect seen**: Tekos calls git-forge `list_repositories` without `provider`, `owner` and `repo`, which returns a 502 (traces `8e160bd26cda4688485f4315ccbe69fb`, `a695d489fb4297e09daa9af30d05dc90`, `a28c1c212a58f0cde28f1843b9b34e1b`).
-- **Not proven**: the cost of an Arkos turn that delegates (not measured), `X-Zuno-Max-Tokens` end to end, and the refusal checks of `evaluations/common/delegation_checks.py` (unentitled user, undeclared target, depth 2, cycle, write refused) on this operator.
+- **Refusal checks replayed** (`evaluations/arkos/security_checks.py`, `eval-consultant-01`, operator 0.1.53): the delegated surface exposes only read tools; refused without the target entitlement, with a depth header that disagrees and with half a chain (403). The undeclared target, the depth limit and the cycle answer 200 with an EMPTY tool list on `tools/list` and `denied: ... (ADR-0401)` / `(ADR-0406)` on `tools/call`; the checks expected a 403 and were corrected to accept an empty surface (`bde97594`). Write refusal: the delegated surface lists no write tool.
+- **Cost of one delegating turn** (ai-gateway counters, user `eval-consultant-01`, idle baseline checked, scenario 21, one passing turn of about 90 s, 2026-11-03 19:21): Arkos 753,363 tokens in 208 model calls, Tekos 85,696 tokens in 104 model calls, about 839,000 tokens and 312 calls for the turn, all on local `gpt-oss-20b`. The `evaluation` quota class of the persona is exhausted by a few such turns (a rate limit of about 16 minutes followed).
+- **Not proven**: `X-Zuno-Max-Tokens` end to end. Still red: `unifai_forwards_identity_to_the_gateways` (the orchestrator no longer calls MCP tools itself, the worker does).
 
 ## What remains
 
-1. The cost of an Arkos turn that delegates (use the ai-gateway counters, the traces carry no token counts).
-2. `X-Zuno-Max-Tokens` proven end to end, and the refusal checks of `evaluations/common/delegation_checks.py`.
+1. `X-Zuno-Max-Tokens` proven end to end, and a decision on `unifai_forwards_identity_to_the_gateways`.
+2. The cost of a delegating turn is measured (about 839,000 tokens and 312 model calls); whether it is acceptable, or needs a lower ceiling, is a decision.
 3. Then WP-174 Done and ADR-0401, ADR-0403, ADR-0406 to Implemented only for the proofs above that are made.
