@@ -132,7 +132,9 @@ open-webui:
       value: /openwebui_admin
     - name: ENABLE_OAUTH_ID_TOKEN_COOKIE
       value: "False"
-    # The ai-gateway is the authority on models (WP-180 section 2).
+    # The ai-gateway is the authority on models (WP-180 section 2): it lists
+    # `auto` alone to this client, shown as "Zuno" (WP-193). No `model_ids` in
+    # OPENAI_API_CONFIGS: Open WebUI would name the model by its id.
     - name: BYPASS_MODEL_ACCESS_CONTROL
       value: "True"
     - name: OPENAI_API_CONFIGS
@@ -164,3 +166,29 @@ open-webui:
       value: "False"
     - name: ENABLE_CODE_INTERPRETER
       value: "False"
+    # WP-193: one model, the Zuno tools on in every chat, native tool calls, the
+    # title as the only background task, a banner and Zuno suggestions.
+    - name: DEFAULT_MODELS
+      value: auto
+    - name: DEFAULT_MODEL_METADATA
+      value: '{"toolIds":["server:mcp:zuno-mcp"],"description":"Zuno picks the model for you: internal data stays on local models."}'
+    - name: DEFAULT_MODEL_PARAMS
+      value: '{"function_calling":"native"}'
+    - name: ENABLE_TITLE_GENERATION
+      value: "True"
+    - name: ENABLE_TAGS_GENERATION
+      value: "False"
+    - name: ENABLE_FOLLOW_UP_GENERATION
+      value: "False"
+    - name: ENABLE_AUTOCOMPLETE_GENERATION
+      value: "False"
+    - name: ENABLE_SEARCH_QUERY_GENERATION
+      value: "False"
+    - name: ENABLE_RETRIEVAL_QUERY_GENERATION
+      value: "False"
+    - name: WEBUI_BANNERS
+      value: '[{"id":"zuno-routing","type":"info","title":"Zuno picks the model","content":"Zuno chooses the model for each answer. Answers that use Confluence or the technical documentation are produced by a local model.","dismissible":true,"timestamp":1762128000}]'
+    - name: DEFAULT_PROMPT_SUGGESTIONS
+      value: '[{"title":["Find our onboarding pages","in Confluence"],"content":"Find our onboarding pages in Confluence."},{"title":["Search my Drive","for the latest proposal"],"content":"Search my Drive for the latest proposal."},{"title":["Configure a MachineSet autoscaler","in OpenShift"],"content":"How do I configure a MachineSet autoscaler in OpenShift?"},{"title":["Summarize the benefits","of a hybrid cloud strategy"],"content":"Summarize the benefits of a hybrid cloud strategy."}]'
+    - name: DEFAULT_LOCALE
+      value: en-US
