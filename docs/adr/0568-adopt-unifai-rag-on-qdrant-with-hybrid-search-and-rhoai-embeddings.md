@@ -232,3 +232,10 @@ query's top results with the source stack.
 Live work happens on `demo333`, which is powered off at the time of writing;
 the user is asked to power it on first, and every `oc` command passes
 `--context`. `demo222` is untouched until its own cutover (ADR-0573).
+
+## Update 2026-11-03 (WP-187): the source classification
+
+`UnifaiRAGSource.spec.classification` (C1 to C4, optional; operator 0.1.50) is written on every chunk in `metadata.classification` and returned in the
+search results; changing it embeds the pages again. On demo333 the Confluence sources are C2 and the 21 Red Hat documentation sources are C1;
+`sales-demo` is unclassified, which the mcp-gateway returns as C2 (fail closed). Live proof, through the mcp-gateway, of a result set of three C2 and
+two C1 chunks: [evidence](../roadmap/evidence/wp-187-live-labels.md). The old per-chunk classification of the retired rag-service is therefore back.

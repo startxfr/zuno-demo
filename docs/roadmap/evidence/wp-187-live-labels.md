@@ -37,8 +37,16 @@ Run as the OpenClaw persona `consultant-02` through its egress proxy; mcp-gatewa
 | Forged marker (rewritten to C1, external=1) | signature fails, counted as unmarked: C2, local |
 | `knowledge.tech.search` | **401** from the rag-server `query.bearer` endpoint: "Bearer token rejected: Audience doesn't match" |
 
-## Not proven yet
+## Per-chunk label through `knowledge.tech.search` (about 09:50 UTC)
 
-The per-chunk label on `knowledge.tech.search` results is not proven live from an experience client: the forwarded OpenClaw token does not carry
-the audience the rag-server accepts, so the search never reaches the chunks. The payload counts above stand on their own. The question of the
-accepted audience is with the UnifAI operator session (b9). WP-187 step 7 and the ADR notes wait on that.
+The 401 was an audience mismatch: the OpenClaw clients' tokens lacked the `zuno-admin-api` audience the rag-server `query.bearer` endpoint checks.
+Commit `325f9c28` adds the audience mapper to the `openclaw-consultant-02` and `openclaw-sale-01` clients (the Keycloak client reconcile Job
+updated both). As `consultant-02` through its proxy, `knowledge.tech.search "How do I configure a MachineSet autoscaler in OpenShift?"` returns five results:
+
+| Result | Source | Classification |
+|---|---|---|
+| 3 | Confluence SXSI pages O0B45-SUCIN, O0B42-PRCIN, O0B45-EXCIN | C2 |
+| 2 | "Machine management \| OpenShift Container Platform 4.22 \| Red Hat Documentation" | C1 |
+
+The mcp-gateway marker on that result is `level=C2 external=0`: the highest chunk level, which the ai-gateway then applies to the turn.
+No turn is raised by the RAG itself; the raise happens in the ai-gateway from the signed marker (WP-191, ADR-0594).

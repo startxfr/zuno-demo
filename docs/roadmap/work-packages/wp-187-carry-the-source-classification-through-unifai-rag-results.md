@@ -1,6 +1,6 @@
 # WP-187: Carry the source classification through UnifAI RAG results, and keep Confluence content off external models
 
-- **State:** Repo work merged (steps 1 to 6 done; operator 0.1.50 and the sources rolled on demo333 2026-11-03; step 7 live proof through the mcp-gateway and step 8 records remain)
+- **State:** Done (2026-11-03: operator 0.1.50 and the source labels are live on demo333; a Confluence result is C2 and a Red Hat documentation result is C1 through the mcp-gateway)
 - **ADRs:** [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0034](../../adr/0034-compute-effective-classification-from-the-complete-context.md)
 - **Depends on:** none (step 3 needs a UnifAI operator release)
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [ADR-0206](../../adr/0206-separate-current-salesforce-knowledge-from-legacy-sxa.md)
@@ -68,6 +68,9 @@ reads Confluence can send that content to an external model.
   `devel-042c793d1` (`fec63456`), and the sources classified (`b1629fc6`: the two Confluence sources C2, the 21 Red Hat sources C1, `sales-demo`
   unclassified = C2 for the mcp-gateway). After the re-embed every Confluence chunk (501) is C2 and 15,663 web chunks are C1.
   The chart passes `classification` to `UnifaiRAGSource` for `ragSources` and for `redhatDocs`.
+- **2026-11-03 (closed):** the live proof of step 7 passed ([evidence](../evidence/wp-187-live-labels.md)). It first met a 401 on `query.bearer`
+  (OpenClaw tokens had no `zuno-admin-api` audience), fixed by `325f9c28` in the Keycloak realm; then five results came back with 3 C2 (Confluence)
+  and 2 C1 (Red Hat) and the marker `level=C2`. ADR-0565 and ADR-0568 carry dated notes.
 
 ## Steps
 

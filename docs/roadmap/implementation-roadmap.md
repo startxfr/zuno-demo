@@ -22,7 +22,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 
 | Version | ADRs | Open ADRs | WPs | Open WPs |
 |---|---|---|---|---|
-| v0 | 72 | — | 8 | WP-187 |
+| v0 | 72 | — | 8 | — |
 | v0.1 | 29 | 1 | 19 | — |
 | v0.2 | 14 | — | 19 | WP-098 |
 | v0.3 | 15 | — | 19 | — |
@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 18 | 26 | WP-166, WP-172, WP-173, WP-174, WP-187 |
+| v0.11 | 24 | 18 | 26 | WP-166, WP-172, WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 8 | 1 | 10 | WP-191 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -996,7 +996,7 @@ the old stack. The comparison found three behaviours that the retirement dropped
 |---|---|---|---|---|---|
 | WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Done (2026-11-02) | cleanup live in agents v0.9.0, ADR-0219 Deprecated, domain left dropped by decision; descriptor removed with agents v0.9.2; live question to comage answered without fallback (2026-11-03) |
 | WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Done (2026-11-03) | records corrected; French run hit@1 0.80 (10 questions), accepted as is, no stemmer follow-up |
-| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | repo work merged | steps 1 to 6 done; operator 0.1.50, the images and the source labels are live on demo333 (Confluence 501 chunks C2, Red Hat 15,663 chunks C1); next: the live proof through the mcp-gateway and the ADR notes |
+| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | Done (2026-11-03) | operator 0.1.50, the images and the source labels live on demo333; a Confluence result is C2 and a Red Hat result C1 through the mcp-gateway; ADR notes written |
 
 ### OKF stream phases
 
