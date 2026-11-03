@@ -81,8 +81,8 @@ Proofs made, against the list above:
 | Classification on return: Tekos results join Arkos's C3 run | 0401 | not checked separately |
 | Refusals: unentitled user, undeclared target, depth 2, cycle, half a chain, depth header mismatch, read-only delegated surface (`evaluations/arkos/security_checks.py`) | 0401, 0403, 0406 | made: 7 of 7 hold on 0.1.53 |
 | The cost lands on the initiating user; the cost of one delegating turn | 0406 | made: one scenario 21 turn as `eval-consultant-01` cost Arkos 753,363 tokens in 208 calls and Tekos 85,696 tokens in 104 calls (about 839,000 tokens, all local gpt-oss-20b; ai-gateway counters, idle baseline checked, `f4fd6318`). Whether this cost is acceptable or needs a lower ceiling is an open decision, not a missing proof |
-| A delegation no longer awaited cancels the remote task | 0406 | not run |
-| `X-Zuno-Max-Tokens` end to end | 0406 | not proven |
+| A delegation no longer awaited cancels the remote task | 0406 | not implemented: the UnifAI client never calls `cancel_task` as of 0.1.53, on a timeout, a user abort or a cancelled Temporal run (b9, fork code); fix planned in 0.1.55 |
+| `X-Zuno-Max-Tokens` end to end | 0406 | half proven: the ai-gateway enforces the header (64 gives 64 completion tokens, 128 gives 128); the operator sends it on every call, but Arkos declares 8192, so no call reaches it, and the value sent is not logged. A low-ceiling test needs a signed release; a span attribute with the value is offered for 0.1.55 |
 | Approval (ADR-0409) | 0409 | waits for WP-173 |
 
 The refusal checks were replayed as `eval-consultant-01` on 0.1.53. Three of them (undeclared target, depth limit, cycle)
@@ -102,3 +102,19 @@ The cost of a delegating turn is a decision still open: accept it, or lower the 
 
 A defect unrelated to the delegation was also seen: Tekos calls git-forge `list_repositories` without `provider`,
 `owner` and `repo`, which returns a 502.
+
+## Progress (2026-11-03, evening): cost levers and the two last proofs
+
+See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#cost-levers-git-forge-schema-and-what-the-fork-does-not-do-2026-11-03-evening).
+- **Cap at 1** (`MAS_MAX_DELEGATIONS_PER_ITEM=1`, `bf128167`): four scenario 21 turns passed, each with exactly 1 A2A message.
+  - Tekos: 25,376 to 34,164 tokens per turn, about a third of its cost at the cap of 3.
+  - Arkos: 339,729 to 882,973 tokens, with no measurable change and a high variance.
+  - A turn with no delegation costs Arkos 309,231 tokens in 104 calls, so most of the cost is Arkos's own loop, not
+    the delegation.
+  - The Arkos suite passed 17 of 18 at the cap of 1. Scenario 10 is flaky, and the cap's effect on it is not shown.
+  - Keeping the cap at 1, and reducing Arkos's own loop, are decisions still open.
+- **git-forge**: the 502s came from `tools/list` advertising an open schema. The mcp-gateway now advertises the backend's
+  schema (`8625492f`, `4c6bef54`, verified on `tools/list`). No real Tekos call through the new schema has been seen yet.
+- **Still open, both waiting for operator 0.1.55**: the cancellation of a delegation no longer awaited (not implemented
+  in the UnifAI client) and `X-Zuno-Max-Tokens` end to end. ADR-0406 stays `Accepted`, and approval (ADR-0409) still
+  waits for WP-173.
