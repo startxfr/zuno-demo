@@ -154,7 +154,7 @@ used: neither `zuno-mariadb` Application is applied, `install` instead
 validates the `zuno_mariadb_external_*` payload (fail-fast on any
 `"xxxxxx"` sentinel), seeds the two per-database passwords into the
 same Vault paths the consumer ExternalSecrets already read
-(`rag/pipeline-db`, `mlops/dspa-mysql`, `rhtas/trillian-mysql` -
+(`mlops/dspa-mysql`, `rhtas/trillian-mysql` -
 overwriting the internally generated ones), and asserts reachability plus
 per-database AUTH through a short-lived client Job in `zuno-data`
 (image: `zuno_mariadb_client_image`, default

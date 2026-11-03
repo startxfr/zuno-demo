@@ -44,8 +44,9 @@ the demo case by construction, and ADR-0565 defines `preferred_classification` a
 rises. The level is therefore carried and raised by the agents' runs (WP-173), and the gateway judges each call on its own
 header. ADR-0401 and ADR-0403 say so.
 
-Not live until a release carrying the OKF delegation fields and `access` is promoted (WP-171); before that no bundle
-declares a target, so every delegated call is refused.
+Deployed, not yet proven: the release carrying the delegation fields and `access` is admitted and the gateway enforcement code
+is running in the mcp-gateway (verified 2026-11-03). No delegated call has reached the gateway live yet: the WP-174 run stops
+before it ("Node a2a-tekos is not adjacent, or the uid is wrong"), so the State stays "Repo work merged" until that proof exists.
 
 Decided when the records were accepted: the boolean `delegation.allow_write` is transitional. When approval ships (WP-173) the gateway check
 becomes "the target `agent/task` is on `delegation.write_allowed`" (ADR-0409 clause 5), and this module's `DelegationLimits` and `evaluate`

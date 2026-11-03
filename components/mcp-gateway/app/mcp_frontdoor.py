@@ -23,7 +23,9 @@ from __future__ import annotations
 import logging
 import os
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+from app import classification_marker
 
 logger = logging.getLogger("mcp_gateway.frontdoor")
 
@@ -117,6 +119,24 @@ def _result(request_id: Any, result: Dict[str, Any]) -> Dict[str, Any]:
     return {"jsonrpc": JSONRPC_VERSION, "id": request_id, "result": result}
 
 
+def _marker_for(policy_store: Any, binding: Any, name: str, payload: Any) -> Tuple[str, bool]:
+    """ADR-0594: the level and the external-context flag of one tool result -
+    the highest of the tool's min_classification and the levels inside the
+    result; external context allowed only if the tool's policy allows it. A tool
+    the policy does not know is marked C2 with no external context."""
+    entry = None
+    for candidate in (binding.all_names() if binding else []) or [name]:
+        entry = policy_store.get_tool(candidate) if policy_store is not None else None
+        if entry is not None:
+            break
+    if entry is None:
+        return "C2", False
+    level = classification_marker.highest(
+        [entry.min_classification, *classification_marker.levels_in(payload)]
+    )
+    return level, bool(getattr(entry, "allow_external_context", True))
+
+
 def _error(request_id: Any, code: int, message: str, data: Any = None) -> Dict[str, Any]:
     err: Dict[str, Any] = {"code": code, "message": message}
     if data is not None:
@@ -129,7 +149,7 @@ def _tool_error(text: str) -> Dict[str, Any]:
     return {"content": [{"type": "text", "text": text}], "isError": True}
 
 
-def _tool_ok(payload: Any) -> Dict[str, Any]:
+def _tool_ok(payload: Any, marker: Optional[Tuple[str, bool]] = None) -> Dict[str, Any]:
     """MCP requires `content` blocks. Downstream tools return structured JSON,
     so we send both: `structuredContent` for clients that can use it, and a
     text rendering for those that cannot. Lightspeed reads the text form.
@@ -143,6 +163,10 @@ def _tool_ok(payload: Any) -> Dict[str, Any]:
             text = _json.dumps(payload, ensure_ascii=False, indent=2)
         except (TypeError, ValueError):
             text = str(payload)
+    if marker is not None:
+        # ADR-0594: the signed classification of this result, read by the
+        # ai-gateway when the text comes back in a later model call.
+        text = classification_marker.mark(text, marker[0], marker[1])
     result: Dict[str, Any] = {"content": [{"type": "text", "text": text}], "isError": False}
     if isinstance(payload, dict):
         result["structuredContent"] = payload
@@ -478,7 +502,7 @@ async def dispatch(
                 "mcp frontdoor: tool '%s' failed: %s (argument names: %s)", name, exc, sorted(arguments)
             )
             return _result(request_id, _tool_error(_short_error(exc)))
-        return _result(request_id, _tool_ok(payload))
+        return _result(request_id, _tool_ok(payload, marker=_marker_for(policy_store, binding_for_names, name, payload)))
 
     raise JsonRpcError(METHOD_NOT_FOUND, f"unknown method '{method}'")
 

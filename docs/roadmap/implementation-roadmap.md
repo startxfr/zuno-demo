@@ -22,9 +22,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 
 | Version | ADRs | Open ADRs | WPs | Open WPs |
 |---|---|---|---|---|
-| v0 | 72 | — | 8 | WP-187 |
-| v0.1 | 29 | 1 | 19 | WP-186 |
-| v0.2 | 14 | — | 19 | WP-098, WP-186 |
+| v0 | 72 | — | 8 | — |
+| v0.1 | 29 | 1 | 19 | — |
+| v0.2 | 14 | — | 19 | WP-098 |
 | v0.3 | 15 | — | 19 | — |
 | v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
 | v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
@@ -33,9 +33,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 18 | 26 | WP-166, WP-171, WP-172, WP-173, WP-174, WP-186, WP-187 |
+| v0.11 | 24 | 18 | 26 | WP-166, WP-172, WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 7 | 1 | 9 | WP-190 |
+| v0.13 | 9 | — | 12 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -955,8 +955,8 @@ frozen mirror.
 | WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Done (2026-10-24) | Red Hat docs on UnifAI (38 web sources, 16/18 vs 13/18), rag-service and rag-ingestion retired on demo333 and in the repository; corpus scoped to 21 latest-version sources 2026-10-25 |
 | WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Done | live on demo333 2026-10-23 (89ec9fba): five eval-* personas; harnesses switched (86ef03e4); platform/keycloak/tests now run in CI |
 | WP-170 | [wp-170](work-packages/wp-170-agent-delegation-contract-and-adrs.md) | 0401, 0402, 0403, 0406, 0409 | none | Done | the four records accepted 2026-10-24 (Implemented after WP-174's live proofs) |
-| WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Repo work merged | merged on zuno-demo-agents devel (PR #9); a release and its promotion into agents.lock are the maintainer's |
-| WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Repo work merged | live once the release carrying the delegation fields and tool `access` is promoted |
+| WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Done (2026-11-03) | merged on zuno-demo-agents devel (PR #9), released and admitted; fields and `access` live in the mcp-gateway |
+| WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Repo work merged | release admitted and enforcement deployed; no delegated call proven live yet (WP-174) |
 | WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | step 6 (the operator refuses A2A and delegation targets) is live in operator 0.1.35; steps 1 to 5 wait for the user's priority |
 | WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | operator pending | wiring live (agents v0.8.0, operator 0.1.49); behavioural proof waits for the GPU models |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Done (2026-10-25) | zuno-side A2A gateway live on demo333, 32 test blueprints (26 valid, 6 wait for placeholder agents), real delegated turns and the denial check proven |
@@ -983,7 +983,10 @@ WP-184 closes them together.
 | WP-184 | [wp-184](work-packages/wp-184-three-experiences-demonstration.md) | 0587, 0588, 0589 | WP-181, WP-183 | Done (2026-11-03) | joint close: dashboard, demo script, shared-quota proof across the three experiences |
 | WP-188 | [wp-188](work-packages/wp-188-route-only-to-ready-local-models.md) | 0591 | WP-179 | Done | ai-gateway: skip local models their controller reports not ready, per-provider circuit breaker, no SDK retries, immediate 503 when nothing is left, NeMo warm-up; build and roll after the user's go |
 | WP-189 | [wp-189](work-packages/wp-189-experience-clients-in-the-agents-release.md) | 0592 | WP-181 | Done | experience clients (Open WebUI, OpenClaw) declared in their own layer of the agents release, read by the mcp-gateway only, C1 read-only tools; release, promotion and roll by the user |
-| WP-190 | [wp-190](work-packages/wp-190-one-identity-one-budget-and-one-infrastructure-pattern-for-the-three-experiences.md) | 0593, 0587, 0589 | WP-184 | Not started | one per-user budget across Open WebUI, UnifAI and OpenClaw (persona claim on the OpenClaw service accounts, `user` label = persona), then the same observability, network, automation and chart/role pattern for the three; ai-gateway build and live proof need the owners' go |
+| WP-190 | [wp-190](work-packages/wp-190-one-identity-one-budget-and-one-infrastructure-pattern-for-the-three-experiences.md) | 0593, 0587, 0589 | WP-184 | Done (2026-11-03) | one per-user budget across Open WebUI, UnifAI and OpenClaw (persona claim on the OpenClaw service accounts, `user` label = persona), then the same observability, network, automation and chart/role pattern for the three; ai-gateway build and live proof need the owners' go |
+| WP-191 | [wp-191](work-packages/wp-191-same-mcp-tools-in-the-three-experiences.md) | 0594, 0592 | WP-189, WP-190 | Done (2026-11-03) | the same read MCP tools (Confluence, technical docs) in the three experiences; signed classification markers on tool results, raised by the ai-gateway to local-only |
+| WP-192 | [wp-192](work-packages/wp-192-one-demo-password-and-named-keycloak-administrators.md) | 0595 | — | Done (2026-11-03) | one shared demo password through one variable per component; named `zuno-admin` and `zuno-automation` Keycloak accounts replace the temporary bootstrap admin |
+| WP-193 | [wp-193](work-packages/wp-193-open-webui-user-experience.md) | 0588, 0594 | WP-191 | Done (2026-11-03) | Open WebUI: one model shown as Zuno (the ai-gateway lists `auto` alone to experience clients), the tools on by default, the title as the only background task, a banner and Zuno suggestions |
 
 ### Phase 47 — gaps left by the retirement of the old RAG stack (added 2026-11-02)
 
@@ -993,9 +996,9 @@ the old stack. The comparison found three behaviours that the retirement dropped
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Done (2026-11-02) | cleanup live in agents v0.9.0, ADR-0219 Deprecated, domain left dropped by decision; descriptor removed with agents v0.9.2; leftover: live comage question when the GPU nodes return |
-| WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Repo work merged | records corrected and ten French questions added; the French run (and the 0.7 decision) waits on the embedding model |
-| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | operator pending | steps 1 and 2 done and proved (the label is not the leak; five Confluence-reading tasks are local only since agents v0.8.1); next: the source classification field (operator 0.1.50 plus a rag image), waiting for the user's go |
+| WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Done (2026-11-02) | cleanup live in agents v0.9.0, ADR-0219 Deprecated, domain left dropped by decision; descriptor removed with agents v0.9.2; live question to comage answered without fallback (2026-11-03) |
+| WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Done (2026-11-03) | records corrected; French run hit@1 0.80 (10 questions), accepted as is, no stemmer follow-up |
+| WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | Done (2026-11-03) | operator 0.1.50, the images and the source labels live on demo333; a Confluence result is C2 and a Red Hat result C1 through the mcp-gateway; ADR notes written |
 
 ### OKF stream phases
 
@@ -1141,10 +1144,20 @@ moving.
 
 ## Change log
 
+- 2026-11-03 — WP-191 and WP-193 Done, ADR-0594 Implemented. The three experiences list the same read MCP tools, filtered
+  by groups. Signed markers raise OpenClaw tool turns to C2 and local. Open WebUI rewrites tool results, so its markers
+  never verify and every tool turn there is C2 and local (the fail-closed case, accepted by the user). Open WebUI shows
+  one "Zuno" model, with its tools on by default.
+- 2026-11-03 — WP-193 added to phase 46: Open WebUI shows one model, "Zuno", since the ai-gateway routes on the
+  classification and never on the model name; the tools are on by default and the title is the only background task.
+- 2026-11-03 — ADR-0595 and WP-192 added to phase 46: one shared demo password through one variable per component,
+  and named Keycloak administrators in place of the temporary bootstrap account.
+- 2026-11-03 — ADR-0594 and WP-191 added to phase 46: the experience clients get the same read MCP tools as the agents,
+  filtered by groups; signed classification markers on tool results keep Confluence content on local models.
 - 2026-11-03 — WP-188 Done and ADR-0591 Implemented: with the GPU node back, the local models served again on the same
   ai-gateway pod that had skipped them as not ready, without a restart.
 - 2026-11-03 — ADR-0593 and WP-190 added to phase 46: the per-user quota counter and the `user` label are keyed by persona so
-  the three experiences share one budget, and the three are aligned on the platform in phases (WP-184 rehearsal finding).
+  the three experiences share one budget, and the three are aligned on the platform in phases (WP-184 shared-quota finding).
 - 2026-11-02 — ADR-0588 and ADR-0592 Implemented (WP-181 and WP-189 Done, proven live on
   demo333); v0.13 open ADRs: ADR-0587 (closes with WP-184) and ADR-0591 (WP-188).
 - 2026-11-03 — WP-184 Done and ADR-0587 Implemented: the three experiences, the dashboard and the script are proved live; the

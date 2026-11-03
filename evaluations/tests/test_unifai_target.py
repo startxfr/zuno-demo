@@ -637,3 +637,14 @@ def test_delegation_spans_report_success_and_a_failed_attempt_is_not_a_delegatio
     got = ut.delegation_spans(spans)
     assert [(x["name"], x["ok"]) for x in got] == [
         ("execute_tool iem.delegate_task", False), ("execute_tool iem.delegate_task", True), ("node.run", False)]
+
+
+def test_a2a_calls_counts_only_the_a2a_client_send_message_spans():
+    spans = [
+        {"name": "execute_tool iem.delegate_task", "attrs": {"mas.success": "True"}},
+        {"name": "a2a.client.transports.jsonrpc.JsonRpcTransport.send_message", "attrs": {}},
+        {"name": "a2a.client.transports.jsonrpc.JsonRpcTransport._send_request", "attrs": {}},
+        {"name": "a2a.client.transports.jsonrpc.JsonRpcTransport.send_message", "attrs": {}},
+    ]
+    assert ut.a2a_calls(spans) == 2
+    assert ut.a2a_calls([]) == 0

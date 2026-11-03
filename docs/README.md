@@ -16,8 +16,9 @@ This directory is the canonical documentation set for the Zuno Demo platform.
 10. [OKF workflow: change, sign, deploy, consume](agents/okf-workflow.md)
 11. [Platform prerequisites](platform/prerequisites.md)
 12. [Installation](platform/installation.md)
-13. [Roadmap](roadmap/README.md)
-14. [Demo script: three experiences, one governed backend](demo/three-experiences.md)
+13. [Release sequence on demo333](platform/release-sequence.md)
+14. [Roadmap](roadmap/README.md)
+15. [Demo script: three experiences, one governed backend](demo/three-experiences.md)
 
 ## Documentation policy
 

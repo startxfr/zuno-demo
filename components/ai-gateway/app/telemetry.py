@@ -36,6 +36,7 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExporter
 from opentelemetry.propagate import extract
 from opentelemetry.sdk.metrics import MeterProvider
+from opentelemetry.sdk.metrics.view import ExplicitBucketHistogramAggregation, View
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -120,6 +121,23 @@ _empty_response_counter = None
 _candidates_skipped_counter = None
 
 
+# WP-190 phase 2: the SDK's default histogram buckets stop at 10 s, so every
+# call slower than that (local models take 11 to 120 s; 22 % of UnifAI's calls
+# on demo333 2026-11-03) fell into +Inf and the p95 panels read a flat 10000 ms.
+# Bounds in ms, up to the 180 s provider timeout and beyond.
+MODEL_CALL_DURATION_BUCKETS_MS = (
+    250, 500, 750, 1000, 2500, 5000, 7500, 10000, 15000, 20000, 30000,
+    45000, 60000, 90000, 120000, 180000, 300000,
+)
+
+
+def metric_views() -> list:
+    return [View(
+        instrument_name="zuno.model_call_duration_ms",
+        aggregation=ExplicitBucketHistogramAggregation(boundaries=MODEL_CALL_DURATION_BUCKETS_MS),
+    )]
+
+
 def init_telemetry(service_name: str = "ai-gateway") -> None:
     global _tracer, _model_call_counter, _token_counter, _cost_counter, _cache_lookup_counter
     global _model_call_duration_histogram
@@ -136,6 +154,7 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
 
     meter_provider = MeterProvider(
         resource=resource,
+        views=metric_views(),
         metric_readers=[
             PeriodicExportingMetricReader(
                 OTLPMetricExporter(endpoint=f"{OTEL_ENDPOINT}/v1/metrics")
@@ -258,6 +277,17 @@ def client_label(azp: Optional[str]) -> str:
         if azp == entry:
             return azp
     return "other"
+
+
+# ADR-0593: the persona of the request (CallerIdentity.persona), the value of
+# the `user` label. The raw token `sub` stays in the span (zuno.user_sub).
+_caller_persona: ContextVar[str] = ContextVar("zuno_caller_persona", default="")
+
+
+def set_caller_persona(persona: Optional[str]) -> None:
+    """Remember this request's persona for the `user` label of model_call_span.
+    Called once per handler, after token validation."""
+    _caller_persona.set(persona or "")
 
 
 def set_caller_client(azp: Optional[str]) -> None:
@@ -477,7 +507,7 @@ def model_call_span(
             latency_ms = (time.monotonic() - start) * 1000.0
             span.set_attribute("zuno.latency_ms", latency_ms)
             span.set_attribute("zuno.outcome", outcome)
-            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": caller_sub or "", "agent": agent or "",
+            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": _caller_persona.get() or caller_sub or "", "agent": agent or "",
                      "client": client}
             group_list = groups or [""]
             for attrs_per_group in ({**attrs, "group": g} for g in group_list):

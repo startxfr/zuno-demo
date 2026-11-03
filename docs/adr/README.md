@@ -351,7 +351,9 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0590](0590-front-openclaw-with-oauth2-proxy-and-an-egress-firewall-one-claw-operator-per-persona-namespace.md) | Implemented | Front OpenClaw with oauth2-proxy and an egress firewall, one claw-operator per persona namespace |
 | [ADR-0591](0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md) | Implemented | Route only to ready local models and fail fast on stalled candidates |
 | [ADR-0592](0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md) | Implemented | Declare experience clients in the agents release, apart from agents |
-| [ADR-0593](0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md) | Accepted | Key the per-user quota and telemetry by persona across experiences |
+| [ADR-0593](0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md) | Implemented | Key the per-user quota and telemetry by persona across experiences |
+| [ADR-0594](0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md) | Implemented | Give the three experiences the same MCP tools behind signed classification markers |
+| [ADR-0595](0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md) | Implemented | Set demo passwords from one shared value through one variable per component |
 
 ## OKF v0.1
 

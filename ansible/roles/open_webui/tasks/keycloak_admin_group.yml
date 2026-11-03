@@ -4,18 +4,8 @@
 # the group and its members, but groups and users are create-only on a live realm
 # (the client-reconcile Job only creates agent_* groups), so they are created here:
 # the group when missing, and each member added when missing. Nothing is removed.
-- name: "open-webui | read the Keycloak admin credentials"
-  kubernetes.core.k8s_info:
-    kind: Secret
-    namespace: zuno-auth
-    name: keycloak-admin
-  register: _open_webui_kc_admin
-  no_log: true
-
-- name: "open-webui | fail if the Keycloak admin credentials are missing"
-  ansible.builtin.fail:
-    msg: "Secret zuno-auth/keycloak-admin not found - run `make d0 install keycloak` first."
-  when: (_open_webui_kc_admin.resources | default([]) | length) == 0
+- name: "open-webui | read the Keycloak automation credentials (ADR-0595)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/read_keycloak_automation_credentials.yml"
 
 - name: "open-webui | create the openwebui_admin group and its members (create-only)"
   kubernetes.core.k8s_exec:
@@ -26,8 +16,8 @@
       K=/opt/keycloak/bin/kcadm.sh; C="--config /tmp/kcadm-open-webui.config";
       trap "rm -f /tmp/kcadm-open-webui.config" EXIT;
       $K config credentials $C --server http://localhost:8080 --realm master
-      --user {{ _open_webui_kc_admin.resources[0].data.username | b64decode | quote }}
-      --password {{ _open_webui_kc_admin.resources[0].data.password | b64decode | quote }} >/dev/null || exit 1;
+      --user {{ _kc_automation_user | quote }}
+      --password {{ _kc_automation_password | quote }} >/dev/null || exit 1;
       gid=$($K get groups -r zuno $C -q search=openwebui_admin -q exact=true --fields id,name --format csv --noquotes | grep ",openwebui_admin$" | cut -d, -f1);
       if [ -z "$gid" ]; then
         gid=$($K create groups -r zuno $C -s name=openwebui_admin -i) && echo "created group openwebui_admin";

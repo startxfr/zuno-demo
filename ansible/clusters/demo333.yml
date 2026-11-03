@@ -119,6 +119,7 @@ zuno_unifai_values:
       rootTitle: 'Technologie : Satellite'
       spaceKey: SXSI
     name: tekos-satellite
+    classification: C2   # WP-187: Confluence content stays at C2
     syncInterval: 6h
     tags:
     - knowledge.tech
@@ -135,6 +136,7 @@ zuno_unifai_values:
       rootTitle: 'Technologie : Openshift'
       spaceKey: SXSI
     name: tekos-openshift
+    classification: C2   # WP-187: Confluence content stays at C2
     syncInterval: 6h
     tags:
     - knowledge.tech
@@ -214,11 +216,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:23635466a7eead52c6c4b2cbb915147f91d0d1ef4600261eb4611e87b78e7568  # devel-be4821358
-      identity: quay.io/zuno/unifai-identity@sha256:4a68541949850543d9e8fc85ec96d34ba6e7889b501190e64fe9a1752a9dd741  # devel-be4821358
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:39b3843a32a342cd3e35c6160553b44817df87e3cd99a14836b6730be5127253  # devel-d5d4f936c (tool errors logged, tool-result context fix)
-      rag: quay.io/zuno/unifai-rag@sha256:24a509279b56937b9c38a78efa257fecc9378dc2a3ff3e5949ba97dd0bdb793d  # devel-be4821358
-      ui: quay.io/zuno/unifai-ui@sha256:64891466197c48d118945876edebba4e56d804bb917136bf4197b1febfbe395a  # devel-c33f19799 (mermaid error graphic fix)
+      backend: quay.io/zuno/unifai-backend@sha256:5527daeb3341cf4afa4ee34148c84efe2cc618a8a4bfc7e765e763f986dfa89a  # devel-042c793d1 (operator 0.1.50 e2e tag)
+      identity: quay.io/zuno/unifai-identity@sha256:29d002700b376b61da185550a8c1734f26c8f9260255fc768e8592105766d24f  # devel-042c793d1 (operator 0.1.50 e2e tag)
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:e2be8ee0c4983032959f50955279d30d912d0b5a89f092a903b2517ea237284f  # devel-042c793d1 (operator 0.1.50 e2e tag)
+      rag: quay.io/zuno/unifai-rag@sha256:406bd70022c618cba03fc8679a636e846e1a868b03e75867b4a3902980197ad9  # devel-66105c780 (web sync guard: a crawl that would delete over half of a source fails, 429/503 retried; R-527)
+      ui: quay.io/zuno/unifai-ui@sha256:e03f9f81435ccd81ec0f6e29c77c27da9b0a800ddd840953815ca09f429e7e5c  # devel-042c793d1 (operator 0.1.50 e2e tag)
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
@@ -246,6 +248,7 @@ zuno_unifai_values:
   redhatDocs:
     enabled: true
     syncInterval: 168h
+    classification: C1   # WP-187: public Red Hat documentation
 
 # WP-157 live enable sequence (user go 2026-10-24, one step at a time, each
 # verified before the next; brief "Decisions of 2026-10-24" and Progress).

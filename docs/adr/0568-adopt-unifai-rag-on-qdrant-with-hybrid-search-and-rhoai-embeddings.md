@@ -164,10 +164,10 @@ Measured against the live fork while closing WP-186, behaviours of the retired r
 - **The `sql-dump` source type was not built**, although this record made it a condition of retiring the old ingestion, so `knowledge.sxa-legacy` (about 310,000 documents) has no source and the
   agents stopped declaring it in release v0.9.0 ([ADR-0219](0219-serve-sxa-only-as-a-historical-rag-corpus.md), WP-185). On 2026-11-02 the user decided to leave the domain dropped, so the `sql-dump` condition is withdrawn for it.
 - **The language boost** (+0.01) is not carried. The sparse side is a hashing BM25 encoder with accent folding and English and French stop words, without stemming. French queries
-  are measured by WP-186.
+  were measured on 2026-11-03 (WP-186): hit@1 0.80 on ten French questions, so the bilingual handling stays as it is, with no language boost and no stemmer.
 
-ADR-0203 and ADR-0205 stay in force, as the table above says; only their "see" references to deleted code are updated. ADR-0205 no longer has a test that asserts its read-only
-invariant for the indexed path (WP-186).
+ADR-0203 and ADR-0205 stay in force, as the table above says; only their "see" references to deleted code are updated. ADR-0205's read-only invariant for the indexed path is asserted again since 2026-11-03
+by `components/mcp-gateway/tests/test_rag_query.py` (WP-186).
 
 ## Consequences
 
@@ -232,3 +232,10 @@ query's top results with the source stack.
 Live work happens on `demo333`, which is powered off at the time of writing;
 the user is asked to power it on first, and every `oc` command passes
 `--context`. `demo222` is untouched until its own cutover (ADR-0573).
+
+## Update 2026-11-03 (WP-187): the source classification
+
+`UnifaiRAGSource.spec.classification` (C1 to C4, optional; operator 0.1.50) is written on every chunk in `metadata.classification` and returned in the
+search results; changing it embeds the pages again. On demo333 the Confluence sources are C2 and the 21 Red Hat documentation sources are C1;
+`sales-demo` is unclassified, which the mcp-gateway returns as C2 (fail closed). Live proof, through the mcp-gateway, of a result set of three C2 and
+two C1 chunks: [evidence](../roadmap/evidence/wp-187-live-labels.md). The old per-chunk classification of the retired rag-service is therefore back.

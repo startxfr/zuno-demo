@@ -112,7 +112,7 @@ first evaluation `unavailable`.
   (`zuno_model_candidates_skipped_total{reason="not_ready"}`, 2 to 4 per provider over 25 minutes). The GPU node came back and
   `gpt-oss-20b`, `qwen35-9b` and `qwen36-27b-instruct` turned `Ready=True` at 22:59:33, 23:01:50 and 23:05:50. Between 23:00 and
   23:13 the same pod served 615 successful calls on `local-gpt-oss-maas` (`zuno_model_calls_total{outcome="success"}`, client
-  `unifai`, a peer session's delegation tests), and the OpenClaw rehearsal turns of 23:15 were answered by `local-maas`.
+  `unifai`, a peer session's delegation tests), and the OpenClaw proof turns of 23:15 were answered by `local-maas`.
   `qwen35-9b-wesh` stayed `Ready=False` (one GPU node) and its candidates stayed skipped. The readiness poll picked the change up
   on its own; nothing was restarted for it.
 - **Found during the rollout, fixed in the same component** (Build 32, waiting for the user's go): a client that drops a stream

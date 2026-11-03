@@ -14,7 +14,7 @@ that component now lives in (ADR-0060) - see
 
 Most components have real content on only one side - a component with no
 OLM operator (`vault`, `ai-gateway`, `llm`, `mcp`,
-`models`, `rag`) has an empty `-d0`, pointing at `gitops/charts/noop` (see
+`models`) has an empty `-d0`, pointing at `gitops/charts/noop` (see
 that chart's README). `namespaces` has real content on *both* sides: its `-d0`
 (Namespace objects) and `-d1` (ResourceQuota/NetworkPolicy) also span the
 *macro* Day 0/Day 2 split (`day0_install.yml` and `day2_install.yml`

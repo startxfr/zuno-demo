@@ -48,6 +48,14 @@ access token on an OpenAI connection (and refresh it), and whether an MCP connec
    community functions and pipelines, and direct connections added by users.
 6. **Exposure.** One Route with an ACME certificate (cert-manager); the "Open WebUI" branding is kept.
 
+> **Correction (2026-11-03, ADR-0594):** the MCP connection now sends `X-Zuno-Data-Classification: C2` so the user's
+> Confluence and knowledge-base tools are listed; the OpenAI connection stays C1. A turn that used one of them is answered
+> by a local model, enforced by the ai-gateway from signed markers on the tool results.
+
+> **Correction (2026-11-03, WP-193):** the model list is no longer every model in the ai-gateway's `/v1/models`. The
+> ai-gateway routes on the classification and never on the model name, so it lists `auto` alone to the experience clients,
+> shown as "Zuno". Open WebUI defaults to that model and turns the Zuno tools on in every chat.
+
 ## Alternatives considered
 
 - **Native RAG with the RHOAI embedding model:** familiar drag-a-PDF experience, but a second knowledge store

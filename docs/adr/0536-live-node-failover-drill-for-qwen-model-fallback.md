@@ -238,6 +238,8 @@ and after the restore it must be answered by a local provider (`answered-local`)
 ai-gateway answers 503 "no eligible provider" while no local model is ready, and no external attempt appears in `zuno_model_calls_total` for the agent). An external
 provider, or an outcome that cannot be established, fails it. Comage's fallback check is unchanged.
 
+The drill was replayed live on 2026-11-03 with the GPU nodes back: Comage failed over from `local-wesh-maas` to `local-qwen35-maas` and returned, and Tekos was answered by a local model in every phase, with no external provider ([evidence](../roadmap/evidence/wp-105-drill-2026-11-03.md)).
+
 ## Related ADRs
 
 - [ADR-0526](0526-fine-tune-and-serve-a-french-urban-register-model-variant.md) - names the untested fallback gap this ADR closes

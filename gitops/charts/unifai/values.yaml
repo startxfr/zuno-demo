@@ -13,11 +13,11 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.49, signed
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.52, signed
   # since 0.1.39 (ADR-0586): its signature, provenance and SBOM verify with the operator
   # release workflow's identity, without the development one. Move it with
   # platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z at each release.
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:b46d4917d848063f0311258c844b9bcf85c6a13913abcc83c322cdaa5b4243b7
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:7764ab1db369a650a482bc0dcde7f44aaa59da7cd029269fd9376c831c779a20
   catalogSourceName: unifai-operator-catalog
   channel: stable
   package: unifai-operator
@@ -174,6 +174,7 @@ ragSources: []
 redhatDocs:
   enabled: false
   syncInterval: 168h
+  # classification: C1   # WP-187: public documentation; unset = chunks carry none (consumers treat it as C2)
 # - name: tech-satellite
 #   tags: [knowledge.tech]   # domain tag for scoped searches (operator >= 0.1.28)
 #   type: confluence

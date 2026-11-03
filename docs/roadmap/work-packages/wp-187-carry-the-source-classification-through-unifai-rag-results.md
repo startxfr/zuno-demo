@@ -1,6 +1,6 @@
 # WP-187: Carry the source classification through UnifAI RAG results, and keep Confluence content off external models
 
-- **State:** Operator pending (steps 1 and 2 done 2026-11-02; step 3 set aside 2026-11-03; step 4 pushed to the fork, not released; the rest waits on operator 0.1.50)
+- **State:** Done (2026-11-03: operator 0.1.50 and the source labels are live on demo333; a Confluence result is C2 and a Red Hat documentation result is C1 through the mcp-gateway)
 - **ADRs:** [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0034](../../adr/0034-compute-effective-classification-from-the-complete-context.md)
 - **Depends on:** none (step 3 needs a UnifAI operator release)
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [ADR-0206](../../adr/0206-separate-current-salesforce-knowledge-from-legacy-sxa.md)
@@ -55,6 +55,22 @@ reads Confluence can send that content to an external model.
     commits.
   - After the release, in this repository: the catalog pin, the rag image roll, the demo333 Confluence sources set to C2 (the next sync
     re-embeds their pages), then step 6.
+- **2026-11-03 (user):**
+  - The release of operator 0.1.50 goes ahead now; the go is given in the UnifAI operator session that runs the canary and the release.
+  - The acceptance is reworded: the classification is an audit label. Results carry their source's level (Confluence C2, Red Hat
+    documentation C1) and the mcp-gateway returns it; no turn is raised from a retrieved chunk (step 3 set aside). The block on
+    external models stays the routing policy's `local_only_for`, proven in step 2.
+  - The demo333 Confluence sources are set to C2 right after the catalog pin; the re-embedding of their pages is announced to the
+    peers first. The Red Hat web sources are set to C1 explicitly, since a chunk without a level is returned as C2.
+  - This session (zuno-demo 40) does the mcp-gateway change, its build and the live proof.
+
+- **2026-11-03 (done, [evidence](../evidence/wp-187-live-labels.md)):** operator 0.1.50 pinned (`bd0fd5df`), the five images moved to
+  `devel-042c793d1` (`fec63456`), and the sources classified (`b1629fc6`: the two Confluence sources C2, the 21 Red Hat sources C1, `sales-demo`
+  unclassified = C2 for the mcp-gateway). After the re-embed every Confluence chunk (501) is C2 and 15,663 web chunks are C1.
+  The chart passes `classification` to `UnifaiRAGSource` for `ragSources` and for `redhatDocs`.
+- **2026-11-03 (closed):** the live proof of step 7 passed ([evidence](../evidence/wp-187-live-labels.md)). It first met a 401 on `query.bearer`
+  (OpenClaw tokens had no `zuno-admin-api` audience), fixed by `325f9c28` in the Keycloak realm; then five results came back with 3 C2 (Confluence)
+  and 2 C1 (Red Hat) and the marker `level=C2`. ADR-0565 and ADR-0568 carry dated notes.
 
 ## Steps
 
@@ -71,15 +87,18 @@ reads Confluence can send that content to an external model.
    sources are set to C2 in `ansible/clusters/demo333.yml` and `gitops/charts/unifai`; the Red Hat web sources keep the `technical-docs` level.
 5. **Fork and operator release** (owned by the UnifAI operator session): operator 0.1.50 plus a rag image; `zuno-demo` pins the release
    (`pin_operator_catalog.py`, then `make d2 install unifai`) and re-syncs the sources so existing chunks get the field.
-6. **mcp-gateway.** `_from_unifai` reads the chunk's classification instead of the constant, and returns C2 when it is missing. Update
+6. **mcp-gateway (coded 2026-11-03, not built).** `_from_unifai` reads the chunk's classification instead of the constant, and returns C2 when it is missing or not one of C1 to C4. Update
    `components/mcp-gateway/tests/test_rag_query.py`: field present is honoured, field missing gives C2. Agree the edit with the session that owns the mcp-gateway first.
-7. **Prove it live.** A Confluence question through the mcp-gateway search tool shows C2; if step 3 allows it, a Confluence-backed tekos turn is raised to C2 in the
-   ai-gateway span; a Red Hat docs question stays at its source's level. Save the evidence next to the measurement.
+7. **Prove it live.** A Confluence question through the mcp-gateway search tool shows C2; a Red Hat docs question shows C1.
+   No turn is raised from a result (step 3 set aside 2026-11-03). Save the evidence next to the measurement.
 8. **Records.** Dated notes in ADR-0565 (clause 3, with the operator version) and ADR-0568. No new ADR.
 
 ## Acceptance
 
 - No task that reads Confluence can reach an external model: the live proof of step 2 is in the evidence.
-- The live proofs of step 7 are in the evidence file.
-- The constant `C1` no longer appears in `rag_query.py`, and the mcp-gateway suite is green.
-- ADR-0565 clause 3 and ADR-0568 state what is implemented and with which operator release; the answer of step 3 is recorded.
+- A Confluence question through the mcp-gateway search tool returns C2 results and a Red Hat documentation question returns C1
+  results, live; the proof is in the evidence file.
+- The constant `C1` no longer appears in `rag_query.py`, a chunk without a level is returned as C2, and the mcp-gateway tests of
+  `test_rag_query.py` are green.
+- ADR-0565 clause 3 and ADR-0568 state what is implemented (the per-chunk audit label) and with which operator release, and that
+  no turn is raised from a retrieved chunk (step 3 set aside 2026-11-03).

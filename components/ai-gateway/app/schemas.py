@@ -128,6 +128,9 @@ class ModelObject(BaseModel):
     """One entry of GET /v1/models (OpenAI list-models format)."""
 
     id: str
+    # Display name (an extra field OpenAI clients such as Open WebUI read);
+    # `auto` is shown as "Zuno" (WP-193).
+    name: Optional[str] = None
     object: str = "model"
     created: int = 0
     owned_by: str = "zuno"

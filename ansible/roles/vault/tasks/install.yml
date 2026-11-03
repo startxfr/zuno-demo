@@ -362,6 +362,14 @@
         username: admin
         password: "{{ zuno_admin_keycloak_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      # ADR-0595: the permanent master-realm accounts. keycloak/admin above is
+      # the bootstrap account only.
+      keycloak/console:
+        username: zuno-admin
+        password: "{{ zuno_admin_keycloak_console_password }}"
+      keycloak/automation:
+        username: zuno-automation
+        password: "{{ zuno_admin_keycloak_automation_password }}"
       postgresql/app:
         # Lowercase letters/digits only: PGO derives an RFC 1123 Secret name
         # from this, and unquoted PostgreSQL identifiers reject hyphens.
@@ -466,37 +474,15 @@
         password: "{{ zuno_admin_aap_metrics_readonly_postgresql_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
 
-# ADR-0562 (WP-151): the UnifAI identity service's confidential client of
-# realm zuno - a single generated client_secret. Read by Keycloak
-# (KC_VAULT) and by the UnifaiStack (gitops/charts/unifai ExternalSecret).
-- name: "vault | generate and seed the unifai confidential OIDC client secret (idempotent)"
+# WP-190 phase 4: the confidential client of every user experience (UnifAI ADR-0562, Open WebUI ADR-0588, the OpenClaw
+# assistants ADR-0589/0590), declared once in gitops/charts/keycloak/values.yaml `experienceClients`. One generated
+# client_secret each, read by Keycloak (KC_VAULT) and by the experience (its own ExternalSecret); create-if-missing.
+- name: "vault | generate and seed the experience clients' confidential OIDC client secrets (idempotent)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
   no_log: true
+  loop: "{{ (lookup('ansible.builtin.file', zuno_repo_root ~ '/gitops/charts/keycloak/values.yaml') | from_yaml).experienceClients | map(attribute='name') | list }}"
   vars:
-    vault_seed_path: keycloak/unifai
-    vault_seed_fields:
-      client_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
-
-# ADR-0588 (WP-181): Open WebUI's confidential client of realm zuno, same
-# shape as unifai above. Read by Keycloak (KC_VAULT) and by Open WebUI
-# (gitops/charts/open-webui ExternalSecret).
-- name: "vault | generate and seed the open-webui confidential OIDC client secret (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  vars:
-    vault_seed_path: keycloak/open-webui
-    vault_seed_fields:
-      client_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
-
-# ADR-0589/0590 (WP-183): the confidential client of each OpenClaw assistant,
-# same shape as unifai above. Read by Keycloak (KC_VAULT) and by the assistant's
-# proxy and front door (gitops/charts/openclaw ExternalSecret).
-- name: "vault | generate and seed the openclaw-<persona> confidential OIDC client secrets (idempotent)"
-  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
-  no_log: true
-  loop: ["consultant-02", "sale-01"]
-  vars:
-    vault_seed_path: "keycloak/openclaw-{{ item }}"
+    vault_seed_path: "keycloak/{{ item }}"
     vault_seed_fields:
       client_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
 

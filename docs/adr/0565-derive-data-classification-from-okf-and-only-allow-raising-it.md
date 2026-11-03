@@ -141,3 +141,11 @@ claiming `X-Zuno-Agent: cognos` with `C1` is routed at C3; a request with no
 classification header is routed local-only. Live checks run on demo333
 (powered off at the time of writing; the user must be asked to power it on),
 with `--context` passed explicitly to every `oc` command (ADR-0559).
+
+## Update 2026-11-03 (WP-187): what clause 3 became for RAG sources
+
+The RAG source's classification is now carried per chunk (operator 0.1.50; [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md))
+and returned by the mcp-gateway on `knowledge.tech.search`, with the marker of the highest level of the result. The UnifAI session is not raised from a
+retrieved chunk (WP-187 set that aside, the work being larger than a field read); the turn is raised by the ai-gateway from the signed marker
+(WP-191, ADR-0594), and the static `local_only_for` of the routing policy stays the control for Confluence-reading tasks. This clause stays partly
+implemented. Live proof: [evidence](../roadmap/evidence/wp-187-live-labels.md).

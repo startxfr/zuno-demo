@@ -52,6 +52,13 @@ rules:
   - apiGroups: ["operators.coreos.com"]
     resources: ["catalogsources"]
     verbs: ["get", "list", "watch", "patch"]
+  # `make d2 install unifai` waits for the UnifaiStack to be Ready and `check`/`backup` read it
+  # (ansible/roles/unifai/tasks/install.yml, check.yml, backup.yml). Read only: the stack itself is
+  # applied by ArgoCD, never by this identity. Without it the AAP run failed after 60 polls on a 403
+  # (job 1284, 2026-11-03).
+  - apiGroups: ["unifai.startx.fr"]
+    resources: ["unifaistacks"]
+    verbs: ["get", "list", "watch"]
   # Vault-backed secret delivery every component's install.yml relies on.
   - apiGroups: ["external-secrets.io"]
     resources: ["externalsecrets", "clustersecretstores", "secretstores"]

@@ -44,7 +44,7 @@
           | selectattr('metadata.name', 'equalto', item.key) | list | first) | default({}, true) }}
     _day2_ready: >-
       {{ (_day2_bundle.status.conditions | default([])
-          | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first) | default('missing') }}
+          | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | first) | default('missing') | string }}
     _day2_placeholder: "{{ item.value.status | default('active') == 'placeholder' }}"
     _day2_row:
       agent: "{{ item.key }}"

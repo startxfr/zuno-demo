@@ -99,38 +99,18 @@ spec:
                         path: zuno_google__client__id
                       - key: client_secret
                         path: zuno_google__client__secret
+                {{- /* WP-190 phase 4: one item per experience client of .Values.experienceClients; the
+                       file name is zuno_<key with every "_" doubled>, key = <name with "-" as "_">_client_secret. */}}
+                {{- range .Values.experienceClients }}
+                {{- $key := printf "%s_client_secret" (.name | replace "-" "_") }}
                 - secret:
-                    # ADR-0562 (WP-151): the UnifAI identity service's
-                    # confidential client, ${vault.unifai_client_secret}.
-                    name: unifai-client-secret
+                    # ${vault.{{ $key }}}, ADR-0562, ADR-0588, ADR-0589/0590.
+                    name: {{ .name }}-client-secret
                     optional: true
                     items:
                       - key: client_secret
-                        path: zuno_unifai__client__secret
-                - secret:
-                    # ADR-0588 (WP-181): Open WebUI's confidential client,
-                    # ${vault.open_webui_client_secret}.
-                    name: open-webui-client-secret
-                    optional: true
-                    items:
-                      - key: client_secret
-                        path: zuno_open__webui__client__secret
-                - secret:
-                    # ADR-0589/0590 (WP-183): consultant-02's OpenClaw assistant,
-                    # ${vault.openclaw_consultant_02_client_secret}.
-                    name: openclaw-consultant-02-client-secret
-                    optional: true
-                    items:
-                      - key: client_secret
-                        path: zuno_openclaw__consultant__02__client__secret
-                - secret:
-                    # ADR-0589/0590 (WP-183): sale-01's OpenClaw assistant,
-                    # ${vault.openclaw_sale_01_client_secret}.
-                    name: openclaw-sale-01-client-secret
-                    optional: true
-                    items:
-                      - key: client_secret
-                        path: zuno_openclaw__sale__01__client__secret
+                        path: {{ printf "zuno_%s" ($key | replace "_" "__") }}
+                {{- end }}
                 - secret:
                     name: demo-personas-password
                     optional: true

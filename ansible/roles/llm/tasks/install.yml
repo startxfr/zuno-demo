@@ -53,9 +53,8 @@
       trustedPlatformClients: "{{ zuno_ai_gateway_trusted_platform_clients | default([]) }}"
       quotaLedger:
         store: "{{ zuno_ai_gateway_quota_ledger_store | default('memory') }}"
-      # WP-184: empty outside a shared-quota rehearsal.
-      quotaRehearsalGroup: "{{ zuno_ai_gateway_quota_rehearsal_group | default('') }}"
-      quotaRehearsalClass: "{{ zuno_ai_gateway_quota_rehearsal_class | default('') }}"
+      # WP-184: empty outside a shared-quota proof.
+      quotaStresstestGroup: "{{ zuno_ai_gateway_quota_stresstest_group | default('') }}"
       # ADR-0581 (WP-164 lot 2): mount the generated model-routing policy.
       modelRouting:
         generated: "{{ zuno_ai_gateway_model_routing_generated | default(false) | bool }}"

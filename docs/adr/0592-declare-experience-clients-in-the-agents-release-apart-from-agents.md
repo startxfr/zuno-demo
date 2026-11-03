@@ -45,6 +45,11 @@ gateway applied its `/mcp` default, C2.
 6. **Unchanged.** No UnifAI bundle, Keycloak group, MaaS subscription, A2A endpoint or routing entry is derived from
    a client; `generate_stack_config.py` does not read them.
 
+> **Correction (2026-11-03, ADR-0594):** decision 5 is amended in part. The two clients keep declaring C1 on their model
+> connection, but call the mcp-gateway at C2, and their task `chat` also allows `confluence.page.search`,
+> `confluence.page.read` and `knowledge.tech.search`. Signed classification markers on the tool results make the
+> ai-gateway answer those turns with local models only.
+
 ## Alternatives considered
 
 - **Front door without `X-Zuno-Agent`:** works today (the `frontdoorCapabilities` ceiling, filtered by groups), but the
