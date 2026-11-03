@@ -12,37 +12,16 @@ zuno_name: "{{ zuno_org }}-{{ zuno_env }}"
 zuno_id: "{{ zuno_orgId }}{{ zuno_envId }}"
 zuno_ID: "{{ zuno_orgID }}{{ zuno_envID }}"
 
-# One root token/password per Vault-seeded secret in
-# ansible/roles/vault/tasks/install.yml, so an operator can set
-# zuno_admin_mainpwd once (ansible/confidential.yml) and get known
-# credentials everywhere instead of the role's random fallback.
+# Tokens derived from the shared admin password. The passwords themselves - one
+# variable per component, each inheriting zuno_admin_password or
+# zuno_personas_password - live in passwords.yml (ADR-0595).
 #
-# "everywhere" is narrower than it reads, and deliberately so. Only the three
-# overrides below are wired: zunoapp, keycloak (Keycloak's own admin) and the
-# keycloak PostgreSQL role. The other PostgreSQL roles listed
-# in ansible/roles/postgresql/defaults/main.yml (aapgateway, aapcontroller,
-# aapeda, aaphub, maas, ogxserver, mlflow,
-# metricsservice, msawxreadonly) have no
-# override here and keep the role's per-path
-# `lookup('ansible.builtin.password', '/dev/null', ...)`, so each gets its own
-# distinct random password.
-#
-# The accepted consequence: zunoapp and keycloak share ONE password on
-# the live cluster, so a leak of zuno_admin_password yields both at once.
-# That is a demo-convenience trade, not an oversight, and no ADR forbids it -
-# do not "fix" it by rotating one of the two in isolation. Under ADR-0529's
-# creationPolicy: Merge a new Vault value no longer reaches the database on its
-# own; rotation now requires that ADR's explicit runbook.
+# Sharing one password across components is a deliberate demo trade-off, not an
+# oversight: a leak of zuno_admin_password yields all of them at once. To split
+# one component off, set its own variable in ansible/confidential.yml. On a
+# seeded cluster a new value reaches Vault only after the path is deleted and
+# re-seeded (ADR-0345); a database additionally needs the ADR-0529 runbook, and
+# the demo personas' live passwords diverge in Keycloak after their first change
+# (ADR-0349 section 3; delete zuno/keycloak/demo-personas to re-seed).
 zuno_admin_vault_token: "{{ zuno_admin_token }}"
-zuno_admin_postgresql_root_password: "{{ zuno_admin_password }}"
-zuno_admin_keycloak_root_password: "{{ zuno_admin_password }}"
-zuno_admin_keycloak_postgresql_root_password: "{{ zuno_admin_password }}"
-# ADR-0349 §3: the demo personas' INITIAL password, deliberately decoupled
-# from zuno_admin_password - a demo-grade initialization value, treated as
-# compromised from day one (each persona's live password diverges in
-# Keycloak's own database after first change; Vault only ever holds this
-# init default). Seeding is idempotent (ADR-0345): an existing install
-# keeps its old seeded value until the operator deletes
-# zuno/keycloak/demo-personas and re-runs the seed.
-zuno_admin_demo_personas_root_password: "{{ zuno_personas_mainpwd | default('secretdemerde') }}"
 zuno_admin_mcp_gateway_token: "{{ zuno_admin_token }}"
