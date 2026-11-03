@@ -8,7 +8,7 @@
 - **Estimated files touched:** ~25 (ai-gateway auth, quota, quota windows, MaaS adapter, telemetry and tests; Keycloak realm;
   Grafana and Perses dashboards; the three experiences' charts and roles; docs)
 
-> Why: the WP-184 rehearsal showed that the per-user budget is one counter for Open WebUI and UnifAI but a separate one for
+> Why: the WP-184 shared-quota run showed that the per-user budget is one counter for Open WebUI and UnifAI but a separate one for
 > OpenClaw, which calls as a service account. The user asked to unify the three experiences as far as possible on the
 > infrastructure (RHOAI, logs, mesh, API gateway, SSO, Vault, AAP). Decisions of 2026-11-03 (user): one WP with phases;
 > a signed `persona` claim on the OpenClaw service-account tokens (the person's own token for OpenClaw is only a spike,
@@ -30,7 +30,7 @@
      the `service-account-` username is never a persona. `platform/testing/token_quota_429.py` gets a persona-then-service-
      account scenario. The `user` label is not bounded today (it is the `sub`); the persona set is smaller, so
      cardinality does not grow.
-   - *Live proof (user go in the session that runs it):* the rehearsal group with sale-01 only; sale-01 spends the budget in
+   - *Live proof (user go in the session that runs it):* the stresstest group with sale-01 only; sale-01 spends the budget in
      Open WebUI, then 429 in UnifAI and in OpenClaw; raw Prometheus shows one `user="sale-01"` series across the three
      `client` values.
    - *Spike:* OpenClaw with the person's own token for the interactive session (oauth2-proxy forward and refresh): note and
@@ -80,7 +80,7 @@
 
 ## Acceptance
 
-On demo333, one persona has one per-user budget across Open WebUI, UnifAI and OpenClaw: with the rehearsal class, the
+On demo333, one persona has one per-user budget across Open WebUI, UnifAI and OpenClaw: with the stresstest class, the
 budget spent in any one of them ends in a 429 in the other two, and raw Prometheus shows one `user` series per persona
 across the `client` values. Each later phase closes with its own recorded decisions and a green `make d2 check` for the
 experience it touches.
@@ -90,3 +90,13 @@ experience it touches.
 Keycloak and docs: this track. `app/*` of the ai-gateway: the zuno-demo-40 session. `ansible/roles/openclaw` and
 `gitops/charts/openclaw`: the OpenClaw track, asked before any edit. UnifAI operator and bundle sessions: told before
 phase 3 touches `zuno-unifai`. Every cluster action needs the user's go in the session that runs it.
+
+## Follow-up (2026-11-03): the fail-open `rehearsal` class is removed
+
+The `rehearsal` quota class (agents release 0.9.1, kept in 0.9.2) was never used: the shared-quota proof ran with the existing
+`stresstest` class once the GPU models were back. It is removed from the agents policy (branch `quota/remove-rehearsal-class`,
+VERSION 0.9.3), and the ai-gateway switch is renamed `QUOTA_STRESSTEST_GROUP` (chart value `quotaStresstestGroup`, cluster variable
+`zuno_ai_gateway_quota_stresstest_group`; the class is always `stresstest`, no class override). After the agents release 0.9.3 is
+promoted, the quota files are regenerated (`python3 platform/okf/generate_quota_enforcement.py`), which drops `rehearsal` from
+`components/ai-gateway/app/quota_{budgets,fail_modes,windows}.yaml` and from the connectivity-link quota policy templates; until
+then those generated files still carry it, inert (no task and no group selects it).

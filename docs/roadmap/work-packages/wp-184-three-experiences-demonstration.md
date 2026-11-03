@@ -28,8 +28,8 @@
   candidates skipped for availability, ADR-0591), *Same user, one budget* (a user's tokens across clients).
 - Script: [docs/demo/three-experiences.md](../../demo/three-experiences.md), one persona (sale-01) through the three
   experiences, eight steps, with the GPU-down case.
-- User decision of 2026-11-02: repository only for now; the shared-quota proof (step 3) waits for a rehearsal.
-- Rehearsal attempt of 2026-11-02 (GPU nodes down): `QUOTA_REHEARSAL_GROUP` (ai-gateway build 34) put sale-01 in the tight
+- User decision of 2026-11-02: repository only for now; the shared-quota proof (step 3) waits for a run.
+- Shared-quota attempt of 2026-11-02 (GPU nodes down): `QUOTA_STRESSTEST_GROUP` (ai-gateway build 34) put sale-01 in the tight
   `stresstest` class; three Open WebUI chats returned 502, 502, 200 (the 200 after the pod rolled and the group env was gone).
   The gateway skipped every SaaS candidate and every direct local sibling because `stresstest` is `fail_mode: closed`, and the
   MaaS local models were not ready, so no token was counted. Reverted the same evening. Step 3 needs the local models back,
@@ -51,14 +51,14 @@
 ## Acceptance
 
 The script runs end to end on demo333 and the evidence shows, from raw Prometheus, one series per client for the same
-persona, a guardrail hit and a 429 in each experience. Reworded on 2026-11-03 after the rehearsal (user decision): the
+persona, a guardrail hit and a 429 in each experience. Reworded on 2026-11-03 after the run (user decision): the
 per-user budget is shared by Open WebUI and UnifAI (they call with the persona's own token), the group budget by the three
 experiences, and OpenClaw has its own per-user counter (it calls as a service account, ADR-0589); a 429 is shown in Open
 WebUI, UnifAI and OpenClaw. *Superseded on 2026-11-03 by WP-190 (ADR-0593): the counter is keyed by persona, so the budget is
 one for the three experiences, proved live.*
 
-- Shared-quota rehearsal of 2026-11-03 (GPU models back; sale-01 and `service-account-openclaw-sale-01` in the group
-  `zuno-quota-rehearsal`, `QUOTA_REHEARSAL_GROUP` set live, class `stresstest`, 2,000 tokens per user per 5 minutes; reverted
+- Shared-quota run of 2026-11-03 (GPU models back; sale-01 and `service-account-openclaw-sale-01` in the group
+  `zuno-quota-stresstest`, `QUOTA_STRESSTEST_GROUP` set live, class `stresstest`, 2,000 tokens per user per 5 minutes; reverted
   after the run, an empty group left in Keycloak). OpenClaw (azp `openclaw-sale-01`): 3 turns 200 (666 tokens, 23:15:15-39), a
   big turn 200 at 23:17:13 (1,520 tokens, total 2,186 of 2,000), then 429 at 23:18:41-42 (3 calls). Open WebUI as sale-01
   (fresh sign-in): 429 at about 23:18:40 with the same body `{"error":"quota_exceeded","quota_class":"stresstest","dimension":"user",
@@ -69,7 +69,7 @@ one for the three experiences, proved live.*
   platform does for the user dimension; the group dimension is common to the persona's accounts. UnifAI was not exercised.
   Raw Prometheus (cumulative since the pod roll): `zuno_model_tokens_total` open-webui 146 (openai) + 12,188 (local-maas),
   openclaw-sale-01 57,507 (openai) + 2,664 (local-maas), unifai 2,116,676 (local-gpt-oss-maas); one series per client.
-- Shared-quota rerun of 2026-11-03, UnifAI-only (sale-01 alone in `zuno-quota-rehearsal`, class `stresstest`, 2,000 tokens per
+- Shared-quota rerun of 2026-11-03, UnifAI-only (sale-01 alone in `zuno-quota-stresstest`, class `stresstest`, 2,000 tokens per
   user per 5 minutes, window 23:40-23:45 UTC, reverted afterwards): four parallel 500-word Open WebUI chats answered 200
   (23:41:44-23:42:21), the next Open WebUI call returned 429 `quota_exceeded` (dimension `user`) at 23:43:26, and a UnifAI chat
   (Team `agent-comage`, workflow `comage-check-my-drive-and-mail`, fresh SSO login as sale-01) at 23:43:36 showed the card

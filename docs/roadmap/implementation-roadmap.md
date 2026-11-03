@@ -1144,7 +1144,7 @@ moving.
 - 2026-11-03 — WP-188 Done and ADR-0591 Implemented: with the GPU node back, the local models served again on the same
   ai-gateway pod that had skipped them as not ready, without a restart.
 - 2026-11-03 — ADR-0593 and WP-190 added to phase 46: the per-user quota counter and the `user` label are keyed by persona so
-  the three experiences share one budget, and the three are aligned on the platform in phases (WP-184 rehearsal finding).
+  the three experiences share one budget, and the three are aligned on the platform in phases (WP-184 shared-quota finding).
 - 2026-11-02 — ADR-0588 and ADR-0592 Implemented (WP-181 and WP-189 Done, proven live on
   demo333); v0.13 open ADRs: ADR-0587 (closes with WP-184) and ADR-0591 (WP-188).
 - 2026-11-03 — WP-184 Done and ADR-0587 Implemented: the three experiences, the dashboard and the script are proved live; the

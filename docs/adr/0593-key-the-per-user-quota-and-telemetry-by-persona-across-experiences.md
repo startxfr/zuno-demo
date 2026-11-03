@@ -9,7 +9,7 @@
 ## Context
 
 ADR-0587 puts three user experiences (UnifAI, Open WebUI, OpenClaw) on one governed backend and asks that a person's
-budget be the same whichever one they use. The WP-184 rehearsal of 2026-11-03 showed what holds today. The ai-gateway
+budget be the same whichever one they use. The WP-184 shared-quota run of 2026-11-03 showed what holds today. The ai-gateway
 ledger (`app/quota.py`) keys the per-user token counter by the token `sub`. Open WebUI and UnifAI call with the
 signed-in person's own token, so they spend one counter: a budget spent in Open WebUI refused the next UnifAI call
 (429 `quota_exceeded`). OpenClaw calls as a Keycloak service account (`service-account-openclaw-<persona>`, ADR-0589),
