@@ -1,6 +1,6 @@
 # WP-190: One identity, one budget and one infrastructure pattern for the three experiences
 
-- **State:** Repo work merged (phases 0 to 3 done 2026-11-03, phase 4 open)
+- **State:** Done (2026-11-03)
 - **ADRs:** [ADR-0593](../../adr/0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md)
 - **Depends on:** [WP-184](wp-184-three-experiences-demonstration.md), [WP-183](wp-183-install-openclaw-on-demo333.md), [WP-181](wp-181-install-open-webui-on-demo333.md)
 - **Related:** [WP-179](wp-179-common-preparation-for-experience-clients.md), [WP-177](wp-177-finish-the-maas-quota-delegation.md)
@@ -66,13 +66,16 @@
      `make d2 check` for both (`ansible/roles/open_webui/tasks/precheck.yml`, `check_persona.yml`).
    - *RHOAI:* the ai-gateway is the only model path for the three; no change.
 5. **Phase 4, common chart and role base ([inventory](../evidence/wp-190-keycloak-plumbing-inventory.md)).**
-   - *4a (done 2026-11-03):* the experience clients are declared once in `gitops/charts/keycloak/values.yaml`
+   - *4a (done 2026-11-03, live: `zuno-keycloak-d1` Synced and Healthy on `cf3e4089`, the four client ExternalSecrets `SecretSynced`, the Keycloak CR `Ready` with no rolling update):* the experience clients are declared once in `gitops/charts/keycloak/values.yaml`
      (`experienceClients`: `unifai`, `open-webui`, `openclaw-consultant-02`, `openclaw-sale-01`). The Keycloak chart renders their
      ExternalSecrets (`templates/externalsecret-experience-clients.yaml`) and the KC_VAULT items of `keycloak.yaml` from it, and the
      vault role seeds `keycloak/<name>` from the same file. Checked by rendering the chart before and after in a copy without
      the remote `operator` dependency: the 21 rendered objects are identical. The realm client blocks stay in `realm-zuno.json`.
-   - *4b:* one precheck skeleton (state, pod, in-pod probes, Route, running-image digest) shared by Open WebUI and OpenClaw.
-6. **Close.** Evidence `docs/roadmap/evidence/wp-190-*.md`; the WP-184 note on the OpenClaw counter reverts to "one budget
+   - *4b (decided, not built):* no shared precheck skeleton. The OpenClaw check is operator-specific (CSV, Claw, one loop per
+     persona) and the Open WebUI check probes the chain from its pod; they already share what is common
+     (`ansible/tasks/check_gitops_app_state.yml`, `record_state.yml`, `resolve_cluster_base_domain.yml`), and a skeleton would be
+     forced and would reach into the OpenClaw role. Revisit if a third plain-Deployment experience appears.
+6. **Close (done).** Evidence `docs/roadmap/evidence/wp-190-*.md`; the WP-184 note on the OpenClaw counter reverts to "one budget
    for the three"; ADR-0593 to `Implemented`.
 
 ## Acceptance
