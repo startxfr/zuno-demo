@@ -1227,6 +1227,17 @@
                         "id.token.claim": "false",
                         "userinfo.token.claim": "false"
                     }
+                },
+                {
+                    "name": "maas-gateway-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-admin-api",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
                 }
             ],
             "defaultClientScopes": [
@@ -1279,6 +1290,17 @@
                         "access.token.claim": "true",
                         "id.token.claim": "false",
                         "userinfo.token.claim": "false"
+                    }
+                },
+                {
+                    "name": "maas-gateway-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-admin-api",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
                     }
                 }
             ],
