@@ -65,9 +65,13 @@
      (harmless in `warn`, a refusal in `enforce`). The integrity check is the digest pin, now compared with the running image by
      `make d2 check` for both (`ansible/roles/open_webui/tasks/precheck.yml`, `check_persona.yml`).
    - *RHOAI:* the ai-gateway is the only model path for the three; no change.
-5. **Phase 4, common chart and role base.** One shared helper for the near-identical Keycloak client plumbing
-   (`externalsecret-*-client.yaml`, KC_VAULT entry, Vault seed), the precheck conventions of
-   `ansible/roles/open_webui/tasks/precheck.yml` (probe the chain from the pod) and the `make d2 check` shape.
+5. **Phase 4, common chart and role base ([inventory](../evidence/wp-190-keycloak-plumbing-inventory.md)).**
+   - *4a (done 2026-11-03):* the experience clients are declared once in `gitops/charts/keycloak/values.yaml`
+     (`experienceClients`: `unifai`, `open-webui`, `openclaw-consultant-02`, `openclaw-sale-01`). The Keycloak chart renders their
+     ExternalSecrets (`templates/externalsecret-experience-clients.yaml`) and the KC_VAULT items of `keycloak.yaml` from it, and the
+     vault role seeds `keycloak/<name>` from the same file. Checked by rendering the chart before and after in a copy without
+     the remote `operator` dependency: the 21 rendered objects are identical. The realm client blocks stay in `realm-zuno.json`.
+   - *4b:* one precheck skeleton (state, pod, in-pod probes, Route, running-image digest) shared by Open WebUI and OpenClaw.
 6. **Close.** Evidence `docs/roadmap/evidence/wp-190-*.md`; the WP-184 note on the OpenClaw counter reverts to "one budget
    for the three"; ADR-0593 to `Implemented`.
 
