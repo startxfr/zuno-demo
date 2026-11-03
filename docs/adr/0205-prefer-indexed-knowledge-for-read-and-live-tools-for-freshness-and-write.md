@@ -1,6 +1,6 @@
 # ADR-0205: Prefer indexed knowledge for read and live tools for freshness and write
 
-- **Status:** Implemented - the indexed read goes through UnifAI's RAG (the agents' retrievers, and `components/mcp-gateway/app/handlers/rag_query.py` for the `knowledge.tech.search` tool), current state and writes go through the live tools of `platform/bindings/tools/tool-bindings.yaml`; the write-path invariant test of `rag-service` went with it (WP-168), so the read-only shape of the indexed path now rests on the handler's single GET and on UnifAI's read-only query route.
+- **Status:** Implemented - the indexed read goes through UnifAI's RAG (the agents' retrievers, and `components/mcp-gateway/app/handlers/rag_query.py` for the `knowledge.tech.search` tool), current state and writes go through the live tools of `platform/bindings/tools/tool-bindings.yaml`; the write-path invariant test of `rag-service` went with it (WP-168) and is replaced since 2026-11-03 by `components/mcp-gateway/tests/test_rag_query.py` (every request of the handler is a GET with no body, and the handler source has no write call; WP-186), on top of UnifAI's read-only query route.
 - **Target:** v0.2
 - **Date:** 2026-08-13
 - **Decision owners:** Zuno Demo architecture team

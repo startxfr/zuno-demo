@@ -8,6 +8,7 @@ import os
 import sys
 
 import httpx
+import pytest
 
 COMPONENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, COMPONENT_DIR)
@@ -126,3 +127,25 @@ def test_an_empty_query_contacts_no_backend(monkeypatch):
     result = asyncio.run(rag_query.handle({"query": "  "}, "consultant-01", bearer_token=JWT))
     assert result == {"error": "query is required"}
     assert seen == []
+
+
+@pytest.mark.parametrize("confluence,web", [
+    (httpx.Response(200, json={"matches": [UNIFAI_MATCH]}), httpx.Response(200, json={"matches": WEB_MATCHES})),
+    (httpx.Response(401, json={"detail": "invalid bearer token"}), httpx.Response(403, json={})),
+    (httpx.Response(500, json={}), httpx.Response(503, json={})),
+], ids=["answer", "refusal", "server-error"])
+def test_the_retrieval_path_only_reads(monkeypatch, confluence, web):
+    """ADR-0205 (WP-186): the indexed path never writes. The invariant test that went with the retired
+    rag-service is replaced by this one: whatever the outcome, every request the handler sends is a GET
+    with no body."""
+    _, seen = _run(monkeypatch, JWT, _by_type(confluence, web))
+    assert seen, "the handler sent no request"
+    for request in seen:
+        assert request.method == "GET"
+        assert request.content == b""
+
+
+def test_the_handler_source_has_no_write_call():
+    source = open(rag_query.__file__, encoding="utf-8").read()
+    for verb in (".post(", ".put(", ".patch(", ".delete("):
+        assert verb not in source, f"rag_query.py calls {verb}: the retrieval path must stay read only"

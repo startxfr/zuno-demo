@@ -166,8 +166,8 @@ Measured against the live fork while closing WP-186, behaviours of the retired r
 - **The language boost** (+0.01) is not carried. The sparse side is a hashing BM25 encoder with accent folding and English and French stop words, without stemming. French queries
   were measured on 2026-11-03 (WP-186): hit@1 0.80 on ten French questions, so the bilingual handling stays as it is, with no language boost and no stemmer.
 
-ADR-0203 and ADR-0205 stay in force, as the table above says; only their "see" references to deleted code are updated. ADR-0205 no longer has a test that asserts its read-only
-invariant for the indexed path (WP-186).
+ADR-0203 and ADR-0205 stay in force, as the table above says; only their "see" references to deleted code are updated. ADR-0205's read-only invariant for the indexed path is asserted again since 2026-11-03
+by `components/mcp-gateway/tests/test_rag_query.py` (WP-186).
 
 ## Consequences
 

@@ -64,3 +64,4 @@ The records say what the UnifAI RAG does about freshness and language, and Frenc
   24-question baseline stayed at 0.71 / 0.86 / 0.77. Rule of step 3: at least 0.7, so the result is accepted, no stemmer follow-up is opened, and ADR-0568 records that the bilingual handling
   is English and French stop words plus accent folding, with no language boost. One question misses (26, registry exposure), watched rather than fixed: a single miss of ten does not
   justify a sparse encoder version 3 and a full re-index.
+- **2026-11-03 (written):** the read-only test of ADR-0205 exists again in `components/mcp-gateway/tests/test_rag_query.py` (GET and empty body for an answer, a refusal and a server error; no write call in the handler source).
