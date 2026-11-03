@@ -714,16 +714,15 @@ def _default_quota_class(identity: CallerIdentity) -> str:
     eval-* and stress-* personas), provided the budgets define the class -
     an image older than the policy that adds it keeps them on `standard`
     rather than denying them as an unknown class."""
-    # WP-184: a rehearsal group (empty = off) puts its members under a tight
-    # budget class that already exists in the budgets, so the shared-quota
-    # proof needs no budget change. Leaving the group ends it.
-    rehearsal_group = os.getenv("QUOTA_REHEARSAL_GROUP", "").strip().lstrip("/")
-    rehearsal_class = os.getenv("QUOTA_REHEARSAL_CLASS", "stresstest").strip()
+    # WP-184: a stresstest group (empty = off) puts its members under the tight
+    # `stresstest` budget class, so the shared-quota proof needs no budget
+    # change. Leaving the group ends it.
+    stresstest_group = os.getenv("QUOTA_STRESSTEST_GROUP", "").strip().lstrip("/")
     if (
-        rehearsal_group and rehearsal_group in (identity.groups or [])
-        and rehearsal_class in (getattr(quota.ledger, "_classes", None) or {})
+        stresstest_group and stresstest_group in (identity.groups or [])
+        and "stresstest" in (getattr(quota.ledger, "_classes", None) or {})
     ):
-        return rehearsal_class
+        return "stresstest"
     group = os.getenv("EVALUATION_GROUP", "zuno-evaluation").strip().lstrip("/")
     if not group or group not in (identity.groups or []):
         return "standard"

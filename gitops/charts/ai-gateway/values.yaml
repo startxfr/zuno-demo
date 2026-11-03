@@ -191,12 +191,10 @@ modelRouting:
 trustedPlatformClients: []
 
 # WP-184: Keycloak group whose members run under the tight `stresstest` budget
-# (2000 tokens / 5 min per user), for the shared-quota rehearsal. Empty = off.
-# Set it only for a rehearsal and clear it afterwards.
-quotaRehearsalGroup: ""
-# Class those members run under; empty = the image default (stresstest). The
-# fail-open `rehearsal` class (agents release 0.9.1+) lets SaaS answer without GPUs.
-quotaRehearsalClass: ""
+# (2000 tokens / 5 min per user), for the shared-quota proof. Empty = off.
+# Set it only for a proof and clear it afterwards. The class is fail_mode closed:
+# it needs the local models, because it skips every SaaS candidate.
+quotaStresstestGroup: ""
 
 # ADR-0587 (WP-179): allowed values of the `client` label on zuno_model_* and
 # zuno_guardrails_* (the token's `azp`, the user experience the call came

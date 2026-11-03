@@ -211,13 +211,9 @@ spec:
             - name: TRUSTED_PLATFORM_CLIENTS
               value: {{ join "," .Values.trustedPlatformClients | quote }}
             {{- end }}
-            {{- if .Values.quotaRehearsalGroup }}
-            - name: QUOTA_REHEARSAL_GROUP
-              value: {{ .Values.quotaRehearsalGroup | quote }}
-            {{- if .Values.quotaRehearsalClass }}
-            - name: QUOTA_REHEARSAL_CLASS
-              value: {{ .Values.quotaRehearsalClass | quote }}
-            {{- end }}
+            {{- if .Values.quotaStresstestGroup }}
+            - name: QUOTA_STRESSTEST_GROUP
+              value: {{ .Values.quotaStresstestGroup | quote }}
             {{- end }}
             {{- if .Values.experienceClients }}
             - name: EXPERIENCE_CLIENTS

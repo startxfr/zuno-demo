@@ -44,7 +44,7 @@ same persona (the OpenClaw assistant of that persona: client
 `openclaw-<persona>`, service account, `persona` claim), one more call is sent
 with it after the first 429 and must be refused too. That identity is not a
 trusted platform client, so its class comes from its groups: run it inside the
-rehearsal window (QUOTA_REHEARSAL_GROUP holding the persona, whose groups the
+proof window (QUOTA_STRESSTEST_GROUP holding the persona, whose groups the
 assistant's service account copies), otherwise it runs under `standard`.
 
 Prints a JSON array of Day2Result rows to stdout, same convention as

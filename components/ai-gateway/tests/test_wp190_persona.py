@@ -2,7 +2,7 @@
 attestation and the `user` label are keyed by persona, so one person has one
 budget across Open WebUI, UnifAI and OpenClaw.
 
-Found in the WP-184 rehearsal (2026-11-03): OpenClaw's token belongs to the
+Found in the WP-184 shared-quota proof (2026-11-03): OpenClaw's token belongs to the
 service account of client `openclaw-<persona>`, so its `sub` differs from the
 person's and it spent a budget of its own.
 
