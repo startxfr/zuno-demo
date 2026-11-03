@@ -35,7 +35,7 @@ flowchart LR
   - OpenClaw (sale-01's assistant): `https://assistant-zuno-claw-sale-01.apps.demo333.startx.fr` - Keycloak sign-in
     through oauth2-proxy, then OpenClaw's own UI password, kept in the Secret `openclaw-ui` of the persona's namespace
     (`oc extract secret/openclaw-ui -n zuno-claw-sale-01 --to=-`, before the session, never on screen)
-  - Grafana, dashboard **Zuno Platform / Three experiences** (time range: last 1 hour, `client` = All, `user` = sale-01's id)
+  - Grafana, dashboard **Zuno Platform / Three experiences** (time range: last 1 hour, `client` = All, `user` = sale-01's Keycloak id, or `sale-01` once WP-190 is live: the label is then the persona)
 - Check the models: `oc get llminferenceservice -n zuno-ai-run`. If they are `Ready=False` (GPU nodes down), the demo still
   runs: every experience is answered by the first eligible SaaS provider in seconds (ADR-0591), and step 5 shows why.
 

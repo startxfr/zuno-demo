@@ -37,8 +37,10 @@ token claims, for every experience.**
    `Retry-After`. Group and project dimensions are unchanged. The per-user ceiling stays enforced by the ledger, not
    by MaaS (ADR-0570, WP-177).
 4. **MaaS attestation.** The attested header `X-Zuno-User-Sub` carries the persona, so no Kuadrant policy changes.
-5. **Telemetry.** The `user` label of `zuno_model_*` and `zuno_guardrails_*` and the dashboards' `$user` variable are the
-   persona. The raw token `sub` stays in the span attribute `zuno.user_sub` and in logs, for audit.
+5. **Telemetry.** The `user` label of `zuno_model_*` (the guardrail metrics have no `user` label) and the dashboards'
+   `$user` variable are the persona, which changes the value for every person from the Keycloak id to the username; series
+   recorded before keep the id. The raw token `sub` stays in the span attribute `zuno.user_sub` and in logs, for audit.
+   The semantic cache stays keyed by the raw `sub`, so an assistant turn never reads the person's cached answers.
 6. **Unchanged.** OpenClaw keeps its service account, its token-injecting proxy and its client credentials. Using the
    person's own token for the interactive OpenClaw session is a spike of WP-190 with a go/no-go, not a decision.
 7. **Alignment of the three experiences on the platform** (observability, network and mesh, automation, common chart and
