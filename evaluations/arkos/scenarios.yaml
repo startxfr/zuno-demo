@@ -198,6 +198,9 @@ scenarios:
     target: tekos
     target_task: answer-technical-question
     timeout_seconds: 190
+    # At least one and at most this many A2A messages to the target in one turn: a delegation that repeats
+    # itself (11 calls seen on operator 0.1.52) is a defect, not a pass.
+    max_a2a_calls: 3
     message: >-
       For the architecture testimonial I am drafting, ask the technical consultant what the difference
       is between a Route and an Ingress on OpenShift, and include that answer in your reply.

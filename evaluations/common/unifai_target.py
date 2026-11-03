@@ -243,6 +243,13 @@ def delegation_spans(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return out
 
 
+def a2a_calls(spans: List[Dict[str, Any]]) -> int:
+    """How many A2A messages the run sent: the spans of the A2A client's `send_message`. A `delegate_task` span
+    also covers the internal workers of the agent, so only these spans prove a call to another agent through
+    the a2a-gateway, and their number shows a delegation that loops instead of answering once."""
+    return sum(1 for sp in spans if str(sp.get("name", "")).endswith("JsonRpcTransport.send_message"))
+
+
 class UnifaiTarget:
     def __init__(
         self,
