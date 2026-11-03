@@ -281,19 +281,24 @@ def _short_error(exc: Exception) -> str:
     return text if len(text) <= _MAX_ERROR_CHARS else text[: _MAX_ERROR_CHARS - 1] + "\u2026"
 
 
-def _input_schema(binding: Any) -> Dict[str, Any]:
-    """Advertise an open object schema.
+def _input_schema(binding: Any, published: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """The schema advertised for one capability.
 
-    We deliberately do NOT restate each downstream tool's argument schema here.
-    Duplicating it would create a second contract that silently drifts from the
-    MCP server that actually validates the call - and the downstream server
-    already rejects bad arguments with a clear error. An open schema keeps this
-    module a pure adapter.
+    We deliberately do NOT restate each downstream tool's argument schema here:
+    duplicating it would create a second contract that silently drifts from the
+    MCP server that actually validates the call. When the backend's own schema is
+    available (`published`, read from the backend and cached by app/downstream.py)
+    it is passed through unchanged, so the model knows the required arguments
+    (an open schema made it omit them and get a 502 from the backend). Otherwise
+    - in-process handlers, a backend that cannot be read - an open object schema
+    is advertised and the backend rejects bad arguments with a clear error.
 
     The one thing worth encoding is that arguments are an object, not an array,
     which is what every binding in platform/bindings/tools/tool-bindings.yaml
     expects.
     """
+    if isinstance(published, dict) and published.get("type") == "object":
+        return published
     return {"type": "object", "properties": {}, "additionalProperties": True}
 
 
@@ -304,6 +309,7 @@ def list_tools(
     identity: Any,
     classification: str,
     surface: Optional[Surface] = None,
+    published: Optional[Dict[str, Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Every capability this caller is actually authorized for, right now.
 
@@ -337,7 +343,8 @@ def list_tools(
         if not decision.allowed:
             continue
         entry = policy_store.get_tool(capability)
-        description = getattr(entry, "description", None) or (
+        backend_tool = (published or {}).get(capability) or {}
+        description = getattr(entry, "description", None) or backend_tool.get("description") or (
             f"Zuno platform capability '{capability}', served by the "
             f"'{binding.backend}' backend through the Zuno MCP Gateway."
         )
@@ -346,7 +353,7 @@ def list_tools(
             {
                 "name": capability,
                 "description": description,
-                "inputSchema": _input_schema(binding),
+                "inputSchema": _input_schema(binding, backend_tool.get("inputSchema")),
                 # ADR-0524 clause 4: every capability reachable here is a
                 # read, except the deliberate exceptions in
                 # _NON_READONLY_CAPABILITIES above. Lightspeed's
@@ -368,6 +375,7 @@ async def dispatch(
     classification: str,
     invoke_tool: Callable[..., Any],
     surface: Optional[Surface] = None,
+    describe_tools: Optional[Callable[[List[Any]], Any]] = None,
 ) -> Optional[Dict[str, Any]]:
     """Handle one JSON-RPC message. Returns None for notifications.
 
@@ -419,6 +427,14 @@ async def dispatch(
         return _result(request_id, {})
 
     if method == "tools/list":
+        published: Dict[str, Dict[str, Any]] = {}
+        if describe_tools is not None:
+            capabilities = surface.capabilities if surface else frontdoor_capabilities()
+            bindings = [binding_registry.resolve(c) for c in capabilities]
+            try:
+                published = await describe_tools([b for b in bindings if b is not None]) or {}
+            except Exception:  # noqa: BLE001 - listing must never fail on a schema lookup
+                logger.warning("could not read the backends' tool schemas, advertising open schemas", exc_info=True)
         return _result(
             request_id,
             {
@@ -428,6 +444,7 @@ async def dispatch(
                     identity=identity,
                     classification=classification,
                     surface=surface,
+                    published=published,
                 )
             },
         )

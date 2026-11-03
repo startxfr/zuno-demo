@@ -25,7 +25,7 @@ from app.delegation import get_delegated_token
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
 from app.policy import PolicyDecision, PolicyStore, evaluate, evaluate_without_declaration
-from app import mcp_frontdoor
+from app import downstream, mcp_frontdoor
 from app.telemetry import adopt_incoming_trace_context, init_telemetry, tool_invoke_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -533,6 +533,7 @@ async def mcp_frontdoor_endpoint(
                 classification=classification,
                 invoke_tool=_invoke,
                 surface=surface,
+                describe_tools=downstream.schemas_for,
             )
         except mcp_frontdoor.JsonRpcError as exc:
             resp = mcp_frontdoor.error_response(
