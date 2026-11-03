@@ -42,6 +42,10 @@ class SecretEnvNames(unittest.TestCase):
         failures = self._findings([{"name": "MAAS_GATEWAY_API_KEY_ENV", "value": "MAAS_GATEWAY_API_KEY"}])
         self.assertEqual(failures, [])
 
+    def test_a_count_of_model_tokens_is_not_a_secret(self):
+        failures = self._findings([{"name": "MAX_TOKENS_DEFAULT", "value": "8192"}])
+        self.assertEqual(failures, [])
+
     def test_a_literal_credential_still_fails(self):
         for name in ("API_TOKEN", "DB_PASSWORD", "CLIENT_SECRET"):
             failures = self._findings([{"name": name, "value": "hunter2"}])

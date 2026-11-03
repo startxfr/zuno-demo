@@ -305,14 +305,18 @@ def test_each_eval_persona_copies_its_source_users_groups() -> None:
     }
     assert values["evalPersonas"], "no evaluation persona declared"
     for p in values["evalPersonas"]:
-        assert p["username"].startswith("eval-"), (
-            f"{p['username']}: evaluation personas carry the eval- prefix, "
-            "so a quota policy can key on them"
+        assert p["username"].startswith(("eval-", "stress-")), (
+            f"{p['username']}: evaluation personas carry the eval- or stress- prefix, "
+            "so they never collide with a demo persona"
         )
         assert p["username"] not in users, (
             f"{p['username']} is also a realm-file user: the Job owns eval personas"
         )
-        assert lines[p["username"]] == users[p["copyOf"]]["groups"]
+        # the Job adds evalPersonasGroup (when set) to every group of the source persona
+        expected = users[p["copyOf"]]["groups"] + (
+            [values["evalPersonasGroup"]] if values.get("evalPersonasGroup") else []
+        )
+        assert lines[p["username"]] == expected
 
 
 def test_the_eval_personas_job_runs_after_the_client_reconcile() -> None:

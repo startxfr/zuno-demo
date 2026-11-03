@@ -100,6 +100,14 @@ jobs:
             context: .
             build_args: |
               BASE_IMAGE=docker.io/library/python:3.11-slim
+          # ADR-0585/WP-175: the A2A front door; built in-cluster by its own role, listed here so
+          # the ADR-0324 inventory is whole. It bakes nothing from the agents release (okf-fetch
+          # extracts it at pod start), but follows the other gateways' repository-root context.
+          - name: a2a-gateway
+            dockerfile: components/a2a-gateway/Dockerfile
+            context: .
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.11-slim
           # ADR-0516: backs mcp-gateway's generate_diagram handler, same
           # relationship ai-gateway has to image_gen.py above - a
           # standalone entry (not context: ".") since, unlike every

@@ -184,6 +184,10 @@ def check_no_hardcoded_secret_values(chart: str, findings: Findings) -> None:
                     # own indirection pattern) - its value is an env var
                     # name, never a credential itself.
                     continue
+                if re.search(r"TOKENS(_|$)", name):
+                    # A count of model tokens (e.g. MAX_TOKENS_DEFAULT="8192"), not an
+                    # authentication token: a credential name is singular (*_TOKEN).
+                    continue
                 has_literal_value = bool(env.get("value"))
                 findings.check(
                     f"{chart}/{dep_name}/{cname}: {name} is not a hardcoded literal value",
