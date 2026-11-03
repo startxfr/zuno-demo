@@ -1,6 +1,6 @@
 # ADR-0595: Set demo passwords from one shared value through one variable per component
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.13
 - **Date:** 2026-11-03
 - **Decision owners:** Zuno Demo architecture team
@@ -41,9 +41,9 @@ another value later without a refactoring.
    bootstrap `admin` stays only as the first-run fallback and is disabled, not deleted, once the Jobs run as `zuno-automation`.
 6. **Seeding is unchanged.** Vault paths are still seeded only when missing (ADR-0345). A new value reaches a seeded cluster
    after its path is deleted and re-seeded; a database also needs the ADR-0529 runbook. The twins
-   share the humans' Secret `demo-personas-password` because five consumers read it (the persona Job, the stresstest Job, the
-   acceptance gate, the mlops probe, the RAGAS ExternalSecret); giving them their own family means changing all five together
-   and is a follow-up.
+   share the humans' Secret `demo-personas-password` by decision (2026-11-03): at least eight consumers read it and pick the
+   twin family by `EVAL_TWIN_PREFIX`, and a separate password for `eval-*` and `stress-*` brings nothing to a demo where the
+   shared value is the point.
 
 ## Alternatives considered
 
@@ -57,6 +57,9 @@ another value later without a refactoring.
 
 ## Consequences
 
+- Applied on demo333 on 2026-11-03: `zuno-admin` and `zuno-automation` exist, both Keycloak Jobs sign in as `zuno-automation`, the
+  bootstrap `admin` is disabled, and the 37 realm users were moved to the shared persona value. Databases keep their current
+  passwords there (procedure in `docs/platform/operations.md`).
 - `ansible/confidential.example.yml` documents both shared variables and the per-component overrides.
 - The persona literal of ADR-0349 section 3 is replaced by `zuno_personas_mainpwd`; the live personas keep their Keycloak
   passwords until the Vault path is re-seeded and the persona Job runs.

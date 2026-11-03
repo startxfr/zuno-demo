@@ -1,6 +1,6 @@
 # WP-192: One demo password, one variable per component, and named Keycloak administrators
 
-- **State:** Repo work merged (2026-11-03: live on demo333, both Jobs run as `zuno-automation`; open: the console check by a person, databases on fresh installs only, the twins decision)
+- **State:** Done (2026-11-03: live on demo333, both Jobs run as `zuno-automation`, no temporary-admin warning for `zuno-admin` (checked by the user); databases on fresh installs only; the twins share the humans' Secret by decision)
 - **ADRs:** [ADR-0595](../../adr/0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md)
 - **Depends on:** none
 - **Related:** [ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) (section 3 amended), [WP-190](wp-190-one-identity-one-budget-and-one-infrastructure-pattern-for-the-three-experiences.md) (the Keycloak plumbing it declared once)
@@ -50,7 +50,7 @@ One shared password reaches every admin, persona family and database through its
   PostgreSQL procedure is in `docs/platform/operations.md`, MariaDB/Redis/AAP databases are not covered). The
   `eval-*`/`stress-*` twins still share the humans' Secret: at least eight consumers read `DEMO_PERSONA_PASSWORD` from it (the
   acceptance gate, the stresstest, failover and persona probes, the mlops copy, the RAGAS ExternalSecret, the scaffold and compare
-  scripts) and pick the twin family by `EVAL_TWIN_PREFIX`, so a split is a decision to take, not a quick follow-up. The first run of the reconcile Job used the bootstrap admin (the
+  scripts) and pick the twin family by `EVAL_TWIN_PREFIX`, so the user decided on 2026-11-03 not to split them. The first run of the reconcile Job used the bootstrap admin (the
   automation account did not exist yet). After the bootstrap admin was disabled, a manual sync of `zuno-keycloak-d1` at
   c296d0f4 ran both Jobs again: each logs "signed in as the automation account (zuno-automation)" and completes.
-- To confirm by a person: that the console shows no temporary-admin warning when signed in as `zuno-admin`.
+- Checked by the user (2026-11-03): the console shows no temporary-admin warning when signed in as `zuno-admin`.
