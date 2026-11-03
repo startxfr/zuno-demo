@@ -240,6 +240,15 @@ zuno_unifai_values:
       # the multilingual mmarco-mMiniLMv2 got 0.67/0.86/0.75 (2.9 s for 10 candidates, no score threshold separates the
       # unanswerable questions). To retry: reranker: {mode: deploy, model: <model>, candidates: <n>}; the image and
       # resources keys stay, unused while rag.reranker is unset.
+    # R-528 (2026-11-03): a work item is delegated at most this many times (default 3, 0 = unlimited). One means
+    # the answer of the first delegation is final; a delegating turn cost ~839,000 tokens in 312 model calls at 3.
+    extraEnv:
+      multiagent:
+      - name: MAS_MAX_DELEGATIONS_PER_ITEM
+        value: '1'
+      multiagentWorker:
+      - name: MAS_MAX_DELEGATIONS_PER_ITEM
+        value: '1'
     ragClients:
     - namespace: zuno-ai-run
       podLabels:
