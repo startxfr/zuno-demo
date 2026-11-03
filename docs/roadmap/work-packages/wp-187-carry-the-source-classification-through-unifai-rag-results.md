@@ -1,6 +1,6 @@
 # WP-187: Carry the source classification through UnifAI RAG results, and keep Confluence content off external models
 
-- **State:** Operator pending (steps 1 and 2 done 2026-11-02; the rest waits on a UnifAI operator release)
+- **State:** Operator pending (steps 1 and 2 done 2026-11-02; step 3 set aside 2026-11-03; step 4 pushed to the fork, not released; the rest waits on operator 0.1.50)
 - **ADRs:** [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [ADR-0034](../../adr/0034-compute-effective-classification-from-the-complete-context.md)
 - **Depends on:** none (step 3 needs a UnifAI operator release)
 - **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [ADR-0206](../../adr/0206-separate-current-salesforce-knowledge-from-legacy-sxa.md)
@@ -42,6 +42,19 @@ reads Confluence can send that content to an external model.
 - **2026-11-02 (user):** a chunk with no classification in its metadata is returned as **C2** (fail closed), not C1.
 - **2026-11-02 (user, after the measurement):** widen this work package. It also closes the external-model path for the Confluence-reading tekos tasks and asks
   whether UnifAI can raise the session level from the source (ADR-0565 clause 3).
+- **2026-11-03 (status from the UnifAI operator sessions, checked against the fork):**
+  - Step 3 is set aside. Raising the run's level from a retrieved chunk is larger than a field read: a per-run classification floor that
+    survives the Temporal activity boundaries, and the LLM, MCP and A2A header builders emitting the higher of the static level and that
+    floor. The static route of step 2 (`local_only_for`) stays the control; no separate work package is opened.
+  - Step 4 is coded and pushed to `devel` of the UnifAI fork, not released: `e10ab3be6` (the RAG writes the source's `classification` on
+    every chunk; a change re-embeds the pages), `24ef98c56` (`UnifaiRAGSource.spec.classification`, optional enum C1 to C4, registered with
+    the RAG service), `556707001` (end-to-end check of the field in search results and of the re-embedding), roadmap row R-521 of the fork.
+    The search already returns the whole chunk metadata, so the field reaches the matches without a further change.
+  - Step 5: `9630ecfd1` sets the operator VERSION to 0.1.50, with the rag image `devel-ca45ea9f5`; the release also carries the Tekos
+    delegation fix (R-523). It waits on the user's canary and release approval; no date. Owner: the UnifAI operator session holding these
+    commits.
+  - After the release, in this repository: the catalog pin, the rag image roll, the demo333 Confluence sources set to C2 (the next sync
+    re-embeds their pages), then step 6.
 
 ## Steps
 
