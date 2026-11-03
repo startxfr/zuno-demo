@@ -116,11 +116,16 @@ spec:
                    && $KCADM config credentials $CFG --server "$KC_SERVER" \
                         --realm master --user "$KC_AUTOMATION_USER" \
                         --password "$KC_AUTOMATION_PASSWORD" >/dev/null 2>&1; then
+                  [ -n "${KC_LOGIN_LOGGED:-}" ] || { echo "signed in as the automation account ($KC_AUTOMATION_USER)"; KC_LOGIN_LOGGED=1; }
                   return 0
                 fi
-                $KCADM config credentials $CFG --server "$KC_SERVER" \
-                  --realm master --user "$KC_ADMIN_USER" \
-                  --password "$KC_ADMIN_PASSWORD" >/dev/null 2>&1
+                if $KCADM config credentials $CFG --server "$KC_SERVER" \
+                     --realm master --user "$KC_ADMIN_USER" \
+                     --password "$KC_ADMIN_PASSWORD" >/dev/null 2>&1; then
+                  [ -n "${KC_LOGIN_LOGGED:-}" ] || { echo "signed in as the BOOTSTRAP admin ($KC_ADMIN_USER): the automation account did not work"; KC_LOGIN_LOGGED=1; }
+                  return 0
+                fi
+                return 1
               }
 
               ready=""

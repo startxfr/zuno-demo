@@ -46,6 +46,9 @@ One shared password reaches every admin, persona family and database through its
   `zuno/keycloak/demo-personas` was overwritten with the shared persona password, `demo-personas-password` and
   `zuno-ai-run/ragas-eval-credentials` were force-refreshed, and the passwords of all 37 realm users (27 humans, 5 `eval-*`,
   5 `stress-*`) were reset with `kcadm`; password-grant logins as `consultant-01`, `eval-consultant-01` and `stress-sale-01` return 200.
-- Not done: databases and caches keep their current passwords (ADR-0529; the new values apply to fresh installs). The
-  `eval-*`/`stress-*` twins still share the humans' Secret. The first run of the reconcile Job used the bootstrap admin (the
+- Not done: databases and caches keep their current passwords (ADR-0529; the new values apply to fresh installs; the per-role
+  PostgreSQL procedure is in `docs/platform/operations.md`, MariaDB/Redis/AAP databases are not covered). The
+  `eval-*`/`stress-*` twins still share the humans' Secret: at least eight consumers read `DEMO_PERSONA_PASSWORD` from it (the
+  acceptance gate, the stresstest, failover and persona probes, the mlops copy, the RAGAS ExternalSecret, the scaffold and compare
+  scripts) and pick the twin family by `EVAL_TWIN_PREFIX`, so a split is a decision to take, not a quick follow-up. The first run of the reconcile Job used the bootstrap admin (the
   automation account did not exist yet); a second run as `zuno-automation` has not been observed.
