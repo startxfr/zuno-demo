@@ -137,6 +137,10 @@ class Refusals(unittest.TestCase):
         self.assertTrue(run(refusal(release(True)), FakeGateway(chained_status=403, direct_status=403)).passed)
         self.assertFalse(run(refusal(release(True)), FakeGateway(chained_status=200, direct_status=200)).passed)
 
+    def test_an_empty_tool_surface_is_a_refusal_but_a_listed_tool_is_not(self):
+        self.assertTrue(run(refusal(release(True)), FakeGateway(chained=(), direct_status=200)).passed)
+        self.assertFalse(run(refusal(release(True)), FakeGateway(chained=(READ,), direct_status=200)).passed)
+
     def test_malformed_headers_replace_the_chain_exactly(self):
         gw = FakeGateway(chained_status=403, direct_status=403)
         result = run(refusal(release(True), hops=[], malformed={"X-Zuno-Delegated-By": "arkos:t"}), gw)
