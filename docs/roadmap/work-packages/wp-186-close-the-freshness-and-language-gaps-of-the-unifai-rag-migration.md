@@ -68,10 +68,13 @@ The records say what the UnifAI RAG does about freshness and language, and Frenc
 - **2026-11-03 (user, after the fork's stemmer v3 shipped off in operator 0.1.50/0.1.51):** compare the sparse encoders on the live stack before deciding about v3.
   Result ([README](../../../evaluations/redhat-docs/README.md), `results/ranking-sparse-v1-v2-v3-2026-11-03.json`): French hit@1 v1 0.80, v2 0.60, v3 0.60; all 31
   v1 0.68, v2 0.48, v3 0.52. By the rule above v3 is not needed (v1 French hit@1 is above 0.7) and it stays off; the stack reads v1 again. The `_v2` and `_v3`
-  collections stay in Qdrant (dropping them is a separate decision). Open, not acted on: v1 reads 0.62 on the English 21 against 0.71 earlier the same day.
+  collections stay in Qdrant (dropping them is a separate decision). Corrected below: the v2 and v3 figures are on an incomplete corpus.
 - **2026-11-03 (rerun, user's go, after the second GPU node and operator 0.1.51):** the 0.62 is reproduced exactly
   (`results/ranking-v1-rerun-2026-11-03.json`): all 31 0.68 / 0.81 / 0.74, English 21 0.62 / 0.76 / 0.69, French 10 0.80 / 0.90 / 0.85.
   - Four English entries moved since the 0.71 run: 7 and 10 from rank 1 to 2; 9 and 11 from ranks 4 and 3 to out of the top 10.
   - Their books are still indexed. Asked for 50 results, 9 ranks 7 and 11 ranks 4, so the fused order depends on `top_k_results`.
-  - The drop follows the corpus change between the two runs (WP-187 re-embed and the v2/v3 rewrites; v1 keeps a stale tail),
-    not missing content. The French rule still holds. A fresh v1 resync would be the clean way to compare again.
+  - Both runs used `top_k` 10, so `top_k` does not explain the move; what changed between the two runs is not known. The French rule still holds.
+- **2026-11-03 (correction, from a Qdrant facet on `metadata.source_id`):** the v2 and v3 collections were incomplete. The `[2,3]` resync left 11 of the 23
+  sources without any chunk in v2/v3 and five partial, so the v2 and v3 columns above are not reliable and the 1,198-chunk gap is not a stale tail in v1 (v1 is
+  complete, 4 stale chunks of a deleted source). A fresh v1 resync is not needed. Per the fork the first sync at a new version re-ingests every page, so the run did not complete for them (not investigated); a forced full ingest
+  is a classification change or a recreated source. v3 stays off by the rule applied to v1.

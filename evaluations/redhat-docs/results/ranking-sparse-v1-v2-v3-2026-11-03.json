@@ -6,7 +6,7 @@
   "v2": "stop words + length normalisation (<name>_hybrid_v2)",
   "v3": "v2 + light French suffix stemmer (<name>_hybrid_v3)"
  },
- "note": "write [2,3], one full resync of the 24 sources, then read 2, read 3, then read 1 again (write [1]). v2/v3 hold 14,489 web chunks, v1 15,687 (v1 keeps a stale tail): not the same corpus state.",
+ "note": "write [2,3], resyncToken on all 24 sources, then read 2, read 3, then read 1 again (write [1]). CAVEAT: the v2/v3 collections are INCOMPLETE (11 of 23 sources have no chunk, 5 partial; 14,489 vs 15,687 web chunks; found by a facet on metadata.source_id), so the v2 and v3 reports are not a reliable comparison; v1 is complete.",
  "summary": {
   "v1": {
    "all31": {
