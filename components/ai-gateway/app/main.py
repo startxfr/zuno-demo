@@ -22,6 +22,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
+from app import tool_markers
 from app import guardrails, maas_adapter, quota, quota_fail_modes, quota_windows, reasoning as reasoning_fallback, routing_decisions, semantic_cache
 from app.auth import CallerIdentity, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
@@ -395,6 +396,20 @@ async def chat_completions(
     local_only = x_zuno_local_only.strip().lower() == "true" or model_routing_policy.local_only_for_classification(
         x_zuno_agent, x_zuno_task, classification
     )
+    # ADR-0594: raise the call from the signed classification markers of the
+    # tool results in its context; for an experience client an unmarked tool
+    # result, or any C2+ content, keeps the turn on local models. Only raises.
+    marks = tool_markers.assess(payload.messages, classification, local_only, identity.client)
+    if marks.changed:
+        logger.info(
+            "classification raised by tool results: %s -> %s, local_only %s -> %s (%s) client=%s",
+            classification, marks.classification, local_only, marks.local_only,
+            ", ".join(sorted(set(marks.reasons))), identity.client,
+        )
+        classification, local_only = marks.classification, marks.local_only
+        local_only = local_only or model_routing_policy.local_only_for_classification(
+            x_zuno_agent, x_zuno_task, classification
+        )
     request_id = x_zuno_request_id.strip() or str(uuid.uuid4())
     run_id = x_zuno_run_id.strip() or None
     quota_class, project_id = _platform_context(identity, x_zuno_quota_class, x_zuno_project_id)

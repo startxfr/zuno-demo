@@ -70,6 +70,18 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            {{- if .Values.toolMarker.enabled }}
+            # ADR-0594: key of the signed tool-result classification markers
+            # (externalsecret-tool-marker.yaml of the mcp-gateway chart).
+            - name: ZUNO_MARKER_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.toolMarker.secretName }}
+                  key: ZUNO_MARKER_KEY
+                  optional: true
+            - name: MARKER_FAIL_CLOSED_CLIENTS
+              value: {{ join "," .Values.toolMarker.failClosedClients | quote }}
+            {{- end }}
             - name: KEYCLOAK_ISSUER
               value: {{ .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) | quote }}
             - name: KEYCLOAK_JWKS_URL
