@@ -293,6 +293,11 @@ def agent_isolation_placeholder_empty(s: Dict[str, Any]) -> ScenarioResult:
     from kubernetes import client as k8s_client
     from kubernetes import config as k8s_config
 
+    # Outside a pod (a workstation run against the cluster) there is no ServiceAccount to read: the scenario
+    # cannot observe the cluster there, which is not a failure of the placeholders. Inside a pod the variable
+    # is always set, so the gate Job still fails closed when its config cannot load.
+    if not os.getenv("KUBERNETES_SERVICE_HOST"):
+        return _skip(s, "not running in a pod (no KUBERNETES_SERVICE_HOST): the cluster state cannot be read from here")
     try:
         k8s_config.load_incluster_config()
     except Exception as exc:
