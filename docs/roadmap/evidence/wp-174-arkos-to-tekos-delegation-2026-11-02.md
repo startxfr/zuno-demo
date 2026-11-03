@@ -57,7 +57,7 @@ One GPU node came back (three of the four models Ready). Arkos scenario 21 as `e
   - The `FAILED` labels printed by the scenario were a harness label (a span without `mas.success`), fixed in `0b55200e`. No `mas.session` or `send_message` span has an error status.
 - **Unrelated defect seen**: Tekos calls git-forge `list_repositories` without `provider`, `owner` and `repo`, which returns a 502 (traces `8e160bd26cda4688485f4315ccbe69fb`, `a695d489fb4297e09daa9af30d05dc90`, `a28c1c212a58f0cde28f1843b9b34e1b`).
 - **Refusal checks replayed** (`evaluations/arkos/security_checks.py`, `eval-consultant-01`, operator 0.1.53): the delegated surface exposes only read tools; refused without the target entitlement, with a depth header that disagrees and with half a chain (403). The undeclared target, the depth limit and the cycle answer 200 with an EMPTY tool list on `tools/list` and `denied: ... (ADR-0401)` / `(ADR-0406)` on `tools/call`; the checks expected a 403 and were corrected to accept an empty surface (`bde97594`). Write refusal: the delegated surface lists no write tool.
-- **Cost of one delegating turn** (ai-gateway counters, user `eval-consultant-01`, idle baseline checked, scenario 21, one passing turn of about 90 s, 2026-11-03 19:21): Arkos 753,363 tokens in 208 model calls, Tekos 85,696 tokens in 104 model calls, about 839,000 tokens and 312 calls for the turn, all on local `gpt-oss-20b`. The `evaluation` quota class of the persona is exhausted by a few such turns (a rate limit of about 16 minutes followed).
+- **Cost of one delegating turn** (ai-gateway counters, user `eval-consultant-01`, idle baseline checked, scenario 21, one passing turn of about 90 s, 2026-11-03 19:21): Arkos 753,363 tokens in 208 model calls, Tekos 85,696 tokens in 104 model calls, about 839,000 tokens and 312 calls for the turn, all on local `gpt-oss-20b`. The `evaluation` quota class of the persona is exhausted by a few such turns (a rate limit of about 16 minutes followed). **CORRECTED the same evening: these figures are 13 times too high, see "Correction: the model counters fan out per group" below.**
 - **Not proven**: `X-Zuno-Max-Tokens` end to end. Still red: `unifai_forwards_identity_to_the_gateways` (the orchestrator no longer calls MCP tools itself, the worker does).
 
 ## Cost levers, git-forge schema and what the fork does not do (2026-11-03, evening)
@@ -68,8 +68,20 @@ One GPU node came back (three of the four models Ready). Arkos scenario 21 as `e
 - **Cancellation of a delegation no longer awaited (ADR-0406 clause 4)**: not implemented in the fork. `cancel_task` exists in the A2A client but nothing calls it; on the node's 30 s polling timeout (hard-coded, 0.5 s x 60) the remote task keeps running, and a user abort or a cancelled Temporal run does not reach it. Planned by b9 for 0.1.55 together with a configurable timeout; the live proof needs it.
 - **`X-Zuno-Max-Tokens`**: the ai-gateway cuts at the header (64 gives 64 and 128 gives 128 completion tokens). The operator sets the header on every model call and on the A2A hop from the task ceiling (b9, `agentbundle_controller.go:392`). Arkos's drafting task declares 8192, so no observed call reaches the cap (the largest has 1,781 completion tokens; one call has 1,537, near the 1,536 of `structure-demo`). A test bundle with a ceiling of 64 would need a signed task, since bundles are verified from the signed release; not done. Open until a span attribute (offered by b9 for 0.1.55) or a low-ceiling task shows the value on the wire.
 
+## Correction: the model counters fan out per group (2026-11-03, night)
+
+The cost figures above (839,000 tokens and 312 calls per delegating turn, and the four turns at the cap of 1) are **13 times too high**. The ai-gateway emits `zuno_model_calls_total`, `zuno_model_tokens_total` and the cost counter once per Keycloak group of the caller (`components/ai-gateway/app/telemetry.py`, three `for g in group_list` loops), and the evaluation persona holds 13 groups, so any `sum` over the user reads 13 times the truth. Control: three direct ai-gateway calls of 69 tokens (207 tokens in total) moved the counters by +39 calls and +2,691 tokens, exactly 13 times; a delegating turn's trace holds 9 Arkos `chat` spans and 9 ai-gateway `model_call` spans while the counters said 117 calls for it. This is the shape already recorded for `agent-bff` (one point per group). Corrected per-turn figures (counter delta divided by 13, consistent with the spans):
+
+| Turn | Arkos tokens / calls | Tekos tokens / calls |
+|---|---|---|
+| Cap 3, one delegating turn | about 58,000 / 16 | about 6,600 / 8 |
+| Cap 1, four delegating turns | 67,900 / 16, 48,500 / 14, 45,500 / 14, 26,100 / 9 | 1,950 / 2, 2,100 / 3, 2,000 / 3, 2,600 / 4 |
+| No delegation | about 23,800 / 8 | - |
+
+So a delegating turn costs about 65,000 tokens and 24 calls at the cap of 3, and 28,000 to 70,000 tokens at the cap of 1: there is no cost problem to solve, and the cap of 1 saves little (Tekos about 4,500 tokens per turn). Per-turn figures must be read from the spans or from a counter filtered on one group. The fan-out is not fixed (a decision: one point per call with the groups joined, which changes any dashboard that filters on `group`).
+
 ## What remains
 
 1. `X-Zuno-Max-Tokens` on the wire for a UnifAI model call, and the cancellation of an abandoned delegation (ADR-0406 clause 4): both wait for operator 0.1.55.
-2. Whether the cap of 1 stays, and what to do with Arkos's own loop (117 to 208 model calls per turn): a decision, with the per-node counter of 0.1.55.
+2. Whether the cap of 1 stays: it saves little (see the correction above); the per-node counter of 0.1.55 is no longer needed to explain the cost. The ai-gateway group fan-out of the model counters is a defect to fix.
 3. Scenario 10 flakiness, and a real Tekos call through the new git-forge schema.
