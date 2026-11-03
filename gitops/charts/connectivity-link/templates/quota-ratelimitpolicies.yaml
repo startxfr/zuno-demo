@@ -78,31 +78,6 @@ spec:
       when:
         - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'intensive' : false)"
         - predicate: "'x-zuno-project-id' in request.headers"
-    rehearsal-user:
-      rates:
-        - limit: 60
-          window: 5m
-      counters:
-        - expression: 'auth.identity.sub'
-      when:
-        - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'rehearsal' : false)"
-    rehearsal-group:
-      rates:
-        - limit: 600
-          window: 5m
-      counters:
-        - expression: "auth.identity.groups.join('|')"
-      when:
-        - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'rehearsal' : false)"
-    rehearsal-project:
-      rates:
-        - limit: 300
-          window: 5m
-      counters:
-        - expression: "request.headers['x-zuno-project-id']"
-      when:
-        - predicate: "(('x-zuno-quota-class' in request.headers) ? request.headers['x-zuno-quota-class'] == 'rehearsal' : false)"
-        - predicate: "'x-zuno-project-id' in request.headers"
     standard-user:
       rates:
         - limit: 60
