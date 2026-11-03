@@ -171,7 +171,7 @@ open-webui:
     - name: DEFAULT_MODELS
       value: auto
     - name: DEFAULT_MODEL_METADATA
-      value: '{"toolIds":["server:mcp:zuno-mcp"],"description":"Zuno picks the model for you: internal data stays on local models."}'
+      value: '{"toolIds":["server:mcp:zuno-mcp"],"capabilities":{"builtin_tools":false},"description":"Zuno picks the model for you: internal data stays on local models."}'
     - name: DEFAULT_MODEL_PARAMS
       value: '{"function_calling":"native"}'
     - name: ENABLE_TITLE_GENERATION
