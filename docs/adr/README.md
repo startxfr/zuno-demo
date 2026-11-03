@@ -352,6 +352,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0591](0591-route-only-to-ready-local-models-and-fail-fast-on-stalled-candidates.md) | Implemented | Route only to ready local models and fail fast on stalled candidates |
 | [ADR-0592](0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md) | Implemented | Declare experience clients in the agents release, apart from agents |
 | [ADR-0593](0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md) | Implemented | Key the per-user quota and telemetry by persona across experiences |
+| [ADR-0594](0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md) | Accepted | Give the three experiences the same MCP tools behind signed classification markers |
 
 ## OKF v0.1
 
