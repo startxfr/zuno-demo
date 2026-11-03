@@ -80,8 +80,15 @@ The cost figures above (839,000 tokens and 312 calls per delegating turn, and th
 
 So a delegating turn costs about 65,000 tokens and 24 calls at the cap of 3, and 28,000 to 70,000 tokens at the cap of 1: there is no cost problem to solve, and the cap of 1 saves little (Tekos about 4,500 tokens per turn). Per-turn figures must be read from the spans or from a counter filtered on one group. The fan-out is not fixed (a decision: one point per call with the groups joined, which changes any dashboard that filters on `group`).
 
+## Fan-out fixed, UnifAI v0.1.54 on demo333 (2026-11-03, night)
+
+- **Counters fixed** (`cc000ec3`, ai-gateway build 40, session 40): `zuno_model_calls_total`, `zuno_model_tokens_total` and the cost counter now take one point per call with no group label, and `zuno_model_*_by_group_total` feed the group panels. Control by session 40: 3 direct calls of 87 tokens for `consultant-02` (10 groups) read +3 calls and +87 tokens on the main series and +30 and +870 on the by-group series. Cost figures below are exact, with no division.
+- **Operator 0.1.54, the first unified release** (`release.yml@refs/tags/v0.1.54`, operator `sha256:5b8fdb65…`, catalog `sha256:df4b99ed…`, five images `v0.1.54`, same code as `devel-851331422`): the identity is accepted by the offline verifier and by the WP-178 admission policy (`673e6189`), the catalog is pinned (`dd105d96`), the images rolled (`bff1d48a`), the delegation cap is back at the default 3 (`550fa857`). The OLM Subscription of demo333 was created by hand and is not managed by the chart, so its channel was patched live from `stable` to `alpha` (the `channel: alpha` value in the chart is documentation only, `2c1f45e4`). Operator 0.1.54 `Succeeded`, stack `Ready`.
+- **Delegating turns on 0.1.54** (scenario 21, exact counters): Arkos 20,090 / 47,184 / 169,415 tokens in 7 / 13 / 32 model calls, Tekos 3,736 / 3,429 / 4,057 tokens in 4 / 4 / 5 calls (1, 1 and 2 A2A messages); a turn where the model answered without delegating cost 22,764 tokens in 8 calls and failed the scenario by design. Arkos suite 16 of 18: scenario 20 failed on a dropped local port-forward to the ai-gateway, scenario 21 once returned an empty final reply after a successful delegation (0 characters), the earlier defect, intermittent: 1 empty reply in 5 delegating turns on 0.1.54.
+- **Still open**: `X-Zuno-Max-Tokens` on the wire and the cancellation of an abandoned delegation both wait for operator 0.1.55 (b9: `97b6ccfa6` codes `cancel_task` on timeout with `spec.delegation.timeoutSeconds`, `cc90a1597` records the header in the LLM call span). The empty final reply is rare but not gone.
+
 ## What remains
 
-1. `X-Zuno-Max-Tokens` on the wire for a UnifAI model call, and the cancellation of an abandoned delegation (ADR-0406 clause 4): both wait for operator 0.1.55.
-2. Whether the cap of 1 stays: it saves little (see the correction above); the per-node counter of 0.1.55 is no longer needed to explain the cost. The ai-gateway group fan-out of the model counters is a defect to fix.
-3. Scenario 10 flakiness, and a real Tekos call through the new git-forge schema.
+1. Operator 0.1.55 (not released): live proof of `X-Zuno-Max-Tokens` on the wire (span metadata) and of `cancel_task` (a test bundle with `timeoutSeconds: 5`, a slow question to Tekos, a `tasks/cancel` at the a2a-gateway). Cancellation on a user abort or a cancelled Temporal run is a separate design question.
+2. The intermittent empty final reply after a successful delegation (1 in 5 on 0.1.54), and the intermittent turn where Arkos answers without delegating (1 in 4).
+3. Whether the cap of 3 is right: the cost is small (a delegating turn is 24,000 to 173,000 tokens), so there is no cost reason to lower it.
