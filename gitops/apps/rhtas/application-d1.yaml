@@ -31,6 +31,16 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-rhtas
+  # The operator (RHTAS 1.5, Securesign v1 is the storage version) drops
+  # spec.trillian.database.databaseSecretRef when it converts the v1alpha1
+  # manifest this chart writes; the live object never carries it, so the
+  # Application showed a permanent, harmless OutOfSync on that one field.
+  ignoreDifferences:
+    - group: rhtas.redhat.com
+      kind: Securesign
+      name: zuno-securesign
+      jsonPointers:
+        - /spec/trillian/database/databaseSecretRef
   syncPolicy:
     automated:
       prune: true
