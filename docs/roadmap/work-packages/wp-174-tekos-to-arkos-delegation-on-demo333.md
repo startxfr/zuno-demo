@@ -1,6 +1,6 @@
 # WP-174: Arkos to Tekos delegation on demo333 (the file keeps its first name; direction reversed 2026-11-01)
 
-- **State:** operator pending
+- **State:** Repo work merged
 - **ADRs:** [ADR-0401](../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md), [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md)
 - **Depends on:** [WP-171](wp-171-okf-delegation-fields-and-conformance-cases.md), [WP-172](wp-172-gateway-enforcement-of-the-delegation-chain.md), [WP-173](wp-173-unifai-a2a-identity-server-and-approval.md)
 - **Related:** [WP-154](wp-154-tekos-pilot-on-demo333.md), [WP-169](wp-169-dedicated-evaluation-personas.md)
@@ -59,3 +59,46 @@ Operators 0.1.42, 0.1.43, 0.1.44, 0.1.45 and 0.1.47 are live on demo333 (catalog
 ## Progress (2026-11-02)
 
 Wiring is live on demo333 (agents v0.8.0 admitted, bundles repinned, operator 0.1.49 fixing the node uid); the behavioural proof waits for the GPU models. See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md).
+
+## Progress (2026-11-03): the delegation works
+
+Operator 0.1.53 (catalog pin `90146463`; R-528 and a cap of 3 delegations per work item) and the application images
+`devel-8c86d4f19` (`a2cbb665`) are live on demo333. As `eval-consultant-01`:
+- Scenario 21 passed 3 of 3, with 3, 2 and 1 A2A messages and a non-empty reply carrying the Tekos content each time.
+- The Arkos suite passed 18 of 18.
+- `a2a_delegation_check.py`: 9 x 200, 0 x 404.
+- The mcp-gateway audit carries `delegated_by`.
+
+[The evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#operator-0152-and-0153-on-demo333-2026-11-03)
+has the traces. [WP-172](wp-172-gateway-enforcement-of-the-delegation-chain.md) is Done.
+
+Proofs made, against the list above:
+
+| Proof | ADR | State |
+|---|---|---|
+| The chain in the audit line and the trace (`sub`, `delegated_by`, depth) | 0401, 0403 | made |
+| The number of calls per turn read from real traces; the cap was needed and fired | 0406 | made |
+| Classification on return: Tekos results join Arkos's C3 run | 0401 | not checked separately |
+| Refusals: unentitled user, undeclared target, depth 2, cycle, half a chain, depth header mismatch, read-only delegated surface (`evaluations/arkos/security_checks.py`) | 0401, 0403, 0406 | made: 7 of 7 hold on 0.1.53 |
+| The cost lands on the initiating user; the cost of one delegating turn | 0406 | made: one scenario 21 turn as `eval-consultant-01` cost Arkos 753,363 tokens in 208 calls and Tekos 85,696 tokens in 104 calls (about 839,000 tokens, all local gpt-oss-20b; ai-gateway counters, idle baseline checked, `f4fd6318`). Whether this cost is acceptable or needs a lower ceiling is an open decision, not a missing proof |
+| A delegation no longer awaited cancels the remote task | 0406 | not run |
+| `X-Zuno-Max-Tokens` end to end | 0406 | not proven |
+| Approval (ADR-0409) | 0409 | waits for WP-173 |
+
+The refusal checks were replayed as `eval-consultant-01` on 0.1.53. Three of them (undeclared target, depth limit, cycle)
+first failed with status 200, although the gateway was right. On `/mcp`, a refused chain gets `tools/list` 200 with an
+EMPTY tool list, and its `tools/call` answers "denied: ... (ADR-0401)" or "denied: ... (ADR-0406)". The checks now count
+an empty surface as a refusal (`bde97594`). With that fix, all 7 hold. The legitimate chain lists 6 read tools.
+
+`unifai_forwards_identity_to_the_gateways` failed on this operator for a reason unrelated to the chain. The orchestrator
+now only calls `workplan.*` and `iem.delegate_task`, and the MCP calls come from the worker, so the check never saw
+them. Since `1261ebf1`, the check accepts the mcp-gateway trace as proof. It has not been rerun live since that change.
+
+**Result:** ADR-0401 and ADR-0403 are `Implemented`. ADR-0406 and this work package stay open on two proofs:
+- the cancellation of a delegation no longer awaited;
+- `X-Zuno-Max-Tokens` end to end.
+
+The cost of a delegating turn is a decision still open: accept it, or lower the delegation cap or the token ceiling.
+
+A defect unrelated to the delegation was also seen: Tekos calls git-forge `list_repositories` without `provider`,
+`owner` and `repo`, which returns a 502.

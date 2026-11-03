@@ -1,6 +1,6 @@
 # ADR-0403: Propagate the user's identity and the delegation chain across agent-to-agent calls
 
-- **Status:** Accepted (2026-10-24) - the decisions below are settled; it becomes `Implemented` once the proofs of "Before Implemented" are made live (WP-174)
+- **Status:** Implemented (2026-11-03, WP-174: delegated calls carry the user's token and the chain, audited and traced)
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
@@ -139,3 +139,13 @@ declaration for every hop.
 `components/mcp-gateway/app/{auth,policy,main,agent_declarations}.py`, `gitops/charts/keycloak/`,
 ADR-0032, ADR-0563, ADR-0571 and the UnifAI fork's `identity_forwarding.py` and
 `a2a_agent` node, read on 2026-10-24.
+
+## Implementation proof (2026-11-03)
+
+These proofs were made on demo333 as `eval-consultant-01`, on operator 0.1.53 ([evidence](../roadmap/evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md)):
+- delegated calls run as the user;
+- the mcp-gateway audit carries `delegated_by=arkos:draft-architecture-testimonial` (16 lines);
+- `platform/testing/a2a_delegation_check.py` passed (9 x 200, 0 x 404);
+- the refusals of ADR-0401 hold.
+
+The identity-forwarding check now reads the mcp-gateway trace when the orchestrator delegates (`1261ebf1`).

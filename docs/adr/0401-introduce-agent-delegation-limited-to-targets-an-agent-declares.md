@@ -1,6 +1,6 @@
 # ADR-0401: Introduce agent-to-agent delegation limited to the targets an agent declares
 
-- **Status:** Accepted (2026-10-24) - the decisions below are settled; it becomes `Implemented` once the proofs of "Before Implemented" are made live (WP-174)
+- **Status:** Implemented (2026-11-03, WP-174: Arkos to Tekos delegation live on operator 0.1.53, the refusals hold)
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
@@ -106,3 +106,20 @@ Residual risk and its mitigation are stated there.
 Eight agent bundles and their prompts read on 2026-10-24: no declared delegation
 anywhere; the schema `additionalProperties: false` has no delegation field;
 `components/mcp-gateway/app/policy.py` evaluates a single agent per call.
+
+## Implementation proof (2026-11-03)
+
+These proofs were made on demo333 as `eval-consultant-01`, on operator 0.1.53 with the application images `devel-8c86d4f19`
+([evidence](../roadmap/evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md)). Arkos declares Tekos / `answer-technical-question`, and the delegation runs: scenario 21 passed 3 of 3,
+with a non-empty reply carrying the Tekos content. The refusals hold (`evaluations/arkos/security_checks.py`, `bde97594`):
+- an unentitled user;
+- an undeclared target;
+- depth 2;
+- a cycle;
+- half a chain;
+- a depth header mismatch.
+On `/mcp`, a refused chain gets an empty tool list and a `denied: ...` answer on `tools/call`.
+
+Classification on return: the direction was reversed on 2026-11-01. Arkos, the delegator, runs at C3 and is local-only,
+so the Tekos result joins a C3 run and the ai-gateway floor applies. This holds by construction. No separate test raises
+a C1 run to C3.

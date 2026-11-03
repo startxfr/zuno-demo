@@ -1,6 +1,6 @@
 # WP-172: Gateway enforcement of the delegation chain
 
-- **State:** Repo work merged
+- **State:** Done (2026-11-03)
 - **ADRs:** [ADR-0401](../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md)
 - **Depends on:** [WP-170](wp-170-agent-delegation-contract-and-adrs.md), [WP-171](wp-171-okf-delegation-fields-and-conformance-cases.md)
 - **Related:** [ADR-0011](../../adr/0011-define-tool-authorization-as-policy-intersection.md), [WP-146](wp-146-unifai-identity-and-context-header-forwarding.md)
@@ -51,3 +51,16 @@ before it ("Node a2a-tekos is not adjacent, or the uid is wrong"), so the State 
 Decided when the records were accepted: the boolean `delegation.allow_write` is transitional. When approval ships (WP-173) the gateway check
 becomes "the target `agent/task` is on `delegation.write_allowed`" (ADR-0409 clause 5), and this module's `DelegationLimits` and `evaluate`
 change with it, in the same corp release.
+
+## Closure (2026-11-03)
+
+The live proof this work package waited for exists: on demo333, with operator 0.1.53 (catalog pin `90146463`) and the
+application images `devel-8c86d4f19` (`a2cbb665`), Arkos delegated to Tekos as `eval-consultant-01` and the mcp-gateway
+audit carries 16 lines with `delegated_by=arkos:draft-architecture-testimonial`. `platform/testing/a2a_delegation_check.py`
+passed (9 x 200, 0 x 404). See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#operator-0152-and-0153-on-demo333-2026-11-03).
+The acceptance of this work package is met: every refusal is a unit test, calls without chain headers are unchanged,
+and the audit line carries the chain.
+
+The live refusal checks (`evaluations/common/delegation_checks.py`: unentitled user, undeclared target, depth 2, cycle,
+write refused) have not run yet on this operator. They are a proof of [WP-174](wp-174-tekos-to-arkos-delegation-on-demo333.md)
+and of ADR-0401, ADR-0403 and ADR-0406, which stay `Accepted` until they pass.
