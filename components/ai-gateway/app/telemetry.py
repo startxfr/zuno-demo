@@ -113,6 +113,8 @@ _tracer: Optional[trace.Tracer] = None
 _model_call_counter = None
 _token_counter = None
 _cost_counter = None
+_model_call_by_group_counter = None
+_token_by_group_counter = None
 _cache_lookup_counter = None
 _model_call_duration_histogram = None
 _guardrails_eval_counter = None
@@ -140,7 +142,7 @@ def metric_views() -> list:
 
 def init_telemetry(service_name: str = "ai-gateway") -> None:
     global _tracer, _model_call_counter, _token_counter, _cost_counter, _cache_lookup_counter
-    global _model_call_duration_histogram
+    global _model_call_duration_histogram, _model_call_by_group_counter, _token_by_group_counter
     global _guardrails_eval_counter, _guardrails_detection_counter, _empty_response_counter
     global _candidates_skipped_counter
 
@@ -173,6 +175,17 @@ def init_telemetry(service_name: str = "ai-gateway") -> None:
     )
     _cost_counter = meter.create_counter(
         "zuno.model_cost_usd", description="Estimated USD cost of model calls, by provider"
+    )
+    # One point per Keycloak group of the caller, for the group panels only. The three counters above and the
+    # duration histogram take ONE point per call: summing a per-group series over a user counts a call once per
+    # group (13 times for eval-consultant-01, WP-174).
+    _model_call_by_group_counter = meter.create_counter(
+        "zuno.model_calls_by_group",
+        description="Model calls, one point per Keycloak group of the caller; sum it by group only",
+    )
+    _token_by_group_counter = meter.create_counter(
+        "zuno.model_tokens_by_group",
+        description="Prompt/completion tokens, one point per Keycloak group of the caller; sum it by group only",
     )
     _cache_lookup_counter = meter.create_counter(
         "zuno.semantic_cache_lookups",
@@ -425,11 +438,15 @@ def model_call_span(
     now): the validated Keycloak identity, already resolved by
     app/main.py's `validate_token` dependency at every call site. A
     Keycloak group membership is a list, but Prometheus/OTel metric labels
-    are scalar - one metric point is recorded per group (attributed
-    double-counting across a `sum by (group)` rollup for a multi-group
-    user is an accepted demo-scope trade-off, same class as this file's
-    other approximations; a user with zero groups still gets one point
-    with `group=""`).
+    are scalar. The calls, tokens and cost counters and the duration
+    histogram carry NO group label and take one point per call, so any sum
+    over a user, an agent or a client is exact. The group breakdown lives in
+    `zuno.model_calls_by_group` and `zuno.model_tokens_by_group`: one point
+    per group (a user with zero groups gets one point with `group=""`), to
+    be summed by group only. Until 2026-11-03 the main counters took one
+    point per group, which multiplied every per-user sum by the caller's
+    group count (13x for eval-consultant-01, WP-174), the same defect
+    agent-bff had (3f74e4b0).
 
     `agent` (ADR-0029's "by user, agent, task, model and provider" bullet,
     also never wired until now): the X-Zuno-Agent header agent-runtime
@@ -510,19 +527,24 @@ def model_call_span(
             attrs = {"provider": provider, "model": model, "outcome": outcome, "user": _caller_persona.get() or caller_sub or "", "agent": agent or "",
                      "client": client}
             group_list = groups or [""]
-            for attrs_per_group in ({**attrs, "group": g} for g in group_list):
-                if _model_call_counter is not None:
-                    _model_call_counter.add(1, attrs_per_group)
-                if _model_call_duration_histogram is not None:
-                    _model_call_duration_histogram.record(latency_ms, attrs_per_group)
+            if _model_call_counter is not None:
+                _model_call_counter.add(1, attrs)
+            if _model_call_duration_histogram is not None:
+                _model_call_duration_histogram.record(latency_ms, attrs)
+            if _model_call_by_group_counter is not None:
+                for g in group_list:
+                    _model_call_by_group_counter.add(1, {**attrs, "group": g})
             has_token_usage = bool(recorder.prompt_tokens or recorder.completion_tokens)
             if has_token_usage:
                 span.set_attribute("zuno.prompt_tokens", recorder.prompt_tokens)
                 span.set_attribute("zuno.completion_tokens", recorder.completion_tokens)
-                for attrs_per_group in ({**attrs, "group": g} for g in group_list):
-                    if _token_counter is not None:
-                        _token_counter.add(recorder.prompt_tokens, {**attrs_per_group, "kind": "prompt"})
-                        _token_counter.add(recorder.completion_tokens, {**attrs_per_group, "kind": "completion"})
+                if _token_counter is not None:
+                    _token_counter.add(recorder.prompt_tokens, {**attrs, "kind": "prompt"})
+                    _token_counter.add(recorder.completion_tokens, {**attrs, "kind": "completion"})
+                if _token_by_group_counter is not None:
+                    for g in group_list:
+                        _token_by_group_counter.add(recorder.prompt_tokens, {**attrs, "group": g, "kind": "prompt"})
+                        _token_by_group_counter.add(recorder.completion_tokens, {**attrs, "group": g, "kind": "completion"})
 
             # Local GPU time is billed whether the call succeeded or
             # errored - the GPU was occupied for `latency_ms` either way
@@ -533,9 +555,8 @@ def model_call_span(
             if has_token_usage or provider in _COST_PER_SECOND_LOCAL:
                 cost = _estimate_cost_usd(provider, recorder.prompt_tokens, recorder.completion_tokens, latency_ms)
                 span.set_attribute("zuno.estimated_cost_usd", cost)
-                for attrs_per_group in ({**attrs, "group": g} for g in group_list):
-                    if _cost_counter is not None:
-                        _cost_counter.add(cost, attrs_per_group)
+                if _cost_counter is not None:
+                    _cost_counter.add(cost, attrs)
 
 
 class ModelCallRecorder:
