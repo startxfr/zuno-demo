@@ -50,7 +50,7 @@ sources: 11 sources have no chunk at all in v2 and v3 (OpenShift Virtualization 
 partial; the large OpenShift Container Platform source is complete. Per the fork, the first sync at a new write version re-ingests every page, so the run did not complete for those sources (cause not investigated: a Qdrant write, an embedding timeout or a time
 budget; a plain resync would now be incremental). v2 and v3 were measured on an incomplete corpus (14,489 web chunks against 15,687). v1 is complete (its only stale rows are 4 chunks of a deleted source). The comparison above says
 nothing reliable about v2 against v1; v3 against v2 is meaningful only on the sources both hold. Redoing it needs a forced full ingest of every page into the new version (question
-open with the fork). v3 stays off by the French rule on v1 (0.80). The `_v2` and `_v3` collections are left in Qdrant.
+open with the fork). v3 stays off by the French rule on v1 (0.80). The `_v2` and `_v3` collections were dropped from Qdrant on 2026-11-03 (incomplete corpus; recreate with `sparseWriteVersions: [1, 3]` and a full sync).
 
 **v1 rerun (2026-11-03, operator 0.1.51).** `results/ranking-v1-rerun-2026-11-03.json` reproduces the v1 figures exactly: all 31 0.68 / 0.81 / 0.74,
 English 21 0.62 / 0.76 / 0.69, French 10 0.80 / 0.90 / 0.85.
