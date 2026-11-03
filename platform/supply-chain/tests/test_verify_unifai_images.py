@@ -211,6 +211,20 @@ class Identities(unittest.TestCase):
         self.assertIn("publish-images", ident["operator"]["dev_subject_regexp"])
         self.assertNotIn("dev_subject_regexp", ident["operator_artifacts"])
 
+    def test_the_unified_release_identity_is_accepted_but_never_a_pre_release_or_a_branch(self):
+        import re
+
+        base = "https://github.com/startxfr/UnifAI/.github/workflows/"
+        for section in ("images", "operator", "operator_artifacts"):
+            rx = re.compile(v.subject_regexp(ident, section, False))
+            self.assertTrue(rx.match(base + "release.yml@refs/tags/v0.1.54"), section)
+            self.assertFalse(rx.match(base + "release.yml@refs/tags/v0.1.54-rc.1"), section)
+            self.assertFalse(rx.match(base + "release.yml@refs/heads/devel"), section)
+            self.assertFalse(rx.match(base + "release.yml@refs/tags/v0.1"), section)
+            # the identity the earlier releases carry is still accepted
+        self.assertTrue(re.match(v.subject_regexp(ident, "images", False), base + "publish-images.yml@refs/tags/v1.0.0"))
+        self.assertTrue(re.match(v.subject_regexp(ident, "operator", False), base + "unifai-operator-release.yml@refs/tags/operator-v0.1.53"))
+
 
 class Pods(unittest.TestCase):
     def pods(self, *image_ids):

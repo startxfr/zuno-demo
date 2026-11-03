@@ -180,6 +180,7 @@
       {%- set ids = lookup('ansible.builtin.file', zuno_repo_root + '/platform/supply-chain/image-identities.yaml') | from_yaml -%}
       {%- set dev = zuno_unifai_accept_dev_signatures | default(false) | bool -%}
       {%- set rx = [ids.images.release_subject_regexp, ids.operator.release_subject_regexp] -%}
+      {%- for sec in [ids.images, ids.operator] -%}{%- if sec.unified_release_subject_regexp is defined and sec.unified_release_subject_regexp not in rx -%}{%- set _ = rx.append(sec.unified_release_subject_regexp) -%}{%- endif -%}{%- endfor -%}
       {%- if dev -%}{%- set _ = rx.append(ids.images.dev_subject_regexp) -%}{%- set _ = rx.append(ids.operator.dev_subject_regexp) -%}{%- endif -%}
       {{ {'enabled': (zuno_unifai_admission_enabled | default(true) | bool),
           'mode': (zuno_unifai_admission_mode | default('warn')),

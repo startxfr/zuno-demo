@@ -14,6 +14,10 @@ images:
   # A release: the workflow run on a vX.Y.Z tag. The only identity a cluster
   # without an explicit opt-in accepts.
   release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/publish-images\.yml@refs/tags/v'
+  # The unified fork release (one product tag vX.Y.Z, release.yml): signs the five images, the operator, the
+  # bundle and the catalog of one release together. Accepted next to the identity above while both lifecycles
+  # exist. A pre-release tag (vX.Y.Z-rc.N) never matches: only a final tag is trusted.
+  unified_release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$'
   # A development build (devel-<sha>): the same workflow run on the devel branch.
   # Accepted only by a cluster that says so (zuno_unifai_accept_dev_signatures).
   dev_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/publish-images\.yml@refs/heads/devel$'
@@ -26,6 +30,10 @@ images:
 # development identity can still verify it.
 operator:
   release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/unifai-operator-release\.yml@refs/tags/operator-v'
+  # The unified fork release (one product tag vX.Y.Z, release.yml): signs the five images, the operator, the
+  # bundle and the catalog of one release together. Accepted next to the identity above while both lifecycles
+  # exist. A pre-release tag (vX.Y.Z-rc.N) never matches: only a final tag is trusted.
+  unified_release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$'
   # The build on the devel branch: accepted only by a cluster that says so.
   dev_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/publish-images\.yml@refs/heads/devel$'
 
@@ -34,6 +42,10 @@ operator:
 # development identity: they are never produced from a branch.
 operator_artifacts:
   release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/unifai-operator-release\.yml@refs/tags/operator-v'
+  # The unified fork release (one product tag vX.Y.Z, release.yml): signs the five images, the operator, the
+  # bundle and the catalog of one release together. Accepted next to the identity above while both lifecycles
+  # exist. A pre-release tag (vX.Y.Z-rc.N) never matches: only a final tag is trusted.
+  unified_release_subject_regexp: '^https://github\.com/startxfr/UnifAI/\.github/workflows/release\.yml@refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$'
 
 # What every image carries besides its signature. The provenance (cosign attest)
 # says which workflow built it from which commit. The SBOM lists what is in it; it
