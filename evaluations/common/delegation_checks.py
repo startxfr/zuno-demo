@@ -135,7 +135,7 @@ def delegation_refused(
     persona: str, agent: str, task: str, hops: List[str], malformed: Optional[Dict[str, str]] = None,
     requires: Optional[tuple] = None,
 ) -> Callable[[], Any]:
-    """The gateway must answer 403 to this chain. `hops` are the delegators (outermost first);
+    """The gateway must refuse this chain: 403, or 200 with an empty tool surface (nothing is callable). `hops` are the delegators (outermost first);
     `malformed` replaces the headers with exactly these values. `requires=(delegator, target, task)`
     skips the check unless the release declares that delegation (so a refusal is never confused with
     "nothing is enabled")."""
@@ -153,7 +153,17 @@ def delegation_refused(
             detail = str(resp.json().get("detail", ""))[:160]
         except ValueError:
             pass
-        return CheckResult(name, resp.status_code == 403, f"status={resp.status_code} {detail}".strip())
+        refused = resp.status_code == 403
+        if resp.status_code == 200:
+            # The `/mcp` front-door lists only the tools the chain allows: a refused chain yields an empty
+            # surface (the refusal itself, with its ADR reason, comes back on `tools/call`). An empty list is a
+            # refusal; any listed tool is not.
+            try:
+                refused = (resp.json().get("result") or {}).get("tools") == []
+            except ValueError:
+                refused = False
+            detail = detail or "empty tool surface"
+        return CheckResult(name, refused, f"status={resp.status_code} {detail}".strip())
 
     check.__name__ = name
     return check
