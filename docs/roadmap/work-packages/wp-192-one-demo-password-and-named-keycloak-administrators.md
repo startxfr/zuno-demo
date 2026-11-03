@@ -1,6 +1,6 @@
 # WP-192: One demo password, one variable per component, and named Keycloak administrators
 
-- **State:** Repo work in review (2026-11-03: phase 1, the variable scheme, is pushed; phase 2 Keycloak accounts in the repo; phase 3 live rollout follows)
+- **State:** Repo work merged (2026-11-03: phases 1 and 2 pushed, phase 3 applied on demo333; the Jobs' second run as `zuno-automation` and the database/twin follow-ups remain)
 - **ADRs:** [ADR-0595](../../adr/0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md)
 - **Depends on:** none
 - **Related:** [ADR-0349](../../adr/0349-restructure-demo-personas-cluster-access-groups-and-new-agents.md) (section 3 amended), [WP-190](wp-190-one-identity-one-budget-and-one-infrastructure-pattern-for-the-three-experiences.md) (the Keycloak plumbing it declared once)
@@ -37,3 +37,15 @@ One shared password reaches every admin, persona family and database through its
 - `python3 platform/vault/tests/test_password_scheme.py` passes; no password literal in `git grep` outside ADR history.
 - Live: master realm has `zuno-admin` and `zuno-automation`, the bootstrap `admin` is disabled, the client-reconcile and
   persona Jobs are green as `zuno-automation`, and the console shows no temporary-admin warning for `zuno-admin`.
+
+## Live on demo333 (2026-11-03)
+
+- `zuno-admin` and `zuno-automation` exist in the master realm (created by the client-reconcile Job at 83cd2bb0), both with the
+  `admin` role, and both sign in with the shared demo password (password-grant 200). The bootstrap `admin` is disabled, not deleted.
+- Vault `keycloak/console` and `keycloak/automation` were seeded by `make d0 install vault` (only the missing paths were written).
+  `zuno/keycloak/demo-personas` was overwritten with the shared persona password, `demo-personas-password` and
+  `zuno-ai-run/ragas-eval-credentials` were force-refreshed, and the passwords of all 37 realm users (27 humans, 5 `eval-*`,
+  5 `stress-*`) were reset with `kcadm`; password-grant logins as `consultant-01`, `eval-consultant-01` and `stress-sale-01` return 200.
+- Not done: databases and caches keep their current passwords (ADR-0529; the new values apply to fresh installs). The
+  `eval-*`/`stress-*` twins still share the humans' Secret. The first run of the reconcile Job used the bootstrap admin (the
+  automation account did not exist yet); a second run as `zuno-automation` has not been observed.
