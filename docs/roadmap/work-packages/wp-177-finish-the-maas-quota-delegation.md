@@ -26,6 +26,14 @@ putting the `standard-*` limits first stops the subscription budgets from counti
 The user accepted the missing per-user ceiling at MaaS on 2026-10-25. The upstream report stays drafted and not filed; reporting upstream is deferred and the subject is closed (user decision of 2026-10-25)
 ([kuadrant-token-limits-upstream-report.md](../evidence/kuadrant-token-limits-upstream-report.md)).
 
+**Re-measured 2026-11-04 (WP-195 step 4a), on RHCL 1.4.4 / authorino 1.4.4 / limitador 1.4.3 with RHOAI 3.5.2:**
+`quota_counters_probe.py` gives `OK: moved ['subscription']` again. The `standard-group` and `standard-user` limits still do not
+count, so the ledger stays. Since RHOAI 3.5.2, maas-controller names its subscription limits `tokens-<N>-per-<window>` (it used
+`models-as-a-service-...` before), and the probe now classifies both. Those names sort after `standard-*`, yet the
+subscription limit is still the one that counts. So "first two by sorted limit name" no longer describes the selection
+exactly; that question only matters for the upstream report, which stays deferred. Next measurement: RHCL 1.5.0 (WP-195
+step 4b).
+
 ## Steps
 
 1. **Counters probe (repo, done in review).** `platform/testing/quota_counters_probe.py` reads Limitador's counters for one route

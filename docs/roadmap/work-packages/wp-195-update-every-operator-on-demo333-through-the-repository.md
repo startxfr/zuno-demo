@@ -167,6 +167,30 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
      Do not run 4b before reading Red Hat's 1.4 → 1.5 procedure.
    - So step 4 splits into **4a**, `stable-1.4` → 1.4.4, and **4b**,
      `stable-1.5` → 1.5.0, which waits for that procedure.
+
+   **4a done 2026-11-04 (user go, after 7e's go):**
+   - `zuno_connectivity_link_channel: "stable-1.4"` (08012154), then
+     `make d1 install connectivity-link`. OLM moved rhcl to 1.4.4, authorino
+     to 1.4.4, and limitador and dns to 1.4.3, all `Succeeded`. In the same
+     resolution of the `openshift-operators` namespace it also took
+     rhtas-operator 1.5.0 → 1.5.1 (Automatic).
+   - **Trap:** the authorino-operator upgrade recreated the
+     `authorino-authorino-authorization` Service without the WP-071
+     `serving-cert-secret-name` annotation. The garbage collector then deleted
+     `authorino-server-cert`, which was owned by the old Service. The new
+     Authorino pod sat in `ContainerCreating` (FailedMount) while the old pod
+     kept serving from its mounted copy. The role annotates before OLM
+     finishes the upgrade, so a second `make d1 install connectivity-link`
+     re-annotated the Service and fixed it: the secret was regenerated and
+     Authorino rolled. **After any authorino-operator upgrade, run the install
+     twice, or run `make d1 check connectivity-link`, whose WP-071 check
+     catches the missing secret.**
+   - After it: Kuadrant `Ready`; the AuthPolicy and every per-model
+     TokenRateLimitPolicy are `Enforced`; the four chat models answer 200
+     through MaaS; 401 without a token.
+   - `quota_counters_probe.py`: `OK: moved ['subscription']`, so no change
+     for WP-177 (recorded there). The probe had to learn RHOAI 3.5.2's new
+     limit names (`tokens-<N>-per-<window>`) first.
 5. **Kueue 1.5.0.** Set `zuno_kueue_channel: stable-v1.5`, then
    `make d1 install kueue`.
 

@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 import time
 import urllib.parse
@@ -40,7 +41,10 @@ def family(limit_name: str) -> str:
         return "user"
     if limit_name.startswith("standard-group"):
         return "group"
-    if limit_name.startswith("models-as-a-service-"):
+    # maas-controller names its per-subscription limits `models-as-a-service-...`
+    # up to RHOAI 3.5.0 and `tokens-<N>-per-<window>` from 3.5.2 (demo333,
+    # 2026-11-04, WP-195: the probe read them as "other" until this).
+    if limit_name.startswith("models-as-a-service-") or re.match(r"^tokens-\d+-per-", limit_name):
         return "subscription"
     return "other"
 
