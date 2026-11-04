@@ -100,6 +100,15 @@
     - (_openshift_ai_maas_api_restarts | int) > 0
     - blocked_findings is defined
 
+# --- maas-controller's copy of maas-db-config (2026-11-04): a stale copy
+# after a password rotation crash-loops maas-api on SQLSTATE 28P01. Report
+# only here; `make d1 reconcile openshift-ai` resyncs it. Rationale in the
+# shared file.
+- name: "openshift_ai | precheck: compare maas-controller's copy of maas-db-config with its source"
+  ansible.builtin.include_tasks: maas_db_copy.yml
+  vars:
+    _oai_maas_db_copy_fix: false
+
 # --- MaaS /llm/ path-identity off-by-one tripwire (ADR-0201) ----------------
 # Latent upstream defect, verified live 2026-08-25: every model-identity
 # extraction in the generated AuthPolicy/maas-gateway-auth that fires on
