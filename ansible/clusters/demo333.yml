@@ -107,19 +107,29 @@ zuno_unifai_released_bundles_exclude: []
 zuno_unifai_values:
   gatewayLLM:
     timeoutSeconds: 200
+    # ADR-0597 (UnifAI >= 0.1.58): public built-ins, seen by every user and
+    # team. Cannot be turned off again: withdraw by deleting the object.
+    builtin: true
+  mcpGateway:
+    builtin: true
   # ADR-0598: one team workspace per business group of the zuno realm (the
   # agent-<bundle> teams come from the bundles). ops gathers the two ops groups.
   teams:
-  - {name: consultant, groups: [consultant]}
-  - {name: sales, groups: [sales]}
-  - {name: adv, groups: [adv]}
-  - {name: finance, groups: [finance]}
-  - {name: board, groups: [board]}
-  - {name: recrut, groups: [recrut]}
+  - {name: consultant, groups: [consultant], examples: true}
+  - {name: sales, groups: [sales], examples: true}
+  - {name: adv, groups: [adv], examples: true}
+  - {name: finance, groups: [finance], examples: true}
+  - {name: board, groups: [board], examples: true}
+  - {name: recrut, groups: [recrut], examples: true}
   - {name: cdp, groups: [cdp]}
-  - {name: ops, groups: [ocp-ai-ops, ocp-paas-ops]}
+  - {name: ops, groups: [ocp-ai-ops, ocp-paas-ops], examples: true}
   templates:
     enabled: true
+  # ADR-0598 points 4-5: example components and workflows in the teams marked
+  # `examples` (cdp has no persona), and a starter in these personal workspaces.
+  teamExamples:
+    enabled: true
+  personalStarters: [consultant-01, sale-01, ai-ops-01]
   ragSources:
   - aclGroups:
     - consultant/confluence-archi-satellite
