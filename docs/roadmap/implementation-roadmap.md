@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 16 | 26 | WP-173, WP-174 |
+| v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 9 | — | 12 | — |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -1144,6 +1144,7 @@ moving.
 
 ## Change log
 
+- 2026-11-04 — ADR-0406 Implemented: the cancel of a delegation that times out is proven live on UnifAI 0.1.57 (`a2a.timeout`, then `a2a.task_cancelled`; trace `54ebccfa482247d3ae41280e1dab4424`). A user abort is not covered, by decision. WP-174 stays open on approval (ADR-0409, waits for WP-173), the empty final reply (fix R-531 shipped in 0.1.56, not yet re-measured) and the turns where Arkos answers without delegating.
 - 2026-11-03 — WP-172 Done: delegated calls reach the mcp-gateway live on operator 0.1.53 and the audit carries the
   chain. WP-174 records the working Arkos to Tekos delegation (scenario 21 3/3, the cap of 3 delegations fired). The
   refusals hold, so ADR-0401 and ADR-0403 are Implemented. ADR-0406 stays Accepted: the cancellation of a delegation no
