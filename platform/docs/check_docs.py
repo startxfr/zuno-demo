@@ -173,7 +173,8 @@ def _parse_makefile_lists() -> dict:
                  "DAY1_VERBS", "DAY1_RUN_COMPONENTS", "DAY1_BUILD_COMPONENTS",
                  "DAY2_VERBS", "DAY2_RUN_COMPONENTS", "DAY2_CHECK_ONLY_COMPONENTS",
                  "DAY2_BUILD_COMPONENTS",
-                 "DAY3_VERBS", "DAY3_TEST_COMPONENTS", "DAY3_BACKUP_COMPONENTS"):
+                 "DAY3_VERBS", "DAY3_TEST_COMPONENTS", "DAY3_BACKUP_COMPONENTS",
+                 "DAY3_CHECK_ONLY_COMPONENTS"):
         match = re.search(rf"^{name}\s*:=\s*(.*)$", text, re.MULTILINE)
         lists[name] = match.group(1).split() if match else []
     return lists
@@ -205,7 +206,12 @@ def _components_for(day: str, verb: str, lists: dict) -> List[str]:
             components = components + lists.get(
                 f"DAY{day[1]}_CHECK_ONLY_COMPONENTS", [])
         return components
-    return lists["DAY3_TEST_COMPONENTS"] + lists["DAY3_BACKUP_COMPONENTS"]
+    components = lists["DAY3_TEST_COMPONENTS"] + lists["DAY3_BACKUP_COMPONENTS"]
+    if verb == "check":
+        # `make d3 check <x>` also accepts the check-only components
+        # (lightspeed, mlflow, operators, ...), as the Makefile does.
+        components = components + lists.get("DAY3_CHECK_ONLY_COMPONENTS", [])
+    return components
 
 
 def _check_one_make_command(day: str, verb: str, component: str,

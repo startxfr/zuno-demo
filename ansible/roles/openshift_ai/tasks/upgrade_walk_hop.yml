@@ -1,0 +1,90 @@
+---
+# One hop of upgrade_walk.yml. Every task is skipped once the pin is reached
+# (_oai_walk_done), so the remaining loop iterations cost nothing.
+- name: "openshift_ai | upgrade hop {{ _oai_walk_hop }}: read the Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: rhods-operator
+    namespace: redhat-ods-operator
+  register: _oai_hop_sub
+  when: not (_oai_walk_done | default(false) | bool)
+
+- name: "openshift_ai | upgrade hop {{ _oai_walk_hop }}: record where the walk stands"
+  ansible.builtin.set_fact:
+    _oai_walk_now: "{{ _oai_hop_sub.resources[0].status.installedCSV | default('') | regex_replace('^rhods-operator\\.v?', '') }}"
+    _oai_walk_done: >-
+      {{ (_oai_hop_sub.resources[0].status.installedCSV | default('') | regex_replace('^rhods-operator\\.v?', ''))
+         == (_openshift_ai_version | regex_replace('^v', '')) }}
+  when: not (_oai_walk_done | default(false) | bool)
+
+- name: "openshift_ai | upgrade hop {{ _oai_walk_hop }}: wait for the next InstallPlan"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: rhods-operator
+    namespace: redhat-ods-operator
+  register: _oai_hop_sub
+  until: >-
+    (_oai_hop_sub.resources[0].status.installPlanRef.name | default('')) | length > 0 and
+    (_oai_hop_sub.resources[0].status.currentCSV | default('')) != (_oai_hop_sub.resources[0].status.installedCSV | default(''))
+  retries: 30
+  delay: 10
+  when: not (_oai_walk_done | bool)
+
+- name: "openshift_ai | upgrade hop {{ _oai_walk_hop }}: read the InstallPlan"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    name: "{{ _oai_hop_sub.resources[0].status.installPlanRef.name }}"
+    namespace: redhat-ods-operator
+  register: _oai_hop_ip
+  when: not (_oai_walk_done | bool)
+
+- name: "openshift_ai | upgrade hop {{ _oai_walk_hop }}: refuse a hop past the pin or off the walk"
+  ansible.builtin.fail:
+    msg: >-
+      InstallPlan {{ _oai_hop_ip.resources[0].metadata.name }} targets
+      {{ _oai_hop_ip.resources[0].spec.clusterServiceVersionNames }}, which is
+      not one rhods-operator CSV between the installed {{ _oai_walk_now }}
+      (excluded) and the pin {{ _openshift_ai_version }} (included). Refusing to
+      approve it. Investigate, or change zuno_openshift_ai_version.
+  vars:
+    _names: "{{ _oai_hop_ip.resources[0].spec.clusterServiceVersionNames | default([]) }}"
+    _target: "{{ (_names | first | default('')) | regex_replace('^rhods-operator\\.v?', '') }}"
+    _pin: "{{ _openshift_ai_version | regex_replace('^v', '') }}"
+  when:
+    - not (_oai_walk_done | bool)
+    - >-
+      (_names | length) != 1
+      or not (_names | first).startswith('rhods-operator.')
+      or not (_target is version(_pin, '<=', version_type='semver'))
+      or not (_target is version(_oai_walk_now, '>', version_type='semver'))
+
+- name: "openshift_ai | upgrade hop {{ _oai_walk_hop }}: approve {{ _oai_hop_ip.resources[0].spec.clusterServiceVersionNames | default(['-']) | first }}"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    name: "{{ _oai_hop_ip.resources[0].metadata.name }}"
+    namespace: redhat-ods-operator
+    definition:
+      spec:
+        approved: true
+  when:
+    - not (_oai_walk_done | bool)
+    - not (_oai_hop_ip.resources[0].spec.approved | default(false))
+
+- name: "openshift_ai | upgrade hop {{ _oai_walk_hop }}: wait for the CSV to be installed and Succeeded"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    name: "{{ _oai_hop_ip.resources[0].spec.clusterServiceVersionNames | first }}"
+    namespace: redhat-ods-operator
+  register: _oai_hop_csv
+  until: (_oai_hop_csv.resources[0].status.phase | default('')) == 'Succeeded'
+  # The 3.5.0 GA upgrade took most of an hour on demo222 (quota surge, six new
+  # operands): 90 x 20s.
+  retries: 90
+  delay: 20
+  when: not (_oai_walk_done | bool)

@@ -1,9 +1,11 @@
 ---
-- name: "openshift_ai | discover the operator channel (ADR-0048)"
-  ansible.builtin.include_tasks: discover_channel.yml
-
+# The pin first: discover_channel.yml derives the channel family from it
+# (2026-11-04 - a 3.6 pre-release pin selects `beta`, a 3.6 release `stable-3.6`).
 - name: "openshift_ai | resolve the effective version pin (WP-132)"
   ansible.builtin.include_tasks: resolve_version_pin.yml
+
+- name: "openshift_ai | discover the operator channel (ADR-0048)"
+  ansible.builtin.include_tasks: discover_channel.yml
 
 - name: "openshift_ai | apply the openshift-ai GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
@@ -53,6 +55,30 @@
 # configured to pin to (checked below), never anything else - that
 # preserves the "don't drift past the pinned build" property Manual
 # exists for.
+# Upgrade of an installed operator (2026-11-04): OLM offers every hop of the
+# replaces chain (3.5.0 -> 3.5.1 -> 3.5.2), and the exact-match approval below
+# only knows the pinned CSV. Walk the hops first; once the pin is installed the
+# Subscription references the pin's InstallPlan and the checks below pass.
+- name: "openshift_ai | read the Subscription before approving (upgrade walk)"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: rhods-operator
+    namespace: redhat-ods-operator
+  register: _oai_walk_sub_info
+
+- name: "openshift_ai | upgrade walk: initialise"
+  ansible.builtin.set_fact:
+    _oai_walk_sub: "{{ _oai_walk_sub_info.resources[0] | default({}) }}"
+    _oai_walk_done: false
+    _oai_walk_now: "{{ ((_oai_walk_sub_info.resources[0] | default({})).status | default({})).installedCSV | default('') | regex_replace('^rhods-operator\\.v?', '') }}"
+
+- name: "openshift_ai | walk the installed operator up to the pin"
+  ansible.builtin.include_tasks: upgrade_walk.yml
+  when:
+    - _oai_walk_now | length > 0
+    - _oai_walk_now != (_openshift_ai_version | regex_replace('^v', ''))
+
 - name: "openshift_ai | wait for the Subscription to reference a pending InstallPlan, diagnosing blocked resources on timeout"
   block:
     - name: "openshift_ai | wait for the Subscription to reference a pending InstallPlan"

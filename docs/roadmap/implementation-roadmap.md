@@ -31,7 +31,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
-| v0.9 | 9 | 4 | 8 | WP-145 |
+| v0.9 | 9 | 4 | 9 | WP-145, WP-195 |
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
@@ -893,6 +893,7 @@ being discovered by whoever tries the next install.
 |---|---|---|---|---|---|
 | WP-144 | [wp-144](work-packages/wp-144-olm-catalog-drop-tolerance.md) | 0558 | none | Done (2026-09-14 - shared discovery task adopted by the twelve exact-name roles, readiness probe P8 live-verified on demo222 reporting 13 frozen Subscriptions and naming openshift-operators as the namespace where they block others) | decide per operator whether to drop each of the 13 frozen Subscriptions (forfeits its update path) or wait for the catalog to publish again - P8 reports, deliberately does not repair |
 | WP-145 | [wp-145](work-packages/wp-145-fleet-version-and-catalog-policy.md) | 0559 | WP-144 | Not started | blocked on measuring demo333 at its next power-on (powered off, reported 4.22 but unverified) - that single read-only measurement decides whether additional CatalogSources are justified |
+| WP-195 | [wp-195](work-packages/wp-195-update-every-operator-on-demo333-through-the-repository.md) | 0559 | WP-145 | Operator pending | repo work done (operator update audit `make d3 check operators`, channel pins, RHOAI upgrade walk); live steps on demo333 one go each: GitOps 1.22.3, OCP 4.22.20, RHOAI 3.5.2, RHCL 1.5.0 (re-run the WP-177 counters probe), Kueue 1.5.0, RHOAI 3.6.0-ea.2 |
 
 ### Phase 44 — adopt UnifAI as the agent and RAG platform (added 2026-10-17)
 
@@ -1145,6 +1146,7 @@ moving.
 
 ## Change log
 
+- 2026-11-04 — WP-195 added to phase 43: every Subscription on demo333 said `AtLatestKnown` while seven operators had newer versions (RHOAI and GitOps behind unapproved Manual InstallPlans, rhcl on a channel that stops at 1.4.3, authorino/limitador/dns pinned by rhcl, Kueue on a frozen channel). A report-only audit (`make d3 check operators`), per-cluster channel pins and an RHOAI upgrade walk land in the repo; the live updates follow one go at a time.
 - 2026-11-04 — ADR-0596 and WP-194 added to phase 46: a code question in Open WebUI and OpenClaw was always answered by the local qwen model, since the experience clients had no task preferring Codestral and showed `auto` alone. A declared "Zuno Code" model maps to a `code` task, Codestral first and the local models as fallback; turns with tool results stay local (ADR-0594).
 - 2026-11-04 — ADR-0406 Implemented: the cancel of a delegation that times out is proven live on UnifAI 0.1.57 (`a2a.timeout`, then `a2a.task_cancelled`; trace `54ebccfa482247d3ae41280e1dab4424`). A user abort is not covered, by decision. WP-174 stays open on approval (ADR-0409, waits for WP-173), the empty final reply (fix R-531 shipped in 0.1.56, not yet re-measured) and the turns where Arkos answers without delegating.
 - 2026-11-03 — WP-172 Done: delegated calls reach the mcp-gateway live on operator 0.1.53 and the audit carries the
