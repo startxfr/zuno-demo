@@ -1,6 +1,6 @@
 # WP-198: Default UnifAI team workspaces, shared inventory and catalog
 
-- **State:** Repo work in review
+- **State:** Repo work in review (2026-11-04: steps 1-2 live on demo333; steps 3-4 wait for UnifAI 0.1.58)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md), [ADR-0597](../../adr/0597-declare-unifai-built-in-resources-through-the-operator.md)
 - **Depends on:** WP-197 (steps 3 and 4 only)
 - **Related:** [WP-199](wp-199-personal-unifai-starters-for-the-demo-personas.md), [WP-201](wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md)
@@ -39,3 +39,10 @@ any key, the shared gateway in "Built-in", and example workflows in its team.
 - As consultant-01 (browser), the team selector lists consultant, agent-tekos, agent-arkos and agent-comage, but not sales.
   "Zuno Chat" generates a workflow that answers.
 - As sale-01: sales and agent-comage only.
+
+## Live record
+
+- 2026-11-04, `make d2 install unifai` on devel d7bda8c3 (operator 0.1.57): the eight business teams (`adv`, `board`, `cdp`,
+  `consultant`, `finance`, `ops`, `recrut`, `sales`) and the templates `zuno-chat`, `zuno-draft-review` and
+  `zuno-tools-agent` are Ready next to the three agent teams. `zuno-unifai-d0`/`d1` are Synced/Healthy. The ArgoCD sync took
+  about 6 minutes (the teams in wave 5, then the templates).
