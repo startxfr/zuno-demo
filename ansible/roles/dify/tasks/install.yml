@@ -57,6 +57,29 @@
     _dify_s3_endpoint_host: "s3.{{ zuno_dify_s3_region }}.amazonaws.com"
     _dify_site_url: "https://dify.{{ cluster_base_domain }}"
 
+# Dify's bundled Redis runs the zuno-ai-build mirror of bitnamilegacy/redis (as gitops/charts/redis).
+# Pull access for that one ServiceAccount only, not every ServiceAccount of the namespace (the
+# rest of the pods there are third-party images pulled from public registries).
+- name: "dify | grant the Redis ServiceAccount image-pull access to zuno-ai-build"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: "dify-redis-image-puller-{{ dify_namespace }}"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      subjects:
+        - kind: ServiceAccount
+          name: dify-redis
+          namespace: "{{ dify_namespace }}"
+      roleRef:
+        kind: ClusterRole
+        name: system:image-puller
+        apiGroup: rbac.authorization.k8s.io
+
 - name: "dify | apply the token proxy Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
