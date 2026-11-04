@@ -1,10 +1,11 @@
 # WP-203: Dify preparation
 
-- **State:** Not started
+- **State:** Done (2026-11-04: steps 1 to 8 answered live on demo333, scratch namespace removed; see [the evidence](../evidence/wp-203-dify-spike.md))
 - **ADRs:** [ADR-0599](../../adr/0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md), [ADR-0601](../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md)
 - **Depends on:** [WP-202](wp-202-common-preparation-for-dify-and-kagent.md) steps 1 and 3 (a local token proxy build is enough)
 - **Related:** [WP-204](wp-204-install-dify-on-demo333.md), [WP-205](wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md)
 - **Target:** v0.14
+- **Evidence:** [wp-203-dify-spike.md](../evidence/wp-203-dify-spike.md)
 - **Estimated files touched:** one evidence file `docs/roadmap/evidence/wp-203-dify-spike.md`; no shared file
 
 > No cluster action except, with the user's go, a throw-away install in `zuno-dify-scratch` that is removed afterwards.

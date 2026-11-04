@@ -275,7 +275,7 @@ Dify's knowledge node goes through an adapter over the mcp-gateway, kagent's
 cluster reading becomes governed mcp-gateway read tools that every experience
 can use, and a first-party token proxy gives both a refreshed Keycloak token.
 
-**3 ADRs, all `Proposed` (ADR-0599, ADR-0600, ADR-0601).** Open work packages: WP-202 to WP-208.
+**3 ADRs, all `Proposed` (ADR-0599, ADR-0600, ADR-0601).** Open work packages: WP-204 to WP-208.
 
 ## OKF stream
 

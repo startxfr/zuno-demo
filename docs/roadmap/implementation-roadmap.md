@@ -36,7 +36,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 12 | 3 | 18 | WP-194, WP-197, WP-198, WP-199, WP-200, WP-201 |
-| v0.14 | 3 | 3 | 7 | WP-202, WP-203, WP-204, WP-205, WP-206, WP-207, WP-208 |
+| v0.14 | 3 | 3 | 7 | WP-204, WP-205, WP-206, WP-207, WP-208 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1027,8 +1027,8 @@ WP-208 shows the five experiences together. No cluster action while demo333 is b
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-202 | [wp-202](work-packages/wp-202-common-preparation-for-dify-and-kagent.md) | 0601, 0599, 0600 | none | Repo work in review | push (rolls the ai-gateway for the new env), then `make d2 build token-proxy` with the user's go, after the demo333 upgrade |
-| WP-203 | [wp-203](work-packages/wp-203-dify-preparation.md) | 0599, 0601 | WP-202 | Not started | scratch install in `zuno-dify-scratch`, removed afterwards |
+| WP-202 | [wp-202](work-packages/wp-202-common-preparation-for-dify-and-kagent.md) | 0601, 0599, 0600 | none | Done | none |
+| WP-203 | [wp-203](work-packages/wp-203-dify-preparation.md) | 0599, 0601 | WP-202 | Done | none |
 | WP-204 | [wp-204](work-packages/wp-204-install-dify-on-demo333.md) | 0599, 0601 | WP-202, WP-203 | Not started | Vault seed before the Keycloak client push; `make d2 install dify` |
 | WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Not started | adapter build and roll; knowledge base registered in Dify |
 | WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Not started | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |

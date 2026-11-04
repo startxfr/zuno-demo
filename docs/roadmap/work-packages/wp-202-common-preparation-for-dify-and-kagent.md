@@ -1,6 +1,6 @@
 # WP-202: Common preparation for Dify and kagent
 
-- **State:** Repo work in review (2026-11-04: steps 1 to 5 and 7 in the repo; step 6, the build, waits for the user's go and the end of the demo333 upgrade)
+- **State:** Done (2026-11-04: steps 1 to 7 done, the token proxy image is built and signed in-cluster, sha256:2e718001f74fab4d…)
 - **ADRs:** [ADR-0601](../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md), [ADR-0599](../../adr/0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md), [ADR-0600](../../adr/0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md), [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md)
 - **Depends on:** none
 - **Related:** [WP-203](wp-203-dify-preparation.md), [WP-206](wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md), [WP-207](wp-207-kagent-preparation-and-install.md), [WP-179](wp-179-common-preparation-for-experience-clients.md)
