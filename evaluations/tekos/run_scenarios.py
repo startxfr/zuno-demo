@@ -655,7 +655,7 @@ def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
             sys.path.insert(0, str(candidate))
     from okf_release import okf_root
     import delegation_checks
-    from unifai_target import a2a_calls, delegation_spans, tempo_run_spans
+    from unifai_target import a2a_calls, delegation_spans, tempo_run_trace, turn_summary
 
     delegator, target, target_task = s["delegator"], s["target"], s["target_task"]
     root = [okf_root(pathlib.Path(__file__).resolve().parents[2]), pathlib.Path("/gate"), pathlib.Path("/")]
@@ -673,7 +673,7 @@ def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
     if not run_id:
         return ScenarioResult(s["id"], s["title"], False, "the turn produced no session id")
     try:
-        spans = tempo_run_spans(run_id, tempo)
+        trace_id, spans = tempo_run_trace(run_id, tempo)
     except Exception as exc:  # noqa: BLE001 - an unreachable backend cannot prove anything
         return ScenarioResult(s["id"], s["title"], False, f"trace backend: {exc}")
     found = delegation_spans(spans)
@@ -691,6 +691,12 @@ def u_chat_delegates(s: Dict[str, Any]) -> ScenarioResult:
     # sent to the target, no more than `max_a2a_calls` (a delegation that repeats itself is a defect, it
     # costs one model turn of the target each time), and a reply that carries the answer.
     ok = bool(succeeded) and 1 <= sent <= max_calls and bool(reply) and content_ok
+    # Every turn names its trace; a turn that did not pass also says what the model did (finish reasons,
+    # tools asked for, whether `delegate_task` was offered), so a missed delegation or an empty reply can be
+    # told apart without opening Tempo (UnifAI 0.1.58 adds the tool names to the spans).
+    detail += f" trace={trace_id or 'none'}"
+    if not ok:
+        detail += f" {turn_summary(spans)} empty_reply={not reply.strip()}"
     return ScenarioResult(s["id"], s["title"], ok, detail)
 
 

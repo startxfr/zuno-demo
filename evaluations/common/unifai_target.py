@@ -42,7 +42,7 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 
 import httpx
 
@@ -190,12 +190,13 @@ def tempo_rag_searches(
             http.close()
 
 
-def tempo_run_spans(
+def tempo_run_trace(
     run_id: str, tempo_url: str, *, wait_seconds: float = 25, client: Optional[httpx.Client] = None
-) -> List[Dict[str, Any]]:
-    """Every span of the trace of run `run_id` (name and attributes), from Tempo; [] when none appears
-    within `wait_seconds`. Used to observe nodes that emit no tool event, such as an A2A delegation
-    node (WP-174). Raises `UnifaiError` when Tempo cannot be reached."""
+) -> Tuple[str, List[Dict[str, Any]]]:
+    """The trace id (32 hex digits, left-padded because Tempo drops leading zeros) and every span (name and
+    attributes) of the trace of run `run_id`, from Tempo; `("", [])` when none appears within `wait_seconds`.
+    Used to observe nodes that emit no tool event, such as an A2A delegation node (WP-174), and to name
+    the trace of a turn that went wrong. Raises `UnifaiError` when Tempo cannot be reached."""
     http = client or httpx.Client(timeout=20)
     base = tempo_url.rstrip("/")
     deadline = time.monotonic() + wait_seconds
@@ -210,7 +211,8 @@ def tempo_run_spans(
                 raise UnifaiError(f"tempo search failed: {found.status_code}")
             traces = found.json().get("traces") or []
             if traces:
-                trace = http.get(f"{base}/api/traces/{traces[0]['traceID']}")
+                trace_id = str(traces[0]["traceID"])
+                trace = http.get(f"{base}/api/traces/{trace_id}")
                 if trace.status_code == 200:
                     spans = [
                         {"name": sp.get("name", ""), "attrs": _span_attrs(sp)}
@@ -219,15 +221,67 @@ def tempo_run_spans(
                         for sp in scope.get("spans", [])
                     ]
                     if spans:
-                        return spans
+                        return trace_id.zfill(32), spans
             if time.monotonic() >= deadline:
-                return []
+                return "", []
             time.sleep(2)
     except httpx.HTTPError as exc:
         raise UnifaiError(f"tempo unreachable: {exc}") from exc
     finally:
         if client is None:
             http.close()
+
+
+def tempo_run_spans(
+    run_id: str, tempo_url: str, *, wait_seconds: float = 25, client: Optional[httpx.Client] = None
+) -> List[Dict[str, Any]]:
+    """Every span of the trace of run `run_id`; [] when none appears within `wait_seconds` (see `tempo_run_trace`)."""
+    return tempo_run_trace(run_id, tempo_url, wait_seconds=wait_seconds, client=client)[1]
+
+
+def _names(value: Any) -> List[str]:
+    return [n.strip() for n in str(value or "").split(",") if n.strip()]
+
+
+def model_calls(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """The model-call spans (`chat <model>`) of a trace in start order of the list, each reduced to what explains a
+    turn: `finish` (`mas.finish_reason`), `chars` (`mas.content_chars`), `called` (tool names the model asked for,
+    `mas.called_tools`) and `offered` (tool names in the request, `mas.tool_names`). The two name lists exist from
+    UnifAI 0.1.58; before that `offered` is None (unknown) and `called` is None, only the count `n_called` is known
+    (`mas.tool_calls`)."""
+    out = []
+    for sp in spans:
+        if not str(sp.get("name", "")).startswith("chat "):
+            continue
+        a = sp.get("attrs") or {}
+        out.append({
+            "finish": a.get("mas.finish_reason"),
+            "chars": a.get("mas.content_chars"),
+            "n_called": a.get("mas.tool_calls"),
+            "called": _names(a["mas.called_tools"]) if "mas.called_tools" in a else None,
+            "offered": _names(a["mas.tool_names"]) if "mas.tool_names" in a else None,
+        })
+    return out
+
+
+def offered_tool(spans: List[Dict[str, Any]], tool: str = "delegate_task") -> Optional[bool]:
+    """Whether `tool` was offered to the model in any call of the trace: True or False once the spans carry
+    `mas.tool_names` (UnifAI 0.1.58), None when they do not (unknown, never a guess)."""
+    lists = [c["offered"] for c in model_calls(spans) if c["offered"] is not None]
+    if not lists:
+        return None
+    return any(tool in names or any(n.endswith(tool) for n in names) for names in lists)
+
+
+def turn_summary(spans: List[Dict[str, Any]], tool: str = "delegate_task") -> str:
+    """One line for the detail of a scenario: the model calls (finish reason, characters, tools asked for) and
+    whether `tool` was offered, so a turn that did not delegate or came back empty can be read without Tempo."""
+    calls = model_calls(spans)
+    shown = []
+    for c in calls[:12]:
+        called = ",".join(c["called"]) if c["called"] is not None else f"{c['n_called']} call(s)"
+        shown.append(f"{c['finish']}/{c['chars']}ch/{called}")
+    return f"model_calls={len(calls)} [{'; '.join(shown)}] {tool}_offered={offered_tool(spans, tool)}"
 
 
 def delegation_spans(spans: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
