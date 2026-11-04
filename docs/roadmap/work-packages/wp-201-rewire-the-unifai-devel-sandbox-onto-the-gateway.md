@@ -1,6 +1,6 @@
 # WP-201: Rewire the unifai-devel sandbox onto the gateway (amended: keyless, isolated)
 
-- **State:** Repo work in review
+- **State:** Repo work in review (2026-11-04: overlay on fork devel 1e1c86a2a; re-apply pending)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-198
 - **Related:** [ADR-0562](../../adr/0562-authenticate-unifai-against-the-zuno-keycloak-realm.md)

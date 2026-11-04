@@ -1016,7 +1016,7 @@ sandbox rewired (WP-201).
 | WP-198 | [wp-198](work-packages/wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) | 0598, 0597 | WP-197 (steps 3-4) | Repo work in review | teams, templates, built-ins and team examples live on demo333 (2026-11-04); browser check as consultant-01 and sale-01 pending |
 | WP-199 | [wp-199](work-packages/wp-199-personal-unifai-starters-for-the-demo-personas.md) | 0598 | WP-197, WP-198 | Repo work in review | starters Ready on demo333 for consultant-01, sale-01, ai-ops-01 (2026-11-04); browser check pending |
 | WP-200 | [wp-200](work-packages/wp-200-show-the-unifai-rag-working-live.md) | 0598 | WP-198 | Repo work in review | chart `resyncToken`, test documents and demo steps ready; live upload and resync after the WP-198 examples |
-| WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Repo work in review | variant A (keyless, isolated): fork overlay sent as a patch; re-apply with the user's go |
+| WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Repo work in review | variant A (keyless, isolated): fork overlay on fork devel 1e1c86a2a; re-apply with the user's go |
 
 ### Phase 49 — Dify and kagent as experience clients (added 2026-11-04)
 
