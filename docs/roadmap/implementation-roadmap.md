@@ -35,7 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 10 | 1 | 13 | WP-194 |
+| v0.13 | 12 | 3 | 18 | WP-194, WP-197, WP-198, WP-199, WP-200, WP-201 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1002,6 +1002,21 @@ the old stack. The comparison found three behaviours that the retirement dropped
 | WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Done (2026-11-03) | records corrected; French run hit@1 0.80 (10 questions), accepted as is, no stemmer follow-up |
 | WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | Done (2026-11-03) | operator 0.1.50, the images and the source labels live on demo333; a Confluence result is C2 and a Red Hat result C1 through the mcp-gateway; ADR notes written |
 
+### Phase 48 — a ready UnifAI workspace for every persona (added 2026-11-04)
+
+consultant-01 logged into UnifAI and could do nothing: no team, no inventory, no workflow, and a RAG page reading 0. The
+operator first gains built-in resources (WP-197). The demo stack then gets business teams, a shared inventory, a catalog
+without keys and example workflows (WP-198), followed by personal starters (WP-199), a RAG shown live (WP-200) and the devel
+sandbox rewired (WP-201).
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-197 | [wp-197](work-packages/wp-197-declare-unifai-built-in-resources-through-the-operator.md) | 0597 | none | Repo work in review | fork operator `spec.builtin` coded and tested in a worktree; push to fork devel, release (canary with TestUpgrade, user cut), catalog pin |
+| WP-198 | [wp-198](work-packages/wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) | 0598, 0597 | WP-197 (steps 3-4) | Repo work in review | eight business teams and three keyless templates in the chart; built-in gateway and team workflows after WP-197; live check as consultant-01 and sale-01 |
+| WP-199 | [wp-199](work-packages/wp-199-personal-unifai-starters-for-the-demo-personas.md) | 0598 | WP-197, WP-198 | Not started | starters in the personal workspaces of consultant-01, sale-01, ai-ops-01 |
+| WP-200 | [wp-200](work-packages/wp-200-show-the-unifai-rag-working-live.md) | 0598 | WP-198 | Not started | document upload end to end and a Confluence resync on demand |
+| WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Not started | devel examples on the gateway, owned by ai-ops-01; re-apply with the user's go |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1146,6 +1161,7 @@ moving.
 
 ## Change log
 
+- 2026-11-04 — ADR-0597, ADR-0598 and WP-197 to WP-201 added as phase 48: consultant-01 found an empty UnifAI (no team, no inventory, no workflow). The operator gains built-in resources, and the demo stack gets business teams next to the agent teams, a catalog without keys, a shared gateway, example workflows, persona starters and a RAG shown live.
 - 2026-11-04 — WP-195 added to phase 43: every Subscription on demo333 said `AtLatestKnown` while seven operators had newer versions (RHOAI and GitOps behind unapproved Manual InstallPlans, rhcl on a channel that stops at 1.4.3, authorino/limitador/dns pinned by rhcl, Kueue on a frozen channel). A report-only audit (`make d3 check operators`), per-cluster channel pins and an RHOAI upgrade walk land in the repo; the live updates follow one go at a time.
 - 2026-11-04 — ADR-0596 and WP-194 added to phase 46: a code question in Open WebUI and OpenClaw was always answered by the local qwen model, since the experience clients had no task preferring Codestral and showed `auto` alone. A declared "Zuno Code" model maps to a `code` task, Codestral first and the local models as fallback; turns with tool results stay local (ADR-0594).
 - 2026-11-04 — ADR-0406 Implemented: the cancel of a delegation that times out is proven live on UnifAI 0.1.57 (`a2a.timeout`, then `a2a.task_cancelled`; trace `54ebccfa482247d3ae41280e1dab4424`). A user abort is not covered, by decision. WP-174 stays open on approval (ADR-0409, waits for WP-173), the empty final reply (fix R-531 shipped in 0.1.56, not yet re-measured) and the turns where Arkos answers without delegating.

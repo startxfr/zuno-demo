@@ -9,6 +9,15 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition (2026-11-04) - ADR-0597 and ADR-0598 join v0.13
+
+consultant-01 found an empty UnifAI: no team, no inventory, no workflow. The
+gateway LLM and MCP provider were in ai-ops-01's personal workspace, the only
+teams were those of the agent bundles, and the catalog asked for a Gemini key.
+ADR-0597 lets the operator declare UnifAI built-in resources; ADR-0598 gives
+every persona a team per business group next to the agent teams, a catalog
+without keys, example workflows and starters.
+
 ## Addition (2026-11-04) - ADR-0596 joins v0.13
 
 A code question asked in Open WebUI and OpenClaw was always answered by the

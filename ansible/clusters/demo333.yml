@@ -107,6 +107,19 @@ zuno_unifai_released_bundles_exclude: []
 zuno_unifai_values:
   gatewayLLM:
     timeoutSeconds: 200
+  # ADR-0598: one team workspace per business group of the zuno realm (the
+  # agent-<bundle> teams come from the bundles). ops gathers the two ops groups.
+  teams:
+  - {name: consultant, groups: [consultant]}
+  - {name: sales, groups: [sales]}
+  - {name: adv, groups: [adv]}
+  - {name: finance, groups: [finance]}
+  - {name: board, groups: [board]}
+  - {name: recrut, groups: [recrut]}
+  - {name: cdp, groups: [cdp]}
+  - {name: ops, groups: [ocp-ai-ops, ocp-paas-ops]}
+  templates:
+    enabled: true
   ragSources:
   - aclGroups:
     - consultant/confluence-archi-satellite

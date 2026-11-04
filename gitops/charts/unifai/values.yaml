@@ -125,6 +125,11 @@ gatewayLLM:
   # while the ai-gateway allows 180 s to the local models, so a cold first request would fail at 120 s).
   # Unset keeps the client default; retries are unchanged.
   timeoutSeconds: ""
+  # ADR-0597: a public UnifAI built-in, so every user and team workspace sees it
+  # in the inventory's "Built-in" tab and can use it. The owner ($owner, an
+  # UnifAI admin) is unchanged and the resource is promoted in place. Needs
+  # unifai-operator with spec.builtin (WP-197); it cannot be turned off again.
+  builtin: false
 
 # MCP tools through mcp-gateway's MCP endpoint, with the user's own token
 # (ADR-0571 path B until the RHOAI MCP gateway evaluation concludes).
@@ -136,6 +141,23 @@ mcpGateway:
   # headers (ADR-0571), so tools are the agent task's own declaration instead
   # of the Lightspeed ceiling. Needs unifai-operator >= 0.1.19 (spec.mcp).
   perTask: true
+  # ADR-0597: a public UnifAI built-in (see gatewayLLM.builtin).
+  builtin: false
+
+# ADR-0598: default team workspaces, one UnifaiTeam per business group of the
+# Keycloak realm (members are OIDC groups of the users' tokens, read by the
+# identity service's oidc-claims provider: stack.identity.oidcClaims). The
+# agent-<bundle> teams come from the bundles (groupTeam) and are not listed here.
+# Owned by $owner, so only an UnifAI admin can change them in the UI.
+teams: []
+# - name: consultant
+#   groups: [consultant]
+
+# ADR-0598: catalog templates built on the platform's gateway LLM and MCP
+# provider, so a user creates a working workflow without any API key. Public,
+# owned by $owner (an UnifAI admin).
+templates:
+  enabled: false
 
 # Signed OKF agent bundles (ADR-0564), verified keyless (ADR-0578): with
 # bundles set, verify.keyless {issuer, subjectRegExp} (from
