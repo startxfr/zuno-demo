@@ -358,6 +358,14 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0597](0597-declare-unifai-built-in-resources-through-the-operator.md) | Proposed | Declare UnifAI built-in resources through the operator |
 | [ADR-0598](0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md) | Proposed | Give every persona default UnifAI team workspaces and a shared catalog |
 
+## v0.14
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-0599](0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md) | Proposed | Serve a no-code workflow canvas with Dify as an experience client |
+| [ADR-0600](0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md) | Proposed | Govern Kubernetes read tools in the mcp-gateway and admit kagent as a thin operations client |
+| [ADR-0601](0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md) | Proposed | Inject client-credentials tokens for experience clients without OIDC passthrough |
+
 ## OKF v0.1
 
 | ADR | Status | Decision |

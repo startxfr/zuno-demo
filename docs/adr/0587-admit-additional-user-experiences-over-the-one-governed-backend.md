@@ -68,6 +68,10 @@ and single Route stand") stay true for **agent** UIs. Each carries a dated corre
 single-UI rule is about agents, not about every user-facing surface. No clause is retired, so neither record is
 superseded.
 
+> **Correction (2026-11-04, ADR-0600):** clause 4 stands. kagent's declarative Agents are admitted as an experience
+> surface over governed mcp-gateway tools, with no OKF bundle, no delegation and no per-agent entry; they are not a second
+> agent platform. Dify (ADR-0599) and kagent reach the gateways through the token proxy of ADR-0601.
+
 ## Alternatives considered
 
 - **A showcase namespace outside the governance**, the UIs calling MaaS directly with ServiceAccount tokens:
