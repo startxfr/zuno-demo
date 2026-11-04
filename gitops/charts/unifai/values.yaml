@@ -13,11 +13,11 @@ operator:
   # created by hand, which must not be duplicated).
   install: false
   # The catalog repository only publishes a moving `latest` tag (each release
-  # rebuilds it with every version), so pin it by digest. Current: 0.1.57, signed
+  # rebuilds it with every version), so pin it by digest. Current: 0.1.58, signed
   # since 0.1.39 (ADR-0586): its signature, provenance and SBOM verify with the operator
   # release workflow's identity, without the development one. Move it with
   # platform/supply-chain/pin_operator_catalog.py latest --version X.Y.Z at each release.
-  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:9900b54a7af9d4cac0491cb7074d45462648c036e407fb393948a1df9e4ee9d6
+  catalogImage: quay.io/zuno/unifai-operator-catalog@sha256:62eaec4e507dc32802657bb6421962fbc9fbae797c26afd4bce0fd64605afd54
   catalogSourceName: unifai-operator-catalog
   channel: alpha
   package: unifai-operator
