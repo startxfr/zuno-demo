@@ -114,8 +114,17 @@ keeps local ones only) - the same eligibility filter as chat completions.
 
 `auto` carries `"name": "Zuno"` (`AUTO_MODEL_NAME`). An experience client
 (the token's `azp` matches `MARKER_FAIL_CLOSED_CLIENTS`, default
-`open-webui,openclaw-*`) gets `auto` alone (WP-193). Routing never follows
-the model name, so its menu offers no model the gateway would not serve.
+`open-webui,openclaw-*`) gets `auto` plus the declared task models of
+`MODEL_TASK_ALIASES` (default `zuno-code=code:Zuno Code`, ADR-0596). Routing
+never follows a provider name, so its menu offers no model the gateway would
+not serve.
+
+On `POST /v1/chat/completions` from an experience client, a `model` listed in
+`MODEL_TASK_ALIASES` replaces the `X-Zuno-Task` header with its task: `zuno-code`
+routes under (client, `code`), whose generated policy entry puts
+`mistral-codestral` first and the local models after it. The classification and
+ADR-0594's local-only rule still apply, so a turn with a tool result stays
+local. The `model_call` span carries `zuno.task`.
 
 ### `GET /healthz` / `GET /readyz`
 

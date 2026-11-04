@@ -34,7 +34,7 @@ policy, in the chart's values (maas.agentSubscriptionTier).
 A third file, gitops/charts/ai-gateway/files/model-routing.generated.yaml,
 is the ai-gateway's model-routing policy (ADR-0581 amendment of 2026-10-25,
 WP-164 lot 2), in the schema app/model_routing_policy.py loads. For each
-(agent, task):
+(agent, task), and since ADR-0596 for each (experience client, task) too:
   1. a corp `preferences:` entry sets the candidates; an agent never adds a
      model, never loosens `strict` and never touches `local_only_for`;
   2. the task's `zuno.models.preferred` roles, or else the agent's, move the
@@ -224,10 +224,15 @@ def model_routing(release_dir: pathlib.Path, view: Dict[str, dict]) -> dict:
     entries = [dict(e) for e in corp.get("preferences") or []]
     index = {(e.get("agent"), e.get("task")): i for i, e in enumerate(entries)}
     added = []
-    for name, a in sorted(view.items()):
-        agent_models = _models_field(release_dir / "agents" / name / "agent.okf.md")
-        for task in sorted(a["tasks"]):
-            task_models = _models_field(release_dir / "agents" / name / "tasks" / f"{task}.md")
+    # ADR-0596: the experience clients' tasks are routed with the same rules
+    # (a client's name is never an agent's, ADR-0592), after the agents.
+    callers = [("agents", "agent.okf.md", name, a["tasks"]) for name, a in sorted(view.items())]
+    callers += [("experience-clients", "client.okf.md", name, c["tasks"])
+                for name, c in sorted(admit.clients_view(release_dir).items())]
+    for layer, card, name, tasks in callers:
+        agent_models = _models_field(release_dir / layer / name / card)
+        for task in sorted(tasks):
+            task_models = _models_field(release_dir / layer / name / "tasks" / f"{task}.md")
             roles = list(task_models.get("preferred") or agent_models.get("preferred") or [])
             forbidden = set(agent_models.get("forbidden") or []) | set(task_models.get("forbidden") or [])
             exclude = [m["name"] for m in catalog if m.get("role") in forbidden]

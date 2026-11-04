@@ -303,6 +303,16 @@ def set_caller_persona(persona: Optional[str]) -> None:
     _caller_persona.set(persona or "")
 
 
+_caller_task: ContextVar[str] = ContextVar("zuno_caller_task", default="")
+
+
+def set_caller_task(task: Optional[str]) -> None:
+    """ADR-0596: remember the task this request is routed under (the header's,
+    or the one an experience client's declared model selects) for the
+    model_call span. Span only: the counters keep their label set."""
+    _caller_task.set(task or "")
+
+
 def set_caller_client(azp: Optional[str]) -> None:
     """Remember this request's experience client for model_call_span and the
     guardrails counters. Called once per handler, after token validation."""
@@ -500,6 +510,9 @@ def model_call_span(
             span.set_attribute("zuno.client", client)
         if run_id:
             span.set_attribute("zuno.run_id", run_id)
+        task = _caller_task.get()
+        if task:
+            span.set_attribute("zuno.task", task)
         if model_kind:
             span.set_attribute("zuno.model_kind", model_kind)
         if project_id:

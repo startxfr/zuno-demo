@@ -22,7 +22,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from app import tool_markers
+from app import model_tasks, tool_markers
 from app import guardrails, maas_adapter, quota, quota_fail_modes, quota_windows, reasoning as reasoning_fallback, routing_decisions, semantic_cache
 from app.auth import CallerIdentity, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
@@ -47,7 +47,7 @@ from app.schemas import (
 from app.routing_watch import ROUTING_RELOAD_INTERVAL_SECONDS, RoutingWatcher
 from app.circuit_breaker import breaker
 from app.model_readiness import readiness
-from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_candidate_skipped, record_empty_response, set_caller_client, set_caller_persona
+from app.telemetry import adopt_incoming_trace_context, init_telemetry, model_call_span, record_cache_outcome, record_candidate_skipped, record_empty_response, set_caller_client, set_caller_persona, set_caller_task
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("ai_gateway")
@@ -388,6 +388,10 @@ async def chat_completions(
 ):
     set_caller_client(identity.client)  # ADR-0587: experience client on the metrics
     set_caller_persona(identity.persona)  # ADR-0593: the `user` label and the per-user budget
+    # ADR-0596: an experience client's declared model (e.g. zuno-code) selects
+    # one of its tasks; the routing policy, never the name, picks the provider.
+    x_zuno_task = model_tasks.task_for(identity.client, payload.model, x_zuno_task)
+    set_caller_task(x_zuno_task)
     classification = x_zuno_data_classification.upper()
     # ADR-0550: a per-(agent,task) local_only_for declaration ORs into the
     # caller's own X-Zuno-Local-Only flag - it can only ever add a
@@ -590,7 +594,9 @@ async def list_models(
     offer models that routing ignores; the gateway keeps the choice."""
     response.headers["Cache-Control"] = "private, max-age=30"
     if tool_markers.is_fail_closed_client(identity.client or ""):
-        return ModelList(data=[ModelObject(id="auto", name=AUTO_MODEL_NAME)])
+        # ADR-0596: plus the declared models that select a task (Zuno Code).
+        return ModelList(data=[ModelObject(id="auto", name=AUTO_MODEL_NAME)]
+                         + [ModelObject(id=i, name=n) for i, n in model_tasks.listed_models()])
     classification = x_zuno_data_classification.upper()
     try:
         candidates = routing_table.candidates_for(
