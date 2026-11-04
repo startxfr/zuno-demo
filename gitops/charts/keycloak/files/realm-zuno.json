@@ -1023,6 +1023,23 @@
             }
         },
         {
+            "username": "service-account-dify",
+            "enabled": true,
+            "serviceAccountClientId": "dify",
+            "groups": [
+                "/consultant",
+                "/consultant/confluence-build-openshift",
+                "/consultant/confluence-build-openshift-ai",
+                "/consultant/confluence-archi-satellite",
+                "/consultant/confluence-archi-openshift",
+                "/consultant/confluence-archi-openshift-ai",
+                "/consultant/confluence-archi-keycloak",
+                "/agent_tekos",
+                "/agent_arkos",
+                "/aap_ops"
+            ]
+        },
+        {
             "username": "service-account-openclaw-consultant-02",
             "enabled": true,
             "serviceAccountClientId": "openclaw-consultant-02",
@@ -1183,6 +1200,70 @@
             "attributes": {
                 "post.logout.redirect.uris": "https://open-webui.apps.mycluster.example.com/*"
             }
+        }, {
+            "clientId": "dify",
+            "name": "Dify workflow canvas",
+            "description": "Confidential client of the Dify experience (ADR-0599, ADR-0601): client credentials for the token proxy's model and tool calls (persona consultant-02), browser flow for its oauth2-proxy front door",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "${vault.dify_client_secret}",
+            "redirectUris": [
+                "https://dify.apps.mycluster.example.com/oauth2/callback"
+            ],
+            "webOrigins": [
+                "https://dify.apps.mycluster.example.com"
+            ],
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": true,
+            "protocolMappers": [
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
+                    }
+                },
+                {
+                    "name": "persona",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-hardcoded-claim-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "claim.name": "persona",
+                        "claim.value": "consultant-02",
+                        "jsonType.label": "String",
+                        "access.token.claim": "true",
+                        "id.token.claim": "false",
+                        "userinfo.token.claim": "false"
+                    }
+                },
+                {
+                    "name": "maas-gateway-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-admin-api",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                }
+            ],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ]
         }, {
             "clientId": "openclaw-consultant-02",
             "name": "OpenClaw assistant of consultant-02",

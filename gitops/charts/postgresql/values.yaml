@@ -226,6 +226,18 @@ mlflowDatabase:
   owner: mlflow
   vaultPath: mlflow/postgresql-app
 
+# Dify (ADR-0599, WP-204): one role owning two databases. dify-helm wants `dify`
+# (api, worker, beat) and `dify_plugin` (plugin-daemon) - WP-203 section 2. One
+# owner and one Vault path serve both, so one pguser Secret and one ExternalSecret.
+# gitops/charts/dify resolves the same Vault path independently (secretKeyRef
+# can't cross namespaces). PGO never recreates a dropped database (same caveat as
+# every block here).
+difyDatabase:
+  name: dify
+  pluginName: dify_plugin
+  owner: dify
+  vaultPath: dify/postgresql-app
+
 # Dedicated database/role for the OGX-backed RAG provider prototype's
 # remote::pgvector vector I/O provider (ADR-0322 v0.1 integration scope) -
 # isolated from every other database on this cluster. The consumer-side Secret (in

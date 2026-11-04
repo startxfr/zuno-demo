@@ -140,6 +140,9 @@ platformNamespaces:
       # their dedicated trillian database on the shared MariaDB (see
       # gitops/charts/mariadb/templates/database-rhtas-trillian.yaml).
       - zuno-rhtas
+      # ADR-0599/WP-204: Dify's api, worker, beat and plugin-daemon reach the dify and
+      # dify_plugin databases (gitops/charts/postgresql difyDatabase).
+      - zuno-dify
     # mariadb-operator's admission webhook (vmariadb-v1alpha1.kb.io etc.)
     # lives here and is called synchronously by the API server on every
     # MariaDB/Grant/User write - without this, the webhook call times out

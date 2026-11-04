@@ -1,0 +1,40 @@
+# ADR-0599 decision 7 and ADR-0590: Dify reaches Keycloak's public name (oauth2-proxy) and its
+# dedicated S3 bucket, and nothing else outside the cluster. In-cluster traffic (DNS, zuno-data,
+# the token proxy) is not affected by an EgressFirewall. PyPI is closed except during the plugin
+# install window (WP-203 section 3), which the role opens and closes through
+# egress.pluginInstallWindow.enabled. One per namespace, named default.
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  egress:
+    - type: Allow
+      to:
+        dnsName: keycloak.{{ .Values.global.zuno.clusterBaseDomain }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- range .Values.egress.s3Hosts }}
+    - type: Allow
+      to:
+        dnsName: {{ . }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- if .Values.egress.pluginInstallWindow.enabled }}
+    {{- range .Values.egress.pluginInstallWindow.hosts }}
+    - type: Allow
+      to:
+        dnsName: {{ . }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- end }}
+    - type: Deny
+      to:
+        cidrSelector: 0.0.0.0/0

@@ -38,23 +38,32 @@ ADR-0587 forbids a client its own model key, RAG store or upload, and lets knowl
    (label `zuno.io/experience-client: "true"`, default-deny, outside the mesh) declared in the `namespaces` chart.
    Pod security context left to `restricted-v2`, with no `anyuid` grant. A component that cannot run that way is
    switched off, not given a wider SCC.
-2. **State.** Dify's metadata uses its own database `dify` in the shared `zuno-postgresql` (PGO user and ExternalSecret,
-   as for MLflow). A Redis inside `zuno-dify` serves as cache and Celery broker only. File storage is a PVC on the
-   resolved StorageClass. No MinIO, and no vector database is deployed.
+2. **State.** Dify uses two databases, `dify` (api, worker, beat) and `dify_plugin` (plugin-daemon), owned by one role
+   in the shared `zuno-postgresql` (PGO user and ExternalSecret, as for MLflow; WP-203). A Redis inside `zuno-dify`
+   serves as cache and Celery broker only. File storage is a **dedicated S3 bucket** (user decision 2026-11-04; the
+   platform's EBS volumes are ReadWriteOnce and the chart wants ReadWriteMany); the plugin-daemon keeps a small
+   ReadWriteOnce volume for installed plugins. No MinIO, and no vector database is deployed.
 3. **Login.** oauth2-proxy in front of the console Route (Keycloak client `dify`, allowed groups from the experience
-   declaration), as in ADR-0590. Dify accounts exist behind it; local sign-up is off and the first admin is seeded.
+   declaration), as in ADR-0590. Dify Community has no SSO, so each person who uses Dify also has **a Dify account of
+   their own** (user decision 2026-11-04), created by the install role; local sign-up is off. The accounts share the
+   one workspace (licence) and the one persona identity (ADR-0601 decision 5).
 4. **Models.** One OpenAI-API-compatible provider whose base URL is the `zuno-token-proxy` (ADR-0601) in front of the
    ai-gateway, with a dummy key. The model list is the ai-gateway's (`auto`, and `zuno-code` per ADR-0596). No other
    provider plugin is installed.
-5. **Knowledge.** Dify datasets and upload are off. One **External Knowledge** base points at `zuno-dify-knowledge`,
+5. **Knowledge.** Dify datasets and upload are **unused and unreachable**: Dify has no switch to disable them (WP-203
+   section 6), so no vector store and no embedding model exist, and the only knowledge base is the one below. One **External Knowledge** base points at `zuno-dify-knowledge`,
    a first-party adapter that implements `POST /retrieval` by calling the mcp-gateway `/mcp` tool `search_technical_docs`
    (through the token proxy, `X-Zuno-Agent: dify`). The adapter holds no store and no copy. Group ACLs (ADR-0568) and
    classification markers (ADR-0594) apply to the Dify identity exactly as to any other client.
 6. **Tools.** One MCP tool provider, the mcp-gateway `/mcp` through the token proxy. The logical client `dify` is
    declared in the agents release (`experience-clients/dify`, ADR-0592) with its tasks, allowed tools and groups.
-7. **Off.** The marketplace and plugin installation from the internet, provider plugins other than the one above, the
-   code sandbox and the code node (unless WP-203 proves the sandbox runs under `restricted-v2`), web-search and HTTP
-   nodes to the internet, telemetry. The EgressFirewall denies `0.0.0.0/0` apart from the Keycloak Route.
+7. **Off.** The marketplace (`MARKETPLACE_ENABLED=false`) and plugin installation from the internet, provider plugins
+   other than the one above (installed from a package whose sha256 is pinned, `langgenius/openai_api_compatible`
+   0.0.73), the code sandbox and the code node (WP-203: the sandbox crashes under `restricted-v2`, so it stays off),
+   the agent backend, web-search and HTTP nodes to the internet, telemetry and update checks. The EgressFirewall denies
+   `0.0.0.0/0` apart from the Keycloak Route and the dedicated S3 bucket. The plugin daemon runs `uv sync` per plugin
+   and needs PyPI: `pypi.org` and `files.pythonhosted.org` are allowed **only during the install window**, which the
+   role opens for the install and closes again (user decision 2026-11-04).
 8. **Exposure.** One Route with an ACME certificate, held by the oauth2-proxy. The Dify logo and copyright are kept.
 
 ## Alternatives considered
@@ -67,6 +76,14 @@ ADR-0587 forbids a client its own model key, RAG store or upload, and lets knowl
   vLLM): bypasses every gateway. Rejected.
 - **Langflow or Flowise:** comparable canvases with OIDC in the community editions, but a smaller field footprint than
   Dify. Not retained for now. The admission pattern would be the same.
+
+## Spike findings (WP-203, 2026-11-04)
+
+The decisions above were checked on demo333 under `restricted-v2` with no SCC granted
+([evidence](../roadmap/evidence/wp-203-dify-spike.md)). Beyond what changed above: the chart's nginx cannot write its
+cache, so the repository ships its own nginx deployment on port 8080 with `emptyDir` volumes (same routing, from the
+chart's own ConfigMap); the chart's own ExternalSecrets are `external-secrets.io/v1`, which this cluster does not
+serve, so the pods read a Secret rendered by our own `v1beta1` ExternalSecret through explicit environment variables.
 
 ## Consequences
 

@@ -200,6 +200,15 @@ zuno_aap_hub_s3_region: "xxxxxx"
 zuno_aap_hub_s3_access_key_id: "xxxxxx"
 zuno_aap_hub_s3_secret_access_key: "xxxxxx"
 
+# --- Dify file storage S3 bucket (ADR-0599/WP-204: uploads, plugin packages and
+# app files, dedicated bucket by decision 2026-11-04). All four fields go to Vault
+# zuno/dify/s3 (gitops/charts/dify/templates/externalsecrets.yaml); the role skips the
+# seed while any is "xxxxxx". Use a dedicated, bucket-scoped IAM user. ----------
+zuno_dify_s3_bucket_name: "xxxxxx"
+zuno_dify_s3_region: "xxxxxx"
+zuno_dify_s3_access_key_id: "xxxxxx"
+zuno_dify_s3_secret_access_key: "xxxxxx"
+
 # --- RHOAI monitoring traces S3 bucket (ADR-0522/WP-079: Tempo's object -----
 # storage backend for RHOAI's own side-by-side monitoring stack, distinct
 # from zuno-monitoring's TempoMonolithic. Dedicated bucket, same "bucket

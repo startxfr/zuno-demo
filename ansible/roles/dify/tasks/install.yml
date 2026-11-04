@@ -1,6 +1,133 @@
 ---
-# Stub (WP-202): WP-204 replaces this file. A no-op, never a failure, so a full
-# `make d2 install` stays green until the dify track lands.
-- name: "dify | not implemented yet"
+# ADR-0599 (WP-204): Dify, the no-code workflow canvas, as an experience client.
+# Order: confidential.yml S3 values, Vault paths, the token proxy (the model check of
+# the provider needs it up), then the Dify Application. The Dify side configuration (model
+# provider, MCP tool, accounts) is done by configure.yml once the pods run.
+- name: "dify | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "dify | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _dify_confidential_file
+
+- name: "dify | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _dify_confidential_file.stat.exists
+
+# The chart has no other file storage than the bucket: fail before anything is applied.
+- name: "dify | fail while the dedicated S3 bucket is not configured"
+  ansible.builtin.assert:
+    that:
+      - lookup('vars', item, default='xxxxxx') != 'xxxxxx'
+      - lookup('vars', item, default='') | length > 0
+    fail_msg: >-
+      {{ item }} is unset in ansible/confidential.yml. Dify's files live in a dedicated S3 bucket
+      (ADR-0599, decision 2026-11-04): set the four zuno_dify_s3_* values, run `make d0 install vault`
+      to seed Vault zuno/dify/s3, then run this again.
+    quiet: true
+  loop: "{{ dify_s3_vars_required }}"
+  no_log: true
+
+- name: "dify | seed the Vault paths"
+  ansible.builtin.include_tasks: seed_vault.yml
+
+- name: "dify | read the cluster networks"
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Network
+    name: cluster
+  register: _dify_network
+
+- name: "dify | fail if the cluster networks are unknown"
+  ansible.builtin.fail:
+    msg: "Network.config.openshift.io/cluster has no clusterNetwork/serviceNetwork: the egress policy cannot exclude them."
+  when: >-
+    (_dify_network.resources | default([]) | length) == 0 or
+    (_dify_network.resources[0].spec.clusterNetwork | default([]) | length) == 0 or
+    (_dify_network.resources[0].spec.serviceNetwork | default([]) | length) == 0
+
+- name: "dify | compute the cluster networks and the S3 names"
+  ansible.builtin.set_fact:
+    _dify_cluster_cidrs: >-
+      {{ (_dify_network.resources[0].spec.clusterNetwork | map(attribute='cidr') | list)
+         + _dify_network.resources[0].spec.serviceNetwork }}
+    # The bucket is addressed virtual-hosted (<bucket>.s3.<region>...), plus the regional endpoint.
+    _dify_s3_endpoint_host: "s3.{{ zuno_dify_s3_region }}.amazonaws.com"
+    _dify_site_url: "https://dify.{{ cluster_base_domain }}"
+
+- name: "dify | apply the token proxy Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "token-proxy-dify"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-token-proxy-dify-d1"
+    gitops_app_extra_helm_values:
+      namespace: "{{ dify_namespace }}"
+      clientId: dify
+      clusterBaseDomain: "{{ cluster_base_domain }}"
+      aiHeaders: "{{ dify_ai_headers }}"
+      mcpHeaders: "{{ dify_mcp_headers }}"
+      egress:
+        clusterCIDRs: "{{ _dify_cluster_cidrs }}"
+
+- name: "dify | apply the Dify Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "dify"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-dify-d1"
+    gitops_app_extra_helm_values:
+      global:
+        zuno:
+          clusterBaseDomain: "{{ cluster_base_domain }}"
+          routeHost: "dify.{{ cluster_base_domain }}"
+      egress:
+        clusterCIDRs: "{{ _dify_cluster_cidrs }}"
+        s3Hosts:
+          - "{{ _dify_s3_endpoint_host }}"
+          - "{{ zuno_dify_s3_bucket_name }}.{{ _dify_s3_endpoint_host }}"
+        pluginInstallWindow:
+          enabled: "{{ dify_plugin_install_window | bool }}"
+      dify:
+        global:
+          consoleApiDomain: "{{ _dify_site_url }}"
+          consoleWebDomain: "{{ _dify_site_url }}"
+          serviceApiDomain: "{{ _dify_site_url }}"
+          appApiDomain: "{{ _dify_site_url }}"
+          appWebDomain: "{{ _dify_site_url }}"
+          filesDomain: "{{ _dify_site_url }}"
+          triggerDomain: "{{ _dify_site_url }}"
+        externalS3:
+          endpoint: "https://{{ _dify_s3_endpoint_host }}"
+          region: "{{ zuno_dify_s3_region }}"
+          bucketName:
+            api: "{{ zuno_dify_s3_bucket_name }}"
+
+- name: "dify | wait for the Deployments to be available"
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    namespace: "{{ dify_namespace }}"
+    name: "{{ item }}"
+  register: _dify_deploy
+  until: >-
+    (_dify_deploy.resources | default([]) | length > 0) and
+    ((_dify_deploy.resources[0].status.availableReplicas | default(0)) >= 1)
+  retries: 60
+  delay: 15
+  loop:
+    - zuno-token-proxy
+    - dify-api
+    - dify-worker
+    - dify-web
+    - dify-plugin-daemon
+    - dify-nginx
+    - dify-front-door
+
+- name: "dify | installed"
   ansible.builtin.debug:
-    msg: "dify is declared but not implemented yet (WP-204, ADR-0599); nothing was applied."
+    msg: >-
+      Dify is at https://dify.{{ cluster_base_domain }} behind Keycloak (realm zuno). The
+      model provider, MCP tool and accounts are configured by the next step of WP-204;
+      `make d2 check dify` verifies the chain.

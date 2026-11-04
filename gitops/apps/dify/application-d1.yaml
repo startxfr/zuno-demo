@@ -1,0 +1,35 @@
+# ADR-0599 (WP-204): Dify in zuno-dify (namespace, experience-client label and baseline from
+# gitops/charts/namespaces). No operator, so no d0. The role (ansible/roles/dify) passes the
+# cluster values: global.zuno, the dify.global URLs, the S3 bucket and endpoint, the egress
+# networks and, during the plugin install window only, egress.pluginInstallWindow.enabled.
+# skipTests: dify-helm ships two `helm test` Jobs that must never run under ArgoCD.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-dify-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-57"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/dify
+    helm:
+      releaseName: zuno-dify-d1
+      skipTests: true
+      values: |
+        global:
+          zuno:
+            clusterBaseDomain: apps.mycluster.example.com
+            routeHost: dify.apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-dify
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

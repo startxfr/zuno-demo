@@ -1,0 +1,244 @@
+# ADR-0599 (WP-204). Every value comes from the WP-203 spike
+# (docs/roadmap/evidence/wp-203-dify-spike.md). The role (ansible/roles/dify) passes
+# the cluster values through the Application: global.zuno, dify.global.*Domain,
+# dify.externalS3.{endpoint,region,bucketName.api}, egress.clusterCIDRs.
+
+global:
+  zuno:
+    clusterBaseDomain: apps.mycluster.example.com
+    routeHost: dify.apps.mycluster.example.com
+
+namespace: zuno-dify
+
+externalSecrets:
+  refreshInterval: 1h
+  secretStore: vault-backend
+
+# Front door (ADR-0599 decision 3): oauth2-proxy admits the Keycloak groups below, then
+# Dify's own per-person account (email + password) applies behind it.
+frontDoor:
+  image: quay.io/oauth2-proxy/oauth2-proxy@sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
+  clientId: dify
+  # Keycloak groups allowed through (full path). Dify accounts are created per person
+  # by the role; this is the outer gate only.
+  allowedGroups:
+    - /consultant
+  cookieName: _dify_front_door
+
+route:
+  # Workflow runs and streamed answers outlast the router's 30 s default.
+  timeout: 5m
+
+egress:
+  # The two gateways' namespace is reached through the token proxy only; Dify itself
+  # talks to zuno-postgresql (5432) and, until the plugin is installed, to PyPI.
+  databaseNamespace: zuno-data
+  databasePort: 5432
+  # Pod and Service networks, excluded from the HTTPS-out rule (the role reads them
+  # from Network.config.openshift.io/cluster).
+  clusterCIDRs:
+    - 10.128.0.0/14
+    - 172.30.0.0/16
+  # ADR-0599 decision 7 and WP-203 section 3: the plugin daemon runs `uv sync` per plugin
+  # and needs PyPI. Closed by default; the role opens it for the install window only
+  # (extraHosts below) and closes it again.
+  pluginInstallWindow:
+    enabled: false
+    hosts:
+      - pypi.org
+      - files.pythonhosted.org
+  # DNS names of the dedicated S3 bucket (decision 2026-11-04): the regional endpoint and the
+  # virtual-hosted bucket name. The role fills them from zuno_dify_s3_*.
+  s3Hosts: []
+
+# nginx front of api/web/plugin-daemon, replacing the dify-helm one that cannot write its
+# cache under restricted-v2 (WP-203 section 2). Listens on 8080, emptyDirs for what it writes.
+proxy:
+  image: docker.io/library/nginx:1.29.3@sha256:2f4e10193b0c4f61472245e9d26cea78e7df7af266c7e7cf5e67353ee2731b51
+
+dify:
+  # Stable object names whatever the release name (dify-api, dify-web, dify-plugin-daemon).
+  fullnameOverride: dify
+  global:
+    # Real value comes from Vault (ExternalSecret dify-app); this one is never used.
+    appSecretKey: "overridden-by-dify-app-secret"
+    internalApiKey: "overridden-by-dify-app-secret"
+    # The chart passes these through as full URLs (CONSOLE_API_URL, FILES_URL, ...), despite its "Domain" names.
+    consoleApiDomain: https://dify.apps.mycluster.example.com
+    consoleWebDomain: https://dify.apps.mycluster.example.com
+    serviceApiDomain: https://dify.apps.mycluster.example.com
+    appApiDomain: https://dify.apps.mycluster.example.com
+    appWebDomain: https://dify.apps.mycluster.example.com
+    filesDomain: https://dify.apps.mycluster.example.com
+    triggerDomain: https://dify.apps.mycluster.example.com
+    # ADR-0599 decision 7: no marketplace, plugins come from a verified package.
+    marketplace:
+      enabled: false
+      apiProxyEnabled: false
+
+  # Digests: multi-arch index digests read from the registry on 2026-11-04 (WP-204).
+  image:
+    api:
+      repository: langgenius/dify-api
+      tag: "1.17.0@sha256:52be6088dd842e01bc58cdb23a701266a55aa3814b24057c18adfb4d351f8079"
+      pullPolicy: IfNotPresent
+    web:
+      repository: langgenius/dify-web
+      tag: "1.17.0@sha256:6a81fcdd82b51f6fe3436cdc25d1a358cd301a2c3457554bf96de7f5f32a6b5a"
+      pullPolicy: IfNotPresent
+    pluginDaemon:
+      repository: langgenius/dify-plugin-daemon
+      tag: "0.6.10-local@sha256:34412a22d1e1d1a6c73727fef88cffbcdd9be7a21bf9ad3076b4bf5c1b88fd9b"
+      pullPolicy: IfNotPresent
+    agentBackend:
+      repository: langgenius/dify-agent-backend
+      tag: "1.17.0@sha256:bdb2ed516bd3c872007c128f67c3a3218c6bf20fd6bae32f274ba3cb884ec4d6"
+      pullPolicy: IfNotPresent
+
+  # Off by design (ADR-0599 decisions 2 and 7; WP-203 section 2).
+  weaviate:
+    enabled: false
+  postgresql:
+    enabled: false
+  proxy:
+    enabled: false
+  sandbox:
+    enabled: false
+  localSandbox:
+    enabled: false
+  agentBackend:
+    enabled: false
+  apiWebsocket:
+    enabled: false
+  ingress:
+    enabled: false
+
+  # zuno-postgresql PRIMARY, not pgbouncer (Alembic migrations). The credential comes
+  # from the dify-app Secret (DB_USERNAME, DB_PASSWORD).
+  externalPostgres:
+    enabled: true
+    username: dify
+    password: "overridden-by-dify-app-secret"
+    address: zuno-postgresql-primary.zuno-data.svc
+    port: 5432
+    database:
+      api: dify
+      pluginDaemon: dify_plugin
+
+  # Dedicated bucket by decision 2026-11-04; endpoint/region/bucket come from the role.
+  # The keys come from the dify-app Secret (S3_ACCESS_KEY, S3_SECRET_KEY).
+  externalS3:
+    enabled: true
+    endpoint: "https://s3.eu-central-1.amazonaws.com"
+    pathStyle: false
+    accessKey: "overridden-by-dify-app-secret"
+    secretKey: "overridden-by-dify-app-secret"
+    bucketName:
+      api: "xxxxxx"
+    useIAM: false
+    region: "eu-central-1"
+
+  # Cache and Celery broker only (ADR-0599 decision 2). Image: the zuno-ai-build mirror
+  # of bitnamilegacy/redis, as gitops/charts/redis uses.
+  redis:
+    enabled: true
+    fullnameOverride: dify-redis
+    architecture: standalone
+    global:
+      security:
+        allowInsecureImages: true
+    image:
+      registry: image-registry.openshift-image-registry.svc:5000
+      repository: zuno-ai-build/bitnami-redis
+      tag: "8.2.1"
+    auth:
+      enabled: true
+      existingSecret: dify-redis
+      existingSecretPasswordKey: redis-password
+    master:
+      podSecurityContext:
+        enabled: false
+      containerSecurityContext:
+        enabled: false
+      persistence:
+        enabled: true
+        size: 1Gi
+
+  # restricted-v2 assigns the uid and fsGroup: the chart's fixed ones are refused (WP-203).
+  api: &app
+    podSecurityContext:
+      enabled: false
+    containerSecurityContext:
+      enabled: false
+    persistence:
+      persistentVolumeClaim:
+        accessModes: ReadWriteOnce
+    extraEnv: &appEnv
+      - name: DB_EXTRAS
+        value: sslmode=require
+      - name: SECRET_KEY
+        valueFrom: {secretKeyRef: {name: dify-app, key: SECRET_KEY}}
+      - name: DB_USERNAME
+        valueFrom: {secretKeyRef: {name: dify-app, key: DB_USERNAME}}
+      - name: DB_PASSWORD
+        valueFrom: {secretKeyRef: {name: dify-app, key: DB_PASSWORD}}
+      - name: REDIS_PASSWORD
+        valueFrom: {secretKeyRef: {name: dify-app, key: REDIS_PASSWORD}}
+      - name: CELERY_BROKER_URL
+        valueFrom: {secretKeyRef: {name: dify-app, key: CELERY_BROKER_URL}}
+      - name: PLUGIN_DAEMON_KEY
+        valueFrom: {secretKeyRef: {name: dify-app, key: PLUGIN_DAEMON_KEY}}
+      - name: INNER_API_KEY_FOR_PLUGIN
+        valueFrom: {secretKeyRef: {name: dify-app, key: INNER_API_KEY_FOR_PLUGIN}}
+      - name: S3_ACCESS_KEY
+        valueFrom: {secretKeyRef: {name: dify-app, key: S3_ACCESS_KEY}}
+      - name: S3_SECRET_KEY
+        valueFrom: {secretKeyRef: {name: dify-app, key: S3_SECRET_KEY}}
+      # Dify polls its own update endpoint and sends usage statistics by default.
+      - name: MARKETPLACE_ENABLED
+        value: "false"
+      - name: DISABLE_TELEMETRY
+        value: "true"
+      - name: ENABLE_CHECK_UPGRADABLE_PLUGIN_TASK
+        value: "false"
+      # Local sign-up closed: accounts are created by the role (decision 2026-11-04).
+      - name: ALLOW_REGISTER
+        value: "false"
+      - name: ALLOW_CREATE_WORKSPACE
+        value: "false"
+      - name: ENABLE_SOCIAL_OAUTH_LOGIN
+        value: "false"
+  worker:
+    <<: *app
+    extraEnv: *appEnv
+  beat:
+    <<: *app
+    extraEnv: *appEnv
+  pluginDaemon:
+    # No securityContext keys: this template renders the map as given (an `enabled: false` key
+    # would reach the pod spec), and the empty default leaves the uid to restricted-v2.
+    persistence:
+      persistentVolumeClaim:
+        accessModes: ReadWriteOnce
+        size: 5Gi
+    extraEnv:
+      - name: DB_SSL_MODE
+        value: require
+      - name: DB_USERNAME
+        valueFrom: {secretKeyRef: {name: dify-app, key: DB_USERNAME}}
+      - name: DB_PASSWORD
+        valueFrom: {secretKeyRef: {name: dify-app, key: DB_PASSWORD}}
+      - name: REDIS_PASSWORD
+        valueFrom: {secretKeyRef: {name: dify-app, key: REDIS_PASSWORD}}
+      - name: SERVER_KEY
+        valueFrom: {secretKeyRef: {name: dify-app, key: PLUGIN_DAEMON_KEY}}
+      - name: DIFY_INNER_API_KEY
+        valueFrom: {secretKeyRef: {name: dify-app, key: INNER_API_KEY_FOR_PLUGIN}}
+      # WP-203 section 2: writable paths under restricted-v2.
+      - {name: PLUGIN_WORKING_PATH, value: /app/storage/cwd}
+      - {name: PLUGIN_STORAGE_LOCAL_ROOT, value: /app/storage}
+      - {name: PLUGIN_INSTALLED_PATH, value: plugin}
+      - {name: PLUGIN_PACKAGE_CACHE_PATH, value: plugin_packages}
+      - {name: PLUGIN_MEDIA_CACHE_PATH, value: assets}
+      - {name: HOME, value: /app/storage/home}
+      - {name: UV_CACHE_DIR, value: /app/storage/uv-cache}

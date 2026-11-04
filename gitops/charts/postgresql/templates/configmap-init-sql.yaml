@@ -51,6 +51,13 @@ data:
     \connect {{ .Values.mlflowDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.mlflowDatabase.owner }};
 
+    -- ADR-0599/WP-204: Dify's Alembic migrations (api) and the plugin-daemon's
+    -- GORM auto-migration create their schemas in public on first start.
+    \connect {{ .Values.difyDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.difyDatabase.owner }};
+    \connect {{ .Values.difyDatabase.pluginName }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.difyDatabase.owner }};
+
     \connect {{ .Values.ogxDatabase.name }}
     CREATE EXTENSION IF NOT EXISTS vector;
     GRANT ALL ON SCHEMA public TO {{ .Values.ogxDatabase.owner }};

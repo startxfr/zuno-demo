@@ -1,5 +1,13 @@
 ---
-# Stub (WP-202): WP-204 replaces this file. Nothing was ever installed by it.
-- name: "dify | not implemented yet"
-  ansible.builtin.debug:
-    msg: "dify is declared but not implemented yet (WP-204, ADR-0599); nothing to remove."
+# Removes both Applications (and with them the Deployments, Route, PVC and Secrets). The Keycloak
+# client, the Vault paths and the databases are kept: they are shared declarations (realm-zuno.json,
+# the vault and postgresql roles) and a reinstall reuses them; the S3 bucket is never emptied.
+- name: "dify | delete the Dify Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-dify-d1"
+
+- name: "dify | delete the token proxy Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+  vars:
+    gitops_app_name: "zuno-token-proxy-dify-d1"
