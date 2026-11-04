@@ -216,11 +216,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:7e8ee1783249209bf240217def8867650f765e422f34b67d696f0b5ddc2c558a  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
-      identity: quay.io/zuno/unifai-identity@sha256:8fcfb6ed366e82a9557da7dbe95589de83146d54937b90d50bf7aadc8e0c1aee  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:dbbe479cb7183567f123399d4d3089bf4bd311c48d484d11e26a1b910511be8e  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
-      rag: quay.io/zuno/unifai-rag@sha256:f7437ce0cb8a45140ae052f0907941256c7778ec0fa9ced1940a4b0589d0e428  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
-      ui: quay.io/zuno/unifai-ui@sha256:b0ab4e85184441b3394b03cf725e9cea7e42460a2fa0b6722613cb44114b86d3  # v0.1.55 (devel-97b6ccfa6: A2A cancel on timeout, max-tokens span metadata)
+      backend: quay.io/zuno/unifai-backend@sha256:0054624a81f2c2eeaa3cee300af64cbed6a288269a4bf5818f8f95ec1ada2e2b  # v0.1.57
+      identity: quay.io/zuno/unifai-identity@sha256:f1020ef4d7c8cf84edfc0a6ce71009ca70fcc77e9e7a958dbcd7613f73b7d0a3  # v0.1.57
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:cf0059e814ab621f7ebd1ef5827096edfbfcdabeafe969e37183b3bfe27df2e2  # v0.1.57
+      rag: quay.io/zuno/unifai-rag@sha256:49e44b1c847e98dd2f9170244b990721136df7f4cbef138dcd73ae0b79de941e  # v0.1.57
+      ui: quay.io/zuno/unifai-ui@sha256:8788273f906f259e37381c4037656ef6efb9f6165e84c69ecd46743e2f1bba20  # v0.1.57
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
