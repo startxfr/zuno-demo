@@ -81,8 +81,8 @@ Proofs made, against the list above:
 | Classification on return: Tekos results join Arkos's C3 run | 0401 | not checked separately |
 | Refusals: unentitled user, undeclared target, depth 2, cycle, half a chain, depth header mismatch, read-only delegated surface (`evaluations/arkos/security_checks.py`) | 0401, 0403, 0406 | made: 7 of 7 hold on 0.1.53 |
 | The cost lands on the initiating user; the cost of one delegating turn | 0406 | made: one scenario 21 turn as `eval-consultant-01` at the cap of 3 costs about 65,000 tokens and 24 calls: Arkos ~58,000 tokens in 16 calls, Tekos ~6,600 in 8 (all local gpt-oss-20b). The ai-gateway counters count each call once per Keycloak group of the caller (13 for this persona), so the raw sums first read were 13 times too high (`e9a67d3c`; the Tempo trace has 9 Arkos chat spans where the counters said 117 calls). No cost problem remains |
-| A delegation no longer awaited cancels the remote task | 0406 | not implemented: the UnifAI client never calls `cancel_task` as of 0.1.53, on a timeout, a user abort or a cancelled Temporal run (b9, fork code); fix planned in 0.1.55 |
-| `X-Zuno-Max-Tokens` end to end | 0406 | half proven: the ai-gateway enforces the header (64 gives 64 completion tokens, 128 gives 128); the operator sends it on every call, but Arkos declares 8192, so no call reaches it, and the value sent is not logged. A low-ceiling test needs a signed release; a span attribute with the value is offered for 0.1.55 |
+| A delegation no longer awaited cancels the remote task | 0406 | not proven: v0.1.55 cancels on a poll timeout, but the A2A send is one blocking call, so the timeout never fires (`timeoutSeconds: 5`, three delegations, no cancel); bounding the send is asked for 0.1.56. A cancel on timeout is enough by the decision of 2026-11-04; a user abort is not covered |
+| `X-Zuno-Max-Tokens` end to end | 0406 | made on v0.1.55: the model spans carry `mas.x_zuno_max_tokens=8192`, the declared value, and the ai-gateway cuts at the header (64 gives 64) |
 | Approval (ADR-0409) | 0409 | waits for WP-173 |
 
 The refusal checks were replayed as `eval-consultant-01` on 0.1.53. Three of them (undeclared target, depth limit, cycle)
@@ -123,3 +123,13 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#co
 - **Still open, both waiting for operator 0.1.55**: the cancellation of a delegation no longer awaited (not implemented
   in the UnifAI client) and `X-Zuno-Max-Tokens` end to end. ADR-0406 stays `Accepted`, and approval (ADR-0409) still
   waits for WP-173.
+
+## Progress (2026-11-04): UnifAI v0.1.55
+
+See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#unifai-v0155-on-demo333-2026-11-04).
+- `X-Zuno-Max-Tokens` is proven end to end: the value reaches the model spans, and the ai-gateway enforces it.
+- The cancellation of an abandoned delegation is still not proven. The A2A send is a single blocking call, so the poll
+  timeout that would cancel the task is never reached. A bounded send is asked for 0.1.56.
+- Still open: that cancellation (ADR-0406 stays `Accepted` on it alone), approval (ADR-0409, waits for WP-173), the
+  intermittent empty final reply after a delegation (fix planned in 0.1.56), and turns where Arkos answers without
+  delegating.

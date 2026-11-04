@@ -77,11 +77,18 @@ These proofs were made on demo333 on operator 0.1.53, as `eval-consultant-01` ([
 - the calls per turn were read from real traces: 10 to 11 delegations per turn on 0.1.52 triggered the cap, at 3 per work
   item in 0.1.53, then at 1 on demo333 (`bf128167`).
 
-Two points are still open, so the status stays `Accepted`:
-- **Cancellation:** a delegation no longer awaited does not cancel the remote task. The UnifAI client never calls
-  `cancel_task` as of 0.1.53, on a timeout, a user abort or a cancelled Temporal run. The fix is planned in 0.1.55.
-- **`X-Zuno-Max-Tokens`:** the ai-gateway enforces it, but it is not proven end to end. No delegated call reaches the
-  8192-token ceiling Arkos declares, and the value sent is not logged.
+**`X-Zuno-Max-Tokens` is proven end to end on UnifAI v0.1.55** ([evidence](../roadmap/evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#unifai-v0155-on-demo333-2026-11-04)):
+- the model spans of an Arkos turn carry `mas.x_zuno_max_tokens=8192`, the value the drafting task declares (Tempo traces
+  `a74187ef484f7a7f0d56faf811887c18` and `211e68bb5c5480a843a05e917666a7c1`);
+- the ai-gateway cuts a completion at the header (64 gives 64 completion tokens, 128 gives 128).
+
+One point is still open, so the status stays `Accepted`:
+- **Cancellation:** a delegation no longer awaited does not cancel the remote task yet. The decision of 2026-11-04 is that
+  a cancel on timeout is enough to satisfy this clause; a user abort and a cancelled Temporal run are named as not covered.
+  v0.1.55 cancels the remote task when the A2A poll times out. But the A2A `message/send` to the zuno a2a-gateway is one
+  blocking call that returns the finished answer, so the poll loop is never entered. With `timeoutSeconds: 5`, three
+  delegations completed and none was cancelled (trace `caa12a9da8d6e3507fe902161ed8ac95`). The send itself must be bounded
+  first, which is asked of the UnifAI fork for 0.1.56.
 
 ## Alternatives considered
 
