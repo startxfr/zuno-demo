@@ -23,6 +23,15 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-dify
+  ignoreDifferences:
+    # image.openshift.io/triggers (the chart's Deployment annotation) rewrites the container image
+    # to the built digest each time the ImageStream moves; without this ArgoCD reverts it to
+    # :latest and the two fight forever (seen live: Deployment generation 46 in 25 minutes).
+    # Same pattern as the ai-gateway Application (ADR-0059).
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
   syncPolicy:
     automated:
       prune: true
