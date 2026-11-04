@@ -91,6 +91,30 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    - Vault re-seals after the reboots, which leaves istio-csr unable to sign
      certificates;
    - follow the post-restart checklist.
+
+   **Done 2026-11-04 (user go):** ClusterVersion 4.22.20 at 13:54, every
+   clusteroperator healthy, both MachineConfigPools updated, every CSV
+   `Succeeded`. What the run actually needed:
+   - the drain stalled on single-replica PDBs: a2a-gateway, ai-gateway,
+     mcp-gateway, then Keycloak `zuno-0`; deleting each pod unblocked it
+     (rhods-dashboard's PDB only delayed it);
+   - Vault re-sealed and stayed sealed about 10 minutes (13:36 to 13:46),
+     because the background unseal loop missed the new pod. It was unsealed
+     by hand, then the `vault-issuer` and `vault-issuer-istio` ClusterIssuers
+     were nudged back to `True`;
+   - 19 pods were left behind after the reboots: 14 UnifAI pods in
+     `CreateContainerConfigError` ("failed to prepare subPath for volumeMount
+     unifai-logging-volume") across `unifai-devel`, `unifai-olm` and
+     `zuno-unifai`, and 5 in `ContainerStatusUnknown` (aap-gateway,
+     automation-hub controller, two RHTAS ctlog). Deleting them by name
+     (user go) brought every Deployment back to Ready within two minutes;
+   - side effect: the drained pods landed on GPU node `ip-10-18-18-19`, which
+     sits at 93% CPU requested, so `qwen35-9b-wesh` (2 CPU plus one
+     `mig-2g.48gb`) stays Pending even though the MIG slice is free.
+
+   After it, ArgoCD had 100 Applications Synced/Healthy and the same two sxcm
+   `startx-cluster-*` OutOfSync/Healthy as before. The other models
+   (gpt-oss-20b, qwen35-9b, qwen36-27b-instruct, embeddings) are Ready.
 3. **RHOAI 3.5.2.** Set `zuno_openshift_ai_version: "3.5.2"`, then
    `make d1 install openshift-ai`, which walks 3.5.1 → 3.5.2. Before the run,
    size the namespace quotas for five operator pods (3.5.0 GA trap 1). After
