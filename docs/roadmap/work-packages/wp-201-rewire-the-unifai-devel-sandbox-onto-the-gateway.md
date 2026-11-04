@@ -1,6 +1,6 @@
-# WP-201: Rewire the unifai-devel sandbox onto the gateway
+# WP-201: Rewire the unifai-devel sandbox onto the gateway (amended: keyless, isolated)
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-198
 - **Related:** [ADR-0562](../../adr/0562-authenticate-unifai-against-the-zuno-keycloak-realm.md)
@@ -13,17 +13,25 @@
 
 ## Goal
 
-ai-ops-01 on `unifai-ui-unifai-devel` sees the examples, and they run without any external API key.
+ai-ops-01 on `unifai-ui-unifai-devel` sees the examples, and they run without any external API key (mock LLM).
 
 ## Steps
 
-1. Confirm the realm and `adminUsers` of the devel stack.
-2. In the fork's examples:
-   - set `owner: ai-ops-01`;
-   - move the LLMs onto the gateway config;
-   - replace the Gemini templates with the zuno ones;
-   - remove `demo-gemini` and `demo-openai`.
-3. Re-apply them on demo333. This is a cluster action and needs the user's go.
+1. **Confirm the identity.** Done on 2026-11-04: the live stack is on realm `zuno` with `adminUsers: [ai-ops-01]` and
+   reads groups through oidc-claims. The 25 `demo-*` objects were owned by `admin`, the CRD default, which no realm user
+   is.
+2. **Variant A, chosen by the user on 2026-11-04.** The gateway variant would have needed the ai-gateway and mcp-gateway
+   NetworkPolicies opened to `unifai-devel`; they only admit `zuno-unifai`. The fork gets a kustomize overlay,
+   `examples/overlays/unifai-devel-demo333`, sent as a patch to the fork session:
+   - every object gets `owner: ai-ops-01`;
+   - it drops `demo-gemini`, `demo-openai`, `demo-vllm` and `demo-docs-wide`;
+   - the two templates run on the mock LLM and the demo MCP server, with no placeholders;
+   - `stack-unifai-devel.yaml` is refreshed to the live identity.
+
+   The generic examples, used by the e2e tests, are left unchanged.
+3. **Re-apply on demo333.** Delete the `admin`-owned objects, then
+   `oc kustomize --load-restrictor LoadRestrictionsNone examples/overlays/unifai-devel-demo333 | oc apply -n unifai-devel -f -`.
+   This is a cluster action and needs the user's go.
 
 ## Acceptance
 

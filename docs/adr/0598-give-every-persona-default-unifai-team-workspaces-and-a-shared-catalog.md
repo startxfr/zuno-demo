@@ -39,8 +39,9 @@ templates in the catalog asked for a Gemini API key.
    branches, orchestrated and RAG.
 5. **Personal starters.** A short list of demo personas (consultant-01, sale-01, ai-ops-01) gets starter workflows in their
    personal workspace. These are declarative `UnifaiWorkflow` objects with `owner: <username>`, recreated if deleted.
-6. **`unifai-devel` stays a sandbox.** Its examples move onto the gateway LLM and the zuno templates, so they run without an
-   external key.
+6. **`unifai-devel` stays an isolated sandbox.** Its examples are owned by the stack admin (ai-ops-01) and run on the
+   in-namespace mock LLM and demo MCP server, so they need no external key. They do not use the gateway: the
+   ai-gateway and mcp-gateway NetworkPolicies stay closed to `unifai-devel` (user decision of 2026-11-04).
 
 ## Consequences
 
