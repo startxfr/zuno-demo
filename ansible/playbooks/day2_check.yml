@@ -36,6 +36,9 @@
       # ADR-0587 (WP-179): experience clients, stubs until WP-181/WP-183.
       - open_webui
       - openclaw
+      # ADR-0599/ADR-0600 (WP-202): Dify and kagent, stubs until WP-204/WP-207.
+      - dify
+      - kagent
       - supply_chain
   tasks:
     - name: Resolve cluster API credentials

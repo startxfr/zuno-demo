@@ -1027,7 +1027,7 @@ WP-208 shows the five experiences together. No cluster action while demo333 is b
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-202 | [wp-202](work-packages/wp-202-common-preparation-for-dify-and-kagent.md) | 0601, 0599, 0600 | none | Not started | token proxy build and roll with the user's go |
+| WP-202 | [wp-202](work-packages/wp-202-common-preparation-for-dify-and-kagent.md) | 0601, 0599, 0600 | none | Repo work in review | push (rolls the ai-gateway for the new env), then `make d2 build token-proxy` with the user's go, after the demo333 upgrade |
 | WP-203 | [wp-203](work-packages/wp-203-dify-preparation.md) | 0599, 0601 | WP-202 | Not started | scratch install in `zuno-dify-scratch`, removed afterwards |
 | WP-204 | [wp-204](work-packages/wp-204-install-dify-on-demo333.md) | 0599, 0601 | WP-202, WP-203 | Not started | Vault seed before the Keycloak client push; `make d2 install dify` |
 | WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Not started | adapter build and roll; knowledge base registered in Dify |

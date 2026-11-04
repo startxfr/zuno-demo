@@ -24,8 +24,9 @@ Verbs: `check`, `install`, `uninstall`, `reconcile`, `all`, `reinstall`.
 **Day 2** — AI infrastructure and agents (ADR-0060; the RAG and its ingestion are
 UnifAI's since ADR-0568): `namespaces`, `llm`, `models`, `mcp`, `agents`, `mlops`,
 `trustyai-config`, `mlflow`, `lightspeed-config`, `unifai`, `open-webui`,
-`openclaw`, `supply-chain` (check-only — it has no install path). Buildable:
-`mcp`, `mlops`, `trustyai-eval`. Verbs: `check`, `install`, `build`,
+`openclaw`, `dify`, `kagent` (both stubs until WP-204/WP-207), `supply-chain`
+(check-only — it has no install path). Buildable: `mcp`, `mlops`,
+`trustyai-eval`, `token-proxy`. Verbs: `check`, `install`, `build`,
 `uninstall`, `all`, `reinstall`, and `reconcile` for `models` only.
 
 **Day 3** — operations (ADR-0057/ADR-0058): `test` and `sign` take `agents`

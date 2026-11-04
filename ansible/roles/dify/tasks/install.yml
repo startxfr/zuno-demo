@@ -1,0 +1,6 @@
+---
+# Stub (WP-202): WP-204 replaces this file. A no-op, never a failure, so a full
+# `make d2 install` stays green until the dify track lands.
+- name: "dify | not implemented yet"
+  ansible.builtin.debug:
+    msg: "dify is declared but not implemented yet (WP-204, ADR-0599); nothing was applied."

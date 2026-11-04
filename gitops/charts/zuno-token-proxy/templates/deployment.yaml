@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zuno-token-proxy
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: zuno-token-proxy
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+    image.openshift.io/triggers: |-
+      {{ include "zuno-token-proxy.imageTrigger" . }}
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zuno-token-proxy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zuno-token-proxy
+    spec:
+      serviceAccountName: zuno-token-proxy
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: zuno-token-proxy
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: TOKEN_URL
+              value: {{ include "zuno-token-proxy.tokenUrl" . | quote }}
+            - name: CLIENT_ID
+              value: {{ .Values.clientId | quote }}
+            - name: CLIENT_SECRET_FILE
+              value: /var/run/zuno-token-proxy/client_secret
+            - name: AI_GATEWAY_URL
+              value: {{ .Values.aiGatewayUrl | quote }}
+            - name: MCP_GATEWAY_URL
+              value: {{ .Values.mcpGatewayUrl | quote }}
+            - name: AI_HEADERS
+              value: {{ .Values.aiHeaders | toJson | quote }}
+            - name: MCP_HEADERS
+              value: {{ .Values.mcpHeaders | toJson | quote }}
+            - name: REFRESH_RATIO
+              value: {{ .Values.refreshRatio | quote }}
+            - name: UPSTREAM_TIMEOUT_S
+              value: {{ .Values.upstreamTimeoutSeconds | quote }}
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+          volumeMounts:
+            - name: client-secret
+              mountPath: /var/run/zuno-token-proxy
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: client-secret
+          secret:
+            secretName: zuno-token-proxy
+        - name: tmp
+          emptyDir: {}

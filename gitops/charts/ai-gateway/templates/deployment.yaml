@@ -231,6 +231,10 @@ spec:
             - name: EXPERIENCE_CLIENTS
               value: {{ join "," .Values.experienceClients | quote }}
             {{- end }}
+            {{- if .Values.personaClaimClients }}
+            - name: PERSONA_CLAIM_CLIENTS
+              value: {{ join "," .Values.personaClaimClients | quote }}
+            {{- end }}
             {{- if .Values.maasAdapter.closedClassMaasOnly.enabled }}
             - name: QUOTA_CLOSED_CLASS_MAAS_ONLY
               value: "true"

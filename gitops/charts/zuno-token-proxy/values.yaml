@@ -1,0 +1,64 @@
+# ADR-0601: one release per experience client that cannot forward a user token
+# (Dify, kagent). The client points its OpenAI base URL at
+# http://zuno-token-proxy.<namespace>.svc:8080/v1 and its MCP URL at .../mcp,
+# with any dummy key; the proxy replaces it.
+
+# Namespace of the experience client (labelled zuno.io/experience-client=true
+# by the namespaces chart). Required.
+namespace: ""
+
+image:
+  # Built by the "token-proxy" build component (ansible/roles/token_proxy_build).
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/zuno-token-proxy
+  # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
+  tag: latest
+  pullPolicy: Always
+
+replicas: 1
+
+clusterBaseDomain: apps.mycluster.example.com
+# The Keycloak ROUTE, never the in-cluster http service (its issuer differs, see
+# the keycloak-internal-svc trap). Empty = https://keycloak.<clusterBaseDomain>/realms/zuno/...
+tokenUrl: ""
+
+# Keycloak client of this experience (its service account carries the persona
+# claim, ADR-0593). Its secret is read from Vault keycloak/<clientId>.
+clientId: ""
+vaultKey: ""            # default keycloak/<clientId>
+vaultProperty: client_secret
+
+aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
+mcpGatewayUrl: http://mcp-gateway.zuno-ai-run.svc:8080
+
+# Fixed headers per upstream; they replace any header of the same name the client sends.
+# X-Zuno-Agent must be the experience-client name declared in the agents release (ADR-0592).
+aiHeaders: {}
+mcpHeaders: {}
+
+# Pods of the client namespace allowed to call the proxy (empty = every pod of the namespace).
+clientPodSelector: {}
+
+egress:
+  # The two gateways' namespace and pod port (WP-179 ingress peers).
+  gatewayNamespace: zuno-ai-run
+  gatewayPort: 8080
+  # Pod and Service networks, excluded from the HTTPS-out rule; the client's role
+  # reads them from Network.config.openshift.io/cluster, as ansible/roles/open_webui does.
+  clusterCIDRs:
+    - 10.128.0.0/14
+    - 172.30.0.0/16
+
+refreshRatio: "0.7"
+upstreamTimeoutSeconds: "300"
+
+externalSecrets:
+  refreshInterval: 1h
+  secretStore: vault-backend
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi

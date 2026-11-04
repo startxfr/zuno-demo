@@ -14,5 +14,6 @@ to live here (`agent-runtime`, `agent-bff`, `agent-frontend`, and
 | `diagram-render` | Self-hosted Mermaid rendering behind mcp-gateway's diagram tool (ADR-0516). |
 | `mlops` | Training/evaluation pipeline (ADR-0302). |
 | `trustyai-eval` | RAGAS evaluation image (ADR-0534). |
+| `zuno-token-proxy` | Gives an experience client that cannot forward a user token (Dify, kagent) a refreshed client-credentials token towards the two gateways (ADR-0601). |
 | `supply-chain-signer` | In-cluster image signing identity (ADR-0420, ADR-0535). |
 | `aap-execution-environment` | Custom AAP execution environment (ADR-0418). |

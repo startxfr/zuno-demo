@@ -108,6 +108,13 @@ jobs:
             context: .
             build_args: |
               BASE_IMAGE=docker.io/library/python:3.11-slim
+          # ADR-0601/WP-202: the experience clients' token proxy; built in-cluster by
+          # ansible/roles/token_proxy_build, listed here so the ADR-0324 inventory is whole.
+          - name: zuno-token-proxy
+            dockerfile: components/zuno-token-proxy/Dockerfile
+            context: .
+            build_args: |
+              BASE_IMAGE=docker.io/library/python:3.11-slim
           # ADR-0516: backs mcp-gateway's generate_diagram handler, same
           # relationship ai-gateway has to image_gen.py above - a
           # standalone entry (not context: ".") since, unlike every

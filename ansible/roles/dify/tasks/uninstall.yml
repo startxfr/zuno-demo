@@ -1,0 +1,5 @@
+---
+# Stub (WP-202): WP-204 replaces this file. Nothing was ever installed by it.
+- name: "dify | not implemented yet"
+  ansible.builtin.debug:
+    msg: "dify is declared but not implemented yet (WP-204, ADR-0599); nothing to remove."

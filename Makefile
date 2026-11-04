@@ -53,8 +53,8 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # ansible/roles/namespaces/README.md (internal task/Application naming
 # stays "_d1"/"-d1", an implementation detail, not renamed with the macro
 # tier). "build" only knows how to build the named image groups (mcp,
-# mlops, trustyai-eval - see
-# ansible/roles/{mcp,mlops,trustyai_eval}_build; the
+# mlops, trustyai-eval, token-proxy - see
+# ansible/roles/{mcp,mlops,trustyai_eval,token_proxy}_build; the
 # "agent" image group was retired with the zuno agent stack, WP-156);
 # "agents" no longer deploys anything (UnifAI serves the agents) and stays
 # for its "check", the ADR-0053 acceptance gate against UnifAI; "check"/
@@ -74,9 +74,9 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (DAY3_CHECK_ONLY_COMPONENTS): "check" accepts it, every mutating verb
 # rejects it cleanly instead of dying inside Ansible on a missing
 # tasks/install.yml.
-DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw
+DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
-DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval
+DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy
 DAY2_VERBS := check install build uninstall reconcile all reinstall
 # Day 2 components with a targeted tasks/reconcile.yml. `reconcile` is limited
 # to them: a Day 2 reconcile never falls back to re-installing a component.
