@@ -204,8 +204,8 @@ zuno_aap_hub_s3_secret_access_key: "xxxxxx"
 # app files, dedicated bucket by decision 2026-11-04). All four fields go to Vault
 # zuno/dify/s3 (gitops/charts/dify/templates/externalsecrets.yaml); the role skips the
 # seed while any is "xxxxxx". Use a dedicated, bucket-scoped IAM user. ----------
-zuno_dify_s3_bucket_name: "xxxxxx"
-zuno_dify_s3_region: "xxxxxx"
+zuno_dify_s3_bucket_name: "zuno-demo-dify"
+zuno_dify_s3_region: "eu-central-1"
 zuno_dify_s3_access_key_id: "xxxxxx"
 zuno_dify_s3_secret_access_key: "xxxxxx"
 
