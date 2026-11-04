@@ -133,7 +133,7 @@ operators:
     namespace: openshift-gitops-operator
     channel: gitops-1.22
     approval: Manual
-    version: "1.22.2"
+    version: "1.22.3"
   - package: opentelemetry-product
     catalog: redhat-operators
     namespace: openshift-opentelemetry-operator

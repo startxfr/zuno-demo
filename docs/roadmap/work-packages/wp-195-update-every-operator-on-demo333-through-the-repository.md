@@ -78,6 +78,12 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
 
 1. **GitOps 1.22.3.** `make d0 check argocd` green, then approve
    `install-fgcdf`.
+   **Done 2026-11-04 (user go):** precheck green, `install-fgcdf` approved at
+   12:15; CSV 1.22.3 `Succeeded` after about 70 s (InstallReady/Pending
+   cycles are normal); Subscription `AtLatestKnown`; ArgoCD pods Running;
+   Applications unchanged (100 Synced/Healthy, the same two sxcm
+   `startx-cluster-*` OutOfSync/Healthy as before); `make d0 check argocd`
+   green again. Approved by hand: the argocd role has no approval task.
 2. **OCP 4.22.8 → 4.22.20** (infrastructure). Run
    `oc adm upgrade --to 4.22.20`. Known traps:
    - single-replica PDBs block the drain (delete the pod; the eviction API
