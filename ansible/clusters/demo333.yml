@@ -341,3 +341,7 @@ zuno_connectivity_link_token_rate_limits:
 # installed 3.5.0, `make d1 install openshift-ai` walks 3.5.1 then 3.5.2
 # (upgrade_walk.yml), approving no InstallPlan past this pin.
 zuno_openshift_ai_version: "3.5.2"
+# WP-195 step 4a (2026-11-04): rhcl 1.4.3 -> 1.4.4 on stable-1.4. stable-1.5's
+# 1.5.0 only skips >=1.4.4, and it bundles its own authorino/limitador/dns,
+# so 1.5 waits for Red Hat's migration procedure (step 4b).
+zuno_connectivity_link_channel: "stable-1.4"
