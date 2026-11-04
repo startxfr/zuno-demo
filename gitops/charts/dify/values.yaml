@@ -178,6 +178,10 @@ dify:
     extraEnv: &appEnv
       - name: DB_EXTRAS
         value: sslmode=require
+      # Read by `celery beat` only (CELERY_<COMMAND>_<OPTION>): it writes its schedule file in the working
+      # directory (/app/api), which restricted-v2's random uid cannot write. Shared list, harmless elsewhere.
+      - name: CELERY_BEAT_SCHEDULE
+        value: /tmp/celerybeat-schedule
       - name: SECRET_KEY
         valueFrom: {secretKeyRef: {name: dify-app, key: SECRET_KEY}}
       - name: DB_USERNAME
