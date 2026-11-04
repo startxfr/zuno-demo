@@ -1,6 +1,6 @@
 # WP-197: Declare UnifAI built-in resources through the operator
 
-- **State:** Repo work in review
+- **State:** Repo work merged (2026-11-04: fork devel 5b62f70e1, ships in UnifAI 0.1.58; catalog pin and live check pending)
 - **ADRs:** [ADR-0597](../../adr/0597-declare-unifai-built-in-resources-through-the-operator.md)
 - **Depends on:** none
 - **Related:** [WP-198](wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) (its first user)
@@ -25,7 +25,8 @@
    - `internal/validate`: the static rule, plus fixtures (replayed at admission).
    - Envtests `builtin_test.go`, fake MAS endpoint, README section, `make manifests generate`.
 2. **Release.**
-   - Push the branch to fork devel (this session has no push access to the fork: the user or a fork session pushes).
+   - Done 2026-11-04: handed over as a patch (the fork's hook refuses fork/ paths off devel); b9 applied it unchanged on fork
+     devel as 5b62f70e1, `make manifests generate` without diff and `make test` green on the rebased head.
    - Then either the Friday alpha, or a manual release: ci-image, canary-e2e-full including TestUpgrade (CRD change), then
      cut-release by the user.
 3. **Pin here.** `pin_operator_catalog.py` to the release carrying the field.
