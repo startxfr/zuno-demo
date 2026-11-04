@@ -159,6 +159,17 @@ teams: []
 templates:
   enabled: false
 
+# ADR-0598 points 4-5: example components and workflows in the team workspaces
+# whose entry in `teams` says `examples: true`, and a starter (agent + workflow)
+# in the personal workspace of each user in personalStarters. They reference the
+# gateway LLM and MCP provider, so they need both as public built-ins
+# (gatewayLLM.builtin, mcpGateway.builtin: UnifAI >= 0.1.58); otherwise a team
+# member or a persona cannot see what they run on.
+teamExamples:
+  enabled: false
+personalStarters: []
+# - consultant-01
+
 # Signed OKF agent bundles (ADR-0564), verified keyless (ADR-0578): with
 # bundles set, verify.keyless {issuer, subjectRegExp} (from
 # platform/okf/stack-config.generated.yaml, unifai.verify.keyless) and

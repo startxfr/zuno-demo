@@ -95,3 +95,122 @@ spec:
 ---
 {{ end }}
 {{- end }}
+
+{{/*
+Example components and workflows of a team workspace (ADR-0598 point 4): two
+agents, a direct condition and an orchestrator in the team's inventory, and three
+workflows on them (linear, branches, orchestrated). They reference the public
+built-in gateway LLM and MCP provider (ADR-0597), so every member can run them.
+Arguments: root (the chart context), owner (an UnifAI admin), team (the team name).
+*/}}
+{{- define "unifai.teamExamples" -}}
+{{- $root := .root }}
+{{- $t := .team }}
+{{- $llm := printf "$ref:llm/%s" $root.Values.gatewayLLM.name }}
+{{- $mcp := printf "$ref:provider/%s" $root.Values.mcpGateway.name }}
+{{- $ask := dict "rid" "user_question" "name" "User Question Node" "type" "user_question_node" "config" (dict "type" "user_question_node" "retries" 1) }}
+{{- $final := dict "rid" "final_answer" "name" "Final Answer Node" "type" "final_answer_node" "config" (dict "type" "final_answer_node" "retries" 1) }}
+{{- $objs := list
+  (dict "kind" "UnifaiCondition" "name" (printf "%s-direct" $t) "spec" (dict "type" "router_direct" "config" (dict)))
+  (dict "kind" "UnifaiAgent" "name" (printf "%s-assistant" $t) "spec" (dict "type" "custom_agent_node"
+    "config" (dict "llm" $llm "hitl_mode" "skip"
+      "system_message" (printf "You are the assistant of the %s team. Answer in the language of the question, and say when you are not sure." $t))))
+  (dict "kind" "UnifaiAgent" "name" (printf "%s-tools" $t) "spec" (dict "type" "custom_agent_node"
+    "config" (dict "llm" $llm "providers" (list $mcp) "strategy_type" "react" "max_rounds" 10 "hitl_mode" "skip"
+      "system_message" "Use the MCP tools you are entitled to when they help. Say which tool gave each fact.")))
+  (dict "kind" "UnifaiAgent" "name" (printf "%s-orchestrator" $t) "spec" (dict "type" "orchestrator_node"
+    "config" (dict "llm" $llm "max_rounds" 5
+      "system_message" "You coordinate two workers. Delegate with the delegate_task tool; its dst_uid is exactly `assistant` (general questions, writing) or `tools` (anything that needs live data from the MCP tools). Then give a single final answer built from their results.")))
+  (dict "kind" "UnifaiWorkflow" "name" (printf "%s-linear" $t) "spec" (dict
+    "description" "Example: question, then the team assistant, then the answer."
+    "blueprint" (dict
+      "nodes" (list $ask $final (dict "rid" (printf "$ref:agent/%s-assistant" $t)))
+      "conditions" (list (dict "rid" (printf "$ref:condition/%s-direct" $t)))
+      "plan" (list
+        (dict "uid" "ask" "node" "user_question" "exit_condition" (printf "$rid:condition/%s-direct" $t) "branches" (dict "agent" "agent"))
+        (dict "uid" "agent" "node" (printf "$rid:agent/%s-assistant" $t))
+        (dict "uid" "finish" "node" "final_answer" "after" "agent")))))
+  (dict "kind" "UnifaiWorkflow" "name" (printf "%s-branches" $t) "spec" (dict
+    "description" "Example: the question goes either to the assistant or to the tools agent."
+    "blueprint" (dict
+      "nodes" (list $ask $final (dict "rid" (printf "$ref:agent/%s-assistant" $t)) (dict "rid" (printf "$ref:agent/%s-tools" $t)))
+      "conditions" (list (dict "rid" (printf "$ref:condition/%s-direct" $t)))
+      "plan" (list
+        (dict "uid" "ask" "node" "user_question" "exit_condition" (printf "$rid:condition/%s-direct" $t) "branches" (dict "chat" "chat" "tools" "tools"))
+        (dict "uid" "chat" "node" (printf "$rid:agent/%s-assistant" $t))
+        (dict "uid" "tools" "node" (printf "$rid:agent/%s-tools" $t))
+        (dict "uid" "finish" "node" "final_answer" "after" (list "chat" "tools"))))))
+  (dict "kind" "UnifaiWorkflow" "name" (printf "%s-orchestrated" $t) "spec" (dict
+    "description" "Example: an orchestrator delegates to the assistant and the tools agent, then answers."
+    "blueprint" (dict
+      "nodes" (list $ask $final (dict "rid" (printf "$ref:agent/%s-orchestrator" $t)) (dict "rid" (printf "$ref:agent/%s-assistant" $t)) (dict "rid" (printf "$ref:agent/%s-tools" $t)))
+      "conditions" (list (dict "rid" (printf "$ref:condition/%s-direct" $t)))
+      "plan" (list
+        (dict "uid" "ask" "node" "user_question" "exit_condition" (printf "$rid:condition/%s-direct" $t) "branches" (dict "agent" "orchestrate"))
+        (dict "uid" "orchestrate" "node" (printf "$rid:agent/%s-orchestrator" $t) "after" (list "assistant" "tools")
+          "exit_condition" (printf "$rid:condition/%s-direct" $t) "branches" (dict "assistant" "assistant" "tools" "tools" "finish" "finish"))
+        (dict "uid" "assistant" "node" (printf "$rid:agent/%s-assistant" $t))
+        (dict "uid" "tools" "node" (printf "$rid:agent/%s-tools" $t))
+        (dict "uid" "finish" "node" "final_answer")))))
+}}
+{{- range $objs }}
+apiVersion: unifai.startx.fr/v1alpha1
+kind: {{ .kind }}
+metadata:
+  name: {{ .name }}
+  namespace: {{ $root.Values.namespace }}
+  annotations:
+    # after the team (5) and the built-ins (10); workflows after their components
+    argocd.argoproj.io/sync-wave: {{ ternary "16" "15" (eq .kind "UnifaiWorkflow") | quote }}
+spec:
+  owner: {{ $.owner }}
+  teamRef: {{ $t }}
+  {{- toYaml .spec | nindent 2 }}
+---
+{{ end }}
+{{- end }}
+
+{{/*
+Starters in a persona's personal workspace (ADR-0598 point 5): an assistant
+agent and a one-step workflow, owned by the persona itself. Arguments: root,
+user (the preferred_username).
+*/}}
+{{- define "unifai.personalStarter" -}}
+{{- $root := .root }}
+{{- $u := .user }}
+apiVersion: unifai.startx.fr/v1alpha1
+kind: UnifaiAgent
+metadata:
+  name: {{ $u }}-assistant
+  namespace: {{ $root.Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  owner: {{ $u | quote }}
+  type: custom_agent_node
+  config:
+    llm: {{ printf "$ref:llm/%s" $root.Values.gatewayLLM.name | quote }}
+    hitl_mode: skip
+    system_message: You are my personal assistant. Answer in the language of the question.
+---
+apiVersion: unifai.startx.fr/v1alpha1
+kind: UnifaiWorkflow
+metadata:
+  name: {{ $u }}-my-assistant
+  namespace: {{ $root.Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "16"
+spec:
+  owner: {{ $u | quote }}
+  description: My assistant on the Zuno gateway. Copy it, change the prompt, add tools.
+  blueprint:
+    nodes:
+      - {rid: user_question, name: User Question Node, type: user_question_node, config: {type: user_question_node, retries: 1}}
+      - {rid: final_answer, name: Final Answer Node, type: final_answer_node, config: {type: final_answer_node, retries: 1}}
+      - {rid: "$ref:agent/{{ $u }}-assistant"}
+    plan:
+      - {uid: ask, node: user_question}
+      - {uid: agent, node: "$rid:agent/{{ $u }}-assistant", after: ask}
+      - {uid: finish, node: final_answer, after: agent}
+---
+{{- end }}

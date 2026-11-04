@@ -23,8 +23,13 @@ any key, the shared gateway in "Built-in", and example workflows in its team.
 2. **Templates.** Chart `templates.enabled`: `zuno-chat`, `zuno-tools-agent` and `zuno-draft-review` on the gateway LLM
    and MCP config, shared with the objects through `_helpers.tpl`.
 3. **Shared inventory (after WP-197).** `gatewayLLM.builtin` and `mcpGateway.builtin` set to true on demo333.
-4. **Team workflows (after WP-197).** Linear, branches, orchestrated and RAG examples on the built-in gateway, one set per
-   business team with personas (Helm loop, `teamRef`).
+4. **Team workflows (after WP-197).** Chart `teamExamples.enabled` plus `examples: true` on a team entry: in that team's
+   inventory, the agents `<team>-assistant` and `<team>-tools` (MCP), the condition `<team>-direct` (router_direct) and
+   the agent `<team>-orchestrator`. Three workflows run on them: `<team>-linear`, `<team>-branches` and
+   `<team>-orchestrated`. The chart fails if the gateway LLM and MCP provider are not both built-ins. The RAG example
+   moves to WP-200: no retriever is reachable from a business team (built-in retrievers are refused, and the
+   `knowledge-*` retrievers belong to the agent teams). On demo333: `examples: true` for every team with personas
+   (all but cdp).
 
 ## Acceptance
 

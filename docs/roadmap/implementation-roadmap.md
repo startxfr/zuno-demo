@@ -1013,8 +1013,8 @@ sandbox rewired (WP-201).
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-197 | [wp-197](work-packages/wp-197-declare-unifai-built-in-resources-through-the-operator.md) | 0597 | none | Repo work merged | fork devel 5b62f70e1, ships in UnifAI 0.1.58 (canary with TestUpgrade, user cut); then the catalog pin and the live check |
-| WP-198 | [wp-198](work-packages/wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) | 0598, 0597 | WP-197 (steps 3-4) | Repo work in review | eight business teams and three keyless templates in the chart; built-in gateway and team workflows after WP-197; live check as consultant-01 and sale-01 |
-| WP-199 | [wp-199](work-packages/wp-199-personal-unifai-starters-for-the-demo-personas.md) | 0598 | WP-197, WP-198 | Not started | starters in the personal workspaces of consultant-01, sale-01, ai-ops-01 |
+| WP-198 | [wp-198](work-packages/wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) | 0598, 0597 | WP-197 (steps 3-4) | Repo work in review | eight business teams, three keyless templates and the team examples in the chart; on demo333 after UnifAI 0.1.58: built-in gateway, `teamExamples`, live check as consultant-01 and sale-01 |
+| WP-199 | [wp-199](work-packages/wp-199-personal-unifai-starters-for-the-demo-personas.md) | 0598 | WP-197, WP-198 | Repo work in review | chart `personalStarters` ready; on demo333 after UnifAI 0.1.58: list consultant-01, sale-01, ai-ops-01, then the live check |
 | WP-200 | [wp-200](work-packages/wp-200-show-the-unifai-rag-working-live.md) | 0598 | WP-198 | Not started | document upload end to end and a Confluence resync on demand |
 | WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Not started | devel examples on the gateway, owned by ai-ops-01; re-apply with the user's go |
 

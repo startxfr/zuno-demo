@@ -59,6 +59,19 @@ spec:
 {{- if .Values.templates.enabled }}
 {{- include "unifai.templates" (dict "root" . "owner" $owner) }}
 {{- end }}
+{{- if and (or .Values.teamExamples.enabled .Values.personalStarters) (not (and .Values.gatewayLLM.builtin .Values.mcpGateway.builtin)) }}
+{{- fail "teamExamples and personalStarters need gatewayLLM.builtin and mcpGateway.builtin (ADR-0597, UnifAI >= 0.1.58)" }}
+{{- end }}
+{{- if .Values.teamExamples.enabled }}
+{{- range .Values.teams }}
+{{- if .examples }}
+{{ include "unifai.teamExamples" (dict "root" $ "owner" $owner "team" .name) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range .Values.personalStarters }}
+{{ include "unifai.personalStarter" (dict "root" $ "user" .) }}
+{{- end }}
 {{- if and .Values.okf.bundles .Values.okf.verify.keyless .Values.okf.trustedRoot }}
 # ADR-0578: the Sigstore trusted root keyless bundles are verified against
 # (offline, by unifai-operator >= 0.1.25).
