@@ -13,8 +13,12 @@
 - name: "openshift_ai | upgrade hop {{ _oai_walk_hop }}: record where the walk stands"
   ansible.builtin.set_fact:
     _oai_walk_now: "{{ _oai_hop_sub.resources[0].status.installedCSV | default('') | regex_replace('^rhods-operator\\.v?', '') }}"
+    # `[.]`, not `\\.`: a `>-` block scalar does no YAML unescaping, so `\\.`
+    # reached the regex as a literal backslash, never matched, and the walk
+    # never saw the pin reached (WP-195 step 3, live: hop 2 waited for an
+    # InstallPlan past 3.5.2 and failed the run).
     _oai_walk_done: >-
-      {{ (_oai_hop_sub.resources[0].status.installedCSV | default('') | regex_replace('^rhods-operator\\.v?', ''))
+      {{ (_oai_hop_sub.resources[0].status.installedCSV | default('') | regex_replace('^rhods-operator[.]v?', ''))
          == (_openshift_ai_version | regex_replace('^v', '')) }}
   when: not (_oai_walk_done | default(false) | bool)
 
