@@ -327,3 +327,7 @@ zuno_connectivity_link_token_rate_limits:
   attachment: defaults
   gatewayIdentity:
     username: system:serviceaccount:zuno-ai-run:ai-gateway
+# WP-195 step 3 (2026-11-04): RHOAI pinned to the head of stable-3.5. From an
+# installed 3.5.0, `make d1 install openshift-ai` walks 3.5.1 then 3.5.2
+# (upgrade_walk.yml), approving no InstallPlan past this pin.
+zuno_openshift_ai_version: "3.5.2"
