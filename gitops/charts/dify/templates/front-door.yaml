@@ -1,3 +1,5 @@
+# Sync wave 5, after the dify-helm resources (wave 0): nginx mounts the chart's dify-proxy ConfigMap,
+# and ArgoCD waits for each wave to be healthy before applying the next one.
 # ADR-0599 decision 3 (as ADR-0590 for OpenClaw): Dify Community has no OIDC login, so
 # oauth2-proxy (realm zuno) is the only way in. Dify's own per-person account applies behind it.
 apiVersion: apps/v1
@@ -6,7 +8,7 @@ metadata:
   name: dify-front-door
   labels: {app: dify-front-door}
   annotations:
-    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   replicas: 1
   selector:
@@ -60,7 +62,7 @@ kind: Service
 metadata:
   name: dify-front-door
   annotations:
-    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   selector: {app: dify-front-door}
   ports:

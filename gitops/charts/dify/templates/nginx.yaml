@@ -1,3 +1,5 @@
+# Sync wave 5, after the dify-helm resources (wave 0): nginx mounts the chart's dify-proxy ConfigMap,
+# and ArgoCD waits for each wave to be healthy before applying the next one.
 # nginx in front of api, web and plugin-daemon. The dify-helm one (proxy.enabled) fails under
 # restricted-v2: it writes /var/cache/nginx and /var/run as a user it cannot choose (WP-203
 # section 2). Same routing: the chart still renders its ConfigMap (dify-proxy) even with
@@ -8,7 +10,7 @@ metadata:
   name: dify-nginx
   labels: {app: dify-nginx}
   annotations:
-    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   replicas: 1
   selector:
@@ -46,7 +48,7 @@ kind: Service
 metadata:
   name: dify-nginx
   annotations:
-    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/sync-wave: "5"
 spec:
   selector: {app: dify-nginx}
   ports:
