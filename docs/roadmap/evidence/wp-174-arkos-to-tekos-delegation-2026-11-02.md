@@ -93,8 +93,21 @@ So a delegating turn costs about 65,000 tokens and 24 calls at the cap of 3, and
 - **`X-Zuno-Max-Tokens` on the wire (proof)**: on the 0.1.55 stack the model spans of the Arkos drafting task carry the ceiling: the 8 `chat` spans of the first Arkos turn read (Tempo trace id starting `d6db2dc04ba1`) show `mas.max_tokens=8192` and `mas.x_zuno_max_tokens=8192`, the value the task declares; Tempo finds `mas.x_zuno_max_tokens` on the traces `08472ced9f27cad99b4ee26fcf7fb269`, `a74187ef484f7a7f0d56faf811887c18` and `211e68bb5c5480a843a05e917666a7c1` too. The ai-gateway cuts at the value it receives (64 gives 64 completion tokens, 128 gives 128, `finish_reason` stop). No call of the drafting task generates more than a few thousand tokens, so none was cut at 8192.
 - **`cancel_task` on timeout (R-529)**: NOT demonstrable with the zuno a2a-gateway as it is. With `spec.delegation.timeoutSeconds: 5` on the Arkos bundle (ArgoCD automation paused, patch removed afterwards) the operator wrote `timeout_seconds: 5` on the A2A node of the Arkos workflows, and three delegations still completed with Tekos answers and no cancel in the worker or a2a-gateway logs. The trace shows why: the A2A `message/send` is one blocking POST (5.9 s in trace `caa12a9da8d6e3507fe902161ed8ac95`) that returns the finished answer, so the client never enters the polling loop that `timeout_seconds` bounds, and the wait of a blocking call stays the client's fixed 300 s read timeout. For the cancel to fire the timeout must also bound the send call, or the send must be non-blocking when a timeout is set (to settle with b9). The bundle and the ArgoCD policy were restored to the saved state.
 
+## UnifAI v0.1.57 on demo333: the cancel on timeout is proven (2026-11-04)
+
+Pinned and rolled with the user's go (catalog `sha256:9900b54a...`, five application images from the release, commits 4b89b3e5 and its parent). OLM walked 0.1.55, 0.1.56, 0.1.57 one step at a time and the stack followed; `zuno-unifai-d1` stayed Synced and Healthy. Scenario 21 passes on the plain 0.1.57 setup (a `mas.node A2A: Tekos` span, one A2A call, 4138 character reply).
+
+The proof of ADR-0406 clause 4, with a temporary change that was reverted exactly (ArgoCD automated sync paused, Arkos bundle `spec.delegation.timeoutSeconds` lowered, then removed and the original `automated` policy restored; the live bundle delegation and the Application syncPolicy are byte-identical to what they were before):
+
+- With 5 seconds, Tekos still answered inside the bound (two delegations returned about 5 seconds apart), so nothing timed out. With 1 second (the minimum), the delegation timed out.
+- Worker log, session of the run: `a2a.timeout {task_id: dc19823d-4fd3-4637-825d-3427c432e0e6, timeout_seconds: 1.0}` at 10:22:30.568Z, `a2a.task_cancelled {task_id: dc19823d-...}` at 10:22:30.593Z, then `a2a.task_error: Polling timeout after 1.0s`.
+- Trace `54ebccfa482247d3ae41280e1dab4424` (Tempo, `{ span.mas.a2a_timeout=true }`): span `mas.node A2A: Tekos` (`mas.node.uid` `a2a-tekos/delegation`) has status ERROR (`A2ATimeoutError: Polling timeout after 1.0s`) and carries `mas.a2a_timeout=true`, `mas.a2a_timeout_seconds=1`, `mas.a2a_task_id=dc19823d-...`, `mas.a2a_cancel=cancelled`.
+- The orchestrator went on: the Arkos turn finished with a reply (1638 characters) and scenario 21 passed.
+
+Not shown: the zuno a2a-gateway does not log the `tasks/cancel` call at info level, so the gateway side is inferred from `cancelled` (the cancel RPC returned success), not read in its logs.
+
 ## What remains
 
-1. `cancel_task` for an abandoned delegation (ADR-0406 clause 4): the live proof needs the wait of a blocking `message/send` to be bounded by `timeout_seconds` (b9), then a bundle with a lowered timeout and a slow question to Tekos.
+1. `cancel_task` for an abandoned delegation (ADR-0406 clause 4): proven on 0.1.57 (see above).
 2. The empty final reply after a delegation (about 1 in 5 on 0.1.54, fix R-531 in 0.1.56) and the turns where Arkos answers without delegating (2 of 8 on 0.1.54 and 0.1.55).
 3. Cancellation when the user aborts the Arkos turn, or a Temporal run is cancelled: a separate design question.
