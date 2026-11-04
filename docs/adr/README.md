@@ -354,6 +354,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0593](0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md) | Implemented | Key the per-user quota and telemetry by persona across experiences |
 | [ADR-0594](0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md) | Implemented | Give the three experiences the same MCP tools behind signed classification markers |
 | [ADR-0595](0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md) | Implemented | Set demo passwords from one shared value through one variable per component |
+| [ADR-0596](0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md) | Proposed | Let experience clients pick a declared code model, routed to Codestral first |
 
 ## OKF v0.1
 

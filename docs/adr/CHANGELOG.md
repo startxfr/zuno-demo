@@ -9,6 +9,14 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition (2026-11-04) - ADR-0596 joins v0.13
+
+A code question asked in Open WebUI and OpenClaw was always answered by the
+local qwen model: the ai-gateway never routes on the question, and the
+experience clients had no task preferring Codestral. ADR-0596 adds a declared
+"Zuno Code" model that maps to a `code` task, Codestral first and the local
+models as fallback, with ADR-0594's local-only rule unchanged.
+
 ## Addition (2026-11-02) - ADR-0592 joins v0.13
 
 Open WebUI and OpenClaw need tools under a logical agent name, but an agent in

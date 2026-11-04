@@ -35,7 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 9 | — | 12 | — |
+| v0.13 | 10 | 1 | 13 | WP-194 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -987,6 +987,7 @@ WP-184 closes them together.
 | WP-191 | [wp-191](work-packages/wp-191-same-mcp-tools-in-the-three-experiences.md) | 0594, 0592 | WP-189, WP-190 | Done (2026-11-03) | the same read MCP tools (Confluence, technical docs) in the three experiences; signed classification markers on tool results, raised by the ai-gateway to local-only |
 | WP-192 | [wp-192](work-packages/wp-192-one-demo-password-and-named-keycloak-administrators.md) | 0595 | — | Done (2026-11-03) | one shared demo password through one variable per component; named `zuno-admin` and `zuno-automation` Keycloak accounts replace the temporary bootstrap admin |
 | WP-193 | [wp-193](work-packages/wp-193-open-webui-user-experience.md) | 0588, 0594 | WP-191 | Done (2026-11-03) | Open WebUI: one model shown as Zuno (the ai-gateway lists `auto` alone to experience clients), the tools on by default, the title as the only background task, a banner and Zuno suggestions |
+| WP-194 | [wp-194](work-packages/wp-194-zuno-code-model-for-experience-clients.md) | 0596, 0594, 0592 | WP-193, WP-189 | Not started | "Zuno Code" in Open WebUI and OpenClaw: a declared model mapped to a `code` task, Codestral first and the local models as fallback; tool turns stay local (ADR-0594); agents release, generator, ai-gateway, both charts |
 
 ### Phase 47 — gaps left by the retirement of the old RAG stack (added 2026-11-02)
 
@@ -1144,6 +1145,7 @@ moving.
 
 ## Change log
 
+- 2026-11-04 — ADR-0596 and WP-194 added to phase 46: a code question in Open WebUI and OpenClaw was always answered by the local qwen model, since the experience clients had no task preferring Codestral and showed `auto` alone. A declared "Zuno Code" model maps to a `code` task, Codestral first and the local models as fallback; turns with tool results stay local (ADR-0594).
 - 2026-11-04 — ADR-0406 Implemented: the cancel of a delegation that times out is proven live on UnifAI 0.1.57 (`a2a.timeout`, then `a2a.task_cancelled`; trace `54ebccfa482247d3ae41280e1dab4424`). A user abort is not covered, by decision. WP-174 stays open on approval (ADR-0409, waits for WP-173), the empty final reply (fix R-531 shipped in 0.1.56, not yet re-measured) and the turns where Arkos answers without delegating.
 - 2026-11-03 — WP-172 Done: delegated calls reach the mcp-gateway live on operator 0.1.53 and the audit carries the
   chain. WP-174 records the working Arkos to Tekos delegation (scenario 21 3/3, the cap of 3 delegations fired). The
