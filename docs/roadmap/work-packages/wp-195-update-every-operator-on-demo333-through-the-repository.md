@@ -175,6 +175,40 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    upgrade 1.4.3. Reaching 1.5.0 means removing the 1.4.3 Subscription and
    CSV (keeping the CRDs and the `Kueue` CR), then installing 1.5.0, or
    waiting for a 1.5.z that declares an edge from 1.4.
+
+   **Decision 2026-11-04 (user):** K1 first, which means staying on 1.4.3
+   and re-auditing for a 1.5.z that has an edge from 1.4. K2, a controlled
+   reinstall, is prepared below and runs only after the user validates it.
+
+   **K2 plan (proposed, not run).** What it relies on, measured live:
+   - The operand `kueue-controller-manager` (2 replicas, which serve the
+     `kueue-*-webhook-configuration` webhooks with `failurePolicy: Fail`) is
+     owned by `Kueue.kueue.openshift.io/cluster`, not by the CSV, so it keeps
+     admitting while the operator is swapped.
+   - The DSC's `default-kueue` is `Unmanaged`.
+   - There are 159 Workloads, one ClusterQueue, LocalQueues in `zuno-ai-run`
+     and `zuno-ai-build`, and two ResourceFlavors.
+   - The Subscription belongs to the ArgoCD Application `zuno-kueue-d0`
+     (selfHeal, prune), so a Subscription deleted by hand would come back on
+     `stable-v1.4`.
+
+   Steps:
+   1. Commit `zuno_kueue_channel: stable-v1.5` and run
+      `make d1 install kueue`. The Subscription moves to `stable-v1.5`, and
+      OLM keeps 1.4.3 because there is no edge.
+   2. Delete only CSV `kueue-operator.v1.4.3` in `openshift-kueue-operator`.
+      OLM keeps the CRDs and CRs, and the operand keeps running.
+   3. OLM re-resolves the Subscription to the channel head, 1.5.0
+      (Automatic). Wait for CSV `Succeeded`, then for the operand Deployment
+      to roll and the webhooks to answer.
+   4. Check: the ClusterQueue and LocalQueues are Active, a test Job in
+      `zuno-ai-run` is admitted, the DSC is `KueueReady=True`, and ArgoCD
+      `zuno-kueue-d0`/`-d1` are Synced.
+
+   Never use `make d1 uninstall kueue` for this: it deletes the queues, the
+   Application and the owned CRDs, which would take every Workload with them.
+   If 1.5.0 fails to install, recreate the 1.4.3 CSV by setting the channel
+   back to `stable-v1.4` with `startingCSV: kueue-operator.v1.4.3`.
 6. **RHOAI 3.6.0-ea.2.** Set `zuno_openshift_ai_version: "3.6.0-ea.2"` (the
    channel resolves to `beta`), then `make d1 install openshift-ai`.
    - **There is no rollback: OLM does not downgrade.**
