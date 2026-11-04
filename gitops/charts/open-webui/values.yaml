@@ -186,8 +186,9 @@ open-webui:
       value: "False"
     - name: ENABLE_RETRIEVAL_QUERY_GENERATION
       value: "False"
+    # ADR-0596 (WP-194): new id, so a banner dismissed before Zuno Code shows again.
     - name: WEBUI_BANNERS
-      value: '[{"id":"zuno-routing","type":"info","title":"Zuno picks the model","content":"Zuno chooses the model for each answer. Answers that use Confluence or the technical documentation are produced by a local model.","dismissible":true,"timestamp":1762128000}]'
+      value: '[{"id":"zuno-routing-code","type":"info","title":"Zuno picks the model","content":"Zuno chooses the model for each answer. Zuno Code sends code questions to Mistral Codestral, with a local model as fallback. Answers that use Confluence, the technical documentation or any other tool are produced by a local model.","dismissible":true,"timestamp":1793750400}]'
     - name: DEFAULT_PROMPT_SUGGESTIONS
       value: '[{"title":["Find our onboarding pages","in Confluence"],"content":"Find our onboarding pages in Confluence."},{"title":["Search my Drive","for the latest proposal"],"content":"Search my Drive for the latest proposal."},{"title":["Configure a MachineSet autoscaler","in OpenShift"],"content":"How do I configure a MachineSet autoscaler in OpenShift?"},{"title":["Summarize the benefits","of a hybrid cloud strategy"],"content":"Summarize the benefits of a hybrid cloud strategy."}]'
     - name: DEFAULT_LOCALE

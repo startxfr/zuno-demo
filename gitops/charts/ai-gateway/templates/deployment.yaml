@@ -81,6 +81,10 @@ spec:
                   optional: true
             - name: MARKER_FAIL_CLOSED_CLIENTS
               value: {{ join "," .Values.toolMarker.failClosedClients | quote }}
+            # ADR-0596: the experience clients' declared models that select a
+            # task (model=task:Display name).
+            - name: MODEL_TASK_ALIASES
+              value: {{ join "," .Values.toolMarker.modelTaskAliases | quote }}
             {{- end }}
             - name: KEYCLOAK_ISSUER
               value: {{ .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) | quote }}

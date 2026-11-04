@@ -297,3 +297,8 @@ toolMarker:
     - openclaw-*
     - dify
     - kagent
+  # ADR-0596 (WP-194): models an experience client may pick, each selecting one
+  # of its tasks declared in the agents release ("<model>=<task>:<name>"). The
+  # routing policy of that task picks the provider, never the model name.
+  modelTaskAliases:
+    - "zuno-code=code:Zuno Code"
