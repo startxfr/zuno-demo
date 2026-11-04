@@ -1,6 +1,6 @@
 # WP-201: Rewire the unifai-devel sandbox onto the gateway (amended: keyless, isolated)
 
-- **State:** Repo work in review (2026-11-04: overlay on fork devel 1e1c86a2a; re-apply pending)
+- **State:** Repo work merged (2026-11-04: live on demo333, smoke chat answers; browser check by ai-ops-01 pending)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-198
 - **Related:** [ADR-0562](../../adr/0562-authenticate-unifai-against-the-zuno-keycloak-realm.md)
@@ -32,6 +32,19 @@ ai-ops-01 on `unifai-ui-unifai-devel` sees the examples, and they run without an
 3. **Re-apply on demo333.** Delete the `admin`-owned objects, then
    `oc kustomize --load-restrictor LoadRestrictionsNone examples/overlays/unifai-devel-demo333 | oc apply -n unifai-devel -f -`.
    This is a cluster action and needs the user's go.
+
+## Live record (2026-11-04, user go)
+
+- **Delete.** The 25 `admin`-owned objects were saved, then deleted. Two `UnifaiTemplate` deletions wedged on a 403: the
+  operator deletes as `spec.owner`, and `admin` is no longer a UnifAI admin, so the status read "cannot delete (still
+  referenced?)". Patching `spec.owner` to ai-ops-01 let them go. The fork keeps the "act as the owner" model and only
+  improves the message.
+- **Apply.** The 21 overlay objects are owned by ai-ops-01 and are Ready (`demo-weekday-morning` is Suspended by its
+  spec).
+- **SSRF guard.** `demo-chat-smoke` first failed: the multiagent outbound guard refuses hosts that resolve to private
+  addresses, here `unifai-demo-mcp`. The stack's `extraEnv.multiagent` and `extraEnv.multiagentWorker` now carry
+  `OUTBOUND_ALLOWED_HOSTS=unifai-demo-mcp,unifai-demo-llm`, also sent to the fork's `stack-unifai-devel.yaml`.
+- **Result.** `demo-chat-smoke` (workflow `demo-linear`) completed with "pong from the demo mock LLM".
 
 ## Acceptance
 
