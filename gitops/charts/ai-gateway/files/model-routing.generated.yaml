@@ -251,6 +251,14 @@ preferences:
   - local-gpt-oss
   - local-maas
   - local
+- agent: open-webui
+  task: code
+  prefer:
+  - mistral-codestral
+- agent: openclaw
+  task: code
+  prefer:
+  - mistral-codestral
 objectives:
 - agent: comage
   task: check-deal-status
