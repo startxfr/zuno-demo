@@ -76,7 +76,9 @@ dify:
       enabled: false
       apiProxyEnabled: false
 
-  # Digests: multi-arch index digests read from the registry on 2026-11-04 (WP-204).
+  # Digests read from the registry on 2026-11-04 (WP-204). api and web: single-manifest digests; the
+  # plugin-daemon is an index, so the linux/amd64 manifest is pinned (the node reports that one as imageID,
+  # which is what `make d2 check dify` compares).
   image:
     api:
       repository: langgenius/dify-api
@@ -88,7 +90,7 @@ dify:
       pullPolicy: IfNotPresent
     pluginDaemon:
       repository: langgenius/dify-plugin-daemon
-      tag: "0.6.10-local@sha256:34412a22d1e1d1a6c73727fef88cffbcdd9be7a21bf9ad3076b4bf5c1b88fd9b"
+      tag: "0.6.10-local@sha256:0b8f1f1e766826352d868aaf8c9eeeee8e37a3a3b023044ed8ab0d145f853cdf"
       pullPolicy: IfNotPresent
     agentBackend:
       repository: langgenius/dify-agent-backend
@@ -210,10 +212,8 @@ dify:
         value: "false"
   worker:
     <<: *app
-    extraEnv: *appEnv
   beat:
     <<: *app
-    extraEnv: *appEnv
   pluginDaemon:
     # No securityContext keys: this template renders the map as given (an `enabled: false` key
     # would reach the pod spec), and the empty default leaves the uid to restricted-v2.
