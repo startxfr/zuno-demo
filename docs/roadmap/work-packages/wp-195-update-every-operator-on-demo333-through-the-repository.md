@@ -152,8 +152,29 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    - Run `platform/testing/quota_counters_probe.py`. If it prints `IMPROVED`
      (the group or user counters move), the Kuadrant two-limit ceiling of
      WP-177 is gone and the removal of `app/quota.py` can be reconsidered.
+   **Catalog graph, read 2026-11-04 from the redhat-operators catalog pod:**
+   - `stable-1.5` holds a single entry, 1.5.0, with `skipRange >=1.4.4
+     <1.5.0` and no `replaces`. From 1.4.3, a switch straight to
+     `stable-1.5` has no upgrade edge. The path is `stable-1.4` (1.4.4
+     replaces 1.4.3) first, then `stable-1.5`.
+   - 1.4.4 still pins authorino 1.4.4, limitador 1.4.3 and dns 1.4.3.
+   - 1.5.0 declares no `olm.package.required`, but its bundle ships its own
+     authorino, limitador and dns operator images (plus an MCP gateway) and
+     a new `kuadrantcontrolplanes` CRD. It does not own the Authorino,
+     Limitador or AuthConfig CRDs, which stay with the three separate
+     operators installed today in `openshift-operators`. Moving to 1.5 is
+     therefore a migration of those three operators, not a channel bump.
+     Do not run 4b before reading Red Hat's 1.4 → 1.5 procedure.
+   - So step 4 splits into **4a**, `stable-1.4` → 1.4.4, and **4b**,
+     `stable-1.5` → 1.5.0, which waits for that procedure.
 5. **Kueue 1.5.0.** Set `zuno_kueue_channel: stable-v1.5`, then
    `make d1 install kueue`.
+
+   **Catalog graph, read 2026-11-04:** `stable-v1.5` holds only 1.5.0, with
+   no `replaces`, `skips` or `skipRange`. A channel switch therefore does not
+   upgrade 1.4.3. Reaching 1.5.0 means removing the 1.4.3 Subscription and
+   CSV (keeping the CRDs and the `Kueue` CR), then installing 1.5.0, or
+   waiting for a 1.5.z that declares an edge from 1.4.
 6. **RHOAI 3.6.0-ea.2.** Set `zuno_openshift_ai_version: "3.6.0-ea.2"` (the
    channel resolves to `beta`), then `make d1 install openshift-ai`.
    - **There is no rollback: OLM does not downgrade.**
