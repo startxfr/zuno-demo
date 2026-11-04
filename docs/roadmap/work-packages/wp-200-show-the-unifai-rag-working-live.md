@@ -24,8 +24,11 @@ Two demos:
    - Check end to end: upload, then docling, embedding, Qdrant, then a chat through a RAG workflow or template.
    - Find which retriever covers the `document_data` collection.
    - Fix whatever breaks (NetworkPolicy, mesh, docling timeout).
-2. **Confluence resync on demand.** Find the existing trigger (annotation, operator field, rag endpoint). If there is
-   none, propose a `unifai.startx.fr/resync-at` annotation to the fork. Write the demo steps.
+2. **Confluence resync on demand.** The trigger exists, so no fork change is needed: any new value of
+   `UnifaiRAGSource.spec.resyncToken` queues a sync at once (it only changes the spec hash). A live `oc patch` would be
+   reverted by ArgoCD selfHeal, which changes the hash again and queues a second sync. So the chart's `ragSources`
+   entries get an optional `resyncToken`, set per cluster. Write the demo steps: change the token, then follow the
+   source status and the pipeline.
 3. **Docs.** Record what the Overview page counts. The rh-* sources stay suspended (R-530).
 
 ## Acceptance
