@@ -72,22 +72,18 @@
       loop_control:
         label: "{{ item.name }}"
 
+    - name: "dify | copy the probe into the api pod"
+      kubernetes.core.k8s_cp:
+        namespace: "{{ dify_namespace }}"
+        pod: "{{ _dify_api_pod.metadata.name }}"
+        remote_path: /tmp/zuno-dify-probe.py
+        content: "{{ lookup('ansible.builtin.file', role_path ~ '/files/probe.py') }}"
+
     - name: "dify | probe the token proxy, the gateways and the internet from the api pod"
       kubernetes.core.k8s_exec:
         namespace: "{{ dify_namespace }}"
         pod: "{{ _dify_api_pod.metadata.name }}"
-        command: >-
-          python3 -c "
-          import urllib.request as u, urllib.error as e
-          def c(url):
-              try: return str(u.urlopen(url, timeout=8).status)
-              except e.HTTPError as x: return str(x.code)
-              except Exception: return '000'
-          print('proxy=' + c('http://zuno-token-proxy:8080/healthz'))
-          print('ai_gateway=' + c('http://ai-gateway.zuno-ai-run.svc:8080/v1/models'))
-          print('mcp_gateway=' + c('http://mcp-gateway.zuno-ai-run.svc:8080/health'))
-          print('internet=' + c('https://huggingface.co'))
-          print('pypi=' + c('https://pypi.org'))"
+        command: python3 /tmp/zuno-dify-probe.py
       register: _dify_probe
       changed_when: false
 
