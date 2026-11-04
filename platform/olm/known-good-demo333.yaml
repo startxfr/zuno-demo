@@ -31,7 +31,7 @@ operators:
     namespace: openshift-cluster-observability-operator
     channel: stable
     approval: Automatic
-    version: "1.5.3"
+    version: "1.5.4"
   - package: crunchy-postgres-operator
     catalog: certified-operators
     namespace: openshift-operators
@@ -139,7 +139,7 @@ operators:
     namespace: openshift-opentelemetry-operator
     channel: stable
     approval: Automatic
-    version: "0.158.0-202610221301"
+    version: "0.158.0-202611022311"
   - package: policy-controller-operator
     catalog: redhat-operators
     namespace: policy-controller-operator
@@ -169,7 +169,7 @@ operators:
     namespace: redhat-ods-operator
     channel: stable-3.5
     approval: Manual
-    version: "3.5.0"
+    version: "3.5.2"
   - package: rhtas-operator
     catalog: redhat-operators
     namespace: openshift-operators

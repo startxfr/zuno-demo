@@ -123,6 +123,27 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    `make d1 install openshift-ai`, which walks 3.5.1 → 3.5.2. Before the run,
    size the namespace quotas for five operator pods (3.5.0 GA trap 1). After
    it, check whether `rbac-kserve-module-networkpolicy.yaml` can go.
+
+   **Done 2026-11-04 (user go, run after UnifAI 0.1.58's canary at b9's
+   request):** the walk approved `install-q6xqx` (3.5.1), then the 3.5.2
+   InstallPlan, each after its single-CSV, `installed < v <= pin` check.
+   rhods-operator 3.5.2 `Succeeded` about 20 minutes after the start; the
+   DSC reports release 3.5.2 and is `Ready=True` (it was `Ready=False`
+   before). All five models stayed Ready, and MaaS answers 200 with the
+   ai-gateway identity (gpt-oss-20b, `qwen3.5-9b`). The quota already held
+   five operator pods (2.5 of 4 CPU requested, 20 of 24 Gi of limits).
+   Two repo defects surfaced and were fixed on the way:
+   - `333a69f4`: the openshift_ai and kueue roles never loaded
+     `ansible/clusters/<cluster>.yml`, and connectivity_link loaded it after
+     resolving its package, so the committed pins were silently ignored
+     (`make d1 check openshift-ai` still compared against the chart's 3.5.0);
+   - `56d202e7`: in a `>-` block scalar `\\.` is not unescaped, so the walk
+     never recognised the pin as reached; after 3.5.2 it waited for a
+     further InstallPlan and failed the run. A second
+     `make d1 install openshift-ai` then completed cleanly (walk skipped).
+
+   `kserve-module-manager-role` in 3.5.2 still lacks `update` on
+   networkpolicies, so `rbac-kserve-module-networkpolicy.yaml` stays.
 4. **RHCL 1.5.0.**
    - Check the RHOAI support matrix for RHCL 1.5 first.
    - Set `zuno_connectivity_link_channel: stable-1.5`, then
