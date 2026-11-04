@@ -87,8 +87,9 @@ One point is still open, so the status stays `Accepted`:
   a cancel on timeout is enough to satisfy this clause; a user abort and a cancelled Temporal run are named as not covered.
   v0.1.55 cancels the remote task when the A2A poll times out. But the A2A `message/send` to the zuno a2a-gateway is one
   blocking call that returns the finished answer, so the poll loop is never entered. With `timeoutSeconds: 5`, three
-  delegations completed and none was cancelled (trace `caa12a9da8d6e3507fe902161ed8ac95`). The send itself must be bounded
-  first, which is asked of the UnifAI fork for 0.1.56.
+  delegations completed and none was cancelled (trace `caa12a9da8d6e3507fe902161ed8ac95`). Bounding the blocking send would
+  not be enough, because the task id is only known once the answer returns. The UnifAI fork therefore sends non-blocking
+  (`blocking=false`) when `timeoutSeconds` is set, then cancels on a poll timeout. That fix ships in 0.1.57.
 
 ## Alternatives considered
 
