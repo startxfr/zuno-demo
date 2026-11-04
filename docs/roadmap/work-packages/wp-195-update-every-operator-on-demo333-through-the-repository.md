@@ -110,7 +110,11 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
      (user go) brought every Deployment back to Ready within two minutes;
    - side effect: the drained pods landed on GPU node `ip-10-18-18-19`, which
      sits at 93% CPU requested, so `qwen35-9b-wesh` (2 CPU plus one
-     `mig-2g.48gb`) stays Pending even though the MIG slice is free.
+     `mig-2g.48gb`) stays Pending even though the MIG slice is free. Fixed
+     (user go) by deleting `zuno-evalhub` and `diagram-render`, which
+     rescheduled to `ip-10-18-94-42`; wesh was scheduled at once and was
+     Ready about 5 minutes later. The gateways were left alone because a
+     UnifAI canary was running through them.
 
    After it, ArgoCD had 100 Applications Synced/Healthy and the same two sxcm
    `startx-cluster-*` OutOfSync/Healthy as before. The other models
