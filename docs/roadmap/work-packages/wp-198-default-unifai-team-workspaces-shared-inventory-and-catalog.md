@@ -1,6 +1,6 @@
 # WP-198: Default UnifAI team workspaces, shared inventory and catalog
 
-- **State:** Repo work in review (2026-11-04: steps 1-2 live on demo333; steps 3-4 wait for UnifAI 0.1.58)
+- **State:** Repo work in review (2026-11-04: steps 1-4 live on demo333; browser check pending)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md), [ADR-0597](../../adr/0597-declare-unifai-built-in-resources-through-the-operator.md)
 - **Depends on:** WP-197 (steps 3 and 4 only)
 - **Related:** [WP-199](wp-199-personal-unifai-starters-for-the-demo-personas.md), [WP-201](wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md)
@@ -51,3 +51,8 @@ any key, the shared gateway in "Built-in", and example workflows in its team.
   `consultant`, `finance`, `ops`, `recrut`, `sales`) and the templates `zuno-chat`, `zuno-draft-review` and
   `zuno-tools-agent` are Ready next to the three agent teams. `zuno-unifai-d0`/`d1` are Synced/Healthy. The ArgoCD sync took
   about 6 minutes (the teams in wave 5, then the templates).
+
+- 2026-11-04 evening, UnifAI 0.1.58 (pinned by zuno-demo-da, 4b39cf4c/0a672cd2), `make d2 install unifai` on devel 839f596c:
+  `zuno-gateway` and `mcp-gateway` are Ready with `spec.builtin: true`, and their rids carry a public
+  `builtin_resource_descriptors` entry in UnifAI (promoted in place). The 76 example objects are all Ready: 7 teams with
+  personas × 10, plus 3 personal starters × 2. Browser check as consultant-01 and sale-01 pending (user).

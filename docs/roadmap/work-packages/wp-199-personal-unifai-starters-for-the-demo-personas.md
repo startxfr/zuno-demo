@@ -1,6 +1,6 @@
 # WP-199: Personal UnifAI starters for the demo personas
 
-- **State:** Repo work in review
+- **State:** Repo work in review (2026-11-04: starters Ready on demo333; browser check pending)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-197, WP-198
 - **Related:** [WP-175](wp-175-a2a-gateway-and-persona-test-blueprints.md) (test blueprints, unchanged)

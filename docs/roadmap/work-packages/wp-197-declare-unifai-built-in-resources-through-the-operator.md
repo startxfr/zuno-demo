@@ -36,3 +36,10 @@
 - `go test ./internal/... ./api/...` and golangci-lint pass in the fork. Canary green.
 - Live on demo333: `oc get unifaillm zuno-gateway -o yaml` shows `builtin: true` and Ready with the same rid. As
   consultant-01, the inventory's "Built-in" tab lists the LLM and the MCP provider.
+
+## Live record
+
+- 2026-11-04 evening, UnifAI 0.1.58 (pinned by zuno-demo-da, 4b39cf4c/0a672cd2), `make d2 install unifai` on devel 839f596c:
+  `zuno-gateway` and `mcp-gateway` are Ready with `spec.builtin: true`, and their rids carry a public
+  `builtin_resource_descriptors` entry in UnifAI (promoted in place). The 76 WP-198/199 objects that use them are all Ready: 7 teams with
+  personas × 10, plus 3 personal starters × 2. Browser check as consultant-01 and sale-01 pending (user).
