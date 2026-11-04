@@ -97,9 +97,11 @@ spec:
 {{- end }}
 
 {{/*
-Example components and workflows of a team workspace (ADR-0598 point 4): two
-agents, a direct condition and an orchestrator in the team's inventory, and three
-workflows on them (linear, branches, orchestrated). They reference the public
+Example components and workflows of a team workspace (ADR-0598 point 4): three
+agents, a documents retriever, a direct condition and an orchestrator in the
+team's inventory, and four workflows on them (linear, branches, RAG,
+orchestrated). The retriever searches the uploaded documents of the user who
+runs the chat, plus the Confluence sources of that user's groups (forwarded token). They reference the public
 built-in gateway LLM and MCP provider (ADR-0597), so every member can run them.
 Arguments: root (the chart context), owner (an UnifAI admin), team (the team name).
 */}}
@@ -118,6 +120,11 @@ Arguments: root (the chart context), owner (an UnifAI admin), team (the team nam
   (dict "kind" "UnifaiAgent" "name" (printf "%s-tools" $t) "spec" (dict "type" "custom_agent_node"
     "config" (dict "llm" $llm "providers" (list $mcp) "strategy_type" "react" "max_rounds" 10 "hitl_mode" "skip"
       "system_message" "Use the MCP tools you are entitled to when they help. Say which tool gave each fact.")))
+  (dict "kind" "UnifaiRetriever" "name" (printf "%s-documents" $t) "spec" (dict "type" "docs_rag"
+    "config" (dict "source_type" "DOCUMENT" "extra_source_types" (list "CONFLUENCE") "forward_user_token" true "top_k_results" 5 "threshold" 0.3)))
+  (dict "kind" "UnifaiAgent" "name" (printf "%s-rag" $t) "spec" (dict "type" "custom_agent_node"
+    "config" (dict "llm" $llm "retriever" (printf "$ref:retriever/%s-documents" $t) "hitl_mode" "skip"
+      "system_message" "Answer from the retrieved passages only and cite the document or page each fact comes from. If they do not hold the answer, say so.")))
   (dict "kind" "UnifaiAgent" "name" (printf "%s-orchestrator" $t) "spec" (dict "type" "orchestrator_node"
     "config" (dict "llm" $llm "max_rounds" 5
       "system_message" "You coordinate two workers. Delegate with the delegate_task tool; its dst_uid is exactly `assistant` (general questions, writing) or `tools` (anything that needs live data from the MCP tools). Then give a single final answer built from their results.")))
@@ -140,6 +147,14 @@ Arguments: root (the chart context), owner (an UnifAI admin), team (the team nam
         (dict "uid" "chat" "node" (printf "$rid:agent/%s-assistant" $t))
         (dict "uid" "tools" "node" (printf "$rid:agent/%s-tools" $t))
         (dict "uid" "finish" "node" "final_answer" "after" (list "chat" "tools"))))))
+  (dict "kind" "UnifaiWorkflow" "name" (printf "%s-rag" $t) "spec" (dict
+    "description" "Example: answers from your uploaded documents and your groups' Confluence pages, with sources."
+    "blueprint" (dict
+      "nodes" (list $ask $final (dict "rid" (printf "$ref:agent/%s-rag" $t)))
+      "plan" (list
+        (dict "uid" "ask" "node" "user_question")
+        (dict "uid" "rag" "node" (printf "$rid:agent/%s-rag" $t) "after" "ask")
+        (dict "uid" "finish" "node" "final_answer" "after" "rag")))))
   (dict "kind" "UnifaiWorkflow" "name" (printf "%s-orchestrated" $t) "spec" (dict
     "description" "Example: an orchestrator delegates to the assistant and the tools agent, then answers."
     "blueprint" (dict

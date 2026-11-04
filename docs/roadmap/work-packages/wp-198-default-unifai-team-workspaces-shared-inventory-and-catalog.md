@@ -23,13 +23,18 @@ any key, the shared gateway in "Built-in", and example workflows in its team.
 2. **Templates.** Chart `templates.enabled`: `zuno-chat`, `zuno-tools-agent` and `zuno-draft-review` on the gateway LLM
    and MCP config, shared with the objects through `_helpers.tpl`.
 3. **Shared inventory (after WP-197).** `gatewayLLM.builtin` and `mcpGateway.builtin` set to true on demo333.
-4. **Team workflows (after WP-197).** Chart `teamExamples.enabled` plus `examples: true` on a team entry: in that team's
-   inventory, the agents `<team>-assistant` and `<team>-tools` (MCP), the condition `<team>-direct` (router_direct) and
-   the agent `<team>-orchestrator`. Three workflows run on them: `<team>-linear`, `<team>-branches` and
-   `<team>-orchestrated`. The chart fails if the gateway LLM and MCP provider are not both built-ins. The RAG example
-   moves to WP-200: no retriever is reachable from a business team (built-in retrievers are refused, and the
-   `knowledge-*` retrievers belong to the agent teams). On demo333: `examples: true` for every team with personas
-   (all but cdp).
+4. **Team workflows (after WP-197).** Chart `teamExamples.enabled` plus `examples: true` on a team entry. Each such team
+   gets the following in its inventory:
+   - the agents `<team>-assistant`, `<team>-tools` (MCP), `<team>-rag` and `<team>-orchestrator`;
+   - the retriever `<team>-documents`;
+   - the condition `<team>-direct` (router_direct).
+
+   Four workflows run on them: `<team>-linear`, `<team>-branches`, `<team>-rag` and `<team>-orchestrated`.
+   - The retriever is a team resource, not a built-in (UnifAI refuses built-in retrievers). It is still safe to share:
+     `docs_rag` searches the uploads of the user who runs the chat, plus the Confluence sources of that user's groups
+     (forwarded token).
+   - The chart fails if the gateway LLM and the MCP provider are not both built-ins.
+   - On demo333, `examples: true` is set for every team with personas, that is all of them except cdp.
 
 ## Acceptance
 

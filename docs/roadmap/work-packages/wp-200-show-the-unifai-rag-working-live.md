@@ -1,6 +1,6 @@
 # WP-200: Show the UnifAI RAG working live
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-198
 - **Related:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md)
@@ -35,3 +35,11 @@ Two demos:
 
 - The uploaded test document reaches embedded. A question about it returns a cited answer.
 - A triggered Confluence resync changes the source's status, and a page changed recently can then be found.
+
+## Repo work (2026-11-04)
+
+- Chart: the `ragSources` entries take an optional `resyncToken`.
+- The upload test set and the demo steps are in [docs/demo/unifai-live-rag.md](../../demo/unifai-live-rag.md).
+- The RAG workflow is `<team>-rag` (WP-198 team examples). It searches the caller's uploads (DOCUMENT) and their groups'
+  Confluence sources.
+- Live check pending, after the WP-198 examples are enabled.

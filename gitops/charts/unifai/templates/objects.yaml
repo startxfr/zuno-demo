@@ -238,6 +238,10 @@ spec:
   {{- with .syncInterval }}
   syncInterval: {{ . }}
   {{- end }}
+  {{- with .resyncToken }}
+  # WP-200: any new value queues a sync at once (unifai-operator spec.resyncToken).
+  resyncToken: {{ . | quote }}
+  {{- end }}
 ---
 {{- end }}
 {{- if .Values.redhatDocs.enabled }}

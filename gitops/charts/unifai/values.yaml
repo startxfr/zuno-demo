@@ -216,3 +216,4 @@ redhatDocs:
 #   visibility: shared
 #   aclGroups: [agent_tekos]
 #   syncInterval: 6h
+#   resyncToken: demo-1   # WP-200: change the value to sync now (a live oc patch is reverted by ArgoCD)
