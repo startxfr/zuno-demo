@@ -251,6 +251,10 @@ preferences:
   - local-gpt-oss
   - local-maas
   - local
+- agent: dify
+  task: code
+  prefer:
+  - mistral-codestral
 - agent: open-webui
   task: code
   prefer:
