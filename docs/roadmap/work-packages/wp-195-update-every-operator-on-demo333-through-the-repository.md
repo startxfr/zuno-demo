@@ -515,6 +515,12 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
 - **Guardrails smoke (T2), open.** `GuardrailsOrchestrator zuno-guardrails-smoke` keeps `phase=Error` with
   `ReconcileFailed: Built-in route reconciliation failed`, a condition stamped 2026-10-12. Its Deployment, Service and
   Route are fine (route Admitted), and an annotation nudge produced no operator log and no status change, so the
-  condition looks stale. It is the last thing holding TrustyAI at Ready=False. Planned remedy: delete the CR so
-  `zuno-trustyai-config` recreates it with a fresh status (backup in the session scratchpad).
+  condition looks stale. Remedy (user go, 2026-11-05): the CR was deleted and `zuno-trustyai-config` recreated it
+  (backup in the session scratchpad). It came back `Ready`, TrustyAI reports "All enabled services are healthy", and
+  TrustyAIReady is True.
+- **DSC after this:** `Ready=False` only because of "Some modules are degraded: ogx". The `default-ogx` CR has no unhealthy
+  condition and `OGXReady=True`, and the install role already treats the ogx module state as benign, so this is left alone.
+  The `MCPLifecycleOperator`, `MaaSConsumerPortal` and `WorkbenchesV2` conditions are False only because those submodules
+  are `Removed`. Still OutOfSync in ArgoCD: `startx-cluster-auth`, `startx-cluster-infra-config` and `zuno-mlops-d1`
+  (TrainingRuntime `mlops-lora`), not traced to 3.6.
 
