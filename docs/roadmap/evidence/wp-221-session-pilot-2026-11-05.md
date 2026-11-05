@@ -26,4 +26,14 @@ UnifAI already does what the clause asks, with no change in the fork: **the owne
 
 - The test workflow has no LLM node, so there was no answer from an agent. Only the owner's own message was displayed afterwards: whether an agent's answers stay readable is not shown. A pilot on a real agent chat would show it.
 - The "404" in the workflow panel is a cosmetic rough edge, not a data loss.
-- Screenshots exist but are not committed: they show the whole desktop. The results above were read from them.
+
+## Captures
+
+Cropped to the address bar and the page.
+
+| Step | Capture |
+|---|---|
+| The workflow is in the list, before the deletion (7 workflows) | ![the list before](wp-221-session-pilot-2-workflow-in-the-list-before.png) |
+| The chat, before the deletion | ![the chat before](wp-221-session-pilot-1-chat-before-deletion.png) |
+| The workflow is gone from the list, after the deletion (6 workflows) | ![the list after](wp-221-session-pilot-4-workflow-list-after.png) |
+| The chat after the deletion: still listed, still openable, refused when continued | ![the chat after](wp-221-session-pilot-3-chat-after-deletion-refused.png) |
