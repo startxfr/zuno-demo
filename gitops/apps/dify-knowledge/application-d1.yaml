@@ -1,0 +1,37 @@
+# ADR-0599 (WP-205): the External Knowledge adapter of Dify, in zuno-dify. The role
+# (ansible/roles/dify) applies it; the API key comes from Vault dify/knowledge-api.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-dify-knowledge-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-58"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/zuno-dify-knowledge
+    helm:
+      releaseName: zuno-dify-knowledge-d1
+      values: |
+        namespace: zuno-dify
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-dify
+  ignoreDifferences:
+    # image.openshift.io/triggers (the chart's Deployment annotation) rewrites the container image
+    # to the built digest each time the ImageStream moves; without this ArgoCD reverts it to
+    # :latest and the two fight forever (seen live: Deployment generation 46 in 25 minutes).
+    # Same pattern as the ai-gateway Application (ADR-0059).
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

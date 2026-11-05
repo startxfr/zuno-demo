@@ -257,10 +257,13 @@ dataScienceCluster:
       # this Day 1 component; the new work both ADRs describe lives in the
       # Day 2 `trustyai-config` component instead.
       trustyai:
-        eval:
-          lmeval:
-            permitCodeExecution: deny
-            permitOnline: deny
+        # No `eval.lmeval` block (WP-195 step 6, 2026-11-05): RHOAI 3.6.0-ea.2
+        # copies the DSC's string enum ("deny") into the TrustyAI module CR,
+        # whose CRD now types permitOnline/permitCodeExecution as boolean, so
+        # provisioning fails ("expected boolean, got deny"). With the block
+        # absent nothing is defaulted on the DSC, and the module CRD's own
+        # defaults apply: false/false, which is the same as the old deny/deny.
+        # Do not put the block back while the two schemas disagree.
         # MUST stay false (ADR-0534/WP-108, live-proven 2026-09-02): on
         # this operand version `true` is NOT "enable guardrails" - it
         # redeploys the operator with `--enable-services NEMO_GUARDRAILS`
@@ -352,6 +355,13 @@ dataScienceCluster:
         batchGateway:
           managementState: Managed
         managementState: Managed
+        # WP-195 step 6 (2026-11-05): RHOAI 3.6 defaults this to Removed and
+        # tears MaaS down, which deletes maas-gateway-auth and leaves the
+        # MaaS gateway open without authentication, even though
+        # kserve.modelsAsService (under kserve) is still Managed. It must be Managed
+        # explicitly. maas-api then runs in redhat-ai-gateway-infra.
+        modelsAsAService:
+          managementState: Managed
       trainingoperator:
         managementState: Managed
 

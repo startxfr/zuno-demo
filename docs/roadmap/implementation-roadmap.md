@@ -35,8 +35,8 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 12 | 1 | 18 | WP-200 |
-| v0.14 | 3 | 3 | 7 | WP-204, WP-205, WP-206, WP-207, WP-208 |
+| v0.13 | 12 | — | 18 | — |
+| v0.14 | 3 | 2 | 7 | WP-206, WP-207, WP-208 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1015,7 +1015,7 @@ sandbox rewired (WP-201).
 | WP-197 | [wp-197](work-packages/wp-197-declare-unifai-built-in-resources-through-the-operator.md) | 0597 | none | Done | live on demo333 with UnifAI 0.1.58; Built-in tab checked in the browser (2026-11-05) |
 | WP-198 | [wp-198](work-packages/wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) | 0598, 0597 | WP-197 (steps 3-4) | Done | teams, templates, built-ins and team examples live; browser check as consultant-01 and sale-01 passed (2026-11-05) |
 | WP-199 | [wp-199](work-packages/wp-199-personal-unifai-starters-for-the-demo-personas.md) | 0598 | WP-197, WP-198 | Done | starters and personal RAG `<user>-my-documents` checked in the browser (2026-11-05) |
-| WP-200 | [wp-200](work-packages/wp-200-show-the-unifai-rag-working-live.md) | 0598 | WP-198 | Repo work merged | live upload demo passed in the browser (2026-11-05); Confluence resync on demand pending |
+| WP-200 | [wp-200](work-packages/wp-200-show-the-unifai-rag-working-live.md) | 0598 | WP-198 | Done | live upload and on-demand Confluence resync checked in the browser (2026-11-05) |
 | WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Done | one instance: unifai-devel and unifai-olm retired, tool and schedule examples live (2026-11-05) |
 
 ### Phase 49 — Dify and kagent as experience clients (added 2026-11-04)
@@ -1029,9 +1029,9 @@ WP-208 shows the five experiences together. No cluster action while demo333 is b
 |---|---|---|---|---|---|
 | WP-202 | [wp-202](work-packages/wp-202-common-preparation-for-dify-and-kagent.md) | 0601, 0599, 0600 | none | Done | none |
 | WP-203 | [wp-203](work-packages/wp-203-dify-preparation.md) | 0599, 0601 | WP-202 | Done | none |
-| WP-204 | [wp-204](work-packages/wp-204-install-dify-on-demo333.md) | 0599, 0601 | WP-202, WP-203 | Repo work in review | Vault seed before the Keycloak client push; `make d2 install dify` |
-| WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Not started | adapter build and roll; knowledge base registered in Dify |
-| WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Not started | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
+| WP-204 | [wp-204](work-packages/wp-204-install-dify-on-demo333.md) | 0599, 0601 | WP-202, WP-203 | Done | Vault seed before the Keycloak client push; `make d2 install dify` |
+| WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Done (2026-11-05) | adapter built, signed and rolled; knowledge base registered in Dify; forbidden-space case not exercised |
+| WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Repo work in review | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
 | WP-207 | [wp-207](work-packages/wp-207-kagent-preparation-and-install.md) | 0600, 0601 | WP-202, WP-206 | Not started | scratch spike in `zuno-kagent-scratch`; `make d2 install kagent` |
 | WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Not started | live rehearsal on demo333 |
 

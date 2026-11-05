@@ -95,6 +95,15 @@
       egress:
         clusterCIDRs: "{{ _dify_cluster_cidrs }}"
 
+- name: "dify | apply the External Knowledge adapter Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "dify-knowledge"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-dify-knowledge-d1"
+    gitops_app_extra_helm_values:
+      namespace: "{{ dify_namespace }}"
+
 - name: "dify | apply the Dify Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -141,6 +150,7 @@
   delay: 15
   loop:
     - zuno-token-proxy
+    - zuno-dify-knowledge
     - dify-api
     - dify-worker
     - dify-web
@@ -148,9 +158,15 @@
     - dify-nginx
     - dify-front-door
 
+- name: "dify | give the service account the persona's groups"
+  ansible.builtin.include_tasks: keycloak_sa_groups.yml
+
+- name: "dify | configure the administrator, plugin, models and MCP tool"
+  ansible.builtin.include_tasks: configure.yml
+
 - name: "dify | installed"
   ansible.builtin.debug:
     msg: >-
-      Dify is at https://dify.{{ cluster_base_domain }} behind Keycloak (realm zuno). The
-      model provider, MCP tool and accounts are configured by the next step of WP-204;
-      `make d2 check dify` verifies the chain.
+      Dify is at https://dify.{{ cluster_base_domain }} behind Keycloak (realm zuno), configured
+      with its single local administrator (Vault zuno/dify/admin). `make d2 check dify`
+      verifies the chain.

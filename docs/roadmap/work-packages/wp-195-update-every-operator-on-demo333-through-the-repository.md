@@ -363,6 +363,91 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
      prerequisite. Note that CEL rejects re-enabling the old field once it
      is `Removed`.
    - Nothing on the cluster changed.
+
+   **Decision 2026-11-05 (user): force the EA install.** A model and MaaS
+   outage is accepted, provided the peer sessions are coordinated.
+   Procedure:
+   1. Commit `zuno_openshift_ai_version: "3.6.0-ea.2"` and run
+      `make d1 install openshift-ai`. The d0 Application moves the
+      Subscription to `beta` with `startingCSV: rhods-operator.3.6.0-ea.2`.
+      The upgrade walk then fails after about 5 minutes, because no hop
+      exists. This failure is expected.
+   2. Back up the DSC, the DSCI, the CSV and the Subscription. Then delete
+      CSV `rhods-operator.3.5.2` and Subscription `rhods-operator`. ArgoCD
+      (`zuno-openshift-ai-d0`) recreates the Subscription on `beta` with a
+      clean status, and OLM creates a Manual InstallPlan for 3.6.0-ea.2.
+      Operands owned by the DSC keep running while no operator is present.
+   3. Re-run `make d1 install openshift-ai`. With no installedCSV the walk is
+      skipped and the exact-match approval takes the 3.6.0-ea.2 InstallPlan;
+      d1 (DSCI, DSC) is then applied.
+   4. Check the DSC conditions and any new operands, against the 3.5.0 GA
+      traps: quotas, the mesh-egress union, immutable selectors and RBAC
+      verbs. Then check MaaS end to end and run the quota probe.
+
+   **Run 2026-11-05 (window 12:20-12:52 UTC): RHOAI 3.6.0-ea.2 `Succeeded`.**
+   The procedure worked: install 1 failed in the walk as planned; deleting
+   the CSV and the Subscription gave InstallPlan `install-z52dv`; install 2
+   approved it; the operator came up in about 2 minutes. Install 2 then
+   timed out waiting for the DSC Ready, because of the defects below, all
+   fixed live:
+   1. **SECURITY: the MaaS gateway was open without authentication for
+      about 20 minutes (about 12:25-12:45 UTC).** 3.6 defaults
+      `aigateway.modelsAsAService` to `Removed`, even with
+      `kserve.modelsAsService: Managed`. It tore MaaS down: maas-api,
+      maas-controller, `maas-gateway-auth` and the per-model
+      TokenRateLimitPolicies were all deleted. Meanwhile
+      `maas-default-gateway` kept routing, and `/v1/models` and
+      `/v1/chat/completions` answered 200 without a token. The models
+      stayed up the whole time. The gateway has no access log, so who used
+      it cannot be known. Fix: `aigateway.modelsAsAService: Managed` on the
+      live DSC, and in the chart. maas-controller recreated the AuthPolicy
+      at 12:45:33; no-token requests answered 401 from 12:45:52. maas-api now runs in
+      `redhat-ai-gateway-infra`, no longer in `redhat-ods-applications`, and
+      requests answered 500 for about a minute while it started.
+      `gateway-default-deny` is now `Enforced`, where it was False before.
+   2. **TrustyAI schema mismatch (vendor defect).** The DSC types
+      `trustyai.eval.lmeval.permit*` as the string enum `allow`/`deny`. The
+      3.6.0-ea.2 TrustyAI module CRD types them as boolean, and the operator
+      copies the string, so provisioning stopped with "expected boolean,
+      got deny". Upstream main has a string on both sides. Fix:
+      - remove `eval` from the live DSC and from the chart, so the module
+        CRD defaults false/false apply, which equals deny/deny;
+      - delete `default-trustyai`: the stored 3.5 object could no longer be
+        patched.
+   3. **Immutable selectors** (trap 5 of the 3.5.0 GA again):
+      `spark-operator-controller`, `spark-operator-webhook` and
+      `kuberay-operator`. Remedy: `oc delete deploy`; the operator
+      recreates them.
+   4. **ServiceMonitor `data-science-pipelines-operator-service-monitor`**
+      was still controlled by the 3.5 `DataSciencePipelines` CR, which
+      blocked the new AIPipelines module. Remedy: delete the ServiceMonitor;
+      AIPipelines recreated it.
+   5. **512Mi managers OOMKilled** (`odh-observability`,
+      `opendatahub-feast-operator`, `spark-operator-module-controller-manager`).
+      Raised to 1536Mi by hand. The operator keeps the change, but only
+      live: on a fresh install the three are 512Mi again.
+   6. The DSC and `default-ray` controllers stopped reconciling after the
+      errors, with `observedGeneration` stuck at 1. An annotation woke them.
+
+   **State after the run:**
+   - The four LLMInferenceServices are Ready the whole time. MaaS answers
+     200 on the four chat models and 401 without a token.
+   - The DSC lists only `trustyai`: three LMEvalJobs from before ("operand
+     status is not yet available") and `zuno-guardrails-smoke` in `Error`.
+     `ogx` is degraded, which the role already treats as benign.
+
+   **Open:**
+   - **Quota counting at MaaS stopped: FIXED 2026-11-05 (0338f9ed).** See
+     "Quota counters" below.
+   - TrustyAI not Ready (above).
+   - ArgoCD `zuno-namespaces-d0` is OutOfSync: `zuno-ai-build` lost
+     `kueue.openshift.io/managed=true`.
+   - ArgoCD `zuno-mlops-d1` is OutOfSync: TrainingRuntime `mlops-lora`.
+   - The repo copies of maas-api settings (namespace `redhat-ods-applications`
+     in the openshift-ai, postgresql, namespaces, service-mesh and models
+     charts, and in the maas_db_copy role) are now stale. MaaS works because
+     maas-api in its new namespace uses its own built-in config, but they
+     must be audited.
    - **There is no rollback: OLM does not downgrade.**
    - Expect new operands. Re-check the quotas, the mesh-egress NetworkPolicy
      union and immutable Deployment selectors (3.5.0 GA traps 1, 4 and 5).
@@ -385,3 +470,51 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
   (WP-177)? Only the counters probe answers that.
 - Is the RHOAI 3.6 EA supported with RHCL 1.5 and Kueue 1.5? To check in the
   release notes before steps 4 to 6.
+
+## Quota counters after RHOAI 3.6.0-ea.2 (2026-11-05)
+
+- **Cause:** the kuadrant-operator could not update the EnvoyFilter
+  `openshift-ingress/kuadrant-maas-default-gateway`: `etcdserver: request is
+  too large`. RHOAI 3.6 gave each local model route 11 rules / 15 matches, and
+  Kuadrant expands a gateway-level policy into one wasm action set per match
+  (68 sets; upstream Kuadrant/kuadrant-operator #2353 and #2051, both open).
+  The EnvoyFilter stayed at its first version (generation 1, 795 KB of wasm
+  config), which held only the AuthPolicy and `zuno-token-quota`. The six
+  `maas-trlp-*` route policies and `gateway-default-deny` never reached the
+  shim, although all reported `Enforced=True`. The probe said `moved []`.
+- **Fix:** `zuno_connectivity_link_token_rate_limits.enabled: false` in
+  demo333.yml, then `make d1 install connectivity-link`. The EnvoyFilter went
+  to generation 2 (1.27 MB as an object) and now carries all six `maas-trlp-*`
+  policies and `gateway-default-deny`. The probe gives
+  `OK: moved ['subscription']` (+29); the four models answer 200 and no token
+  gives 401.
+- **What is lost:** `zuno-token-quota` was the MaaS-level user and group
+  budget of ADR-0511 (standard-user 3M/24h, standard-group 30M/24h, ai-gateway
+  headers only). While it is off, the user and group ceilings are enforced
+  only by the ai-gateway ledger (WP-177, Redis-backed), and MaaS enforces
+  only the per-subscription limits, which apply to the ai-gateway ServiceAccount
+  as a whole. In practice nothing changes: WP-177 measured that these two
+  limits never counted next to the controller's limits on the local routes.
+  Turn it back on only when the EnvoyFilter still fits (watch its size and
+  the operator log for `request is too large`).
+- **Still unexplained:** the gateway still logs a few `Task failed: "0"` from
+  the wasm shim, about one per chat, while chats succeed and counters move.
+
+## TrustyAI after RHOAI 3.6.0-ea.2 (2026-11-05)
+
+- **LMEvalJobs (T1), root cause: vendor defect.** The three 2026-09-07 jobs were failed (`ErrImagePull`). They were deleted
+  and ArgoCD recreated them; all three then `Succeeded` (MMLU abstract_algebra: qwen3.5-9b 0.67, qwen3.6-27b 0.70, run
+  against the model workload services, not through MaaS). TrustyAI still said "LMES ... operand status is not yet available",
+  so the 3.6.0-ea.2 module cannot read an LMEvalJob status at all (the CRD has `state`, no `phase` or `conditions`).
+  Fix (user choice): `lmEval.enabled: false` in `gitops/charts/models/values.yaml` (7cc43a39). ArgoCD pruned the jobs and the
+  TrustyAI message dropped the LMES part, which confirms the diagnosis. Re-enable when a 3.6 release reads the status.
+- **Permit flags (T3): not a regression.** The ConfigMap `trustyai-service-operator-config` shows `lmes-allow-online=true`
+  and `lmes-allow-code-execution=true` (the shipped defaults), but the operator logs
+  "Read PermitOnline from DSC config: false" and the same for code execution, so the DSC value applies. The API server
+  admits an LMEvalJob with `allowOnline: true` (server dry-run); the controller is what enforces the deny.
+- **Guardrails smoke (T2), open.** `GuardrailsOrchestrator zuno-guardrails-smoke` keeps `phase=Error` with
+  `ReconcileFailed: Built-in route reconciliation failed`, a condition stamped 2026-10-12. Its Deployment, Service and
+  Route are fine (route Admitted), and an annotation nudge produced no operator log and no status change, so the
+  condition looks stale. It is the last thing holding TrustyAI at Ready=False. Planned remedy: delete the CR so
+  `zuno-trustyai-config` recreates it with a fresh status (backup in the session scratchpad).
+

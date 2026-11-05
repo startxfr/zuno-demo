@@ -1,6 +1,6 @@
 # ADR-0598: Give every persona default UnifAI team workspaces and a shared catalog
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.13
 - **Date:** 2026-11-04
 - **Decision owners:** Zuno Demo architecture team

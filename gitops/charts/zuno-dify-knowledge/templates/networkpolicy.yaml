@@ -1,0 +1,47 @@
+# Ingress: the pods of the namespace (Dify's api and worker call it) and the monitoring stack.
+# Egress: DNS and the token proxy only. The dify-egress policy of the dify chart also selects these
+# pods and allows the namespace; this one is the narrower of the two for the adapter's own intent.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zuno-dify-knowledge
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: zuno-dify-knowledge
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: zuno-token-proxy
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353

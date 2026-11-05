@@ -625,3 +625,9 @@ subscriptions show their tiers. Today only service accounts call MaaS (the ai-ga
   the test. The persona key test passed on 2026-10-25 (59, recorded in WP-164, `8daee554`), after the
   maas-api HTTPRoute was admitted by the gateway listener (`59b9be49`): it had been `NotAllowedByListeners`
   since RHOAI 3.5 moved it to `redhat-ai-gateway-infra`, so no key could be minted.
+
+## Follow-up of 2026-11-05 (WP-195) - the gateway-level policy is off
+
+Everything above that treats `zuno-token-quota` as live no longer holds on demo333: it was switched
+off after RHOAI 3.6.0-ea.2, because the MaaS gateway's wasm configuration exceeded the etcd request
+limit and the route-level policies never reached the shim. Details and the fix are in WP-195.

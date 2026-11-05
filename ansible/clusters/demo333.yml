@@ -142,6 +142,7 @@ zuno_unifai_values:
       rootTitle: 'Technologie : Satellite'
       spaceKey: SXSI
     name: tekos-satellite
+    resyncToken: demo-2026-11-05-1   # WP-200: any new value queues a sync at once
     classification: C2   # WP-187: Confluence content stays at C2
     syncInterval: 6h
     tags:
@@ -159,6 +160,7 @@ zuno_unifai_values:
       rootTitle: 'Technologie : Openshift'
       spaceKey: SXSI
     name: tekos-openshift
+    resyncToken: demo-2026-11-05-1   # WP-200: any new value queues a sync at once
     classification: C2   # WP-187: Confluence content stays at C2
     syncInterval: 6h
     tags:
@@ -239,11 +241,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:0286e6fbf7423895818d8e52f7f2afa3c8750335399e32586a64b239cc4e2c7d  # v0.1.58
-      identity: quay.io/zuno/unifai-identity@sha256:af34d193bd20bfea817be2fdcc17aa56a7516da87f78c63111b7416e11f61649  # v0.1.58
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:0b8ea86fd9cfae551d1dcc8d2bb2f038db2f6016a286ba085cda97642993be8c  # v0.1.58
-      rag: quay.io/zuno/unifai-rag@sha256:5831227d9c5338686bf90cc7a6b8600c614b1d60ef3e3f050a3a9a5ff7b64b69  # v0.1.58
-      ui: quay.io/zuno/unifai-ui@sha256:99c64954b932e87868b4fc023b5ed54b934747eee3d1a2c489fbc93fbba3ed0e  # v0.1.58
+      backend: quay.io/zuno/unifai-backend@sha256:31906788e9ef7eeb54e23ca9264fc432e91a2cbad4ee15293bba8b11e6081f9e  # v0.1.59
+      identity: quay.io/zuno/unifai-identity@sha256:d7c7dc82704e06aa7284c10e08a57e2bea00f19b079943f2ecbc18d3cc35cc2a  # v0.1.59
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:a8af9f4836ca6ef02a32de0ca312b95e8a79d6d198241dfbd1deb093d7c725d9  # v0.1.59
+      rag: quay.io/zuno/unifai-rag@sha256:a4345ae467cd147cf7500cb568a4c1782276e66c42be6d5e9d0205645dd2ea24  # v0.1.59
+      ui: quay.io/zuno/unifai-ui@sha256:f5c7bcead19a132f8658c4f350add629d52c4971fde5097d125a456e255576b4  # v0.1.59
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
@@ -329,8 +331,16 @@ zuno_models_saas_subscriptions_gateway_only: true
 # main to devel (zuno_gitops_target_revision, now loaded by the role), whose
 # connectivity-link render is otherwise identical (checked 2026-10-24 with
 # the live values).
+# WP-195 step 6 (2026-11-05): OFF. With RHOAI 3.6 each local model route has 15
+# matches, and Kuadrant expands a gateway-level policy into one wasm action
+# set per match (68 sets). The EnvoyFilter then exceeds etcd's request limit
+# ("request is too large"), the operator stops updating it, and the
+# per-route maas-trlp-* subscription limits never reach the shim, so no MaaS
+# counter moves. The ai-gateway ledger keeps the user and group ceilings.
+# Upstream: Kuadrant/kuadrant-operator #2353, #2051. Turn back on only when
+# the EnvoyFilter fits with it.
 zuno_connectivity_link_token_rate_limits:
-  enabled: true
+  enabled: false
   targetGateway:
     name: maas-default-gateway
     namespace: openshift-ingress
@@ -340,7 +350,10 @@ zuno_connectivity_link_token_rate_limits:
 # WP-195 step 3 (2026-11-04): RHOAI pinned to the head of stable-3.5. From an
 # installed 3.5.0, `make d1 install openshift-ai` walks 3.5.1 then 3.5.2
 # (upgrade_walk.yml), approving no InstallPlan past this pin.
-zuno_openshift_ai_version: "3.5.2"
+# WP-195 step 6 (2026-11-05, user decision): forced EA install. The beta
+# channel's 3.6.0-ea.2 has no upgrade edge from 3.5.2, so the CSV and
+# Subscription are deleted once by hand (see WP-195). No rollback.
+zuno_openshift_ai_version: "3.6.0-ea.2"
 # WP-195 step 4a (2026-11-04): rhcl 1.4.3 -> 1.4.4 on stable-1.4. Step 4b
 # (2026-11-05, user go): 1.4.4 -> 1.5.0 on stable-1.5 (skipRange >=1.4.4).
 # 1.5 deploys authorino/limitador/dns itself and removes their OLM

@@ -1,0 +1,33 @@
+# Spike-verified (WP-206): read_only; an enabled_tools allowlist (no exec, no write, no namespaces_list);
+# Secret and ConfigMap refused by kind even where RBAC would allow; the server's own ServiceAccount identity.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: k8s-mcp-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: k8s-mcp
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+data:
+  config.toml: |
+    port = "8080"
+    stateless = true
+    read_only = true
+    cluster_auth_mode = "kubeconfig"
+    toolsets = [{{ if .Values.metrics.enabled }}"core", "observability/metrics"{{ else }}"core"{{ end }}]
+    enabled_tools = ["resources_get", "resources_list", "events_list", "pods_log"{{ if .Values.metrics.enabled }}, "execute_instant_query"{{ end }}]
+    [[denied_resources]]
+    group = ""
+    version = "v1"
+    kind = "Secret"
+    [[denied_resources]]
+    group = ""
+    version = "v1"
+    kind = "ConfigMap"
+    {{- if .Values.metrics.enabled }}
+    [toolset_configs."observability/metrics"]
+    prometheus_url = {{ .Values.metrics.prometheusUrl | quote }}
+    auth_mode = "kubeconfig"
+    {{- end }}

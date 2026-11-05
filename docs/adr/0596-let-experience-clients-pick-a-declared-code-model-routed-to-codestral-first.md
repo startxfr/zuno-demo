@@ -61,6 +61,13 @@ whether a SaaS model is allowed at all.**
    any other call (ADR-0593). The Open WebUI banner and the demo script say that "Zuno Code" may send the conversation
    to Mistral, and that tool turns stay on local models.
 
+> **Extension (2026-11-05, ADR-0599):** Dify is a third experience client under this decision. It is in
+> `MARKER_FAIL_CLOSED_CLIENTS`, so `model: zuno-code` maps to its task `code`, and agents release v0.12.0 declares
+> `dify` with tasks `chat` and `code` (`zuno.models.preferred: [code]`, no tools). On demo333, the ai-gateway
+> reloaded the routing at 11:34:30Z. From 11:55Z, Dify's `code` calls were served by `mistral-codestral` (C1, 0.36 to
+> 0.84 s) and its `chat` calls by `local-maas`. See the
+> [WP-194 evidence](../roadmap/evidence/wp-194-zuno-code-live-proof.md#addendum-dify-agents-release-v0120).
+
 ## Alternatives considered
 
 - **Codestral first for all of an experience client's traffic:** one routing entry, no ai-gateway code. Every question,

@@ -1,6 +1,6 @@
 # WP-204: Install Dify on demo333
 
-- **State:** Repo work in review (chart, apps, role, database, Keycloak client and agents declaration written and committed locally; the S3 bucket values and the go to push are awaited, then the live configuration step)
+- **State:** Done 2026-11-05 on demo333: installed, configured (single local administrator, OpenAI-compatible plugin 0.0.73, models `auto` and `zuno-code`, MCP tool through the token proxy), PyPI window closed. Evidence: chat through the proxy 200 (`zuno-code` routed to codestral-latest), MCP `tools/list` returns the six chat tools for consultant-02, ai-gateway log `agent=dify`, `make d2 check dify` green. Metric proven 2026-11-05 after RHOAI 3.6.0-ea.2: `zuno_model_tokens_total{client="dify"}` = 88 in `prometheus-k8s` (openshift-monitoring; the user-workload and mesh Prometheus do not hold it), chats `auto` (qwen3.6-27b-instruct) and `zuno-code` (codestral-latest) 200. Not exercised: a chat typed in the Dify UI. WP-205 (knowledge adapter) is next.
 - **ADRs:** [ADR-0599](../../adr/0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md), [ADR-0601](../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md)
 - **Depends on:** [WP-202](wp-202-common-preparation-for-dify-and-kagent.md), [WP-203](wp-203-dify-preparation.md)
 - **Related:** [WP-205](wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md), [WP-208](wp-208-five-experiences-demonstration.md)
