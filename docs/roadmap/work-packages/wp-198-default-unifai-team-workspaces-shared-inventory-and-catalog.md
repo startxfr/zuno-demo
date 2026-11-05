@@ -1,6 +1,6 @@
 # WP-198: Default UnifAI team workspaces, shared inventory and catalog
 
-- **State:** Repo work in review (2026-11-04: steps 1-4 live on demo333; browser check pending)
+- **State:** Done (2026-11-05: browser check as consultant-01 and sale-01 passed; sale-01 does not see the consultant team)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md), [ADR-0597](../../adr/0597-declare-unifai-built-in-resources-through-the-operator.md)
 - **Depends on:** WP-197 (steps 3 and 4 only)
 - **Related:** [WP-199](wp-199-personal-unifai-starters-for-the-demo-personas.md), [WP-201](wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md)

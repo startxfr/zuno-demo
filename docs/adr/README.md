@@ -355,7 +355,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0594](0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md) | Implemented | Give the three experiences the same MCP tools behind signed classification markers |
 | [ADR-0595](0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md) | Implemented | Set demo passwords from one shared value through one variable per component |
 | [ADR-0596](0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md) | Implemented | Let experience clients pick a declared code model, routed to Codestral first |
-| [ADR-0597](0597-declare-unifai-built-in-resources-through-the-operator.md) | Proposed | Declare UnifAI built-in resources through the operator |
+| [ADR-0597](0597-declare-unifai-built-in-resources-through-the-operator.md) | Implemented | Declare UnifAI built-in resources through the operator |
 | [ADR-0598](0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md) | Proposed | Give every persona default UnifAI team workspaces and a shared catalog |
 
 ## v0.14

@@ -1,6 +1,6 @@
 # WP-200: Show the UnifAI RAG working live
 
-- **State:** Repo work in review
+- **State:** Repo work merged (2026-11-05: live upload demo passed in the browser; Confluence resync on demand pending)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-198
 - **Related:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md)
@@ -53,3 +53,5 @@ Two demos:
   (5 results) and the documents did not (0 results). This is upstream design, not a defect, and the Team view has no
   Documents page to upload in the team's name.
 - **Fix:** the RAG demo moves to the personal workflow `<user>-my-documents` (WP-199 step 3). The demo guide says so.
+- **Upload demo passed** (2026-11-05, in the browser): consultant-01 asked `consultant-01-my-documents` and got the cited
+  answers; the team's `consultant-rag` still does not see the personal upload, as designed.

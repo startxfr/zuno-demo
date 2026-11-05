@@ -1,6 +1,6 @@
 # ADR-0597: Declare UnifAI built-in resources through the operator
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.13
 - **Date:** 2026-11-04
 - **Decision owners:** Zuno Demo architecture team
