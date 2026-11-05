@@ -547,3 +547,19 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
 - Proposed remedy (needs a go): delete `RoleBinding zuno-ogx-rb` so the operator recreates it with `nonroot-v2`, then let the new
   ReplicaSet replace the old pod. Expected: OGXServer `Ready`, DSC `Ready=True`.
 
+## OGX and mlops fixed (2026-11-05, user go)
+
+- **OGX:** `RoleBinding zuno-ogx-rb` was deleted (copy in the session scratchpad). The OGX operator recreated it with
+  `system:openshift:scc:nonroot-v2` only after a harmless annotation woke the `OGXServer`; the new ReplicaSet also needed an
+  annotation to retry after its failed pod creations. The new `zuno-ogx` pod runs under SCC `nonroot-v2` (2/2), the old
+  `anyuid` pod is gone, `OGXServer` is `Ready`, and `default-ogx` lost its `Degraded` condition after a nudge. **The DSC is
+  `Ready=True`** (the three `Removed` submodule conditions remain, cosmetic). Same recipe for the next time an operator
+  changes the SCC of a workload it owns: delete the RoleBinding, nudge the CR, nudge the ReplicaSet.
+- **`zuno-mlops-d1` OutOfSync, cause:** the chart's TrainingRuntime `mlops-lora` set `mlPolicy.torch.numProcPerNode: 1`. The
+  3.6.0-ea.2 Trainer CRD no longer has that field (`torch` only keeps `envInjection`; `numProcPerNode` lives on the TrainJob's
+  `spec.trainer`), so the API server pruned it on every apply, and ArgoCD saw git ahead of live for ever. The live object
+  only differed by server defaults (`template.metadata`, `groupName`), which ArgoCD ignores.
+- **Fix:** the field was removed from `gitops/charts/mlops/templates/trainingruntime.yaml` (8ec6c12d), checked with a server
+  dry-run. After a hard refresh the Application is `Synced/Healthy`. Nothing in this repo sets `numProcPerNode` on a TrainJob,
+  so check the next LoRA TrainJob.
+
