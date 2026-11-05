@@ -312,3 +312,8 @@
 # patch survives the operator's Server-Side Apply, lives in the shared file.
 - name: "openshift_ai | mount the dashboard SA token into core-bff (RHOAI 3.5.0 defect)"
   ansible.builtin.include_tasks: dashboard_core_bff_token.yml
+
+# RHOAI 3.6.0-ea.2 ships three module managers at a 512Mi limit that gets them
+# OOM-killed; shared with reconcile.yml, rationale in the shared file.
+- name: "openshift_ai | raise the memory limit of the OOM-killed module managers (RHOAI 3.6.0-ea.2)"
+  ansible.builtin.include_tasks: module_manager_memory.yml

@@ -47,3 +47,9 @@ No code change from this ADR. It fixes the vocabulary the other four rely on.
 (`components/a2a-gateway`) that serves the active agents of the admitted release. "No delegation runs" above therefore no longer
 holds for a call a user makes directly, for instance from a blueprint. A delegation declared in a bundle (`zuno.delegation.targets`)
 still waits for WP-173, because the operator refuses it and the platform does not yet render the chain headers.
+
+## Update (2026-11-05)
+
+The A2A server in the fork (WP-173 step 4) is dropped by decision of the user: the zuno a2a-gateway serves the agents, and the
+fork stays an A2A client only. "Receiving a delegation therefore needs an A2A server in the fork" above no longer holds. The
+delegating run is delivered by the fork's client work (R-535 in the fork's roadmap, WP-173 steps 1 to 3 and 5).

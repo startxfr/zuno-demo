@@ -127,7 +127,7 @@ operators:
     namespace: policy-controller-operator
     channel: stable
     approval: Automatic
-    version: "1.1.0"
+    version: "1.1.1"
   - package: rhbk-operator
     catalog: redhat-operators
     namespace: zuno-auth
@@ -143,9 +143,9 @@ operators:
   - package: rhods-operator
     catalog: redhat-operators
     namespace: redhat-ods-operator
-    channel: stable-3.5
+    channel: beta
     approval: Manual
-    version: "3.5.2"
+    version: "3.6.0-ea.2"
   - package: rhtas-operator
     catalog: redhat-operators
     namespace: openshift-operators
@@ -169,4 +169,4 @@ operators:
     namespace: unifai-operator
     channel: alpha
     approval: Automatic
-    version: "0.1.58"
+    version: "0.1.59"

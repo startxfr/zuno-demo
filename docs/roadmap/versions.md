@@ -9,6 +9,23 @@ waiting on.
 The history of how ADRs moved between these bands (retargetings, renumberings,
 band creation) is in the [ADR change log](../adr/CHANGELOG.md), not here.
 
+## Release tags
+
+A platform tag `v0.X.0` names the band `v0.X` and sits on `main`, on the commit where the band closed. The rule and the
+steps are in [RELEASING.md](../../RELEASING.md#platform-tags-follow-the-roadmap-bands). Per-ADR status and work-package
+state are not restated here.
+
+| Band | Tag | Date | Note |
+|---|---|---|---|
+| v0.1 | `v0.1.0`, `v0.1.1` | 2026-08-20 | ADR-0110 was still open when it was cut |
+| v0.2 | `v0.2.0` | 2026-09-05 | WP-098 was still open; in-cluster ledger run |
+| v0.3 | `v0.3.0` | 2026-10-22 | in-cluster ledger run |
+| v0.4 to v0.12 | none | | never tagged; their content is in `v0.13.0` |
+| v0.13 | `v0.13.0` | 2026-11-05 | no open ADR or WP; ledger not run |
+| v0.14 | next | | `v0.14.0` once WP-208 is Done |
+| v0.15 | planned | | the classification floor (WP-209) and the agent lifecycle (WP-221) |
+| v0.16 | planned | | day-0 internal/external mode (WP-211 to WP-218), cluster-management decisions, page-level ACL (WP-210) |
+
 ## MVP / v0
 
 Seven-day internal vertical slice and five-agent demo, prioritizing Tekos as
@@ -22,7 +39,7 @@ Industrialization: HA shared services, resumable workflows, automated
 ingestion and evaluation, stronger signing, source freshness, ACL
 synchronization and SecNumCloud-oriented hardening.
 
-**29 ADRs, 28 closed.** Open: ADR-0110 (partially implemented).
+**28 ADRs, all closed.** ADR-0110 (partially implemented) moved to v0.16 on 2026-11-05: its remaining work, page-level ACL in the fork's Confluence connector, is not started.
 
 ## v0.2
 
@@ -195,6 +212,7 @@ managing the cluster from a remote ArgoCD (native vs RHACM — study concluded
 model ruled out of external mode), and ADR-0556
 records the long-term `zuno` operator contract
 (ZunoFoundation/ZunoInfra/ZunoStack CRDs mirroring the Day 0/1/2 playbooks).
+On 2026-11-05 ADR-0352, ADR-0557 and ADR-0556 moved to v0.16, since none of their remaining work has started; this band keeps ADR-0559.
 The band closes with ADR-0558 (2026-09-14, **Implemented**), opened by an
 incident during WP-143's own flip back rather than planned: an OCP upgrade's
 catalog indexes stopped publishing packages whose operators were installed
@@ -239,6 +257,8 @@ with tekos; demo222 cuts over only after full validation.
 **24 ADRs: 21 `Accepted`, 1 `Implemented` (ADR-0586), ADR-0564 superseded in part by ADR-0577 and
 ADR-0578, ADR-0353 `Proposed`.** Open: ADR-0353, ADR-0401, ADR-0402, ADR-0403, ADR-0406, ADR-0409, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575, ADR-0585; WP-146 – WP-157, WP-172 – WP-175.
 
+On 2026-11-05 ADR-0565 moved to v0.15: its remaining clause, the ai-gateway classification floor (WP-209), is not started.
+
 ## v0.12
 
 Agent definitions leave `zuno-demo`. Agent bundles and the corp policies that
@@ -276,6 +296,26 @@ cluster reading becomes governed mcp-gateway read tools that every experience
 can use, and a first-party token proxy gives both a refreshed Keycloak token.
 
 **3 ADRs, all `Proposed` (ADR-0599, ADR-0600, ADR-0601).** Open work packages: WP-204 to WP-208.
+
+## v0.15
+
+Close the classification loop. The ai-gateway enforces the per-(agent, task) classification floor itself, so a caller can no
+longer lower a level by sending a lower header, and a request without a header is treated as `C3` once no current caller
+depends on the old `C1` default (ADR-0565 clause 5). The operator validation, the bundle overrides and the per-chunk
+classification are already done; ADR-0594's signed markers already raise a turn.
+
+The band also holds the agent lifecycle: the `deprecated` and `retired` states, an incident revocation list and audit events (ADR-0584, WP-221), moved here from v0.12 on 2026-11-05 because none of it has started.
+
+**2 ADRs: ADR-0565 `Partially implemented`, ADR-0584 `Accepted`.** Open work packages: WP-209, WP-221.
+
+## v0.16
+
+Run the day-0 platform services in internal or external mode, one component per work package (ADR-0352: keycloak, vault,
+postgresql, redis, aap, external_secrets, cert_manager, then argocd), and settle the cluster-management decisions it
+depends on: ADR-0557 (a remote ArgoCD, natively or through RHACM, study concluded) and ADR-0556 (the long-term `zuno`
+operator contract). The band also holds page-level Confluence ACL (ADR-0110, WP-210), to be built only if it is wanted.
+
+**4 ADRs: ADR-0352 and ADR-0110 `Partially implemented`, ADR-0557 `Accepted`, ADR-0556 `Proposed`.** Open work packages: WP-210 to WP-218.
 
 ## OKF stream
 

@@ -96,8 +96,8 @@ python3 platform/supply-chain/pin_release.py --manifest <path> [--dry-run]
 **Note (2026-09-05, ADR-0549):** mothballed for the in-cluster release
 flow - permanently rewriting `main`'s `image.tag` away from `latest` is
 out of scope by design (ADR-0059). Stays correct and available, unedited,
-for the day ADR-0353's still-unwritten external-registry cutover is ever
-adopted. See the section below for the mechanism actually in use today.
+for the day a zuno component is ever sourced from an external registry
+(ADR-0353 keeps that to the UnifAI and OKF images). See the section below for the mechanism actually in use today.
 
 ## tag_local_release.py / release_ledger.py / check_release_ledger.py (ADR-0549/WP-134)
 

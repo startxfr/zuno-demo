@@ -318,6 +318,11 @@ dataScienceCluster:
       # wrongly credited applicationsNamespace alone).
       dashboard:
         managementState: Managed
+        # WP-220 pilot 2 (RHOAI 3.6.0-ea.2): MaaS consumer portal, a
+        # self-service page for API-key issue/list/revoke, served by the MaaS
+        # gateway under /maas-portal. Revert by setting this to Removed.
+        maasConsumerPortal:
+          managementState: Managed
       # Re-enabled by ADR-0331: was Removed because the ClusterTrainingRuntime
       # this component seeds failed validation - its ValidatingWebhookConfiguration
       # (RHOAI's own bundled manifest, not rendered by this chart) hardcodes

@@ -71,7 +71,10 @@
   kubernetes.core.k8s_info:
     api_version: v1
     kind: Pod
-    namespace: redhat-ods-applications
+    # maas-api runs in redhat-ai-gateway-infra since RHOAI 3.5 GA (WP-195
+    # 2026-11-05: this still read redhat-ods-applications, found no pod, and
+    # so never recorded the restart evidence).
+    namespace: redhat-ai-gateway-infra
     label_selectors:
       - app.kubernetes.io/name=maas-api
   register: _openshift_ai_maas_api_pods
@@ -90,10 +93,10 @@
   vars:
     blocked_finding:
       component: openshift-ai
-      resource: "Deployment/maas-api (redhat-ods-applications)"
+      resource: "Deployment/maas-api (redhat-ai-gateway-infra)"
       state: "{{ _openshift_ai_maas_api_restarts }} container restart(s)"
       cause: "ADR-0201 - maas-api races its own PostgreSQL at startup: it dials with TLS, the mesh resets the connection, it falls back to plaintext and pg_hba rejects that (SQLSTATE 28000, 'no pg_hba.conf entry ... user maas, database maas, no encryption'). It recovers on a later retry, so the only lasting evidence is the restart count"
-      solution: "Confirm the maas role and maas database exist on zuno-postgresql and that the mesh is not intercepting the connection before maas-api starts; check `oc logs deploy/maas-api -n redhat-ods-applications --previous` for the pg_hba line"
+      solution: "Confirm the maas role and maas database exist on zuno-postgresql and that the mesh is not intercepting the connection before maas-api starts; check `oc logs deploy/maas-api -n redhat-ai-gateway-infra --previous` for the pg_hba line"
       auto_fix: "make d1 reconcile openshift-ai"
   when:
     - (_openshift_ai_maas_api_pods.resources | default([]) | length) > 0

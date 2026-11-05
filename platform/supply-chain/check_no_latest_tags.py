@@ -30,8 +30,8 @@ triggers` auto-redeploy annotation watches. ADR-0111's control-matrix row
 this check used to back is now enforced instead by
 `check_release_ledger.py` (validates named-release provenance, not
 `values.yaml` literals). This script is kept, unchanged, only because it
-becomes meaningful again the day ADR-0353's still-unwritten external-
-registry cutover is ever adopted (at which point `.repository` really
+becomes meaningful again the day a zuno component is ever sourced from an
+external registry (ADR-0353 keeps that to UnifAI and OKF) (at which point `.repository` really
 would move off the in-cluster mirror and `latest` really would become a
 live bug again) - see `pin_release.py`'s matching dated note.
 """

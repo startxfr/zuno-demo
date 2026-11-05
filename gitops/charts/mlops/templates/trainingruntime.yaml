@@ -37,16 +37,12 @@ metadata:
 spec:
   mlPolicy:
     numNodes: 1
-    torch:
-      # WP-126: NOT a quoted string. numProcPerNode is IntOrString
-      # (`oc explain trainingruntime.spec.mlPolicy.torch.numProcPerNode`:
-      # "auto, cpu, gpu, or int value"); the CRD's CEL validation rejects a
-      # quoted "1" with "no such overload" (neither the string branch nor
-      # the int branch matches), caught live only by
-      # `oc apply --dry-run=server` - `helm template`/`helm lint` render
-      # and pass either form. A bare YAML 1 parses as the int variant and
-      # is accepted.
-      numProcPerNode: 1
+    # RHOAI 3.6.0-ea.2 (WP-195, 2026-11-05): the TrainingRuntime CRD no longer has
+    # `mlPolicy.torch.numProcPerNode` (only `torch.envInjection` is left;
+    # `numProcPerNode` moved to the TrainJob's `spec.trainer`). The API server
+    # pruned the field on apply, so the Application stayed OutOfSync for ever.
+    # It was `1` (WP-126: an int, not a quoted string, for the old CEL rule);
+    # the TrainJob decides it now. Nothing in this repo sets it on the TrainJob.
   template:
     spec:
       replicatedJobs:

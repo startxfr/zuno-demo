@@ -1,6 +1,6 @@
 # ADR-0585: Serve zuno agents over A2A from a gateway that answers with the caller's identity
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-05, WP-174 and WP-175: `components/a2a-gateway` serves A2A 0.3 with the caller's token; `POST /agents/tekos/` 200, anonymous refused with 401, delegation header refusals replayed on operator 0.1.53 ([evidence](../roadmap/evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md), [ADR-0583 check](../roadmap/evidence/adr-0583-authorization-verification.md)))
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team

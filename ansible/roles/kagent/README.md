@@ -1,11 +1,19 @@
 # kagent
 
-Day 2 component `kagent`: kagent, the operations experience over governed Kubernetes read tools, a user experience over the governed chain
-(ADR-0600, under ADR-0587's admission contract, reaching the gateways through the
-token proxy of ADR-0601).
+Day 2 component `kagent`: kagent, the Kubernetes-native agent operator, admitted as a thin operations
+experience client over the governed chain (ADR-0600, under ADR-0587's admission contract, reaching the
+gateways through the token proxy of ADR-0601).
 
-**Stub (WP-202).** The component is declared in the `Makefile`, the Day 2
-playbooks and the AAP workflow DAGs so its track never edits those shared files.
-Every verb is a no-op that says so and changes nothing on the cluster, so
-`make d2 install` / `make d2 check` over all components stay green. WP-207 replaces
-these tasks; nothing outside this directory changes then.
+- `make d2 install kagent` seeds Vault (`keycloak/kagent`, `kagent/app`; `kagent/postgresql-app` comes from
+  the vault role), gives the `kagent` Keycloak service account the groups of its persona `ai-ops-01` (realm
+  users are create-only), applies three Applications (`zuno-kagent-d0` CRDs, `zuno-token-proxy-kagent-d1`,
+  `zuno-kagent-d1`) and waits for the Deployments.
+- `make d2 check kagent` compares the running images with the pinned digests, checks that the controller
+  discovered the governed tools and accepted the declarative agent `zuno-sre`, and that the Route answers
+  only through the front door.
+- The chart (`gitops/charts/kagent`) switches off every bundled provider, tool server, sample agent and the
+  bundled PostgreSQL; the controller has namespaced Roles only (`watchNamespaces`). Its one ModelConfig and one
+  RemoteMCPServer point at the token proxy.
+- Prerequisite order: `make d0 install vault` (seeds `kagent/postgresql-app`) and `make d0 install postgresql`
+  (creates the role and database and replays the grants) before the first install.
+- Uninstall removes the Applications; the Keycloak client, the Vault paths and the database are kept.

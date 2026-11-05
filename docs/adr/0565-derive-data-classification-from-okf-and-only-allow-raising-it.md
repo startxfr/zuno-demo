@@ -1,7 +1,7 @@
 # ADR-0565: Derive data classification from OKF and only allow raising it
 
 - **Status:** Partially implemented
-- **Target:** v0.11
+- **Target:** v0.15 (retargeted from v0.11 on 2026-11-05: all of its remaining work is not started, so it follows the code release that will carry it)
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
 - **Extends:** [ADR-0034](0034-compute-effective-classification-from-the-complete-context.md) (compute effective classification from the complete context)

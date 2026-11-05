@@ -182,6 +182,22 @@ dify:
       # directory (/app/api), which restricted-v2's random uid cannot write. Shared list, harmless elsewhere.
       - name: CELERY_BEAT_SCHEDULE
         value: /tmp/celerybeat-schedule
+      # The console asks the vector store for its retrieval settings (GET /datasets/retrieval-setting answers
+      # 400 "Vector store type is not configured" without one, and the home page shows the error). pgvector in
+      # the dify database of zuno-postgresql (extension created by the postgresql chart init SQL); knowledge
+      # stays External Knowledge (ADR-0599), there is no embedding model, so nothing is stored in it.
+      - name: VECTOR_STORE
+        value: pgvector
+      - name: PGVECTOR_HOST
+        value: zuno-postgresql-primary.zuno-data.svc
+      - name: PGVECTOR_PORT
+        value: "5432"
+      - name: PGVECTOR_DATABASE
+        value: dify
+      - name: PGVECTOR_USER
+        valueFrom: {secretKeyRef: {name: dify-app, key: DB_USERNAME}}
+      - name: PGVECTOR_PASSWORD
+        valueFrom: {secretKeyRef: {name: dify-app, key: DB_PASSWORD}}
       - name: SECRET_KEY
         valueFrom: {secretKeyRef: {name: dify-app, key: SECRET_KEY}}
       - name: DB_USERNAME

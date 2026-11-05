@@ -1,0 +1,82 @@
+# ADR-0600 clause 4: the one model and the one tool server of kagent, both through the zuno-token-proxy
+# (ADR-0601). The api key is a dummy the proxy drops. Sync wave 6: after the controller (wave 0..5) so the
+# CRDs of the d0 Application and the admission of the controller are in place.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: kagent-model-dummy-key
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+type: Opaque
+stringData:
+  OPENAI_API_KEY: dummy-dropped-by-the-token-proxy
+---
+apiVersion: kagent.dev/v1alpha2
+kind: ModelConfig
+metadata:
+  name: zuno-model
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  model: {{ .Values.tokenProxy.model | quote }}
+  provider: OpenAI
+  apiKeySecret: kagent-model-dummy-key
+  apiKeySecretKey: OPENAI_API_KEY
+  openAI:
+    baseUrl: {{ .Values.tokenProxy.url }}/v1
+---
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: zuno-mcp-gateway
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "6"
+spec:
+  description: The Zuno MCP gateway, reached through the zuno-token-proxy (ADR-0601); the only tool source of kagent.
+  url: {{ .Values.tokenProxy.url }}/mcp
+  protocol: STREAMABLE_HTTP
+---
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: {{ .Values.agent.name }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "7"
+spec:
+  type: Declarative
+  description: Read-only diagnosis of the Zuno platform namespaces over the governed Kubernetes tools.
+  declarative:
+    modelConfig: zuno-model
+    executeCodeBlocks: false
+    systemMessage: |
+      You are zuno-sre, a read-only operations assistant for the Zuno AI platform on OpenShift.
+      You can only read: list and get resources, read events and logs, and run one instant PromQL query.
+      You cannot change anything, and you never see Secret or ConfigMap data.
+      The platform namespaces are zuno-ai-run (ai-gateway, mcp-gateway, a2a-gateway and the MCP servers),
+      zuno-ai-build (builds), zuno-auth (Keycloak), zuno-data (PostgreSQL, Redis, MariaDB), zuno-vault,
+      zuno-mesh, zuno-monitoring, zuno-unifai, zuno-openwebui, zuno-dify and zuno-kagent.
+      To explain why a pod fails: list the pods of the namespace, read the events of the failing pod,
+      then its logs, and cite what you read. A PromQL query must carry a label matcher, for example
+      kube_pod_status_phase{namespace="zuno-ai-run"}. If a tool refuses, say so and stop; do not guess.
+    tools:
+      - type: McpServer
+        mcpServer:
+          name: zuno-mcp-gateway
+          kind: RemoteMCPServer
+          apiGroup: kagent.dev
+          toolNames:
+            {{- toYaml .Values.agent.tools | nindent 12 }}
+    a2aConfig:
+      skills:
+        - id: diagnose-platform
+          name: Diagnose the platform
+          description: Explain why a Zuno pod or service is failing from events, logs and metrics.
+          tags: [kubernetes, diagnosis, read-only]

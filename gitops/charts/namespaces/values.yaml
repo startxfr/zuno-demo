@@ -143,6 +143,8 @@ platformNamespaces:
       # ADR-0599/WP-204: Dify's api, worker, beat and plugin-daemon reach the dify and
       # dify_plugin databases (gitops/charts/postgresql difyDatabase).
       - zuno-dify
+      # ADR-0600/WP-207: kagent's controller reaches its kagent database.
+      - zuno-kagent
     # mariadb-operator's admission webhook (vmariadb-v1alpha1.kb.io etc.)
     # lives here and is called synchronously by the API server on every
     # MariaDB/Grant/User write - without this, the webhook call times out

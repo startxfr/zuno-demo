@@ -1,6 +1,6 @@
 # ADR-0553: Collocate Perses dashboards in redhat-ods-monitoring for real visibility
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-05, WP-138 and WP-139: ten dashboards in `redhat-ods-monitoring`, `Available: true` on demo333. The placement is implemented; its original visibility benefit was not obtained, see the dated correction note of 2026-09-07)
 - **Target:** v0.5
 - **Date:** 2026-09-07
 - **Decision owners:** Zuno Demo architecture team

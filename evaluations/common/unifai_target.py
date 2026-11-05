@@ -270,7 +270,8 @@ def offered_tool(spans: List[Dict[str, Any]], tool: str = "delegate_task") -> Op
     lists = [c["offered"] for c in model_calls(spans) if c["offered"] is not None]
     if not lists:
         return None
-    return any(tool in names or any(n.endswith(tool) for n in names) for names in lists)
+    # Exact name, a namespaced name (`iem_delegate_task`) or a family prefix (`confluence` for `confluence_page_read`).
+    return any(tool in names or any(n.endswith(tool) or n.startswith(tool + "_") for n in names) for names in lists)
 
 
 def turn_summary(spans: List[Dict[str, Any]], tool: str = "delegate_task") -> str:

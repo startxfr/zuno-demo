@@ -265,6 +265,9 @@ no backup by itself - PGO waits for the annotation's value to change.
       databases:
         - {{ .Values.difyDatabase.name }}
         - {{ .Values.difyDatabase.pluginName }}
+    - name: {{ .Values.kagentDatabase.owner }}
+      databases:
+        - {{ .Values.kagentDatabase.name }}
     - name: {{ .Values.ogxDatabase.owner }}
       databases:
         - {{ .Values.ogxDatabase.name }}

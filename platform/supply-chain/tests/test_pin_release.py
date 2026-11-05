@@ -29,21 +29,42 @@ REPO_ROOT = SUPPLY_CHAIN_DIR.parents[1]
 sys.path.insert(0, str(SUPPLY_CHAIN_DIR))
 import pin_release  # noqa: E402
 
-FULL_PINS = [
-    {"chart_values": "gitops/charts/mcp-confluence/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/ai-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/mcp-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/diagram-render/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/mcp-gateway/values.yaml", "path": "okf.fetch.image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/mcp-aap/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/mcp-git-forge/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/mcp-salesforce/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/mlops/values.yaml", "path": "images.mlops.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/a2a-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/a2a-gateway/values.yaml", "path": "okf.fetch.image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/zuno-token-proxy/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-    {"chart_values": "gitops/charts/zuno-dify-knowledge/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
-]
+import check_no_latest_tags  # noqa: E402
+
+# Charts and fields the tests below rely on by name. Each must be a current
+# non-immutable field (or, for keycloak, must NOT be one) for the assertions to
+# mean what they say; _full_pins() checks it so a chart change fails here with
+# a clear message instead of deep inside a test.
+FIXTURE_FIELDS = (
+    ("gitops/charts/diagram-render/values.yaml", "image.tag"),
+    ("gitops/charts/mcp-confluence/values.yaml", "image.tag"),
+)
+NOT_A_FINDING = ("gitops/charts/keycloak/values.yaml", "image.tag")
+
+
+def _full_pins() -> list:
+    """The complete manifest: one pin per field check_no_latest_tags.py
+    reports today. It is derived, not written by hand, so a new chart with
+    `tag: latest` (zuno-token-proxy in WP-202, zuno-dify-knowledge in WP-205)
+    no longer breaks these tests. It comes from check_no_latest_tags.py, not
+    from pin_release._current_findings(), so test_full_manifest also proves
+    the two scripts agree on which fields are non-immutable."""
+    pins = []
+    for values_path in sorted((REPO_ROOT / "gitops" / "charts").glob("*/values.yaml")):
+        for finding in check_no_latest_tags.check_values_file(values_path):
+            pins.append({"chart_values": finding.file, "path": finding.path, "tag": "v0.1.0"})
+    keys = {(p["chart_values"], p["path"]) for p in pins}
+    missing = [field for field in FIXTURE_FIELDS if field not in keys]
+    if missing:
+        raise AssertionError(
+            f"fixture field(s) {missing} are no longer `tag: latest`; pick other charts for these tests"
+        )
+    if NOT_A_FINDING in keys:
+        raise AssertionError(f"{NOT_A_FINDING} became `tag: latest`; pick another 'unknown path' example")
+    return pins
+
+
+FULL_PINS = _full_pins()
 
 
 def _repoint_module_at(tmp_root: Path):

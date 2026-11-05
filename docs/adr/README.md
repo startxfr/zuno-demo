@@ -160,7 +160,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0107](0107-introduce-automated-model-quality-gates.md) | Implemented | Introduce automated model quality gates |
 | [ADR-0108](0108-automate-model-evaluation-with-lm-eval.md) | Implemented | Automate model evaluation with LM-Eval |
 | [ADR-0109](0109-implement-source-freshness-and-trust-scoring.md) | Superseded in part by ADR-0568 | Implement source freshness and trust scoring |
-| [ADR-0110](0110-automate-document-acl-synchronization.md) | Partially implemented | Automate document ACL synchronization |
 | [ADR-0112](0112-implement-production-grade-backup-and-recovery.md) | Implemented | Implement production-grade backup and recovery |
 | [ADR-0116](0116-decouple-logical-tool-capabilities-from-physical-backend-bindings.md) | Implemented | Decouple logical tool capabilities from physical backend bindings |
 | [ADR-0117](0117-implement-confluence-as-the-first-real-external-mcp-integration.md) | Implemented | Implement Confluence as the first real external MCP integration |
@@ -245,8 +244,8 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0537](0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md) | Implemented | Integrate RHOAI HardwareProfiles for local models |
 | [ADR-0543](0543-propagate-a-per-run-id-across-every-service-span.md) | Implemented | Propagate a per-run id across every service span (documents work implemented 2026-08-23 whose ADR was never written) |
 | [ADR-0551](0551-add-namespace-scoped-perses-dashboards-alongside-grafana.md) | Superseded in part by ADR-0552, ADR-0553 | Add namespace-scoped Perses dashboards alongside the existing Grafana stack |
-| [ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md) | Accepted | Reuse RHOAI's Perses instance instead of running an independent one |
-| [ADR-0553](0553-collocate-perses-dashboards-in-redhat-ods-monitoring-for-visibility.md) | Accepted | Collocate Perses dashboards in redhat-ods-monitoring for real visibility |
+| [ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md) | Implemented | Reuse RHOAI's Perses instance instead of running an independent one |
+| [ADR-0553](0553-collocate-perses-dashboards-in-redhat-ods-monitoring-for-visibility.md) | Implemented | Collocate Perses dashboards in redhat-ods-monitoring for real visibility |
 | [ADR-0554](0554-widen-rhoais-monitoringstack-to-observe-zuno-ai-run.md) | Implemented | Widen RHOAI's built-in MonitoringStack to observe zuno-ai-run's models |
 | [ADR-0555](0555-parallel-and-quota-exhaustive-day3-stresstest.md) | Implemented | Parallel-by-default Day 3 stresstest, generalized quota/limit exhaustion proofs |
 
@@ -284,11 +283,8 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Partially implemented | Run day-0 platform services in internal or external mode |
 | [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | Implemented | Adopt RHTAS as the artifact trust and supply-chain service |
 | [ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md) | Implemented | Close ADR-0111's last SecNumCloud gap with an in-cluster release ledger |
-| [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | Proposed | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
-| [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 | [ADR-0558](0558-tolerate-catalogs-that-stop-publishing-an-installed-operator.md) | Implemented | Tolerate catalogs that stop publishing an installed operator |
 | [ADR-0559](0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md) | Accepted | Follow the cluster's version and never branch the repository by OCP version |
 
@@ -302,29 +298,28 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0353](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) | Proposed | Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF |
+| [ADR-0353](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) | Implemented | Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF |
 | [ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md) | Implemented | Introduce agent-to-agent delegation limited to the targets an agent declares |
 | [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Accepted | Adopt A2A as the inter-agent protocol |
 | [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) | Implemented | Propagate the user's identity and the delegation chain across agent-to-agent calls |
 | [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Implemented | Limit agent delegation by depth, cycle and budget |
 | [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Accepted | Introduce human approval for delegated operations, resumable from persisted checkpoints |
 | [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md) | Implemented | Keep the ai-gateway as the policy router in front of UnifAI |
-| [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Accepted | Adopt UnifAI as the agent platform |
+| [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Implemented | Adopt UnifAI as the agent platform |
 | [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md) | Implemented | Authenticate UnifAI against the zuno Keycloak realm |
-| [ADR-0563](0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md) | Partially implemented | Forward caller identity and Zuno context headers from UnifAI |
+| [ADR-0563](0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md) | Implemented | Forward caller identity and Zuno context headers from UnifAI |
 | [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) | Superseded in part by ADR-0577 and ADR-0578 | Deliver OKF bundles to unifai-operator as signed OCI artifacts |
-| [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Partially implemented | Derive data classification from OKF and only allow raising it |
-| [ADR-0566](0566-instrument-unifai-with-opentelemetry.md) | Partially implemented | Instrument UnifAI with OpenTelemetry |
-| [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Partially implemented | Move TrustyAI guardrails into the ai-gateway |
-| [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) | Partially implemented | Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings |
-| [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Partially implemented | Close UnifAI parity gaps generically |
+| [ADR-0566](0566-instrument-unifai-with-opentelemetry.md) | Implemented | Instrument UnifAI with OpenTelemetry |
+| [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Implemented | Move TrustyAI guardrails into the ai-gateway |
+| [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) | Implemented | Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings |
+| [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Implemented | Close UnifAI parity gaps generically |
 | [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Partially implemented | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
 | [ADR-0571](0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md) | Implemented | Evaluate the RHOAI MCP gateway before extending mcp-gateway |
-| [ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md) | Accepted | Scope the zuno operator to the platform foundation |
-| [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Partially implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
+| [ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md) | Implemented | Scope the zuno operator to the platform foundation |
+| [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
 | [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) | Implemented | Deploy UnifAI through ArgoCD from a pinned OLM catalog |
-| [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Accepted | Upstream generic UnifAI changes and isolate zuno-specific code |
-| [ADR-0585](0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) | Accepted | Serve zuno agents over A2A from a gateway that answers with the caller's identity |
+| [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Implemented | Upstream generic UnifAI changes and isolate zuno-specific code |
+| [ADR-0585](0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) | Implemented | Serve zuno agents over A2A from a gateway that answers with the caller's identity |
 | [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) | Implemented | Verify the UnifAI runtime images by digest, signature and attestations before deploying them |
 
 ## v0.12
@@ -337,9 +332,8 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0579](0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md) | Accepted | Extend OKF to v0.3 with skills, model roles, guardrails and limits |
 | [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Implemented | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
 | [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Accepted | Derive stack configuration from the admitted corp bundle |
-| [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Accepted | Serve a per-agent entry and descriptive sheet from the admitted bundle |
+| [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Implemented | Serve a per-agent entry and descriptive sheet from the admitted bundle |
 | [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Implemented | Require group visibility and object-level authorisation before per-agent entries |
-| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
 
 ## v0.13
 
@@ -363,8 +357,24 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0599](0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md) | Implemented | Serve a no-code workflow canvas with Dify as an experience client |
-| [ADR-0600](0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md) | Proposed | Govern Kubernetes read tools in the mcp-gateway and admit kagent as a thin operations client |
-| [ADR-0601](0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md) | Proposed | Inject client-credentials tokens for experience clients without OIDC passthrough |
+| [ADR-0600](0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md) | Implemented | Govern Kubernetes read tools in the mcp-gateway and admit kagent as a thin operations client |
+| [ADR-0601](0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md) | Implemented | Inject client-credentials tokens for experience clients without OIDC passthrough |
+
+## v0.15
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Partially implemented | Derive data classification from OKF and only allow raising it |
+| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
+
+## v0.16
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-0110](0110-automate-document-acl-synchronization.md) | Partially implemented | Automate document ACL synchronization |
+| [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Partially implemented | Run day-0 platform services in internal or external mode |
+| [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | Proposed | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
+| [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 
 ## OKF v0.1
 

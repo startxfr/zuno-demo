@@ -1,6 +1,6 @@
 # ADR-0552: Reuse RHOAI's Perses instance instead of running an independent one
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-05, WP-138 and WP-139: no `Perses` server CR, ten `PersesDashboard`s and three `PersesGlobalDatasource`s `Available: true` on demo333, live-verified 2026-09-07 and 2026-09-10)
 - **Target:** v0.5
 - **Date:** 2026-09-07
 - **Decision owners:** Zuno Demo architecture team

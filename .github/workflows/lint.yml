@@ -201,12 +201,14 @@ jobs:
         run: |
           python3 tests/test_verify_unifai_images.py
           python3 tests/test_check_unifai_pins.py
+          python3 tests/test_check_unifai_identity.py
           python3 tests/test_pin_unifai_images.py
           python3 tests/test_pin_operator_catalog.py
           python3 tests/test_admission_preflight.py
           python3 tests/test_render_policy_trustroot.py
           python3 render_policy_trustroot.py --check
           python3 check_unifai_pins.py
+          python3 check_unifai_identity.py
       - name: supply-chain OpenClaw pins (ADR-0590)
         working-directory: platform/supply-chain
         run: python3 tests/test_pin_claw_catalog.py

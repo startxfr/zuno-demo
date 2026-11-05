@@ -104,3 +104,10 @@ and internet egress off, a workflow cannot run arbitrary code or reach outside t
 
 `zuno_model_tokens{client="dify"}` and mcp-gateway audit lines with `agent=dify` are the proof of the governed path.
 A Dify chat that answers while both stay empty means a bypass.
+
+## Implementation note (2026-11-05, rehearsal)
+
+The console asks the vector store for its retrieval settings; without `VECTOR_STORE` it answers 400 "Vector store type
+is not configured" and the home page shows the error. Dify therefore points at **pgvector in its own `dify` database**
+of zuno-postgresql (extension created by the postgresql chart's init SQL). Knowledge stays External Knowledge, there is
+no embedding model and the store holds nothing: the decision "no vector database of our own" stands.

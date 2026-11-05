@@ -1,7 +1,7 @@
 # ADR-0352: Run day-0 platform services in internal or external mode
 
 - **Status:** Partially implemented
-- **Target:** v0.9
+- **Target:** v0.16 (retargeted from v0.9 on 2026-11-05: all of its remaining work is not started, so it follows the code release that will carry it)
 - **Date:** 2026-08-17
 - **Amended:** 2026-09-10 (re-derived against the post-ADR-0421 component
   lists; AAP added as a vital Tier-A component; Day-1 externalization

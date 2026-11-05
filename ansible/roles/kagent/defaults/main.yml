@@ -1,0 +1,15 @@
+---
+kagent_namespace: zuno-kagent
+# ADR-0600 / ADR-0601: the kagent Keycloak client is the operations persona ai-ops-01 (groups ocp-ai-ops).
+# Realm users are create-only, so the service account gets the persona's groups live (keycloak_sa_groups.yml).
+kagent_persona: ai-ops-01
+kagent_keycloak_realm: zuno
+# The headers the token proxy sets (ADR-0601 decision 3).
+kagent_ai_headers:
+  X-Zuno-Agent: kagent
+  X-Zuno-Task: diagnose
+  X-Zuno-Data-Classification: C1
+kagent_mcp_headers:
+  X-Zuno-Agent: kagent
+  X-Zuno-Task: diagnose
+  X-Zuno-Data-Classification: C2

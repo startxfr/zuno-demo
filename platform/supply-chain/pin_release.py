@@ -70,8 +70,8 @@ auto-redeploy, and `gitops/apps/*` deliberately stays on
 `tag_local_release.py --record-release` writes the ledger directly
 instead, via `release_ledger.py`, without ever touching `values.yaml`.
 This script stays correct and available, unchanged, for the day
-ADR-0353's still-unwritten external-registry cutover is ever adopted -
-the one scenario where rewriting `values.yaml`'s `tag:` fields would
+a zuno component is ever sourced from an external registry (ADR-0353 keeps
+that to UnifAI and OKF) - the one scenario where rewriting `values.yaml`'s `tag:` fields would
 become the right move again.
 """
 from __future__ import annotations

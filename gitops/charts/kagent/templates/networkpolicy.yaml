@@ -1,0 +1,73 @@
+# ADR-0600: egress of the kagent pods. In the cluster: DNS, the namespace itself (the controller,
+# the UI, the agent pods, the token proxy), zuno-postgresql in zuno-data and the Kubernetes API
+# (6443 on the control-plane addresses). Outside it: HTTPS to the public names the EgressFirewall
+# allows. The gateways are reached through the zuno-token-proxy only, which has its own egress policy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kagent-egress
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
+    - to:
+        - podSelector: {}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.egress.databaseNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.egress.databasePort }}
+    {{- if .Values.egress.kubeApiAddresses }}
+    - to:
+        {{- range .Values.egress.kubeApiAddresses }}
+        - ipBlock:
+            cidr: {{ . }}/32
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 6443
+    {{- end }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml .Values.egress.clusterCIDRs | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 443
+---
+# ADR-0600 clause 5: the controller's port (UI backend and A2A endpoint of the agents) is reachable
+# only from pods of this namespace; the Route points at the front door alone.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kagent-controller-ingress
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: kagent
+      app.kubernetes.io/component: controller
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 8083

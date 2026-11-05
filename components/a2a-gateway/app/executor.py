@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import Part, TextPart
+from a2a.types import Part, TaskState, TextPart
 from a2a.utils import new_agent_text_message
 
 from app.agent_chain import ChainError, DelegationLimits, parse_chain, verify_chain
@@ -29,6 +29,9 @@ from app.config import Settings
 logger = logging.getLogger("a2a_gateway.executor")
 
 CHAIN_HEADERS = ("X-Zuno-Delegated-By", "X-Zuno-Delegation-Depth")
+# Task metadata key carrying the classification the turn ran at (ADR-0403 clause 5): the caller raises its own
+# run to at least this level. Metadata, not a response header, because a delegator polls tasks/get.
+CLASSIFICATION_METADATA = "zuno.classification"
 
 
 _RUN_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,128}$")
@@ -74,7 +77,7 @@ class ZunoAgentExecutor(AgentExecutor):
             await updater.submit()
         await updater.start_work()
         try:
-            text = await self._answer(context)
+            text, classification = await self._answer(context)
         except (Refused, ChainError, DownstreamError) as exc:
             await updater.failed(new_agent_text_message(str(exc), context.context_id, context.task_id))
             return
@@ -83,9 +86,20 @@ class ZunoAgentExecutor(AgentExecutor):
             await updater.failed(new_agent_text_message("The agent failed to answer.", context.context_id, context.task_id))
             return
         await updater.add_artifact([Part(root=TextPart(text=text))], name="answer")
-        await updater.complete()
+        await updater.update_status(
+            TaskState.completed, final=True, metadata={CLASSIFICATION_METADATA: classification}
+        )
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        # A delegating UnifAI run that is interrupted or times out sends tasks/cancel (UnifAI >= 0.1.57). Log it at
+        # info level so the gateway side of the cancel is readable here, not only inferred from the caller's logs.
+        caller = (context.call_context.state if context.call_context else {}).get("caller")
+        logger.info(
+            "tasks/cancel agent=%s task_id=%s caller=%s",
+            self._agent.name,
+            context.task_id,
+            getattr(caller, "sub", "unknown"),
+        )
         await TaskUpdater(event_queue, context.task_id, context.context_id).cancel()
 
     # -- one turn -----------------------------------------------------------
@@ -106,7 +120,7 @@ class ZunoAgentExecutor(AgentExecutor):
             raise Refused(f"Agent '{self._agent.name}' has no task '{task}'.")
         return task
 
-    async def _answer(self, context: RequestContext) -> str:
+    async def _answer(self, context: RequestContext) -> tuple[str, str]:
         caller = self._caller(context)
         headers = (context.call_context.state.get("headers") or {}) if context.call_context else {}
         request_text = context.get_user_input().strip()
@@ -146,7 +160,7 @@ class ZunoAgentExecutor(AgentExecutor):
             reply = await self._llm.chat(messages=messages, tools=tools, **common)
             calls = reply.get("tool_calls") or []
             if not calls or not tools:
-                return str(reply.get("content") or "").strip() or "The agent has no answer."
+                return str(reply.get("content") or "").strip() or "The agent has no answer.", classification
             messages.append({"role": "assistant", "content": reply.get("content") or "", "tool_calls": calls})
             for call in calls:
                 function = call.get("function") or {}
@@ -158,7 +172,7 @@ class ZunoAgentExecutor(AgentExecutor):
                 messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
         # Out of rounds: ask once more without tools so the user gets a final answer.
         reply = await self._llm.chat(messages=messages, tools=None, **common)
-        return str(reply.get("content") or "").strip() or "The agent has no answer."
+        return str(reply.get("content") or "").strip() or "The agent has no answer.", classification
 
     async def _available_tools(self, common: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
         if not self._settings.tools_enabled or not self._agent.tasks.get(common["task"]):

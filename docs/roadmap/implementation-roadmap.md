@@ -23,20 +23,22 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | Version | ADRs | Open ADRs | WPs | Open WPs |
 |---|---|---|---|---|
 | v0 | 72 | — | 8 | — |
-| v0.1 | 29 | 1 | 19 | — |
+| v0.1 | 28 | — | 18 | — |
 | v0.2 | 14 | — | 19 | WP-098 |
 | v0.3 | 15 | — | 19 | — |
 | v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
-| v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
+| v0.5 | 13 | — | 18 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
-| v0.9 | 9 | 4 | 9 | WP-145, WP-195 |
+| v0.9 | 6 | 1 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
-| v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
+| v0.11 | 23 | 3 | 28 | WP-173, WP-174, WP-220 |
+| v0.12 | 8 | 2 | 9 | WP-161, WP-164 |
 | v0.13 | 12 | — | 18 | — |
-| v0.14 | 3 | 2 | 7 | WP-206, WP-207, WP-208 |
+| v0.14 | 3 | — | 7 | WP-208 |
+| v0.15 | 2 | 2 | 3 | WP-209, WP-221 |
+| v0.16 | 4 | 4 | 11 | WP-210, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -894,7 +896,7 @@ being discovered by whoever tries the next install.
 |---|---|---|---|---|---|
 | WP-144 | [wp-144](work-packages/wp-144-olm-catalog-drop-tolerance.md) | 0558 | none | Done (2026-09-14 - shared discovery task adopted by the twelve exact-name roles, readiness probe P8 live-verified on demo222 reporting 13 frozen Subscriptions and naming openshift-operators as the namespace where they block others) | decide per operator whether to drop each of the 13 frozen Subscriptions (forfeits its update path) or wait for the catalog to publish again - P8 reports, deliberately does not repair |
 | WP-145 | [wp-145](work-packages/wp-145-fleet-version-and-catalog-policy.md) | 0559 | WP-144 | Not started | blocked on measuring demo333 at its next power-on (powered off, reported 4.22 but unverified) - that single read-only measurement decides whether additional CatalogSources are justified |
-| WP-195 | [wp-195](work-packages/wp-195-update-every-operator-on-demo333-through-the-repository.md) | 0559 | WP-145 | Operator pending | repo work done (operator update audit `make d3 check operators`, channel pins, RHOAI upgrade walk); live steps on demo333 one go each: GitOps 1.22.3, OCP 4.22.20, RHOAI 3.5.2, RHCL 1.5.0 (re-run the WP-177 counters probe), Kueue 1.5.0, RHOAI 3.6.0-ea.2 |
+| WP-195 | [wp-195](work-packages/wp-195-update-every-operator-on-demo333-through-the-repository.md) | 0559 | WP-145 | Done | every operator of demo333 updated through the repository (OCP 4.22.20, GitOps 1.22.3, RHOAI 3.6.0-ea.2, RHCL 1.5.0, Kueue 1.5.0); known-good set `platform/olm/known-good-demo333.yaml`; quota counters, TrustyAI and OGX fixed |
 
 ### Phase 44 — adopt UnifAI as the agent and RAG platform (added 2026-10-17)
 
@@ -910,7 +912,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-146 | [wp-146](work-packages/wp-146-unifai-identity-and-context-header-forwarding.md) | 0563, 0562, 0575 | none | Done (2026-10-24) | live-proven on demo333 2026-10-17 (user JWT + templated X-Zuno-* headers, fail-closed, MAS-side refresh); X-Authenticated-User surface checked unreachable from outside the stack (2026-10-23); header authorship decided 2026-10-24 (never trust the template; ai-gateway quota headers only from trusted platform clients), see ADR-0563 |
-| WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Done | instrumentation merged in fork devel (c918f732b); operator env block, zuno collector rule/dashboard, gateway traceparent and a live trace remain |
+| WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Done | instrumentation merged in fork devel (c918f732b); operator `spec.openTelemetry`, gateway `traceparent`, the zuno dashboards and a live 76-span trace are done (2026-10-22 to 2026-10-24) |
 | WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Done | live-proven on demo333 2026-10-22 on fork devel e76c71cd0 (routing explanation, structured 429, memory tool and extraction node, group-bound teams); browser rendering not tested |
 | WP-149 | [wp-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md) | 0568, 0575 | none | Done (2026-10-24) | hybrid search, ACL, incremental sync and restore proven on demo333 |
 | WP-150 | [wp-150](work-packages/wp-150-unifai-operator-okf-agent-bundles.md) | 0564, 0565 | WP-146 | Done (2026-10-24) | signed bundles verified keyless and served live |
@@ -922,7 +924,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Done | phase 2 landed 2026-10-23 (agent stack uninstalled and removed, frontend Keycloak clients and agent PGO databases dropped, ADR-0042/0214/0411 superseded); step-6 chain green on demo333 2026-10-24; rag-service and rag-ingestion stay for WP-168 |
 | WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Done (2026-10-24) | local models through MaaS with the per-subscription budgets, the 429 pass-through and closed-class refusal; the user, group and cross-model ceilings stay in the ai-gateway's quota.py (Kuadrant counts two limits per route); follow-up in WP-177 |
 | WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Done (2026-11-03) | split out of WP-156 by user decision 2026-10-23; every rebuilt panel returns series on demo333 |
-| WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Repo work merged | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |
+| WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Done | visibility proof repeated on UnifAI 0.1.59 (2026-11-05); ADR-0584 is not carried by this WP |
 
 ### Phase 45 — agents in their own repository, delivered as signed OCI releases (added 2026-10-22)
 
@@ -1031,9 +1033,29 @@ WP-208 shows the five experiences together. No cluster action while demo333 is b
 | WP-203 | [wp-203](work-packages/wp-203-dify-preparation.md) | 0599, 0601 | WP-202 | Done | none |
 | WP-204 | [wp-204](work-packages/wp-204-install-dify-on-demo333.md) | 0599, 0601 | WP-202, WP-203 | Done | Vault seed before the Keycloak client push; `make d2 install dify` |
 | WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Done (2026-11-05) | adapter built, signed and rolled; knowledge base registered in Dify; forbidden-space case not exercised |
-| WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Repo work in review | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
-| WP-207 | [wp-207](work-packages/wp-207-kagent-preparation-and-install.md) | 0600, 0601 | WP-202, WP-206 | Not started | scratch spike in `zuno-kagent-scratch`; `make d2 install kagent` |
-| WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Not started | live rehearsal on demo333 |
+| WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Done | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
+| WP-207 | [wp-207](work-packages/wp-207-kagent-preparation-and-install.md) | 0600, 0601 | WP-202, WP-206 | Done | scratch spike in `zuno-kagent-scratch`; `make d2 install kagent` |
+| WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Repo work in review | live rehearsal on demo333 |
+
+### Phase 50 — follow-up work from the ADR close-out (added 2026-11-05)
+
+Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially implemented` for a concrete reason, so each now has work packages: the ai-gateway classification floor (WP-209, ADR-0565), page-level Confluence ACL (WP-210, ADR-0110) and the remaining day-0 components of ADR-0352 in the ADR's own order (WP-211 to WP-218). ADR-0570's checks that were never run are blocked, see the ADR close-out note in the change log.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-209 | [wp-209](work-packages/wp-209-ai-gateway-classification-floor-per-agent-and-task.md) | 0565 | none | Not started | ai-gateway change plus a generated floor slice; default header C3 after the caller inventory |
+| WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110 | none | Not started | only if page-level ACL is wanted; change in the fork's Confluence connector, sent to the fork session as a patch |
+| WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal there-and-back on a simulated external Keycloak |
+| WP-212 | [wp-212](work-packages/wp-212-vault-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal; who unseals in external mode |
+| WP-213 | [wp-213](work-packages/wp-213-postgresql-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal |
+| WP-214 | [wp-214](work-packages/wp-214-redis-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal |
+| WP-215 | [wp-215](work-packages/wp-215-aap-internal-external-mode.md) | 0352 | WP-143, WP-213 | Not started | cluster rehearsal; keep the Fernet key persistent |
+| WP-216 | [wp-216](work-packages/wp-216-external-secrets-internal-external-mode.md) | 0352 | WP-143 | Not started | documentation and check surgery |
+| WP-217 | [wp-217](work-packages/wp-217-cert-manager-internal-external-mode.md) | 0352 | WP-143 | Not started | documentation and check surgery |
+| WP-218 | [wp-218](work-packages/wp-218-argocd-internal-external-mode.md) | 0352 | WP-143, ADR-0557 decision | Not started | waits for ADR-0557's mechanism |
+| WP-219 | [wp-219](work-packages/wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md) | 0570 | WP-177 | Closed — deferred | every check is blocked: vendor route defect (V2, V3, V5), personas get 401 from MaaS (V6), no verified project id (V11) |
+| WP-221 | [wp-221](work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md) | 0584 | WP-167 | Not started (2026-11-05: go given by the user, the fork session builds the operator part as soon as it can) | the fork session builds the operator part, a release with the user's go, one pilot on demo333 |
+| WP-220 | [wp-220](work-packages/wp-220-evaluate-the-rhoai-3-6-mcp-lifecycle-portal-and-workbenches-v2-components.md) | 0571 | WP-195 | Repo work in review | evaluation of three RHOAI 3.6 components; a pilot needs the user's go |
 
 ### OKF stream phases
 
@@ -1179,6 +1201,17 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — WP-221 added and ADR-0584 retargeted from v0.12 to v0.15: its lifecycle states, revocation list and audit events are not built, and WP-167 never carried them. The user asked for a work package and for unstarted work to follow later releases.
+- 2026-11-05 — WP-167 Done and ADR-0582 Implemented: the user repeated the per-agent sheet proof on UnifAI 0.1.59 as consultant-01 and sale-01. ADR-0584 stays `Accepted`: its lifecycle states, revocation list and audit events are not built and no work package carries them.
+- 2026-11-05 — Unstarted work follows the code releases (user decision). ADR-0565 moves to the new band v0.15; ADR-0110, ADR-0352, ADR-0556 and ADR-0557 move to the new band v0.16, with WP-209 and WP-210 to WP-218 following their ADRs. Closed ADRs, ADRs with a started package, and the past bands are untouched; the old bands v0.1 now has no open ADR or WP, and v0.9 keeps only ADR-0559 (WP-145, WP-195). See the ADR change log.
+- 2026-11-05 — `v0.13.0` tagged on `main` (`388555d6`): the first platform tag since `v0.3.0`, so that tags follow the roadmap bands again. The rule (a tag per band, on `main`, annotated, the in-cluster ledger as a separate step) is in RELEASING.md and the tag table in versions.md. v0.4 to v0.12 are not tagged retroactively; the next tag is `v0.14.0`.
+- 2026-11-05 — WP-220 added (evaluation, no cluster change): what the RHOAI 3.6 MCP lifecycle operator, MaaS consumer portal and WorkbenchesV2 would bring to this project, which custom code each could replace, and the questions that gate a pilot. It also records that the MaaS 3.6 documentation describes the WP-195 quota incident (gateway wasm object size) and its levers.
+- 2026-11-05 — ADR-0567 Implemented with an amendment: the builtin guardrail detectors and the smoke orchestrator stay as a documented fallback (decision 5's deletion is no longer decided). WP-219 added, deferred: it holds ADR-0570's never-run checks, each blocked (vendor route defect, personas 401 on MaaS, no verified project id).
+- 2026-11-05 — ADR-0561 Implemented (ADR close-out): the replacement of the first-party agent stack by UnifAI is carried out and its security gate (ADR-0563) is cleared. The ai-gateway classification floor it relies on is WP-209, still open.
+- 2026-11-05 — Phase 50 added (ADR close-out, WP-209 to WP-218): the ADRs that stay `Partially implemented` get work. WP-209 is the ai-gateway classification floor of ADR-0565. WP-210 is page-level Confluence ACL of ADR-0110 (to be built only if wanted). WP-211 to WP-218 take ADR-0352's remaining day-0 components in its own order: keycloak, vault, postgresql, redis, aap, external_secrets, cert_manager, argocd.
+- 2026-11-05 — ADR-0566, ADR-0563, ADR-0569, ADR-0573 and ADR-0568 Implemented (ADR close-out, point 2): the remainder of each was a status that had not followed, or a scope cut now written in the ADR (project dimension, group-gated tiles, the demo222 cutover, freshness fields, `sql-dump`, language boost). ADR-0567 was left open: its decision 5 cleanup is not done.
+- 2026-11-05 — ADR-0353, ADR-0575 and ADR-0572 Implemented (ADR close-out, point 1). ADR-0353 was ratified and closed together: WP-176 and ADR-0586 realise it. ADR-0575 notes that no upstream PR was opened, by decision. ADR-0572 is implemented at the playbook and chart level; its operator clauses 2 and 3 stay a contract of ADR-0556, and a new check, `check_unifai_identity.py`, refuses `identity.keycloak`.
+- 2026-11-05 — ADR-0552, ADR-0553 and ADR-0585 Implemented: every WP behind them was already Done. ADR-0553 is Implemented as a placement only; its visibility benefit was never obtained and the dated correction note says so. (ADR close-out, point 1.)
 - 2026-11-05 — WP-194 Done and ADR-0596 Implemented: on demo333, "Zuno Code" is served by Codestral from Open WebUI (consultant-01, 1.3 s) and OpenClaw (consultant-02, 2.2 s), and "Zuno" stays on the local qwen (130 s on the same question). The fallback with Codestral down is covered by unit tests only.
 - 2026-11-04 — ADR-0597, ADR-0598 and WP-197 to WP-201 added as phase 48: consultant-01 found an empty UnifAI (no team, no inventory, no workflow). The operator gains built-in resources, and the demo stack gets business teams next to the agent teams, a catalog without keys, a shared gateway, example workflows, persona starters and a RAG shown live.
 - 2026-11-04 — WP-195 added to phase 43: every Subscription on demo333 said `AtLatestKnown` while seven operators had newer versions (RHOAI and GitOps behind unapproved Manual InstallPlans, rhcl on a channel that stops at 1.4.3, authorino/limitador/dns pinned by rhcl, Kueue on a frozen channel). A report-only audit (`make d3 check operators`), per-cluster channel pins and an RHOAI upgrade walk land in the repo; the live updates follow one go at a time.

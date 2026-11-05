@@ -1,6 +1,6 @@
 # WP-195: Update every operator on demo333 through the repository
 
-- **State:** Operator pending (repo work done 2026-11-04; each live step needs the user's go)
+- **State:** Done (2026-11-05: every live step ran with the user's go; see the sections at the end)
 - **ADRs:** [ADR-0559](../../adr/0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md)
 - **Depends on:** [WP-145](wp-145-fleet-version-and-catalog-policy.md) (step 1, the demo333 measurement, is taken here)
 - **Related:** [ADR-0048](../../adr/0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md), [ADR-0558](../../adr/0558-tolerate-catalogs-that-stop-publishing-an-installed-operator.md), [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [WP-157](wp-157-slim-the-ai-gateway-via-maas.md), [WP-177](wp-177-finish-the-maas-quota-delegation.md)
@@ -443,11 +443,10 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    - ArgoCD `zuno-namespaces-d0` is OutOfSync: `zuno-ai-build` lost
      `kueue.openshift.io/managed=true`.
    - ArgoCD `zuno-mlops-d1` is OutOfSync: TrainingRuntime `mlops-lora`.
-   - The repo copies of maas-api settings (namespace `redhat-ods-applications`
-     in the openshift-ai, postgresql, namespaces, service-mesh and models
-     charts, and in the maas_db_copy role) are now stale. MaaS works because
-     maas-api in its new namespace uses its own built-in config, but they
-     must be audited.
+   - maas-api namespace references: audited 2026-11-05. maas-api has run in `redhat-ai-gateway-infra` since RHOAI 3.5 GA, and
+     the repo already knew it. The `maas-db-config` source Secret and ExternalSecret in `redhat-ods-applications` are
+     correct (maas-controller copies it across). Only `precheck.yml` still looked for the maas-api pods in
+     `redhat-ods-applications`, so its restart-evidence finding never fired; fixed.
    - **There is no rollback: OLM does not downgrade.**
    - Expect new operands. Re-check the quotas, the mesh-egress NetworkPolicy
      union and immutable Deployment selectors (3.5.0 GA traps 1, 4 and 5).
@@ -515,6 +514,78 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
 - **Guardrails smoke (T2), open.** `GuardrailsOrchestrator zuno-guardrails-smoke` keeps `phase=Error` with
   `ReconcileFailed: Built-in route reconciliation failed`, a condition stamped 2026-10-12. Its Deployment, Service and
   Route are fine (route Admitted), and an annotation nudge produced no operator log and no status change, so the
-  condition looks stale. It is the last thing holding TrustyAI at Ready=False. Planned remedy: delete the CR so
-  `zuno-trustyai-config` recreates it with a fresh status (backup in the session scratchpad).
+  condition looks stale. Remedy (user go, 2026-11-05): the CR was deleted and `zuno-trustyai-config` recreated it
+  (backup in the session scratchpad). It came back `Ready`, TrustyAI reports "All enabled services are healthy", and
+  TrustyAIReady is True.
+- **DSC after this:** `Ready=False` only because of "Some modules are degraded: ogx". The `default-ogx` CR has no unhealthy
+  condition and `OGXReady=True`, and the install role already treats the ogx module state as benign, so this is left alone.
+  The `MCPLifecycleOperator`, `MaaSConsumerPortal` and `WorkbenchesV2` conditions are False only because those submodules
+  are `Removed`. Still OutOfSync in ArgoCD: `startx-cluster-auth`, `startx-cluster-infra-config` and `zuno-mlops-d1`
+  (TrainingRuntime `mlops-lora`), not traced to 3.6.
+
+## Repo cleanup after RHOAI 3.6.0-ea.2 (2026-11-05)
+
+- `ansible/roles/openshift_ai/tasks/precheck.yml`: the maas-api pod lookup, the finding's resource name and its hint now use
+  `redhat-ai-gateway-infra`.
+- New `ansible/roles/openshift_ai/tasks/module_manager_memory.yml`, included from `install.yml` and `reconcile.yml`: raises
+  the memory limit of `odh-observability`, `opendatahub-feast-operator` and `spark-operator-module-controller-manager` to
+  1536Mi (they ship at 512Mi and are OOM-killed). Whether the RHOAI operators keep the patch is unverified; the file says so,
+  and `make d1 reconcile openshift-ai` re-applies it.
+- Not done by choice: `startx-cluster-auth` and `startx-cluster-infra-config` (ArgoCD OutOfSync) are out of scope.
+
+## OGX after RHOAI 3.6.0-ea.2 (2026-11-05, investigation only)
+
+`DSC Ready=False` comes only from "Some modules are degraded: ogx". Cause:
+- `OGXServer redhat-ods-applications/zuno-ogx` is `phase=Failed`: `RoleBinding zuno-ogx-rb ... cannot change roleRef`.
+  The RoleBinding (created 2026-09-07) binds ServiceAccount `zuno-ogx-sa` to ClusterRole
+  `system:openshift:scc:anyuid`. The 3.6 OGX operator wants `system:openshift:scc:nonroot-v2`, and a roleRef is immutable
+  (same family as the immutable-selector trap of the 3.5.0 GA).
+- The new ReplicaSet `zuno-ogx-5565c4d5f5` (12:30Z) cannot create pods: "unable to validate against any security context
+  constraint ... seccomp may not be set". The old pod (21 h, SCC `anyuid`) keeps serving, so `Deployment` shows 1/1 ready and
+  0 up to date.
+- Impact is small: `zuno-ogx` is labelled `rag-provider-prototype` and nothing in the cluster references it.
+- Proposed remedy (needs a go): delete `RoleBinding zuno-ogx-rb` so the operator recreates it with `nonroot-v2`, then let the new
+  ReplicaSet replace the old pod. Expected: OGXServer `Ready`, DSC `Ready=True`.
+
+## OGX and mlops fixed (2026-11-05, user go)
+
+- **OGX:** `RoleBinding zuno-ogx-rb` was deleted (copy in the session scratchpad). The OGX operator recreated it with
+  `system:openshift:scc:nonroot-v2` only after a harmless annotation woke the `OGXServer`; the new ReplicaSet also needed an
+  annotation to retry after its failed pod creations. The new `zuno-ogx` pod runs under SCC `nonroot-v2` (2/2), the old
+  `anyuid` pod is gone, `OGXServer` is `Ready`, and `default-ogx` lost its `Degraded` condition after a nudge. **The DSC is
+  `Ready=True`** (the three `Removed` submodule conditions remain, cosmetic). Same recipe for the next time an operator
+  changes the SCC of a workload it owns: delete the RoleBinding, nudge the CR, nudge the ReplicaSet.
+- **`zuno-mlops-d1` OutOfSync, cause:** the chart's TrainingRuntime `mlops-lora` set `mlPolicy.torch.numProcPerNode: 1`. The
+  3.6.0-ea.2 Trainer CRD no longer has that field (`torch` only keeps `envInjection`; `numProcPerNode` lives on the TrainJob's
+  `spec.trainer`), so the API server pruned it on every apply, and ArgoCD saw git ahead of live for ever. The live object
+  only differed by server defaults (`template.metadata`, `groupName`), which ArgoCD ignores.
+- **Fix:** the field was removed from `gitops/charts/mlops/templates/trainingruntime.yaml` (8ec6c12d), checked with a server
+  dry-run. After a hard refresh the Application is `Synced/Healthy`. Nothing in this repo sets `numProcPerNode` on a TrainJob,
+  so check the next LoRA TrainJob.
+
+## Follow-up observations (2026-11-05, read-only)
+
+- **Shim `Task failed`, now explained in part.** The line, once per chat, reads
+  `Failed to get response CEL value: Failed to retrieve gRPC response: Received response with size 0`
+  (wasm shim sha256 fd5039db..., Kuadrant 1.5.0). In the shim source
+  (`kuadrant-filter/src/kuadrant/pipeline/tasks/dynamic.rs`, `process_dynamic_response`), when a dynamic gRPC task has
+  follow-up `onReply` tasks, the shim reads the reply as a CEL value; an empty reply (size 0) makes it return
+  `TaskOutcome::Failed`. The rate-limit calls are `failureMode: allow`, so the request still passes, and the counter still
+  moves because Limitador has already applied the call. Hypothesis, not tested: a Failed task stops the actions queued
+  behind it, which would also explain the old WP-177 finding that only the first two limits count. To test it, reproduce on
+  a throwaway Gateway with two matching limits and read the shim log. No upstream issue or PR mentions the message.
+- **Module manager memory: more durable than feared.** On `odh-observability` and `spark-operator-module-controller-manager`,
+  server-side apply shows the operator (`platform`, Apply) owning only `limits.cpu` and `requests.cpu`, and the manual patch
+  (`kubectl-patch`) owning `limits.memory` and `requests.memory`. The operator does not declare memory in its current
+  manifests, so it has nothing to revert; the values were unchanged after about three hours and several operator reconciles.
+  The risk is a later RHOAI release that declares memory itself, and then the ownership would conflict.
+- **The three `Removed` DSC conditions.**
+  - `MCPLifecycleOperatorReady`: DSC module `mcplifecycleoperator` (empty spec, `Removed` by default). It deploys the
+    MCP lifecycle operator, which manages MCP servers as Kubernetes objects. This platform uses the Kuadrant MCP gateway and
+    its own MCP deployments, so it is not needed.
+  - `MaaSConsumerPortalAvailable`: a submodule of the MaaS stack with no DSC field of its own on this cluster. By name, a
+    consumer-facing portal to request MaaS API keys. Not documented in the cluster's CRDs; MaaS keys come from maas-api
+    here, so it is not needed.
+  - `WorkbenchesV2Ready`: `spec.components.workbenches.workbenchesV2`, a second-generation workbench controller (the live
+    CRD still has `notebooks.kubeflow.org`). The classic `workbenches` component is `Managed` and Ready in `zuno-ai-build`.
 

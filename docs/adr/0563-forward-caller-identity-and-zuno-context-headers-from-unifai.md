@@ -1,6 +1,6 @@
 # ADR-0563: Forward caller identity and Zuno context headers from UnifAI
 
-- **Status:** Partially implemented
+- **Status:** Implemented (2026-11-05, WP-146: identity and context headers forwarded and verified live on demo333; the project dimension is dropped for untrusted callers, by decision)
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -133,7 +133,7 @@ LLM or MCP resource with any `X-Zuno-*` template; what matters is what the gatew
   This is the verification clause 5 asked for, in the simplest form: the caller is verified, not the header.
   A project id resolved server-side from a verified grant (ADR-0528) is not implemented; the project
   dimension is dropped for untrusted callers.
-- Classification keeps the floor of ADR-0565.
+- Classification keeps the floor of ADR-0565. That floor is not built yet in the ai-gateway; it is planned as WP-209 (see the closure note below).
 No resource creation is restricted on the UnifAI side. Probes and the live check:
 [wp-146-header-authorship-2026-10-24.md](../roadmap/evidence/wp-146-header-authorship-2026-10-24.md).
 
@@ -181,3 +181,11 @@ persona's `sub`; an MCP tool call reaches `mcp-gateway` with the same `sub`;
 expiring the access token mid-session triggers a refresh, not a 401; revoking
 the Keycloak session makes the next call fail closed. Any `oc` command passes
 `--context` explicitly (ADR-0559).
+
+## Closure note (2026-11-05)
+
+Every clause is in effect and was proven live on demo333 (WP-146, Done 2026-10-24; evidence in [wp-146-header-authorship-2026-10-24.md](../roadmap/evidence/wp-146-header-authorship-2026-10-24.md)). What was not built is recorded as a decision, not as missing work:
+
+- **The project dimension.** A project id resolved server-side from a verified grant (ADR-0528) is not implemented. Clause 5 allowed this: until it exists UnifAI does not send the project, and the ai-gateway ignores `X-Zuno-Project-Id` from callers whose `azp` is not a trusted platform client. If a verified project is wanted again, it needs a new ADR.
+- **Runs that outlive the SSO session, and schedules.** A schedule cannot forward a token, so a forwarded-token LLM refuses it. A `UnifaiChat` submitted by the operator has no signed-in user either (observed 2026-11-05: the chat completes with "no identity binding for session"; the operator only mirrors the session status; this was reported to the fork session as a low-priority defect).
+- **The classification floor.** ADR-0565 clause 5 is not built in the ai-gateway; WP-209 carries it. ADR-0594 already raises the turn from signed markers.

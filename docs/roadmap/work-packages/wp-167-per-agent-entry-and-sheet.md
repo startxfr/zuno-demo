@@ -1,6 +1,6 @@
 # WP-167: Serve a per-agent entry and descriptive sheet from the admitted bundle
 
-- **State:** Repo work merged
+- **State:** Done (2026-11-05: the visibility proof is repeated on UnifAI 0.1.59 as consultant-01 and sale-01; ADR-0582 Implemented; ADR-0584 is not carried by this WP, see the note)
 - **ADRs:** [ADR-0582](../../adr/0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md), [ADR-0583](../../adr/0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md), [ADR-0584](../../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md)
 - **Depends on:** [WP-155](wp-155-migrate-remaining-agents-and-cut-demo222-over.md)
 - **Related:** [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md), [WP-148](wp-148-unifai-parity-memory-routing-quota-ux.md)
@@ -99,3 +99,11 @@ free-form), the valid conformance cases state their `ui` block in `expected.json
 schema accepted them) and that every real agent complies, whatever its `okf_version` (all eight are v0.2 at
 the time of writing, so the schema change alone would not protect them). CI runs the new test.
 Left: the release that carries it (version bump, zuno-demo-a0).
+
+## Proof on UnifAI 0.1.59 (2026-11-05)
+
+Repeated by the user in a real browser on the current release, as consultant-01 and sale-01: the sheet shows for an agent the caller may use, and a hidden agent and an unknown one give the same "Agent not found" page. The results, with the cropped captures and what was not captured, are in [the evidence](../evidence/wp-167-per-agent-sheet-proof-unifai-0.1.59-2026-11-05.md). The line "Next: an operator release (a9), a UI image and the role rerun" above is out of date: operator 0.1.59 and the UI image are live.
+
+## What this WP does not carry (note 2026-11-05)
+
+This WP delivers ADR-0582, and the group visibility of ADR-0583 (Implemented). It does not build ADR-0584 (lifecycle states, roles, incident revocation): see its dated note. The `placeholder` and `active` states exist; the `deprecated` and `retired` states, the revocation list and the audit events do not.

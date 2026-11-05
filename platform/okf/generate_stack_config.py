@@ -116,6 +116,10 @@ HEADER = (
 )
 
 
+# ADR-0584 clause 3: a deprecated agent stays usable (its sheet is marked), so it keeps the same reach as an
+# active one; a placeholder or a retired agent is not served and reaches nothing.
+SERVED_STATES = ("active", "deprecated")
+
 def verify_keyless() -> dict:
     """spec.verify.keyless of every UnifaiAgentBundle (WP-162), from the one
     place zuno-demo names the signing identities (platform/okf/sigstore/identity.yaml)."""
@@ -176,7 +180,7 @@ def maas_agent_subscriptions(release_dir: pathlib.Path, view: Dict[str, dict],
     published = published_models(routing)
     out: Dict[str, dict] = {}
     for name, a in sorted(view.items()):
-        if a["status"] != "active":
+        if a["status"] not in SERVED_STATES:
             continue
         levels = _reachable_classifications(a["classification"])
         agent_md = release_dir / "agents" / name / "agent.okf.md"

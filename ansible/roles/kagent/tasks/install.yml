@@ -1,6 +1,103 @@
 ---
-# Stub (WP-202): WP-207 replaces this file. A no-op, never a failure, so a full
-# `make d2 install` stays green until the kagent track lands.
-- name: "kagent | not implemented yet"
+# ADR-0600 / WP-207: kagent as a thin operations experience client. Order: Vault seeds, the
+# service account's groups, the CRDs (d0), the token proxy, then kagent (d1).
+- name: "kagent | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "kagent | seed the Vault paths"
+  ansible.builtin.include_tasks: seed_vault.yml
+
+- name: "kagent | give the service account the persona's groups"
+  ansible.builtin.include_tasks: keycloak_sa_groups.yml
+
+- name: "kagent | read the cluster networks"
+  kubernetes.core.k8s_info:
+    api_version: config.openshift.io/v1
+    kind: Network
+    name: cluster
+  register: _kagent_network
+
+- name: "kagent | fail if the cluster networks are unknown"
+  ansible.builtin.fail:
+    msg: "Network.config.openshift.io/cluster has no clusterNetwork/serviceNetwork: the egress policy cannot exclude them."
+  when: >-
+    (_kagent_network.resources | default([]) | length) == 0 or
+    (_kagent_network.resources[0].spec.clusterNetwork | default([]) | length) == 0 or
+    (_kagent_network.resources[0].spec.serviceNetwork | default([]) | length) == 0
+
+# kubernetes.default.svc resolves to these addresses on 6443; the controller watches the API there.
+- name: "kagent | read the control-plane addresses"
+  kubernetes.core.k8s_info:
+    kind: Endpoints
+    namespace: default
+    name: kubernetes
+  register: _kagent_kube_endpoints
+
+- name: "kagent | compute the cluster networks and the API addresses"
+  ansible.builtin.set_fact:
+    _kagent_cluster_cidrs: >-
+      {{ (_kagent_network.resources[0].spec.clusterNetwork | map(attribute='cidr') | list)
+         + _kagent_network.resources[0].spec.serviceNetwork }}
+    _kagent_kube_api_addresses: >-
+      {{ _kagent_kube_endpoints.resources[0].subsets | default([]) | map(attribute='addresses') | flatten
+         | map(attribute='ip') | list }}
+
+- name: "kagent | apply the CRDs Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "kagent"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-kagent-d0"
+
+- name: "kagent | apply the token proxy Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "token-proxy-kagent"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-token-proxy-kagent-d1"
+    gitops_app_extra_helm_values:
+      namespace: "{{ kagent_namespace }}"
+      clientId: kagent
+      clusterBaseDomain: "{{ cluster_base_domain }}"
+      aiHeaders: "{{ kagent_ai_headers }}"
+      mcpHeaders: "{{ kagent_mcp_headers }}"
+      egress:
+        clusterCIDRs: "{{ _kagent_cluster_cidrs }}"
+
+- name: "kagent | apply the kagent Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "kagent"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-kagent-d1"
+    gitops_app_extra_helm_values:
+      global:
+        zuno:
+          clusterBaseDomain: "{{ cluster_base_domain }}"
+          routeHost: "kagent.{{ cluster_base_domain }}"
+      egress:
+        clusterCIDRs: "{{ _kagent_cluster_cidrs }}"
+        kubeApiAddresses: "{{ _kagent_kube_api_addresses }}"
+
+- name: "kagent | wait for the Deployments to be available"
+  kubernetes.core.k8s_info:
+    kind: Deployment
+    namespace: "{{ kagent_namespace }}"
+    name: "{{ item }}"
+  register: _kagent_deploy
+  until: >-
+    (_kagent_deploy.resources | default([]) | length > 0) and
+    ((_kagent_deploy.resources[0].status.availableReplicas | default(0)) >= 1)
+  retries: 60
+  delay: 15
+  loop:
+    - zuno-token-proxy
+    - kagent-controller
+    - kagent-ui
+    - kagent-front-door
+
+- name: "kagent | installed"
   ansible.builtin.debug:
-    msg: "kagent is declared but not implemented yet (WP-207, ADR-0600); nothing was applied."
+    msg: >-
+      kagent is at https://kagent.{{ cluster_base_domain }} behind Keycloak (realm zuno, group ocp-ai-ops).
+      `make d2 check kagent` verifies the chain.

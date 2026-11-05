@@ -1,6 +1,6 @@
 # ADR-0561: Adopt UnifAI as the agent platform
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-05, WP-154, WP-155, WP-156 and WP-166: the agents run on UnifAI on demo333, the first-party agent-runtime, agent-bff and agent-frontend are retired, and the supersessions are applied. One security dependency is still open, the ai-gateway floor of ADR-0565 clause 5, planned as WP-209)
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -155,3 +155,17 @@ blocks cutover. It is never dropped silently.
 The two stacks run side by side until WP-156. `evaluations/<agent>/`
 scenarios, including `chat_first_token_latency` (`max_seconds: 6`), are
 re-pointed at UnifAI's session API, and a regression there blocks cutover.
+
+## Closure note (2026-11-05)
+
+The decision is carried out: the staged replacement of agent-runtime, agent-bff and agent-frontend by UnifAI is complete (WP-154 pilot gates 2026-10-24, WP-155 parity wave 1, WP-156 retirement, WP-166 dashboards rebuilt 2026-11-03), and every supersession of the "Planned supersession" section reads as such in the ADR index.
+
+- **The security gate is cleared.** "No agent is cut over before ADR-0563 is in place": ADR-0563 is Implemented (2026-11-05, WP-146).
+- **The parity rows marked unverified** were tested as the Operational considerations required, and none was dropped silently:
+  - cross-user session resume and group-gated visibility: the standing check `cross_user_isolation` and the two-user probe of [adr-0583-authorization-verification.md](../roadmap/evidence/adr-0583-authorization-verification.md) (2026-10-24), and again in the browser on 2026-11-05 (consultant-01 sees the consultant team, sale-01 does not);
+  - team-workspace grants: the same file (403 on another team's blueprint, creator-only team changes);
+  - citation rendering: [wp-155-parity-wave1.md](../roadmap/evidence/wp-155-parity-wave1.md) (the RAG citation scenarios pass for advantage, finage and naveo, and the comage fix).
+  - The projects-as-sharing-boundary row is covered by ADR-0569, now Implemented.
+- **One dependency stays open.** The Security considerations rely on the ai-gateway enforcing the classification floor independently (ADR-0565 clause 5). It is not built yet: WP-209. Until then an agent declares the worst case of its tool sources statically in its bundle, which over-classifies and never widens SaaS eligibility, as the ADR requires of the interim.
+- **ADR-0567** (guardrails in the ai-gateway) is a sibling that stays open for its decision 5 cleanup; it does not block this decision.
+- The first-token latency scenario (`max_seconds: 6`) passed in the 18/18 run of 2026-10-24; later runs under load measured longer (see ADR-0573).

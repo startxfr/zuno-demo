@@ -1,0 +1,27 @@
+# ADR-0600 (WP-207): the kagent CRDs (kagent.dev/v1alpha2, all Namespaced) in their own Application so the
+# controller (d1) finds them. Server-side apply: the Agent CRD is larger than the client-side annotation limit.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-kagent-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-60"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/kagent-crds
+    helm:
+      releaseName: zuno-kagent-d0
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-kagent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - ServerSideApply=true

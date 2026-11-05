@@ -651,6 +651,13 @@ def test_model_calls_and_turn_summary_read_the_0158_tool_names():
     assert "model_calls=2" in line and "tool_calls/0ch/plan" in line and "stop/1864ch/" in line and "delegate_task_offered=True" in line
 
 
+def test_offered_tool_matches_a_family_prefix_but_not_a_lookalike():
+    spans = [_chat(**{"mas.tool_names": "confluence_page_read,git_repository_read,time_get_current_time"})]
+    assert ut.offered_tool(spans, "confluence") is True
+    assert ut.offered_tool(spans, "git") is True
+    assert ut.offered_tool(spans, "conflu") is False
+
+
 def test_offered_tool_is_unknown_before_the_tool_names_exist():
     spans = [_chat(**{"mas.finish_reason": "tool_calls", "mas.content_chars": "0", "mas.tool_calls": "1"})]
     assert ut.offered_tool(spans) is None

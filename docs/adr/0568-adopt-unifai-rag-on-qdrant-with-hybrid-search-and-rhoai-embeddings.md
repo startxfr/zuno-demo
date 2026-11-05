@@ -1,6 +1,6 @@
 # ADR-0568: Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings
 
-- **Status:** Partially implemented
+- **Status:** Implemented (2026-11-05, WP-149, WP-156, WP-168 and WP-185 to WP-187: UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings is live on demo333; the cuts are recorded in the updates below)
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -239,3 +239,14 @@ the user is asked to power it on first, and every `oc` command passes
 search results; changing it embeds the pages again. On demo333 the Confluence sources are C2 and the 21 Red Hat documentation sources are C1;
 `sales-demo` is unclassified, which the mcp-gateway returns as C2 (fail closed). Live proof, through the mcp-gateway, of a result set of three C2 and
 two C1 chunks: [evidence](../roadmap/evidence/wp-187-live-labels.md). The old per-chunk classification of the retired rag-service is therefore back.
+
+## Closure note (2026-11-05)
+
+The cutover is complete and the old rag-service and rag-ingestion are retired. The things it did not carry are recorded in the "Update 2026-11-02 (WP-186)" section above, and none of them is open work for this ADR:
+
+- **Freshness fields** (`source_modified_at`, `stale_after`): not written; ADR-0109 is superseded in part by this record.
+- **The `sql-dump` source**: not built; the user left the SXA legacy domain dropped on 2026-11-02 and the condition is withdrawn for it.
+- **The language boost**: not carried, by measurement (hit@1 0.80 on ten French questions).
+- **Page-level ACL reconciliation**: not replaced. Access is the source's `aclGroups`, applied fail-closed at query time. Restoring page-level restrictions is ADR-0110's remaining work, planned as WP-210, in the fork's Confluence connector.
+
+Live checks of the week of 2026-11-02: the restore drill compared 501 points (WP-186), the source classification is live (WP-187), and on 2026-11-05 a document uploaded in a personal workspace and a Confluence page edited in SXSI were found by the RAG, after an on-demand resync.

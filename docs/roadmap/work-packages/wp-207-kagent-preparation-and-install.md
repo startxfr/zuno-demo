@@ -1,6 +1,6 @@
 # WP-207: kagent preparation and install
 
-- **State:** Not started
+- **State:** Done 2026-11-05 on demo333: kagent 0.10.4 installed as a thin client in `zuno-kagent` (controller with namespaced Roles only, UI behind oauth2-proxy, token proxy, own database), `zuno-sre` Ready and answering from mcp-gateway tools only (listed the pods of `zuno-ai-run`); `zuno_model_tokens_total{client="kagent"}` = 2488 in prometheus-k8s. Persona `ai-ops-01`. Details and traps in the evidence file.
 - **ADRs:** [ADR-0600](../../adr/0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md), [ADR-0601](../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md)
 - **Depends on:** [WP-202](wp-202-common-preparation-for-dify-and-kagent.md), [WP-206](wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md)
 - **Related:** [WP-208](wp-208-five-experiences-demonstration.md)

@@ -319,3 +319,7 @@ Clause 2's gateway-level quota policy is switched off on demo333 since RHOAI 3.6
 gateway's wasm configuration became too large for etcd. The ai-gateway ledger carries the user and
 group ceilings, and MaaS carries the per-subscription limits. See WP-195, "Quota counters after RHOAI
 3.6.0-ea.2", and [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md).
+
+## Note (2026-11-05): the never-run checks have a deferred work package
+
+The checks V2, V3, V5, V6 and V11 are recorded as blocked in [WP-177](../roadmap/work-packages/wp-177-finish-the-maas-quota-delegation.md), and none can run today: V2, V3 and V5 need a SaaS ExternalModel through MaaS (vendor route defect), V6 cannot be exercised because personas no longer reach MaaS, and V11 needs a verified project id, which [ADR-0563](0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md) records as not implemented. [WP-219](../roadmap/work-packages/wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md) holds them as a deferred package with the condition to resume. This ADR stays `Partially implemented`, with its own exit unchanged: remove `app/quota.py`, or amend it to accept the ledger as the permanent design.

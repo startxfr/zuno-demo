@@ -1,6 +1,6 @@
 # WP-208: Five experiences demonstration
 
-- **State:** Not started
+- **State:** Repo work in review (dashboards and script written; terminal part of the rehearsal done 2026-11-05, see the evidence; the browser part is the user's)
 - **ADRs:** [ADR-0599](../../adr/0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md), [ADR-0600](../../adr/0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md)
 - **Depends on:** [WP-204](wp-204-install-dify-on-demo333.md), [WP-205](wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md), [WP-207](wp-207-kagent-preparation-and-install.md)
 - **Related:** [WP-184](wp-184-three-experiences-demonstration.md)

@@ -97,10 +97,38 @@ Findings:
 - **A cancelled call before the test.** At 15:05:51, a C1 call with no `zuno.task`, so not `zuno-code` (trace `a2c667d32695ece2`), was
   cancelled after 103 s, before T4 started.
 
-## Not run live
+## T5: Codestral down, local answers in the same turn (ADR-0596 decision 3)
 
-- **Codestral down.** It is not tested live, because the key lives in Vault and this session does not write there. The
-  fallback is covered by the unit test above.
+2026-11-05, 18:15 to 18:21Z (19:15 to 19:21 local), in a window announced to the other sessions. No Vault write and no
+restart. The drill broke the provider, not the key:
+
+1. Argo CD auto-sync was paused on `zuno-llm-d1` only, after a snapshot of its `syncPolicy` and of the ConfigMap
+   `zuno-provider-routing`.
+2. The `mistral-codestral` provider's `model` was set to `codestral-zuno-drill-unknown` in that ConfigMap. The
+   ai-gateway hot-reloaded it at 18:15:00Z.
+3. Open WebUI, consultant-01, model **Zuno Code**, new chat: "écris une fonction python qui inverse une chaîne". The
+   user reported a normal answer (19:17 local).
+4. The saved `syncPolicy` was put back. Argo CD synced at 18:19:43Z and the ai-gateway reloaded the Git config at
+   18:21:00Z. The live ConfigMap was compared with the snapshot and is identical. `zuno-llm-d1` is Synced and Healthy.
+
+`model_call` spans in Tempo (UTC). Each trace holds both calls of one request: the answer and Open WebUI's title call.
+
+| Time | Trace | Provider | `zuno.task` | Class. | Duration | Status |
+|---|---|---|---|---|---|---|
+| 18:17:12 | `3626e30a06cf917d` | `mistral-codestral` | `code` | C1 | 0.20 s | error: Mistral 400 `Invalid model` |
+| 18:17:13 | `3626e30a06cf917d` | `local-maas` | `code` | C1 | 65.9 s | ok |
+| 18:17:12 | `8a937081aa94ae35` | `mistral-codestral` | `code` | C1 | 0.62 s | error: Mistral 400 `Invalid model` |
+| 18:17:13 | `8a937081aa94ae35` | `local-maas` | `code` | C1 | 40.4 s | ok |
+
+The ai-gateway log has the matching line: `provider 'mistral-codestral' failed for caller=…, trying next fallback`.
+
+Findings:
+- **The fallback works live.** When Codestral fails, `local-maas` answers in the same trace, within about one second
+  of the failure. The user sees a normal answer, only slower (40 to 66 s instead of about 1 s).
+- **The error is visible.** The failed call is a `model_call` span with error status and the Mistral message.
+  The user gets no error.
+- **The drill is cheap to repeat.** It only needs a pause of one Argo Application and a model name change. Restoring
+  is Argo CD's own sync.
 
 ## Addendum: Dify, agents release v0.12.0
 

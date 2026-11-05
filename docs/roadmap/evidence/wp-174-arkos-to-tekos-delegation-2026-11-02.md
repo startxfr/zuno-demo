@@ -106,8 +106,20 @@ The proof of ADR-0406 clause 4, with a temporary change that was reverted exactl
 
 Not shown: the zuno a2a-gateway does not log the `tasks/cancel` call at info level, so the gateway side is inferred from `cancelled` (the cancel RPC returned success), not read in its logs.
 
+## UnifAI v0.1.59 on demo333: every delegation polls, an interrupted turn cancels the remote task (2026-11-05)
+
+Pinned in `d52fa4d4` (catalog `sha256:416a029f…`, five images from release `v0.1.59`, cosign verified), rolled on demo333 with the operator CSV 0.1.59 `Succeeded` and the seven stack pods on the release digests.
+
+- **Normal delegation still answers.** Scenario 21, run 2: one A2A call, `execute_tool iem.delegate_task` ok, reply of 5032 characters (trace `cb0a0474630c0aa5db73555c4680a938`). Run 1 did not delegate: the model looped on the workplan tools (trace `32b41c6865140691c46756081d4401bf`), the known model behaviour, not a transport error.
+- **The user interruption reaches the remote task.** The UI path is `user.session.submit` followed by `POST /api2/sessions/session.cancel`; the streamed `user.session.execute` path has no cancel by design (409, and a client disconnect cancels nothing, as seen on 0.1.58). Run `7c33cf65-6079-4ac5-a189-f96a6dda8687` (trace `959903f1892c0cf415e806f66b311d7f`): cancel sent 1.2 s after the agent-card GET returned 200 `CANCELLED`, and the worker logged `a2a.task_cancelled` for task `b63ed104-7046-4c0e-a88f-4fc38db667cb`, then `a2a.task_error` "Cancelled". On 0.1.58 the same turn only raised `CancelledError`, since a blocking send has no task id.
+- **Tekos answers in about 3 s**, so a cancel sent 3.5 s after the card GET finds nothing left to cancel (run `415e1f21-74c9-45bd-b780-25bd68a846a1`).
+- **The remote task is `canceled`.** A `tasks/get` for `b63ed104-7046-4c0e-a88f-4fc38db667cb` on the a2a-gateway (`POST /agents/tekos/`, the persona's Keycloak token, read through a temporary port-forward) returned `state: canceled`, timestamp `2026-11-05T13:59:28.339Z`, which is the moment of the worker's `a2a.task_cancelled` log.
+- **Still open:** the delegation span `mas.node A2A: Tekos` carries `error.type=CancelledError` but no `mas.a2a_cancel` attribute (the timeout path writes it). The gateway does not log `tasks/cancel`: `a2a-gateway` now logs it at info level (`a2225af0`, tested), not yet deployed (image rebuild and roll).
+- **R-534:** the tokenless `GET /v1/models` 401 noise on the ai-gateway stopped after the roll (108 in the 15 minutes before, none in the following 10).
+- `mas.tool_names` is `(none)` on the model calls that offer no tool (the orchestrator synthesis phase).
+
 ## What remains
 
 1. `cancel_task` for an abandoned delegation (ADR-0406 clause 4): proven on 0.1.57 (see above).
 2. The empty final reply after a delegation (about 1 in 5 on 0.1.54, fix R-531 in 0.1.56) and the turns where Arkos answers without delegating (2 of 8 on 0.1.54 and 0.1.55).
-3. Cancellation when the user aborts the Arkos turn, or a Temporal run is cancelled: a separate design question.
+3. Cancellation when the user aborts the Arkos turn: proven on 0.1.59 (see above), including the remote task read back as `canceled`; only the `mas.a2a_cancel` span attribute remains.

@@ -195,6 +195,12 @@ class TurnTests(GatewayTestCase):
         await self.send("alpha", "tok-consultant", "hi", **{"X-Zuno-Data-Classification": "C1"})
         self.assertEqual([c["headers"]["x-zuno-data-classification"] for c in self.down.llm_calls], ["C3", "C1"])
 
+    async def test_the_task_returns_the_classification_the_turn_ran_at(self) -> None:
+        first = await self.send("alpha", "tok-consultant", "hi")
+        raised = await self.send("alpha", "tok-consultant", "hi", **{"X-Zuno-Data-Classification": "C3"})
+        self.assertEqual(first.root.result.metadata["zuno.classification"], "C1")
+        self.assertEqual(raised.root.result.metadata["zuno.classification"], "C3")
+
     async def test_tools_go_through_the_mcp_gateway_with_the_same_identity(self) -> None:
         self.down.tools = [{"name": "search_confluence", "description": "d", "inputSchema": {"type": "object"},
                             "annotations": {"readOnlyHint": True}}]
@@ -330,6 +336,27 @@ class DelegationTests(GatewayTestCase):
         task = (await self.send("alpha", "tok-consultant", "x", **{"X-Zuno-Delegated-By": "alpha:ask"})).root.result
         self.assertEqual(task.status.state, TaskState.failed)
         self.assertEqual(self.down.llm_calls, [])
+
+
+class CancelLoggingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_cancel_is_logged_with_the_agent_the_task_and_the_caller(self) -> None:
+        from unittest import mock
+
+        from app.auth import CallerIdentity
+        from app.executor import ZunoAgentExecutor
+
+        agent = mock.Mock()
+        agent.name = "tekos"
+        executor = ZunoAgentExecutor(agent, mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock())
+        context = mock.Mock(task_id="task-42", context_id="ctx-1")
+        context.call_context.state = {"caller": CallerIdentity(sub="user-7", groups=[], raw_claims={}, token="t")}
+        queue = mock.Mock(enqueue_event=mock.AsyncMock())
+        with self.assertLogs("a2a_gateway.executor", level="INFO") as logs:
+            await executor.cancel(context, queue)
+        self.assertEqual(
+            logs.output, ["INFO:a2a_gateway.executor:tasks/cancel agent=tekos task_id=task-42 caller=user-7"]
+        )
+        queue.enqueue_event.assert_awaited()
 
 
 if __name__ == "__main__":

@@ -55,8 +55,14 @@ data:
     -- GORM auto-migration create their schemas in public on first start.
     \connect {{ .Values.difyDatabase.name }}
     GRANT ALL ON SCHEMA public TO {{ .Values.difyDatabase.owner }};
+    -- The console's retrieval settings need a configured vector store: pgvector in the dify database.
+    CREATE EXTENSION IF NOT EXISTS vector;
     \connect {{ .Values.difyDatabase.pluginName }}
     GRANT ALL ON SCHEMA public TO {{ .Values.difyDatabase.owner }};
+
+    -- ADR-0600/WP-207: kagent's controller migrates its schema in public on first start.
+    \connect {{ .Values.kagentDatabase.name }}
+    GRANT ALL ON SCHEMA public TO {{ .Values.kagentDatabase.owner }};
 
     \connect {{ .Values.ogxDatabase.name }}
     CREATE EXTENSION IF NOT EXISTS vector;
