@@ -44,9 +44,10 @@ ADR-0587 forbids a client its own model key, RAG store or upload, and lets knowl
    platform's EBS volumes are ReadWriteOnce and the chart wants ReadWriteMany); the plugin-daemon keeps a small
    ReadWriteOnce volume for installed plugins. No MinIO, and no vector database is deployed.
 3. **Login.** oauth2-proxy in front of the console Route (Keycloak client `dify`, allowed groups from the experience
-   declaration), as in ADR-0590. Dify Community has no SSO, so each person who uses Dify also has **a Dify account of
-   their own** (user decision 2026-11-04), created by the install role; local sign-up is off. The accounts share the
-   one workspace (licence) and the one persona identity (ADR-0601 decision 5).
+   declaration), as in ADR-0590. Dify Community has no SSO and needs a local account to exist, so the install role creates
+   **one local administrator** (user decision 2026-11-05, replacing the per-person accounts of 2026-11-04): its email and
+   the shared demo password of ADR-0595 are kept in Vault `dify/admin`, and local sign-up is off. Everyone Keycloak admits
+   works in the one workspace (licence) as that administrator and as the one persona identity (ADR-0601 decision 5).
 4. **Models.** One OpenAI-API-compatible provider whose base URL is the `zuno-token-proxy` (ADR-0601) in front of the
    ai-gateway, with a dummy key. The model list is the ai-gateway's (`auto`, and `zuno-code` per ADR-0596). No other
    provider plugin is installed.
