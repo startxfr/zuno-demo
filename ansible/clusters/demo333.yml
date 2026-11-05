@@ -342,7 +342,10 @@ zuno_connectivity_link_token_rate_limits:
 # WP-195 step 3 (2026-11-04): RHOAI pinned to the head of stable-3.5. From an
 # installed 3.5.0, `make d1 install openshift-ai` walks 3.5.1 then 3.5.2
 # (upgrade_walk.yml), approving no InstallPlan past this pin.
-zuno_openshift_ai_version: "3.5.2"
+# WP-195 step 6 (2026-11-05, user decision): forced EA install. The beta
+# channel's 3.6.0-ea.2 has no upgrade edge from 3.5.2, so the CSV and
+# Subscription are deleted once by hand (see WP-195). No rollback.
+zuno_openshift_ai_version: "3.6.0-ea.2"
 # WP-195 step 4a (2026-11-04): rhcl 1.4.3 -> 1.4.4 on stable-1.4. Step 4b
 # (2026-11-05, user go): 1.4.4 -> 1.5.0 on stable-1.5 (skipRange >=1.4.4).
 # 1.5 deploys authorino/limitador/dns itself and removes their OLM
