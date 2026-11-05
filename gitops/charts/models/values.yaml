@@ -1489,7 +1489,13 @@ externalModels:
       property: api_key
 
 lmEval:
-  enabled: true
+  # OFF (WP-195 step 6, 2026-11-05): the RHOAI 3.6.0-ea.2 TrustyAI module cannot
+  # read an LMEvalJob's status (the CRD has `state`, no `phase`/`conditions`)
+  # and holds TrustyAI, hence the DSC, at Ready=False ("LMES: ... operand status
+  # is not yet available") for as long as ANY LMEvalJob exists, even a
+  # Succeeded one. Last run 2026-11-05, MMLU abstract_algebra: qwen3.5-9b 0.67,
+  # qwen3.6-27b-instruct 0.70. Turn back on when a 3.6 release reads the status.
+  enabled: false
   # Benchmarks the one model actually deployed by this chart (see
   # inferenceServiceName/modelId above), same base_url convention as
   # the UnifAI stack's embedding endpoint.
