@@ -20,7 +20,7 @@ An agent can be `deprecated` (still usable, marked on its sheet) or `retired` (n
 3. **Revocation list (clause 5).** A ConfigMap managed through GitOps in the `unifai` chart lists agents to revoke. The operator reads it (never writes) and treats a listed agent as not admitted: it removes or disables its entry and objects, without a new release. A compromised signing identity is handled by changing the trust policy of ADR-0578, as the ADR says.
 4. **Audit events (clause 6).** The operator emits an event for admission, state change, revocation and rejection, with the digest, the actor identity from the pull request and the reason. Sheet views are not audited per view.
 5. **Runbook (clause 5).** Write the incident revocation runbook with a response target, in `docs/`.
-6. **Fork patch.** Steps 1 to 4 on the operator side are a change to the UnifAI fork on a feature branch (ADR-0575): a zuno-demo session cannot push to `startxfr/UnifAI`, so it goes to the fork session as a patch, then a release pinned with the user's go.
+6. **Fork change.** Steps 1 to 4 on the operator side are a change to the UnifAI fork on a feature branch (ADR-0575). The fork session writes it itself (envtest, CRD generation and the validator are fork-internal) and this repository reviews the contract; a release is then pinned with the user's go.
 
 ## Acceptance
 
@@ -28,3 +28,14 @@ An agent can be `deprecated` (still usable, marked on its sheet) or `retired` (n
 - Adding an agent to the revocation list removes its entry and objects within one reconcile, with no release, and an event records it.
 - The runbook exists and the revocation was rehearsed once on demo333.
 - ADR-0584 can then move to `Implemented`.
+
+## What the operator has today (2026-11-05, from the fork session's read of `fork/unifai-operator`)
+
+- **No lifecycle state.** `UnifaiAgentBundle` has no state. Its spec carries source, verify, ceilings, entitlement, llm and mcp; its status carries the conditions `Verified`, `Valid`, `WithinCeilings`, `Emitted` and the phase. The nearest patterns are the `spec.suspend` boolean (on `UnifaiRAGSource`, `UnifaiWorkflow` and the stack CronJobs) and the phase `Suspended`. So `deprecated` and `retired` would be a new enum on the bundle spec (for example `spec.lifecycle`) with a status condition, and `retired` would use the same cleanup path as a deletion: the emitted objects are removed.
+- **No revocation list.** The operator reads no ConfigMap in the bundle pipeline. It would be a new read-only watch (RBAC `get`, `list` and `watch` on one named ConfigMap), a new condition reason `Revoked`, and a requeue of every bundle when the list changes.
+- **Events exist.** The operator already records Kubernetes Events through a recorder (`internal/controller/events.go`, source `unifai-operator`), so the admission, state, revocation and rejection events fit there. The digest and the reason are easy. **The actor from the pull request is not known to the operator:** it has to arrive in a field or an annotation that the GitOps flow writes. This contract point is for this repository to define.
+
+## Decisions pending on the fork side
+
+- The priority against the A2A approval work (the fork's R-535) and the fork's 0.1 freeze on 2026-12-01. This is a CRD change, so it is a candidate for 0.2 unless it turns out small.
+- The fork session opens a ROADMAP row when the user says go. Nothing is built before that.
