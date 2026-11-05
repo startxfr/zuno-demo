@@ -61,10 +61,41 @@ Findings:
 - `model: zuno-code` from an experience client sets the task to `code` and is served by `mistral-codestral`, and `auto`
   keeps the local-first order. `zuno.task` is on the span.
 - Open WebUI's title call uses the picked model, so it goes to Codestral too.
-- In T3 OpenClaw answered in one turn without running a tool. The "local after an `exec`" case did not occur live; it
-  is covered by the unit test and by the WP-191 proof of ADR-0594.
+- In T3 OpenClaw answered in one turn without running a tool. The "local after an `exec`" case was run live later the
+  same day as T4 (see [T4](#t4-openclaw-zuno-code-with-an-exec-adr-0594)).
 - The Codestral answers are shorter, with no reasoning tokens, and arrive 60 to 100 times faster than qwen's on this
   question.
+
+## T4: OpenClaw, zuno-code, with an `exec` (ADR-0594)
+
+2026-11-05, 15:05 to 15:08 local, in a window announced to the other sessions (after the RHOAI 3.6.0-ea.2 reinstall
+and UnifAI 0.1.59). OpenClaw, consultant-02, model `zuno-code`, new session. The question: "Écris un script python qui
+vérifie une adresse email, puis exécute-le sur ces 3 valeurs : alice@startx.fr, pas-une-adresse, bob@exemple et
+montre-moi la sortie." The user reported that the script was run and worked. The figures are the `model_call` spans in
+Tempo.
+
+| Time | Trace | Provider, model | `zuno.task` | Class. | Tokens in / out | Duration |
+|---|---|---|---|---|---|---|
+| 15:05:52 | `bf550c0b4900b465` | `mistral-codestral`, codestral-latest | `code` | C1 | 17,917 / 25 | 0.98 s |
+| 15:05:53 | `bf550c0b4900b465` | `local-maas`, qwen3.6-27b-instruct | `code` | C2 | 18,158 / 334 | 24.0 s |
+| 15:06:17 | `bf550c0b4900b465` | `local-maas`, qwen3.6-27b-instruct | `code` | C2 | 18,465 / 86 | 9.6 s |
+| 15:06:27 | `bf550c0b4900b465` | `local-maas`, qwen3.6-27b-instruct | `code` | C2 | 18,569 / 240 | 18.5 s |
+| 15:07:09 | `e3ef1a2c7a95b3ec` | `local-maas`, qwen3.6-27b-instruct | `code` | C2 | 18,834 / 468 | 30.9 s |
+| 15:07:41 | `e3ef1a2c7a95b3ec` | `local-maas`, qwen3.6-27b-instruct | `code` | C2 | 19,353 / 67 | 8.6 s |
+| 15:07:49 | `e3ef1a2c7a95b3ec` | `local-maas`, qwen3.6-27b-instruct | `code` | C2 | 19,414 / 332 | 23.0 s |
+
+Findings:
+- **Codestral on the tool-free start.** The first call of the turn has no tool result yet. It is C1, so `zuno-code`
+  sends it to Codestral, which answers with the `exec` tool call (25 output tokens).
+- **Local after the tool.** Every later call carries the unmarked `exec` result. It is C2, so it is local-only and
+  `local-maas` serves it (ADR-0594, ADR-0596 decision 4). The second trace (15:07) is a follow-up turn of the same
+  session, which still carries the tool results, and stays local.
+- **Guardrails in observe mode.** On every call, NeMo Guardrails (`observe` mode) detected `email` in the prompt.
+  Observe mode does not change the classification, so the first call stayed C1 and went to Codestral. The test values
+  are not personal data. With real addresses, the turn would still have reached Mistral at C1; only the guardrails mode
+  (or a C2 classification of the prompt) prevents that.
+- **A cancelled call before the test.** At 15:05:51, a C1 call with no `zuno.task`, so not `zuno-code` (trace `a2c667d32695ece2`), was
+  cancelled after 103 s, before T4 started.
 
 ## Not run live
 
