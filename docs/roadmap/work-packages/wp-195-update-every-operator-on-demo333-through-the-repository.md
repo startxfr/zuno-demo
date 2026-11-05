@@ -191,6 +191,59 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    - `quota_counters_probe.py`: `OK: moved ['subscription']`, so no change
      for WP-177 (recorded there). The probe had to learn RHOAI 3.5.2's new
      limit names (`tokens-<N>-per-<window>`) first.
+
+   **4b prepared 2026-11-05 (not run).** Red Hat's 1.4 → 1.5 page was not read:
+   docs.redhat.com answers 403 to this platform (2026-11-03 block). The
+   procedure below comes from the 1.5.0 bundle
+   (`rhcl-operator-bundle@sha256:2ccdc9f2…`) and from upstream
+   kuadrant-operator v1.6.0, the first upstream release with
+   `KuadrantControlPlane`.
+   - The 1.5.0 CSV owns the Kuadrant policy CRDs plus `KuadrantControlPlane`,
+     and requires nothing. It deploys authorino-operator, limitador-operator,
+     dns-operator and an MCP gateway itself, without OLM, under a singleton
+     `KuadrantControlPlane/default` that the manager creates at startup.
+     Deleting that CR cascade-deletes every managed component. It is
+     re-created only on a manager restart.
+   - At startup, `internal/controlplane/olm_cleanup.go` migrates the
+     components off OLM in the operator namespace (`openshift-operators`):
+     - it strips the OLM metadata from the `authorino-operator`,
+       `limitador-operator-controller-manager` and
+       `dns-operator-controller-manager` Deployments and from their CRDs;
+     - it then deletes their Subscriptions and CSVs.
+     The result shows as `OLMMigrationComplete` / `OLMComponentCleaned`
+     events on `KuadrantControlPlane/default`.
+   - On demo333 those three Subscriptions were created by OLM as
+     dependencies, not by `zuno-connectivity-link`, so ArgoCD will not put
+     them back. `mcp-system` does not exist, so the MCP gateway step is a
+     no-op.
+   - **No rollback.** OLM does not downgrade, and after the migration the
+     1.4 dependency packages are gone.
+   - Unverified: Red Hat's support statement for RHCL 1.5 with RHOAI 3.5.2.
+     The RHOAI 3.5.2 and 3.6.0-ea.2 bundles do not mention RHCL. MaaS uses
+     `AuthPolicy` v1 and `TokenRateLimitPolicy` v1alpha1, and 1.5.0 still
+     serves both.
+
+   Steps (each one needs the user's go and the peer windows closed):
+   1. Commit `zuno_connectivity_link_channel: "stable-1.5"`, then run
+      `make d1 install connectivity-link`. OLM moves rhcl to 1.5.0 through
+      the `skipRange`.
+   2. Watch the events on `KuadrantControlPlane/default`, then check:
+      - the three dependency Subscriptions and CSVs are gone from
+        `openshift-operators`;
+      - their Deployments run the 1.5.0 images;
+      - the Authorino, Limitador and AuthConfig CRDs are kept.
+   3. Run `make d1 install connectivity-link` again (the WP-071 Service CA
+      annotation, see the 4a trap), then `make d1 check connectivity-link`.
+   4. Check that Kuadrant is `Ready` and the policies are `Enforced`, that
+      the four chat models answer 200 through MaaS and 401 without a token,
+      and that ArgoCD `zuno-connectivity-link` is Synced.
+   5. Run `quota_counters_probe.py`. The result goes to WP-177; an `IMPROVED`
+      result reopens the ledger removal.
+   6. Follow-ups in the repo:
+      - `connectivity_link/tasks/uninstall.yml` still names the three OLM
+        packages;
+      - the audit and known-good set lose those rows;
+      - the chart's `consolePlugin` copy must match what 1.5 creates.
 5. **Kueue 1.5.0 (Done 2026-11-05).** Set `zuno_kueue_channel: stable-v1.5`, then
    `make d1 install kueue`.
 
