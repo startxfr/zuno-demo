@@ -34,7 +34,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 23 | 2 | 28 | WP-173, WP-174, WP-220 |
-| v0.12 | 8 | 2 | 9 | WP-161, WP-164 |
+| v0.12 | 8 | 2 | 9 | WP-164 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | WP-208 |
 | v0.15 | 2 | 2 | 3 | WP-209, WP-221 |
@@ -951,7 +951,7 @@ frozen mirror.
 | WP-158 | [wp-158](work-packages/wp-158-bootstrap-the-zuno-demo-agents-repository.md) | 0576 | none | Done | repository, rulesets, quay.io repositories and robot, release GitHub App in place; releases v0.1.0, v0.1.1, v0.2.0 cut from it |
 | WP-159 | [wp-159](work-packages/wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md) | 0577, 0578 | WP-158 | Done | publish.yml published and signed keyless v0.1.1 and v0.2.0 (per-agent and corp artifacts on quay.io) |
 | WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Done | v0.2.0 admitted offline and pinned in platform/okf/agents.lock by okf-promote (target branch devel) |
-| WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Operator pending | live and durable on demo333 since 2026-10-23 (okf-fetch on supply-chain-signer:latest built from devel); mlops and ai-gateway read the release at build time since WP-165 (ADR-0580 amendment) |
+| WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Done (2026-11-05: mcp-gateway's okf-fetch init container verifies the digest pinned in `platform/okf/agents.lock`, live on demo333 since 2026-10-23 and rolled by every promotion up to v0.13.0, where the pod verifies release 0.13.0; mlops and ai-gateway read the verified release at build time, see the deviations) | none |
 | WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Done | operator 0.1.25 on stable; five agents of release v0.1.1 verified keyless on demo333 |
 | WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Done (2026-10-24) | schemas, corp ceilings, narrowing rule, operator reader (0.1.27); tekos migrated to OKF v0.3 and live on release v0.4.0, the other seven bundles migrate with their own releases |
 | WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator and consumers live on demo333 (unifai role, Keycloak groups, mcp okf-fetch); step 7 proven 2026-10-25 with release 0.6.1 (exact generated diff, group created, task right live, bundle re-emitted, real 429); open: consumers of per-agent models/guardrails/limits |
@@ -1201,6 +1201,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — WP-161 Done: mcp-gateway's okf-fetch init container, live since 2026-10-23, verifies the pinned release and is rolled by every promotion (now v0.13.0). mlops and ai-gateway read the verified release at build time. WP-164 and ADR-0581 stay open: per-agent quota limits and the quota script are not done, see the WP.
 - 2026-11-05 — WP-221 added and ADR-0584 retargeted from v0.12 to v0.15: its lifecycle states, revocation list and audit events are not built, and WP-167 never carried them. The user asked for a work package and for unstarted work to follow later releases.
 - 2026-11-05 — WP-167 Done and ADR-0582 Implemented: the user repeated the per-agent sheet proof on UnifAI 0.1.59 as consultant-01 and sale-01. ADR-0584 stays `Accepted`: its lifecycle states, revocation list and audit events are not built and no work package carries them.
 - 2026-11-05 — Unstarted work follows the code releases (user decision). ADR-0565 moves to the new band v0.15; ADR-0110, ADR-0352, ADR-0556 and ADR-0557 move to the new band v0.16, with WP-209 and WP-210 to WP-218 following their ADRs. Closed ADRs, ADRs with a started package, and the past bands are untouched; the old bands v0.1 now has no open ADR or WP, and v0.9 keeps only ADR-0559 (WP-145, WP-195). See the ADR change log.
