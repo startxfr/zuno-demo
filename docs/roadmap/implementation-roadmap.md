@@ -1054,7 +1054,7 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP-217 | [wp-217](work-packages/wp-217-cert-manager-internal-external-mode.md) | 0352 | WP-143 | Not started | documentation and check surgery |
 | WP-218 | [wp-218](work-packages/wp-218-argocd-internal-external-mode.md) | 0352 | WP-143, ADR-0557 decision | Not started | waits for ADR-0557's mechanism |
 | WP-219 | [wp-219](work-packages/wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md) | 0570 | WP-177 | Closed — deferred | every check is blocked: vendor route defect (V2, V3, V5), personas get 401 from MaaS (V6), no verified project id (V11) |
-| WP-221 | [wp-221](work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md) | 0584 | WP-167 | Not started | fork patch to the UnifAI operator, a release with the user's go, one pilot on demo333 |
+| WP-221 | [wp-221](work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md) | 0584 | WP-167 | Not started (2026-11-05: go given by the user, the fork session builds the operator part as soon as it can) | the fork session builds the operator part, a release with the user's go, one pilot on demo333 |
 | WP-220 | [wp-220](work-packages/wp-220-evaluate-the-rhoai-3-6-mcp-lifecycle-portal-and-workbenches-v2-components.md) | 0571 | WP-195 | Repo work in review | evaluation of three RHOAI 3.6 components; a pilot needs the user's go |
 
 ### OKF stream phases

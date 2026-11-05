@@ -1,6 +1,6 @@
 # WP-221: Agent lifecycle states, revocation list and audit events
 
-- **State:** Not started
+- **State:** Not started (2026-11-05: go given by the user, the fork session builds the operator part as soon as it can)
 - **ADRs:** [ADR-0584](../../adr/0584-define-agent-lifecycle-states-roles-and-incident-revocation.md)
 - **Depends on:** [WP-167](wp-167-per-agent-entry-and-sheet.md) (done: the sheet already shows the state)
 - **Related:** [ADR-0582](../../adr/0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md), [ADR-0578](../../adr/0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md), [ADR-0575](../../adr/0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md)
@@ -35,7 +35,17 @@ An agent can be `deprecated` (still usable, marked on its sheet) or `retired` (n
 - **No revocation list.** The operator reads no ConfigMap in the bundle pipeline. It would be a new read-only watch (RBAC `get`, `list` and `watch` on one named ConfigMap), a new condition reason `Revoked`, and a requeue of every bundle when the list changes.
 - **Events exist.** The operator already records Kubernetes Events through a recorder (`internal/controller/events.go`, source `unifai-operator`), so the admission, state, revocation and rejection events fit there. The digest and the reason are easy. **The actor from the pull request is not known to the operator:** it has to arrive in a field or an annotation that the GitOps flow writes. This contract point is for this repository to define.
 
-## Decisions pending on the fork side
+## Decisions (2026-11-05)
 
-- The priority against the A2A approval work (the fork's R-535) and the fork's 0.1 freeze on 2026-12-01. This is a CRD change, so it is a candidate for 0.2 unless it turns out small.
-- The fork session opens a ROADMAP row when the user says go. Nothing is built before that.
+- **Go.** The user approved the work, and the fork session writes the operator part.
+- **Priority.** The user wants it as early as possible. It is a CRD change, so it lands in the fork's 0.1 line only if it is small enough before the freeze of 2026-12-01; otherwise it is a 0.2 candidate and the fork session says so with a date.
+- **Order.** The fork session opens its own ROADMAP row and places it against its other work (R-535, the A2A approval).
+
+## Contract proposed for the actor and the reason
+
+The operator cannot know who approved a state change, so the GitOps flow writes it onto the `UnifaiAgentBundle`:
+
+- `unifai.startx.fr/actor`: who approved the change (the merger of the pull request that changed the state or the revocation list).
+- `unifai.startx.fr/reason`: a short reason, required for `retired` and for a revocation.
+- The operator copies both into the event it emits and into the status condition, and writes `unknown` when they are absent. The names are generic on purpose: the fork carries no Zuno field (ADR-0575).
+- On the zuno-demo side, the promotion flow of the agents release (`.github/workflows/okf-promote.yml`) or the `unifai` chart fills them; the revocation list's own commit gives the actor of a revocation. This is to be reviewed by the fork session before it builds.
