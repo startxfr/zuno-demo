@@ -100,8 +100,8 @@ spec:
 Example components and workflows of a team workspace (ADR-0598 point 4): three
 agents, a documents retriever, a direct condition and an orchestrator in the
 team's inventory, four workflows on them (linear, branches, RAG,
-orchestrated), a web-fetch tool, a suspended weekday schedule and a welcome
-chat. A team workflow runs as the team: the retriever finds the documents
+orchestrated), a web-fetch tool and a suspended weekday schedule. No UnifaiChat:
+one submitted by the operator has no signed-in user, and the gateway refuses it. A team workflow runs as the team: the retriever finds the documents
 uploaded in the team's name and the Confluence sources of the caller's groups
 (forwarded token), never a member's personal uploads (see the personal starter).
 They reference the public built-in gateway LLM and MCP provider (ADR-0597), so
@@ -175,11 +175,8 @@ Arguments: root (the chart context), owner (an UnifAI admin), team (the team nam
     "workflow" (printf "%s-linear" $t) "suspend" true
     "inputs" (dict "user_prompt" (printf "Give the %s team a three-line morning brief: what to check first today." $t))
     "schedule" (dict "cron_expression" "30 8 * * 1-5" "timezone" "Europe/Paris" "overlap_policy" "skip")))
-  (dict "kind" "UnifaiChat" "name" (printf "%s-welcome" $t) "spec" (dict
-    "workflow" (printf "%s-linear" $t) "title" "Welcome"
-    "prompt" (printf "In two sentences, say what the %s team workspace offers: its example workflows and the shared inventory." $t)))
 }}
-{{- $waves := dict "UnifaiWorkflow" "16" "UnifaiSchedule" "17" "UnifaiChat" "17" }}
+{{- $waves := dict "UnifaiWorkflow" "16" "UnifaiSchedule" "17" }}
 {{- range $objs }}
 apiVersion: unifai.startx.fr/v1alpha1
 kind: {{ .kind }}
@@ -187,7 +184,7 @@ metadata:
   name: {{ .name }}
   namespace: {{ $root.Values.namespace }}
   annotations:
-    # after the team (5) and the built-ins (10); workflows after their components, schedules and chats after workflows
+    # after the team (5) and the built-ins (10); workflows after their components, schedules after workflows
     argocd.argoproj.io/sync-wave: {{ get $waves .kind | default "15" | quote }}
 spec:
   owner: {{ $.owner }}

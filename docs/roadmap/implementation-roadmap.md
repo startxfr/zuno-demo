@@ -1016,7 +1016,7 @@ sandbox rewired (WP-201).
 | WP-198 | [wp-198](work-packages/wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) | 0598, 0597 | WP-197 (steps 3-4) | Repo work in review | teams, templates, built-ins and team examples live on demo333 (2026-11-04); browser check as consultant-01 and sale-01 pending |
 | WP-199 | [wp-199](work-packages/wp-199-personal-unifai-starters-for-the-demo-personas.md) | 0598 | WP-197, WP-198 | Repo work in review | starters Ready on demo333 (2026-11-04); personal RAG `<user>-my-documents` added 2026-11-05, install pending |
 | WP-200 | [wp-200](work-packages/wp-200-show-the-unifai-rag-working-live.md) | 0598 | WP-198 | Repo work in review | upload pipeline live (2026-11-05); the demo asks the personal `<user>-my-documents`, since a team workflow runs as the team; Confluence resync pending |
-| WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Repo work in review | amended 2026-11-05: one instance; tool/schedule/chat examples migrated to the team examples; retire unifai-devel and unifai-olm with the user's go |
+| WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Repo work merged | amended 2026-11-05: one instance; unifai-devel and unifai-olm retired, tool and schedule examples live in the team examples |
 
 ### Phase 49 — Dify and kagent as experience clients (added 2026-11-04)
 

@@ -1,6 +1,6 @@
 # WP-201: Rewire the unifai-devel sandbox onto the gateway (amended: retire it, one instance)
 
-- **State:** Repo work in review (2026-11-05: retire unifai-devel and unifai-olm; migration of the missing kinds in the chart)
+- **State:** Repo work merged (2026-11-05: unifai-devel and unifai-olm retired; tool and schedule examples live)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-198
 - **Related:** [ADR-0562](../../adr/0562-authenticate-unifai-against-the-zuno-keycloak-realm.md)
@@ -60,10 +60,15 @@ retired.
 2. **What stays.** The OLM operator, which reconciles `zuno-unifai`: namespace `unifai-operator`, Subscription
    `unifai-operator`, CatalogSource `openshift-marketplace/unifai-operator-catalog`. The Keycloak of realm `zuno` has its
    own `rhbk-operator` Subscription in `zuno-auth`; the one in `unifai-olm` goes with that namespace.
-3. **Migration.** The chart's team examples gain the kinds that only the sandbox showed: a `<team>-web-fetch` tool, a
-   suspended `<team>-weekday-brief` schedule and a `<team>-welcome` chat. The mock LLM, the demo MCP server and the
+3. **Migration.** The chart's team examples gain the kinds that only the sandbox showed: a `<team>-web-fetch` tool, and a
+   suspended `<team>-weekday-brief` schedule. A `<team>-welcome` chat was tried and dropped: the chat completed, but its
+   result was the gateway's refusal "no identity binding for session …: it was not submitted by a signed-in user". An
+   operator-submitted chat has no user token. The mock LLM, the demo MCP server and the
    `demo-*` objects are not migrated; the team examples replace them. The fork keeps the overlay and the stack example
    as references.
 4. **Retirement** (cluster actions, each with the user's go). For each of `unifai-devel` and `unifai-olm`: delete the
    UnifaiStack and wait until it is gone, while the operator still runs so its finalizers clean up. Then delete the
    namespace.
+5. **Done on 2026-11-05** (user go). The install created the tools, schedules and personal RAG starters (d0/d1
+   Synced/Healthy). `unifai-devel` and `unifai-olm` were deleted, stack first, then the namespace. The operator lets the
+   finalizers go once the namespace is being deleted. `zuno-unifai`, the OLM operator and `zuno-auth` are untouched.

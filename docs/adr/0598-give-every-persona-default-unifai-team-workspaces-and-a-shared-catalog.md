@@ -36,8 +36,9 @@ templates in the catalog asked for a Gemini API key.
 3. **Shared inventory.** `zuno-gateway` and `mcp-gateway` become public built-ins (ADR-0597). The `knowledge-*` retrievers
    stay in their agent team: UnifAI has no built-in retrievers, and the RAG ACLs apply per user anyway.
 4. **Example workflows.** Each business team that has personas gets example workflows on the built-in gateway: linear,
-   branches, orchestrated and RAG. It also gets a web-fetch tool, a suspended weekday schedule and a welcome chat, so every
-   kind of the inventory has one example (amended 2026-11-05).
+   branches, orchestrated and RAG. It also gets a web-fetch tool and a suspended weekday schedule (amended 2026-11-05).
+   - There is no example chat. A `UnifaiChat` is submitted by the operator, with no signed-in user, and the gateway
+     LLM refuses a call without the user's identity.
    - A team workflow runs as the team. Its RAG finds the documents uploaded in the team's name and the Confluence
      sources of the caller's groups, never a member's personal uploads.
 5. **Personal starters.** A short list of demo personas (consultant-01, sale-01, ai-ops-01) gets starter workflows in their
@@ -53,8 +54,8 @@ templates in the catalog asked for a Gemini API key.
      `unifai-e2e-<n>`).
    - The OLM operator stays: namespace `unifai-operator`, its Subscription, and the CatalogSource
      `openshift-marketplace/unifai-operator-catalog`. It reconciles `zuno-unifai`.
-   - The kinds that only the sandbox had examples of (tool, schedule, chat) now have per-team examples on the gateway
-     (point 4). The mock LLM, the demo MCP server and the `demo-*` objects are not migrated: the team examples replace
+   - The tool and schedule kinds, which only the sandbox had examples of, now have per-team examples on the gateway
+     (point 4). The sandbox's smoke chat is not migrated (see point 4). The mock LLM, the demo MCP server and the `demo-*` objects are not migrated: the team examples replace
      them.
 
 ## Consequences
