@@ -331,8 +331,16 @@ zuno_models_saas_subscriptions_gateway_only: true
 # main to devel (zuno_gitops_target_revision, now loaded by the role), whose
 # connectivity-link render is otherwise identical (checked 2026-10-24 with
 # the live values).
+# WP-195 step 6 (2026-11-05): OFF. With RHOAI 3.6 each local model route has 15
+# matches, and Kuadrant expands a gateway-level policy into one wasm action
+# set per match (68 sets). The EnvoyFilter then exceeds etcd's request limit
+# ("request is too large"), the operator stops updating it, and the
+# per-route maas-trlp-* subscription limits never reach the shim, so no MaaS
+# counter moves. The ai-gateway ledger keeps the user and group ceilings.
+# Upstream: Kuadrant/kuadrant-operator #2353, #2051. Turn back on only when
+# the EnvoyFilter fits with it.
 zuno_connectivity_link_token_rate_limits:
-  enabled: true
+  enabled: false
   targetGateway:
     name: maas-default-gateway
     namespace: openshift-ingress
