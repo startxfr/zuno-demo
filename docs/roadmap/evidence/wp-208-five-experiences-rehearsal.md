@@ -32,3 +32,23 @@ pages (MNGD2-AP001 Onboarding Chef de projet métier, MNGD2-AP002 …). `Zuno Te
 knowledge retrieval, LLM, Answer all `succeeded`, the answer tabulates the onboarding workshops of the knowledge base.
 `Zuno Confluence Search` (Workflow): Start, tool, LLM, End all `succeeded`, output `summary`. Imported from scratch after
 deleting the three applications, and left idempotent (a second run reports "already imported").
+
+## Browser rehearsal (2026-11-05, the user, screenshots)
+
+- **Dify**: the three example applications run in Studio. Agent lists the six onboarding pages through
+  `confluence.page.search`; Chatflow answers from the knowledge base; Workflow ran in 2.8-2.9 s twice after the prompt
+  was tightened to list titles and spaces only (the first run took 426 s: the 7 minutes were spent inside Dify before the
+  call reached the gateway, which logged it at 21:53:35 UTC; not reproduced on the two later runs, cause not established).
+- **kagent**: signing in as `consultant-02` gives 403 from oauth2-proxy (the front door admits `ocp-ai-ops` only); as
+  `ai-ops-01` the UI opens. `zuno-sre` answered "20 pods Running, 0 not Running" with one `k8s.resource.list` call
+  (checked: 20 Running pods; audit `agent=kagent task=diagnose`). It declined to read a Secret and to delete a pod **without
+  calling any tool** (one audit line only): a model-level refusal, not the tool-level one. The kagent first-run wizard
+  created a stray agent `my-first-k8s-agent` (no tools); deleted on 2026-11-05. A kagent user can create agents from the UI;
+  their tools stay governed by the gateway.
+- **Grafana "Five experiences"**: all rows render with the five clients. Tokens per user: dify = consultant-02 31 994,
+  kagent = ai-ops-01 61 249. `k8s.*` calls `allowed`, `k8s.resource.read` `downstream_error` (the refused Secret of the
+  WP-206 test). Guardrails: `dify (detected)` present. Fixed after the review: the first row title said "three experiences";
+  the error-rate panel now shows a percentage and the latency panel states milliseconds (kagent p95 81 s: agent loops).
+- **Dify error rate 0.341** is per attempt: 8 failed calls on `qwen3.6-27b-instruct` were counted once on `local` and once
+  on `local-maas` (the fallback chain), then served by another provider; none in the last 15 minutes, `qwen36-27b-instruct`
+  Ready. Cause of those 8 failures not investigated.

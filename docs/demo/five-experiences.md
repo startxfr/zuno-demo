@@ -66,7 +66,9 @@ flowchart LR
 5. **A cluster diagnosis in kagent.** In kagent open the agent **zuno-sre** and ask "Which pods of zuno-ai-run are not
    Running, and how many are?". The agent answers from the mcp-gateway's tools only (`k8s.resource.list`, events,
    logs, one PromQL query): kagent runs no tool server of its own and its controller has namespaced Roles only. Ask it
-   to read a Secret: it is refused (`resource not allowed: Kind=Secret`). It cannot change anything: there is no write
+   to read a Secret: it declines from its prompt without calling a tool; to show the server-side refusal
+   (`resource not allowed: Kind=Secret`, outcome `downstream_error` in the dashboard) ask it to call `k8s.resource.read` on
+   a Secret explicitly. Click **Skip wizard** on the first screen: the wizard creates a stray agent. It cannot change anything: there is no write
    capability (ADR-0600 clause 6).
 6. **The same rule, from two chairs.** Row *Same tools, governed*: the table *Cluster read tool calls by tool and
    outcome* shows the five `k8s.*` capabilities and their outcomes. In Dify the same tools are not offered: its task

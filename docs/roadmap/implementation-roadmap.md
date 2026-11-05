@@ -36,7 +36,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.11 | 23 | 2 | 28 | WP-173, WP-174, WP-220 |
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
-| v0.14 | 3 | — | 7 | WP-208 |
+| v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 2 | 3 | WP-209, WP-221 |
 | v0.16 | 4 | 4 | 11 | WP-210, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -1035,7 +1035,7 @@ WP-208 shows the five experiences together. No cluster action while demo333 is b
 | WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Done (2026-11-05) | adapter built, signed and rolled; knowledge base registered in Dify; forbidden-space case not exercised |
 | WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Done | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
 | WP-207 | [wp-207](work-packages/wp-207-kagent-preparation-and-install.md) | 0600, 0601 | WP-202, WP-206 | Done | scratch spike in `zuno-kagent-scratch`; `make d2 install kagent` |
-| WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Repo work in review | live rehearsal on demo333 |
+| WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Done | live rehearsal on demo333 done 2026-11-05 |
 
 ### Phase 50 — follow-up work from the ADR close-out (added 2026-11-05)
 

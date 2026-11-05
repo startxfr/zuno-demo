@@ -94,7 +94,7 @@ spec:
         {
           "id": 100,
           "type": "row",
-          "title": "Same backend, three experiences",
+          "title": "Same backend, five experiences",
           "collapsed": false,
           "gridPos": {
             "h": 1,
@@ -339,6 +339,7 @@ spec:
           "id": 8,
           "title": "Model call error rate by experience (over range)",
           "type": "table",
+          "fieldConfig": {"defaults": {"unit": "percentunit"}, "overrides": []},
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
@@ -361,12 +362,13 @@ spec:
               "instant": true
             }
           ],
-          "description": "Share of calls that ended in error, per client, from the ai-gateway for the five experiences; a quota refusal is not a model call and is not counted here."
+          "description": "Share of calls that ended in error, per client, from the ai-gateway for the five experiences; a quota refusal is not a model call and is not counted here. Counted per attempt: a request that fails on one provider and is served by the next counts one error and one success."
         },
         {
           "id": 9,
           "title": "Model call latency p95 by experience (over range)",
           "type": "table",
+          "fieldConfig": {"defaults": {"unit": "ms"}, "overrides": []},
           "datasource": {
             "type": "prometheus",
             "uid": "prometheus"
