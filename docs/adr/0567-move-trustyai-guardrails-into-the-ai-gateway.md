@@ -1,6 +1,6 @@
 # ADR-0567: Move TrustyAI guardrails into the ai-gateway
 
-- **Status:** Partially implemented
+- **Status:** Implemented (2026-11-05, WP-153 and WP-156: the guardrails run in the ai-gateway on the `nemo` backend, every level in `observe`, the agent-runtime hook retired and one observer live on demo333. Decision 5's deletions are amended: the builtin detectors stay as a documented fallback, see the amendment)
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -143,3 +143,12 @@ ConfigMap or an unrecognised activated-rails payload yields zero detections
 while healthy, so the precheck reads the ConfigMap's key set and the
 *Observer unavailable (share)* panel stays. Every `oc` command passes
 `--context` explicitly (ADR-0559).
+
+## Amendment (2026-11-05): the builtin fallback stays
+
+Decision 5 said that the decision retiring `GuardrailsOrchestrator/zuno-guardrails-smoke` also deletes `DETECTOR_PARAMS` and `PolicyParityWithRails`, and that all three go with Agent Runtime at WP-156. Checked on demo333 and in the repository on 2026-11-05, that cleanup was not done, and it is **no longer decided**: the standalone built-in detectors stay as a documented fallback.
+
+- **What is in place.** The ai-gateway runs `guardrails.backend: nemo` (`gitops/charts/ai-gateway/values.yaml`): the gateway hook is the only observer, every level is `observe`, and the agent-runtime hook is gone (WP-156). That is what this ADR set out to do.
+- **What stays.** `GuardrailsOrchestrator/zuno-guardrails-smoke` (Ready on demo333, orchestrator disabled, built-in detectors only), the `guardrailsSmoke` block of `gitops/charts/trustyai-config/values.yaml`, the builtin backend of `components/ai-gateway/app/guardrails.py` with its `DETECTOR_PARAMS`, and the parity test that keeps `DETECTOR_PARAMS` in step with the NeMo rails file. They are the way back if the NeMo backend has to be switched off (`guardrails.backend: builtin`), and `ai-gateway`'s `detectorUrl` still points at the smoke service.
+- **What would change this.** Deleting them is a small, separate change (the gateway image changes, so it needs a window on demo333). Do it only when the NeMo backend has run long enough that nobody wants the way back, and record it as a new decision.
+- **Still true.** Moving a level to `block` stays a reviewed policy edit gated on a recorded false-positive rate (decision 2).

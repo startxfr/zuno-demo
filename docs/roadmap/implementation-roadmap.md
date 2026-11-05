@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 17 | WP-145, WP-195, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 5 | 28 | WP-173, WP-174, WP-209, WP-210 |
+| v0.11 | 24 | 4 | 29 | WP-173, WP-174, WP-209, WP-210 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | 2 | 7 | WP-206, WP-207, WP-208 |
@@ -1051,6 +1051,7 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP-216 | [wp-216](work-packages/wp-216-external-secrets-internal-external-mode.md) | 0352 | WP-143 | Not started | documentation and check surgery |
 | WP-217 | [wp-217](work-packages/wp-217-cert-manager-internal-external-mode.md) | 0352 | WP-143 | Not started | documentation and check surgery |
 | WP-218 | [wp-218](work-packages/wp-218-argocd-internal-external-mode.md) | 0352 | WP-143, ADR-0557 decision | Not started | waits for ADR-0557's mechanism |
+| WP-219 | [wp-219](work-packages/wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md) | 0570 | WP-177 | Closed — deferred | every check is blocked: vendor route defect (V2, V3, V5), personas get 401 from MaaS (V6), no verified project id (V11) |
 
 ### OKF stream phases
 
@@ -1196,6 +1197,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — ADR-0567 Implemented with an amendment: the builtin guardrail detectors and the smoke orchestrator stay as a documented fallback (decision 5's deletion is no longer decided). WP-219 added, deferred: it holds ADR-0570's never-run checks, each blocked (vendor route defect, personas 401 on MaaS, no verified project id).
 - 2026-11-05 — ADR-0561 Implemented (ADR close-out): the replacement of the first-party agent stack by UnifAI is carried out and its security gate (ADR-0563) is cleared. The ai-gateway classification floor it relies on is WP-209, still open.
 - 2026-11-05 — Phase 50 added (ADR close-out, WP-209 to WP-218): the ADRs that stay `Partially implemented` get work. WP-209 is the ai-gateway classification floor of ADR-0565. WP-210 is page-level Confluence ACL of ADR-0110 (to be built only if wanted). WP-211 to WP-218 take ADR-0352's remaining day-0 components in its own order: keycloak, vault, postgresql, redis, aap, external_secrets, cert_manager, argocd.
 - 2026-11-05 — ADR-0566, ADR-0563, ADR-0569, ADR-0573 and ADR-0568 Implemented (ADR close-out, point 2): the remainder of each was a status that had not followed, or a scope cut now written in the ADR (project dimension, group-gated tiles, the demo222 cutover, freshness fields, `sql-dump`, language boost). ADR-0567 was left open: its decision 5 cleanup is not done.

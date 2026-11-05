@@ -315,7 +315,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) | Superseded in part by ADR-0577 and ADR-0578 | Deliver OKF bundles to unifai-operator as signed OCI artifacts |
 | [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Partially implemented | Derive data classification from OKF and only allow raising it |
 | [ADR-0566](0566-instrument-unifai-with-opentelemetry.md) | Implemented | Instrument UnifAI with OpenTelemetry |
-| [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Partially implemented | Move TrustyAI guardrails into the ai-gateway |
+| [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Implemented | Move TrustyAI guardrails into the ai-gateway |
 | [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) | Implemented | Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings |
 | [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Implemented | Close UnifAI parity gaps generically |
 | [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Partially implemented | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
