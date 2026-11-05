@@ -345,3 +345,7 @@ zuno_openshift_ai_version: "3.5.2"
 # 1.5.0 only skips >=1.4.4, and it bundles its own authorino/limitador/dns,
 # so 1.5 waits for Red Hat's migration procedure (step 4b).
 zuno_connectivity_link_channel: "stable-1.4"
+# WP-195 step 5 / K2 (2026-11-05): kueue 1.4.3 -> 1.5.0. stable-v1.5 has no
+# edge from 1.4, so the switch is followed by deleting CSV kueue-operator.v1.4.3
+# by hand (CRDs, CRs and the operand stay); see the WP-195 K2 plan.
+zuno_kueue_channel: "stable-v1.5"
