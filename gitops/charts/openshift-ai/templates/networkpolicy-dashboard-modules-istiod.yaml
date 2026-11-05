@@ -31,9 +31,16 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
 spec:
+  # maas-consumer-portal (RHOAI 3.6 EA2, WP-220 pilot 2) is a dashboard
+  # module that carries its own part-of value and the same vendor-policy
+  # gap (Init:1/2 forever, xDS dial to istiod dropped), so it is listed too.
   podSelector:
-    matchLabels:
-      app.kubernetes.io/part-of: odh-dashboard
+    matchExpressions:
+      - key: app.kubernetes.io/part-of
+        operator: In
+        values:
+          - odh-dashboard
+          - maas-consumer-portal
   policyTypes:
     - Egress
   egress:
