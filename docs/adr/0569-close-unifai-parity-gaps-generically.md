@@ -1,6 +1,6 @@
 # ADR-0569: Close UnifAI parity gaps generically
 
-- **Status:** Partially implemented
+- **Status:** Implemented (2026-11-05, WP-148: the parity gaps are closed generically on demo333; clause 5, the group-gated tiles, moved to ADR-0582 to ADR-0584, and the rate-limit notice has not been checked in a browser)
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -180,3 +180,11 @@ Each clause has its own acceptance in WP-148:
 
 Langfuse and OpenTelemetry (ADR-0566) record compaction and memory calls as
 internal spans.
+
+## Closure note (2026-11-05)
+
+WP-148 is Done and the generic parity work is live on demo333 (2026-10-22): project memory, the memory tool, routing and the quota notice code. What the status does not cover:
+
+- **Clause 5, group-gated tiles.** Not coded here. It moved to the per-agent entry and sheet, ADR-0582 and ADR-0584 (Accepted, WP-167), with ADR-0583 (Implemented) for authorisation.
+- **Not verified** (WP-148, "Not verified"): the rate-limit notice shown in a browser, which needs a throwaway persona with a low quota (not created), and the memory tool against a large Qdrant corpus under load. Both are tests, not missing features.
+- **Follow-up done elsewhere.** The group-bound team is now emitted from the bundle (`groupTeam`, unifai-operator 0.1.25) and the business teams of ADR-0598 exist on `zuno-unifai`.

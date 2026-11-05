@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 9 | WP-145, WP-195 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 11 | 26 | WP-173, WP-174 |
+| v0.11 | 24 | 6 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | 2 | 7 | WP-206, WP-207, WP-208 |
@@ -910,7 +910,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-146 | [wp-146](work-packages/wp-146-unifai-identity-and-context-header-forwarding.md) | 0563, 0562, 0575 | none | Done (2026-10-24) | live-proven on demo333 2026-10-17 (user JWT + templated X-Zuno-* headers, fail-closed, MAS-side refresh); X-Authenticated-User surface checked unreachable from outside the stack (2026-10-23); header authorship decided 2026-10-24 (never trust the template; ai-gateway quota headers only from trusted platform clients), see ADR-0563 |
-| WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Done | instrumentation merged in fork devel (c918f732b); operator env block, zuno collector rule/dashboard, gateway traceparent and a live trace remain |
+| WP-147 | [wp-147](work-packages/wp-147-unifai-opentelemetry-instrumentation.md) | 0566, 0575 | none | Done | instrumentation merged in fork devel (c918f732b); operator `spec.openTelemetry`, gateway `traceparent`, the zuno dashboards and a live 76-span trace are done (2026-10-22 to 2026-10-24) |
 | WP-148 | [wp-148](work-packages/wp-148-unifai-parity-memory-routing-quota-ux.md) | 0569, 0575 | WP-146 | Done | live-proven on demo333 2026-10-22 on fork devel e76c71cd0 (routing explanation, structured 429, memory tool and extraction node, group-bound teams); browser rendering not tested |
 | WP-149 | [wp-149](work-packages/wp-149-unifai-rag-qdrant-hybrid-sources-backup.md) | 0568, 0575 | none | Done (2026-10-24) | hybrid search, ACL, incremental sync and restore proven on demo333 |
 | WP-150 | [wp-150](work-packages/wp-150-unifai-operator-okf-agent-bundles.md) | 0564, 0565 | WP-146 | Done (2026-10-24) | signed bundles verified keyless and served live |
@@ -1179,6 +1179,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — ADR-0566, ADR-0563, ADR-0569, ADR-0573 and ADR-0568 Implemented (ADR close-out, point 2): the remainder of each was a status that had not followed, or a scope cut now written in the ADR (project dimension, group-gated tiles, the demo222 cutover, freshness fields, `sql-dump`, language boost). ADR-0567 was left open: its decision 5 cleanup is not done.
 - 2026-11-05 — ADR-0353, ADR-0575 and ADR-0572 Implemented (ADR close-out, point 1). ADR-0353 was ratified and closed together: WP-176 and ADR-0586 realise it. ADR-0575 notes that no upstream PR was opened, by decision. ADR-0572 is implemented at the playbook and chart level; its operator clauses 2 and 3 stay a contract of ADR-0556, and a new check, `check_unifai_identity.py`, refuses `identity.keycloak`.
 - 2026-11-05 — ADR-0552, ADR-0553 and ADR-0585 Implemented: every WP behind them was already Done. ADR-0553 is Implemented as a placement only; its visibility benefit was never obtained and the dated correction note says so. (ADR close-out, point 1.)
 - 2026-11-05 — WP-194 Done and ADR-0596 Implemented: on demo333, "Zuno Code" is served by Codestral from Open WebUI (consultant-01, 1.3 s) and OpenClaw (consultant-02, 2.2 s), and "Zuno" stays on the local qwen (130 s on the same question). The fallback with Codestral down is covered by unit tests only.

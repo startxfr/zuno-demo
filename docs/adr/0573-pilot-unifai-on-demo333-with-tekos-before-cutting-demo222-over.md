@@ -1,6 +1,6 @@
 # ADR-0573: Pilot UnifAI on demo333 with Tekos before cutting demo222 over
 
-- **Status:** Partially implemented
+- **Status:** Implemented (2026-11-05, WP-154 and WP-155: the Tekos pilot passed its gates and the agents run on UnifAI on demo333; demo222 was retired instead of cut over, and three agent gaps are accepted)
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -178,3 +178,11 @@ proof that the chain runs.
 caps requests (`fork/unifai-operator/README.md`), but RAG ingestion of the
 Confluence corpus is the heaviest load, and it is scheduled with the user
 before it runs.
+
+## Closure note (2026-11-05)
+
+The pilot did its job: Tekos then the other agents run on UnifAI on demo333 (WP-154 passed 2026-10-24, WP-155 and WP-156 Done), and the old agent code is gone (WP-156, WP-168). Where the plan changed:
+
+- **The demo222 cutover (Phase 3) no longer applies.** demo222 was retired (wiped) on 2026-10-23, and demo333 is the demo platform, so there was nothing to cut over (WP-155, update 2026-10-23).
+- **Accepted gaps.** cognos and soursage were not migrated (no `graph_shape`, so they cannot be instantiated); advantage, finage and naveo are placeholders by design (ADR-0007); the live Salesforce read stays unwired (WP-101 has no owner).
+- **Latency.** The comage first-token latency measured 9 to 10 s inside a full scenario run and 3.7 to 4.2 s alone (objective 6 s); the cause under load was not proven.

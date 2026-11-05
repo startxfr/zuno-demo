@@ -1,6 +1,6 @@
 # ADR-0566: Instrument UnifAI with OpenTelemetry
 
-- **Status:** Partially implemented
+- **Status:** Implemented (2026-11-05, WP-147 and WP-166: operator `spec.openTelemetry`, gateway `traceparent`, one 76-span Tempo trace across nine services on demo333 (2026-10-23), run-trace dashboards rebuilt on UnifAI spans)
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -151,3 +151,7 @@ full sampling, as the zuno services do today.
 WP-147 carries the fork work; the dashboard swap happens in WP-154 on
 `demo333`, which is powered off at the time of writing and must be powered
 on by the user first. Every `oc` command passes `--context`.
+
+## Implementation note (2026-11-05)
+
+Nothing was open any more; only the status had not followed. WP-147 (Done) carries the operator `spec.openTelemetry` block (operator 0.1.20), the gateway `traceparent` and the live trace (one continuous Tempo trace, UnifAI to ai-gateway, 76 spans over nine services, 2026-10-23). Its step 8, the run-trace dashboards on UnifAI spans (Grafana and Perses, queries run against the live Tempo), was done in WP-154 and rebuilt in WP-166 (Done 2026-11-03). The instrumentation lives on a fork feature branch (ADR-0575). Whether upstream ever accepts it is a matter for that ADR, not a gap here.
