@@ -1,6 +1,6 @@
 # WP-205: Dify External Knowledge adapter over the mcp-gateway
 
-- **State:** Not started
+- **State:** In progress (code, tests, chart, role written 2026-11-05; not pushed, not built, not live)
 - **ADRs:** [ADR-0599](../../adr/0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md)
 - **Depends on:** [WP-203](wp-203-dify-preparation.md) step 6, [WP-204](wp-204-install-dify-on-demo333.md)
 - **Related:** [WP-208](wp-208-five-experiences-demonstration.md)

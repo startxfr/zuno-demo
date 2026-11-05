@@ -1,0 +1,6 @@
+apiVersion: v2
+name: zuno-dify-knowledge
+description: Dify External Knowledge API over the mcp-gateway knowledge.tech.search tool, through the zuno-token-proxy (ADR-0599, WP-205).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

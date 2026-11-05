@@ -1,6 +1,7 @@
 ---
 # ADR-0599 decision 3: configure Dify through its console API, from inside the api pod (the
 # Route is behind oauth2-proxy). Idempotent (files/configure.py). The plugin package is
+# the External Knowledge API and base (WP-205) are registered by the same helper. The plugin package is
 # downloaded here, checked against the pinned sha256 and copied in; its install needs the PyPI
 # window (-e dify_plugin_install_window=true) the first time.
 - name: "dify | make the cache directory"
@@ -49,6 +50,16 @@
   register: _dify_admin_pw
   no_log: true
 
+- name: "dify | read the External Knowledge adapter key from Vault"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _dify_cfg_vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _dify_cfg_vault.resources[0].data.root_token | b64decode }} vault kv get -field=api_key zuno/dify/knowledge-api"
+  register: _dify_knowledge_key
+  no_log: true
+
 - name: "dify | copy the plugin package and the helper into the api pod"
   ansible.builtin.command: >-
     oc -n {{ dify_namespace }} cp {{ item.src }} {{ _dify_cfg_pods.resources[0].metadata.name }}:{{ item.dest }}
@@ -64,7 +75,8 @@
   environment:
     DIFY_CFG: >-
       {{ {'email': dify_admin_email, 'password': _dify_admin_pw.stdout, 'pkg': '/tmp/oac.difypkg',
-          'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'models': dify_models} | to_json }}
+          'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'models': dify_models,
+          'knowledge': dify_knowledge | combine({'api_key': _dify_knowledge_key.stdout})} | to_json }}
   args:
     executable: /bin/bash
   register: _dify_cfg_out

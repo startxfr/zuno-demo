@@ -6,7 +6,7 @@ token proxy of ADR-0601).
 
 | Verb | Does |
 |---|---|
-| `make d2 install dify` | Seeds the Vault paths, applies the token proxy instance (`zuno-token-proxy-dify-d1`) and the Dify Application (`zuno-dify-d1`), waits for the pods. |
+| `make d2 install dify` | Seeds the Vault paths, applies the token proxy instance (`zuno-token-proxy-dify-d1`), the External Knowledge adapter (`zuno-dify-knowledge-d1`, WP-205; build it first with `make d2 build dify-knowledge`) and the Dify Application (`zuno-dify-d1`), waits for the pods. |
 | `make d2 check dify` | Both Applications Synced and Healthy, running images equal to the digest pins, Dify reaches its token proxy and nothing else, the Route answers only through Keycloak. |
 | `make d2 uninstall dify` | Deletes both Applications. Keeps the Keycloak client, the Vault paths, the databases and the S3 bucket. |
 

@@ -95,6 +95,15 @@
       egress:
         clusterCIDRs: "{{ _dify_cluster_cidrs }}"
 
+- name: "dify | apply the External Knowledge adapter Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "dify-knowledge"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-dify-knowledge-d1"
+    gitops_app_extra_helm_values:
+      namespace: "{{ dify_namespace }}"
+
 - name: "dify | apply the Dify Application (d1)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -141,6 +150,7 @@
   delay: 15
   loop:
     - zuno-token-proxy
+    - zuno-dify-knowledge
     - dify-api
     - dify-worker
     - dify-web

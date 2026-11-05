@@ -164,6 +164,11 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_token_proxy.py
+      - name: zuno-dify-knowledge tests (ADR-0599)
+        working-directory: components/zuno-dify-knowledge
+        run: |
+          pip install -r requirements.txt
+          python3 tests/test_dify_knowledge.py
       - name: ai-gateway tests
         working-directory: components/ai-gateway
         run: |

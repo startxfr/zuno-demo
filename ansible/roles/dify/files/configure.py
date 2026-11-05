@@ -97,3 +97,30 @@ else:
         "timeout": 30, "sse_read_timeout": 300,
     })
     print("mcp: registered")
+
+# 5. External Knowledge (WP-205): the adapter as an External Knowledge API, and one knowledge base on it.
+# Optional input: knowledge = {endpoint, api_key, api_name, kb_name, kb_id, top_k, score_threshold}.
+K = IN.get("knowledge")
+if K:
+    apis = call("GET", "/datasets/external-knowledge-api?page=1&limit=100")
+    found = [a for a in apis.get("data", []) if a.get("name") == K["api_name"]]
+    if found:
+        api_id = found[0]["id"]
+        print("knowledge api: already registered")
+    else:
+        # Dify probes POST {endpoint}/retrieval with an empty id and query; the adapter answers 200 {"records": []}.
+        api_id = call("POST", "/datasets/external-knowledge-api", json={
+            "name": K["api_name"], "settings": {"endpoint": K["endpoint"], "api_key": K["api_key"]},
+        })["id"]
+        print("knowledge api: registered")
+    datasets = call("GET", "/datasets?page=1&limit=100&include_all=true")
+    if any(d.get("name") == K["kb_name"] for d in datasets.get("data", [])):
+        print("knowledge base: already registered")
+    else:
+        call("POST", "/datasets/external", json={
+            "external_knowledge_api_id": api_id, "external_knowledge_id": K["kb_id"], "name": K["kb_name"],
+            "description": "Group-filtered, classification-marked technical documentation (Confluence, Red Hat product docs).",
+            "external_retrieval_model": {"top_k": K["top_k"], "score_threshold": K["score_threshold"],
+                                          "score_threshold_enabled": False},
+        })
+        print("knowledge base: registered")

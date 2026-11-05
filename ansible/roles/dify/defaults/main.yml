@@ -32,3 +32,12 @@ dify_plugin_sha256: a3c6524f183083e0f6f57ac50f201700fd019e786bd1971249ef086adcb7
 dify_models:
   - { name: auto, mode: chat, context: 128000 }
   - { name: zuno-code, mode: chat, context: 32000 }
+# WP-205: the External Knowledge API and the one knowledge base registered in Dify. kb_id is the
+# knowledge_id Dify sends to the adapter (KNOWLEDGE_BASES of gitops/charts/zuno-dify-knowledge).
+dify_knowledge:
+  api_name: Zuno knowledge adapter
+  endpoint: http://zuno-dify-knowledge:8080
+  kb_name: Zuno technical documentation
+  kb_id: tech
+  top_k: 5
+  score_threshold: 0.0

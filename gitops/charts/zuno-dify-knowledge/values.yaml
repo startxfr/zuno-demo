@@ -1,0 +1,33 @@
+# ADR-0599 / WP-205: the adapter Dify's External Knowledge API points at. One release, in the Dify namespace.
+namespace: zuno-dify
+
+image:
+  # Built by the "dify-knowledge" build component (ansible/roles/dify_knowledge_build).
+  repository: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/zuno-dify-knowledge
+  # image.tag must stay "latest" until a release is cut - see RELEASING.md (two parallel image paths).
+  tag: latest
+  pullPolicy: Always
+
+replicas: 1
+
+# The token proxy of this namespace (ADR-0601) holds the dify client token; the adapter never talks to the gateway directly.
+mcpUrl: http://zuno-token-proxy:8080/mcp
+toolName: knowledge.tech.search
+# knowledge_id Dify sends -> tag. One fixed base today.
+knowledgeBases: "tech=knowledge.tech"
+
+# The static key Dify presents as a bearer. Vault dify/knowledge-api, property api_key.
+vaultKey: dify/knowledge-api
+vaultProperty: api_key
+
+externalSecrets:
+  refreshInterval: 1h
+  secretStore: vault-backend
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 96Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
