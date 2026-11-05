@@ -1,6 +1,6 @@
 # ADR-0600: Govern Kubernetes read tools in the mcp-gateway and admit kagent as a thin operations client
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.14
 - **Date:** 2026-11-04
 - **Decision owners:** Zuno Demo architecture team

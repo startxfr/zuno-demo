@@ -1,6 +1,6 @@
 # WP-206: Kubernetes read tools behind the mcp-gateway
 
-- **State:** Repo work in review
+- **State:** Done 2026-11-05 on demo333: `mcp-k8s` (kubernetes-mcp-server v0.0.69 by digest) behind the mcp-gateway on agents v0.13.0. Five-factor proof: the kagent persona token lists the pods of `zuno-ai-run`, reads events and runs a PromQL query through `/mcp`; a Secret read is refused by the server (`resource not allowed: Kind=Secret`); Dify's token cannot call any `k8s.*` tool (`not exposed through this MCP endpoint`). Audit lines carry `agent=kagent task=diagnose capability=k8s.*`. Trap: the gateway image bakes `tool-bindings.yaml`, so the agents release must not be loaded before the image carries the new bindings (`make d2 build mcp` first; the new pod stayed at readyz 503 and the old one kept serving).
 - **ADRs:** [ADR-0600](../../adr/0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md)
 - **Depends on:** none (its spike part can start at once; the install waits for the end of the demo333 upgrade)
 - **Related:** [WP-207](wp-207-kagent-preparation-and-install.md), [WP-202](wp-202-common-preparation-for-dify-and-kagent.md)
