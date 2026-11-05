@@ -1,6 +1,6 @@
 # WP-194: "Zuno Code" in Open WebUI and OpenClaw: Codestral first, local models as fallback
 
-- **State:** Not started
+- **State:** Done (2026-11-05, [evidence](../evidence/wp-194-zuno-code-live-proof.md))
 - **ADRs:** [ADR-0596](../../adr/0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md), [ADR-0594](../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md), [ADR-0592](../../adr/0592-declare-experience-clients-in-the-agents-release-apart-from-agents.md)
 - **Depends on:** [WP-193](wp-193-open-webui-user-experience.md), [WP-189](wp-189-experience-clients-in-the-agents-release.md)
 - **Target:** v0.13

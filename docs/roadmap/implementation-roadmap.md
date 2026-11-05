@@ -35,7 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 12 | 3 | 18 | WP-194, WP-197, WP-198, WP-199, WP-200, WP-201 |
+| v0.13 | 12 | 2 | 18 | WP-197, WP-198, WP-199, WP-200, WP-201 |
 | v0.14 | 3 | 3 | 7 | WP-204, WP-205, WP-206, WP-207, WP-208 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -989,7 +989,7 @@ WP-184 closes them together.
 | WP-191 | [wp-191](work-packages/wp-191-same-mcp-tools-in-the-three-experiences.md) | 0594, 0592 | WP-189, WP-190 | Done (2026-11-03) | the same read MCP tools (Confluence, technical docs) in the three experiences; signed classification markers on tool results, raised by the ai-gateway to local-only |
 | WP-192 | [wp-192](work-packages/wp-192-one-demo-password-and-named-keycloak-administrators.md) | 0595 | — | Done (2026-11-03) | one shared demo password through one variable per component; named `zuno-admin` and `zuno-automation` Keycloak accounts replace the temporary bootstrap admin |
 | WP-193 | [wp-193](work-packages/wp-193-open-webui-user-experience.md) | 0588, 0594 | WP-191 | Done (2026-11-03) | Open WebUI: one model shown as Zuno (the ai-gateway lists `auto` alone to experience clients), the tools on by default, the title as the only background task, a banner and Zuno suggestions |
-| WP-194 | [wp-194](work-packages/wp-194-zuno-code-model-for-experience-clients.md) | 0596, 0594, 0592 | WP-193, WP-189 | Not started | "Zuno Code" in Open WebUI and OpenClaw: a declared model mapped to a `code` task, Codestral first and the local models as fallback; tool turns stay local (ADR-0594); agents release, generator, ai-gateway, both charts |
+| WP-194 | [wp-194](work-packages/wp-194-zuno-code-model-for-experience-clients.md) | 0596, 0594, 0592 | WP-193, WP-189 | Done (2026-11-05) | "Zuno Code" in Open WebUI and OpenClaw: a declared model mapped to a `code` task, Codestral first and the local models as fallback; tool turns stay local (ADR-0594); agents release, generator, ai-gateway, both charts |
 
 ### Phase 47 — gaps left by the retirement of the old RAG stack (added 2026-11-02)
 
@@ -1179,6 +1179,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — WP-194 Done and ADR-0596 Implemented: on demo333, "Zuno Code" is served by Codestral from Open WebUI (consultant-01, 1.3 s) and OpenClaw (consultant-02, 2.2 s), and "Zuno" stays on the local qwen (130 s on the same question). The fallback with Codestral down is covered by unit tests only.
 - 2026-11-04 — ADR-0597, ADR-0598 and WP-197 to WP-201 added as phase 48: consultant-01 found an empty UnifAI (no team, no inventory, no workflow). The operator gains built-in resources, and the demo stack gets business teams next to the agent teams, a catalog without keys, a shared gateway, example workflows, persona starters and a RAG shown live.
 - 2026-11-04 — WP-195 added to phase 43: every Subscription on demo333 said `AtLatestKnown` while seven operators had newer versions (RHOAI and GitOps behind unapproved Manual InstallPlans, rhcl on a channel that stops at 1.4.3, authorino/limitador/dns pinned by rhcl, Kueue on a frozen channel). A report-only audit (`make d3 check operators`), per-cluster channel pins and an RHOAI upgrade walk land in the repo; the live updates follow one go at a time.
 - 2026-11-04 — ADR-0596 and WP-194 added to phase 46: a code question in Open WebUI and OpenClaw was always answered by the local qwen model, since the experience clients had no task preferring Codestral and showed `auto` alone. A declared "Zuno Code" model maps to a `code` task, Codestral first and the local models as fallback; turns with tool results stay local (ADR-0594).

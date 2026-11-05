@@ -1,0 +1,72 @@
+# WP-194: "Zuno Code" in Open WebUI and OpenClaw
+
+- **Date:** 2026-11-04 (deployment) and 2026-11-05 (live run), demo333, consultant-01 (Open WebUI) and consultant-02 (OpenClaw)
+- **Running versions:**
+  - ai-gateway build 41 (`d94b8554`, `sha256:5f9f27d9…`);
+  - charts `b62e3b41`;
+  - agents release v0.11.0 (`okf-corp@sha256:c77d8c9f…`, promoted by PR #28).
+- **Rollback:** ai-gateway `sha256:59d12c1dd2c2c261f2455538a8463763a53c5706b9c29f022d5dc825a70f4b67`.
+- **Brief:** [WP-194](../work-packages/wp-194-zuno-code-model-for-experience-clients.md),
+  [ADR-0596](../../adr/0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md)
+
+## Deployed state
+
+1. **Routing table.** The ConfigMap `ai-gateway-model-routing` holds 24 preferences. Among them, `open-webui`/`code` and
+   `openclaw`/`code` have `prefer: [mistral-codestral]` and no `strict`.
+2. **ai-gateway.**
+   - The environment has `MODEL_TASK_ALIASES=zuno-code=code:Zuno Code`.
+   - `app/model_tasks.py` is in the pod.
+   - The gateway started with no error and `/healthz` returns 200.
+3. **Clients.**
+   - Open WebUI shows the banner `zuno-routing-code`.
+   - Both claws (`consultant-02`, `sale-01`) declare `{name: zuno-code, alias: zuno-code}`.
+   - The Argo CD Applications `zuno-ai-gateway-d1`, `zuno-open-webui-d1` and `zuno-openclaw-d1` are Synced and Healthy at
+     `b62e3b41`.
+4. **Checks before the live run (18:10 local).**
+   - `qwen36-27b-instruct` and `qwen35-9b` answer a 5-token completion with HTTP 200, in 0.33 s and 0.12 s.
+   - All `LLMInferenceService`s are Ready.
+
+## Automated checks
+
+- ai-gateway suite: 366 passed, 358 before WP-194. `tests/test_wp194_model_tasks.py` covers:
+  - `zuno-code` from an experience client is served by `mistral-codestral`, and `auto` by `local-maas`;
+  - Codestral raising makes `local-maas` answer in the same turn;
+  - an unmarked `tool` message keeps the turn local (ADR-0594);
+  - a non-experience client sending `zuno-code` keeps its header task;
+  - `zuno.task` is on the `model_call` span and not on the counters.
+- `platform/okf/tests/test_generate_stack_config.py`: 38 passed. `generate_stack_config.py --check` passes on v0.11.0.
+
+## Live run
+
+2026-11-05, 10:00 to 10:25 local, in a window announced to the other sessions. Same question in each case: "peux tu me
+faire du code python pour verifier une adresse email". The user reported the three cases OK. The figures are the
+ai-gateway `model_call` spans in Tempo (`zuno-monitoring`, `tempo-tempo`).
+
+| Case | Client, user | Model picked | Time | Provider, model | `zuno.task` | Class. | Tokens in / out | Duration |
+|---|---|---|---|---|---|---|---|---|
+| T1 | Open WebUI, consultant-01 | Zuno Code, tools off | 10:16:22 | `mistral-codestral`, codestral-latest | `code` | C1 | 595 / 192 | 1.3 s |
+| T1, title | Open WebUI, consultant-01 | Zuno Code | 10:16:22 | `mistral-codestral`, codestral-latest | `code` | C1 | 258 / 10 | 0.45 s |
+| T2 | Open WebUI, consultant-01 | Zuno | 10:17:00 | `local-maas`, qwen3.6-27b-instruct | `chat` | C1 | 797 / 2,384 | 129.8 s |
+| T2, title | Open WebUI, consultant-01 | Zuno | 10:17:00 | `local-maas`, qwen3.6-27b-instruct | `chat` | C1 | 276 / 860 | 48.1 s |
+| T3 | OpenClaw, consultant-02 | zuno-code | 10:23:13 | `mistral-codestral`, codestral-latest | `code` | C1 | 17,884 / 186 | 2.2 s |
+
+Compared with the same question on 2026-11-04 at 11:18, before WP-194, when every call went to the local qwen:
+
+| | Before (2026-11-04) | Zuno Code (2026-11-05) |
+|---|---|---|
+| Open WebUI, consultant-01 | qwen, 1,075 in / 3,641 out, 2 min 48 s | Codestral, 853 in / 202 out, 1.3 s |
+| OpenClaw, consultant-02 | qwen, 8 calls with `exec` (C1, then C2), 159,885 in / 4,538 out, 5 min 10 s | Codestral, 1 call, 17,884 in / 186 out, 2.2 s |
+
+Findings:
+- `model: zuno-code` from an experience client sets the task to `code` and is served by `mistral-codestral`, and `auto`
+  keeps the local-first order. `zuno.task` is on the span.
+- Open WebUI's title call uses the picked model, so it goes to Codestral too.
+- In T3 OpenClaw answered in one turn without running a tool. The "local after an `exec`" case did not occur live; it
+  is covered by the unit test and by the WP-191 proof of ADR-0594.
+- The Codestral answers are shorter, with no reasoning tokens, and arrive 60 to 100 times faster than qwen's on this
+  question.
+
+## Not run live
+
+- **Codestral down.** It is not tested live, because the key lives in Vault and this session does not write there. The
+  fallback is covered by the unit test above.

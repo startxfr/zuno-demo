@@ -52,6 +52,10 @@ access token on an OpenAI connection (and refresh it), and whether an MCP connec
 > Confluence and knowledge-base tools are listed; the OpenAI connection stays C1. A turn that used one of them is answered
 > by a local model, enforced by the ai-gateway from signed markers on the tool results.
 
+> **Correction (2026-11-05, ADR-0596):** Open WebUI now shows two models, "Zuno" and "Zuno Code", both listed by the
+> ai-gateway. "Zuno Code" selects the client's task `code`, Codestral first and the local models as fallback; a turn
+> with a tool result stays local.
+
 > **Correction (2026-11-03, WP-193):** the model list is no longer every model in the ai-gateway's `/v1/models`. The
 > ai-gateway routes on the classification and never on the model name, so it lists `auto` alone to the experience clients,
 > shown as "Zuno". Open WebUI defaults to that model and turns the Zuno tools on in every chat.

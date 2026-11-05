@@ -1,6 +1,6 @@
 # ADR-0596: Let experience clients pick a declared code model, routed to Codestral first
 
-- **Status:** Proposed
+- **Status:** Implemented (2026-11-05, WP-194: Zuno Code served by Codestral from Open WebUI and OpenClaw on demo333, Zuno stays local)
 - **Target:** v0.13
 - **Date:** 2026-11-04
 - **Decision owners:** Zuno Demo architecture team
