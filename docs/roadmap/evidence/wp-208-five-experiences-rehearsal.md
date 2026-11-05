@@ -24,3 +24,11 @@ Metrics in `prometheus-k8s` (openshift-monitoring): `zuno_model_tokens_total` ha
 
 Open: the browser part of the rehearsal (user), the Perses/Grafana rendering of the new rows, the `k8s.*` tools from UnifAI
 (no agent declares them yet).
+
+## Example applications (2026-11-05, console API)
+
+`Zuno Agent`: `confluence.page.search` called with `{"query": "onboarding", "limit": 10}`, the answer lists the Confluence
+pages (MNGD2-AP001 Onboarding Chef de projet métier, MNGD2-AP002 …). `Zuno Technical Documentation` (Chatflow): Start,
+knowledge retrieval, LLM, Answer all `succeeded`, the answer tabulates the onboarding workshops of the knowledge base.
+`Zuno Confluence Search` (Workflow): Start, tool, LLM, End all `succeeded`, output `summary`. Imported from scratch after
+deleting the three applications, and left idempotent (a second run reports "already imported").

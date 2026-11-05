@@ -43,11 +43,20 @@ flowchart LR
 
 ## Script (about 20 minutes)
 
-1. **A business workflow drawn in Dify.** In Dify create a *Chatflow*: a **Knowledge retrieval** node on the external
-   knowledge base *Zuno technical documentation* (the adapter calls the same `search_technical_docs` capability as the
-   other experiences, WP-205), an **LLM** node on the model `auto` (labelled "Zuno"), an answer node. Ask "How do I
-   configure an OpenShift route with a custom certificate?". The answer cites chunks whose source and classification
-   come from the platform (Confluence chunks keep C2, public documentation C1).
+1. **Three Dify applications, already there.** Every install of Dify (`make d2 install dify`) imports three examples
+   from `ansible/roles/dify/files/apps/` (DSL files). Open **Studio** and run them with the persona's models and tools:
+   - **Zuno Agent** (Agent): ask "Find our onboarding pages in Confluence". The agent calls the MCP tool
+     `confluence.page.search` through the token proxy and cites the pages; the knowledge base is its context too.
+   - **Zuno Technical Documentation** (Chatflow): ask "Quels sont les workshops de onboarding disponibles ?". The flow
+     is Start, knowledge retrieval over *Zuno technical documentation* (the adapter calls the same
+     `search_technical_docs` capability as the other experiences, WP-205), LLM `auto`, Answer. Open it in the canvas to
+     show the drawing. The answer carries the sources and their classification (Confluence C2, public documentation C1).
+   - **Zuno Confluence Search** (Workflow): in *Run*, enter the topic "onboarding": the MCP tool node searches Confluence,
+     an LLM summarises the pages found.
+   To build one live instead, follow the same shape: Studio, Create from blank, Chatflow (Start, Knowledge Retrieval,
+   LLM `auto`, Answer) or Agent (add the tools of *Zuno MCP gateway*, tab MCP). The MCP page of Integrations shows the
+   server and its six tools; do not click its card (Dify 1.17.0 answers 500 there, a known upstream defect, the
+   applications are not affected).
 2. **The same question in UnifAI and Open WebUI.** Same persona, same documents, same entitlement: the three answers draw
    on the same sources. Say what differs: the interface.
 3. **Same backend, five clients.** Dashboard row *Same backend, five experiences*: one series per client (`unifai`,

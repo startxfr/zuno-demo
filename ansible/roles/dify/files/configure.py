@@ -15,7 +15,7 @@ PROVIDER = "langgenius/openai_api_compatible/openai_api_compatible"
 S = requests.Session()
 
 
-def call(method, path, ok=(200, 201), **kw):
+def call(method, path, ok=(200, 201, 204), **kw):
     h = kw.pop("headers", {})
     # The cookies are Secure and the pod talks plain http: send the same values explicitly.
     h["Cookie"] = "; ".join(f"{c.name}={c.value}" for c in S.cookies)
@@ -67,23 +67,34 @@ else:
             sys.exit(1)
     print("plugin: installed", uid)
 
-# 3. models
+# 3. models. Both models answer tool calls through the token proxy and the ai-gateway (checked live 2026-11-05), so
+# they are registered with function_calling_type tool_call: the Agent app needs the model's "tool-call" feature.
 have = call("GET", f"/workspaces/current/model-providers/{PROVIDER}/models").get("data", [])
-names = {m.get("model") for m in have}
-for m in IN["models"]:
-    if m["name"] in names:
-        print("model:", m["name"], "already registered")
-        continue
-    call("POST", f"/workspaces/current/model-providers/{PROVIDER}/models/credentials", json={
+registered = {m.get("model"): m for m in have}
+
+
+def credentials(m):
+    return {
         "model": m["name"], "model_type": "llm",
         "credentials": {
             "mode": m["mode"], "context_size": str(m["context"]), "max_tokens_to_sample": "4096",
             "display_name": m["name"], "api_key": "dummy-dropped-by-the-token-proxy",
             "endpoint_url": IN["proxy"] + "/v1", "endpoint_model_name": m["name"],
-            "function_calling_type": "no_call", "stream_function_calling": "not_supported",
+            "function_calling_type": "tool_call", "stream_function_calling": "supported",
             "vision_support": "no_support", "structured_output_support": "not_supported",
         },
-    })
+    }
+
+
+for m in IN["models"]:
+    cur = registered.get(m["name"])
+    if cur and any("tool-call" in f for f in (cur.get("features") or [])):
+        print("model:", m["name"], "already registered with tool calls")
+        continue
+    if cur:
+        call("DELETE", f"/workspaces/current/model-providers/{PROVIDER}/models", params={"model": m["name"], "model_type": "llm"}, json={"model": m["name"], "model_type": "llm"})
+        print("model:", m["name"], "re-registered to enable tool calls")
+    call("POST", f"/workspaces/current/model-providers/{PROVIDER}/models/credentials", json=credentials(m))
     print("model:", m["name"], "registered")
 
 # 4. MCP tool
@@ -143,3 +154,69 @@ if K:
                                           "score_threshold_enabled": False},
         })
         print("knowledge base: registered")
+
+
+# 6. example applications (WP-208): the DSL files of files/apps/, imported once by name. The MCP tools are named in
+# the DSL by the server identifier (what the agent and workflow runtimes resolve), so nothing in them is specific to
+# this instance; Dify drops the plain dataset ids of an imported DSL, so the external knowledge base is attached
+# through the draft APIs after the import.
+import glob
+import os
+
+import yaml
+
+KB_NAME = (IN.get("knowledge") or {}).get("kb_name", "Zuno technical documentation")
+dataset = next((d for d in call("GET", "/datasets?page=1&limit=100&include_all=true").get("data", [])
+                if d.get("name") == KB_NAME), None)
+if dataset is None:
+    print("FAIL external knowledge base not found: run the adapter step first")
+    sys.exit(1)
+
+apps = call("GET", "/apps?page=1&limit=100").get("data", [])
+by_name = {a["name"]: a for a in apps}
+
+
+def attach_dataset(app_id, mode):
+    """Attach the external knowledge base; True when something changed (idempotent)."""
+    if mode == "agent-chat":
+        detail = call("GET", f"/apps/{app_id}")
+        cfg = detail["model_config"]
+        listed = cfg.get("dataset_configs", {}).get("datasets", {}).get("datasets", [])
+        if any(d.get("dataset", {}).get("id") == dataset["id"] for d in listed):
+            return False
+        cfg.setdefault("dataset_configs", {})["datasets"] = {"datasets": [{"dataset": {"enabled": True, "id": dataset["id"]}}]}
+        call("POST", f"/apps/{app_id}/model-config", json=cfg)
+        return True
+    if mode == "advanced-chat":
+        draft = call("GET", f"/apps/{app_id}/workflows/draft")
+        nodes = [n for n in draft["graph"]["nodes"] if n["data"].get("type") == "knowledge-retrieval"]
+        if all(dataset["id"] in n["data"].get("dataset_ids", []) for n in nodes):
+            return False
+        for n in nodes:
+            n["data"]["dataset_ids"] = [dataset["id"]]
+        call("POST", f"/apps/{app_id}/workflows/draft", json={"graph": draft["graph"], "features": draft.get("features", {}), "hash": draft.get("hash")})
+        return True
+    return False
+
+
+for path in sorted(glob.glob(os.path.join(IN["apps_dir"], "*.yml"))):
+    text = open(path).read()
+    meta = yaml.safe_load(text)["app"]
+    if meta["name"] in by_name:
+        app_id, mode = by_name[meta["name"]]["id"], meta["mode"]
+        changed = attach_dataset(app_id, mode)
+        if changed and mode == "advanced-chat":
+            call("POST", f"/apps/{app_id}/workflows/publish", json={})
+        print("app:", meta["name"], "already imported" + (", knowledge base attached" if changed else ""))
+        continue
+    res = call("POST", "/apps/imports", ok=(200, 201, 202), json={"mode": "yaml-content", "yaml_content": text})
+    if res.get("status") == "pending":
+        res = call("POST", f"/apps/imports/{res['id']}/confirm", ok=(200, 201))
+    if res.get("status") != "completed":
+        print("FAIL import", meta["name"], json.dumps(res)[:400])
+        sys.exit(1)
+    app_id, mode = res["app_id"], meta["mode"]
+    attach_dataset(app_id, mode)
+    if mode in ("advanced-chat", "workflow"):
+        call("POST", f"/apps/{app_id}/workflows/publish", json={})
+    print("app:", meta["name"], "imported", mode, app_id)

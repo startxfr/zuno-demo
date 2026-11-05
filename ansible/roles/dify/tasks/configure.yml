@@ -60,12 +60,20 @@
   register: _dify_knowledge_key
   no_log: true
 
+- name: "dify | clear the example applications directory of the api pod"
+  kubernetes.core.k8s_exec:
+    namespace: "{{ dify_namespace }}"
+    pod: "{{ _dify_cfg_pods.resources[0].metadata.name }}"
+    command: rm -rf /tmp/apps
+  changed_when: false
+
 - name: "dify | copy the plugin package and the helper into the api pod"
   ansible.builtin.command: >-
     oc -n {{ dify_namespace }} cp {{ item.src }} {{ _dify_cfg_pods.resources[0].metadata.name }}:{{ item.dest }}
   loop:
     - { src: "{{ zuno_repo_root }}/.cache/dify-oac.difypkg", dest: /tmp/oac.difypkg }
     - { src: "{{ role_path }}/files/configure.py", dest: /tmp/configure.py }
+    - { src: "{{ role_path }}/files/apps", dest: /tmp/apps }
   changed_when: false
 
 - name: "dify | configure the administrator, the plugin, the models and the MCP tool"
@@ -75,7 +83,7 @@
   environment:
     DIFY_CFG: >-
       {{ {'email': dify_admin_email, 'password': _dify_admin_pw.stdout, 'pkg': '/tmp/oac.difypkg',
-          'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'models': dify_models,
+          'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'apps_dir': '/tmp/apps', 'models': dify_models,
           'knowledge': dify_knowledge | combine({'api_key': _dify_knowledge_key.stdout})} | to_json }}
   args:
     executable: /bin/bash
