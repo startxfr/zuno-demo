@@ -195,6 +195,12 @@ class TurnTests(GatewayTestCase):
         await self.send("alpha", "tok-consultant", "hi", **{"X-Zuno-Data-Classification": "C1"})
         self.assertEqual([c["headers"]["x-zuno-data-classification"] for c in self.down.llm_calls], ["C3", "C1"])
 
+    async def test_the_task_returns_the_classification_the_turn_ran_at(self) -> None:
+        first = await self.send("alpha", "tok-consultant", "hi")
+        raised = await self.send("alpha", "tok-consultant", "hi", **{"X-Zuno-Data-Classification": "C3"})
+        self.assertEqual(first.root.result.metadata["zuno.classification"], "C1")
+        self.assertEqual(raised.root.result.metadata["zuno.classification"], "C3")
+
     async def test_tools_go_through_the_mcp_gateway_with_the_same_identity(self) -> None:
         self.down.tools = [{"name": "search_confluence", "description": "d", "inputSchema": {"type": "object"},
                             "annotations": {"readOnlyHint": True}}]

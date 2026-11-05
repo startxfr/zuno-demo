@@ -58,6 +58,8 @@ rather than an on-behalf-of exchange.
    and the local-only rules (ADR-0035, ADR-0550) apply to what comes back. The mcp-gateway judges each
    call on the header it receives, as for any call: it cannot see the delegator's run, so keeping the level
    monotone is the duty of the A2A client and server (WP-173), proven by their tests.
+   The a2a-gateway returns the level its turn ran at in the completed task's metadata, under the key
+   `zuno.classification`, so a delegator that polls `tasks/get` reads it on every poll.
 6. **The chain is audited.** The gateway log line and the tool span add the user's
    `sub`, `delegated_by` (the chain) and `delegation_depth`, so a delegated call can be
    reconstructed. Counters keep their current low-cardinality labels.
