@@ -180,6 +180,30 @@ wiring is still to be tested on one server.
   "gpt-oss-20b-developer"`, `"expiresIn": "30d"`); the plaintext key is shown once. Then Claude Code is tested against
   `https://maas.apps.demo333.startx.fr/zuno-ai-run/gpt-oss-20b` with `ANTHROPIC_AUTH_TOKEN` set to that key.
 
+## 8. Pilot 2: MaaS consumer portal (2026-11-05, user go, OpenShift login)
+
+Window announced to the peer sessions and opened after zuno-demo-7e closed its Codestral-down drill (18:21Z). DSC `zuno-dsc` backed up
+first, then one live patch: `dashboard.maasConsumerPortal.managementState: Managed` (the chart carries the same value, because ArgoCD
+ignores the DSC `/spec`).
+
+What happened:
+
+- The dashboard operator created `maas-consumer-portal` (Deployment, Service, NetworkPolicy, HTTPRoute) within seconds. The pods looped in
+  `Init:1/2` and the DSC went `Ready=False` (`MaaSConsumerPortalDeploymentUnavailable`).
+- Cause: the same gap as ADR-0517. The portal pods are `part-of: maas-consumer-portal`, so the supplementary egress policy
+  `zuno-dashboard-modules-istiod-egress` (selector `part-of: odh-dashboard`) did not select them, and the vendor policy `maas-consumer-portal`
+  allows only DNS, 6443, `maas-ui` and `gen-ai-ui`. The istio-proxy xDS dial to istiod:15012 timed out.
+- Fix, in the chart (b8eb1b51): the policy selector is now `part-of In (odh-dashboard, maas-consumer-portal)`. After the Argo sync the
+  pod went 2/2 and the DSC `Ready=True`.
+- Reachability: the portal is **not** under the MaaS hostname. The HTTPRoute is on `data-science-gateway` at
+  `https://rh-ai.apps.demo333.startx.fr/maas-consumer-portal` (the earlier assumption `/maas-portal` on the MaaS gateway was wrong). An
+  unauthenticated request gets a 302 to the OpenShift OAuth server (client `data-science`), as designed.
+- No regression: MaaS without a token still answers 401, the four models are Ready, no unhealthy pod, DSC Ready.
+
+Not yet done: the interactive sign-in as `dev` and the key create, use, list and revoke cycle in the browser (needs the user's own login).
+Open questions for that run: which subscription the portal offers (expected `gpt-oss-20b-developer`), whether key events are audited, and
+whether the vendor policy also blocks the portal's calls to maas-api once a user is signed in.
+
 ## Steps
 
 1. This evaluation (done, in review).
