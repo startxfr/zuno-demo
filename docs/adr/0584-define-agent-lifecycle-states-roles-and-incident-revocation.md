@@ -1,7 +1,7 @@
 # ADR-0584: Define agent lifecycle states, roles and incident revocation
 
 - **Status:** Accepted
-- **Target:** v0.12
+- **Target:** v0.15 (retargeted from v0.12 on 2026-11-05: WP-167 delivered ADR-0582, not this decision, so none of its work has started, see the status note)
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
 - **Extends:** [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md) (review and CODEOWNERS), [ADR-0578](0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md), [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)
@@ -106,4 +106,4 @@ Checked against the repository and demo333, the decision is mostly not built, an
 
 - **Built:** the `placeholder` and `active` states (ADR-0007), the second-reviewer rule relaxed to the owner plus the platform session by the acceptance note above, and a state shown on the sheet (ADR-0582).
 - **Not built:** the `deprecated` and `retired` states and their effects (clause 3); the behaviour of sessions on retirement, to be verified in the pilot (clause 4); the revocation list as a GitOps-managed ConfigMap read by the operator, and the runbook (clause 5); the operator events for admission, state change, revocation and rejection (clause 6).
-- **Next step:** a work package for clauses 3 to 6, which needs a change in the UnifAI operator (a fork patch). Until then this ADR is a decision without code.
+- **Next step:** [WP-221](../roadmap/work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md) carries clauses 3 to 6. It needs a change in the UnifAI operator (a fork patch).

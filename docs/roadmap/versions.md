@@ -23,7 +23,7 @@ state are not restated here.
 | v0.4 to v0.12 | none | | never tagged; their content is in `v0.13.0` |
 | v0.13 | `v0.13.0` | 2026-11-05 | no open ADR or WP; ledger not run |
 | v0.14 | next | | `v0.14.0` once WP-208 is Done |
-| v0.15 | planned | | the classification floor (WP-209) |
+| v0.15 | planned | | the classification floor (WP-209) and the agent lifecycle (WP-221) |
 | v0.16 | planned | | day-0 internal/external mode (WP-211 to WP-218), cluster-management decisions, page-level ACL (WP-210) |
 
 ## MVP / v0
@@ -304,7 +304,9 @@ longer lower a level by sending a lower header, and a request without a header i
 depends on the old `C1` default (ADR-0565 clause 5). The operator validation, the bundle overrides and the per-chunk
 classification are already done; ADR-0594's signed markers already raise a turn.
 
-**1 ADR, `Partially implemented` (ADR-0565).** Open work package: WP-209.
+The band also holds the agent lifecycle: the `deprecated` and `retired` states, an incident revocation list and audit events (ADR-0584, WP-221), moved here from v0.12 on 2026-11-05 because none of it has started.
+
+**2 ADRs: ADR-0565 `Partially implemented`, ADR-0584 `Accepted`.** Open work packages: WP-209, WP-221.
 
 ## v0.16
 

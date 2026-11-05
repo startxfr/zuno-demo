@@ -334,7 +334,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Accepted | Derive stack configuration from the admitted corp bundle |
 | [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Implemented | Serve a per-agent entry and descriptive sheet from the admitted bundle |
 | [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Implemented | Require group visibility and object-level authorisation before per-agent entries |
-| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
 
 ## v0.13
 
@@ -366,6 +365,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Partially implemented | Derive data classification from OKF and only allow raising it |
+| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
 
 ## v0.16
 

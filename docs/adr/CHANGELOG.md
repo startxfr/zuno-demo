@@ -9,6 +9,10 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Retarget (2026-11-05) - ADR-0584 follows the code release that will build it
+
+ADR-0584 (agent lifecycle states, roles and incident revocation) moves from v0.12 to v0.15. WP-167, the only work package that cited it, delivers ADR-0582 and the group visibility of ADR-0583, and builds none of ADR-0584's clauses 3 to 6; the new WP-221 does. v0.12 therefore keeps no unstarted ADR.
+
 ## Retarget (2026-11-05) - unstarted work follows the code releases, new bands v0.15 and v0.16
 
 The platform now tags a release per band (`v0.13.0`, then `v0.14.0`; see RELEASING.md). Five ADRs sat in bands that are past, with all their remaining work not started, so those bands could never close. They move to the bands that will carry the work. ADRs that are closed, and ADRs with a work package already started, did not move.
