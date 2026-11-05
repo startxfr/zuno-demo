@@ -294,14 +294,14 @@ def evaluate(
         )
 
     decision = _evaluate_tool_policy(store, tool_name, names, caller_groups, request_classification)
-    if delegated and decision.allowed and not limits.allow_write:
+    if delegated and decision.allowed and not limits.allow_write and (agent_name, task_name) not in limits.write_allowed:
         entry = next((e for e in (store.get_tool(n) for n in names) if e is not None), None)
         if entry is None or entry.access != "read":
             return PolicyDecision(
                 allowed=False,
                 reason=(
                     f"tool '{tool_name}' is a write tool and delegated writes are refused until "
-                    "delegation.allow_write is set (ADR-0406, ADR-0409)"
+                    "the target agent/task is listed in delegation.write_allowed (ADR-0406, ADR-0409)"
                 ),
             )
     return decision

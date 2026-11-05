@@ -24,7 +24,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, FrozenSet, List, Optional, Tuple
 
 import yaml
 
@@ -99,24 +99,32 @@ class DelegationLimits:
         self._path = path
         self.ceiling = 1
         self.allow_write = False
+        # (agent, task) pairs a delegated call may write through (ADR-0409 clause 5, with human approval).
+        self.write_allowed: FrozenSet[Tuple[str, str]] = frozenset()
         self.load_error: Optional[str] = None
         self.reload()
 
     def reload(self) -> None:
-        ceiling, allow_write, error = 1, False, None
+        ceiling, allow_write, write_allowed, error = 1, False, frozenset(), None
         try:
             with open(self._path, "r", encoding="utf-8") as fh:
                 doc = yaml.safe_load(fh) or {}
             value = doc.get("max_delegation_depth", 1)
             ceiling = value if isinstance(value, int) and not isinstance(value, bool) and value >= 1 else 1
-            allow_write = (doc.get("delegation") or {}).get("allow_write") is True
+            delegation = doc.get("delegation") or {}
+            allow_write = delegation.get("allow_write") is True  # legacy global switch, kept off
+            write_allowed = frozenset(
+                (str(e["agent"]), str(e["task"]))
+                for e in (delegation.get("write_allowed") or [])
+                if isinstance(e, dict) and e.get("agent") and e.get("task")
+            )
         except FileNotFoundError:
             error = f"limits policy not found at {self._path}; delegation uses the safe defaults"
             logger.warning(error)
         except Exception as exc:  # malformed YAML
             error = f"failed to parse limits policy {self._path}: {exc}; delegation uses the safe defaults"
             logger.error(error)
-        self.ceiling, self.allow_write, self.load_error = ceiling, allow_write, error
+        self.ceiling, self.allow_write, self.write_allowed, self.load_error = ceiling, allow_write, write_allowed, error
 
 
 def verify_chain(

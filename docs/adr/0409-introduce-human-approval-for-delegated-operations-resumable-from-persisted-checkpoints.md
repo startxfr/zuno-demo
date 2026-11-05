@@ -96,3 +96,22 @@ are unchanged.
   later version that adds the checkpoint store. Every other proof of the list still applies.
 - **Order of the fork work (R-535):** 1 identity, 3 limits, 2 classification, 5 approval. Each step goes into a weekly
   release; the steps that change A2A behaviour get a canary on demo333.
+
+### Gateway contract of the approval (2026-11-05)
+
+Agreed with the fork (R-535) and implemented in `components/a2a-gateway` and `components/mcp-gateway`:
+
+- **Request.** On a delegated call to a target listed in `delegation.write_allowed`, a call of a write tool stops the turn at the
+  task state `input-required`, with `status.message.metadata["zuno.approval"] = {request_id, operation, args, reasoning}`
+  (`args` is a redacted summary: sensitive keys are masked, long values cut).
+- **Answer.** A message on the same `task_id` and `context_id` with a data part
+  `{"zuno.approval": {request_id, decision, feedback}}`. The gateway serves `approve` and `reject`; any other decision
+  (`modify`, `redirect`) counts as a refusal. Only the caller who started the task may answer.
+- **Silence is a refusal.** The state needed to go on is held in the gateway's memory for 300 seconds. An answer that comes later,
+  or after a restart, finds nothing to resume: the task fails and the write never runs. Until an answer arrives the task stays in
+  `input-required`. (The A2A SDK ends a turn at `input-required`, so no thread waits.)
+- **Both gateways check the list.** The a2a-gateway offers write tools to the model only for a listed target; the mcp-gateway
+  refuses a delegated write unless the executing `agent/task` is listed. `delegation.allow_write` stays honoured as the legacy
+  global switch, off by default. The list itself is in the corp policy of the agents release (`policies/limits/limits-policy.yaml`)
+  and still has to be added there, with Arkos / `draft-architecture-testimonial` as its first entry.
+

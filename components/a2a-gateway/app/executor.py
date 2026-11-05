@@ -10,16 +10,18 @@ from __future__ import annotations
 
 import logging
 import re
+import uuid
 from typing import Any, Dict, List, Optional
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
 from a2a.server.tasks import TaskUpdater
-from a2a.types import Part, TaskState, TextPart
+from a2a.types import Message, Part, Role, TaskState, TextPart
 from a2a.utils import new_agent_text_message
 
 from app.agent_chain import ChainError, DelegationLimits, parse_chain, verify_chain
 from app.agent_declarations import AgentDeclaration, AgentDeclarationStore
+from app.approvals import APPROVAL_KEY, DECISIONS, PendingApproval, PendingStore, answer_in, redact_arguments
 from app.auth import CallerIdentity
 from app.clients import (
     AiGatewayClient, DownstreamError, McpGatewayClient, parse_arguments, raise_classification, to_openai_tools,
@@ -52,6 +54,14 @@ class Refused(Exception):
     """The request is not acceptable; the message is shown to the caller."""
 
 
+class ApprovalRequested(Exception):
+    """A delegated write needs the initiating user's approval: the turn stops at `input-required` here."""
+
+    def __init__(self, operation: str, payload: Dict[str, Any], pending: PendingApproval) -> None:
+        super().__init__(operation)
+        self.operation, self.payload, self.pending = operation, payload, pending
+
+
 class ZunoAgentExecutor(AgentExecutor):
     def __init__(
         self,
@@ -68,16 +78,53 @@ class ZunoAgentExecutor(AgentExecutor):
         self._settings = settings
         self._llm = llm
         self._tools = tools
+        self._approvals = PendingStore()
 
     # -- A2A entry points ---------------------------------------------------
 
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         updater = TaskUpdater(event_queue, context.task_id, context.context_id)
+        answer = answer_in(context.message)
+        if answer is not None and context.current_task is not None:
+            await self._resume(context, updater, answer)
+            return
         if context.current_task is None:
             await updater.submit()
         await updater.start_work()
+        await self._turn(context, updater, None)
+
+    async def _resume(self, context: RequestContext, updater: TaskUpdater, answer: Dict[str, Any]) -> None:
+        """The user's answer to a pending approval (ADR-0409): run the write if approved, then go on with the turn."""
         try:
-            text, classification = await self._answer(context)
+            caller = self._caller(context)
+        except Refused as exc:
+            await updater.failed(new_agent_text_message(str(exc), context.context_id, context.task_id))
+            return
+        pending = self._approvals.take(context.task_id, str(answer.get("request_id") or ""))
+        if pending is None or pending.caller_sub != caller.sub:
+            await updater.failed(new_agent_text_message(
+                "No approval is pending for this task (it expired after 300 seconds, was answered, or the gateway "
+                "restarted). The operation was not run.", context.context_id, context.task_id,
+            ))
+            return
+        await updater.start_work()
+        await self._turn(context, updater, (pending, answer))
+
+    async def _turn(
+        self, context: RequestContext, updater: TaskUpdater, resume: Optional[tuple[PendingApproval, Dict[str, Any]]]
+    ) -> None:
+        try:
+            text, classification = await self._answer(context, updater, resume)
+        except ApprovalRequested as request:
+            self._approvals.put(context.task_id, request.pending)
+            logger.info("approval requested agent=%s task_id=%s operation=%s",
+                        self._agent.name, context.task_id, request.operation)
+            await updater.requires_input(Message(
+                role=Role.agent, message_id=uuid.uuid4().hex, task_id=context.task_id, context_id=context.context_id,
+                parts=[Part(root=TextPart(text=f"Approval required to run {request.operation}."))],
+                metadata={APPROVAL_KEY: request.payload},
+            ), final=True)
+            return
         except (Refused, ChainError, DownstreamError) as exc:
             await updater.failed(new_agent_text_message(str(exc), context.context_id, context.task_id))
             return
@@ -120,72 +167,122 @@ class ZunoAgentExecutor(AgentExecutor):
             raise Refused(f"Agent '{self._agent.name}' has no task '{task}'.")
         return task
 
-    async def _answer(self, context: RequestContext) -> tuple[str, str]:
+    async def _answer(
+        self, context: RequestContext, updater: TaskUpdater, resume: Optional[tuple[PendingApproval, Dict[str, Any]]]
+    ) -> tuple[str, str]:
         caller = self._caller(context)
-        headers = (context.call_context.state.get("headers") or {}) if context.call_context else {}
-        request_text = context.get_user_input().strip()
-        if not request_text:
-            raise Refused("The message is empty.")
-        if len(request_text) > self._settings.max_message_chars:
-            raise Refused("The message is too long.")
+        if resume is not None:
+            # An approval answered: the turn goes on from where it stopped, with the state kept at the request.
+            pending, answer = resume
+            task, chain_headers, classification, run_id = (
+                pending.task, pending.chain_headers, pending.classification, pending.run_id,
+            )
+            messages, backlog, rounds_left, writes = pending.messages, pending.backlog, pending.rounds_left, True
+        else:
+            headers = (context.call_context.state.get("headers") or {}) if context.call_context else {}
+            request_text = context.get_user_input().strip()
+            if not request_text:
+                raise Refused("The message is empty.")
+            if len(request_text) > self._settings.max_message_chars:
+                raise Refused("The message is too long.")
 
-        lowered = {k.lower(): v for k, v in headers.items()}
-        task = self._task_name(context, lowered)
-        chain = parse_chain(lowered.get("x-zuno-delegated-by"), lowered.get("x-zuno-delegation-depth"))
-        reason = verify_chain(chain, self._agent.name, task, caller.groups, self._store, self._limits)
-        if reason:
-            raise Refused(reason)
-        chain_headers = {h: lowered[h.lower()] for h in CHAIN_HEADERS if lowered.get(h.lower())}
-        # The caller's reply cap crosses the hop (the ai-gateway keeps the smallest of it and its own default).
-        max_tokens = _max_tokens(lowered.get("x-zuno-max-tokens"))
-        if max_tokens:
-            chain_headers["X-Zuno-Max-Tokens"] = max_tokens
-
-        classification = raise_classification(
-            self._agent.classification or "C1", lowered.get("x-zuno-data-classification", "")
-        )
-        run_id = _run_id(lowered.get("x-zuno-run-id")) or context.task_id or ""
+            lowered = {k.lower(): v for k, v in headers.items()}
+            task = self._task_name(context, lowered)
+            chain = parse_chain(lowered.get("x-zuno-delegated-by"), lowered.get("x-zuno-delegation-depth"))
+            reason = verify_chain(chain, self._agent.name, task, caller.groups, self._store, self._limits)
+            if reason:
+                raise Refused(reason)
+            chain_headers = {h: lowered[h.lower()] for h in CHAIN_HEADERS if lowered.get(h.lower())}
+            # The caller's reply cap crosses the hop (the ai-gateway keeps the smallest of it and its own default).
+            max_tokens = _max_tokens(lowered.get("x-zuno-max-tokens"))
+            if max_tokens:
+                chain_headers["X-Zuno-Max-Tokens"] = max_tokens
+            classification = raise_classification(
+                self._agent.classification or "C1", lowered.get("x-zuno-data-classification", "")
+            )
+            run_id = _run_id(lowered.get("x-zuno-run-id")) or context.task_id or ""
+            messages = [
+                {"role": "system", "content": self._agent.system_prompt(task)},
+                {"role": "user", "content": request_text},
+            ]
+            backlog, rounds_left = [], self._settings.max_tool_rounds + 1
+            # A write tool is offered only on a delegated call to a target listed in delegation.write_allowed, and
+            # each call of it waits for the initiating user's approval (ADR-0409).
+            writes = bool(chain) and (self._agent.name, task) in self._limits.write_allowed
         common = dict(
             token=caller.token, agent=self._agent.name, task=task,
             classification=classification, run_id=run_id, chain_headers=chain_headers,
         )
-
-        messages: List[Dict[str, Any]] = [
-            {"role": "system", "content": self._agent.system_prompt(task)},
-            {"role": "user", "content": request_text},
-        ]
-        tools = await self._available_tools(common)
+        tools, read_only = await self._available_tools(common, writes)
         offered = {t["function"]["name"] for t in tools or []}
-        for _ in range(self._settings.max_tool_rounds + 1):
-            reply = await self._llm.chat(messages=messages, tools=tools, **common)
-            calls = reply.get("tool_calls") or []
-            if not calls or not tools:
-                return str(reply.get("content") or "").strip() or "The agent has no answer.", classification
-            messages.append({"role": "assistant", "content": reply.get("content") or "", "tool_calls": calls})
-            for call in calls:
+
+        if resume is not None:
+            call = backlog.pop(0)
+            function = call.get("function") or {}
+            name = str(function.get("name") or "")
+            decision = str(answer.get("decision") or "reject")
+            if decision not in DECISIONS:
+                note = f"The decision '{decision}' is not supported."
+            else:
+                note = str(answer.get("feedback") or "")[:300]
+            logger.info("approval answered agent=%s task_id=%s operation=%s decision=%s",
+                        self._agent.name, context.task_id, name, decision)
+            if decision == "approve" and name in offered:
+                result = await self._tools.call_tool(name, parse_arguments(function.get("arguments")), **common)
+            else:
+                result = f"The operation {name} was not approved and was not run. {note}".strip()
+            messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
+
+        while rounds_left > 0:
+            if not backlog:
+                reply = await self._llm.chat(messages=messages, tools=tools, **common)
+                calls = reply.get("tool_calls") or []
+                if not calls or not tools:
+                    return str(reply.get("content") or "").strip() or "The agent has no answer.", classification
+                messages.append({"role": "assistant", "content": reply.get("content") or "", "tool_calls": calls})
+                backlog = list(calls)
+                rounds_left -= 1
+            while backlog:
+                call = backlog[0]
                 function = call.get("function") or {}
                 name = str(function.get("name") or "")
-                if name not in offered:  # never run a tool that was not offered (read-only, listed for this task)
+                if name not in offered:  # never run a tool that was not offered (listed for this task)
                     result = f"The tool {name} is not available."
-                else:
+                elif name in read_only:
                     result = await self._tools.call_tool(name, parse_arguments(function.get("arguments")), **common)
+                else:
+                    request_id = uuid.uuid4().hex
+                    arguments = parse_arguments(function.get("arguments"))
+                    assistant = next((m for m in reversed(messages) if m.get("role") == "assistant"), {})
+                    payload = {
+                        "request_id": request_id, "operation": name, "args": redact_arguments(arguments),
+                        "reasoning": str(assistant.get("content") or "")[:500],
+                    }
+                    raise ApprovalRequested(name, payload, PendingApproval(
+                        request_id=request_id, caller_sub=caller.sub, task=task, classification=classification,
+                        run_id=run_id, chain_headers=chain_headers, messages=messages, backlog=backlog,
+                        rounds_left=rounds_left,
+                    ))
+                backlog.pop(0)
                 messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
         # Out of rounds: ask once more without tools so the user gets a final answer.
         reply = await self._llm.chat(messages=messages, tools=None, **common)
         return str(reply.get("content") or "").strip() or "The agent has no answer.", classification
 
-    async def _available_tools(self, common: Dict[str, Any]) -> Optional[List[Dict[str, Any]]]:
+    async def _available_tools(self, common: Dict[str, Any], writes: bool = False):
+        """The tools offered for this turn and the names of the read-only ones among them."""
         if not self._settings.tools_enabled or not self._agent.tasks.get(common["task"]):
-            return None
+            return None, set()
         try:
             listed = await self._tools.list_tools(**common)
         except DownstreamError as exc:
             logger.info("no tools for %s/%s: %s", self._agent.name, common["task"], exc)
-            return None
+            return None, set()
         except Exception:
             logger.warning("tool listing failed for %s", self._agent.name, exc_info=True)
-            return None
-        # No approval exists across hops (ADR-0409, WP-173 step 5): only tools that declare themselves
-        # read-only are offered, so a write can never run here without the approval UnifAI would ask.
+            return None, set()
+        # Only tools that declare themselves read-only run freely. A write tool is offered solely when the call is
+        # a delegation to a target listed in delegation.write_allowed, and then every call of it asks the user.
         read_only = [t for t in listed if (t.get("annotations") or {}).get("readOnlyHint") is True]
-        return to_openai_tools(read_only) or None
+        chosen = listed if writes else read_only
+        return to_openai_tools(chosen) or None, {t["name"] for t in read_only}
