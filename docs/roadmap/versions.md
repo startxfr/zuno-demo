@@ -9,6 +9,21 @@ waiting on.
 The history of how ADRs moved between these bands (retargetings, renumberings,
 band creation) is in the [ADR change log](../adr/CHANGELOG.md), not here.
 
+## Release tags
+
+A platform tag `v0.X.0` names the band `v0.X` and sits on `main`, on the commit where the band closed. The rule and the
+steps are in [RELEASING.md](../../RELEASING.md#platform-tags-follow-the-roadmap-bands). Per-ADR status and work-package
+state are not restated here.
+
+| Band | Tag | Date | Note |
+|---|---|---|---|
+| v0.1 | `v0.1.0`, `v0.1.1` | 2026-08-20 | ADR-0110 was still open when it was cut |
+| v0.2 | `v0.2.0` | 2026-09-05 | WP-098 was still open; in-cluster ledger run |
+| v0.3 | `v0.3.0` | 2026-10-22 | in-cluster ledger run |
+| v0.4 to v0.12 | none | | never tagged; their content is in `v0.13.0` |
+| v0.13 | `v0.13.0` | 2026-11-05 | no open ADR or WP; ledger not run |
+| v0.14 | next | | `v0.14.0` once WP-208 is Done |
+
 ## MVP / v0
 
 Seven-day internal vertical slice and five-agent demo, prioritizing Tekos as

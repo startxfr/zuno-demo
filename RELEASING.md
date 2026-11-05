@@ -74,6 +74,42 @@ maintainer decision, not something to fabricate a tag for. Path 3
 (ADR-0549) is unaffected by this and deliberately never touches
 `targetRevision` at all, ever — see point 3 above.
 
+## Platform tags follow the roadmap bands
+
+A platform tag `v0.X.0` is named after the roadmap band `v0.X`, in the same way the first tags were: `v0.1.0` for band
+v0.1, `v0.2.0` for v0.2, `v0.3.0` for v0.3, `v0.13.0` for v0.13. The bands, their goals and their ADRs are in
+[docs/roadmap/versions.md](docs/roadmap/versions.md); the work packages are in the
+[implementation roadmap](docs/roadmap/implementation-roadmap.md).
+
+| Tag | Band | Date | Commit | In-cluster ledger |
+|---|---|---|---|---|
+| `v0.1.0` | v0.1 | 2026-08-20 | `5111d324` | yes |
+| `v0.1.1` | v0.1 (patch) | 2026-08-20 | `db0181ac` | no |
+| `v0.2.0` | v0.2 | 2026-09-05 | `7d6d91c1` | yes |
+| `v0.3.0` | v0.3 | 2026-10-22 | `8dcea46d` | yes |
+| `v0.13.0` | v0.13 | 2026-11-05 | `388555d6` | not run |
+
+**The rule.**
+- **When.** A band is tagged when its ADRs are all closed and its work packages are Done or deferred by name, as of
+  [implementation-roadmap.md](docs/roadmap/implementation-roadmap.md). The earlier tags were milestones of their band and
+  were cut with a gap or two still named (v0.1 still lists ADR-0110, v0.2 WP-098), so a tagged band may carry a named
+  exception, written in the tag message and in versions.md.
+- **Where.** On `main`, on the commit where the band closed. Never on `devel`. `main` is what ArgoCD deploys to demo333, so a
+  tag names something that ran.
+- **How.** An annotated tag: `git tag -a v0.X.0 <commit> -m "v0.X.0: <what the band delivered>"`, then
+  `git push origin v0.X.0`. A tag push starts no workflow: `build-publish.yml` is manual-only (path 2 above).
+- **Patch tags.** `v0.X.1` for a fix on the band after its tag, as `v0.1.1` was.
+- **The ledger is a separate step.** `make d3 release TAG=v0.X.0` (path 3) rebuilds and signs every component in the cluster
+  and appends to `platform/supply-chain/pinned-releases.yaml`. It is a cluster action with its own go and window. A tag
+  without a ledger entry is valid: it names the commit, not signed images.
+- **Agents releases use the same band numbers.** `zuno-demo-agents` tags `v0.X.y` per band (v0.12.0, v0.13.0) and this
+  platform pins one of them in `platform/okf/agents.lock` (see [Agents release](#agents-release-adr-0576-adr-0580)). The two
+  repositories do not share patch numbers.
+
+**Bands not tagged.** v0.4 to v0.12 were never tagged: work moved from `v0.3.0` straight to the demo333 pilot and the
+UnifAI adoption, and the bands were closed in the roadmap without a tag. They are not tagged retroactively, so `v0.13.0`
+contains all of their content. The next tag is `v0.14.0`, once WP-208 (the five experiences shown together) is Done.
+
 ## Path 2's process, once a maintainer is ready to cut `v0.1.0` via Quay
 
 1. Ensure `main` is at the commit you want to release.

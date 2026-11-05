@@ -1198,6 +1198,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — `v0.13.0` tagged on `main` (`388555d6`): the first platform tag since `v0.3.0`, so that tags follow the roadmap bands again. The rule (a tag per band, on `main`, annotated, the in-cluster ledger as a separate step) is in RELEASING.md and the tag table in versions.md. v0.4 to v0.12 are not tagged retroactively; the next tag is `v0.14.0`.
 - 2026-11-05 — WP-220 added (evaluation, no cluster change): what the RHOAI 3.6 MCP lifecycle operator, MaaS consumer portal and WorkbenchesV2 would bring to this project, which custom code each could replace, and the questions that gate a pilot. It also records that the MaaS 3.6 documentation describes the WP-195 quota incident (gateway wasm object size) and its levers.
 - 2026-11-05 — ADR-0567 Implemented with an amendment: the builtin guardrail detectors and the smoke orchestrator stay as a documented fallback (decision 5's deletion is no longer decided). WP-219 added, deferred: it holds ADR-0570's never-run checks, each blocked (vendor route defect, personas 401 on MaaS, no verified project id).
 - 2026-11-05 — ADR-0561 Implemented (ADR close-out): the replacement of the first-party agent stack by UnifAI is carried out and its security gate (ADR-0563) is cleared. The ai-gateway classification floor it relies on is WP-209, still open.
