@@ -363,6 +363,26 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
      prerequisite. Note that CEL rejects re-enabling the old field once it
      is `Removed`.
    - Nothing on the cluster changed.
+
+   **Decision 2026-11-05 (user): force the EA install.** A model and MaaS
+   outage is accepted, provided the peer sessions are coordinated.
+   Procedure:
+   1. Commit `zuno_openshift_ai_version: "3.6.0-ea.2"` and run
+      `make d1 install openshift-ai`. The d0 Application moves the
+      Subscription to `beta` with `startingCSV: rhods-operator.3.6.0-ea.2`.
+      The upgrade walk then fails after about 5 minutes, because no hop
+      exists. This failure is expected.
+   2. Back up the DSC, the DSCI, the CSV and the Subscription. Then delete
+      CSV `rhods-operator.3.5.2` and Subscription `rhods-operator`. ArgoCD
+      (`zuno-openshift-ai-d0`) recreates the Subscription on `beta` with a
+      clean status, and OLM creates a Manual InstallPlan for 3.6.0-ea.2.
+      Operands owned by the DSC keep running while no operator is present.
+   3. Re-run `make d1 install openshift-ai`. With no installedCSV the walk is
+      skipped and the exact-match approval takes the 3.6.0-ea.2 InstallPlan;
+      d1 (DSCI, DSC) is then applied.
+   4. Check the DSC conditions and any new operands, against the 3.5.0 GA
+      traps: quotas, the mesh-egress union, immutable selectors and RBAC
+      verbs. Then check MaaS end to end and run the quota probe.
    - **There is no rollback: OLM does not downgrade.**
    - Expect new operands. Re-check the quotas, the mesh-egress NetworkPolicy
      union and immutable Deployment selectors (3.5.0 GA traps 1, 4 and 5).
