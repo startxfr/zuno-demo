@@ -1,6 +1,6 @@
 # WP-200: Show the UnifAI RAG working live
 
-- **State:** Repo work merged (2026-11-05: live upload demo passed in the browser; Confluence resync on demand pending)
+- **State:** Done (2026-11-05: live upload and on-demand Confluence resync both checked in the browser)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-198
 - **Related:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md), [WP-149](wp-149-unifai-rag-qdrant-hybrid-sources-backup.md)
@@ -55,3 +55,7 @@ Two demos:
 - **Fix:** the RAG demo moves to the personal workflow `<user>-my-documents` (WP-199 step 3). The demo guide says so.
 - **Upload demo passed** (2026-11-05, in the browser): consultant-01 asked `consultant-01-my-documents` and got the cited
   answers; the team's `consultant-rag` still does not see the personal upload, as designed.
+- **Confluence resync on demand passed** (2026-11-05). The user edited a page in SXSI. `resyncToken: demo-2026-11-05-1` on
+  `tekos-satellite` and `tekos-openshift` (commit 782b5163, then `make d2 install unifai`) queued both syncs at once.
+  `tekos-openshift` reported "411 pages (1 changed, 0 deleted at the last sync)" within a minute. consultant-01 then
+  asked `consultant-01-my-documents` about the page, and the answer cited "O3 : Openshift - Kubevirt" with its link.
