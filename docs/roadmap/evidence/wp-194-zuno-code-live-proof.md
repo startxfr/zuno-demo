@@ -70,3 +70,26 @@ Findings:
 
 - **Codestral down.** It is not tested live, because the key lives in Vault and this session does not write there. The
   fallback is covered by the unit test above.
+
+## Addendum: Dify, agents release v0.12.0
+
+On 2026-11-05, agents release v0.12.0 declared `dify` as an experience client with tasks `chat` and `code`
+([ADR-0599](../../adr/0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md),
+[WP-204](../work-packages/wp-204-install-dify-on-demo333.md)). The release was promoted by zuno-demo PR #30. Argo CD then
+synced the ConfigMap `ai-gateway-model-routing`, which gained `dify`/`code` with `prefer: [mistral-codestral]`. The
+ai-gateway reloaded it at 11:34:30Z (`routing reloaded … sha256 5305d3d43718`), with no restart. The image and
+`MODEL_TASK_ALIASES` did not change, because Dify was already in `MARKER_FAIL_CLOSED_CLIENTS`.
+
+`model_call` spans from Dify in Tempo (UTC). The last two calls ran after the RHOAI 3.6.0-ea.2 reinstall on demo333.
+
+| Time | Trace | Task | Provider, model | Class. | Duration |
+|---|---|---|---|---|---|
+| 11:54:54 | `11db781394b02eda` | `chat` | `local-maas`, qwen3.6-27b-instruct | C1 | 0.44 s |
+| 11:55:06 | `ab430fb243c8859c` | `code` | `mistral-codestral`, codestral-latest | C1 | 0.36 s |
+| 11:55:16 | `5102736d016e965c` | `chat` | `local-maas`, qwen3.6-27b-instruct | C1 | 1.22 s |
+| 12:04:40 | `c8da2a0a724d921e` | `code` | `mistral-codestral`, codestral-latest | C1 | 0.84 s |
+| 12:52:01 | `2d612a73b22da823` | `chat` | `local-maas`, qwen3.6-27b-instruct | C1 | 1.23 s |
+| 12:52:02 | `571b9e6109a23444` | `code` | `mistral-codestral`, codestral-latest | C1 | 0.47 s |
+
+The ADR-0594 rule (a turn with a tool result stays local) applies to Dify as it does to the other clients. This
+addendum does not exercise it.
