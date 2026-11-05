@@ -332,5 +332,26 @@ class DelegationTests(GatewayTestCase):
         self.assertEqual(self.down.llm_calls, [])
 
 
+class CancelLoggingTests(unittest.IsolatedAsyncioTestCase):
+    async def test_a_cancel_is_logged_with_the_agent_the_task_and_the_caller(self) -> None:
+        from unittest import mock
+
+        from app.auth import CallerIdentity
+        from app.executor import ZunoAgentExecutor
+
+        agent = mock.Mock()
+        agent.name = "tekos"
+        executor = ZunoAgentExecutor(agent, mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock(), mock.Mock())
+        context = mock.Mock(task_id="task-42", context_id="ctx-1")
+        context.call_context.state = {"caller": CallerIdentity(sub="user-7", groups=[], raw_claims={}, token="t")}
+        queue = mock.Mock(enqueue_event=mock.AsyncMock())
+        with self.assertLogs("a2a_gateway.executor", level="INFO") as logs:
+            await executor.cancel(context, queue)
+        self.assertEqual(
+            logs.output, ["INFO:a2a_gateway.executor:tasks/cancel agent=tekos task_id=task-42 caller=user-7"]
+        )
+        queue.enqueue_event.assert_awaited()
+
+
 if __name__ == "__main__":
     unittest.main()

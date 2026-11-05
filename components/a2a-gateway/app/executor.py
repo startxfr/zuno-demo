@@ -86,6 +86,15 @@ class ZunoAgentExecutor(AgentExecutor):
         await updater.complete()
 
     async def cancel(self, context: RequestContext, event_queue: EventQueue) -> None:
+        # A delegating UnifAI run that is interrupted or times out sends tasks/cancel (UnifAI >= 0.1.57). Log it at
+        # info level so the gateway side of the cancel is readable here, not only inferred from the caller's logs.
+        caller = (context.call_context.state if context.call_context else {}).get("caller")
+        logger.info(
+            "tasks/cancel agent=%s task_id=%s caller=%s",
+            self._agent.name,
+            context.task_id,
+            getattr(caller, "sub", "unknown"),
+        )
         await TaskUpdater(event_queue, context.task_id, context.context_id).cancel()
 
     # -- one turn -----------------------------------------------------------
