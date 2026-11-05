@@ -1,6 +1,6 @@
 # WP-201: Rewire the unifai-devel sandbox onto the gateway (amended: retire it, one instance)
 
-- **State:** Repo work merged (2026-11-05: unifai-devel and unifai-olm retired; tool and schedule examples live)
+- **State:** Done (2026-11-05: unifai-devel and unifai-olm retired; tool and schedule examples live)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-198
 - **Related:** [ADR-0562](../../adr/0562-authenticate-unifai-against-the-zuno-keycloak-realm.md)

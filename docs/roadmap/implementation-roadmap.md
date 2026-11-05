@@ -35,7 +35,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 12 | 2 | 18 | WP-197, WP-198, WP-199, WP-200, WP-201 |
+| v0.13 | 12 | 1 | 18 | WP-200 |
 | v0.14 | 3 | 3 | 7 | WP-204, WP-205, WP-206, WP-207, WP-208 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -1012,11 +1012,11 @@ sandbox rewired (WP-201).
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-197 | [wp-197](work-packages/wp-197-declare-unifai-built-in-resources-through-the-operator.md) | 0597 | none | Repo work merged | live on demo333 with UnifAI 0.1.58 (2026-11-04): both built-ins promoted; browser check of the Built-in tab pending |
-| WP-198 | [wp-198](work-packages/wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) | 0598, 0597 | WP-197 (steps 3-4) | Repo work in review | teams, templates, built-ins and team examples live on demo333 (2026-11-04); browser check as consultant-01 and sale-01 pending |
-| WP-199 | [wp-199](work-packages/wp-199-personal-unifai-starters-for-the-demo-personas.md) | 0598 | WP-197, WP-198 | Repo work in review | starters Ready on demo333 (2026-11-04); personal RAG `<user>-my-documents` added 2026-11-05, install pending |
-| WP-200 | [wp-200](work-packages/wp-200-show-the-unifai-rag-working-live.md) | 0598 | WP-198 | Repo work in review | upload pipeline live (2026-11-05); the demo asks the personal `<user>-my-documents`, since a team workflow runs as the team; Confluence resync pending |
-| WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Repo work merged | amended 2026-11-05: one instance; unifai-devel and unifai-olm retired, tool and schedule examples live in the team examples |
+| WP-197 | [wp-197](work-packages/wp-197-declare-unifai-built-in-resources-through-the-operator.md) | 0597 | none | Done | live on demo333 with UnifAI 0.1.58; Built-in tab checked in the browser (2026-11-05) |
+| WP-198 | [wp-198](work-packages/wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) | 0598, 0597 | WP-197 (steps 3-4) | Done | teams, templates, built-ins and team examples live; browser check as consultant-01 and sale-01 passed (2026-11-05) |
+| WP-199 | [wp-199](work-packages/wp-199-personal-unifai-starters-for-the-demo-personas.md) | 0598 | WP-197, WP-198 | Done | starters and personal RAG `<user>-my-documents` checked in the browser (2026-11-05) |
+| WP-200 | [wp-200](work-packages/wp-200-show-the-unifai-rag-working-live.md) | 0598 | WP-198 | Repo work merged | live upload demo passed in the browser (2026-11-05); Confluence resync on demand pending |
+| WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Done | one instance: unifai-devel and unifai-olm retired, tool and schedule examples live (2026-11-05) |
 
 ### Phase 49 — Dify and kagent as experience clients (added 2026-11-04)
 

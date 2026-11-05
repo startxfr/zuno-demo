@@ -1,6 +1,6 @@
 # WP-197: Declare UnifAI built-in resources through the operator
 
-- **State:** Repo work merged (2026-11-04: fork devel 5b62f70e1, live on demo333 with UnifAI 0.1.58; browser check pending)
+- **State:** Done (2026-11-05: live on demo333 with UnifAI 0.1.58; the Built-in tab checked in the browser as consultant-01)
 - **ADRs:** [ADR-0597](../../adr/0597-declare-unifai-built-in-resources-through-the-operator.md)
 - **Depends on:** none
 - **Related:** [WP-198](wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) (its first user)

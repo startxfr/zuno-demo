@@ -144,7 +144,7 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
 
    `kserve-module-manager-role` in 3.5.2 still lacks `update` on
    networkpolicies, so `rbac-kserve-module-networkpolicy.yaml` stays.
-4. **RHCL 1.5.0.**
+4. **RHCL 1.5.0 (Done 2026-11-05: 4a 1.4.4, 4b 1.5.0).**
    - Check the RHOAI support matrix for RHCL 1.5 first.
    - Set `zuno_connectivity_link_channel: stable-1.5`, then
      `make d1 install connectivity-link`. authorino, limitador and dns follow
@@ -192,7 +192,40 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
      for WP-177 (recorded there). The probe had to learn RHOAI 3.5.2's new
      limit names (`tokens-<N>-per-<window>`) first.
 
-   **4b prepared 2026-11-05 (not run).** Red Hat's 1.4 → 1.5 page was not read:
+   **4b done 2026-11-05 (user go, after the go of every peer session; 59a27e46).**
+   The user accepted that Red Hat's support statement for RHCL 1.5 with
+   RHOAI 3.5.2 stays unverified.
+   - After `make d1 install connectivity-link` on `stable-1.5`, OLM resolved
+     1.5.0 through the `skipRange` in about 40 s.
+   - `KuadrantControlPlane/default` came up `ComponentsHealthy`, with these
+     events:
+     - `OLMMigrationComplete: migrated 3 component(s) off OLM`;
+     - one `OLMComponentCleaned` per removed Subscription and CSV;
+     - `DeveloperPortalFinalizerRemoved` on the Kuadrant CR;
+     - `ComponentInstalled` for dns-operator 0.18.0, authorino-operator
+       0.27.0, limitador-operator 0.19.0, mcp-gateway 1.0.2 (a new
+       `mcp-gateway-controller` Deployment in `openshift-operators`) and
+       developer-portal-controller 0.3.1.
+   - The 5 component CRDs were kept. The Authorino and Limitador pods
+     rolled once. MaaS answered 200 throughout the swap.
+   - This time `authorino-server-cert` and the WP-071 annotation survived.
+     The second install had `changed=0`, and `make d1 check connectivity-link`
+     passes.
+   - After it:
+     - Kuadrant is `Ready`. The AuthPolicy and every TokenRateLimitPolicy are
+       `Enforced`, except `gateway-default-deny`, which was already False on
+       1.4.4.
+     - The four chat models answer 200 through MaaS, and 401 without a token.
+     - `zuno-connectivity-link-d0`/`-d1` are Synced/Healthy.
+   - `quota_counters_probe.py`: `OK: moved ['subscription']`, so the
+     WP-177 defect is still there on 1.5.0.
+   - Repo: the known-good set loses the three dependency rows.
+     `connectivity_link/tasks/uninstall.yml` discovers those Subscriptions
+     by package name, so on 1.5 its loop is a no-op and needs no change.
+     Removing `rhcl-operator` on 1.5 also removes the components through
+     the `KuadrantControlPlane` cascade.
+
+   **4b procedure as prepared 2026-11-05.** Red Hat's 1.4 → 1.5 page was not read:
    docs.redhat.com answers 403 to this platform (2026-11-03 block). The
    procedure below comes from the 1.5.0 bundle
    (`rhcl-operator-bundle@sha256:2ccdc9f2…`) and from upstream
@@ -306,6 +339,30 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    back to `stable-v1.4` with `startingCSV: kueue-operator.v1.4.3`.
 6. **RHOAI 3.6.0-ea.2.** Set `zuno_openshift_ai_version: "3.6.0-ea.2"` (the
    channel resolves to `beta`), then `make d1 install openshift-ai`.
+
+   **Stopped before any change (2026-11-05, after the user's go).** The
+   `beta` channel holds a single entry, `rhods-operator.3.6.0-ea.2`, with no
+   `replaces`, `skips` or `skipRange`. So no OLM upgrade path leads from
+   3.5.2, and setting the pin would only move the Subscription to `beta` while
+   OLM keeps 3.5.2. The bundle declares no other constraint. The only way in
+   would be the K2-style reinstall: delete the rhods-operator CSV and
+   Subscription and let OLM install 3.6.0-ea.2 over a live 3.5.2 DSC. That is
+   an unsupported path for an EA build with no rollback, and every MaaS model
+   and peer session depends on that DSC.
+
+   **EA notes read (user choice, 2026-11-05).**
+   - Red Hat's 3.6 release notes did not answer. The one GET to
+     docs.redhat.com returned HTTP 503.
+   - Upstream opendatahub-operator documents no EA upgrade path.
+   - It does document one change that matters for 3.6: MaaS moved from
+     `kserve.modelsAsService` to `aigateway.modelsAsAService` in 3.5
+     (`docs/migration-guides/maas-to-aigateway-3.5.md`). The old field is
+     honoured "at least through 3.6".
+   - demo333's v2 DSC still sets `kserve.modelsAsService: Managed`, next to
+     `aigateway: Managed`. Moving the chart to the new field is a 3.6 GA
+     prerequisite. Note that CEL rejects re-enabling the old field once it
+     is `Removed`.
+   - Nothing on the cluster changed.
    - **There is no rollback: OLM does not downgrade.**
    - Expect new operands. Re-check the quotas, the mesh-egress NetworkPolicy
      union and immutable Deployment selectors (3.5.0 GA traps 1, 4 and 5).
