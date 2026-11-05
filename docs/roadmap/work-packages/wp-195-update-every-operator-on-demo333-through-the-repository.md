@@ -339,6 +339,16 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    back to `stable-v1.4` with `startingCSV: kueue-operator.v1.4.3`.
 6. **RHOAI 3.6.0-ea.2.** Set `zuno_openshift_ai_version: "3.6.0-ea.2"` (the
    channel resolves to `beta`), then `make d1 install openshift-ai`.
+
+   **Stopped before any change (2026-11-05, after the user's go).** The
+   `beta` channel holds a single entry, `rhods-operator.3.6.0-ea.2`, with no
+   `replaces`, `skips` or `skipRange`. So no OLM upgrade path leads from
+   3.5.2, and setting the pin would only move the Subscription to `beta` while
+   OLM keeps 3.5.2. The bundle declares no other constraint. The only way in
+   would be the K2-style reinstall: delete the rhods-operator CSV and
+   Subscription and let OLM install 3.6.0-ea.2 over a live 3.5.2 DSC. That is
+   an unsupported path for an EA build with no rollback, and every MaaS model
+   and peer session depends on that DSC. Waiting for the user's decision.
    - **There is no rollback: OLM does not downgrade.**
    - Expect new operands. Re-check the quotas, the mesh-egress NetworkPolicy
      union and immutable Deployment selectors (3.5.0 GA traps 1, 4 and 5).
