@@ -168,6 +168,18 @@ wiring is still to be tested on one server.
 4. **Keycloak token instead of a static key** (Claude Code can fetch a short-lived token through its `apiKeyHelper` setting): worth one
    test once `AITenant.spec.oidc` is configured, since it would avoid long-lived keys.
 
+## 7. Pilot 1: developer key on gpt-oss-20b (2026-11-05, user go)
+
+- `gitops/charts/models/values.yaml` gained the subscription `gpt-oss-20b-developer`: owner user `dev` (the static OpenShift user of
+  demo333), priority 20, 5,000,000 tokens/h on `gpt-oss-20b` (commit 7e8bc34b). The chart already derives the `MaaSAuthPolicy` subject
+  from the subscription, so `gpt-oss-20b-entitlement` gained `dev` with no second edit.
+- Live: ArgoCD created it; the `MaaSSubscription` is `Active`, its `TokenRateLimitPolicy` `maas-trlp-gpt-oss-20b` is `Accepted`. The gateway
+  wasm object went from 1,298,548 to 1,336,460 bytes (+38 KB) and the kuadrant-operator logged no `request is too large`. A chat through
+  MaaS answers 200 and no token answers 401.
+- Not yet done: the key itself. It must be minted by the `dev` user (`oc login` then `POST /maas-api/v1/api-keys`, `"subscription":
+  "gpt-oss-20b-developer"`, `"expiresIn": "30d"`); the plaintext key is shown once. Then Claude Code is tested against
+  `https://maas.apps.demo333.startx.fr/zuno-ai-run/gpt-oss-20b` with `ANTHROPIC_AUTH_TOKEN` set to that key.
+
 ## Steps
 
 1. This evaluation (done, in review).
