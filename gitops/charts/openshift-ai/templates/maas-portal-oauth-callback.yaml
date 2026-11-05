@@ -1,0 +1,37 @@
+{{- if and .Values.maasGateway.enabled .Values.maasGateway.portalOauthCallback.enabled }}
+# WP-220 pilot 2 (RHOAI 3.6.0-ea.2, demo333, 2026-11-05): the MaaS consumer
+# portal is served on its own hostname (rh-ai.<apps domain>) by an HTTPRoute
+# with an explicit `hostnames`. The vendor `oauth-callback-route` that carries
+# /oauth2 to kube-auth-proxy has NO hostname, and Istio does not merge a
+# hostname-less route into the virtual host of a host-specific one. The sign-in
+# therefore succeeded at OpenShift and then ended on a 404 at
+# https://rh-ai.<domain>/oauth2/callback (kube-auth-proxy never saw it).
+# This supplementary route gives that hostname its own /oauth2 rule, to the
+# same backend as the vendor route. Additive: the vendor objects are untouched.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zuno-portal-oauth-callback
+  namespace: openshift-ingress
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: data-science-gateway
+      namespace: openshift-ingress
+  hostnames:
+    - rh-ai.{{ .Values.maasGateway.clusterBaseDomain }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /oauth2
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: kube-auth-proxy
+          port: 8443
+          weight: 1
+{{- end }}
