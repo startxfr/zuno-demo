@@ -1040,6 +1040,16 @@
             ]
         },
         {
+            "username": "service-account-kagent",
+            "enabled": true,
+            "serviceAccountClientId": "kagent",
+            "groups": [
+                "/ocp-ai-ops",
+                "/agent_tekos",
+                "/openwebui_admin"
+            ]
+        },
+        {
             "username": "service-account-openclaw-consultant-02",
             "enabled": true,
             "serviceAccountClientId": "openclaw-consultant-02",
@@ -1233,6 +1243,70 @@
                     "config": {
                         "claim.name": "persona",
                         "claim.value": "consultant-02",
+                        "jsonType.label": "String",
+                        "access.token.claim": "true",
+                        "id.token.claim": "false",
+                        "userinfo.token.claim": "false"
+                    }
+                },
+                {
+                    "name": "maas-gateway-audience",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "zuno-admin-api",
+                        "id.token.claim": "false",
+                        "access.token.claim": "true"
+                    }
+                }
+            ],
+            "defaultClientScopes": [
+                "basic",
+                "web-origins",
+                "profile",
+                "roles",
+                "email"
+            ]
+        }, {
+            "clientId": "kagent",
+            "name": "kagent operations assistant",
+            "description": "Confidential client of the kagent experience (ADR-0600, ADR-0601): client credentials for the token proxy's model and tool calls (persona ai-ops-01), browser flow for its oauth2-proxy front door",
+            "enabled": true,
+            "protocol": "openid-connect",
+            "publicClient": false,
+            "secret": "${vault.kagent_client_secret}",
+            "redirectUris": [
+                "https://kagent.apps.mycluster.example.com/oauth2/callback"
+            ],
+            "webOrigins": [
+                "https://kagent.apps.mycluster.example.com"
+            ],
+            "standardFlowEnabled": true,
+            "directAccessGrantsEnabled": false,
+            "serviceAccountsEnabled": true,
+            "protocolMappers": [
+                {
+                    "name": "groups",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-group-membership-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "full.path": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "userinfo.token.claim": "true",
+                        "claim.name": "groups"
+                    }
+                },
+                {
+                    "name": "persona",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-hardcoded-claim-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "claim.name": "persona",
+                        "claim.value": "ai-ops-01",
                         "jsonType.label": "String",
                         "access.token.claim": "true",
                         "id.token.claim": "false",

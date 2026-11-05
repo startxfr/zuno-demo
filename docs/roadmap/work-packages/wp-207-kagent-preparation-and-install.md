@@ -1,6 +1,6 @@
 # WP-207: kagent preparation and install
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** [ADR-0600](../../adr/0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md), [ADR-0601](../../adr/0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md)
 - **Depends on:** [WP-202](wp-202-common-preparation-for-dify-and-kagent.md), [WP-206](wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md)
 - **Related:** [WP-208](wp-208-five-experiences-demonstration.md)

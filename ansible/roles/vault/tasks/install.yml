@@ -413,6 +413,12 @@
         username: dify
         password: "{{ zuno_admin_dify_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      kagent/postgresql-app:
+        # One role owning kagent's database (ADR-0600/WP-207). Letters/digits-only
+        # password: it is interpolated un-encoded into the database URL.
+        username: kagent
+        password: "{{ zuno_admin_kagent_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       ogx/postgresql-app:
         # Dedicated database/role for the OGX-backed RAG provider
         # prototype's remote::pgvector vector I/O provider (ADR-0322 v0.1

@@ -1,0 +1,2 @@
+# Nothing to configure: the upstream CRDs chart has no values that matter here.
+kagent-crds: {}

@@ -1,9 +1,99 @@
 ---
-# Stub (WP-202): WP-207 replaces this file. State detection, never fails:
-# the component is reported as not installed.
+# `make d2 check kagent` runs this file. State detection first (the CRDs, the controller and the token proxy
+# Applications all Synced and Healthy), then, when installed, the chain ADR-0600 relies on: the running
+# images are the pinned digests, the controller discovered the governed tools, the declarative agent is accepted
+# and the Route answers only through the front door.
+- name: "kagent | check the CRDs Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-kagent-d0"
+
+- name: "kagent | save the d0 result"
+  ansible.builtin.set_fact:
+    _kagent_d0_installed: "{{ _state_check_result }}"
+
+- name: "kagent | check the token proxy Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-token-proxy-kagent-d1"
+
+- name: "kagent | save the token proxy result"
+  ansible.builtin.set_fact:
+    _kagent_proxy_installed: "{{ _state_check_result }}"
+
+- name: "kagent | check the kagent Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-kagent-d1"
+
 - name: "kagent | compute install state"
   ansible.builtin.set_fact:
-    _state_is_installed: false
+    _state_is_installed: "{{ _kagent_d0_installed and _kagent_proxy_installed and _state_check_result }}"
 
 - name: "kagent | record install state"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+- name: "kagent | probe the chain"
+  when: _state_is_installed | bool
+  block:
+    - name: "kagent | resolve the cluster base domain"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "kagent | find the running pods"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ kagent_namespace }}"
+        field_selectors:
+          - status.phase=Running
+      register: _kagent_pods
+
+    # The digest pin is the only integrity check for third-party images (ADR-0586 decision 7).
+    - name: "kagent | compare the running images with the pins"
+      ansible.builtin.assert:
+        that:
+          - _running | select('search', _pin) | list | length > 0
+        fail_msg: "{{ item.name }} runs an image that is not the pinned digest {{ _pin }}."
+        quiet: true
+      vars:
+        _values: "{{ (lookup('ansible.builtin.file', zuno_repo_root ~ '/gitops/charts/kagent/values.yaml') | from_yaml).kagent }}"
+        _pin: "{{ (_values[item.section].image.tag | string).split('@')[1] }}"
+        _running: >-
+          {{ _kagent_pods.resources | selectattr('metadata.labels', 'defined')
+             | selectattr('metadata.name', 'match', item.prefix)
+             | map(attribute='status.containerStatuses') | flatten | map(attribute='imageID') | list }}
+      loop:
+        - {section: controller, name: controller, prefix: "kagent-controller-"}
+        - {section: ui, name: ui, prefix: "kagent-ui-"}
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: "kagent | read the governed tool server and the agent"
+      kubernetes.core.k8s_info:
+        api_version: kagent.dev/v1alpha2
+        kind: "{{ item }}"
+        namespace: "{{ kagent_namespace }}"
+      register: _kagent_crs
+      loop:
+        - RemoteMCPServer
+        - Agent
+
+    - name: "kagent | probe the Route without a session"
+      ansible.builtin.uri:
+        url: "https://kagent.{{ cluster_base_domain }}/"
+        validate_certs: false
+        follow_redirects: none
+        status_code: [200, 302, 401, 403]
+      register: _kagent_route
+      failed_when: false
+
+    - name: "kagent | fail on a broken chain"
+      ansible.builtin.fail:
+        msg: >-
+          kagent chain check failed: RemoteMCPServer discovered tools
+          {{ _kagent_crs.results[0].resources[0].status.discoveredTools | default([]) | map(attribute='name') | list }},
+          Agent accepted {{ _kagent_crs.results[1].resources[0].status.conditions | default([]) }},
+          Route without a session {{ _kagent_route.status | default('unreachable') }} (expected 302 to Keycloak).
+      when: >-
+        (_kagent_crs.results[0].resources | length) == 0 or
+        (_kagent_crs.results[1].resources | length) == 0 or
+        (_kagent_route.status | default(0)) != 302

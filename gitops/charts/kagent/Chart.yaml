@@ -1,0 +1,14 @@
+apiVersion: v2
+name: kagent
+description: >-
+  kagent as a thin operations experience client (ADR-0600, ADR-0587): the upstream chart at a pinned
+  version and image digests with every bundled tool server, sample agent and provider switched off,
+  behind an oauth2-proxy front door, its state in zuno-postgresql, its model and tools only through
+  the zuno-token-proxy (ADR-0601). One ModelConfig, one RemoteMCPServer and one declarative Agent.
+type: application
+version: 0.1.0
+appVersion: "0.10.4"
+dependencies:
+  - name: kagent
+    version: "0.10.4"
+    repository: "oci://ghcr.io/kagent-dev/kagent/helm"

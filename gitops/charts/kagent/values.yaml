@@ -1,0 +1,110 @@
+# ADR-0600 (WP-207). Every key below the `kagent:` block comes from the upstream chart 0.10.4
+# (values.yaml read offline, rendered with helm template; the live spike confirms the runtime facts,
+# docs/roadmap/evidence/wp-207-kagent-spike.md). The role (ansible/roles/kagent) passes the cluster
+# values through the Application: global.zuno, egress.clusterCIDRs, egress.kubeApiAddresses.
+
+global:
+  zuno:
+    clusterBaseDomain: apps.mycluster.example.com
+    routeHost: kagent.apps.mycluster.example.com
+
+namespace: zuno-kagent
+
+externalSecrets:
+  refreshInterval: 1h
+  secretStore: vault-backend
+
+# Front door (ADR-0600 clause 5): oauth2-proxy admits the operations groups; kagent's own UI has
+# no login (controller.auth.mode unsecure), so this is the only gate.
+frontDoor:
+  image: quay.io/oauth2-proxy/oauth2-proxy@sha256:8498b0d0ef0a7b29686414000a08aee467f02d0299c9ed1e006a8f33fc017916
+  clientId: kagent
+  allowedGroups:
+    - /ocp-ai-ops
+  cookieName: _kagent_front_door
+
+route:
+  # An agent run that streams its reasoning outlasts the router's 30 s default.
+  timeout: 30m
+
+egress:
+  databaseNamespace: zuno-data
+  databasePort: 5432
+  # Pod and Service networks, excluded from the HTTPS-out rule (read by the role).
+  clusterCIDRs:
+    - 10.128.0.0/14
+  # The control-plane addresses behind kubernetes.default (the controller watches the API).
+  kubeApiAddresses: []
+
+# The governed chain (ADR-0601): the model and the tools only through the zuno-token-proxy of this namespace.
+tokenProxy:
+  url: http://zuno-token-proxy:8080
+  model: auto
+
+# The declarative agent (ADR-0600 clause 4, WP-207 step 4): a prompt over the governed tools, nothing else.
+agent:
+  name: zuno-sre
+  tools:
+    - k8s.resource.read
+    - k8s.resource.list
+    - k8s.events.read
+    - k8s.logs.read
+    - metrics.query
+
+kagent:
+  fullnameOverride: kagent
+  # Images by tag and digest (ADR-0586 decision 7). Index digests of 0.10.4 (2026-10-21).
+  controller:
+    image:
+      tag: 0.10.4@sha256:e284fbddd327b06649f7e5ea4bc9df5e840c4b493538f07b4a36d9fa154e4af3
+    # The controller creates one Deployment per declarative Agent from these images.
+    agentImage:
+      tag: 0.10.4
+      fullDigest: sha256:b811b0ddbf30d75976e2d29c2c9a0e8a604dcc04076f6eebda0f2dca9667f4f8
+    goAgentImage:
+      tag: 0.10.4
+      fullDigest: sha256:89d5a7df2c5da68797e2d9d78fa2f6531260f3836f51d2ac2fd9b4119fe518ed
+    skillsInitImage:
+      tag: 0.10.4
+    # Namespaced Roles only (no ClusterRole): the controller sees zuno-kagent and nothing else.
+    watchNamespaces:
+      - zuno-kagent
+    volumes:
+      - name: database
+        secret:
+          secretName: kagent-database
+    volumeMounts:
+      - name: database
+        mountPath: /etc/kagent-database
+        readOnly: true
+  rbac:
+    namespaces:
+      - zuno-kagent
+  database:
+    postgres:
+      urlFile: /etc/kagent-database/url
+      bundled:
+        enabled: false
+  ui:
+    image:
+      tag: 0.10.4@sha256:a6edf70c6e8e76a94582ee563652cfa2a8c5f74f5df5d4832b2f250e49655899
+    # The Route is ours (front door); the chart's own would expose the UI without a login.
+    route:
+      enabled: false
+  # No provider, no bundled tool server, no sample agent, no operator (ADR-0600 clause 4).
+  providers: null
+  kmcp: {enabled: false}
+  substrate: {enabled: false}
+  kagent-tools: {enabled: false}
+  grafana-mcp: {enabled: false}
+  oauth2-proxy: {enabled: false}
+  k8s-agent: {enabled: false}
+  kgateway-agent: {enabled: false}
+  istio-agent: {enabled: false}
+  promql-agent: {enabled: false}
+  observability-agent: {enabled: false}
+  argo-rollouts-agent: {enabled: false}
+  helm-agent: {enabled: false}
+  cilium-policy-agent: {enabled: false}
+  cilium-manager-agent: {enabled: false}
+  cilium-debug-agent: {enabled: false}

@@ -1,0 +1,13 @@
+apiVersion: v2
+name: kagent-crds
+description: >-
+  The CustomResourceDefinitions of kagent (kagent.dev/v1alpha2), ADR-0600 / WP-207: the upstream
+  chart at a pinned version, in its own Application (d0) so the controller (d1) finds them.
+  All CRDs are Namespaced.
+type: application
+version: 0.1.0
+appVersion: "0.10.4"
+dependencies:
+  - name: kagent-crds
+    version: "0.10.4"
+    repository: "oci://ghcr.io/kagent-dev/kagent/helm"

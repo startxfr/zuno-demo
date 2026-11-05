@@ -1,0 +1,28 @@
+# ADR-0600 clause 5 and ADR-0590: kagent reaches Keycloak's public name (oauth2-proxy) and the
+# control plane (the controller watches the API), and nothing else outside the cluster. In-cluster
+# traffic (DNS, zuno-data, the token proxy) is not affected by an EgressFirewall. One per namespace, named default.
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  egress:
+    - type: Allow
+      to:
+        dnsName: keycloak.{{ .Values.global.zuno.clusterBaseDomain }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- range .Values.egress.kubeApiAddresses }}
+    - type: Allow
+      to:
+        cidrSelector: {{ . }}/32
+      ports:
+        - protocol: TCP
+          port: 6443
+    {{- end }}
+    - type: Deny
+      to:
+        cidrSelector: 0.0.0.0/0
