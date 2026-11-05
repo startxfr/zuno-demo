@@ -245,8 +245,8 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0537](0537-integrate-rhoai-hardware-profiles-and-maas-external-models.md) | Implemented | Integrate RHOAI HardwareProfiles for local models |
 | [ADR-0543](0543-propagate-a-per-run-id-across-every-service-span.md) | Implemented | Propagate a per-run id across every service span (documents work implemented 2026-08-23 whose ADR was never written) |
 | [ADR-0551](0551-add-namespace-scoped-perses-dashboards-alongside-grafana.md) | Superseded in part by ADR-0552, ADR-0553 | Add namespace-scoped Perses dashboards alongside the existing Grafana stack |
-| [ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md) | Accepted | Reuse RHOAI's Perses instance instead of running an independent one |
-| [ADR-0553](0553-collocate-perses-dashboards-in-redhat-ods-monitoring-for-visibility.md) | Accepted | Collocate Perses dashboards in redhat-ods-monitoring for real visibility |
+| [ADR-0552](0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md) | Implemented | Reuse RHOAI's Perses instance instead of running an independent one |
+| [ADR-0553](0553-collocate-perses-dashboards-in-redhat-ods-monitoring-for-visibility.md) | Implemented | Collocate Perses dashboards in redhat-ods-monitoring for real visibility |
 | [ADR-0554](0554-widen-rhoais-monitoringstack-to-observe-zuno-ai-run.md) | Implemented | Widen RHOAI's built-in MonitoringStack to observe zuno-ai-run's models |
 | [ADR-0555](0555-parallel-and-quota-exhaustive-day3-stresstest.md) | Implemented | Parallel-by-default Day 3 stresstest, generalized quota/limit exhaustion proofs |
 
@@ -324,7 +324,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Partially implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
 | [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) | Implemented | Deploy UnifAI through ArgoCD from a pinned OLM catalog |
 | [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Accepted | Upstream generic UnifAI changes and isolate zuno-specific code |
-| [ADR-0585](0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) | Accepted | Serve zuno agents over A2A from a gateway that answers with the caller's identity |
+| [ADR-0585](0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) | Implemented | Serve zuno agents over A2A from a gateway that answers with the caller's identity |
 | [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) | Implemented | Verify the UnifAI runtime images by digest, signature and attestations before deploying them |
 
 ## v0.12

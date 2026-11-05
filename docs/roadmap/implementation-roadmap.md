@@ -27,13 +27,13 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.2 | 14 | — | 19 | WP-098 |
 | v0.3 | 15 | — | 19 | — |
 | v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
-| v0.5 | 13 | 2 | 18 | WP-55, WP-101, WP-122 |
+| v0.5 | 13 | — | 18 | WP-55, WP-101, WP-122 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 9 | WP-145, WP-195 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
+| v0.11 | 24 | 14 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | 2 | 7 | WP-206, WP-207, WP-208 |
@@ -1179,6 +1179,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — ADR-0552, ADR-0553 and ADR-0585 Implemented: every WP behind them was already Done. ADR-0553 is Implemented as a placement only; its visibility benefit was never obtained and the dated correction note says so. (ADR close-out, point 1.)
 - 2026-11-05 — WP-194 Done and ADR-0596 Implemented: on demo333, "Zuno Code" is served by Codestral from Open WebUI (consultant-01, 1.3 s) and OpenClaw (consultant-02, 2.2 s), and "Zuno" stays on the local qwen (130 s on the same question). The fallback with Codestral down is covered by unit tests only.
 - 2026-11-04 — ADR-0597, ADR-0598 and WP-197 to WP-201 added as phase 48: consultant-01 found an empty UnifAI (no team, no inventory, no workflow). The operator gains built-in resources, and the demo stack gets business teams next to the agent teams, a catalog without keys, a shared gateway, example workflows, persona starters and a RAG shown live.
 - 2026-11-04 — WP-195 added to phase 43: every Subscription on demo333 said `AtLatestKnown` while seven operators had newer versions (RHOAI and GitOps behind unapproved Manual InstallPlans, rhcl on a channel that stops at 1.4.3, authorino/limitador/dns pinned by rhcl, Kueue on a frozen channel). A report-only audit (`make d3 check operators`), per-cluster channel pins and an RHOAI upgrade walk land in the repo; the live updates follow one go at a time.
