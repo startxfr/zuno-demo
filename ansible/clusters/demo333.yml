@@ -142,6 +142,7 @@ zuno_unifai_values:
       rootTitle: 'Technologie : Satellite'
       spaceKey: SXSI
     name: tekos-satellite
+    resyncToken: demo-2026-11-05-1   # WP-200: any new value queues a sync at once
     classification: C2   # WP-187: Confluence content stays at C2
     syncInterval: 6h
     tags:
@@ -159,6 +160,7 @@ zuno_unifai_values:
       rootTitle: 'Technologie : Openshift'
       spaceKey: SXSI
     name: tekos-openshift
+    resyncToken: demo-2026-11-05-1   # WP-200: any new value queues a sync at once
     classification: C2   # WP-187: Confluence content stays at C2
     syncInterval: 6h
     tags:
