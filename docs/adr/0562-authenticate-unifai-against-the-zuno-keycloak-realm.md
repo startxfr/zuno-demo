@@ -178,3 +178,8 @@ Login was verified with real browser-flow sign-ins of `consultant-01`, `sale-01`
 workspaces and blueprints of its `agent_*` groups. `unifai-devel` and
 `unifai-olm` declare no OKF bundle, so they show no team workspace yet.
 `identity.keycloak` stays forbidden on Zuno clusters (ADR-0572).
+
+## Implementation note (2026-11-05, demo333)
+
+demo333 now runs only `zuno-unifai` (ADR-0598 point 6): the `unifai-devel` and `unifai-olm` stacks were retired. The
+`unifai` client's redirect URIs and web origins list only the `zuno-unifai` routes again.
