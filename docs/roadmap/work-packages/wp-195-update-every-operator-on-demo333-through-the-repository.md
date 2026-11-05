@@ -383,6 +383,74 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    4. Check the DSC conditions and any new operands, against the 3.5.0 GA
       traps: quotas, the mesh-egress union, immutable selectors and RBAC
       verbs. Then check MaaS end to end and run the quota probe.
+
+   **Run 2026-11-05 (window 12:20-12:52 UTC): RHOAI 3.6.0-ea.2 `Succeeded`.**
+   The procedure worked: install 1 failed in the walk as planned; deleting
+   the CSV and the Subscription gave InstallPlan `install-z52dv`; install 2
+   approved it; the operator came up in about 2 minutes. Install 2 then
+   timed out waiting for the DSC Ready, because of the defects below, all
+   fixed live:
+   1. **SECURITY: the MaaS gateway was open without authentication for
+      about 20 minutes (about 12:25-12:45 UTC).** 3.6 defaults
+      `aigateway.modelsAsAService` to `Removed`, even with
+      `kserve.modelsAsService: Managed`. It tore MaaS down: maas-api,
+      maas-controller, `maas-gateway-auth` and the per-model
+      TokenRateLimitPolicies were all deleted. Meanwhile
+      `maas-default-gateway` kept routing, and `/v1/models` and
+      `/v1/chat/completions` answered 200 without a token. The models
+      stayed up the whole time. The gateway has no access log, so who used
+      it cannot be known. Fix: `aigateway.modelsAsAService: Managed` on the
+      live DSC, and in the chart. maas-controller recreated the AuthPolicy
+      at 12:45:33; no-token requests answered 401 from 12:45:52. maas-api now runs in
+      `redhat-ai-gateway-infra`, no longer in `redhat-ods-applications`, and
+      requests answered 500 for about a minute while it started.
+      `gateway-default-deny` is now `Enforced`, where it was False before.
+   2. **TrustyAI schema mismatch (vendor defect).** The DSC types
+      `trustyai.eval.lmeval.permit*` as the string enum `allow`/`deny`. The
+      3.6.0-ea.2 TrustyAI module CRD types them as boolean, and the operator
+      copies the string, so provisioning stopped with "expected boolean,
+      got deny". Upstream main has a string on both sides. Fix:
+      - remove `eval` from the live DSC and from the chart, so the module
+        CRD defaults false/false apply, which equals deny/deny;
+      - delete `default-trustyai`: the stored 3.5 object could no longer be
+        patched.
+   3. **Immutable selectors** (trap 5 of the 3.5.0 GA again):
+      `spark-operator-controller`, `spark-operator-webhook` and
+      `kuberay-operator`. Remedy: `oc delete deploy`; the operator
+      recreates them.
+   4. **ServiceMonitor `data-science-pipelines-operator-service-monitor`**
+      was still controlled by the 3.5 `DataSciencePipelines` CR, which
+      blocked the new AIPipelines module. Remedy: delete the ServiceMonitor;
+      AIPipelines recreated it.
+   5. **512Mi managers OOMKilled** (`odh-observability`,
+      `opendatahub-feast-operator`, `spark-operator-module-controller-manager`).
+      Raised to 1536Mi by hand. The operator keeps the change, but only
+      live: on a fresh install the three are 512Mi again.
+   6. The DSC and `default-ray` controllers stopped reconciling after the
+      errors, with `observedGeneration` stuck at 1. An annotation woke them.
+
+   **State after the run:**
+   - The four LLMInferenceServices are Ready the whole time. MaaS answers
+     200 on the four chat models and 401 without a token.
+   - The DSC lists only `trustyai`: three LMEvalJobs from before ("operand
+     status is not yet available") and `zuno-guardrails-smoke` in `Error`.
+     `ogx` is degraded, which the role already treats as benign.
+
+   **Open:**
+   - **Quota counting at MaaS stopped.** The probe reports `moved []`. A
+     direct MaaS chat moves no Limitador counter, and the wasm shim logs
+     `Task failed: "0"` once per chat. The limits are present, renamed back
+     to `models-as-a-service-...`. The ai-gateway ledger is the only quota
+     guard until this is understood.
+   - TrustyAI not Ready (above).
+   - ArgoCD `zuno-namespaces-d0` is OutOfSync: `zuno-ai-build` lost
+     `kueue.openshift.io/managed=true`.
+   - ArgoCD `zuno-mlops-d1` is OutOfSync: TrainingRuntime `mlops-lora`.
+   - The repo copies of maas-api settings (namespace `redhat-ods-applications`
+     in the openshift-ai, postgresql, namespaces, service-mesh and models
+     charts, and in the maas_db_copy role) are now stale. MaaS works because
+     maas-api in its new namespace uses its own built-in config, but they
+     must be audited.
    - **There is no rollback: OLM does not downgrade.**
    - Expect new operands. Re-check the quotas, the mesh-egress NetworkPolicy
      union and immutable Deployment selectors (3.5.0 GA traps 1, 4 and 5).
