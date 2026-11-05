@@ -1,6 +1,6 @@
 {{- if .Values.grafana.enabled }}
-# ADR-0587 (WP-184): the demonstration dashboard of the three user experiences
-# (UnifAI, Open WebUI, OpenClaw) on one governed backend. Built on the bounded
+# ADR-0587 (WP-184): the demonstration dashboard of the five user experiences
+# (UnifAI, Open WebUI, OpenClaw, Dify, kagent; ADR-0599, ADR-0600, WP-208) on one governed backend. Built on the bounded
 # `client` label of WP-179 and the skipped-candidate counter of ADR-0591; the
 # classic row schema, for the reason dashboard-usage-cost.yaml's header gives.
 apiVersion: grafana.integreatly.org/v1beta1
@@ -21,8 +21,8 @@ spec:
   json: |
     {
       "uid": "zuno-three-experiences",
-      "title": "Three experiences",
-      "description": "ADR-0587/WP-184: UnifAI, Open WebUI and OpenClaw on one governed backend - calls, tokens, cost, guardrails, routing and the shared per-user budget, by experience client.",
+      "title": "Five experiences",
+      "description": "ADR-0587/WP-184: UnifAI, Open WebUI, OpenClaw, Dify and kagent on one governed backend - calls, tokens, cost, guardrails, routing and the shared per-user budget, by experience client.",
       "tags": [
         "zuno",
         "usage",
@@ -325,7 +325,7 @@ spec:
         {
           "id": 103,
           "type": "row",
-          "title": "Same health, three experiences",
+          "title": "Same health, five experiences",
           "collapsed": false,
           "gridPos": {
             "h": 1,
@@ -361,7 +361,7 @@ spec:
               "instant": true
             }
           ],
-          "description": "Share of calls that ended in error, per client, from the ai-gateway for the three experiences; a quota refusal is not a model call and is not counted here."
+          "description": "Share of calls that ended in error, per client, from the ai-gateway for the five experiences; a quota refusal is not a model call and is not counted here."
         },
         {
           "id": 9,
@@ -390,6 +390,48 @@ spec:
             }
           ],
           "description": "95th percentile of the ai-gateway's model-call latency in milliseconds, per client."
+        },
+        {
+          "id": 104,
+          "type": "row",
+          "title": "Same tools, governed: cluster reads (ADR-0600)",
+          "collapsed": false,
+          "gridPos": {"h": 1, "w": 24, "x": 0, "y": 44},
+          "panels": []
+        },
+        {
+          "id": 10,
+          "title": "Cluster read tool calls by tool and outcome (over range)",
+          "type": "table",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 45},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "sum by (tool, outcome) (increase(zuno_tool_invocations_total{mcp_server=\"k8s\"}[$__range]))",
+              "legendFormat": "",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "description": "k8s.resource.read, k8s.resource.list, k8s.events.read, k8s.logs.read and metrics.query through the mcp-gateway: allowed, denied (not entitled) or downstream_error (for example a refused Secret). Read by kagent and by UnifAI operations agents; Dify and Open WebUI are not entitled."
+        },
+        {
+          "id": 11,
+          "title": "All governed tool calls by tool and outcome (over range)",
+          "type": "table",
+          "datasource": {"type": "prometheus", "uid": "prometheus"},
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 45},
+          "targets": [
+            {
+              "datasource": {"type": "prometheus", "uid": "prometheus"},
+              "expr": "sum by (mcp_server, tool, outcome) (increase(zuno_tool_invocations_total[$__range]))",
+              "legendFormat": "",
+              "format": "table",
+              "instant": true
+            }
+          ],
+          "description": "Every tool call of every experience goes through the one mcp-gateway: the same tools, the same entitlement, one audit."
         }
       ]
     }

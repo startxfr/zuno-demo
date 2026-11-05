@@ -1,5 +1,5 @@
 {{- if .Values.perses.enabled }}
-# ADR-0587 (WP-184): typed-schema translation of
+# ADR-0587 (WP-184, WP-208): typed-schema translation of
 # gitops/charts/grafana/templates/dashboard-three-experiences.yaml - same panels,
 # same PromQL; same Perses conventions and caveats as dashboard-usage-cost.yaml
 # (units dropped, rows as Grid sections, ListVariable best-effort).
@@ -18,8 +18,8 @@ spec:
       platform.opendatahub.io/part-of: monitoring
   config:
     display:
-      name: "Three experiences"
-      description: "ADR-0587/WP-184: UnifAI, Open WebUI and OpenClaw on one governed backend - calls, tokens, cost, guardrails, routing and the shared per-user budget, by experience client."
+      name: "Five experiences"
+      description: "ADR-0587/WP-184: UnifAI, Open WebUI, OpenClaw, Dify and kagent on one governed backend - calls, tokens, cost, guardrails, routing and the shared per-user budget, by experience client."
     duration: 24h
     refreshInterval: 30s
     variables:
@@ -231,11 +231,49 @@ spec:
                       name: prometheus
                     query: >-
                       histogram_quantile(0.95, sum by (le, client) (increase(zuno_model_call_duration_ms_milliseconds_bucket{client=~"$client", user=~"$user"}[$__range])))
+      clusterReadsByTool:
+        kind: Panel
+        spec:
+          display:
+            name: "Cluster read tool calls by tool and outcome (over range)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (tool, outcome) (increase(zuno_tool_invocations_total{mcp_server="k8s"}[$__range]))
+      toolCallsByTool:
+        kind: Panel
+        spec:
+          display:
+            name: "All governed tool calls by tool and outcome (over range)"
+          plugin:
+            kind: Table
+            spec: {}
+          queries:
+            - kind: TimeSeriesQuery
+              spec:
+                plugin:
+                  kind: PrometheusTimeSeriesQuery
+                  spec:
+                    datasource:
+                      kind: PrometheusDatasource
+                      name: prometheus
+                    query: >-
+                      sum by (mcp_server, tool, outcome) (increase(zuno_tool_invocations_total[$__range]))
     layouts:
       - kind: Grid
         spec:
           display:
-            title: "Same backend, three experiences"
+            title: "Same backend, five experiences"
             collapse:
               open: true
           items:
@@ -298,7 +336,7 @@ spec:
       - kind: Grid
         spec:
           display:
-            title: "Same health, three experiences"
+            title: "Same health, five experiences"
             collapse:
               open: true
           items:
@@ -314,4 +352,23 @@ spec:
               height: 8
               content:
                 $ref: "#/spec/panels/latencyP95ByClient"
+      - kind: Grid
+        spec:
+          display:
+            title: "Same tools, governed: cluster reads (ADR-0600)"
+            collapse:
+              open: true
+          items:
+            - x: 0
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/clusterReadsByTool"
+            - x: 12
+              y: 0
+              width: 12
+              height: 8
+              content:
+                $ref: "#/spec/panels/toolCallsByTool"
 {{- end }}
