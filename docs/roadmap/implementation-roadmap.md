@@ -34,7 +34,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.9 | 6 | 1 | 8 | WP-145 |
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 23 | 3 | 28 | WP-173, WP-174, WP-220 |
-| v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
+| v0.12 | 9 | 3 | 9 | WP-161, WP-164 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | WP-208 |
 | v0.15 | 1 | 1 | 1 | WP-209 |
@@ -924,7 +924,7 @@ UnifAI (ADR-0561, ADR-0568). Fork changes that are generic go upstream
 | WP-156 | [wp-156](work-packages/wp-156-retire-zuno-agent-and-rag-code.md) | 0561, 0568, 0572 | WP-155 | Done | phase 2 landed 2026-10-23 (agent stack uninstalled and removed, frontend Keycloak clients and agent PGO databases dropped, ADR-0042/0214/0411 superseded); step-6 chain green on demo333 2026-10-24; rag-service and rag-ingestion stay for WP-168 |
 | WP-157 | [wp-157](work-packages/wp-157-slim-the-ai-gateway-via-maas.md) | 0570 | WP-155 | Done (2026-10-24) | local models through MaaS with the per-subscription budgets, the 429 pass-through and closed-class refusal; the user, group and cross-model ceilings stay in the ai-gateway's quota.py (Kuadrant counts two limits per route); follow-up in WP-177 |
 | WP-166 | [wp-166](work-packages/wp-166-rebuild-dashboards-and-slos-on-unifai-telemetry.md) | 0566, 0561 | WP-156 | Done (2026-11-03) | split out of WP-156 by user decision 2026-10-23; every rebuilt panel returns series on demo333 |
-| WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Repo work merged | operator release (a9) and a UI image; decisions of 2026-10-23 recorded in the brief |
+| WP-167 | [wp-167](work-packages/wp-167-per-agent-entry-and-sheet.md) | 0582, 0583, 0584 | WP-155 | Done | visibility proof repeated on UnifAI 0.1.59 (2026-11-05); ADR-0584 is not carried by this WP |
 
 ### Phase 45 — agents in their own repository, delivered as signed OCI releases (added 2026-10-22)
 
@@ -1200,6 +1200,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — WP-167 Done and ADR-0582 Implemented: the user repeated the per-agent sheet proof on UnifAI 0.1.59 as consultant-01 and sale-01. ADR-0584 stays `Accepted`: its lifecycle states, revocation list and audit events are not built and no work package carries them.
 - 2026-11-05 — Unstarted work follows the code releases (user decision). ADR-0565 moves to the new band v0.15; ADR-0110, ADR-0352, ADR-0556 and ADR-0557 move to the new band v0.16, with WP-209 and WP-210 to WP-218 following their ADRs. Closed ADRs, ADRs with a started package, and the past bands are untouched; the old bands v0.1 now has no open ADR or WP, and v0.9 keeps only ADR-0559 (WP-145, WP-195). See the ADR change log.
 - 2026-11-05 — `v0.13.0` tagged on `main` (`388555d6`): the first platform tag since `v0.3.0`, so that tags follow the roadmap bands again. The rule (a tag per band, on `main`, annotated, the in-cluster ledger as a separate step) is in RELEASING.md and the tag table in versions.md. v0.4 to v0.12 are not tagged retroactively; the next tag is `v0.14.0`.
 - 2026-11-05 — WP-220 added (evaluation, no cluster change): what the RHOAI 3.6 MCP lifecycle operator, MaaS consumer portal and WorkbenchesV2 would bring to this project, which custom code each could replace, and the questions that gate a pilot. It also records that the MaaS 3.6 documentation describes the WP-195 quota incident (gateway wasm object size) and its levers.

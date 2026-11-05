@@ -1,6 +1,6 @@
 # ADR-0582: Serve a per-agent entry and descriptive sheet from the admitted bundle
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-05, WP-167: the route, the typed `status` display block, the hidden-field tests, the schema allowlists and the visibility proof, repeated in a browser on UnifAI 0.1.59)
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -82,3 +82,7 @@ Needs ADR-0583 first, an operator release (CRD `status` block and mapping)
 and a fork change; none of it touches a cluster until the pilot (ADR-0573).
 Verification: a user without the agent's group gets a not-found identical to
 an unknown agent, and a user with it sees only the public fields.
+
+## Implementation note (2026-11-05)
+
+Every clause is in effect: the sheet is a path of the shared UI (clause 1), built from the admitted bundle through the operator's typed `status` block (2), with the public and hidden field lists tested (3, 4), the same not-found for a hidden and an unknown agent (5), plain-text content and the `icon` and `color` allowlists (6), no state change from the sheet (7) and no Zuno field name in the generic parts (8). The visibility proof was made on 2026-10-23 and repeated on UnifAI 0.1.59 on 2026-11-05: [evidence](../roadmap/evidence/wp-167-per-agent-sheet-proof-unifai-0.1.59-2026-11-05.md). The "coming soon" entry for placeholder agents is left to ADR-0584, as the decision says.

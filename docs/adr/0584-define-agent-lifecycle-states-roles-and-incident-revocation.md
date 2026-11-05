@@ -99,3 +99,11 @@ decision owner of the demo, with a written checklist for every change to
 `access`, `allowed_*`, classification, `local_only_for` and quota class. Clause 7
 (a second approver) is relaxed to the owner plus the platform session until the
 team grows. Revisit this assignment when a second person owns an agent.
+
+## Status note (2026-11-05): what is built
+
+Checked against the repository and demo333, the decision is mostly not built, and no work package carries it (WP-167 delivers ADR-0582 and the group visibility of ADR-0583). The status stays `Accepted`.
+
+- **Built:** the `placeholder` and `active` states (ADR-0007), the second-reviewer rule relaxed to the owner plus the platform session by the acceptance note above, and a state shown on the sheet (ADR-0582).
+- **Not built:** the `deprecated` and `retired` states and their effects (clause 3); the behaviour of sessions on retirement, to be verified in the pilot (clause 4); the revocation list as a GitOps-managed ConfigMap read by the operator, and the runbook (clause 5); the operator events for admission, state change, revocation and rejection (clause 6).
+- **Next step:** a work package for clauses 3 to 6, which needs a change in the UnifAI operator (a fork patch). Until then this ADR is a decision without code.
