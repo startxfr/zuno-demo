@@ -8,12 +8,6 @@ operators:
     channel: stable-2.7
     approval: Automatic
     version: "2.7.0-0.1793374941"
-  - package: authorino-operator
-    catalog: redhat-operators
-    namespace: openshift-operators
-    channel: stable
-    approval: Automatic
-    version: "1.4.4"
   - package: claw-operator
     catalog: claw-operator-catalog
     namespace: zuno-claw-consultant-02
@@ -38,12 +32,6 @@ operators:
     channel: v5
     approval: Automatic
     version: "5.8.9"
-  - package: dns-operator
-    catalog: redhat-operators
-    namespace: openshift-operators
-    channel: stable
-    approval: Automatic
-    version: "1.4.3"
   - package: elasticsearch-eck-operator-certified
     catalog: certified-operators
     namespace: openshift-operators
@@ -98,12 +86,6 @@ operators:
     channel: stable
     approval: Automatic
     version: "2.0.0"
-  - package: limitador-operator
-    catalog: redhat-operators
-    namespace: openshift-operators
-    channel: stable
-    approval: Automatic
-    version: "1.4.3"
   - package: nfd
     catalog: redhat-operators
     namespace: openshift-nfd
@@ -148,12 +130,6 @@ operators:
     version: "1.1.0"
   - package: rhbk-operator
     catalog: redhat-operators
-    namespace: unifai-olm
-    channel: stable-v26.6
-    approval: Automatic
-    version: "26.6.7-opr.3"
-  - package: rhbk-operator
-    catalog: redhat-operators
     namespace: zuno-auth
     channel: stable-v26.6
     approval: Automatic
@@ -161,9 +137,9 @@ operators:
   - package: rhcl-operator
     catalog: redhat-operators
     namespace: openshift-operators
-    channel: stable-1.4
+    channel: stable-1.5
     approval: Automatic
-    version: "1.4.4"
+    version: "1.5.0"
   - package: rhods-operator
     catalog: redhat-operators
     namespace: redhat-ods-operator

@@ -31,8 +31,11 @@ The user accepted the missing per-user ceiling at MaaS on 2026-10-25. The upstre
 count, so the ledger stays. Since RHOAI 3.5.2, maas-controller names its subscription limits `tokens-<N>-per-<window>` (it used
 `models-as-a-service-...` before), and the probe now classifies both. Those names sort after `standard-*`, yet the
 subscription limit is still the one that counts. So "first two by sorted limit name" no longer describes the selection
-exactly; that question only matters for the upstream report, which stays deferred. Next measurement: RHCL 1.5.0 (WP-195
-step 4b).
+exactly; that question only matters for the upstream report, which stays deferred.
+
+**Re-measured 2026-11-05 (WP-195 step 4b), on RHCL 1.5.0** (authorino-operator 0.27.0, limitador-operator 0.19.0, now deployed by
+`KuadrantControlPlane` instead of OLM) with RHOAI 3.5.2: `OK: moved ['subscription']` (+29 tokens). The defect is still there and the ledger
+stays. Next measurement: after the next RHCL or RHOAI upgrade (RHOAI 3.6.0-ea.2 is WP-195 step 6).
 
 ## Steps
 
