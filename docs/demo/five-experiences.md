@@ -99,3 +99,11 @@ flowchart LR
   (`okf-fetch` says `VERIFIED … release 0.13.0`) and that its image carries the `k8s` bindings.
 - No series for `kagent` or `dify`: the export and scrape take about a minute, and the series live in `prometheus-k8s`
   (openshift-monitoring), not in the user-workload Prometheus.
+
+## Where the dashboards are
+
+- **Grafana** (`zuno-monitoring`): the demo dashboard **Zuno Platform / Five experiences**. Use it on stage.
+- **Perses** (RHOAI's `data-science-perses`, namespace `redhat-ods-monitoring`): its route shows a blank page by design of the
+  vendor image; the Perses dashboards (RHOAI's model and llm-d ones and this repository's `zuno-*`) are read in the OpenShift
+  console, **Observe, Dashboards**, through the Cluster Observability Operator console plugin. See
+  [ADR-0552](../adr/0552-reuse-rhoais-perses-instance-instead-of-running-an-independent-one.md).

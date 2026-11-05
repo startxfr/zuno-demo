@@ -111,3 +111,18 @@ happens, not a decision this ADR makes now.
 - [ADR-0522](0522-enable-openshift-ai-monitoring-stack-side-by-side.md) - owns
   `data-science-perses`, now reused (read-only) rather than left
   untouched-and-separate as originally decided.
+
+## Where the dashboards are seen (live check, 2026-11-06)
+
+There is no separate Perses interface to open. `data-science-perses-route` (`redhat-ods-monitoring`) serves the Perses API
+(`/api/v1/projects` answers 200, `/api/v1/health` `database: true`) and a 515-byte stub page titled "Node"; the Perses image
+is the COO build and its web UI is not usable from that route, so a browser sees a blank page. The dashboards are meant to be
+read **inside the OpenShift console**: the `UIPlugin` `dashboards` (type `Dashboards`, Cluster Observability Operator 1.5.5)
+deploys `observability-ui-dashboards`, which registers the `console-dashboards-plugin` console plugin; its manifest declares
+a `console.dashboards/datasource` extension and a `console.page/route` to `/dashboards-datasource-plugin`, that is, Perses
+dashboards are served to the console's own **Observe, Dashboards** page. They are the ones RHOAI's operator creates in
+`redhat-ods-monitoring` (`dashboard-0-cluster-admin`, `dashboard-1-model`, `dashboard-2/3/4-llm-d-*`,
+`dashboard-3-maas-usage-admin`, `data-science-tempo-traces`) next to this repository's (`zuno-agents-tools-rag`,
+`zuno-ai-models`, `zuno-data`, `zuno-gitops`, `zuno-infra-data`). Not verified: the exact navigation in the console UI and
+whether the RHOAI dashboard itself embeds them (nothing in the dashboard deployment or `OdhDashboardConfig` names Perses).
+**The demo dashboard "Five experiences" is Grafana-only** (`zuno-monitoring` Grafana route); the Perses set does not carry it.

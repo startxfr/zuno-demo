@@ -52,3 +52,18 @@ deleting the three applications, and left idempotent (a second run reports "alre
 - **Dify error rate 0.341** is per attempt: 8 failed calls on `qwen3.6-27b-instruct` were counted once on `local` and once
   on `local-maas` (the fallback chain), then served by another provider; none in the last 15 minutes, `qwen36-27b-instruct`
   Ready. Cause of those 8 failures not investigated.
+
+## The 426 s Workflow run, analysed (2026-11-06)
+
+What the logs establish: the run (`workflow_based_app_execution_task`, 21:46:34 UTC) did nothing visible for 7 minutes, then
+called the token proxy at 21:53:35 (first POST to `/mcp` 200, then 202, then 200, each in well under a second) and finished in
+426.03 s; the mcp-gateway logged the `confluence.page.search` at 21:53:35 and the token proxy was not slow. The wait is inside
+the Dify worker **before the first MCP request**. The worker runs `celery worker -P gevent -c 1`: one slot. The two beat tasks
+queued at 21:47:14 and 21:53:40 only ran when the run ended, so the whole worker was held for the 7 minutes (a stuck run also
+stops every other background task of Dify). Every other run of the same workflow reached the token proxy within 0.4 s of its
+start (19:27, 21:59, 22:31), including after a re-import. Not established: what the greenlet was waiting for (the logs have no
+line in the window; candidates are a blocking call under gevent in the MCP client, which uses a thread pool, or a lock). The
+Dify defaults give 30 s connect and a 5 min stream read for the streamable MCP client, which are not 420 s on their own.
+Unreproduced, so not fixed. If it comes back: take `py-spy dump` of the worker process during the wait (needs `SYS_PTRACE`,
+not granted today) and raise `-c` above 1 so a stuck run cannot hold the schedule. Side note: printing the worker's
+environment showed `CELERY_BROKER_URL` with the in-cluster Redis password; it is cluster-internal and unchanged.
