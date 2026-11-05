@@ -41,6 +41,7 @@ FULL_PINS = [
     {"chart_values": "gitops/charts/mlops/values.yaml", "path": "images.mlops.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/a2a-gateway/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
     {"chart_values": "gitops/charts/a2a-gateway/values.yaml", "path": "okf.fetch.image.tag", "tag": "v0.1.0"},
+    {"chart_values": "gitops/charts/zuno-token-proxy/values.yaml", "path": "image.tag", "tag": "v0.1.0"},
 ]
 
 
