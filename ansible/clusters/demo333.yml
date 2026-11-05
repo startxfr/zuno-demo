@@ -79,6 +79,9 @@ zuno_unifai_bundle_settings:
     delegation:
       gatewayURL: http://a2a-gateway.zuno-ai-run.svc:8080
       maxRounds: 5
+      # ADR-0409: a delegated write the gateway proposes goes to the human of the session. Needs an
+      # unifai-operator >= 0.1.61 (older CRDs reject the field); unset = every request is rejected.
+      approval: ask
     ceilings:
       delegationTargets:
       - tekos/answer-technical-question
