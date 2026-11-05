@@ -83,7 +83,7 @@
   environment:
     DIFY_CFG: >-
       {{ {'email': dify_admin_email, 'password': _dify_admin_pw.stdout, 'pkg': '/tmp/oac.difypkg',
-          'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'apps_dir': '/tmp/apps', 'models': dify_models,
+          'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'apps_dir': '/tmp/apps', 'reimport': dify_reimport_apps, 'models': dify_models,
           'knowledge': dify_knowledge | combine({'api_key': _dify_knowledge_key.stdout})} | to_json }}
   args:
     executable: /bin/bash

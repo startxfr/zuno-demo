@@ -202,6 +202,10 @@ def attach_dataset(app_id, mode):
 for path in sorted(glob.glob(os.path.join(IN["apps_dir"], "*.yml"))):
     text = open(path).read()
     meta = yaml.safe_load(text)["app"]
+    if meta["name"] in by_name and meta["name"] in IN.get("reimport", []):
+        # Explicit request (-e dify_reimport_apps=[...]): the DSL changed in the repo, replace the app.
+        call("DELETE", f"/apps/{by_name.pop(meta['name'])['id']}")
+        print("app:", meta["name"], "deleted for re-import")
     if meta["name"] in by_name:
         app_id, mode = by_name[meta["name"]]["id"], meta["mode"]
         changed = attach_dataset(app_id, mode)

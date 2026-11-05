@@ -87,8 +87,9 @@ workflow:
             - id: 00000000-0000-4000-8000-000000000002
               role: system
               text: |-
-                Summarise the Confluence pages found for the topic "{{#start.topic#}}": one line per page with its
-                title, then two sentences on what they cover. If nothing was found, say so. Search result:
+                List the Confluence pages found for the topic "{{#start.topic#}}": one line per page with its title
+                and its space, exactly as they appear in the search result. Add nothing that is not in the result:
+                no description of the content, no guess from a title. If nothing was found, say so. Search result:
                 {{#search.text#}}
           context: {enabled: false, variable_selector: []}
           vision: {enabled: false}
