@@ -16,8 +16,17 @@ The proof of step 5 of [WP-167](../work-packages/wp-167-per-agent-entry-and-shee
 - **A sheet shows**, and only this: the title, the state (`active`), the classification ceiling, the tile description, the description, the "What it does" task list and "Maintained by Zuno Demo architecture team". No prompt, tool, knowledge, retrieval setting, access group or limit appears.
 - **The refusal page is the same for a hidden agent and an unknown one:** "Agent not found. There is no agent with this name that you can use." Existence is not revealed (ADR-0582 clause 5).
 
-## What was captured
+## Captures
 
-Eight browser screenshots were taken. Seven were reviewed: consultant-01 on tekos, arkos, comage and an unknown agent; sale-01 on comage and on tekos (two captures, one is a duplicate). There is **no capture** of sale-01 on arkos or on an unknown agent; the user reports that both showed "Agent not found", and this record keeps that as an observation.
+Cropped to the address bar and the page. The persona of each capture is the one the user was signed in as, noted at the time; the page itself does not show it.
 
-The screenshots are not committed: they show the whole desktop, with the other browser tabs, and this repository is public. A cropped capture can be added next to this file.
+| Persona | Page | Capture |
+|---|---|---|
+| consultant-01 | `/agents/tekos` | ![consultant-01 on tekos](wp-167-sheet-consultant-01-tekos.png) |
+| consultant-01 | `/agents/arkos` | ![consultant-01 on arkos](wp-167-sheet-consultant-01-arkos.png) |
+| consultant-01 | `/agents/comage` | ![consultant-01 on comage](wp-167-sheet-consultant-01-comage.png) |
+| consultant-01 | `/agents/inconnu` | ![consultant-01 on an unknown agent](wp-167-notfound-consultant-01-unknown-agent.png) |
+| sale-01 | `/agents/comage` | ![sale-01 on comage](wp-167-sheet-sale-01-comage.png) |
+| sale-01 | `/agents/tekos` | ![sale-01 on tekos](wp-167-notfound-sale-01-tekos.png) |
+
+There is **no capture** of sale-01 on arkos or on an unknown agent; the user reports that both showed "Agent not found", and this record keeps that as an observation.

@@ -102,7 +102,7 @@ Left: the release that carries it (version bump, zuno-demo-a0).
 
 ## Proof on UnifAI 0.1.59 (2026-11-05)
 
-Repeated by the user in a real browser on the current release, as consultant-01 and sale-01: the sheet shows for an agent the caller may use, and a hidden agent and an unknown one give the same "Agent not found" page. The results, and what was and was not captured, are in [the evidence](../evidence/wp-167-per-agent-sheet-proof-unifai-0.1.59-2026-11-05.md). The line "Next: an operator release (a9), a UI image and the role rerun" above is out of date: operator 0.1.59 and the UI image are live.
+Repeated by the user in a real browser on the current release, as consultant-01 and sale-01: the sheet shows for an agent the caller may use, and a hidden agent and an unknown one give the same "Agent not found" page. The results, with the cropped captures and what was not captured, are in [the evidence](../evidence/wp-167-per-agent-sheet-proof-unifai-0.1.59-2026-11-05.md). The line "Next: an operator release (a9), a UI image and the role rerun" above is out of date: operator 0.1.59 and the UI image are live.
 
 ## What this WP does not carry (note 2026-11-05)
 
