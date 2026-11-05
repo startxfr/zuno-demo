@@ -23,7 +23,7 @@ An agent can delegate to another over A2A as the initiating user, within the lim
 2. **Classification.** Send the run's current `X-Zuno-Data-Classification` on the A2A request; the server starts the target run at the higher of that and its own default; the client raises the delegator's run to at least the result's level (monotone, ADR-0565). Tested on both sides, since the mcp-gateway cannot see the delegator's run.
 3. **Limits.** Hop counter and cycle detection in the A2A metadata; `cancel_task` when the wait ends; a span per A2A
    call tied to the node span and `X-Zuno-Run-Id`.
-4. **A2A server.** Agent card and task endpoint per agent; validate the Keycloak JWT of realm `zuno`; run the
+4. **A2A server (dropped 2026-11-05).** Served by the zuno a2a-gateway instead; no server in the fork. Originally: agent card and task endpoint per agent; validate the Keycloak JWT of realm `zuno`; run the
    workflow as the caller through the identity binding; reject a missing or invalid chain.
 5. **Approval.** Map `input-required` and `auth-required` to the local `approval_required` event on the originating
    user's session; persist the pending approval with its checkpoint; cover the A2A node in the approval policy;
@@ -37,7 +37,7 @@ An agent can delegate to another over A2A as the initiating user, within the lim
 
 A user-authored workflow with an A2A node is refused until enabled; with it enabled, a declared delegation runs as the user,
 shows its chain in the trace, stops at the depth limit and at a cycle, and an approval raised by the target reaches the
-user and survives a worker restart.
+user. (Surviving a worker restart is deferred, see the 2026-11-05 decision below.)
 
 ## Progress (2026-10-24)
 
@@ -91,3 +91,12 @@ then no delegation traffic flows.
 `178cbd52b`) and a zuno-side A2A gateway ([ADR-0585](../../adr/0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md))
 for calls a user makes directly. It does not render `X-Zuno-Delegated-By` / `X-Zuno-Delegation-Depth`, does not raise approvals and does not
 lift the operator refusal of step 6: the rest of this work package is unchanged, and the fork's own server of step 4 stays specified.
+
+## Decision (2026-11-05): scope of the remaining fork work
+
+Decided with the user.
+
+- **Step 4 is dropped:** the zuno a2a-gateway serves the agents ([ADR-0585](../../adr/0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md)).
+- **Step 5 ships first without persistence across a worker restart:** a pending approval is lost with the worker and expires as a refusal after 300 seconds. "An approval survives a worker restart" ([ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) clause 3) is deferred to a later version.
+- **The fork work is tracked as R-535,** in the order 1 (identity), 3 (limits), 2 (classification), 5 (approval). Each step goes into a weekly release, with a demo333 canary for the steps that change A2A behaviour.
+- **Classification on return (step 2):** the gateway returns the level its turn ran at in the completed task's metadata, key `zuno.classification` ([ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) clause 5).

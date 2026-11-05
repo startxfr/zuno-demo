@@ -84,3 +84,15 @@ gateway check of that list and the validation scenarios.
 
 Approval is the control that makes a delegated write acceptable. Persisting it removes a window in
 which a restart silently drops or auto-resolves a pending decision.
+
+## Amendment (2026-11-05)
+
+Decided with the user. Clause 3 ("Approvals survive a restart") is **deferred**: the approval of WP-173 step 5 ships first
+**without persistence**. A pending approval is held by the worker that raised it; a restart of the worker loses it, and it
+expires as a refusal after 300 seconds, as today (a silence is a refusal, so the loss fails closed). Clauses 1, 2, 4, 5 and 6
+are unchanged.
+
+- **Before Implemented:** the proof "it survives a restart of the worker" is removed from this ADR's gate and moves to the
+  later version that adds the checkpoint store. Every other proof of the list still applies.
+- **Order of the fork work (R-535):** 1 identity, 3 limits, 2 classification, 5 approval. Each step goes into a weekly
+  release; the steps that change A2A behaviour get a canary on demo333.
