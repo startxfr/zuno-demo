@@ -36,7 +36,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 12 | — | 18 | — |
-| v0.14 | 3 | 3 | 7 | WP-204, WP-205, WP-206, WP-207, WP-208 |
+| v0.14 | 3 | 3 | 7 | WP-205, WP-206, WP-207, WP-208 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
