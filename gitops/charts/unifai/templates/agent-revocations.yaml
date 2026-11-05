@@ -13,6 +13,10 @@ kind: ConfigMap
 metadata:
   name: unifai-agent-revocations
   namespace: {{ .Values.namespace }}
+  labels:
+    # unifai-operator's cache only watches ConfigMaps with this label: without it a change is seen at the next
+    # resync (10 minutes) instead of within one reconcile.
+    app.kubernetes.io/part-of: unifai
   annotations:
     argocd.argoproj.io/sync-wave: "0"
 data:

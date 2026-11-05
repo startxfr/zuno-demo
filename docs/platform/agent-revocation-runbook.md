@@ -40,6 +40,19 @@ of ADR-0584). Record the person who approves; that name goes in the `actor` fiel
 4. **Then fix it properly.** Open a pull request in `zuno-demo-agents` that sets `zuno.status: retired` (or fixes the
    content), release it, and promote it. Remove the revocation entry in the same change that pins the release.
 
+## What the operator does with the list
+
+- **Format.** Strict: each entry has `bundle`, `reason` and `actor`, and nothing else. The chart requires all three.
+- **Immediate effect.** The ConfigMap carries the label `app.kubernetes.io/part-of: unifai`, which the operator's cache
+  watches, so a change is applied within one reconcile. Without the label it would wait for the next resync (10 minutes).
+- **A revocation always takes effect,** even with an empty reason: the event and the condition then say "no reason given
+  in the revocation list", and the actor reads `unknown`. Only a `retired` bundle without the annotation
+  `unifai.startx.fr/reason` is refused (`MissingReason`, its objects are left as they are).
+- **An unreadable list** (malformed YAML, an unknown field, an entry without `bundle`) puts the operator in the phase
+  `Error` with the reason `RevocationListUnreadable`: nothing new is admitted and what is emitted stays. Fix the list.
+- **Events** (source `unifai-operator`): `Admitted`, `StateChanged` (to `deprecated` or `retired`), `Revoked` and
+  `Rejected`, each with the digest, the actor and the reason.
+
 ## A compromised signing identity
 
 A change of trusted identity is not a revocation-list entry: change the trust policy of
