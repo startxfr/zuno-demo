@@ -563,3 +563,29 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
   dry-run. After a hard refresh the Application is `Synced/Healthy`. Nothing in this repo sets `numProcPerNode` on a TrainJob,
   so check the next LoRA TrainJob.
 
+## Follow-up observations (2026-11-05, read-only)
+
+- **Shim `Task failed`, now explained in part.** The line, once per chat, reads
+  `Failed to get response CEL value: Failed to retrieve gRPC response: Received response with size 0`
+  (wasm shim sha256 fd5039db..., Kuadrant 1.5.0). In the shim source
+  (`kuadrant-filter/src/kuadrant/pipeline/tasks/dynamic.rs`, `process_dynamic_response`), when a dynamic gRPC task has
+  follow-up `onReply` tasks, the shim reads the reply as a CEL value; an empty reply (size 0) makes it return
+  `TaskOutcome::Failed`. The rate-limit calls are `failureMode: allow`, so the request still passes, and the counter still
+  moves because Limitador has already applied the call. Hypothesis, not tested: a Failed task stops the actions queued
+  behind it, which would also explain the old WP-177 finding that only the first two limits count. To test it, reproduce on
+  a throwaway Gateway with two matching limits and read the shim log. No upstream issue or PR mentions the message.
+- **Module manager memory: more durable than feared.** On `odh-observability` and `spark-operator-module-controller-manager`,
+  server-side apply shows the operator (`platform`, Apply) owning only `limits.cpu` and `requests.cpu`, and the manual patch
+  (`kubectl-patch`) owning `limits.memory` and `requests.memory`. The operator does not declare memory in its current
+  manifests, so it has nothing to revert; the values were unchanged after about three hours and several operator reconciles.
+  The risk is a later RHOAI release that declares memory itself, and then the ownership would conflict.
+- **The three `Removed` DSC conditions.**
+  - `MCPLifecycleOperatorReady`: DSC module `mcplifecycleoperator` (empty spec, `Removed` by default). It deploys the
+    MCP lifecycle operator, which manages MCP servers as Kubernetes objects. This platform uses the Kuadrant MCP gateway and
+    its own MCP deployments, so it is not needed.
+  - `MaaSConsumerPortalAvailable`: a submodule of the MaaS stack with no DSC field of its own on this cluster. By name, a
+    consumer-facing portal to request MaaS API keys. Not documented in the cluster's CRDs; MaaS keys come from maas-api
+    here, so it is not needed.
+  - `WorkbenchesV2Ready`: `spec.components.workbenches.workbenchesV2`, a second-generation workbench controller (the live
+    CRD still has `notebooks.kubeflow.org`). The classic `workbenches` component is `Managed` and Ready in `zuno-ai-build`.
+
