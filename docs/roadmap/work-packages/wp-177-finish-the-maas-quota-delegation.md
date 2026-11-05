@@ -35,7 +35,11 @@ exactly; that question only matters for the upstream report, which stays deferre
 
 **Re-measured 2026-11-05 (WP-195 step 4b), on RHCL 1.5.0** (authorino-operator 0.27.0, limitador-operator 0.19.0, now deployed by
 `KuadrantControlPlane` instead of OLM) with RHOAI 3.5.2: `OK: moved ['subscription']` (+29 tokens). The defect is still there and the ledger
-stays. Next measurement: after the next RHCL or RHOAI upgrade (RHOAI 3.6.0-ea.2 is WP-195 step 6).
+stays. Next measurement: after the next RHCL or RHOAI upgrade.
+
+**Re-measured 2026-11-05 after RHOAI 3.6.0-ea.2:** first `moved []`, because the gateway's wasm configuration no longer fit in etcd
+(`request is too large`), so the route-level limits never reached the shim. After `zuno-token-quota` was switched off the probe gives
+`OK: moved ['subscription']` again. The ledger stays, and now also carries the user and group ceilings alone. See WP-195.
 
 ## Steps
 

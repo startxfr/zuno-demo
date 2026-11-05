@@ -312,3 +312,10 @@ Update 2026-10-25 (user): no upstream issue for now and no Kuadrant fix expected
 ai-gateway ledger stays the guard of those ceilings, WP-177 makes it durable (Redis) and adds a probe that shows which counters move, and
 the removal of `quota.py` is deferred until Kuadrant counts every limit. The status moves to Implemented only if that removal is done, or
 is amended to accept the ledger as the permanent design.
+
+## Amendment (2026-11-05, WP-195) - clause 2 on demo333
+
+Clause 2's gateway-level quota policy is switched off on demo333 since RHOAI 3.6.0-ea.2: the MaaS
+gateway's wasm configuration became too large for etcd. The ai-gateway ledger carries the user and
+group ceilings, and MaaS carries the per-subscription limits. See WP-195, "Quota counters after RHOAI
+3.6.0-ea.2", and [ADR-0511](0511-define-okf-quota-policy-enforced-via-kuadrant.md).

@@ -437,11 +437,8 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
      `ogx` is degraded, which the role already treats as benign.
 
    **Open:**
-   - **Quota counting at MaaS stopped.** The probe reports `moved []`. A
-     direct MaaS chat moves no Limitador counter, and the wasm shim logs
-     `Task failed: "0"` once per chat. The limits are present, renamed back
-     to `models-as-a-service-...`. The ai-gateway ledger is the only quota
-     guard until this is understood.
+   - **Quota counting at MaaS stopped: FIXED 2026-11-05 (0338f9ed).** See
+     "Quota counters" below.
    - TrustyAI not Ready (above).
    - ArgoCD `zuno-namespaces-d0` is OutOfSync: `zuno-ai-build` lost
      `kueue.openshift.io/managed=true`.
@@ -473,3 +470,33 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
   (WP-177)? Only the counters probe answers that.
 - Is the RHOAI 3.6 EA supported with RHCL 1.5 and Kueue 1.5? To check in the
   release notes before steps 4 to 6.
+
+## Quota counters after RHOAI 3.6.0-ea.2 (2026-11-05)
+
+- **Cause:** the kuadrant-operator could not update the EnvoyFilter
+  `openshift-ingress/kuadrant-maas-default-gateway`: `etcdserver: request is
+  too large`. RHOAI 3.6 gave each local model route 11 rules / 15 matches, and
+  Kuadrant expands a gateway-level policy into one wasm action set per match
+  (68 sets; upstream Kuadrant/kuadrant-operator #2353 and #2051, both open).
+  The EnvoyFilter stayed at its first version (generation 1, 795 KB of wasm
+  config), which held only the AuthPolicy and `zuno-token-quota`. The six
+  `maas-trlp-*` route policies and `gateway-default-deny` never reached the
+  shim, although all reported `Enforced=True`. The probe said `moved []`.
+- **Fix:** `zuno_connectivity_link_token_rate_limits.enabled: false` in
+  demo333.yml, then `make d1 install connectivity-link`. The EnvoyFilter went
+  to generation 2 (1.27 MB as an object) and now carries all six `maas-trlp-*`
+  policies and `gateway-default-deny`. The probe gives
+  `OK: moved ['subscription']` (+29); the four models answer 200 and no token
+  gives 401.
+- **What is lost:** `zuno-token-quota` was the MaaS-level user and group
+  budget of ADR-0511 (standard-user 3M/24h, standard-group 30M/24h, ai-gateway
+  headers only). While it is off, the user and group ceilings are enforced
+  only by the ai-gateway ledger (WP-177, Redis-backed), and MaaS enforces
+  only the per-subscription limits, which apply to the ai-gateway ServiceAccount
+  as a whole. In practice nothing changes: WP-177 measured that these two
+  limits never counted next to the controller's limits on the local routes.
+  Turn it back on only when the EnvoyFilter still fits (watch its size and
+  the operator log for `request is too large`).
+- **Still unexplained:** the gateway still logs a few `Task failed: "0"` from
+  the wasm shim, about one per chat, while chats succeed and counters move.
+

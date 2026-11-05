@@ -273,3 +273,12 @@ and is therefore charged to that user's quota, group and project exactly like a 
 call; no quota dimension is added per agent or per hop
 ([ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) clause 3). The chain
 is recorded in the audit and the spans, not in the counters.
+
+## Amendment (2026-11-05, WP-195) - the gateway-level policy is off on demo333
+
+On demo333 the gateway-level `zuno-token-quota` TokenRateLimitPolicy is switched off
+(`zuno_connectivity_link_token_rate_limits.enabled: false`). Under RHOAI 3.6.0-ea.2 the MaaS
+gateway's wasm configuration, with that policy and the per-route policies together, exceeds the etcd
+request limit and Kuadrant stops updating it (upstream Kuadrant/kuadrant-operator #2353, #2051). With
+the policy off, the per-user and per-group ceilings of this ADR are enforced by the ai-gateway ledger
+only, as WP-177 already relied on. See WP-195, "Quota counters after RHOAI 3.6.0-ea.2".
