@@ -98,6 +98,25 @@ else:
     })
     print("mcp: registered")
 
+# The registration leaves the server unauthorised with no tool ("Serveur Non Configuré" in the console):
+# authorise it, then fetch its tools. The id the console API wants is the database uuid, which only
+# /tool-providers returns (the /tools/mcp list gives the server_identifier).
+providers = call("GET", "/workspaces/current/tool-providers")
+providers = providers if isinstance(providers, list) else providers.get("data", [])
+mcp = next((p for p in providers if p.get("type") == "mcp" and p.get("name") == IN["mcp_name"]), None)
+if mcp is None:
+    print("FAIL mcp provider not found in /tool-providers")
+    sys.exit(1)
+if not mcp.get("is_team_authorization"):
+    call("POST", "/workspaces/current/tool-provider/mcp/auth", json={"provider_id": mcp["id"]})
+    print("mcp: authorised")
+listed = call("GET", f"/workspaces/current/tool-provider/mcp/tools/{mcp['id']}")
+if not listed.get("tools"):
+    call("GET", f"/workspaces/current/tool-provider/mcp/update/{mcp['id']}")
+    listed = call("GET", f"/workspaces/current/tool-provider/mcp/tools/{mcp['id']}")
+    print("mcp: tools fetched")
+print("mcp: tools", [t["name"] for t in listed.get("tools", [])])
+
 # 5. External Knowledge (WP-205): the adapter as an External Knowledge API, and one knowledge base on it.
 # Optional input: knowledge = {endpoint, api_key, api_name, kb_name, kb_id, top_k, score_threshold}.
 K = IN.get("knowledge")
