@@ -117,6 +117,57 @@ MaaS key; whether the `zuno-ai-build` namespace policy (not mesh-injected) fits.
 - The 3.6 upgrade guide describes IPP being replaced by Praxis (`maas.opendatahub.io/payload-processing-type=praxis`). Our
   payload-processing sidecar and NetworkPolicy workarounds may be affected.
 
+## 5. Spike results (2026-11-05, read only on demo333)
+
+**A human key for Claude Code in VS Code (user request: large ceilings, gpt-oss-20b in the cluster and Codestral).**
+- **gpt-oss-20b through MaaS speaks the Anthropic Messages API.** With a service-account token, `POST
+  /zuno-ai-run/gpt-oss-20b/v1/messages` returned 200 with `anthropic-version: 2023-06-01`, including a `tool_use` block for a
+  tool call and a streamed `message_start` / `content_block_start` sequence. The model is served with `--max-model-len=131072
+  --enable-auto-tool-choice --tool-call-parser=openai`. So a MaaS key can drive Claude Code with `ANTHROPIC_BASE_URL` set to the
+  model's path URL, `ANTHROPIC_AUTH_TOKEN` set to the `sk-oai-*` key and the model name `gpt-oss-20b`. Not tested: Claude Code
+  itself (it also calls `/v1/messages/count_tokens`), and long sessions.
+- **Codestral is not reachable through MaaS.** MaaS holds two ExternalModels only (`mistral-large`, `gpt-oss-120b-ovhcloud`), both with
+  `apiFormat: openai-chat`. `POST /zuno-ai-run/mistral-large/v1/messages` returns 500: ExternalModels need Praxis API translation, which is
+  not enabled here (the IPP to Praxis migration is described in the 3.6 upgrade guide). Codestral runs only through the ai-gateway
+  (`mistral-codestral`, dedicated key, classification C1/C2 only), and the ai-gateway exposes `/v1/chat/completions` only, not
+  `/v1/messages`.
+- **Existing subscriptions** (MaaS namespace `models-as-a-service`): `<model>-ai-gateway` 1,000,000 tokens/h (priority 100),
+  `-lightspeed` 200,000/h (50), `-agents` 100,000/h (10), `-sales` 5,000/h (1). No subscription exists for developers. The Keycloak
+  realm has the group `ocp-ai-dev` (member `ai-dev-01`), which fits a developer subscription.
+- **Ceiling arithmetic.** Claude Code resends the whole context each turn, so a 40,000-token context costs about 40,000 tokens per
+  call; 1,000,000 per hour is about 25 calls. A coding session needs several million per hour.
+- **Gateway size.** The wasm object is 1.27 MB against the 1.5 MiB etcd limit. A subscription at an existing rate adds a clause of about
+  80 bytes; a new rate adds a whole limit on every route match of that model (15 matches here).
+
+**Portal sign-in with Keycloak.**
+- The `AITenant` CRD of 3.6.0-ea.2 has `spec.oidc` with `clientId`, `issuerUrl` and `ttl` only. The `clientSecretRef`, `refreshInterval` and
+  `audience` fields that the upstream main documentation lists for the portal's auth proxy are not in this build. So Keycloak can be
+  accepted as a token issuer on the gateway (the WP-122 question, to test), but a Keycloak browser sign-in for the portal is not
+  supported on this build. OpenShift login is the supported path, which matches the user's choice.
+- The portal is not deployed (`MaaSConsumerPortalAvailable=False`, "not enabled"). The dashboard operator carries one related image
+  (`odh-mod-arch-maas`), and `ai-gateway-controller` runs. Whether enabling the field deploys a complete portal in this EA build can only
+  be learned by a pilot.
+
+**MCP (Kuadrant side).** The CRDs on the cluster: `MCPServerRegistration` (targetRef to an HTTPRoute, `credentialRef`, `prefix`,
+`userSpecificList`, `tokenURLElicitation`), `MCPVirtualServer` (`tools`, `prompts`: a tool allow-list per virtual server) and
+`MCPGatewayExtension` (`trustedHeadersKey`, `oauthProtectedResource`, `sessionStore`, `publicHost`). None of them carries agent or task
+rights, data classification or `allow_context`. Those would have to live in an Authorino AuthPolicy on the MCP route, written in
+OPA/CEL against the OKF bundles. The `kubernetes-sigs` operator's `network.ingressFrom` accepts standard NetworkPolicy peers, so the
+"only from the zuno gateway" rule of ADR-0037 is expressible; whether the generated pod keeps the ExternalSecret and gateway-token
+wiring is still to be tested on one server.
+
+## 6. Recommendations
+
+1. **Claude Code key: MaaS key on gpt-oss-20b only.** New subscription `gpt-oss-20b-developer`: owner groups `/ocp-ai-dev` and
+   `ocp-ai-dev` (both spellings, as the other subscriptions do) plus the user's own login, priority 20, 5,000,000 tokens/h on
+   `gpt-oss-20b` only, key TTL 30 days. Add the group to `gpt-oss-20b-entitlement`. Check the wasm object size after it is applied.
+2. **Codestral stays on the ai-gateway** (Keycloak token, `zuno-code`, as tested by WP-194), because it is a SaaS model bound by
+   classification. To use it from Claude Code, either a translating proxy in front of the ai-gateway or MaaS with Praxis translation; both
+   are separate decisions.
+3. **Portal pilot with OpenShift login** after the key works by hand, to get the self-service lifecycle.
+4. **Keycloak token instead of a static key** (Claude Code can fetch a short-lived token through its `apiKeyHelper` setting): worth one
+   test once `AITenant.spec.oidc` is configured, since it would avoid long-lived keys.
+
 ## Steps
 
 1. This evaluation (done, in review).
