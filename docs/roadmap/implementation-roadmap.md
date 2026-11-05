@@ -34,7 +34,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 23 | 2 | 28 | WP-173, WP-174, WP-220 |
-| v0.12 | 8 | 1 | 9 | — |
+| v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | WP-208 |
 | v0.15 | 2 | 2 | 3 | WP-209, WP-221 |
@@ -1201,6 +1201,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — ADR-0579 Implemented, with an amendment that records the accepted gaps (skills unused, `max_concurrent_requests` and `guardrails.categories` not consumed, v0.2 refused only once the last agent has moved). Band v0.12 now has no open ADR or work package.
 - 2026-11-05 — WP-164 Done and ADR-0581 Implemented, with an amendment: the quota script stays separate, the per-agent limits travel through UnifAI and the ai-gateway instead of Kuadrant policies, the file names are corrected, and the eight `agent_*` groups stay in the realm import. v0.12 keeps only ADR-0579.
 - 2026-11-05 — WP-161 Done: mcp-gateway's okf-fetch init container, live since 2026-10-23, verifies the pinned release and is rolled by every promotion (now v0.13.0). mlops and ai-gateway read the verified release at build time. WP-164 and ADR-0581 stay open: per-agent quota limits and the quota script are not done, see the WP.
 - 2026-11-05 — WP-221 added and ADR-0584 retargeted from v0.12 to v0.15: its lifecycle states, revocation list and audit events are not built, and WP-167 never carried them. The user asked for a work package and for unstarted work to follow later releases.
