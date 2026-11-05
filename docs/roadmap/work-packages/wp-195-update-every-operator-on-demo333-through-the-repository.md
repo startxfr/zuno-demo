@@ -191,7 +191,7 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    - `quota_counters_probe.py`: `OK: moved ['subscription']`, so no change
      for WP-177 (recorded there). The probe had to learn RHOAI 3.5.2's new
      limit names (`tokens-<N>-per-<window>`) first.
-5. **Kueue 1.5.0.** Set `zuno_kueue_channel: stable-v1.5`, then
+5. **Kueue 1.5.0 (Done 2026-11-05).** Set `zuno_kueue_channel: stable-v1.5`, then
    `make d1 install kueue`.
 
    **Catalog graph, read 2026-11-04:** `stable-v1.5` holds only 1.5.0, with
@@ -204,7 +204,23 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    and re-auditing for a 1.5.z that has an edge from 1.4. K2, a controlled
    reinstall, is prepared below and runs only after the user validates it.
 
-   **K2 plan (proposed, not run).** What it relies on, measured live:
+   **Done 2026-11-05 (K2, user go, 9cd092da).** Kueue 1.5.0 is `Succeeded`.
+   The operand `kueue-controller-manager` rolled to the 1.5.0 image (2/2).
+   The 13 CRDs and 159 Workloads are kept, the ClusterQueue `default` is
+   Active, and the DSC reports `KueueReady=True`. `zuno-kueue-d0`/`-d1` are
+   Synced/Healthy. A suspended test Job in `zuno-ai-run` was admitted by
+   ClusterQueue `default` and completed. The audit reports kueue `ok`.
+   **Deviation from the plan below:** deleting the CSV alone is not enough.
+   The Subscription's `status.installPlanRef` still pointed at the 1.4.3
+   InstallPlan, so OLM logged "skipping update: installplan already created"
+   and left the Subscription in `UpgradePending`. Deleting the Subscription
+   as well let ArgoCD's selfHeal recreate it on `stable-v1.5` with a clean
+   status, and OLM then installed 1.5.0 within about 20 seconds. The new
+   operator then waited about 90 seconds for the old leader lease before it
+   rolled the operand. Admission kept working the whole time, because the
+   operand is owned by the `Kueue` CR.
+
+   **K2 plan (as prepared on 2026-11-04).** What it relies on, measured live:
    - The operand `kueue-controller-manager` (2 replicas, which serve the
      `kueue-*-webhook-configuration` webhooks with `failurePolicy: Fail`) is
      owned by `Kueue.kueue.openshift.io/cluster`, not by the CSV, so it keeps
@@ -220,8 +236,10 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    1. Commit `zuno_kueue_channel: stable-v1.5` and run
       `make d1 install kueue`. The Subscription moves to `stable-v1.5`, and
       OLM keeps 1.4.3 because there is no edge.
-   2. Delete only CSV `kueue-operator.v1.4.3` in `openshift-kueue-operator`.
-      OLM keeps the CRDs and CRs, and the operand keeps running.
+   2. Delete CSV `kueue-operator.v1.4.3` in `openshift-kueue-operator`, then
+      the Subscription `kueue-operator` (ArgoCD recreates it; see the
+      deviation above). OLM keeps the CRDs and CRs, and the operand keeps
+      running.
    3. OLM re-resolves the Subscription to the channel head, 1.5.0
       (Automatic). Wait for CSV `Succeeded`, then for the operand Deployment
       to roll and the webhooks to answer.
