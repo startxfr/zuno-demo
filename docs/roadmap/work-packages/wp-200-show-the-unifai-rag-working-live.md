@@ -43,3 +43,13 @@ Two demos:
 - The RAG workflow is `<team>-rag` (WP-198 team examples). It searches the caller's uploads (DOCUMENT) and their groups'
   Confluence sources.
 - Live check pending, after the WP-198 examples are enabled.
+
+## Live findings (2026-11-05)
+
+- **The upload pipeline works.** consultant-01 uploaded the test set in the Personal workspace. The three files reached
+  Done, and Qdrant holds their chunks with `owner_id: consultant-01`, `visibility: private`.
+- **`consultant-rag` did not see them.** A team workflow runs as the team: the rag-server searches with
+  `owner_id = <team id>`. The forwarded token only adds the caller's groups, which is why Confluence passages came back
+  (5 results) and the documents did not (0 results). This is upstream design, not a defect, and the Team view has no
+  Documents page to upload in the team's name.
+- **Fix:** the RAG demo moves to the personal workflow `<user>-my-documents` (WP-199 step 3). The demo guide says so.

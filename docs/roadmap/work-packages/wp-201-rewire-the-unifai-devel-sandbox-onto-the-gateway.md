@@ -1,6 +1,6 @@
-# WP-201: Rewire the unifai-devel sandbox onto the gateway (amended: keyless, isolated)
+# WP-201: Rewire the unifai-devel sandbox onto the gateway (amended: retire it, one instance)
 
-- **State:** Repo work merged (2026-11-04: live on demo333, smoke chat answers; browser check by ai-ops-01 pending)
+- **State:** Repo work in review (2026-11-05: retire unifai-devel and unifai-olm; migration of the missing kinds in the chart)
 - **ADRs:** [ADR-0598](../../adr/0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md)
 - **Depends on:** WP-198
 - **Related:** [ADR-0562](../../adr/0562-authenticate-unifai-against-the-zuno-keycloak-realm.md)
@@ -49,3 +49,21 @@ ai-ops-01 on `unifai-ui-unifai-devel` sees the examples, and they run without an
 ## Acceptance
 
 - As ai-ops-01 on `unifai-ui-unifai-devel`, the examples are listed and one workflow answers.
+
+## Amendment: one UnifAI instance (user decision of 2026-11-05)
+
+demo333 keeps only `zuno-unifai` (ADR-0598 point 6). The sandbox of the steps above was rewired and checked, then
+retired.
+
+1. **Peers.** b9, a9 and da confirmed on 2026-11-05 that nothing of theirs uses `unifai-devel` or `unifai-olm`. The fork
+   canary and e2e tests already create and delete their own namespaces.
+2. **What stays.** The OLM operator, which reconciles `zuno-unifai`: namespace `unifai-operator`, Subscription
+   `unifai-operator`, CatalogSource `openshift-marketplace/unifai-operator-catalog`. The Keycloak of realm `zuno` has its
+   own `rhbk-operator` Subscription in `zuno-auth`; the one in `unifai-olm` goes with that namespace.
+3. **Migration.** The chart's team examples gain the kinds that only the sandbox showed: a `<team>-web-fetch` tool, a
+   suspended `<team>-weekday-brief` schedule and a `<team>-welcome` chat. The mock LLM, the demo MCP server and the
+   `demo-*` objects are not migrated; the team examples replace them. The fork keeps the overlay and the stack example
+   as references.
+4. **Retirement** (cluster actions, each with the user's go). For each of `unifai-devel` and `unifai-olm`: delete the
+   UnifaiStack and wait until it is gone, while the operator still runs so its finalizers clean up. Then delete the
+   namespace.

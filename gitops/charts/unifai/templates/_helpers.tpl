@@ -99,10 +99,13 @@ spec:
 {{/*
 Example components and workflows of a team workspace (ADR-0598 point 4): three
 agents, a documents retriever, a direct condition and an orchestrator in the
-team's inventory, and four workflows on them (linear, branches, RAG,
-orchestrated). The retriever searches the uploaded documents of the user who
-runs the chat, plus the Confluence sources of that user's groups (forwarded token). They reference the public
-built-in gateway LLM and MCP provider (ADR-0597), so every member can run them.
+team's inventory, four workflows on them (linear, branches, RAG,
+orchestrated), a web-fetch tool, a suspended weekday schedule and a welcome
+chat. A team workflow runs as the team: the retriever finds the documents
+uploaded in the team's name and the Confluence sources of the caller's groups
+(forwarded token), never a member's personal uploads (see the personal starter).
+They reference the public built-in gateway LLM and MCP provider (ADR-0597), so
+every member can run them.
 Arguments: root (the chart context), owner (an UnifAI admin), team (the team name).
 */}}
 {{- define "unifai.teamExamples" -}}
@@ -167,7 +170,16 @@ Arguments: root (the chart context), owner (an UnifAI admin), team (the team nam
         (dict "uid" "assistant" "node" (printf "$rid:agent/%s-assistant" $t))
         (dict "uid" "tools" "node" (printf "$rid:agent/%s-tools" $t))
         (dict "uid" "finish" "node" "final_answer")))))
+  (dict "kind" "UnifaiTool" "name" (printf "%s-web-fetch" $t) "spec" (dict "type" "web_fetch" "config" (dict)))
+  (dict "kind" "UnifaiSchedule" "name" (printf "%s-weekday-brief" $t) "spec" (dict
+    "workflow" (printf "%s-linear" $t) "suspend" true
+    "inputs" (dict "user_prompt" (printf "Give the %s team a three-line morning brief: what to check first today." $t))
+    "schedule" (dict "cron_expression" "30 8 * * 1-5" "timezone" "Europe/Paris" "overlap_policy" "skip")))
+  (dict "kind" "UnifaiChat" "name" (printf "%s-welcome" $t) "spec" (dict
+    "workflow" (printf "%s-linear" $t) "title" "Welcome"
+    "prompt" (printf "In two sentences, say what the %s team workspace offers: its example workflows and the shared inventory." $t)))
 }}
+{{- $waves := dict "UnifaiWorkflow" "16" "UnifaiSchedule" "17" "UnifaiChat" "17" }}
 {{- range $objs }}
 apiVersion: unifai.startx.fr/v1alpha1
 kind: {{ .kind }}
@@ -175,8 +187,8 @@ metadata:
   name: {{ .name }}
   namespace: {{ $root.Values.namespace }}
   annotations:
-    # after the team (5) and the built-ins (10); workflows after their components
-    argocd.argoproj.io/sync-wave: {{ ternary "16" "15" (eq .kind "UnifaiWorkflow") | quote }}
+    # after the team (5) and the built-ins (10); workflows after their components, schedules and chats after workflows
+    argocd.argoproj.io/sync-wave: {{ get $waves .kind | default "15" | quote }}
 spec:
   owner: {{ $.owner }}
   teamRef: {{ $t }}
@@ -227,5 +239,60 @@ spec:
       - {uid: ask, node: user_question}
       - {uid: agent, node: "$rid:agent/{{ $u }}-assistant", after: ask}
       - {uid: finish, node: final_answer, after: agent}
+---
+{{/* A personal RAG: in the personal workspace the search runs as the persona, so it
+     sees the persona's own uploads (a team workflow searches as the team and does not). */}}
+apiVersion: unifai.startx.fr/v1alpha1
+kind: UnifaiRetriever
+metadata:
+  name: {{ $u }}-documents
+  namespace: {{ $root.Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  owner: {{ $u | quote }}
+  type: docs_rag
+  config:
+    source_type: DOCUMENT
+    extra_source_types: [CONFLUENCE]
+    forward_user_token: true
+    top_k_results: 5
+    threshold: 0.3
+---
+apiVersion: unifai.startx.fr/v1alpha1
+kind: UnifaiAgent
+metadata:
+  name: {{ $u }}-rag
+  namespace: {{ $root.Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+spec:
+  owner: {{ $u | quote }}
+  type: custom_agent_node
+  config:
+    llm: {{ printf "$ref:llm/%s" $root.Values.gatewayLLM.name | quote }}
+    retriever: "$ref:retriever/{{ $u }}-documents"
+    hitl_mode: skip
+    system_message: Answer from the retrieved passages only and cite the document or page each fact comes from. If they do not hold the answer, say so.
+---
+apiVersion: unifai.startx.fr/v1alpha1
+kind: UnifaiWorkflow
+metadata:
+  name: {{ $u }}-my-documents
+  namespace: {{ $root.Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "16"
+spec:
+  owner: {{ $u | quote }}
+  description: Answers from the documents I uploaded and my groups' Confluence pages, with sources.
+  blueprint:
+    nodes:
+      - {rid: user_question, name: User Question Node, type: user_question_node, config: {type: user_question_node, retries: 1}}
+      - {rid: final_answer, name: Final Answer Node, type: final_answer_node, config: {type: final_answer_node, retries: 1}}
+      - {rid: "$ref:agent/{{ $u }}-rag"}
+    plan:
+      - {uid: ask, node: user_question}
+      - {uid: rag, node: "$rid:agent/{{ $u }}-rag", after: ask}
+      - {uid: finish, node: final_answer, after: rag}
 ---
 {{- end }}

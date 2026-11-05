@@ -21,7 +21,11 @@ consultant-01, sale-01 and ai-ops-01 each find one or two starter workflows in t
    `preferred_username` (`consultant-01`). Like the team examples, this needs the gateway LLM and MCP provider to be
    built-ins (WP-197, UnifAI 0.1.58).
 2. demo333 lists the three personas.
+3. **Personal RAG** (amended 2026-11-05). The live check showed that a team workflow runs as the team and never sees a
+   member's personal uploads. Each persona therefore also gets the retriever `<username>-documents` (its own uploads plus
+   its groups' Confluence, forwarded token), the agent `<username>-rag` and the workflow `<username>-my-documents`.
 
 ## Acceptance
 
 - In the personal workspace of each of the three personas, the starter is listed and answers.
+- `<username>-my-documents` answers from a document the persona uploaded in Personal.

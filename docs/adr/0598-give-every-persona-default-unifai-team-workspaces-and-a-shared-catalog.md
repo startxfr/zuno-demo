@@ -36,12 +36,26 @@ templates in the catalog asked for a Gemini API key.
 3. **Shared inventory.** `zuno-gateway` and `mcp-gateway` become public built-ins (ADR-0597). The `knowledge-*` retrievers
    stay in their agent team: UnifAI has no built-in retrievers, and the RAG ACLs apply per user anyway.
 4. **Example workflows.** Each business team that has personas gets example workflows on the built-in gateway: linear,
-   branches, orchestrated and RAG.
+   branches, orchestrated and RAG. It also gets a web-fetch tool, a suspended weekday schedule and a welcome chat, so every
+   kind of the inventory has one example (amended 2026-11-05).
+   - A team workflow runs as the team. Its RAG finds the documents uploaded in the team's name and the Confluence
+     sources of the caller's groups, never a member's personal uploads.
 5. **Personal starters.** A short list of demo personas (consultant-01, sale-01, ai-ops-01) gets starter workflows in their
    personal workspace. These are declarative `UnifaiWorkflow` objects with `owner: <username>`, recreated if deleted.
-6. **`unifai-devel` stays an isolated sandbox.** Its examples are owned by the stack admin (ai-ops-01) and run on the
-   in-namespace mock LLM and demo MCP server, so they need no external key. They do not use the gateway: the
-   ai-gateway and mcp-gateway NetworkPolicies stay closed to `unifai-devel` (user decision of 2026-11-04).
+   - `<user>-my-assistant` is a plain chat.
+   - `<user>-my-documents` is a RAG that runs as the persona: it answers from the persona's own uploads and the
+     Confluence sources of the persona's groups. This is the workflow of the live upload demo (amended 2026-11-05).
+6. **One UnifAI instance per cluster** (user decision of 2026-11-05, replacing the isolated `unifai-devel` sandbox of
+   2026-11-04). demo333 runs only `zuno-unifai`.
+   - The `unifai-devel` and `unifai-olm` stacks are retired. The fork sessions confirmed that nothing of theirs uses
+     them.
+   - Fork canaries and e2e tests already create and delete their own namespaces (`unifai-operator-canary`,
+     `unifai-e2e-<n>`).
+   - The OLM operator stays: namespace `unifai-operator`, its Subscription, and the CatalogSource
+     `openshift-marketplace/unifai-operator-catalog`. It reconciles `zuno-unifai`.
+   - The kinds that only the sandbox had examples of (tool, schedule, chat) now have per-team examples on the gateway
+     (point 4). The mock LLM, the demo MCP server and the `demo-*` objects are not migrated: the team examples replace
+     them.
 
 ## Consequences
 
@@ -50,3 +64,5 @@ templates in the catalog asked for a Gemini API key.
 - Team names are global in UnifAI identity. A team of the same name that a user created first is not taken over (UnifaiTeam
   semantics), and the chart's object reports it.
 - Points 3 to 5 depend on the operator release that carries ADR-0597. Points 1 and 2 do not.
+- A document uploaded in the personal workspace is not seen by a team workflow. The demo uploads in Personal and asks
+  `<user>-my-documents`.
