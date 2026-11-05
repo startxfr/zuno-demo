@@ -8,12 +8,32 @@
 # as "kueue-operator"; still discover catalog/channel from the
 # PackageManifest rather than hardcoding them, same pattern as
 # ansible/roles/jobset/tasks/install.yml.
+# zuno_kueue_channel is committed in ansible/clusters/<cluster>.yml.
+- name: "kueue | load this cluster's non-secret variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
 - name: "kueue | resolve the operator package"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
   vars:
     operator_package_name: "{{ kueue_package_name | default('kueue-operator') }}"
     operator_subscription_namespace: "openshift-kueue-operator"
     operator_package_catalog_hint: "kueue"
+    # Per-cluster channel pin (2026-11-04, operator update audit): empty keeps
+    # the discovery rule (stable, else the package's defaultChannel).
+    operator_preferred_channel: "{{ zuno_kueue_channel | default('stable', true) }}"
+
+# A pinned channel the catalog does not publish must not silently fall back to
+# the defaultChannel: that would cross a minor version nobody asked for.
+- name: "kueue | fail if the pinned channel is not published"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_kueue_channel={{ zuno_kueue_channel }} is not published by the package
+      (resolved channel: '{{ operator_package_channel }}'). Run
+      `make d3 check operators` to list the channels this catalog serves.
+  when:
+    - (zuno_kueue_channel | default('', true)) | length > 0
+    - not (operator_package_skip_d0 | bool)
+    - operator_package_channel != zuno_kueue_channel
 
 - name: "kueue | apply the kueue GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"

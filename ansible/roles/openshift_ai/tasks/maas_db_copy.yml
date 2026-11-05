@@ -1,0 +1,134 @@
+---
+# Keeps maas-controller's copy of maas-db-config in step with its source.
+#
+# The defect (live, demo333, 2026-11-04): the ModelsAsService operand runs
+# maas-api in redhat-ai-gateway-infra, and maas-controller copies the
+# maas-db-config Secret there from redhat-ods-applications (label
+# app.kubernetes.io/managed-by: maas-controller). The controller creates the
+# copy once and never updates it. The password rotation of 2026-11-03
+# (ADR-0595) rewrote the source through its ExternalSecret, the copy kept the
+# value of 2026-09-07, and maas-api crash-looped on "password authentication
+# failed for user maas" (SQLSTATE 28P01). Deleting the copy is not enough:
+# the controller did not recreate it within a minute, only after a restart.
+#
+# Mode (set by the caller):
+#   _oai_maas_db_copy_fix: false -> record a finding only (precheck)
+#   _oai_maas_db_copy_fix: true  -> delete the copy, restart maas-controller,
+#                                   wait for the new copy, restart maas-api
+#                                   (reconcile)
+#
+# Only hashes of the connection URL are compared, inside no_log tasks: the
+# values never reach the output. The task touches nothing when the copy is
+# absent (maas-controller has not created it yet) or already matches.
+
+- name: "openshift_ai | maas-db copy: read the source and the copy"
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: "{{ item }}"
+    name: maas-db-config
+  loop:
+    - "{{ openshift_ai_maas_db_source_namespace | default('redhat-ods-applications') }}"
+    - "{{ openshift_ai_maas_db_copy_namespace | default('redhat-ai-gateway-infra') }}"
+  register: _oai_maas_db_secrets
+  no_log: true
+
+- name: "openshift_ai | maas-db copy: compare the two connection URLs by hash"
+  ansible.builtin.set_fact:
+    _oai_maas_db_copy_stale: >-
+      {{ (_src | length) > 0 and (_dst | length) > 0
+         and ((_src | first).data.DB_CONNECTION_URL | default('') | hash('sha256'))
+             != ((_dst | first).data.DB_CONNECTION_URL | default('') | hash('sha256')) }}
+  vars:
+    _src: "{{ _oai_maas_db_secrets.results[0].resources | default([]) }}"
+    _dst: "{{ _oai_maas_db_secrets.results[1].resources | default([]) }}"
+  no_log: true
+
+- name: "openshift_ai | maas-db copy: record the stale copy"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
+  vars:
+    blocked_finding:
+      component: openshift-ai
+      resource: "Secret/maas-db-config ({{ openshift_ai_maas_db_copy_namespace | default('redhat-ai-gateway-infra') }})"
+      state: "differs from its source in {{ openshift_ai_maas_db_source_namespace | default('redhat-ods-applications') }}"
+      cause: "maas-controller copies maas-db-config once and never updates it, so a password rotation leaves maas-api with the old database password (SQLSTATE 28P01)"
+      solution: "Delete the copy, restart maas-controller so it recreates it, then restart maas-api"
+      auto_fix: "make d1 reconcile openshift-ai"
+  when:
+    - _oai_maas_db_copy_stale | bool
+    - not (_oai_maas_db_copy_fix | default(false) | bool)
+    - blocked_findings is defined
+
+- name: "openshift_ai | maas-db copy: resync the stale copy"
+  when:
+    - _oai_maas_db_copy_stale | bool
+    - _oai_maas_db_copy_fix | default(false) | bool
+  block:
+    - name: "openshift_ai | maas-db copy: delete the stale copy"
+      kubernetes.core.k8s:
+        api_version: v1
+        kind: Secret
+        namespace: "{{ openshift_ai_maas_db_copy_namespace | default('redhat-ai-gateway-infra') }}"
+        name: maas-db-config
+        state: absent
+
+    - name: "openshift_ai | maas-db copy: restart maas-controller so it recreates the copy"
+      kubernetes.core.k8s:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: "{{ openshift_ai_maas_db_source_namespace | default('redhat-ods-applications') }}"
+        name: maas-controller
+        merge_type: merge
+        definition:
+          spec:
+            template:
+              metadata:
+                annotations:
+                  kubectl.kubernetes.io/restartedAt: "{{ now(utc=true).isoformat() }}"
+
+    - name: "openshift_ai | maas-db copy: wait for the recreated copy to match its source"
+      kubernetes.core.k8s_info:
+        api_version: v1
+        kind: Secret
+        namespace: "{{ openshift_ai_maas_db_copy_namespace | default('redhat-ai-gateway-infra') }}"
+        name: maas-db-config
+      register: _oai_maas_db_new_copy
+      until: >-
+        (_oai_maas_db_new_copy.resources | default([]) | length) > 0
+        and ((_oai_maas_db_new_copy.resources | first).data.DB_CONNECTION_URL | default('') | hash('sha256'))
+            == ((_oai_maas_db_secrets.results[0].resources | first).data.DB_CONNECTION_URL | default('') | hash('sha256'))
+      retries: 24
+      delay: 10
+      no_log: true
+
+    - name: "openshift_ai | maas-db copy: restart maas-api on the new copy"
+      kubernetes.core.k8s:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: "{{ openshift_ai_maas_db_copy_namespace | default('redhat-ai-gateway-infra') }}"
+        name: maas-api
+        merge_type: merge
+        definition:
+          spec:
+            template:
+              metadata:
+                annotations:
+                  kubectl.kubernetes.io/restartedAt: "{{ now(utc=true).isoformat() }}"
+
+    - name: "openshift_ai | maas-db copy: wait for maas-api to roll out"
+      kubernetes.core.k8s_info:
+        api_version: apps/v1
+        kind: Deployment
+        namespace: "{{ openshift_ai_maas_db_copy_namespace | default('redhat-ai-gateway-infra') }}"
+        name: maas-api
+      register: _oai_maas_api_deploy
+      until: >-
+        (_oai_maas_api_deploy.resources | default([]) | length) > 0
+        and ((_oai_maas_api_deploy.resources | first).status.updatedReplicas | default(0))
+            == ((_oai_maas_api_deploy.resources | first).spec.replicas | default(1))
+        and ((_oai_maas_api_deploy.resources | first).status.availableReplicas | default(0))
+            == ((_oai_maas_api_deploy.resources | first).spec.replicas | default(1))
+        and ((_oai_maas_api_deploy.resources | first).status.replicas | default(0))
+            == ((_oai_maas_api_deploy.resources | first).spec.replicas | default(1))
+      retries: 30
+      delay: 10

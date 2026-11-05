@@ -31,11 +31,12 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
-| v0.9 | 9 | 4 | 8 | WP-145 |
+| v0.9 | 9 | 4 | 9 | WP-145, WP-195 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 16 | 26 | WP-173, WP-174 |
+| v0.11 | 24 | 15 | 26 | WP-173, WP-174 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
-| v0.13 | 9 | — | 12 | — |
+| v0.13 | 12 | 2 | 18 | WP-197, WP-198, WP-199, WP-200, WP-201 |
+| v0.14 | 3 | 3 | 7 | WP-204, WP-205, WP-206, WP-207, WP-208 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -893,6 +894,7 @@ being discovered by whoever tries the next install.
 |---|---|---|---|---|---|
 | WP-144 | [wp-144](work-packages/wp-144-olm-catalog-drop-tolerance.md) | 0558 | none | Done (2026-09-14 - shared discovery task adopted by the twelve exact-name roles, readiness probe P8 live-verified on demo222 reporting 13 frozen Subscriptions and naming openshift-operators as the namespace where they block others) | decide per operator whether to drop each of the 13 frozen Subscriptions (forfeits its update path) or wait for the catalog to publish again - P8 reports, deliberately does not repair |
 | WP-145 | [wp-145](work-packages/wp-145-fleet-version-and-catalog-policy.md) | 0559 | WP-144 | Not started | blocked on measuring demo333 at its next power-on (powered off, reported 4.22 but unverified) - that single read-only measurement decides whether additional CatalogSources are justified |
+| WP-195 | [wp-195](work-packages/wp-195-update-every-operator-on-demo333-through-the-repository.md) | 0559 | WP-145 | Operator pending | repo work done (operator update audit `make d3 check operators`, channel pins, RHOAI upgrade walk); live steps on demo333 one go each: GitOps 1.22.3, OCP 4.22.20, RHOAI 3.5.2, RHCL 1.5.0 (re-run the WP-177 counters probe), Kueue 1.5.0, RHOAI 3.6.0-ea.2 |
 
 ### Phase 44 — adopt UnifAI as the agent and RAG platform (added 2026-10-17)
 
@@ -987,6 +989,7 @@ WP-184 closes them together.
 | WP-191 | [wp-191](work-packages/wp-191-same-mcp-tools-in-the-three-experiences.md) | 0594, 0592 | WP-189, WP-190 | Done (2026-11-03) | the same read MCP tools (Confluence, technical docs) in the three experiences; signed classification markers on tool results, raised by the ai-gateway to local-only |
 | WP-192 | [wp-192](work-packages/wp-192-one-demo-password-and-named-keycloak-administrators.md) | 0595 | — | Done (2026-11-03) | one shared demo password through one variable per component; named `zuno-admin` and `zuno-automation` Keycloak accounts replace the temporary bootstrap admin |
 | WP-193 | [wp-193](work-packages/wp-193-open-webui-user-experience.md) | 0588, 0594 | WP-191 | Done (2026-11-03) | Open WebUI: one model shown as Zuno (the ai-gateway lists `auto` alone to experience clients), the tools on by default, the title as the only background task, a banner and Zuno suggestions |
+| WP-194 | [wp-194](work-packages/wp-194-zuno-code-model-for-experience-clients.md) | 0596, 0594, 0592 | WP-193, WP-189 | Done (2026-11-05) | "Zuno Code" in Open WebUI and OpenClaw: a declared model mapped to a `code` task, Codestral first and the local models as fallback; tool turns stay local (ADR-0594); agents release, generator, ai-gateway, both charts |
 
 ### Phase 47 — gaps left by the retirement of the old RAG stack (added 2026-11-02)
 
@@ -999,6 +1002,38 @@ the old stack. The comparison found three behaviours that the retirement dropped
 | WP-185 | [wp-185](work-packages/wp-185-retire-the-undeclared-sxa-legacy-domain-and-decide-its-restoration.md) | 0219, 0568 | none | Done (2026-11-02) | cleanup live in agents v0.9.0, ADR-0219 Deprecated, domain left dropped by decision; descriptor removed with agents v0.9.2; live question to comage answered without fallback (2026-11-03) |
 | WP-186 | [wp-186](work-packages/wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md) | 0109, 0568, 0205 | none | Done (2026-11-03) | records corrected; French run hit@1 0.80 (10 questions), accepted as is, no stemmer follow-up |
 | WP-187 | [wp-187](work-packages/wp-187-carry-the-source-classification-through-unifai-rag-results.md) | 0565, 0568, 0034 | none | Done (2026-11-03) | operator 0.1.50, the images and the source labels live on demo333; a Confluence result is C2 and a Red Hat result C1 through the mcp-gateway; ADR notes written |
+
+### Phase 48 — a ready UnifAI workspace for every persona (added 2026-11-04)
+
+consultant-01 logged into UnifAI and could do nothing: no team, no inventory, no workflow, and a RAG page reading 0. The
+operator first gains built-in resources (WP-197). The demo stack then gets business teams, a shared inventory, a catalog
+without keys and example workflows (WP-198), followed by personal starters (WP-199), a RAG shown live (WP-200) and the devel
+sandbox rewired (WP-201).
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-197 | [wp-197](work-packages/wp-197-declare-unifai-built-in-resources-through-the-operator.md) | 0597 | none | Repo work merged | live on demo333 with UnifAI 0.1.58 (2026-11-04): both built-ins promoted; browser check of the Built-in tab pending |
+| WP-198 | [wp-198](work-packages/wp-198-default-unifai-team-workspaces-shared-inventory-and-catalog.md) | 0598, 0597 | WP-197 (steps 3-4) | Repo work in review | teams, templates, built-ins and team examples live on demo333 (2026-11-04); browser check as consultant-01 and sale-01 pending |
+| WP-199 | [wp-199](work-packages/wp-199-personal-unifai-starters-for-the-demo-personas.md) | 0598 | WP-197, WP-198 | Repo work in review | starters Ready on demo333 (2026-11-04); personal RAG `<user>-my-documents` added 2026-11-05, install pending |
+| WP-200 | [wp-200](work-packages/wp-200-show-the-unifai-rag-working-live.md) | 0598 | WP-198 | Repo work in review | upload pipeline live (2026-11-05); the demo asks the personal `<user>-my-documents`, since a team workflow runs as the team; Confluence resync pending |
+| WP-201 | [wp-201](work-packages/wp-201-rewire-the-unifai-devel-sandbox-onto-the-gateway.md) | 0598 | WP-198 | Repo work merged | amended 2026-11-05: one instance; unifai-devel and unifai-olm retired, tool and schedule examples live in the team examples |
+
+### Phase 49 — Dify and kagent as experience clients (added 2026-11-04)
+
+Dify and kagent were proposed from an external integration guide whose install bypassed every gateway. WP-202 does the
+shared groundwork once (token proxy, namespaces, client lists). The Dify track (WP-203 spike, WP-204 install, WP-205
+knowledge adapter) and the Kubernetes tools track (WP-206 governed read tools, WP-207 kagent) then run in parallel, and
+WP-208 shows the five experiences together. No cluster action while demo333 is being upgraded (WP-195).
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-202 | [wp-202](work-packages/wp-202-common-preparation-for-dify-and-kagent.md) | 0601, 0599, 0600 | none | Done | none |
+| WP-203 | [wp-203](work-packages/wp-203-dify-preparation.md) | 0599, 0601 | WP-202 | Done | none |
+| WP-204 | [wp-204](work-packages/wp-204-install-dify-on-demo333.md) | 0599, 0601 | WP-202, WP-203 | Repo work in review | Vault seed before the Keycloak client push; `make d2 install dify` |
+| WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Not started | adapter build and roll; knowledge base registered in Dify |
+| WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Not started | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
+| WP-207 | [wp-207](work-packages/wp-207-kagent-preparation-and-install.md) | 0600, 0601 | WP-202, WP-206 | Not started | scratch spike in `zuno-kagent-scratch`; `make d2 install kagent` |
+| WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Not started | live rehearsal on demo333 |
 
 ### OKF stream phases
 
@@ -1144,6 +1179,11 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — WP-194 Done and ADR-0596 Implemented: on demo333, "Zuno Code" is served by Codestral from Open WebUI (consultant-01, 1.3 s) and OpenClaw (consultant-02, 2.2 s), and "Zuno" stays on the local qwen (130 s on the same question). The fallback with Codestral down is covered by unit tests only.
+- 2026-11-04 — ADR-0597, ADR-0598 and WP-197 to WP-201 added as phase 48: consultant-01 found an empty UnifAI (no team, no inventory, no workflow). The operator gains built-in resources, and the demo stack gets business teams next to the agent teams, a catalog without keys, a shared gateway, example workflows, persona starters and a RAG shown live.
+- 2026-11-04 — WP-195 added to phase 43: every Subscription on demo333 said `AtLatestKnown` while seven operators had newer versions (RHOAI and GitOps behind unapproved Manual InstallPlans, rhcl on a channel that stops at 1.4.3, authorino/limitador/dns pinned by rhcl, Kueue on a frozen channel). A report-only audit (`make d3 check operators`), per-cluster channel pins and an RHOAI upgrade walk land in the repo; the live updates follow one go at a time.
+- 2026-11-04 — ADR-0596 and WP-194 added to phase 46: a code question in Open WebUI and OpenClaw was always answered by the local qwen model, since the experience clients had no task preferring Codestral and showed `auto` alone. A declared "Zuno Code" model maps to a `code` task, Codestral first and the local models as fallback; turns with tool results stay local (ADR-0594).
+- 2026-11-04 — ADR-0406 Implemented: the cancel of a delegation that times out is proven live on UnifAI 0.1.57 (`a2a.timeout`, then `a2a.task_cancelled`; trace `54ebccfa482247d3ae41280e1dab4424`). A user abort is not covered, by decision. WP-174 stays open on approval (ADR-0409, waits for WP-173), the empty final reply (fix R-531 shipped in 0.1.56, not yet re-measured) and the turns where Arkos answers without delegating.
 - 2026-11-03 — WP-172 Done: delegated calls reach the mcp-gateway live on operator 0.1.53 and the audit carries the
   chain. WP-174 records the working Arkos to Tekos delegation (scenario 21 3/3, the cap of 3 delegations fired). The
   refusals hold, so ADR-0401 and ADR-0403 are Implemented. ADR-0406 stays Accepted: the cancellation of a delegation no

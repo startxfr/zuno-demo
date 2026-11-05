@@ -1,0 +1,55 @@
+# Sync wave 5, after the dify-helm resources (wave 0): nginx mounts the chart's dify-proxy ConfigMap,
+# and ArgoCD waits for each wave to be healthy before applying the next one.
+# nginx in front of api, web and plugin-daemon. The dify-helm one (proxy.enabled) fails under
+# restricted-v2: it writes /var/cache/nginx and /var/run as a user it cannot choose (WP-203
+# section 2). Same routing: the chart still renders its ConfigMap (dify-proxy) even with
+# proxy.enabled=false, so the paths cannot drift from the chart version. Port 8080, emptyDirs.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dify-nginx
+  labels: {app: dify-nginx}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: dify-nginx}
+  template:
+    metadata:
+      labels: {app: dify-nginx}
+    spec:
+      containers:
+        - name: nginx
+          image: {{ .Values.proxy.image }}
+          ports:
+            - {name: http, containerPort: 8080}
+          readinessProbe:
+            tcpSocket: {port: 8080}
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          volumeMounts:
+            - {name: conf, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true}
+            - {name: conf, mountPath: /etc/nginx/proxy.conf, subPath: proxy.conf, readOnly: true}
+            - {name: conf, mountPath: /etc/nginx/conf.d/default.conf, subPath: default.conf, readOnly: true}
+            - {name: cache, mountPath: /var/cache/nginx}
+            - {name: run, mountPath: /var/run/nginx}
+      volumes:
+        - name: conf
+          configMap: {name: dify-proxy}
+        - name: cache
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dify-nginx
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  selector: {app: dify-nginx}
+  ports:
+    - {name: http, port: 8080, targetPort: 8080}

@@ -626,6 +626,37 @@ def test_tempo_run_spans_is_empty_when_no_trace_matches_the_run():
     assert ut.tempo_run_spans("run-1", TEMPO, wait_seconds=0, client=_tempo_client([], [])) == []
 
 
+def test_tempo_run_trace_pads_the_trace_id_that_tempo_gave_without_its_leading_zero():
+    got = ut.tempo_run_trace("run-1", TEMPO, wait_seconds=0, client=_tempo_client([{"traceID": "t1"}], [_plain_span("mas.session")]))
+    assert got[0] == "t1".zfill(32) and len(got[0]) == 32 and [x["name"] for x in got[1]] == ["mas.session"]
+    assert ut.tempo_run_trace("run-1", TEMPO, wait_seconds=0, client=_tempo_client([], [])) == ("", [])
+
+
+def _chat(**attrs):
+    return {"name": "chat auto", "attrs": attrs}
+
+
+def test_model_calls_and_turn_summary_read_the_0158_tool_names():
+    spans = [
+        _chat(**{"mas.finish_reason": "tool_calls", "mas.content_chars": "0", "mas.tool_calls": "1",
+                 "mas.tool_names": "delegate_task,plan", "mas.called_tools": "plan"}),
+        _chat(**{"mas.finish_reason": "stop", "mas.content_chars": "1864", "mas.tool_calls": "0",
+                 "mas.tool_names": "delegate_task,plan", "mas.called_tools": ""}),
+        {"name": "mas.session", "attrs": {}},
+    ]
+    calls = ut.model_calls(spans)
+    assert [c["called"] for c in calls] == [["plan"], []] and calls[0]["offered"] == ["delegate_task", "plan"]
+    assert ut.offered_tool(spans) is True and ut.offered_tool(spans, "git_forge") is False
+    line = ut.turn_summary(spans)
+    assert "model_calls=2" in line and "tool_calls/0ch/plan" in line and "stop/1864ch/" in line and "delegate_task_offered=True" in line
+
+
+def test_offered_tool_is_unknown_before_the_tool_names_exist():
+    spans = [_chat(**{"mas.finish_reason": "tool_calls", "mas.content_chars": "0", "mas.tool_calls": "1"})]
+    assert ut.offered_tool(spans) is None
+    assert "delegate_task_offered=None" in ut.turn_summary(spans) and "1 call(s)" in ut.turn_summary(spans)
+
+
 def test_delegation_spans_report_success_and_a_failed_attempt_is_not_a_delegation():
     spans = [
         {"name": "mas.session", "attrs": {}},

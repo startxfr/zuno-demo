@@ -159,6 +159,11 @@ jobs:
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
           python3 -m pytest -q tests/test_rag_query.py
+      - name: zuno-token-proxy tests (ADR-0601)
+        working-directory: components/zuno-token-proxy
+        run: |
+          pip install -r requirements.txt
+          python3 tests/test_token_proxy.py
       - name: ai-gateway tests
         working-directory: components/ai-gateway
         run: |

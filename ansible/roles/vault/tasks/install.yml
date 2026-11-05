@@ -405,6 +405,14 @@
         username: mlflow
         password: "{{ zuno_admin_mlflow_postgresql_root_password |
           default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
+      dify/postgresql-app:
+        # One role owning Dify's two databases, dify and dify_plugin
+        # (ADR-0599/WP-204; WP-203 section 2). Letters/digits-only password:
+        # it is interpolated un-encoded into the database URI by the Dify chart's
+        # externalsecret. Same naming constraint as postgresql/app above.
+        username: dify
+        password: "{{ zuno_admin_dify_postgresql_root_password |
+          default(lookup('ansible.builtin.password', '/dev/null', length=24, chars=['ascii_letters', 'digits'])) }}"
       ogx/postgresql-app:
         # Dedicated database/role for the OGX-backed RAG provider
         # prototype's remote::pgvector vector I/O provider (ADR-0322 v0.1
@@ -904,6 +912,26 @@
   when: >-
     zuno_rag_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
     and zuno_rag_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
+  no_log: true
+
+# Dify's dedicated file storage bucket (ADR-0599, WP-204; user decision 2026-11-04).
+# Same four-field shape as aap/hub-s3 below; skipped while the placeholders are unset.
+- name: "vault | seed the Dify S3 config from ansible/confidential.yml"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _vault_root_token }} vault kv put zuno/dify/s3
+      bucketName={{ zuno_dify_s3_bucket_name | quote }}
+      region={{ zuno_dify_s3_region | quote }}
+      accessKeyId={{ zuno_dify_s3_access_key_id | quote }}
+      secretAccessKey={{ zuno_dify_s3_secret_access_key | quote }}"
+  when: >-
+    zuno_dify_s3_bucket_name | default('xxxxxx') != 'xxxxxx'
+    and zuno_dify_s3_region | default('xxxxxx') != 'xxxxxx'
+    and zuno_dify_s3_access_key_id | default('xxxxxx') != 'xxxxxx'
+    and zuno_dify_s3_secret_access_key | default('xxxxxx') != 'xxxxxx'
   no_log: true
 
 # AAP Hub's file_storage replacement (WP-075, gitops/charts/aap's hub.s3

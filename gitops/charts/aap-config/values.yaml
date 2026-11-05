@@ -114,18 +114,18 @@ jobTemplates:
     playbook: ansible/playbooks/day2_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, supply-chain]
+    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, supply-chain]
   - name: zuno-day2-build
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [mcp, mlops]
+    surveyComponents: [mcp, mlops, token-proxy]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day2-install
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw]
+    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent]
 
   - name: zuno-day3-test
     playbook: ansible/playbooks/day3_test.yml
@@ -355,12 +355,16 @@ workflowTemplates:
       # ADR-0574/WP-151: UnifAI stack (operator, UnifaiStack, CRs) after the
       # gateways - it consumes the ai-gateway, mcp-gateway and embeddings set up above.
       - id: unifai
-        successNodes: [open-webui, openclaw]
-      # ADR-0587 (WP-179): the experience clients, two independent branches
-      # so one track's failure never blocks the other.
+        successNodes: [open-webui, openclaw, dify, kagent]
+      # ADR-0587 (WP-179): the experience clients, independent branches
+      # so one track's failure never blocks the other (Dify and kagent: WP-202).
       - id: open-webui
         successNodes: []
       - id: openclaw
+        successNodes: []
+      - id: dify
+        successNodes: []
+      - id: kagent
         successNodes: []
   - name: zuno-day2-check-workflow
     jobTemplate: zuno-day2-check
@@ -388,11 +392,15 @@ workflowTemplates:
       - id: lightspeed-config
         successNodes: [unifai]
       - id: unifai
-        successNodes: [open-webui, openclaw, supply-chain]
+        successNodes: [open-webui, openclaw, dify, kagent, supply-chain]
       # ADR-0587 (WP-179): experience clients, independent leaves.
       - id: open-webui
         successNodes: []
       - id: openclaw
+        successNodes: []
+      - id: dify
+        successNodes: []
+      - id: kagent
         successNodes: []
       - id: supply-chain
         successNodes: []
@@ -404,6 +412,7 @@ workflowTemplates:
       # all launch in parallel as workflow roots.
       - {id: mcp, successNodes: []}
       - {id: mlops, successNodes: []}
+      - {id: token-proxy, successNodes: []}
 
   # WP-105/ADR-0536 Part B: the first Workflow Template that is NOT one
   # Job Template fanned out by target_component - each node names its OWN

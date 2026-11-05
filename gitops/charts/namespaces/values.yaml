@@ -55,6 +55,23 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
       zuno.io/experience-client: "true"
+  # ADR-0599/ADR-0600 (WP-202): Dify and kagent, same rules as zuno-openwebui.
+  # Neither forwards a user token: each reaches the gateways through its own
+  # zuno-token-proxy (ADR-0601), the only pod there holding a client secret.
+  - name: zuno-dify
+    displayName: Zuno Dify
+    description: Dify, the no-code workflow canvas experience (ADR-0599).
+    allowedFromNamespaces: []
+    extraLabels:
+      zuno.io/managed: "true"
+      zuno.io/experience-client: "true"
+  - name: zuno-kagent
+    displayName: Zuno kagent
+    description: kagent, the operations experience over governed Kubernetes read tools (ADR-0600).
+    allowedFromNamespaces: []
+    extraLabels:
+      zuno.io/managed: "true"
+      zuno.io/experience-client: "true"
   - name: zuno-auth
     displayName: Zuno Authentication
     description: Keycloak, the platform's central identity provider.
@@ -123,6 +140,9 @@ platformNamespaces:
       # their dedicated trillian database on the shared MariaDB (see
       # gitops/charts/mariadb/templates/database-rhtas-trillian.yaml).
       - zuno-rhtas
+      # ADR-0599/WP-204: Dify's api, worker, beat and plugin-daemon reach the dify and
+      # dify_plugin databases (gitops/charts/postgresql difyDatabase).
+      - zuno-dify
     # mariadb-operator's admission webhook (vmariadb-v1alpha1.kb.io etc.)
     # lives here and is called synchronously by the API server on every
     # MariaDB/Grant/User write - without this, the webhook call times out

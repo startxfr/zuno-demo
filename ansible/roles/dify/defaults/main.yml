@@ -1,0 +1,24 @@
+---
+dify_namespace: zuno-dify
+# ADR-0599 / user decision 2026-11-04: the dedicated S3 bucket comes from confidential.yml
+# (zuno_dify_s3_*, placeholders "xxxxxx" in confidential.example.yml); install fails clearly
+# while they are unset, because the chart has no other storage (the api PVC is ignored with S3).
+dify_s3_vars_required:
+  - zuno_dify_s3_bucket_name
+  - zuno_dify_s3_region
+  - zuno_dify_s3_access_key_id
+  - zuno_dify_s3_secret_access_key
+# Open PyPI in the EgressFirewall for the plugin install window (WP-203 section 3), then close
+# it again. `make d2 install dify` sets it on the first install and for a plugin upgrade; the
+# steady state is false.
+dify_plugin_install_window: false
+# The headers the token proxy sets (ADR-0601 decision 3): the experience name, the task, and the
+# data classification of each upstream (ADR-0594; same split as Open WebUI).
+dify_ai_headers:
+  X-Zuno-Agent: dify
+  X-Zuno-Task: chat
+  X-Zuno-Data-Classification: C1
+dify_mcp_headers:
+  X-Zuno-Agent: dify
+  X-Zuno-Task: chat
+  X-Zuno-Data-Classification: C2

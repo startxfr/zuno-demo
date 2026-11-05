@@ -151,3 +151,29 @@ no new tooling: after any catalog change, the five Subscriptions with an empty
 `status` must regain an `installedCSV`, the three Applications stuck
 `Progressing` must return to `Healthy`, and `oc get installplan -A` must show
 no new unapproved plan.
+
+## Amendment (2026-11-04, WP-195: per-cluster channel pins and the update audit)
+
+The demo333 measurement that WP-145 waited on was taken on 2026-11-04 (OCP
+4.22.8, `:v4.22` indexes): every Subscription was `AtLatestKnown`, yet seven
+operators had newer versions. None of them was missing from a catalog. They
+were held back by three other causes: Manual InstallPlans nobody approved,
+channels frozen at the value discovered at install time, and a dependency
+pinned by another CSV's `olm.package.required`. Clause 4 ("pin only where
+crossing a minor unattended is unacceptable") is therefore made concrete in
+three ways, as cluster data rather than branches:
+
+- a minor version is crossed only through a per-cluster variable in
+  `ansible/clusters/<cluster>.yml`: `zuno_openshift_ai_version` and
+  `zuno_openshift_ai_channel`, `zuno_connectivity_link_channel`,
+  `zuno_kueue_channel`. A pinned channel that the catalog does not publish
+  fails the run instead of falling back to the defaultChannel;
+- an installed RHOAI is walked up to its pin one InstallPlan at a time, and
+  never past it;
+- `make d3 check operators` (`platform/olm/audit_operator_updates.py`)
+  reports what can be updated and why OLM has not done it. It is
+  report-only, and its `--format known-good` output is the version set that
+  clause 4 asks for (`platform/olm/known-good-demo333.yaml`).
+
+The additional-CatalogSource path of clause 3 stays unneeded on 4.22: the
+`:v4.22` indexes serve every installed package.

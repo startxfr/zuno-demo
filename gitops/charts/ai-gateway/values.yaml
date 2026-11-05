@@ -205,8 +205,20 @@ experienceClients:
   - unifai
   - open-webui
   - "openclaw-*"
+  # ADR-0599/ADR-0600 (WP-202): through their zuno-token-proxy (ADR-0601).
+  - dify
+  - kagent
   - zuno-evaluations
   - zuno-stresstest
+
+# ADR-0593/ADR-0601 (WP-202): Keycloak clients whose tokens may carry the
+# hardcoded `persona` claim (an entry ending in `*` is a prefix). The quota and
+# the `user` label are then keyed by that persona. Rendered as
+# PERSONA_CLAIM_CLIENTS; the code default is `openclaw-*` alone.
+personaClaimClients:
+  - "openclaw-*"
+  - dify
+  - kagent
 
 # ADR-0104: opt-in semantic cache in the existing platform Redis
 # (gitops/charts/redis, zuno-auth namespace - same instance
@@ -283,3 +295,10 @@ toolMarker:
   failClosedClients:
     - open-webui
     - openclaw-*
+    - dify
+    - kagent
+  # ADR-0596 (WP-194): models an experience client may pick, each selecting one
+  # of its tasks declared in the agents release ("<model>=<task>:<name>"). The
+  # routing policy of that task picks the provider, never the model name.
+  modelTaskAliases:
+    - "zuno-code=code:Zuno Code"

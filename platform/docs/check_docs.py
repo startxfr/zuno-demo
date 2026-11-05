@@ -173,7 +173,8 @@ def _parse_makefile_lists() -> dict:
                  "DAY1_VERBS", "DAY1_RUN_COMPONENTS", "DAY1_BUILD_COMPONENTS",
                  "DAY2_VERBS", "DAY2_RUN_COMPONENTS", "DAY2_CHECK_ONLY_COMPONENTS",
                  "DAY2_BUILD_COMPONENTS",
-                 "DAY3_VERBS", "DAY3_TEST_COMPONENTS", "DAY3_BACKUP_COMPONENTS"):
+                 "DAY3_VERBS", "DAY3_TEST_COMPONENTS", "DAY3_BACKUP_COMPONENTS",
+                 "DAY3_CHECK_ONLY_COMPONENTS"):
         match = re.search(rf"^{name}\s*:=\s*(.*)$", text, re.MULTILINE)
         lists[name] = match.group(1).split() if match else []
     return lists
@@ -205,7 +206,12 @@ def _components_for(day: str, verb: str, lists: dict) -> List[str]:
             components = components + lists.get(
                 f"DAY{day[1]}_CHECK_ONLY_COMPONENTS", [])
         return components
-    return lists["DAY3_TEST_COMPONENTS"] + lists["DAY3_BACKUP_COMPONENTS"]
+    components = lists["DAY3_TEST_COMPONENTS"] + lists["DAY3_BACKUP_COMPONENTS"]
+    if verb == "check":
+        # `make d3 check <x>` also accepts the check-only components
+        # (lightspeed, mlflow, operators, ...), as the Makefile does.
+        components = components + lists.get("DAY3_CHECK_ONLY_COMPONENTS", [])
+    return components
 
 
 def _check_one_make_command(day: str, verb: str, component: str,
@@ -757,7 +763,8 @@ def _wp_governing_adrs(wp_path: pathlib.Path) -> List[str]:
 
 
 ADR_VERSIONS = ["v0", "v0.1", "v0.2", "v0.3", "v0.4", "v0.5", "v0.6",
-                "v0.7", "v0.8", "v0.9", "v0.10", "v0.11", "v0.12", "v0.13", "OKF v0.1"]
+                "v0.7", "v0.8", "v0.9", "v0.10", "v0.11", "v0.12", "v0.13", "v0.14",
+                "OKF v0.1"]
 WP_OPEN_EXCLUDED = {"done", "abandoned", "cancelled", "closed — deferred"}
 
 

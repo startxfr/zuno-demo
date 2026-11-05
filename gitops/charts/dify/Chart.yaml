@@ -1,0 +1,15 @@
+apiVersion: v2
+name: dify
+description: >-
+  Dify, the no-code LLM workflow canvas, as an experience client of the one
+  governed backend (ADR-0599, ADR-0587): the community dify-helm chart at a pinned
+  version and image digests, behind an oauth2-proxy front door, with models and
+  tools only through the zuno-token-proxy (ADR-0601), its metadata in
+  zuno-postgresql, its files in a dedicated S3 bucket and no vector store.
+type: application
+version: 0.1.0
+appVersion: "1.17.0"
+dependencies:
+  - name: dify
+    version: "0.39.0"
+    repository: "https://borispolonsky.github.io/dify-helm"

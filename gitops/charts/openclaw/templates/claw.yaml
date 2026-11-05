@@ -51,6 +51,9 @@ spec:
       credentialRef: zuno-ai
       models:
         - {name: auto, alias: zuno}
+        # ADR-0596 (WP-194): the ai-gateway routes zuno-code under the task
+        # `code`, Codestral first, local models as fallback.
+        - {name: zuno-code, alias: zuno-code}
   mcpServers:
     zuno:
       url: {{ $.Values.gateways.mcpUrl }}

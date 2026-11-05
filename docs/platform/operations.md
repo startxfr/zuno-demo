@@ -98,6 +98,10 @@ then `keycloak` and `zunoapp`. Traps seen on the way:
   AAP workloads, or the pods fail with `password authentication failed`.
 - Keycloak reads its database Secret at start: delete `zuno-0` after the role changed. Redis (`zuno-redis-master`) and the
   ai-gateway read theirs at start too: refresh both ExternalSecrets, restart Redis, then the ai-gateway.
+- maas-controller copies `maas-db-config` into `redhat-ai-gateway-infra` once and never updates it. Missed on 2026-11-03,
+  maas-api crash-looped the next morning on `password authentication failed for user "maas"`. `make d1 check openshift-ai`
+  reports the stale copy and `make d1 reconcile openshift-ai` resyncs it: it deletes the copy, restarts maas-controller (a
+  delete alone is not recreated), waits for the new copy to match its source, then restarts maas-api.
 
 Not rotated: the MariaDB users (`mlpipeline`, `mlops`, `trillian`) live on the simulated external instance `zuno-ext-sim/ext-mariadb`
 of the frozen WP-143 pilot, whose credentials are not ours (ADR-0352); `aap/admin` is an AAP console password, not a database.

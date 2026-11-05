@@ -1,0 +1,6 @@
+dependencies:
+- name: dify
+  repository: https://borispolonsky.github.io/dify-helm
+  version: 0.39.0
+digest: sha256:d0165b378d9fb81c2c37f23a3738a8f848dc4ccb04573d99cf513d263a4db71f
+generated: "2026-11-04T18:05:19.120098892+01:00"

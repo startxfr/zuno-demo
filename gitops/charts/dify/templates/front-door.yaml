@@ -1,0 +1,87 @@
+# Sync wave 5, after the dify-helm resources (wave 0): nginx mounts the chart's dify-proxy ConfigMap,
+# and ArgoCD waits for each wave to be healthy before applying the next one.
+# ADR-0599 decision 3 (as ADR-0590 for OpenClaw): Dify Community has no OIDC login, so
+# oauth2-proxy (realm zuno) is the only way in. Dify's own per-person account applies behind it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dify-front-door
+  labels: {app: dify-front-door}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: dify-front-door}
+  template:
+    metadata:
+      labels: {app: dify-front-door}
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: {{ .Values.frontDoor.image }}
+          args:
+            - --provider=oidc
+            - --oidc-issuer-url=https://keycloak.{{ .Values.global.zuno.clusterBaseDomain }}/realms/zuno
+            - --client-id={{ .Values.frontDoor.clientId }}
+            - --redirect-url=https://{{ .Values.global.zuno.routeHost }}/oauth2/callback
+            - --upstream=http://dify-nginx:8080
+            - --http-address=0.0.0.0:4180
+            - --email-domain=*
+            {{- range .Values.frontDoor.allowedGroups }}
+            - --allowed-group={{ . }}
+            {{- end }}
+            - --oidc-groups-claim=groups
+            - --scope=openid email profile
+            - --code-challenge-method=S256
+            - --reverse-proxy=true
+            - --skip-provider-button=true
+            - --cookie-name={{ .Values.frontDoor.cookieName }}
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+            # The console streams answers; oauth2-proxy must not buffer or cut them.
+            - --flush-interval=200ms
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: dify-front-door, key: client-secret}}
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom: {secretKeyRef: {name: dify-front-door, key: cookie-secret}}
+          ports:
+            - {name: http, containerPort: 4180}
+          readinessProbe:
+            httpGet: {path: /ping, port: 4180}
+          livenessProbe:
+            httpGet: {path: /ping, port: 4180}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dify-front-door
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  selector: {app: dify-front-door}
+  ports:
+    - {name: http, port: 4180, targetPort: 4180}
+---
+# ADR-0599 decision 8: one Route, TLS from the router's ACME wildcard certificate, held by
+# oauth2-proxy. Nothing else in the namespace has a Route.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: dify
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    haproxy.router.openshift.io/timeout: {{ .Values.route.timeout | quote }}
+spec:
+  host: {{ .Values.global.zuno.routeHost }}
+  to: {kind: Service, name: dify-front-door}
+  port: {targetPort: http}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

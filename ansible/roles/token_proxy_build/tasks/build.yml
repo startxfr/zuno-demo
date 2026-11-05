@@ -1,0 +1,37 @@
+---
+# ADR-0601/WP-202 "token-proxy" build component: builds components/zuno-token-proxy, the
+# first-party proxy that gives the Dify and kagent experience clients a refreshed
+# client-credentials token towards the ai-gateway and the mcp-gateway. Consumed by
+# gitops/charts/zuno-token-proxy as zuno-ai-build/zuno-token-proxy:latest.
+- name: "token_proxy_build | build zuno-token-proxy"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: zuno-token-proxy
+    build_dockerfile_path: components/zuno-token-proxy/Dockerfile
+    build_context_dir: "."
+
+# Pull access for the proxy's own ServiceAccount only, in each client namespace (not every
+# ServiceAccount there, as the shared grant of apply_openshift_build.yml does: those namespaces
+# also run third-party pods that have no business with zuno-ai-build).
+- name: "token_proxy_build | grant the zuno-token-proxy ServiceAccounts image-pull access"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: "zuno-token-proxy-image-puller-{{ ns }}"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      subjects:
+        - kind: ServiceAccount
+          name: zuno-token-proxy
+          namespace: "{{ ns }}"
+      roleRef:
+        kind: ClusterRole
+        name: system:image-puller
+        apiGroup: rbac.authorization.k8s.io
+  loop: "{{ zuno_token_proxy_namespaces }}"
+  loop_control:
+    loop_var: ns

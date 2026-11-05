@@ -1,0 +1,63 @@
+# ADR-0601 decision 6. Ingress: only pods of this namespace (optionally narrowed by
+# clientPodSelector), plus the monitoring stack for /metrics. Egress: DNS, the gateways'
+# namespace (their own NetworkPolicies admit this namespace by its experience-client label),
+# and HTTPS outside the cluster networks for the Keycloak Route, as in the open-webui chart:
+# the client's EgressFirewall narrows it to Keycloak's DNS name (NetworkPolicies cannot).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zuno-token-proxy
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: zuno-token-proxy
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            {{- if .Values.clientPodSelector }}
+            matchLabels:
+              {{- toYaml .Values.clientPodSelector | nindent 14 }}
+            {{- else }}
+            {}
+            {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              network.openshift.io/policy-group: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.egress.gatewayNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.egress.gatewayPort }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml .Values.egress.clusterCIDRs | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 443
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353

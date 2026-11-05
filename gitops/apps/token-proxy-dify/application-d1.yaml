@@ -1,0 +1,40 @@
+# ADR-0601 (WP-204): the zuno-token-proxy instance of Dify, in zuno-dify. One Application per
+# experience client (the kagent instance is its own file, WP-207). The role
+# (ansible/roles/dify) passes the values: client, headers and egress networks.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-token-proxy-dify-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-58"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/zuno-token-proxy
+    helm:
+      releaseName: zuno-token-proxy-dify-d1
+      values: |
+        namespace: zuno-dify
+        clientId: dify
+        clusterBaseDomain: apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-dify
+  ignoreDifferences:
+    # image.openshift.io/triggers (the chart's Deployment annotation) rewrites the container image
+    # to the built digest each time the ImageStream moves; without this ArgoCD reverts it to
+    # :latest and the two fight forever (seen live: Deployment generation 46 in 25 minutes).
+    # Same pattern as the ai-gateway Application (ADR-0059).
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/template/spec/containers/0/image
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

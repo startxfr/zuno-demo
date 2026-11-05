@@ -261,6 +261,10 @@ no backup by itself - PGO waits for the annotation's value to change.
     - name: {{ .Values.mlflowDatabase.owner }}
       databases:
         - {{ .Values.mlflowDatabase.name }}
+    - name: {{ .Values.difyDatabase.owner }}
+      databases:
+        - {{ .Values.difyDatabase.name }}
+        - {{ .Values.difyDatabase.pluginName }}
     - name: {{ .Values.ogxDatabase.owner }}
       databases:
         - {{ .Values.ogxDatabase.name }}

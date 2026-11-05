@@ -266,6 +266,17 @@ owns a model key, a guardrail or a knowledge store.
 
 **9 ADRs: 8 `Implemented` (ADR-0587, ADR-0588, ADR-0590, ADR-0591, ADR-0592, ADR-0593, ADR-0594, ADR-0595), ADR-0589 superseded in part by ADR-0590.** No open ADRs or work packages.
 
+## v0.14
+
+Two more experiences on the same governed chain. Dify gives business users a
+no-code workflow canvas; kagent gives the operations team Kubernetes-native
+agents. Neither owns a model key, a knowledge store or a cluster credential:
+Dify's knowledge node goes through an adapter over the mcp-gateway, kagent's
+cluster reading becomes governed mcp-gateway read tools that every experience
+can use, and a first-party token proxy gives both a refreshed Keycloak token.
+
+**3 ADRs, all `Proposed` (ADR-0599, ADR-0600, ADR-0601).** Open work packages: WP-204 to WP-208.
+
 ## OKF stream
 
 A standalone version line for the Open Knowledge Format initiative, decoupled

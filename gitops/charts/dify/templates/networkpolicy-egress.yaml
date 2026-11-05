@@ -1,0 +1,42 @@
+# ADR-0599: egress of the Dify pods. In the cluster: DNS, the namespace itself (the token proxy,
+# Redis, the pods between them) and zuno-postgresql in zuno-data. Outside it: HTTPS, narrowed by
+# the EgressFirewall (templates/egressfirewall.yaml); NetworkPolicies cannot name a DNS name.
+# The model and tool gateways are reached through the zuno-token-proxy only, which has its own
+# egress policy (gitops/charts/zuno-token-proxy), so Dify holds no route to them.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dify-egress
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+      ports:
+        - protocol: UDP
+          port: 5353
+        - protocol: TCP
+          port: 5353
+    - to:
+        - podSelector: {}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.egress.databaseNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.egress.databasePort }}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              {{- toYaml .Values.egress.clusterCIDRs | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 443

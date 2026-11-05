@@ -1,0 +1,5 @@
+---
+# ADR-0601: the experience-client namespaces that run a zuno-token-proxy.
+zuno_token_proxy_namespaces:
+  - zuno-dify
+  - zuno-kagent

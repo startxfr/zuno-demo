@@ -1,0 +1,76 @@
+---
+# `make d3 check operators`: which OLM operators of the cluster can be
+# updated, and how (platform/olm/audit_operator_updates.py). Read-only and
+# report-only: an available update is information, not a failure, so a vendor
+# shipping a patch never turns `make d3 check` red. Only an audit that cannot
+# run (exit 2) fails this check.
+#
+# Why it exists (demo333, 2026-11-04): every Subscription said
+# `AtLatestKnown`, yet seven operators had newer versions. Two were waiting
+# for a Manual InstallPlan (RHOAI, GitOps), rhcl sat at the head of a channel
+# that stopped at 1.4.3, and authorino/limitador/dns were pinned by rhcl's
+# `olm.package.required`. See ADR-0558 for the vanished-package case and
+# WP-145 for the known-good set (`platform/olm/known-good-<cluster>.yaml`).
+- name: "operators | read the Subscriptions"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+  register: _operators_subs
+
+- name: "operators | read the installed CSVs"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ item.metadata.namespace }}"
+    name: "{{ item.status.installedCSV }}"
+  loop: "{{ _operators_subs.resources | selectattr('status.installedCSV', 'defined') | list }}"
+  loop_control:
+    label: "{{ item.metadata.namespace }}/{{ item.status.installedCSV }}"
+  register: _operators_csvs
+
+- name: "operators | read the PackageManifests"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+  register: _operators_pms
+
+- name: "operators | read the InstallPlans"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+  register: _operators_ips
+
+- name: "operators | audit the available updates"
+  ansible.builtin.command:
+    argv: ["python3", "{{ zuno_repo_root }}/platform/olm/audit_operator_updates.py"]
+    stdin: >-
+      {{ {'subscriptions': _operators_subs.resources,
+          'csvs': (_operators_csvs.results | map(attribute='resources') | flatten),
+          'packagemanifests': _operators_pms.resources,
+          'installplans': _operators_ips.resources} | to_json }}
+  register: _operators_audit
+  changed_when: false
+  failed_when: _operators_audit.rc not in [0, 1]
+
+- name: "operators | report"
+  ansible.builtin.debug:
+    msg: "{{ _operators_audit.stdout_lines }}"
+
+- name: "operators | record state"
+  ansible.builtin.set_fact:
+    _state_is_installed: true
+
+- name: "operators | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+- name: "operators | record the audit summary"
+  ansible.builtin.lineinfile:
+    path: "{{ state_report_file }}"
+    line: >-
+      operators: {{ 'every operator is at the head of its channel'
+                    if _operators_audit.rc == 0
+                    else (_operators_audit.stdout_lines | select('match', '^UPDATE') | list | length | string)
+                         ~ ' operator(s) can be updated - see the report above' }}
+    create: true
+    mode: "0644"

@@ -250,11 +250,12 @@ def test_auto_is_named_zuno() -> None:
     assert all(m.get("name") is None for m in data[1:])
 
 
-def test_an_experience_client_only_gets_auto() -> None:
-    # WP-193: routing ignores the model name, so an experience client's menu offers auto alone.
+def test_an_experience_client_gets_auto_and_the_declared_task_models() -> None:
+    # WP-193: routing ignores provider names, so an experience client's menu offers auto;
+    # ADR-0596 (WP-194): plus the declared models that select a task, Zuno Code by default.
     for client in ("open-webui", "openclaw-sale-01"):
         identity = CallerIdentity(sub="u", groups=["consultant"], raw_claims={"azp": client}, token="t")
         data = _models(identity=identity).json()["data"]
-        assert [(m["id"], m["name"]) for m in data] == [("auto", "Zuno")], client
+        assert [(m["id"], m["name"]) for m in data] == [("auto", "Zuno"), ("zuno-code", "Zuno Code")], client
     unifai = CallerIdentity(sub="u", groups=["consultant"], raw_claims={"azp": "unifai"}, token="t")
     assert [m["id"] for m in _models(identity=unifai).json()["data"]] == ["auto", "model-a", "model-b"]

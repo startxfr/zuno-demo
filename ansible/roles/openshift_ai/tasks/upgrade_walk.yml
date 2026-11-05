@@ -1,0 +1,41 @@
+---
+# Walk an INSTALLED rhods-operator up to the pinned version, one InstallPlan at
+# a time (2026-11-04, operator update audit). Included by install.yml only when
+# the Subscription already has an installedCSV that differs from the pin.
+#
+# Why: install.yml approves only an InstallPlan whose CSV equals the pinned
+# startingCSV. That is right for a first install, but OLM upgrades along the
+# channel's replaces chain: from 3.5.0 with a 3.5.2 pin it first offers 3.5.1
+# (demo333 had InstallPlan install-q6xqx for 3.5.1 pending since 2026-09-29),
+# so the exact-match check refused every upgrade and `make d1 install
+# openshift-ai` failed with "CSV drift" as soon as a z-stream shipped.
+#
+# The walk keeps the property Manual approval exists for: it approves a hop
+# only when its single CSV is rhods-operator.<v> with
+#   installed < v <= pin   (semver; 3.6.0-ea.2 sorts before 3.6.0)
+# and never anything past the pin. OLM does not downgrade: a pin lower than
+# the installed version fails here with a clear message.
+- name: "openshift_ai | upgrade walk: the pin must not be below the installed version"
+  ansible.builtin.fail:
+    msg: >-
+      rhods-operator {{ _oai_walk_installed }} is installed and the pin is
+      {{ _openshift_ai_version }}. OLM never downgrades an operator; set
+      zuno_openshift_ai_version to {{ _oai_walk_installed }} or higher.
+  vars:
+    _oai_walk_installed: "{{ _oai_walk_sub.status.installedCSV | regex_replace('^rhods-operator\\.v?', '') }}"
+  when: _oai_walk_installed is version(_openshift_ai_version | regex_replace('^v', ''), '>', version_type='semver')
+
+- name: "openshift_ai | upgrade walk: approve one hop at a time (at most {{ openshift_ai_upgrade_max_hops | default(6) }})"
+  ansible.builtin.include_tasks: upgrade_walk_hop.yml
+  loop: "{{ range(openshift_ai_upgrade_max_hops | default(6) | int) | list }}"
+  loop_control:
+    loop_var: _oai_walk_hop
+
+- name: "openshift_ai | upgrade walk: fail if the pin was not reached"
+  ansible.builtin.fail:
+    msg: >-
+      rhods-operator did not reach {{ _openshift_ai_version }} after
+      {{ openshift_ai_upgrade_max_hops | default(6) }} hops (installed:
+      {{ _oai_walk_now | default('unknown') }}). Run `make d3 check operators`
+      and check the Subscription's conditions.
+  when: not (_oai_walk_done | default(false) | bool)

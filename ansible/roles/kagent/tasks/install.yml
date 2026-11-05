@@ -1,0 +1,6 @@
+---
+# Stub (WP-202): WP-207 replaces this file. A no-op, never a failure, so a full
+# `make d2 install` stays green until the kagent track lands.
+- name: "kagent | not implemented yet"
+  ansible.builtin.debug:
+    msg: "kagent is declared but not implemented yet (WP-207, ADR-0600); nothing was applied."

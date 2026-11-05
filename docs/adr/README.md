@@ -306,7 +306,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md) | Implemented | Introduce agent-to-agent delegation limited to the targets an agent declares |
 | [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Accepted | Adopt A2A as the inter-agent protocol |
 | [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) | Implemented | Propagate the user's identity and the delegation chain across agent-to-agent calls |
-| [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Accepted | Limit agent delegation by depth, cycle and budget |
+| [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Implemented | Limit agent delegation by depth, cycle and budget |
 | [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Accepted | Introduce human approval for delegated operations, resumable from persisted checkpoints |
 | [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md) | Implemented | Keep the ai-gateway as the policy router in front of UnifAI |
 | [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Accepted | Adopt UnifAI as the agent platform |
@@ -354,6 +354,17 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0593](0593-key-the-per-user-quota-and-telemetry-by-persona-across-experiences.md) | Implemented | Key the per-user quota and telemetry by persona across experiences |
 | [ADR-0594](0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md) | Implemented | Give the three experiences the same MCP tools behind signed classification markers |
 | [ADR-0595](0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md) | Implemented | Set demo passwords from one shared value through one variable per component |
+| [ADR-0596](0596-let-experience-clients-pick-a-declared-code-model-routed-to-codestral-first.md) | Implemented | Let experience clients pick a declared code model, routed to Codestral first |
+| [ADR-0597](0597-declare-unifai-built-in-resources-through-the-operator.md) | Proposed | Declare UnifAI built-in resources through the operator |
+| [ADR-0598](0598-give-every-persona-default-unifai-team-workspaces-and-a-shared-catalog.md) | Proposed | Give every persona default UnifAI team workspaces and a shared catalog |
+
+## v0.14
+
+| ADR | Status | Decision |
+|---|---|---|
+| [ADR-0599](0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md) | Proposed | Serve a no-code workflow canvas with Dify as an experience client |
+| [ADR-0600](0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md) | Proposed | Govern Kubernetes read tools in the mcp-gateway and admit kagent as a thin operations client |
+| [ADR-0601](0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md) | Proposed | Inject client-credentials tokens for experience clients without OIDC passthrough |
 
 ## OKF v0.1
 

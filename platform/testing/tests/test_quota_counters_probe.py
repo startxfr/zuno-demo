@@ -29,6 +29,9 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(probe.family("standard-user"), "user")
         self.assertEqual(probe.family("standard-group"), "group")
         self.assertEqual(probe.family(SUB), "subscription")
+        # RHOAI 3.5.2 naming (WP-195).
+        self.assertEqual(probe.family("tokens-1000000-per-1h"), "subscription")
+        self.assertEqual(probe.family("tokens-per-day"), "other")
         self.assertEqual(probe.family("l1"), "other")
 
     def test_only_the_subscription_moved(self) -> None:

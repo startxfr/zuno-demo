@@ -13,6 +13,9 @@
     zuno_day: d2
     day2_components:
       # ADR-0587 (WP-179): experience clients first, they consume the rest.
+      # ADR-0599/ADR-0600 (WP-202): Dify and kagent first, like the other experience clients.
+      - kagent
+      - dify
       - openclaw
       - open_webui
       - unifai

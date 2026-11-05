@@ -9,6 +9,33 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition (2026-11-04) - new band v0.14, ADR-0599 to ADR-0601
+
+Dify (a no-code workflow canvas) and kagent (a Kubernetes agent operator) were
+proposed as two more experiences. ADR-0599 admits Dify under ADR-0587, with
+knowledge through an External Knowledge adapter over the mcp-gateway. ADR-0600
+turns kagent's value, reading the cluster, into governed mcp-gateway
+capabilities and admits kagent as a thin client over them; ADR-0587 clause 4
+gets a correction note. ADR-0601 adds the token proxy both need, since neither
+can forward a user token.
+
+## Addition (2026-11-04) - ADR-0597 and ADR-0598 join v0.13
+
+consultant-01 found an empty UnifAI: no team, no inventory, no workflow. The
+gateway LLM and MCP provider were in ai-ops-01's personal workspace, the only
+teams were those of the agent bundles, and the catalog asked for a Gemini key.
+ADR-0597 lets the operator declare UnifAI built-in resources; ADR-0598 gives
+every persona a team per business group next to the agent teams, a catalog
+without keys, example workflows and starters.
+
+## Addition (2026-11-04) - ADR-0596 joins v0.13
+
+A code question asked in Open WebUI and OpenClaw was always answered by the
+local qwen model: the ai-gateway never routes on the question, and the
+experience clients had no task preferring Codestral. ADR-0596 adds a declared
+"Zuno Code" model that maps to a `code` task, Codestral first and the local
+models as fallback, with ADR-0594's local-only rule unchanged.
+
 ## Addition (2026-11-02) - ADR-0592 joins v0.13
 
 Open WebUI and OpenClaw need tools under a logical agent name, but an agent in

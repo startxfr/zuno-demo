@@ -48,8 +48,12 @@ flowchart LR
 3. **Same backend.** On the dashboard, row *Same backend, three experiences*: one series per experience (`unifai`,
    `open-webui`, `openclaw-sale-01`) for calls, tokens, cost and guardrail evaluations - one gateway counted them all.
 4. **Same routing.** Row *Same models, same routing*, table *Which provider served each experience*: the provider is
-   chosen by the request's data classification, not by the UI. Open WebUI shows a single model, "Zuno", with a banner saying
-   so, and its tools are on in every new chat (WP-193).
+   chosen by the request's data classification, not by the UI. Open WebUI shows two models, "Zuno" and "Zuno Code", with a
+   banner saying so, and its tools are on in every new chat (WP-193). "Zuno" keeps local models first. "Zuno Code" sends a
+   code question without tools to Mistral Codestral, and falls back to a local model if Codestral fails. A turn that
+   carries a tool result stays local (ADR-0594, ADR-0596). OpenClaw offers the same pair (`zuno`, `zuno-code`). Ask "write
+   Python code that checks the format of an email address" with each model: the table shows `mistral-codestral` for
+   "Zuno Code" and `local-maas` for "Zuno".
 5. **Resilience, the same for all.** Table *Candidates skipped for availability*: when local models are not ready, every
    experience skips them (`not_ready`) instead of waiting; a local-only task gets an immediate refusal, never a SaaS
    answer. Before ADR-0591 the same situation cost each experience up to fifteen minutes.

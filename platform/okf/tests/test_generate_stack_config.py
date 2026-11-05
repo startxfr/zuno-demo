@@ -259,6 +259,36 @@ class ModelRoutingTest(MaasSubscriptionsTest):
             {"agent": "alpha", "task": "two", "exclude": ["local-secret-maas"]},
         ])
 
+    def client(self, name, tasks) -> None:
+        client = self.dir / "experience-clients" / name
+        (client / "tasks").mkdir(parents=True)
+        (client / "client.okf.md").write_text("---\n" + yaml.safe_dump({
+            "okf_version": "v0.3", "type": "experience-client", "title": name,
+            "zuno": {"name": name, "tasks": list(tasks), "classification": "C2",
+                     "access": {"groups": ["sales"]}}}) + "---\n")
+        for task, task_models in tasks.items():
+            tz = {"allowed_tools": []}
+            if task_models:
+                tz["models"] = task_models
+            (client / "tasks" / f"{task}.md").write_text("---\n" + yaml.safe_dump(
+                {"okf_version": "v0.3", "type": "task", "title": task, "zuno": tz}) + "---\n")
+
+    def test_experience_client_task_roles_get_an_entry_after_the_agents(self) -> None:
+        """ADR-0596: a client's `code` task prefers its role; `chat` without roles gets no entry."""
+        self.agent("alpha", ["agent_alpha"], tasks={"one": {"preferred": ["default"]}})
+        self.client("open-webui", {"chat": None, "code": {"preferred": ["general-external"]}})
+        self.assertEqual(self.routing()["preferences"], [
+            {"agent": "alpha", "task": "one", "prefer": ["local-small-maas"]},
+            {"agent": "open-webui", "task": "code", "prefer": ["saas-one"]},
+        ])
+
+    def test_experience_client_task_reorders_a_corp_entry_without_strict(self) -> None:
+        self.corp({"preferences": [{"agent": "openclaw", "task": "code",
+                                    "prefer": ["local-big-maas", "local-big", "saas-one"]}]})
+        self.client("openclaw", {"code": {"preferred": ["general-external"]}})
+        self.assertEqual(self.routing()["preferences"], [
+            {"agent": "openclaw", "task": "code", "prefer": ["saas-one", "local-big-maas", "local-big"]}])
+
     def test_render_model_routing_golden(self) -> None:
         self.corp({"adapters": [], "preferences": [{"agent": "alpha", "task": "one", "prefer": ["local-big"]}]})
         self.agent("alpha", ["agent_alpha"])

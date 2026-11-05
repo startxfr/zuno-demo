@@ -12,24 +12,12 @@ metadata:
     argocd.argoproj.io/sync-wave: "10"
 spec:
   owner: {{ $owner }}
+  {{- if .Values.gatewayLLM.builtin }}
+  builtin: true
+  {{- end }}
   type: openai_compatible
   config:
-    model_name: auto
-    base_url: {{ .Values.gatewayLLM.baseUrl }}
-    api_key: EMPTY
-    forward_user_token: true
-    {{- with .Values.gatewayLLM.timeoutSeconds }}
-    timeout_seconds: {{ . }}
-    {{- end }}
-    default_headers:
-      X-Zuno-Run-Id: "{session_id}"
-    {{- if .Values.gatewayLLM.routingLookup }}
-    # The message carries why this model answered (class, provider, model,
-    # fallback): the multiagent backend asks the gateway after the call, with
-    # the caller's identity (WP-148). Needs a multiagent image with the option.
-    request_id_header: X-Zuno-Request-Id
-    metadata_lookup_url: {{ .Values.gatewayLLM.baseUrl }}/routing-decisions/{request_id}
-    {{- end }}
+    {{- include "unifai.gatewayLLMConfig" . | nindent 4 }}
 ---
 {{- end }}
 {{- if .Values.mcpGateway.enabled }}
@@ -43,14 +31,46 @@ metadata:
     argocd.argoproj.io/sync-wave: "10"
 spec:
   owner: {{ $owner }}
+  {{- if .Values.mcpGateway.builtin }}
+  builtin: true
+  {{- end }}
   type: mcp_server
   config:
-    mcp_url: {{ .Values.mcpGateway.url }}
-    transport_type: "streamable http"
-    auth_method: forward_user_token
-    additional_headers:
-      X-Zuno-Run-Id: "{session_id}"
+    {{- include "unifai.mcpGatewayConfig" . | nindent 4 }}
 ---
+{{- end }}
+{{- range .Values.teams }}
+# ADR-0598: a default team workspace for a business group of the realm.
+apiVersion: unifai.startx.fr/v1alpha1
+kind: UnifaiTeam
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  owner: {{ $owner }}
+  members:
+    {{- range .groups }}
+    - {type: group, id: {{ . | quote }}}
+    {{- end }}
+---
+{{- end }}
+{{- if .Values.templates.enabled }}
+{{- include "unifai.templates" (dict "root" . "owner" $owner) }}
+{{- end }}
+{{- if and (or .Values.teamExamples.enabled .Values.personalStarters) (not (and .Values.gatewayLLM.builtin .Values.mcpGateway.builtin)) }}
+{{- fail "teamExamples and personalStarters need gatewayLLM.builtin and mcpGateway.builtin (ADR-0597, UnifAI >= 0.1.58)" }}
+{{- end }}
+{{- if .Values.teamExamples.enabled }}
+{{- range .Values.teams }}
+{{- if .examples }}
+{{ include "unifai.teamExamples" (dict "root" $ "owner" $owner "team" .name) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range .Values.personalStarters }}
+{{ include "unifai.personalStarter" (dict "root" $ "user" .) }}
 {{- end }}
 {{- if and .Values.okf.bundles .Values.okf.verify.keyless .Values.okf.trustedRoot }}
 # ADR-0578: the Sigstore trusted root keyless bundles are verified against
@@ -217,6 +237,10 @@ spec:
   {{- end }}
   {{- with .syncInterval }}
   syncInterval: {{ . }}
+  {{- end }}
+  {{- with .resyncToken }}
+  # WP-200: any new value queues a sync at once (unifai-operator spec.resyncToken).
+  resyncToken: {{ . | quote }}
   {{- end }}
 ---
 {{- end }}

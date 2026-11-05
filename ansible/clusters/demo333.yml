@@ -107,6 +107,29 @@ zuno_unifai_released_bundles_exclude: []
 zuno_unifai_values:
   gatewayLLM:
     timeoutSeconds: 200
+    # ADR-0597 (UnifAI >= 0.1.58): public built-ins, seen by every user and
+    # team. Cannot be turned off again: withdraw by deleting the object.
+    builtin: true
+  mcpGateway:
+    builtin: true
+  # ADR-0598: one team workspace per business group of the zuno realm (the
+  # agent-<bundle> teams come from the bundles). ops gathers the two ops groups.
+  teams:
+  - {name: consultant, groups: [consultant], examples: true}
+  - {name: sales, groups: [sales], examples: true}
+  - {name: adv, groups: [adv], examples: true}
+  - {name: finance, groups: [finance], examples: true}
+  - {name: board, groups: [board], examples: true}
+  - {name: recrut, groups: [recrut], examples: true}
+  - {name: cdp, groups: [cdp]}
+  - {name: ops, groups: [ocp-ai-ops, ocp-paas-ops], examples: true}
+  templates:
+    enabled: true
+  # ADR-0598 points 4-5: example components and workflows in the teams marked
+  # `examples` (cdp has no persona), and a starter in these personal workspaces.
+  teamExamples:
+    enabled: true
+  personalStarters: [consultant-01, sale-01, ai-ops-01]
   ragSources:
   - aclGroups:
     - consultant/confluence-archi-satellite
@@ -216,11 +239,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:18c16c87b722bdb7a90102b5429366c38d10d35058b889987a4903e01658e744  # v0.1.54 (first unified release; same code as devel-851331422)
-      identity: quay.io/zuno/unifai-identity@sha256:5c1a127e7613ceaa7da19eda33f75b767df40254a97b7978bb0e2179a2c02b55  # v0.1.54 (first unified release; same code as devel-851331422)
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:5dc6defef1cba0f61391a0f30932bc83f619b0527fdf83570d02979f152e5148  # v0.1.54 (first unified release; same code as devel-851331422)
-      rag: quay.io/zuno/unifai-rag@sha256:17307b19d6c33c48b64af8158f250f3df84027c9f9a46a5ef011ac491d8139fa  # v0.1.54 (first unified release; same code as devel-851331422)
-      ui: quay.io/zuno/unifai-ui@sha256:235b62cd3b0c51c83df3c40432026d70135eee74216bc152e58fee296d4187b1  # v0.1.54 (first unified release; same code as devel-851331422)
+      backend: quay.io/zuno/unifai-backend@sha256:0286e6fbf7423895818d8e52f7f2afa3c8750335399e32586a64b239cc4e2c7d  # v0.1.58
+      identity: quay.io/zuno/unifai-identity@sha256:af34d193bd20bfea817be2fdcc17aa56a7516da87f78c63111b7416e11f61649  # v0.1.58
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:0b8ea86fd9cfae551d1dcc8d2bb2f038db2f6016a286ba085cda97642993be8c  # v0.1.58
+      rag: quay.io/zuno/unifai-rag@sha256:5831227d9c5338686bf90cc7a6b8600c614b1d60ef3e3f050a3a9a5ff7b64b69  # v0.1.58
+      ui: quay.io/zuno/unifai-ui@sha256:99c64954b932e87868b4fc023b5ed54b934747eee3d1a2c489fbc93fbba3ed0e  # v0.1.58
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:
@@ -314,3 +337,15 @@ zuno_connectivity_link_token_rate_limits:
   attachment: defaults
   gatewayIdentity:
     username: system:serviceaccount:zuno-ai-run:ai-gateway
+# WP-195 step 3 (2026-11-04): RHOAI pinned to the head of stable-3.5. From an
+# installed 3.5.0, `make d1 install openshift-ai` walks 3.5.1 then 3.5.2
+# (upgrade_walk.yml), approving no InstallPlan past this pin.
+zuno_openshift_ai_version: "3.5.2"
+# WP-195 step 4a (2026-11-04): rhcl 1.4.3 -> 1.4.4 on stable-1.4. stable-1.5's
+# 1.5.0 only skips >=1.4.4, and it bundles its own authorino/limitador/dns,
+# so 1.5 waits for Red Hat's migration procedure (step 4b).
+zuno_connectivity_link_channel: "stable-1.4"
+# WP-195 step 5 / K2 (2026-11-05): kueue 1.4.3 -> 1.5.0. stable-v1.5 has no
+# edge from 1.4, so the switch is followed by deleting CSV kueue-operator.v1.4.3
+# by hand (CRDs, CRs and the operand stay); see the WP-195 K2 plan.
+zuno_kueue_channel: "stable-v1.5"

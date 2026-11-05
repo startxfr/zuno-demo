@@ -50,6 +50,11 @@ gateway applied its `/mcp` default, C2.
 > `confluence.page.read` and `knowledge.tech.search`. Signed classification markers on the tool results make the
 > ai-gateway answer those turns with local models only.
 
+> **Correction (2026-11-05, ADR-0596):** decision 6 is amended in part. An experience client's task may declare
+> `zuno.models`, and `generate_stack_config.py` reads the clients' tasks for the model routing only (agents release
+> v0.11.0: task `code` of `open-webui` and `openclaw`). MaaS subscriptions, guardrail modes and the other derived
+> settings stay agents-only.
+
 ## Alternatives considered
 
 - **Front door without `X-Zuno-Agent`:** works today (the `frontdoorCapabilities` ceiling, filtered by groups), but the

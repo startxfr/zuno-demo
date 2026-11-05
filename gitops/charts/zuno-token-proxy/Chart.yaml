@@ -1,0 +1,6 @@
+apiVersion: v2
+name: zuno-token-proxy
+description: Relays an experience client's calls to the ai-gateway and the mcp-gateway with a refreshed client-credentials token (ADR-0601).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

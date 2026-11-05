@@ -1,0 +1,120 @@
+---
+# `make d2 check dify` runs this file. State detection first (both Applications Synced and
+# Healthy), then, when installed, the chain ADR-0599 relies on, probed with real HTTP requests
+# (TCP probes lie behind NetworkPolicies): Dify reaches its token proxy; it reaches neither the
+# gateways (only the proxy may) nor the internet; the Route answers only through the front door;
+# every running image is the pinned digest.
+- name: "dify | check the Dify Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-dify-d1"
+
+- name: "dify | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: "{{ _state_check_result }}"
+
+- name: "dify | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"
+
+- name: "dify | probe the chain"
+  when: _state_is_installed | bool
+  block:
+    - name: "dify | resolve the cluster base domain"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "dify | check the token proxy Application (d1)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+      vars:
+        gitops_app_name: "zuno-token-proxy-dify-d1"
+
+    - name: "dify | fail while the token proxy is not installed"
+      ansible.builtin.fail:
+        msg: "Application zuno-token-proxy-dify-d1 is not Synced and Healthy: Dify has no way to the models."
+      when: not (_state_check_result | bool)
+
+    - name: "dify | find the running pods"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ dify_namespace }}"
+        field_selectors:
+          - status.phase=Running
+      register: _dify_pods
+
+    - name: "dify | pick the api pod"
+      ansible.builtin.set_fact:
+        _dify_api_pod: >-
+          {{ _dify_pods.resources | selectattr('metadata.labels.component', 'defined')
+             | selectattr('metadata.labels.component', 'equalto', 'api') | list | first | default({}) }}
+
+    - name: "dify | fail without a running api pod"
+      ansible.builtin.fail:
+        msg: "No running Dify api pod in {{ dify_namespace }}."
+      when: _dify_api_pod | length == 0
+
+    # The digest pin is the only integrity check for third-party images (ADR-0586 decision 7).
+    - name: "dify | compare the running images with the pins"
+      ansible.builtin.assert:
+        that:
+          - "'@sha256:' in (_images[item.key].tag | string)"
+          - _running | select('search', (_images[item.key].tag | string).split('@')[1]) | list | length > 0
+        fail_msg: "{{ item.name }} runs an image that is not the pinned digest {{ _images[item.key].tag }}."
+        quiet: true
+      vars:
+        _images: "{{ (lookup('ansible.builtin.file', zuno_repo_root ~ '/gitops/charts/dify/values.yaml') | from_yaml).dify.image }}"
+        _running: >-
+          {{ _dify_pods.resources | selectattr('metadata.labels.component', 'defined')
+             | selectattr('metadata.labels.component', 'equalto', item.component)
+             | map(attribute='status.containerStatuses') | flatten | map(attribute='imageID') | list }}
+      loop:
+        - {key: api, name: api, component: api}
+        - {key: web, name: web, component: web}
+        - {key: pluginDaemon, name: plugin-daemon, component: plugin-daemon}
+      loop_control:
+        label: "{{ item.name }}"
+
+    - name: "dify | copy the probe into the api pod"
+      kubernetes.core.k8s_cp:
+        namespace: "{{ dify_namespace }}"
+        pod: "{{ _dify_api_pod.metadata.name }}"
+        remote_path: /tmp/zuno-dify-probe.py
+        content: "{{ lookup('ansible.builtin.file', role_path ~ '/files/probe.py') }}"
+
+    - name: "dify | probe the token proxy, the gateways and the internet from the api pod"
+      kubernetes.core.k8s_exec:
+        namespace: "{{ dify_namespace }}"
+        pod: "{{ _dify_api_pod.metadata.name }}"
+        command: python3 /tmp/zuno-dify-probe.py
+      register: _dify_probe
+      changed_when: false
+
+    - name: "dify | parse the probe"
+      ansible.builtin.set_fact:
+        _dify_codes: "{{ dict(_dify_probe.stdout_lines | map('split', '=') | list) }}"
+
+    - name: "dify | report the probe"
+      ansible.builtin.debug:
+        msg: "{{ _dify_codes }}"
+
+    - name: "dify | probe the Route without a session"
+      ansible.builtin.uri:
+        url: "https://dify.{{ cluster_base_domain }}/console/api/setup"
+        validate_certs: false
+        follow_redirects: none
+        status_code: [200, 302, 401, 403]
+      register: _dify_route
+      failed_when: false
+
+    - name: "dify | fail on a broken chain"
+      ansible.builtin.fail:
+        msg: >-
+          Dify chain check failed: {{ _dify_codes }}, Route without a session
+          {{ _dify_route.status | default('unreachable') }}. Expected proxy=200, ai_gateway=000 and
+          mcp_gateway=000 (Dify holds no route to the gateways), internet=000 and pypi=000 (egress
+          denied; pypi is open only during the plugin install window), Route 302 (to Keycloak).
+      when: >-
+        _dify_codes.proxy | default('') != '200' or
+        _dify_codes.ai_gateway | default('') != '000' or
+        _dify_codes.mcp_gateway | default('') != '000' or
+        _dify_codes.internet | default('') != '000' or
+        (_dify_codes.pypi | default('') != '000' and not (dify_plugin_install_window | bool)) or
+        (_dify_route.status | default(0)) != 302
