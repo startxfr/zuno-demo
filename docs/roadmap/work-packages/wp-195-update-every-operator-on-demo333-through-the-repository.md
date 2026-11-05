@@ -500,3 +500,21 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
 - **Still unexplained:** the gateway still logs a few `Task failed: "0"` from
   the wasm shim, about one per chat, while chats succeed and counters move.
 
+## TrustyAI after RHOAI 3.6.0-ea.2 (2026-11-05)
+
+- **LMEvalJobs (T1), root cause: vendor defect.** The three 2026-09-07 jobs were failed (`ErrImagePull`). They were deleted
+  and ArgoCD recreated them; all three then `Succeeded` (MMLU abstract_algebra: qwen3.5-9b 0.67, qwen3.6-27b 0.70, run
+  against the model workload services, not through MaaS). TrustyAI still said "LMES ... operand status is not yet available",
+  so the 3.6.0-ea.2 module cannot read an LMEvalJob status at all (the CRD has `state`, no `phase` or `conditions`).
+  Fix (user choice): `lmEval.enabled: false` in `gitops/charts/models/values.yaml` (7cc43a39). ArgoCD pruned the jobs and the
+  TrustyAI message dropped the LMES part, which confirms the diagnosis. Re-enable when a 3.6 release reads the status.
+- **Permit flags (T3): not a regression.** The ConfigMap `trustyai-service-operator-config` shows `lmes-allow-online=true`
+  and `lmes-allow-code-execution=true` (the shipped defaults), but the operator logs
+  "Read PermitOnline from DSC config: false" and the same for code execution, so the DSC value applies. The API server
+  admits an LMEvalJob with `allowOnline: true` (server dry-run); the controller is what enforces the deny.
+- **Guardrails smoke (T2), open.** `GuardrailsOrchestrator zuno-guardrails-smoke` keeps `phase=Error` with
+  `ReconcileFailed: Built-in route reconciliation failed`, a condition stamped 2026-10-12. Its Deployment, Service and
+  Route are fine (route Admitted), and an annotation nudge produced no operator log and no status change, so the
+  condition looks stale. It is the last thing holding TrustyAI at Ready=False. Planned remedy: delete the CR so
+  `zuno-trustyai-config` recreates it with a fresh status (backup in the session scratchpad).
+
