@@ -64,7 +64,8 @@ The operator cannot know who approved a state change, so the GitOps flow writes 
 - **Generator:** `platform/okf/generate_stack_config.py` treats a `deprecated` agent as served (same model reach as `active`) and a `retired` one as not served, with a test.
 - **Chart:** the `unifai` chart renders the ConfigMap `unifai-agent-revocations` from `agentRevocations` (empty today; each entry needs a bundle, a reason and an actor). The operator does not read it until the release of R-536.
 - **Runbook:** [agent-revocation-runbook.md](../../platform/agent-revocation-runbook.md), a draft until the rehearsal.
-- **Still to do:** the `unifai.startx.fr/actor` and `reason` annotations written by the promotion flow, the session pilot, the rehearsal and the evidence.
+- **Annotations (2026-11-05):** the stack-config generator writes `unifai.startx.fr/reason: promoted release vX.Y.Z` on every bundle, and the `unifai` chart renders the annotations of a bundle (a per-agent override goes in `zuno_unifai_bundle_settings.<agent>.annotations`). The operator ignores them until its release. **`unifai.startx.fr/actor` is not written for an ordinary promotion:** nothing in the promotion records who merges the pull request (the PR author is `github-actions[bot]` or whoever started the workflow, and the merger is only known after the merge), so the operator reports `unknown`. A real actor needs a workflow on `pull_request: closed` that reads `merged_by` and commits it, or an explicit `actor` in `zuno_unifai_bundle_settings` for a state change with a named approver.
+- **Still to do:** the rehearsal on demo333 once the operator release is pinned, and the evidence. The session pilot is done.
 
 ## Session pilot (2026-11-05)
 

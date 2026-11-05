@@ -97,6 +97,10 @@ metadata:
   namespace: {{ $.Values.namespace }}
   annotations:
     argocd.argoproj.io/sync-wave: "20"
+    {{- /* ADR-0584 clause 6: who/why of the change, copied by unifai-operator into its events */}}
+    {{- range $k, $v := (.annotations | default dict) }}
+    {{ $k }}: {{ $v | quote }}
+    {{- end }}
 spec:
   owner: {{ $owner }}
   {{- with .teamId }}
