@@ -34,7 +34,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
 | v0.11 | 23 | 2 | 28 | WP-173, WP-174, WP-220 |
-| v0.12 | 8 | 2 | 9 | WP-164 |
+| v0.12 | 8 | 1 | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | WP-208 |
 | v0.15 | 2 | 2 | 3 | WP-209, WP-221 |
@@ -954,7 +954,7 @@ frozen mirror.
 | WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Done (2026-11-05: mcp-gateway's okf-fetch init container verifies the digest pinned in `platform/okf/agents.lock`, live on demo333 since 2026-10-23 and rolled by every promotion up to v0.13.0, where the pod verifies release 0.13.0; mlops and ai-gateway read the verified release at build time, see the deviations) | none |
 | WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Done | operator 0.1.25 on stable; five agents of release v0.1.1 verified keyless on demo333 |
 | WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Done (2026-10-24) | schemas, corp ceilings, narrowing rule, operator reader (0.1.27); tekos migrated to OKF v0.3 and live on release v0.4.0, the other seven bundles migrate with their own releases |
-| WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator and consumers live on demo333 (unifai role, Keycloak groups, mcp okf-fetch); step 7 proven 2026-10-25 with release 0.6.1 (exact generated diff, group created, task right live, bundle re-emitted, real 429); open: consumers of per-agent models/guardrails/limits |
+| WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Done (2026-11-05: live on demo333, per-agent limits through UnifAI and the ai-gateway, see the ADR-0581 amendment) | none |
 | WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Done | agents/ removed, readers on the admitted release, Transit OKF chain gone (dc931dec); full promotion cycle live 2026-10-24 (release 0.3.0, PR #3, "— Tekos" answer on demo333) |
 | WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Done (2026-10-24) | Red Hat docs on UnifAI (38 web sources, 16/18 vs 13/18), rag-service and rag-ingestion retired on demo333 and in the repository; corpus scoped to 21 latest-version sources 2026-10-25 |
 | WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Done | live on demo333 2026-10-23 (89ec9fba): five eval-* personas; harnesses switched (86ef03e4); platform/keycloak/tests now run in CI |
@@ -1201,6 +1201,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — WP-164 Done and ADR-0581 Implemented, with an amendment: the quota script stays separate, the per-agent limits travel through UnifAI and the ai-gateway instead of Kuadrant policies, the file names are corrected, and the eight `agent_*` groups stay in the realm import. v0.12 keeps only ADR-0579.
 - 2026-11-05 — WP-161 Done: mcp-gateway's okf-fetch init container, live since 2026-10-23, verifies the pinned release and is rolled by every promotion (now v0.13.0). mlops and ai-gateway read the verified release at build time. WP-164 and ADR-0581 stay open: per-agent quota limits and the quota script are not done, see the WP.
 - 2026-11-05 — WP-221 added and ADR-0584 retargeted from v0.12 to v0.15: its lifecycle states, revocation list and audit events are not built, and WP-167 never carried them. The user asked for a work package and for unstarted work to follow later releases.
 - 2026-11-05 — WP-167 Done and ADR-0582 Implemented: the user repeated the per-agent sheet proof on UnifAI 0.1.59 as consultant-01 and sale-01. ADR-0584 stays `Accepted`: its lifecycle states, revocation list and audit events are not built and no work package carries them.

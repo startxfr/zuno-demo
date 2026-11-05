@@ -1,6 +1,6 @@
 # ADR-0581: Derive stack configuration from the admitted corp bundle
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-05, WP-164: the generator, the four generated files, the Keycloak group reconcile, the MaaS subscriptions, the ai-gateway routing and guardrail modes and the UnifAI bundles are live on demo333; the amendment of 2026-11-05 records what was dropped or changed)
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -137,3 +137,17 @@ longer needs an image rebuild. For each `(agent, task)`:
 `adapters` and `objectives` are copied from the corp file. With release 0.6.1 no entry changes: every
 tekos task declares its roles in its corp order, arkos and comage (OKF v0.2) declare none, and no
 release declares `forbidden`. A golden test asserts this equality.
+
+## Amendment (2026-11-05): what the implementation does differently
+
+Checked against the repository and demo333 while closing WP-164. The decision stands; these points of the table and of clauses 1 to 4 describe what was built, and replace the text above where they differ.
+
+- **Clause 1, the quota script.** `generate_quota_enforcement.py` was not absorbed. It stays a separate script that runs beside the generator: `lint.yml` checks both, and the promotion workflow regenerates both, so the promotion PR carries both. The generated files name the release (`release: 0.13.0` in the stack config), not the corp digest; the digest is in `platform/okf/agents.lock`.
+- **Keycloak groups.** There is no `agent-groups.generated.json`. The groups are the `keycloak.groups` section of `platform/okf/stack-config.generated.yaml`, which `ansible/roles/keycloak` passes to the reconcile Job as `agentGroups`.
+- **Per-agent limits.** They are **not** carried by Kuadrant policies, so there are no `quota-*.generated.yaml` files. The Kuadrant shim counts only the first limits it is given (ADR-0570), and the per-agent limits have a better home: UnifAI (`limits.memory.history`) and the ai-gateway (the task limits sent by the operator as `X-Zuno-Max-Tokens`, and the default body cap). The quota ceilings themselves come from the corp policy through the quota script (WP-157, WP-177).
+- **Per-agent chart values** are gone with the per-agent charts (WP-156), as the rule under the table says.
+- **UnifAI bundles** are the `unifai.bundles` section of the stack config, merged by name with the platform's own settings by `ansible/roles/unifai`. Since WP-221 each bundle also carries the annotation `unifai.startx.fr/reason`.
+- **okf-fetch digest.** There is no `values.okf-digest.generated.yaml`: the pod annotation `zuno.startx.fr/okf-corp-reference` carries the reference of the lock (WP-161).
+- **Clause 3.** `lint.yml` runs `generate_stack_config.py --check`; the promotion workflow regenerates the files, so the promotion PR carries them and is checked by that job.
+- **Clause 4, the groups in the realm import.** `gitops/charts/keycloak/files/realm-zuno.json` still lists the eight `agent_*` groups. They stay on purpose: 26 of the 32 users of the import are members of one of them, so a realm imported on a new cluster needs the groups to exist. The import copy is the bootstrap; the reconcile Job creates any group the release adds, and never deletes one.
+- **Not hand-written but kept:** the quota-demo hostnames in `gitops/charts/connectivity-link/values.yaml` are a demo fixture, not an agent-derived value.
