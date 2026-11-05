@@ -348,7 +348,21 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    would be the K2-style reinstall: delete the rhods-operator CSV and
    Subscription and let OLM install 3.6.0-ea.2 over a live 3.5.2 DSC. That is
    an unsupported path for an EA build with no rollback, and every MaaS model
-   and peer session depends on that DSC. Waiting for the user's decision.
+   and peer session depends on that DSC.
+
+   **EA notes read (user choice, 2026-11-05).**
+   - Red Hat's 3.6 release notes did not answer. The one GET to
+     docs.redhat.com returned HTTP 503.
+   - Upstream opendatahub-operator documents no EA upgrade path.
+   - It does document one change that matters for 3.6: MaaS moved from
+     `kserve.modelsAsService` to `aigateway.modelsAsAService` in 3.5
+     (`docs/migration-guides/maas-to-aigateway-3.5.md`). The old field is
+     honoured "at least through 3.6".
+   - demo333's v2 DSC still sets `kserve.modelsAsService: Managed`, next to
+     `aigateway: Managed`. Moving the chart to the new field is a 3.6 GA
+     prerequisite. Note that CEL rejects re-enabling the old field once it
+     is `Removed`.
+   - Nothing on the cluster changed.
    - **There is no rollback: OLM does not downgrade.**
    - Expect new operands. Re-check the quotas, the mesh-egress NetworkPolicy
      union and immutable Deployment selectors (3.5.0 GA traps 1, 4 and 5).
