@@ -451,3 +451,39 @@ class ApprovalTests(GatewayTestCase):
         task = (await self.send("alpha", "tok-both", "x")).root.result  # direct call: not delegated
         self.assertEqual(task.status.state, TaskState.completed)
         self.assertNotIn("tools", self.down.llm_calls[0]["body"])
+
+    async def test_the_rest_of_the_calls_run_after_an_approval_even_in_the_last_round(self) -> None:
+        object.__setattr__(self.settings, "max_tool_rounds", 0)  # one round only (the settings are frozen)
+        self.down.tools.append({"name": "read_page", "description": "d", "inputSchema": {"type": "object"},
+                                "annotations": {"readOnlyHint": True}})
+        two_calls = dict(self.WRITE_CALL, tool_calls=self.WRITE_CALL["tool_calls"] + [
+            {"id": "c2", "type": "function", "function": {"name": "read_page", "arguments": "{}"}}])
+        self.down.llm_script = [two_calls, {"role": "assistant", "content": "done"}]
+        task = (await self.send("beta", "tok-both", "write it", **self.CHAIN)).root.result
+        done = await self.answer(task, "approve")
+        self.assertEqual(done.status.state, TaskState.completed)
+        sent = self.down.llm_calls[-1]["body"]["messages"]
+        ids = [m["tool_call_id"] for m in sent if m["role"] == "tool"]
+        self.assertEqual(ids, ["c1", "c2"])
+
+    async def test_the_summary_masks_nested_secrets_and_says_what_it_cuts(self) -> None:
+        from app.approvals import redact_arguments
+        summary = redact_arguments({"auth": {"password": "p"}, "text": "x" * 500, **{f"k{i}": i for i in range(25)}})
+        self.assertEqual(summary["auth"], {"password": "***"})
+        self.assertIn("more characters not shown", summary["text"])
+        self.assertIn("more keys not shown", summary["_truncated"])
+
+    async def test_another_caller_cannot_consume_the_approval(self) -> None:
+        USERS["tok-other"] = auth.CallerIdentity("u-other", ["agent_alpha", "agent_beta"], {}, "tok-other")
+        self.addCleanup(USERS.pop, "tok-other", None)
+        task = await self.start()
+        approval = task.status.message.metadata["zuno.approval"]
+        message = Message(
+            role=Role.user, message_id=uuid.uuid4().hex, task_id=task.id, context_id=task.context_id,
+            parts=[Part(root=DataPart(data={"zuno.approval": {"request_id": approval["request_id"], "decision": "approve"}}))],
+        )
+        async with self.http("tok-other", **self.CHAIN) as client:
+            a2a = A2AClient(client, url="http://a2a.test/agents/beta/")
+            refused = (await a2a.send_message(SendMessageRequest(id="3", params=MessageSendParams(message=message)))).root.result
+        self.assertEqual(refused.status.state, TaskState.failed)
+        self.assertEqual(self.tool_calls(), [])

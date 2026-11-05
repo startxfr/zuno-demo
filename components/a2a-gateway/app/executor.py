@@ -90,6 +90,7 @@ class ZunoAgentExecutor(AgentExecutor):
             return
         if context.current_task is None:
             await updater.submit()
+        self._approvals.drop(context.task_id)  # a fresh turn on this task supersedes any approval still pending
         await updater.start_work()
         await self._turn(context, updater, None)
 
@@ -100,8 +101,8 @@ class ZunoAgentExecutor(AgentExecutor):
         except Refused as exc:
             await updater.failed(new_agent_text_message(str(exc), context.context_id, context.task_id))
             return
-        pending = self._approvals.take(context.task_id, str(answer.get("request_id") or ""))
-        if pending is None or pending.caller_sub != caller.sub:
+        pending = self._approvals.take(context.task_id, str(answer.get("request_id") or ""), caller.sub)
+        if pending is None:
             await updater.failed(new_agent_text_message(
                 "No approval is pending for this task (it expired after 300 seconds, was answered, or the gateway "
                 "restarted). The operation was not run.", context.context_id, context.task_id,
@@ -177,7 +178,9 @@ class ZunoAgentExecutor(AgentExecutor):
             task, chain_headers, classification, run_id = (
                 pending.task, pending.chain_headers, pending.classification, pending.run_id,
             )
-            messages, backlog, rounds_left, writes = pending.messages, pending.backlog, pending.rounds_left, True
+            messages, backlog, rounds_left = pending.messages, pending.backlog, pending.rounds_left
+            # Re-tested now: a write_allowed entry revoked during the wait is no longer honoured.
+            writes = (self._agent.name, task) in self._limits.write_allowed
         else:
             headers = (context.call_context.state.get("headers") or {}) if context.call_context else {}
             request_text = context.get_user_input().strip()
@@ -233,7 +236,7 @@ class ZunoAgentExecutor(AgentExecutor):
                 result = f"The operation {name} was not approved and was not run. {note}".strip()
             messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
 
-        while rounds_left > 0:
+        while backlog or rounds_left > 0:  # the calls of the last assistant message are always answered
             if not backlog:
                 reply = await self._llm.chat(messages=messages, tools=tools, **common)
                 calls = reply.get("tool_calls") or []

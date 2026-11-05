@@ -22,16 +22,34 @@ DECISIONS = ("approve", "reject")  # modify / redirect are not served in v1 and 
 _SENSITIVE = re.compile(r"token|secret|password|passwd|credential|api[-_]?key|authorization", re.I)
 
 
+MAX_ARGUMENTS = 20
+MAX_VALUE_CHARS = 200
+MAX_PENDING = 200
+
+
+def _redact(value: Any, depth: int = 0) -> Any:
+    if isinstance(value, dict):
+        if depth >= 4:
+            return "..."
+        out = {str(k): ("***" if _SENSITIVE.search(str(k)) else _redact(v, depth + 1)) for k, v in list(value.items())[:MAX_ARGUMENTS]}
+        if len(value) > MAX_ARGUMENTS:
+            out["_truncated"] = f"{len(value) - MAX_ARGUMENTS} more keys not shown"
+        return out
+    if isinstance(value, (list, tuple)):
+        if depth >= 4:
+            return "..."
+        items = [_redact(v, depth + 1) for v in list(value)[:MAX_ARGUMENTS]]
+        if len(value) > MAX_ARGUMENTS:
+            items.append(f"... {len(value) - MAX_ARGUMENTS} more items not shown")
+        return items
+    if isinstance(value, str):
+        return value if len(value) <= MAX_VALUE_CHARS else f"{value[:MAX_VALUE_CHARS]}... ({len(value) - MAX_VALUE_CHARS} more characters not shown)"
+    return value if value is None or isinstance(value, (bool, int, float)) else _redact(repr(value), depth)
+
+
 def redact_arguments(arguments: Dict[str, Any]) -> Dict[str, Any]:
-    """A short, safe summary of tool arguments for the user to read (never a secret, never a long blob)."""
-    summary: Dict[str, Any] = {}
-    for key, value in list(arguments.items())[:20]:
-        if _SENSITIVE.search(str(key)):
-            summary[str(key)] = "***"
-        else:
-            text = value if isinstance(value, str) else repr(value)
-            summary[str(key)] = text if len(text) <= 200 else text[:200] + "..."
-    return summary
+    """A safe summary of tool arguments for the user to read: secrets masked at every depth, and anything cut says so."""
+    return _redact(arguments)
 
 
 @dataclass
@@ -57,18 +75,26 @@ class PendingStore:
         self._pending: Dict[str, PendingApproval] = {}
 
     def put(self, task_id: str, pending: PendingApproval) -> None:
+        self._sweep()
+        if len(self._pending) >= MAX_PENDING and task_id not in self._pending:
+            oldest = min(self._pending, key=lambda k: self._pending[k].expires_at)
+            del self._pending[oldest]
+        self._pending[task_id] = pending
+
+    def _sweep(self) -> None:
         now = time.monotonic()
         for key in [k for k, v in self._pending.items() if v.expires_at < now]:
             del self._pending[key]
-        self._pending[task_id] = pending
 
-    def take(self, task_id: str, request_id: str) -> Optional[PendingApproval]:
-        """The pending approval for this answer, removed from the store; None when absent, expired or not this request."""
+    def take(self, task_id: str, request_id: str, caller_sub: str) -> Optional[PendingApproval]:
+        """The pending approval for this answer, removed from the store. None when absent, expired, not this request or
+        not this caller (a wrong caller does not consume it)."""
+        self._sweep()
         pending = self._pending.get(task_id)
-        if pending is None or pending.request_id != request_id:
+        if pending is None or pending.request_id != request_id or pending.caller_sub != caller_sub:
             return None
         del self._pending[task_id]
-        return None if pending.expires_at < time.monotonic() else pending
+        return pending
 
     def drop(self, task_id: str) -> None:
         self._pending.pop(task_id, None)
