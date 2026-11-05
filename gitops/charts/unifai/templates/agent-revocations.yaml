@@ -1,0 +1,21 @@
+{{- if .Values.stack.enabled }}
+# ADR-0584 clause 5 (WP-221): the platform-owned incident revocation list. An agent named here is treated by
+# unifai-operator as not admitted: its entry and its emitted objects are removed, without a new agents release.
+# The operator only reads this ConfigMap, never writes it. Until the operator release that implements
+# R-536 is pinned, the list is written but has no effect (docs/platform/agent-revocation-runbook.md).
+{{- range .Values.agentRevocations }}
+{{- $_ := required "agentRevocations[].bundle is required (the UnifaiAgentBundle name, i.e. the OKF agent name)" .bundle }}
+{{- $_ := required (printf "agentRevocations[%s].reason is required (ADR-0584 clause 5)" .bundle) .reason }}
+{{- $_ := required (printf "agentRevocations[%s].actor is required (who approved the revocation)" .bundle) .actor }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: unifai-agent-revocations
+  namespace: {{ .Values.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+data:
+  revoked: |
+    {{- toYaml (.Values.agentRevocations | default list) | nindent 4 }}
+{{- end }}

@@ -163,6 +163,14 @@ class MaasSubscriptionsTest(unittest.TestCase):
                           "groups": ["/agent_alpha", "/agent_alpha_preview", "/agent_beta"]},
         })
 
+    def test_a_deprecated_agent_is_still_served_and_a_retired_one_is_not(self) -> None:
+        self.agent("alpha", ["agent_alpha"], classification="C1")
+        self.agent("old", ["agent_old"], classification="C1", status="deprecated")
+        self.agent("gone", ["agent_gone"], classification="C1", status="retired")
+        subs = self.subs()
+        self.assertEqual(subs["big-pub"]["agents"], ["alpha", "old"])
+        self.assertNotIn("/agent_gone", subs["big-pub"]["groups"])
+
     def test_strict_preference_narrows_and_plain_preference_does_not(self) -> None:
         (self.dir / "policies" / "model-routing" / "model-routing-policy.yaml").write_text(yaml.safe_dump({
             "preferences": [

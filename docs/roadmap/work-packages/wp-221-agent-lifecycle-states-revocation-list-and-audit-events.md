@@ -57,3 +57,11 @@ The operator cannot know who approved a state change, so the GitOps flow writes 
 - `unifai.startx.fr/reason`: a short reason, required for `retired` and for a revocation.
 - The operator copies both into the event it emits and into the status condition, and writes `unknown` when they are absent. The names are generic on purpose: the fork carries no Zuno field (ADR-0575).
 - On the zuno-demo side, the promotion flow of the agents release (`.github/workflows/okf-promote.yml`) or the `unifai` chart fills them; the revocation list's own commit gives the actor of a revocation. This is to be reviewed by the fork session before it builds.
+
+## Prepared in zuno-demo and the agents repository (2026-11-05)
+
+- **Agents repository:** branch `wp221-lifecycle-states` of `zuno-demo-agents` adds `deprecated` and `retired` to `zuno.status` in the v0.3 schema. Schema only: no agent changes state, and none may be released as `deprecated` or `retired` before the operator release is pinned.
+- **Generator:** `platform/okf/generate_stack_config.py` treats a `deprecated` agent as served (same model reach as `active`) and a `retired` one as not served, with a test.
+- **Chart:** the `unifai` chart renders the ConfigMap `unifai-agent-revocations` from `agentRevocations` (empty today; each entry needs a bundle, a reason and an actor). The operator does not read it until the release of R-536.
+- **Runbook:** [agent-revocation-runbook.md](../../platform/agent-revocation-runbook.md), a draft until the rehearsal.
+- **Still to do:** the `unifai.startx.fr/actor` and `reason` annotations written by the promotion flow, the session pilot, the rehearsal and the evidence.
