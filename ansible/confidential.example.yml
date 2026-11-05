@@ -444,6 +444,47 @@ zuno_aws_route53_secret_access_key: "xxxxxx"
 #
 # zuno_openshift_ai_version: "3.5.0"
 
+# --- Per-cluster operator version pins (ADR-0559 clause 4 / WP-145 step 4) ---
+#
+# OPTIONAL, and NOT secret. These four keys are how ONE trunk carries clusters
+# that sit on different operator versions: a minor version is crossed only
+# through cluster data, never through a branch and never through a chart edit
+# (every Application renders from git with selfHeal, so a chart edit moves
+# every cluster at the next sync). They are commented out here on purpose.
+#
+# Where to set them: ansible/clusters/<cluster>.yml is the home (versioned, so
+# the pin is reviewable and reproducible; demo333 sets all four there today).
+# This file also works for a value you do not want to commit. When a key is in
+# both, the loading order of the playbook decides - set it in ONE place.
+#
+# Unset = no pin: the role follows the catalog's defaultChannel (ADR-0048).
+# A pinned channel that the catalog does not publish FAILS the run instead of
+# falling back to the default. Pinned channels name a stream, not a build.
+#
+#   zuno_openshift_ai_version          exact RHOAI build, version only (no
+#                                      `rhods-operator.` prefix). An installed
+#                                      RHOAI is walked up to it one InstallPlan
+#                                      at a time and never past it.
+#   zuno_openshift_ai_channel          RHOAI channel (e.g. stable-3.5, beta).
+#   zuno_connectivity_link_channel     RHCL channel (e.g. stable-1.5).
+#   zuno_kueue_channel                 Kueue channel (e.g. stable-v1.5).
+#
+# Where startingCSV is set, and why only there: only RHOAI gets a startingCSV,
+# built from the effective pin by ansible/roles/openshift_ai/tasks/precheck.yml
+# (`<subscription.operator.csv>.<zuno_openshift_ai_version>`, defaulting to
+# gitops/charts/openshift-ai/values.yaml's subscription.version) and enforced
+# by install.yml, which refuses to approve an InstallPlan for another CSV.
+# RHOAI is the operator whose unattended minor-version drift is judged
+# unacceptable. Pinning every operator is rejected on purpose: it would
+# re-hardcode what ADR-0048 removed. For the rest, the known-good set is
+# recorded as data in platform/olm/known-good-<cluster>.yaml (regenerate with
+# `make d3 check operators`; see platform/olm/audit_operator_updates.py).
+#
+# zuno_openshift_ai_version: "3.5.0"
+# zuno_openshift_ai_channel: "stable-3.5"
+# zuno_connectivity_link_channel: "stable-1.4"
+# zuno_kueue_channel: "stable-v1.4"
+
 # --- LLM external provider API keys -----------------------------------------
 # Each optional: leave "xxxxxx" and the ModelRouter fails over to the next
 # eligible provider (the local model always works with none filled in).

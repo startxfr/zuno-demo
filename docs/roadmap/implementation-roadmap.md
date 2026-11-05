@@ -31,9 +31,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
-| v0.9 | 6 | 1 | 8 | WP-145 |
+| v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 23 | 3 | 28 | WP-173, WP-174, WP-220 |
+| v0.11 | 23 | 2 | 28 | WP-173, WP-174, WP-220 |
 | v0.12 | 8 | 2 | 9 | WP-161, WP-164 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | WP-208 |
@@ -895,7 +895,7 @@ being discovered by whoever tries the next install.
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-144 | [wp-144](work-packages/wp-144-olm-catalog-drop-tolerance.md) | 0558 | none | Done (2026-09-14 - shared discovery task adopted by the twelve exact-name roles, readiness probe P8 live-verified on demo222 reporting 13 frozen Subscriptions and naming openshift-operators as the namespace where they block others) | decide per operator whether to drop each of the 13 frozen Subscriptions (forfeits its update path) or wait for the catalog to publish again - P8 reports, deliberately does not repair |
-| WP-145 | [wp-145](work-packages/wp-145-fleet-version-and-catalog-policy.md) | 0559 | WP-144 | Not started | blocked on measuring demo333 at its next power-on (powered off, reported 4.22 but unverified) - that single read-only measurement decides whether additional CatalogSources are justified |
+| WP-145 | [wp-145](work-packages/wp-145-fleet-version-and-catalog-policy.md) | 0559 | WP-144 | Done | measurement, known-good set and per-cluster pin keys delivered (CatalogSources not needed, WP-195); closed 2026-11-05 |
 | WP-195 | [wp-195](work-packages/wp-195-update-every-operator-on-demo333-through-the-repository.md) | 0559 | WP-145 | Done | every operator of demo333 updated through the repository (OCP 4.22.20, GitOps 1.22.3, RHOAI 3.6.0-ea.2, RHCL 1.5.0, Kueue 1.5.0); known-good set `platform/olm/known-good-demo333.yaml`; quota counters, TrustyAI and OGX fixed |
 
 ### Phase 44 — adopt UnifAI as the agent and RAG platform (added 2026-10-17)

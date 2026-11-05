@@ -286,7 +286,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | Implemented | Adopt RHTAS as the artifact trust and supply-chain service |
 | [ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md) | Implemented | Close ADR-0111's last SecNumCloud gap with an in-cluster release ledger |
 | [ADR-0558](0558-tolerate-catalogs-that-stop-publishing-an-installed-operator.md) | Implemented | Tolerate catalogs that stop publishing an installed operator |
-| [ADR-0559](0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md) | Accepted | Follow the cluster's version and never branch the repository by OCP version |
+| [ADR-0559](0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md) | Implemented | Follow the cluster's version and never branch the repository by OCP version |
 
 ## v0.10
 
@@ -313,7 +313,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Implemented | Move TrustyAI guardrails into the ai-gateway |
 | [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) | Implemented | Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings |
 | [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Implemented | Close UnifAI parity gaps generically |
-| [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Partially implemented | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
+| [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Implemented | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
 | [ADR-0571](0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md) | Implemented | Evaluate the RHOAI MCP gateway before extending mcp-gateway |
 | [ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md) | Implemented | Scope the zuno operator to the platform foundation |
 | [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
