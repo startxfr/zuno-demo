@@ -302,7 +302,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0353](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) | Proposed | Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF |
+| [ADR-0353](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) | Implemented | Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF |
 | [ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md) | Implemented | Introduce agent-to-agent delegation limited to the targets an agent declares |
 | [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Accepted | Adopt A2A as the inter-agent protocol |
 | [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) | Implemented | Propagate the user's identity and the delegation chain across agent-to-agent calls |
@@ -320,10 +320,10 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Partially implemented | Close UnifAI parity gaps generically |
 | [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Partially implemented | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
 | [ADR-0571](0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md) | Implemented | Evaluate the RHOAI MCP gateway before extending mcp-gateway |
-| [ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md) | Accepted | Scope the zuno operator to the platform foundation |
+| [ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md) | Implemented | Scope the zuno operator to the platform foundation |
 | [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Partially implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
 | [ADR-0574](0574-deploy-unifai-through-argocd-from-a-pinned-olm-catalog.md) | Implemented | Deploy UnifAI through ArgoCD from a pinned OLM catalog |
-| [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Accepted | Upstream generic UnifAI changes and isolate zuno-specific code |
+| [ADR-0575](0575-upstream-generic-unifai-changes-and-isolate-zuno-specific-code.md) | Implemented | Upstream generic UnifAI changes and isolate zuno-specific code |
 | [ADR-0585](0585-serve-zuno-agents-over-a2a-from-a-gateway-answering-with-the-callers-identity.md) | Implemented | Serve zuno agents over A2A from a gateway that answers with the caller's identity |
 | [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) | Implemented | Verify the UnifAI runtime images by digest, signature and attestations before deploying them |
 

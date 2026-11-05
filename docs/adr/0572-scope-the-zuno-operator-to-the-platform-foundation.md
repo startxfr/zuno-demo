@@ -1,6 +1,6 @@
 # ADR-0572: Scope the zuno operator to the platform foundation
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-05, WP-156, WP-168, WP-176: the component lists, the `unifai` chart and the digest verification are in place and `identity.keycloak` is refused by `check_unifai_identity.py`. The zuno operator behaviour of clauses 2 and 3 stays a contract carried by ADR-0556, see the amendment)
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -131,3 +131,12 @@ neither touches the other's resources. On `demo333`, `unifai-operator`
 currently tracks a catalog image tagged `latest` with `installPlanApproval:
 Automatic` (fork `MEMORY.md`, `fork/unifai-operator/README.md`). ADR-0574
 replaces that with a pinned catalog before this boundary is relied on.
+
+## Amendment (2026-11-05): what Implemented covers
+
+The zuno operator does not exist yet (ADR-0556 is `Proposed`, contract only). This ADR is therefore implemented **at the level of the Ansible playbooks and the chart**, which is the boundary its "Operational considerations" already describes "until the zuno operator is implemented". The clauses split as follows:
+
+- **Clause 1 (component entries).** Done in the Ansible lists: `unifai_operator` and `unifai` exist, and `aiagent_operator`, `rag`, `rag_ingestion` and `agents` are gone from `Makefile` DAY2 (WP-156, WP-168).
+- **Clauses 2 and 3 (the operator asserts the Application and orders its entries).** These describe operator behaviour. They stay a contract that ADR-0556 carries and takes effect with the operator. Until then the playbook order (llm, models, mcp, then unifai) is what holds.
+- **Clause 4 (no `identity.keycloak`).** Done and gated: the chart sets `identity.external` only, and `platform/supply-chain/check_unifai_identity.py` fails on a `keycloak` identity in a cluster file or in the chart templates. It runs in `.github/workflows/lint.yml`.
+- **Clause 5 (`supply_chain` widened to UnifAI artifacts).** Done by WP-176 and ADR-0586 (`verify_unifai_images.py`, `check_unifai_pins.py`).

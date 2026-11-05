@@ -1,6 +1,6 @@
 # ADR-0575: Upstream generic UnifAI changes and isolate zuno-specific code
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-05, WP-146 to WP-149 and WP-168: generic changes live on `feat/*` branches of the fork, zuno-specific code under `fork/`, `contrib-check` clean. No upstream PR was opened, by decision)
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -134,3 +134,9 @@ merged, declined) in its `MEMORY.md`, so a declined change is known to be
 permanent delta.
 
 No step of this decision touches a cluster.
+
+## Implementation note (2026-11-05)
+
+All five work packages are Done (2026-10-24). The process the ADR sets is in effect: the generic changes (`feat/forward-user-token`, `feat/otel-instrumentation`, `feat/project-memory`, `feat/qdrant-hybrid`, and the candidate `fix/temporal-foreground-execution-context`) live on feature branches of the fork, and the zuno-specific code stays under `fork/`.
+
+The clause "upstream is contacted before the first PR" is moot: no PR has been opened upstream, by decision (the briefs say `make contrib-pr` is not run until the user says so). If a PR is ever opened, the contact comes first, and the state is kept in the fork's `MEMORY.md`.

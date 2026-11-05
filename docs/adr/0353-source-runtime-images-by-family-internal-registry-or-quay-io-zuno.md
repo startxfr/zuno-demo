@@ -1,6 +1,6 @@
 # ADR-0353: Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF
 
-- **Status:** Proposed
+- **Status:** Implemented (2026-11-05, WP-176 and ADR-0586: ratified and closed the same day. Zuno components come from the internal registry; the UnifAI and OKF images come from `quay.io/zuno`, pinned by digest and verified by `verify_unifai_images.py`)
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
@@ -116,3 +116,11 @@ Chart image repositories inventoried on 2026-10-24 (eleven in-cluster
 registry references, `quay.io/zuno` in `gitops/charts/unifai`, one vendor
 `quay.io/modh`), cross-read against ADR-0115, ADR-0549, ADR-0574 and
 ADR-0577.
+
+## Implementation note (2026-11-05)
+
+The ADR was a decision record with no code of its own, so it was ratified and closed together. What realises it:
+
+- **Clause 2, immutable references.** WP-176 (Done 2026-10-25) and [ADR-0586](0586-verify-the-unifai-runtime-images-by-digest-signature-and-attestations-before-deploying-them.md) pin every `quay.io/zuno` UnifAI image by digest and verify its signature (`platform/supply-chain/verify_unifai_images.py`, `check_unifai_pins.py`). The OKF artifacts are covered by ADR-0578 and ADR-0580.
+- **Clause 3, no per-chart registry override.** No zuno chart points at an external registry. The third-party charts that use external images (oauth2-proxy by digest, `kubernetes-mcp-server`, Open WebUI) are outside the zuno-component family.
+- **Open point, not a gap of this ADR.** Cluster-side admission of the signatures is WP-178.
