@@ -309,7 +309,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Implemented | Limit agent delegation by depth, cycle and budget |
 | [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Accepted | Introduce human approval for delegated operations, resumable from persisted checkpoints |
 | [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md) | Implemented | Keep the ai-gateway as the policy router in front of UnifAI |
-| [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Accepted | Adopt UnifAI as the agent platform |
+| [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Implemented | Adopt UnifAI as the agent platform |
 | [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md) | Implemented | Authenticate UnifAI against the zuno Keycloak realm |
 | [ADR-0563](0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md) | Implemented | Forward caller identity and Zuno context headers from UnifAI |
 | [ADR-0564](0564-deliver-okf-bundles-to-unifai-operator-as-signed-oci-artifacts.md) | Superseded in part by ADR-0577 and ADR-0578 | Deliver OKF bundles to unifai-operator as signed OCI artifacts |

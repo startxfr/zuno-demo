@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 9 | 4 | 17 | WP-145, WP-195, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 6 | 28 | WP-173, WP-174, WP-209, WP-210 |
+| v0.11 | 24 | 5 | 28 | WP-173, WP-174, WP-209, WP-210 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | 2 | 7 | WP-206, WP-207, WP-208 |
@@ -1196,6 +1196,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — ADR-0561 Implemented (ADR close-out): the replacement of the first-party agent stack by UnifAI is carried out and its security gate (ADR-0563) is cleared. The ai-gateway classification floor it relies on is WP-209, still open.
 - 2026-11-05 — Phase 50 added (ADR close-out, WP-209 to WP-218): the ADRs that stay `Partially implemented` get work. WP-209 is the ai-gateway classification floor of ADR-0565. WP-210 is page-level Confluence ACL of ADR-0110 (to be built only if wanted). WP-211 to WP-218 take ADR-0352's remaining day-0 components in its own order: keycloak, vault, postgresql, redis, aap, external_secrets, cert_manager, argocd.
 - 2026-11-05 — ADR-0566, ADR-0563, ADR-0569, ADR-0573 and ADR-0568 Implemented (ADR close-out, point 2): the remainder of each was a status that had not followed, or a scope cut now written in the ADR (project dimension, group-gated tiles, the demo222 cutover, freshness fields, `sql-dump`, language boost). ADR-0567 was left open: its decision 5 cleanup is not done.
 - 2026-11-05 — ADR-0353, ADR-0575 and ADR-0572 Implemented (ADR close-out, point 1). ADR-0353 was ratified and closed together: WP-176 and ADR-0586 realise it. ADR-0575 notes that no upstream PR was opened, by decision. ADR-0572 is implemented at the playbook and chart level; its operator clauses 2 and 3 stay a contract of ADR-0556, and a new check, `check_unifai_identity.py`, refuses `identity.keycloak`.
