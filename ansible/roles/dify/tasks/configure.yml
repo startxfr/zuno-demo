@@ -1,0 +1,76 @@
+---
+# ADR-0599 decision 3: configure Dify through its console API, from inside the api pod (the
+# Route is behind oauth2-proxy). Idempotent (files/configure.py). The plugin package is
+# downloaded here, checked against the pinned sha256 and copied in; its install needs the PyPI
+# window (-e dify_plugin_install_window=true) the first time.
+- name: "dify | make the cache directory"
+  ansible.builtin.file:
+    path: "{{ zuno_repo_root }}/.cache"
+    state: directory
+    mode: "0700"
+
+- name: "dify | download the provider plugin package"
+  ansible.builtin.get_url:
+    url: "https://marketplace.dify.ai/api/v1/plugins/langgenius/openai_api_compatible/{{ dify_plugin_version }}/download"
+    dest: "{{ zuno_repo_root }}/.cache/dify-oac.difypkg"
+    checksum: "sha256:{{ dify_plugin_sha256 }}"
+    mode: "0600"
+
+- name: "dify | find the api pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: "{{ dify_namespace }}"
+    label_selectors: ["component=api"]
+    field_selectors: ["status.phase=Running"]
+  register: _dify_cfg_pods
+
+- name: "dify | find the Vault pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors: ["app.kubernetes.io/name=vault", "component=server"]
+  register: _dify_cfg_vault_pod
+
+- name: "dify | read the Vault bootstrap credentials"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-vault
+    name: vault-bootstrap-credentials
+  register: _dify_cfg_vault
+  no_log: true
+
+- name: "dify | read the administrator password from Vault"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _dify_cfg_vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ _dify_cfg_vault.resources[0].data.root_token | b64decode }} vault kv get -field=password zuno/dify/admin"
+  register: _dify_admin_pw
+  no_log: true
+
+- name: "dify | copy the plugin package and the helper into the api pod"
+  ansible.builtin.command: >-
+    oc -n {{ dify_namespace }} cp {{ item.src }} {{ _dify_cfg_pods.resources[0].metadata.name }}:{{ item.dest }}
+  loop:
+    - { src: "{{ zuno_repo_root }}/.cache/dify-oac.difypkg", dest: /tmp/oac.difypkg }
+    - { src: "{{ role_path }}/files/configure.py", dest: /tmp/configure.py }
+  changed_when: false
+
+- name: "dify | configure the administrator, the plugin, the models and the MCP tool"
+  ansible.builtin.shell: |
+    set -o pipefail
+    printf %s "$DIFY_CFG" | oc -n {{ dify_namespace }} exec -i {{ _dify_cfg_pods.resources[0].metadata.name }} -- python3 /tmp/configure.py
+  environment:
+    DIFY_CFG: >-
+      {{ {'email': dify_admin_email, 'password': _dify_admin_pw.stdout, 'pkg': '/tmp/oac.difypkg',
+          'proxy': 'http://zuno-token-proxy:8080', 'mcp_name': 'Zuno MCP gateway', 'models': dify_models} | to_json }}
+  args:
+    executable: /bin/bash
+  register: _dify_cfg_out
+  changed_when: "'registered' in _dify_cfg_out.stdout or 'installed' in _dify_cfg_out.stdout or 'created' in _dify_cfg_out.stdout"
+  no_log: true
+
+- name: "dify | configuration result"
+  ansible.builtin.debug:
+    msg: "{{ _dify_cfg_out.stdout_lines }}"
