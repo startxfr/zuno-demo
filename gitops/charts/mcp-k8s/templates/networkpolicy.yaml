@@ -1,0 +1,25 @@
+# The upstream server has no gateway-token check and no authentication of its own (ADR-0037 second layer is not
+# available for an unmodified upstream): this NetworkPolicy is the only door. Only the MCP Gateway reaches it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: k8s-mcp
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: k8s-mcp
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mcp-gateway
+      ports:
+        - protocol: TCP
+          port: 8080

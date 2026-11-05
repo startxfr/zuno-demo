@@ -71,6 +71,13 @@ backends:
     default: "http://aap-mcp.zuno-ai-run.svc:8000"
     path: /mcp
 
+  # --- k8s: the upstream containers/kubernetes-mcp-server (ADR-0600/WP-206), read-only, pinned by digest.
+  #     Service k8s-mcp, chart mcp-k8s. The Service port is 8080 (the upstream default), not 8000.
+  k8s:
+    env: K8S_MCP_URL
+    default: "http://k8s-mcp.zuno-ai-run.svc:8080"
+    path: /mcp
+
 bindings:
   # ADR-0219: the five `sxa.*` capabilities that were bound here to the
   # `sales-db` MCP server are removed - SXA is pre-2021 history, served
@@ -377,4 +384,36 @@ bindings:
     transport: in-process
     handler: diagram_gen
     provider_tool: generate_diagram
+    auth_mode: service-identity
+
+  # --- k8s: ADR-0600 clause 1. Four capabilities, all read; the server's own tool list is cut to these
+  #     (enabled_tools in gitops/charts/mcp-k8s) and Secret/ConfigMap are denied by kind.
+  - capability: k8s.resource.read
+    backend: k8s
+    transport: streamable-http
+    provider_tool: resources_get
+    auth_mode: service-identity
+
+  - capability: k8s.resource.list
+    backend: k8s
+    transport: streamable-http
+    provider_tool: resources_list
+    auth_mode: service-identity
+
+  - capability: k8s.events.read
+    backend: k8s
+    transport: streamable-http
+    provider_tool: events_list
+    auth_mode: service-identity
+
+  - capability: k8s.logs.read
+    backend: k8s
+    transport: streamable-http
+    provider_tool: pods_log
+    auth_mode: service-identity
+
+  - capability: metrics.query
+    backend: k8s
+    transport: streamable-http
+    provider_tool: execute_instant_query
     auth_mode: service-identity

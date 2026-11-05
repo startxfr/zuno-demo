@@ -1,0 +1,27 @@
+---
+# The read-only Kubernetes MCP server (ADR-0600, WP-206).
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-mcp-k8s-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-139"
+spec:
+  project: zuno
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/mcp-k8s
+    helm:
+      releaseName: zuno-mcp-k8s-d1
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-ai-run
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

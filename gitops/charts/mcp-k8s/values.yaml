@@ -1,0 +1,40 @@
+# Must match the `k8s` backend default in platform/bindings/tools/tool-bindings.yaml
+# (http://k8s-mcp.zuno-ai-run.svc:8080).
+namespace: zuno-ai-run
+
+# ADR-0600 / WP-206: the upstream containers/kubernetes-mcp-server, not rebuilt in-cluster, pinned by
+# digest (ADR-0586 decision 7). v0.0.69 (2026-10-23), Apache-2.0. A bump is a deliberate change here.
+image:
+  repository: ghcr.io/containers/kubernetes-mcp-server
+  digest: sha256:1da9d62ad0c008a6cadcf2718c86c2e2d18753ca1d9f1f3313068980794b24f2
+  pullPolicy: IfNotPresent
+
+replicas: 1
+
+resources:
+  requests: {cpu: 50m, memory: 64Mi}
+  limits: {cpu: 500m, memory: 256Mi}
+
+# The namespaces the server may read (RoleBinding `view` in each; `view` has no Secret access). The server
+# has no namespace allowlist of its own, RBAC is the boundary (WP-206 spike, evidence/wp-206-k8s-mcp-spike.md).
+readNamespaces:
+  - zuno-ai-run
+  - zuno-ai-build
+  - zuno-auth
+  - zuno-data
+  - zuno-dify
+  - zuno-kagent
+  - zuno-mesh
+  - zuno-mlops
+  - zuno-monitoring
+  - zuno-openwebui
+  - zuno-unifai
+  - zuno-vault
+  - zuno-aap
+
+# metrics.query: Thanos Querier on 9091 needs cluster-monitoring-view (the namespaced 9092 answers 400 to the
+# metric validation call). It reads the metrics of the whole cluster; the server's own guardrails require a label
+# matcher in every query. Switch off to drop the capability.
+metrics:
+  enabled: true
+  prometheusUrl: https://thanos-querier.openshift-monitoring.svc.cluster.local:9091

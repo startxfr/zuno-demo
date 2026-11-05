@@ -1031,7 +1031,7 @@ WP-208 shows the five experiences together. No cluster action while demo333 is b
 | WP-203 | [wp-203](work-packages/wp-203-dify-preparation.md) | 0599, 0601 | WP-202 | Done | none |
 | WP-204 | [wp-204](work-packages/wp-204-install-dify-on-demo333.md) | 0599, 0601 | WP-202, WP-203 | Done | Vault seed before the Keycloak client push; `make d2 install dify` |
 | WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Done (2026-11-05) | adapter built, signed and rolled; knowledge base registered in Dify; forbidden-space case not exercised |
-| WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Not started | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
+| WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Repo work in review | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
 | WP-207 | [wp-207](work-packages/wp-207-kagent-preparation-and-install.md) | 0600, 0601 | WP-202, WP-206 | Not started | scratch spike in `zuno-kagent-scratch`; `make d2 install kagent` |
 | WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Not started | live rehearsal on demo333 |
 

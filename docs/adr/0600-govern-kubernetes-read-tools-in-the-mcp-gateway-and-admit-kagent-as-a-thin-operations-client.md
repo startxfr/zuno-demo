@@ -81,3 +81,12 @@ call it, and the ServiceAccount's RBAC bounds what it can see. Logs may contain 
 
 mcp-gateway audit lines with `capability=k8s.*` and `agent=kagent` show use, and a refused Secret read is part of the
 WP-206 acceptance. `zuno_model_tokens{client="kagent"}` proves the model path.
+
+## Implementation note (2026-11-05, WP-206)
+
+The binding registry maps one capability to one backend tool, so `k8s.resource.read` (get) is paired with
+`k8s.resource.list` (list). The backend is the upstream `kubernetes-mcp-server` v0.0.69 pinned by digest, in
+`read_only` mode with an `enabled_tools` allowlist and Secret and ConfigMap denied by kind. `metrics.query`
+needs `cluster-monitoring-view` (the namespaced Thanos port is unusable), so it reads the metrics of the whole
+cluster, which the user accepted. The entitled groups are `ocp-ai-ops` and `aap_ops`. Evidence:
+[wp-206-k8s-mcp-spike](../roadmap/evidence/wp-206-k8s-mcp-spike.md).

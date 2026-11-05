@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mcp-k8s
+description: Read-only Kubernetes MCP server (ADR-0600, WP-206) - upstream kubernetes-mcp-server pinned by digest, behind the mcp-gateway.
+type: application
+version: 0.1.0
+appVersion: "0.0.69"
