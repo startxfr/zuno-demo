@@ -23,7 +23,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | Version | ADRs | Open ADRs | WPs | Open WPs |
 |---|---|---|---|---|
 | v0 | 72 | — | 8 | — |
-| v0.1 | 29 | 1 | 19 | — |
+| v0.1 | 29 | 1 | 20 | WP-210 |
 | v0.2 | 14 | — | 19 | WP-098 |
 | v0.3 | 15 | — | 19 | — |
 | v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
@@ -31,9 +31,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
-| v0.9 | 9 | 4 | 9 | WP-145, WP-195 |
+| v0.9 | 9 | 4 | 17 | WP-145, WP-195, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 6 | 26 | WP-173, WP-174 |
+| v0.11 | 24 | 6 | 28 | WP-173, WP-174, WP-209, WP-210 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | 2 | 7 | WP-206, WP-207, WP-208 |
@@ -1035,6 +1035,23 @@ WP-208 shows the five experiences together. No cluster action while demo333 is b
 | WP-207 | [wp-207](work-packages/wp-207-kagent-preparation-and-install.md) | 0600, 0601 | WP-202, WP-206 | Repo work in review | scratch spike in `zuno-kagent-scratch`; `make d2 install kagent` |
 | WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Not started | live rehearsal on demo333 |
 
+### Phase 50 — follow-up work from the ADR close-out (added 2026-11-05)
+
+Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially implemented` for a concrete reason, so each now has work packages: the ai-gateway classification floor (WP-209, ADR-0565), page-level Confluence ACL (WP-210, ADR-0110) and the remaining day-0 components of ADR-0352 in the ADR's own order (WP-211 to WP-218). ADR-0570's checks that were never run are blocked, see the ADR close-out note in the change log.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-209 | [wp-209](work-packages/wp-209-ai-gateway-classification-floor-per-agent-and-task.md) | 0565 | none | Not started | ai-gateway change plus a generated floor slice; default header C3 after the caller inventory |
+| WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110, 0568 | none | Not started | only if page-level ACL is wanted; change in the fork's Confluence connector, sent to the fork session as a patch |
+| WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal there-and-back on a simulated external Keycloak |
+| WP-212 | [wp-212](work-packages/wp-212-vault-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal; who unseals in external mode |
+| WP-213 | [wp-213](work-packages/wp-213-postgresql-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal |
+| WP-214 | [wp-214](work-packages/wp-214-redis-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal |
+| WP-215 | [wp-215](work-packages/wp-215-aap-internal-external-mode.md) | 0352 | WP-143, WP-213 | Not started | cluster rehearsal; keep the Fernet key persistent |
+| WP-216 | [wp-216](work-packages/wp-216-external-secrets-internal-external-mode.md) | 0352 | WP-143 | Not started | documentation and check surgery |
+| WP-217 | [wp-217](work-packages/wp-217-cert-manager-internal-external-mode.md) | 0352 | WP-143 | Not started | documentation and check surgery |
+| WP-218 | [wp-218](work-packages/wp-218-argocd-internal-external-mode.md) | 0352 | WP-143, ADR-0557 decision | Not started | waits for ADR-0557's mechanism |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1179,6 +1196,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — Phase 50 added (ADR close-out, WP-209 to WP-218): the ADRs that stay `Partially implemented` get work. WP-209 is the ai-gateway classification floor of ADR-0565. WP-210 is page-level Confluence ACL of ADR-0110 (to be built only if wanted). WP-211 to WP-218 take ADR-0352's remaining day-0 components in its own order: keycloak, vault, postgresql, redis, aap, external_secrets, cert_manager, argocd.
 - 2026-11-05 — ADR-0566, ADR-0563, ADR-0569, ADR-0573 and ADR-0568 Implemented (ADR close-out, point 2): the remainder of each was a status that had not followed, or a scope cut now written in the ADR (project dimension, group-gated tiles, the demo222 cutover, freshness fields, `sql-dump`, language boost). ADR-0567 was left open: its decision 5 cleanup is not done.
 - 2026-11-05 — ADR-0353, ADR-0575 and ADR-0572 Implemented (ADR close-out, point 1). ADR-0353 was ratified and closed together: WP-176 and ADR-0586 realise it. ADR-0575 notes that no upstream PR was opened, by decision. ADR-0572 is implemented at the playbook and chart level; its operator clauses 2 and 3 stay a contract of ADR-0556, and a new check, `check_unifai_identity.py`, refuses `identity.keycloak`.
 - 2026-11-05 — ADR-0552, ADR-0553 and ADR-0585 Implemented: every WP behind them was already Done. ADR-0553 is Implemented as a placement only; its visibility benefit was never obtained and the dated correction note says so. (ADR close-out, point 1.)
