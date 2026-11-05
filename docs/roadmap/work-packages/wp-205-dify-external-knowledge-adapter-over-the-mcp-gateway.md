@@ -1,6 +1,6 @@
 # WP-205: Dify External Knowledge adapter over the mcp-gateway
 
-- **State:** In progress (code, tests, chart, role written 2026-11-05; not pushed, not built, not live)
+- **State:** Done 2026-11-05 on demo333 (commit 8a35dc8a): `zuno-dify-knowledge` built and signed in-cluster (digest sha256:71940d3f…), `zuno-dify-knowledge-d1` Synced and Healthy, External Knowledge API and base "Zuno technical documentation" registered in Dify (the registration probe passed). Evidence: Dify `external-hit-testing` returned 5 records for each of 4 queries, Confluence SXSI chunks kept `classification` C2 and docs.redhat.com chunks C1, with source URL and score; adapter logs show `POST /retrieval` 200 through the token proxy. Not exercised: a space the `dify` persona's groups do not allow (no such space identified; the filter is UnifAI's server-side ACL, the adapter adds none), and a knowledge node in a Dify workflow typed in the UI.
 - **ADRs:** [ADR-0599](../../adr/0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md)
 - **Depends on:** [WP-203](wp-203-dify-preparation.md) step 6, [WP-204](wp-204-install-dify-on-demo333.md)
 - **Related:** [WP-208](wp-208-five-experiences-demonstration.md)

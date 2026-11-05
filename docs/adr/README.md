@@ -362,7 +362,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0599](0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md) | Proposed | Serve a no-code workflow canvas with Dify as an experience client |
+| [ADR-0599](0599-serve-a-no-code-workflow-canvas-with-dify-as-an-experience-client.md) | Implemented | Serve a no-code workflow canvas with Dify as an experience client |
 | [ADR-0600](0600-govern-kubernetes-read-tools-in-the-mcp-gateway-and-admit-kagent-as-a-thin-operations-client.md) | Proposed | Govern Kubernetes read tools in the mcp-gateway and admit kagent as a thin operations client |
 | [ADR-0601](0601-inject-client-credentials-tokens-for-experience-clients-without-oidc-passthrough.md) | Proposed | Inject client-credentials tokens for experience clients without OIDC passthrough |
 

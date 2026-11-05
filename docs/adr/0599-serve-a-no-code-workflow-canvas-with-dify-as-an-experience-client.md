@@ -1,6 +1,6 @@
 # ADR-0599: Serve a no-code workflow canvas with Dify as an experience client
 
-- **Status:** Proposed
+- **Status:** Implemented
 - **Target:** v0.14
 - **Date:** 2026-11-04
 - **Decision owners:** Zuno Demo architecture team
