@@ -15,7 +15,7 @@ under two weeks old). Rendered with the values of `gitops/charts/kagent`:
 | Ports | UI 8080, controller (REST and A2A) 8083 |
 | Declarative agent | `Agent` `spec.type: Declarative`, `declarative.{modelConfig, systemMessage, tools[].mcpServer{name,kind,toolNames}, a2aConfig.skills}` |
 
-Images, index digests (2026-10-21): controller `sha256:e284fbdd…`, ui `sha256:a6edf70c…`, agent runtime `app`
+Images, index digests (2026-10-21): controller `sha256:e284fbdd…`, ui `sha256:6133c1b7…` (linux/amd64 manifest: the node reports it as imageID), agent runtime `app`
 `sha256:b811b0dd…`, `golang-adk` `sha256:89d5a7df…`, `skills-init` `sha256:5be7cb94…` (the last three are used by the
 controller to start the agents; the controller and ui are pinned by tag and digest in the chart values).
 

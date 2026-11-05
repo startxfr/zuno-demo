@@ -87,7 +87,7 @@ kagent:
         enabled: false
   ui:
     image:
-      tag: 0.10.4@sha256:a6edf70c6e8e76a94582ee563652cfa2a8c5f74f5df5d4832b2f250e49655899
+      tag: 0.10.4@sha256:6133c1b72ee54ea98d6e5155a897facb78f492efe22abe3587c2e0938a684d37
     # The Route is ours (front door); the chart's own would expose the UI without a login.
     route:
       enabled: false
