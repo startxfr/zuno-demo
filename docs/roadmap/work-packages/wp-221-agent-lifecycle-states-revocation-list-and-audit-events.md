@@ -16,7 +16,7 @@ An agent can be `deprecated` (still usable, marked on its sheet) or `retired` (n
 ## Steps
 
 1. **States (clause 3).** Add `deprecated` and `retired` to `zuno.status` in the OKF schema of `zuno-demo-agents` (today `placeholder | active`) and to the operator's mapping. There is no new field on the `UnifaiAgentBundle`: the state stays in the reviewed bundle. `deprecated` keeps the agent usable and marks its sheet; `retired` removes its entry and its objects. A state change is a reviewed pull request in `zuno-demo-agents`, never an edit in the cluster.
-2. **Sessions on retirement (clause 4).** Retirement ends new executions at once; existing sessions stay readable by their owner and cannot resume. Verify this in a pilot on demo333 before `retired` is used, and write the result to an evidence file.
+2. **Sessions on retirement (clause 4).** Retirement ends new executions at once; existing sessions stay readable by their owner and cannot resume. **Verified on 2026-11-05** with no fork change: after the workflow is deleted the session stays in the list and can be opened, and a new message is refused ("The workflow associated with this chat has been deleted and can no longer be continued"). See [the pilot](../evidence/wp-221-session-pilot-2026-11-05.md); the answers of an agent were not part of it.
 3. **Revocation list (clause 5).** The ConfigMap `unifai-agent-revocations` (key `revoked`, a YAML list of `{bundle, reason, actor}`), managed through GitOps in the `unifai` chart, in the bundles' namespace, lists agents to revoke. The operator reads it (never writes) and treats a listed agent as not admitted: it removes or disables its entry and objects, without a new release. A compromised signing identity is handled by changing the trust policy of ADR-0578, as the ADR says.
 4. **Audit events (clause 6).** The operator emits an event for admission, state change, revocation and rejection, with the digest, the actor identity from the pull request and the reason. Sheet views are not audited per view.
 5. **Runbook (clause 5).** Write the incident revocation runbook with a response target, in `docs/`.
@@ -65,3 +65,7 @@ The operator cannot know who approved a state change, so the GitOps flow writes 
 - **Chart:** the `unifai` chart renders the ConfigMap `unifai-agent-revocations` from `agentRevocations` (empty today; each entry needs a bundle, a reason and an actor). The operator does not read it until the release of R-536.
 - **Runbook:** [agent-revocation-runbook.md](../../platform/agent-revocation-runbook.md), a draft until the rehearsal.
 - **Still to do:** the `unifai.startx.fr/actor` and `reason` annotations written by the promotion flow, the session pilot, the rehearsal and the evidence.
+
+## Session pilot (2026-11-05)
+
+Done: the owner keeps and can open the session of a deleted workflow and cannot resume it, so clause 4 needs nothing from the fork. [Evidence](../evidence/wp-221-session-pilot-2026-11-05.md). Remaining limit: a pilot on a real agent chat would also show whether the agent's answers stay readable.
