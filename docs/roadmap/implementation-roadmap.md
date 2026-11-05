@@ -23,7 +23,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | Version | ADRs | Open ADRs | WPs | Open WPs |
 |---|---|---|---|---|
 | v0 | 72 | — | 8 | — |
-| v0.1 | 29 | 1 | 20 | WP-210 |
+| v0.1 | 28 | — | 18 | — |
 | v0.2 | 14 | — | 19 | WP-098 |
 | v0.3 | 15 | — | 19 | — |
 | v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
@@ -31,12 +31,14 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
-| v0.9 | 9 | 4 | 17 | WP-145, WP-195, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
+| v0.9 | 6 | 1 | 8 | WP-145, WP-195 |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 24 | 4 | 30 | WP-173, WP-174, WP-209, WP-210, WP-220 |
+| v0.11 | 23 | 3 | 28 | WP-173, WP-174, WP-220 |
 | v0.12 | 9 | 4 | 9 | WP-161, WP-164, WP-167 |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | WP-208 |
+| v0.15 | 1 | 1 | 1 | WP-209 |
+| v0.16 | 4 | 4 | 11 | WP-210, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1042,7 +1044,7 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-209 | [wp-209](work-packages/wp-209-ai-gateway-classification-floor-per-agent-and-task.md) | 0565 | none | Not started | ai-gateway change plus a generated floor slice; default header C3 after the caller inventory |
-| WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110, 0568 | none | Not started | only if page-level ACL is wanted; change in the fork's Confluence connector, sent to the fork session as a patch |
+| WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110 | none | Not started | only if page-level ACL is wanted; change in the fork's Confluence connector, sent to the fork session as a patch |
 | WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal there-and-back on a simulated external Keycloak |
 | WP-212 | [wp-212](work-packages/wp-212-vault-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal; who unseals in external mode |
 | WP-213 | [wp-213](work-packages/wp-213-postgresql-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal |
@@ -1198,6 +1200,7 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — Unstarted work follows the code releases (user decision). ADR-0565 moves to the new band v0.15; ADR-0110, ADR-0352, ADR-0556 and ADR-0557 move to the new band v0.16, with WP-209 and WP-210 to WP-218 following their ADRs. Closed ADRs, ADRs with a started package, and the past bands are untouched; the old bands v0.1 now has no open ADR or WP, and v0.9 keeps only ADR-0559 (WP-145, WP-195). See the ADR change log.
 - 2026-11-05 — `v0.13.0` tagged on `main` (`388555d6`): the first platform tag since `v0.3.0`, so that tags follow the roadmap bands again. The rule (a tag per band, on `main`, annotated, the in-cluster ledger as a separate step) is in RELEASING.md and the tag table in versions.md. v0.4 to v0.12 are not tagged retroactively; the next tag is `v0.14.0`.
 - 2026-11-05 — WP-220 added (evaluation, no cluster change): what the RHOAI 3.6 MCP lifecycle operator, MaaS consumer portal and WorkbenchesV2 would bring to this project, which custom code each could replace, and the questions that gate a pilot. It also records that the MaaS 3.6 documentation describes the WP-195 quota incident (gateway wasm object size) and its levers.
 - 2026-11-05 — ADR-0567 Implemented with an amendment: the builtin guardrail detectors and the smoke orchestrator stay as a documented fallback (decision 5's deletion is no longer decided). WP-219 added, deferred: it holds ADR-0570's never-run checks, each blocked (vendor route defect, personas 401 on MaaS, no verified project id).

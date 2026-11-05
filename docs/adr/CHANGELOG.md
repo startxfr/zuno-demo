@@ -9,6 +9,15 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Retarget (2026-11-05) - unstarted work follows the code releases, new bands v0.15 and v0.16
+
+The platform now tags a release per band (`v0.13.0`, then `v0.14.0`; see RELEASING.md). Five ADRs sat in bands that are past, with all their remaining work not started, so those bands could never close. They move to the bands that will carry the work. ADRs that are closed, and ADRs with a work package already started, did not move.
+
+- **v0.15** (new): ADR-0565, from v0.11. The ai-gateway classification floor, WP-209.
+- **v0.16** (new): ADR-0110 from v0.1, ADR-0352, ADR-0556 and ADR-0557 from v0.9. The day-0 internal/external mode (WP-211 to WP-218), the cluster-management decisions it depends on, and page-level Confluence ACL (WP-210).
+- **Not moved**, on purpose: ADR-0402 and ADR-0409 (WP-174 delivered), ADR-0559 (WP-195 under way), ADR-0541, ADR-0570 and ADR-0115 (a started or deferred package), ADR-0579 and ADR-0581 to ADR-0584 (v0.12, in progress) and ADR-0501 (the OKF stream).
+- A work package has no version of its own: it is counted under the bands of its ADRs. WP-209 and WP-210 to WP-218 therefore follow ADR-0565, ADR-0110 and ADR-0352. WP-210 now cites ADR-0110 only, so it no longer shows as open in v0.11 through ADR-0568.
+
 ## Addition (2026-11-04) - new band v0.14, ADR-0599 to ADR-0601
 
 Dify (a no-code workflow canvas) and kagent (a Kubernetes agent operator) were

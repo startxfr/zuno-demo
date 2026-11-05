@@ -1,10 +1,10 @@
 # WP-210: Page-level Confluence ACL in the fork connector
 
 - **State:** Not started
-- **ADRs:** [ADR-0110](../../adr/0110-automate-document-acl-synchronization.md), [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)
+- **ADRs:** [ADR-0110](../../adr/0110-automate-document-acl-synchronization.md)
 - **Depends on:** none (a change to the UnifAI fork, handed to the fork session as a patch)
-- **Related:** [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-186](wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md)
-- **Target:** v0.1
+- **Related:** [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) (closed; it records this as a cut), [WP-168](wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md), [WP-186](wp-186-close-the-freshness-and-language-gaps-of-the-unifai-rag-migration.md)
+- **Target:** v0.16
 - **Estimated files touched:** ~6 in the fork's Confluence connector and its tests, plus one evidence file in zuno-demo
 
 > Why: ADR-0110 wanted the indexes kept in step with each page's own restrictions. The per-page reconciliation (`stage_reconcile_acls` in `components/rag-ingestion`) was retired with rag-ingestion (WP-168). UnifAI's RAG applies one `aclGroups` list per source, so a page restricted inside a space, or restricted after ingestion, is not reflected. [ADR-0568](../../adr/0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) records this as a cut. This WP restores it only if page-level access is wanted.

@@ -4,7 +4,7 @@
 - **ADRs:** [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md)
 - **Depends on:** none
 - **Related:** [ADR-0594](../../adr/0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md) (signed markers already raise a turn), [WP-187](wp-187-carry-the-source-classification-through-unifai-rag-results.md), [WP-191](wp-191-same-mcp-tools-in-the-three-experiences.md)
-- **Target:** v0.11
+- **Target:** v0.15
 - **Estimated files touched:** ~8: `platform/okf/generate_stack_config.py`, a new `gitops/charts/ai-gateway/files/classification-floors.generated.yaml` and its ConfigMap template, `components/ai-gateway/app/main.py` and a new floor module, their tests, the CI drift check
 
 > Why: ADR-0565 clause 5 asks the ai-gateway to enforce a per-(agent, task) classification floor itself, so a caller cannot lower the level by sending a lower header. It is the one clause of ADR-0565 that has no code. The operator validation and bundle overrides (WP-150) and the per-chunk classification (WP-187) are done, and ADR-0594 raises the turn from signed markers, which covers clause 3 in practice.

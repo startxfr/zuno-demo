@@ -3,7 +3,7 @@
 - **Status:** Accepted - the study concluded 2026-09-10 with its pick
   recorded (see Study); implementation awaits ADR-0352's argocd work
   package.
-- **Target:** v0.9
+- **Target:** v0.16 (retargeted from v0.9 on 2026-11-05: all of its remaining work is not started, so it follows the code release that will carry it)
 - **Date:** 2026-09-10
 - **Decision owners:** Zuno Demo architecture team
 

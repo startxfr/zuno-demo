@@ -4,7 +4,7 @@
 - **ADRs:** [ADR-0352](../../adr/0352-run-day-0-platform-services-in-internal-or-external-mode.md)
 - **Depends on:** WP-143
 - **Related:** [WP-143](wp-143-mariadb-internal-external-pilot.md) (the pilot, whose pattern this follows), [ADR-0557](../../adr/0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md)
-- **Target:** v0.9
+- **Target:** v0.16
 - **Estimated files touched:** ~10: the component's `ansible/roles/<role>/tasks/{install,precheck,uninstall}.yml`, `ansible/confidential.example.yml`, a new endpoint-resolution task, the consumer charts, the d1 check
 
 > Why: ADR-0352 clause 9 lands the internal/external mode contract one component per work package. MariaDB is done (WP-143). This one is next in the ADR's order: keycloak, vault, postgresql, redis, aap, external_secrets, cert_manager, argocd. Keycloak: the first hard one and the highest value: it exercises CA supply, mandatory admin-credential provisioning, the OAuth integration and the widest seam set. An external Keycloak stops using our PostgreSQL entirely (its chart's database block is dead configuration whatever PostgreSQL's mode is, clause 11). Every UnifAI stack, the agents, Open WebUI, Dify and OpenClaw sign in through it, so rehearse it before touching demo333.

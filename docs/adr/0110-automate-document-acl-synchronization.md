@@ -1,7 +1,7 @@
 # ADR-0110: Automate document ACL synchronization
 
 - **Status:** Partially implemented - access is the source's `aclGroups`, applied fail-closed at query time by UnifAI's RAG ([ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md)); the per-page reconciliation implemented in `components/rag-ingestion` (live-verified 2026-08-23, see the dated notes below) was retired with it (WP-168) and is not replaced.
-- **Target:** v0.1
+- **Target:** v0.16 (retargeted from v0.1 on 2026-11-05: all of its remaining work is not started, so it follows the code release that will carry it)
 - **Date:** 2026-08-15
 - **Decision owners:** Zuno Demo architecture team
 
