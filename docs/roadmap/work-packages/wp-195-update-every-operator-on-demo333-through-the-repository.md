@@ -1,6 +1,6 @@
 # WP-195: Update every operator on demo333 through the repository
 
-- **State:** Operator pending (repo work done 2026-11-04; each live step needs the user's go)
+- **State:** Done (2026-11-05: every live step ran with the user's go; see the sections at the end)
 - **ADRs:** [ADR-0559](../../adr/0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md)
 - **Depends on:** [WP-145](wp-145-fleet-version-and-catalog-policy.md) (step 1, the demo333 measurement, is taken here)
 - **Related:** [ADR-0048](../../adr/0048-discover-supported-operator-channels-and-serving-runtimes-at-deployment-time.md), [ADR-0558](../../adr/0558-tolerate-catalogs-that-stop-publishing-an-installed-operator.md), [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [WP-157](wp-157-slim-the-ai-gateway-via-maas.md), [WP-177](wp-177-finish-the-maas-quota-delegation.md)
