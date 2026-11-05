@@ -391,6 +391,11 @@
 - name: "openshift_ai | reconcile: re-mount the dashboard SA token into core-bff"
   ansible.builtin.include_tasks: dashboard_core_bff_token.yml
 
+# --- Module managers shipped at 512Mi (RHOAI 3.6.0-ea.2): shared with
+# install.yml; all the rationale, and the unverified durability, in the file.
+- name: "openshift_ai | reconcile: raise the memory limit of the OOM-killed module managers"
+  ansible.builtin.include_tasks: module_manager_memory.yml
+
 # --- NO remediation for RHOAI's broken collector->Tempo hop (ADR-0523/
 # WP-081 live incident, 2026-08-26; deliberate non-action, recorded so
 # nobody re-attempts it): RHOAI's data-science-collector exports to

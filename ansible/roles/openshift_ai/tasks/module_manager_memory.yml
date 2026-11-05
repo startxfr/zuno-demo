@@ -1,0 +1,49 @@
+---
+# Raises the memory limit of three RHOAI 3.6.0-ea.2 module managers that the
+# operator ships at 512Mi and that the kernel OOM-kills (exit 137) on this
+# cluster, so they CrashLoopBackOff and their module never turns Ready.
+#
+# Included by BOTH install.yml and reconcile.yml, the same shape as
+# dashboard_core_bff_token.yml (live finding WP-195 step 6, demo333,
+# 2026-11-05):
+#   - redhat-ods-applications/odh-observability            (Monitoring module)
+#   - redhat-ods-applications/opendatahub-feast-operator   (Feast module)
+#   - redhat-ods-applications/spark-operator-module-controller-manager
+# They had been patched by hand to 1536Mi, which a fresh install would lose.
+#
+# Contract: patch-only, never fails, and a silent no-op when a Deployment does
+# not exist (older RHOAI, or the module Removed). A STRATEGIC merge patch
+# (the default for a built-in Deployment) merges `containers` on `name`, so
+# only the `manager` memory limit and request change.
+#
+# UNVERIFIED: these Deployments are owned by RHOAI operators that re-apply
+# them with Server-Side Apply. The hand patch held for over an hour, but it
+# may be reverted when an operator re-asserts its own resources. If it is,
+# `make d1 reconcile openshift-ai` puts it back, and the real fix is a RHOAI
+# release that raises the default. THE EXIT: delete this file and its two
+# include sites once the shipped limits are high enough.
+
+- name: "openshift_ai | module managers: raise the memory limit of the OOM-killed 512Mi managers"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: apps/v1
+    kind: Deployment
+    name: "{{ item }}"
+    namespace: redhat-ods-applications
+    definition:
+      spec:
+        template:
+          spec:
+            containers:
+              - name: manager
+                resources:
+                  limits:
+                    memory: "{{ openshift_ai_module_manager_memory | default('1536Mi') }}"
+                  requests:
+                    memory: 256Mi
+  loop:
+    - odh-observability
+    - opendatahub-feast-operator
+    - spark-operator-module-controller-manager
+  failed_when: false
+  register: _openshift_ai_module_manager_patch

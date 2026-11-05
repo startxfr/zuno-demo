@@ -443,11 +443,10 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
    - ArgoCD `zuno-namespaces-d0` is OutOfSync: `zuno-ai-build` lost
      `kueue.openshift.io/managed=true`.
    - ArgoCD `zuno-mlops-d1` is OutOfSync: TrainingRuntime `mlops-lora`.
-   - The repo copies of maas-api settings (namespace `redhat-ods-applications`
-     in the openshift-ai, postgresql, namespaces, service-mesh and models
-     charts, and in the maas_db_copy role) are now stale. MaaS works because
-     maas-api in its new namespace uses its own built-in config, but they
-     must be audited.
+   - maas-api namespace references: audited 2026-11-05. maas-api has run in `redhat-ai-gateway-infra` since RHOAI 3.5 GA, and
+     the repo already knew it. The `maas-db-config` source Secret and ExternalSecret in `redhat-ods-applications` are
+     correct (maas-controller copies it across). Only `precheck.yml` still looked for the maas-api pods in
+     `redhat-ods-applications`, so its restart-evidence finding never fired; fixed.
    - **There is no rollback: OLM does not downgrade.**
    - Expect new operands. Re-check the quotas, the mesh-egress NetworkPolicy
      union and immutable Deployment selectors (3.5.0 GA traps 1, 4 and 5).
@@ -523,4 +522,28 @@ pushed to devel before the run, then re-runs `make d3 check operators`.
   The `MCPLifecycleOperator`, `MaaSConsumerPortal` and `WorkbenchesV2` conditions are False only because those submodules
   are `Removed`. Still OutOfSync in ArgoCD: `startx-cluster-auth`, `startx-cluster-infra-config` and `zuno-mlops-d1`
   (TrainingRuntime `mlops-lora`), not traced to 3.6.
+
+## Repo cleanup after RHOAI 3.6.0-ea.2 (2026-11-05)
+
+- `ansible/roles/openshift_ai/tasks/precheck.yml`: the maas-api pod lookup, the finding's resource name and its hint now use
+  `redhat-ai-gateway-infra`.
+- New `ansible/roles/openshift_ai/tasks/module_manager_memory.yml`, included from `install.yml` and `reconcile.yml`: raises
+  the memory limit of `odh-observability`, `opendatahub-feast-operator` and `spark-operator-module-controller-manager` to
+  1536Mi (they ship at 512Mi and are OOM-killed). Whether the RHOAI operators keep the patch is unverified; the file says so,
+  and `make d1 reconcile openshift-ai` re-applies it.
+- Not done by choice: `startx-cluster-auth` and `startx-cluster-infra-config` (ArgoCD OutOfSync) are out of scope.
+
+## OGX after RHOAI 3.6.0-ea.2 (2026-11-05, investigation only)
+
+`DSC Ready=False` comes only from "Some modules are degraded: ogx". Cause:
+- `OGXServer redhat-ods-applications/zuno-ogx` is `phase=Failed`: `RoleBinding zuno-ogx-rb ... cannot change roleRef`.
+  The RoleBinding (created 2026-09-07) binds ServiceAccount `zuno-ogx-sa` to ClusterRole
+  `system:openshift:scc:anyuid`. The 3.6 OGX operator wants `system:openshift:scc:nonroot-v2`, and a roleRef is immutable
+  (same family as the immutable-selector trap of the 3.5.0 GA).
+- The new ReplicaSet `zuno-ogx-5565c4d5f5` (12:30Z) cannot create pods: "unable to validate against any security context
+  constraint ... seccomp may not be set". The old pod (21 h, SCC `anyuid`) keeps serving, so `Deployment` shows 1/1 ready and
+  0 up to date.
+- Impact is small: `zuno-ogx` is labelled `rag-provider-prototype` and nothing in the cluster references it.
+- Proposed remedy (needs a go): delete `RoleBinding zuno-ogx-rb` so the operator recreates it with `nonroot-v2`, then let the new
+  ReplicaSet replace the old pod. Expected: OGXServer `Ready`, DSC `Ready=True`.
 
