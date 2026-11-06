@@ -13,14 +13,18 @@ differences that make it work on this cluster (measured, WP-220 sections 15-16):
    stack's only LLM provider is the BFF's `remote::passthrough`, which resolves models
    per request and cannot list them, so without this the portal's model list shows
    only the inline reranker.
-3. The pgvector password is generated in-cluster (ESO Password generator), never
+3. Gated on maasGateway.enabled too, because two Applications render this chart
+(zuno-openshift-ai-d0 and -d1) and only d1 sets it: without that gate d0 renders the
+objects with the placeholder domain and the two Applications overwrite each other's
+ConfigMap forever (measured 2026-11-06: endless OGX rollouts).
+4. The pgvector password is generated in-cluster (ESO Password generator), never
    stored in git.
 
 The BFF finds this OGXServer by namespace and uses it; it does not recreate it. If
 someone creates another playground from the portal in another namespace, that one
 is the vendor's version again and will loop. See WP-220 section 17.
 */ -}}
-{{- if .Values.playground.enabled }}
+{{- if and .Values.maasGateway.enabled .Values.playground.enabled }}
 apiVersion: generators.external-secrets.io/v1alpha1
 kind: Password
 metadata:
