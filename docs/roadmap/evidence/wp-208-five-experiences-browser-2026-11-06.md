@@ -52,3 +52,18 @@ reached the proxy, so this timeout does not address it.
 - The mcp-gateway audit lines of kagent carry `groups=['agent_tekos', 'ocp-ai-ops', 'openwebui_admin']`. `agent_tekos` and
   `openwebui_admin` are surprising for an operations persona; whether the token proxy's persona really holds them, and whether
   they widen what kagent may do, was not checked.
+
+## Defect fixes verified on demo333 (2026-11-06, evening)
+
+Build window with da and 4c closed. `make d2 build mcp` (it rebuilds the mcp-gateway, a2a-gateway and the MCP servers: mcp-gateway-44
+from `90d63e98`, a2a-gateway-12 from `71a325d7`), `make d1 build ai-gateway` (ai-gateway-44 from `8be050be`), then the Dify role with
+the three example apps re-imported. Every BuildConfig output is back on `:latest`; no ArgoCD Application is out of Healthy.
+
+- **D3:** `tools/list` through the Dify token proxy: `knowledge.tech.search` has `query` (required) and `top_k`; `diagram.generation.create`
+  requires `mermaid_source`.
+- **D2:** from a probe pod in `zuno-dify`, the chatflow's retrieval (`knowledge.tech.search`, top_k 4) and its LLM prompt to `auto`: with
+  `max_tokens` 1024 the answers used 1024 tokens (the cap) in every run and the one inspected was the model's reasoning served as the answer
+  (`zuno_reasoning_fallback: true`, `finish_reason: stop`); at 2048 they used 1074 tokens, at 3072 1123 tokens. 0 of 33 runs said "no information".
+- **D8:** an oversized prompt (45 072 tokens) is skipped by the pre-flight on the 32 768-token entries and served by `gpt-oss-20b` in one call; the
+  400 path is tested in `components/ai-gateway/tests/test_wp208_client_rejection.py`.
+- **da's approval proof** re-run on the rebuilt gateways: no regression.
