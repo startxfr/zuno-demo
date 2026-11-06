@@ -1,6 +1,6 @@
 # WP-173: UnifAI A2A identity, server and approval (specification for the fork)
 
-- **State:** Not started
+- **State:** Done (2026-11-06)
 - **ADRs:** [ADR-0402](../../adr/0402-adopt-a2a-as-the-inter-agent-protocol.md), [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md), [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md)
 - **Depends on:** [WP-170](wp-170-agent-delegation-contract-and-adrs.md)
 - **Related:** [WP-146](wp-146-unifai-identity-and-context-header-forwarding.md), [WP-150](wp-150-unifai-operator-okf-agent-bundles.md)
@@ -100,3 +100,22 @@ Decided with the user.
 - **Step 5 ships first without persistence across a worker restart:** a pending approval is lost with the worker and expires as a refusal after 300 seconds. "An approval survives a worker restart" ([ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) clause 3) is deferred to a later version.
 - **The fork work is tracked as R-535,** in the order 1 (identity), 3 (limits), 2 (classification), 5 (approval). Each step goes into a weekly release, with a demo333 canary for the steps that change A2A behaviour.
 - **Classification on return (step 2):** the gateway returns the level its turn ran at in the completed task's metadata, key `zuno.classification` ([ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) clause 5).
+
+## Closure (2026-11-06)
+
+The fork work is delivered and live on demo333 (UnifAI 0.1.61, tracked as R-535 in the fork's ROADMAP):
+
+- **Step 1, identity:** `forward_user_token` on the A2A node, and `X-Zuno-Delegated-By` / `X-Zuno-Delegation-Depth` rendered by the operator
+  (visible in the emitted Arkos blueprint); the chain shows in the audit line and the trace ([WP-174](wp-174-tekos-to-arkos-delegation-on-demo333.md)).
+- **Step 2, classification:** the gateway returns `zuno.classification` and the client raises the delegator's run (live, C1 and C3).
+- **Step 3, limits:** hop counter, cycle detection, the cap on delegations per work item, and the cancel of a delegation no longer awaited,
+  with `mas.a2a_interrupted`, `mas.a2a_task_id` and `mas.a2a_cancel` on the A2A span (live on 0.1.60).
+- **Step 4:** dropped, the zuno a2a-gateway serves the agents (decision of 2026-11-05).
+- **Step 5, approval:** the relay of `input-required` to the originating session's `approval_required`, with `spec.delegation.approval`
+  (`skip`, `ask`, `dynamic`) per bundle; the session's auto-approval rules are deliberately ignored for these requests (live on 0.1.61).
+- **Step 6:** the operator's refusal of hand-added A2A nodes and delegation targets, live since operator 0.1.35.
+
+**Not delivered or not proven, carried by [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md)
+(it stays `Accepted`):** persistence of a pending approval across a worker restart (deferred by the 2026-11-05 decision), the per-agent
+option to approve the delegation itself, a live proof that an auto-approval set for another run does not cross the hop, and a live proof that
+a run with no identity binding cannot write.
