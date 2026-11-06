@@ -144,7 +144,8 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#un
 ## Progress (2026-11-06): UnifAI v0.1.60 and agents v0.14.1 on demo333
 
 - **Pinned and rolled:** UnifAI v0.1.60 (catalog `1df1594c`, five images) and agents v0.14.1 (`okf-corp@sha256:7b8319c8`); the mcp-gateway and
-  the a2a-gateway re-read the release at pod start and the a2a-gateway holds `delegation.write_allowed` (arkos / `draft-architecture-testimonial`).
+  the a2a-gateway re-read the release at pod start and the a2a-gateway holds `delegation.write_allowed`. That entry was Arkos / `draft-architecture-testimonial`, which no delegation can reach; it is
+  replaced by Tekos / `answer-technical-question` (whose `aap.cluster.audit` is the write tool) in the next agents release ([ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) amendment).
 - **Cancel, end to end (R-529):** `user.session.submit`, then `session.cancel` 2 s after the agent-card GET: the worker logs `a2a.task_cancelled`
   with the task id, `tasks/get` answers `canceled`, and the span `mas.node A2A: Tekos` carries `mas.a2a_interrupted=true`, `mas.a2a_task_id` and
   `mas.a2a_cancel=cancelled` (Tempo, session `bbce89d0`).
@@ -159,4 +160,4 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#un
   version).
 - **Still open, and the only thing that keeps this work package from `Done`:** the live approval proof (ADR-0409): it needs UnifAI 0.1.61 (the client
   that reads `zuno.approval`, b9 step 5) pinned, `approval: ask` on the Arkos bundle (branch `wip/arkos-approval-ask`, held until 0.1.61), and a run
-  where Arkos delegates a write to itself-as-target through `draft-architecture-testimonial`.
+  where Arkos asks Tekos for a cluster audit (`aap.cluster.audit`), the user approves, and the AAP job starts; an unanswered request ends as a refusal after 300 s.

@@ -78,7 +78,7 @@ then no delegation traffic flows.
 ## Added when ADR-0409 and ADR-0406 were accepted (2026-10-24)
 
 - **Per-target delegated writes.** With the approval, replace `delegation.allow_write` by `delegation.write_allowed: [{agent, task}]` in
-  `policies/limits/limits-policy.yaml` (first entry: Arkos / `draft-architecture-testimonial`), the gateway check in
+  `policies/limits/limits-policy.yaml` (first entry: Tekos / `answer-technical-question`, corrected from Arkos on 2026-11-06, see ADR-0409), the gateway check in
   `components/mcp-gateway/app/policy.py` and `agent_chain.py`, and a test per case, all in the same corp release as the approval.
 - **Approving the delegation itself** is a per-agent option, off by default, in the approval policy of the A2A node.
 - **A run with no identity binding cannot write** through a delegation (no approver).
