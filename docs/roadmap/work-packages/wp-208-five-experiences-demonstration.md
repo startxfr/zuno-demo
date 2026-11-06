@@ -33,3 +33,16 @@ level, not at the tool level** (the agent declined from its prompt and made no t
 `resource not allowed: Kind=Secret` was proven earlier, in the WP-206 test and in the `downstream_error` of
 `k8s.resource.read`). Not shown: the `k8s.*` tools from UnifAI (no agent declares a task for them) and the Perses
 rendering (the vendor image has no UI).
+
+## Known defects at v0.14 (2026-11-06)
+
+Recorded with the second browser run ([evidence](../evidence/wp-208-five-experiences-browser-2026-11-06.md)); none blocks the
+acceptance, none is fixed by this work package.
+
+| # | Defect | State |
+|---|---|---|
+| D1 | A Dify Workflow run once waited 7 minutes before its first MCP request (426 s, 2026-11-05). The wait is inside the Dify worker (`celery -P gevent -c 1`), not in the token proxy or the gateway. Not reproduced since (4.1 s after four idle minutes, 2.8 s twice before). | Open, cause not established. The token proxy now fails an MCP POST after 30 s (`MCP_TIMEOUT_S`, commit `6a275897`): a guard against a stuck upstream, not a fix of this stall |
+| D2 | The Dify Chatflow on the `auto` model sometimes answers "no information" although retrieval returned passages: the answer varies from run to run | Open, model behaviour |
+| D3 | Open WebUI loops in visible reasoning on a question outside its tools (cluster pods) and does not answer | Open, cause not investigated |
+| D4 | kagent: the browser sign-in as the user ends in 403 from oauth2-proxy; interface not seen live in the second run. The `k8s.*` refusal of a Secret was shown at model level, not tool level (see Result) | Open, handled as its own topic |
+| D5 | OpenClaw's onboarding answer comes from its own documents, not from Confluence | Accepted, demo wording to adjust |
