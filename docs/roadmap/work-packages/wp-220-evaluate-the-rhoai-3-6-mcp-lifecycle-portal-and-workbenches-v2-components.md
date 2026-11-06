@@ -526,9 +526,28 @@ Two traps found on the way, both fixed:
 Result: d0 and d1 Synced and Healthy, OGXServer Ready with one stable pod (9 ReplicaSets after the settling, no growth), the stack lists the four `genai-bff-proxy/...` models, DSC Ready, MaaS 401 without
 token, EnvoyFilter unchanged at 1,336,461 bytes. A playground created from the portal in another namespace is still the vendor's version and will loop.
 
-Remaining work, none blocking this topic: test the same flow as `ai-dev-01` (the `ocp-ai-dev` group does not exist until that user signs in once; its users should see no `k8s.*` tools); decide the Anthropic
+Remaining work, none blocking this topic (the `ai-dev-01` flow was tested, see section 18): decide the Anthropic
 counting option (section 9, recommended: accept and document); the V2 workbench pilot waits for an API that does not exist yet (section 12); MaaS 3.6 IPP-to-Praxis impact on the
 payload-processing workarounds and the Keycloak `apiKeyHelper` path were not verified; an upstream report for the OGX CA-bundle defect.
+
+## 18. Retest of the playground recreated from git (2026-11-06, 19:35-19:42 CET)
+
+User ran the flow in private windows against the chart-created playground (no "Create" click), then I checked the cluster read-only. Pod `lsd-genai-playground` had run 96 minutes
+with 0 restarts and no new ReplicaSet during the tests; OGXServer Ready.
+
+| Test | Result | Evidence (UI) | Cluster check |
+|---|---|---|---|
+| Chat as `ai-ops-01`, subscription `gpt-oss-20b-ocp-ai-ops`, 19:35 | works | `docs/assets/img/wp220-playground-chart-chat-ai-ops.png` | pod stable, 0 restarts |
+| RAG: upload `Devis.250302-21.pdf`, ask for the total, 19:37 | works, "1 cited, 1 retrieved" (amount masked in the capture) | `docs/assets/img/wp220-playground-chart-rag-devis.png` | pgvector holds 3 chunks in the vector store |
+| MCP `zuno-mcp-gateway` with the user's own OpenShift token, 19:38 | 9 of 9 tools | `docs/assets/img/wp220-playground-chart-mcp-9-tools.png` | gateway TokenReview: `ai-ops-01`, groups `ocp-ai-ops` |
+| Tool call `confluence.page.search`, 19:39 | called and allowed; Confluence returned no page for "portail MaaS" | `docs/assets/img/wp220-playground-chart-mcp-confluence-call.png` | gateway log: `caller=ai-ops-01 allowed=True` |
+| Chat as `ai-dev-01`, subscription `gpt-oss-20b-ocp-ai-dev`, 19:41 | works | `docs/assets/img/wp220-playground-chart-chat-ai-dev.png` | Group `ocp-ai-dev` holds `ai-dev-01`; gateway groups `agent_tekos`, `ocp-ai-dev` |
+| MCP as `ai-dev-01`, 19:42 | "Connection successful", **0 of 0 tools** (no `k8s.*`) | `docs/assets/img/wp220-playground-chart-mcp-ai-dev-0-tools.png` | `tool-policy.yaml` lists only `ocp-ai-ops` in `allowed_groups`: default deny |
+
+Notes:
+- The RAG answer shows a malformed citation marker (`.{{cit[1]ation:1}}`): the model wrote the marker badly and the portal rendered it as is. Cosmetic; the citation itself works.
+- `ocp-ai-dev` has no MCP tool at all, by policy. Decision (user, 2026-11-06): keep it, so the demo shows the difference between the two groups. Giving it read-only tools later is a policy change in `zuno-demo-agents`.
+- The MaaS Limitador counter probe (`platform/testing/quota_counters_probe.py`) read `OK: moved ['subscription']` (+29) on the same day: counters move again after the 3.6 EA upgrade.
 
 ## Steps
 
