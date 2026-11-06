@@ -484,6 +484,17 @@ works is for the user to confirm in the portal. A recreated playground brings th
 - Open question for the live test: how the portal passes the user's token to the MCP server (the BFF accepts an `X-MCP-Bearer` header; the OGX stack's own
   tool runtime takes headers per tool). If it does not forward one, the front-door answers 401 and a user must paste a token.
 
+**Chat "Server error" in the playground (measured, then fixed in git, 1d6fab89).** The OGX log says "Provider SDK error" and the portal BFF "Response failed
+event ... Error code: 404": the stack calls the BFF model proxy at `https://rh-ai.<domain>/gen-ai/api/v1/genai-proxy/...`, and no HTTPRoute served `/gen-ai`
+on that host. The vendor `rhods-dashboard` route (which carries it) has no hostname, and the portal's route owns the `rh-ai` virtual host (same cause as
+`zuno-portal-oauth-callback`). Calling the dashboard Service directly answered 200 for `/gen-ai/api/v1/lsd/models` and `/genai-proxy/.../v1/models`. New
+HTTPRoute `zuno-portal-genai` (chart `openshift-ai`, flag `maasGateway.portalGenAiRoute`, on by default): host `rh-ai.<domain>`, PathPrefix `/gen-ai` to
+`rhods-dashboard:8443`. After sync: `/gen-ai/...` answers 302 without credentials and 200 with a bearer token, instead of 404.
+
+**MCP, live after the push.** `zuno-mcp-d1` synced (mcp-gateway rolled once, image unchanged), `MCP_FRONTDOOR_CAPABILITIES` carries the four `k8s.*`, the
+NetworkPolicy lists `zuno-playground` and `redhat-ods-applications`, the ConfigMap `gen-ai-aa-mcp-servers` exists. From the playground pod:
+`mcp-gateway /healthz` 200 and `POST /mcp` without a token 401 (reachable, authentication enforced). Not yet verified: tools listed for `ai-ops-01` in the portal.
+
 ## Steps
 
 1. This evaluation (done, in review).
