@@ -457,8 +457,13 @@ one measured cause for the first two:
 - **No MCP server**: the portal reads the ConfigMap `gen-ai-aa-mcp-servers` in `redhat-ods-applications`, which does not exist. It is an admin catalogue to be
   written, separate from the loop.
 
-Next: once peers' windows allow it, try on `lsd-genai-playground` (a) a single CA source (`odh-trusted-ca-bundle` only) and (b) no `tls.trust` block
-(the stack already runs with `--insecure`); the portal BFF is the field manager, so check it does not put the block back.
+Live test (user go, option A, da's window open and no objection, one object only): with a single CA source (`odh-trusted-ca-bundle`) the loop
+continued (the merged bundle is about twice that source's size, so the operator also adds the system trust bundle; the rewrite stayed non-deterministic).
+With **no `spec.tls` block** (`oc patch ogxserver lsd-genai-playground --type merge -p '{"spec":{"tls":null}}'`) the OGXServer went `Ready` with one pod
+that stayed up (ReplicaSets stopped at 12, pod 83 s old and serving `/v1/providers`). The orphan `lsd-genai-playground-ca-bundle` ConfigMap is still
+rewritten, but nothing mounts it any more. Not durable: this is a live edit on an object the portal BFF created; a playground created again by the
+portal will carry the block again, so a lasting fix needs the portal-generated spec changed (not found yet) or the operator fixed. Backups of the
+OGXServer and its config are in the session scratchpad.
 
 ## Steps
 
