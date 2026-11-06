@@ -514,11 +514,19 @@ What is live and what is only a live edit:
 - In git and Argo-managed: namespace `zuno-playground`, the three `gpt-oss-20b-ocp-*` subscriptions, the two-listener MaaS Gateway (chart values, plus the live Application value
   `externalHostnameListener`, which is not git-synced), `zuno-portal-oauth-callback`, `zuno-portal-genai`, the `gen-ai-aa-mcp-servers` ConfigMap, the four `k8s.*` capabilities
   and the `playground` NetworkPolicy peer of `mcp-gateway`.
-- **Live edits only, lost when the portal recreates the playground**: `spec.tls` removed from the OGXServer `lsd-genai-playground` (operator CA-bundle rollout loop, section 15) and the four
-  models added under `registered_resources.models` of its ConfigMap `llama-stack-config` (section 16).
+- **Was live-edit only, now in git (see below)**: `spec.tls` removed from the OGXServer and the four models added to its ConfigMap.
 
-Remaining work, none blocking this topic: ship an OGXServer example in the chart (no `tls`, four models, pgvector) so the playground is reproducible and survives a recreation;
-test the same flow as `ai-dev-01` (the `ocp-ai-dev` group does not exist until that user signs in once; its users should see no `k8s.*` tools); decide the Anthropic
+**Playground shipped in git (2026-11-06, user go A; 22f801e2).** `gitops/charts/openshift-ai/templates/playground.yaml` creates in `zuno-playground` the same objects the portal
+creates (OGXServer `lsd-genai-playground`, `llama-stack-config`, `genai-pgvector` with PVC, Service and NetworkPolicy) with no `spec.tls`, the four MaaS models registered and a pgvector password
+generated in-cluster by the ESO Password generator. The portal-created copy was deleted first (its pgvector database was initialised with a different password; the uploaded test PDF was lost).
+Two traps found on the way, both fixed:
+1. The PVC in an earlier sync wave than its Deployment deadlocked the sync (storage class binds on first use, so the claim stays Pending, not healthy). Same wave now.
+2. `zuno-openshift-ai-d0` and `-d1` both render this chart; d0 has no `maasGateway` value, so it rendered the same objects with the placeholder domain `apps.mycluster.example.com` and the two
+   Applications overwrote the stack ConfigMap in turn, restarting the OGX server at every sync. The playground and the MCP catalogue templates are now gated on `maasGateway.enabled` (d1 only).
+Result: d0 and d1 Synced and Healthy, OGXServer Ready with one stable pod (9 ReplicaSets after the settling, no growth), the stack lists the four `genai-bff-proxy/...` models, DSC Ready, MaaS 401 without
+token, EnvoyFilter unchanged at 1,336,461 bytes. A playground created from the portal in another namespace is still the vendor's version and will loop.
+
+Remaining work, none blocking this topic: test the same flow as `ai-dev-01` (the `ocp-ai-dev` group does not exist until that user signs in once; its users should see no `k8s.*` tools); decide the Anthropic
 counting option (section 9, recommended: accept and document); the V2 workbench pilot waits for an API that does not exist yet (section 12); MaaS 3.6 IPP-to-Praxis impact on the
 payload-processing workarounds and the Keycloak `apiKeyHelper` path were not verified; an upstream report for the OGX CA-bundle defect.
 
