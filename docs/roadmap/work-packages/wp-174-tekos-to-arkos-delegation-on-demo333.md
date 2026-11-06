@@ -158,6 +158,18 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#un
 - **Acceptance amended (same decision as [WP-173](wp-173-unifai-a2a-identity-server-and-approval.md), 2026-11-05):** the approval proof no longer
   requires surviving a worker restart (a pending approval is lost with the worker and ends as a refusal after 300 s; persistence comes in a later
   version).
-- **Still open, and the only thing that keeps this work package from `Done`:** the live approval proof (ADR-0409): it needs UnifAI 0.1.61 (the client
-  that reads `zuno.approval`, b9 step 5) pinned, `approval: ask` on the Arkos bundle (branch `wip/arkos-approval-ask`, held until 0.1.61), and a run
-  where Arkos asks Tekos for a cluster audit (`aap.cluster.audit`), the user approves, and the AAP job starts; an unanswered request ends as a refusal after 300 s.
+- **Approval round trip, live (ADR-0409, 2026-11-06, UnifAI 0.1.61, agents v0.14.2, a2a-gateway build 11, `approval: ask` on Arkos):**
+  as `eval-consultant-01`, Arkos asked Tekos for a cluster audit. The session's HITL stream (`session.subscribe`) carried
+  `approval_required` about 10 s after the submit (`tool_name` `aap.cluster.audit`, `tool_access_mode` `write`, arguments redacted).
+  - **approve** (`POST session.approval`): the gateway logged `approval answered ... decision=approve` and the write reached the
+    mcp-gateway at once (exactly one `aap.cluster.audit` call in 30 minutes).
+  - **reject:** the gateway logged `decision=reject`, the mcp-gateway received no call, and the session completed.
+  - **silence:** after 330 s without an answer the request was refused and nothing reached the mcp-gateway; Arkos then delegated again and
+    asked again every five minutes until the session was cancelled (b9: the cap of 5 is per delegation, a per-session cap is a product decision).
+  - **R-537:** `unifai-rag-celery` rolled with the old and the new pod alive together, without scaling to 0.
+- **The write itself failed downstream, unrelated to the approval:** AAP answered 400 on the launch of Job Template `zuno-day0-check`
+  (`variables_needed_to_start: 'env' value missing`), so no Day 0 job started. The template now needs `env` while the tool launches it bare
+  ([components/mcp-servers/aap/server.py](../../../components/mcp-servers/aap/server.py)); to be fixed in the AAP content or the tool.
+- **Still open before `Done`:** the live refusal of a delegated write to a target absent from `delegation.write_allowed` (covered by the
+  mcp-gateway and a2a-gateway unit tests, not replayed live because no second write-capable target exists), and a launch of the Day 0 check
+  that actually starts a job (the AAP `env` defect above).

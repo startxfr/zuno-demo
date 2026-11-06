@@ -124,3 +124,12 @@ The first `delegation.write_allowed` entry named Arkos / `draft-architecture-tes
 `answer-technical-question`, whose `aap.cluster.audit` (`access: write`, a Day 0 health check run through AAP) is the only write tool a
 delegation can reach today. `approval: ask` goes on the delegating bundle, Arkos, as `spec.delegation.approval` (operator 0.1.61 or later).
 The Arkos entry is removed rather than kept dormant: a safety list should hold nothing that cannot fire.
+
+## Progress 2026-11-06: the approval round trip is proven live
+
+On demo333 (UnifAI 0.1.61, agents v0.14.2, `approval: ask` on Arkos), an approval raised by Tekos reached the initiating user on the
+session that started the chain (`approval_required`, about 10 s), an approve let the write reach the mcp-gateway (one call), a reject
+and a silence of 300 s ran no write, and the session's auto-approval rules were not used. Still to show before `Implemented`: a live
+refusal of a delegated write to a target absent from `delegation.write_allowed`, that an auto-approval set for another run does not
+cross the hop, and that a run with no identity binding cannot write. See the evidence in
+[WP-174](../roadmap/work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md).
