@@ -133,3 +133,8 @@ and a silence of 300 s ran no write, and the session's auto-approval rules were 
 refusal of a delegated write to a target absent from `delegation.write_allowed`, that an auto-approval set for another run does not
 cross the hop, and that a run with no identity binding cannot write. See the evidence in
 [WP-174](../roadmap/work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md).
+
+The proof that an auto-approval does not cross the hop could not be made on UnifAI 0.1.61: a session rule (`session.approval.rule`,
+`approve_all`) is saved but never reaches a session run by the Temporal worker, whose gate is built without the session metadata and
+logs `approve_all: False` (fork R-539, fix planned in 0.1.62). It is to be replayed once after 0.1.62 is pinned.
+
