@@ -81,6 +81,10 @@ flowchart LR
    the current state of the namespace and give me what you find."* As **ai-ops-01** Tekos calls `k8s.events.read` and
    answers from real pods and events. As **consultant-02** the same question gets a generic answer and no `k8s.*` call:
    the tools are offered to `ocp-ai-ops` only (agents release 0.14.0, Tekos 0.5.0). Arkos has none.
+
+   ![ai-ops-01 asks Tekos about a pod in zuno-ai-run](../assets/img/unifai-tekos-k8s-ai-ops-01-question.png)
+   ![Tekos answers from the real events of the namespace](../assets/img/unifai-tekos-k8s-ai-ops-01-answer.png)
+   ![consultant-02 gets a generic answer and no cluster read](../assets/img/unifai-tekos-k8s-consultant-02-generic-answer.png)
 9. **The limit, said out loud.** Dify and kagent count per **persona**: every Dify user is consultant-02 in the
    quota, the telemetry and the audit, every kagent user is ai-ops-01. The front doors (oauth2-proxy) log who signed in;
    the platform cannot tell two Dify users apart (ADR-0601 decision 5).

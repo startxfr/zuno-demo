@@ -62,3 +62,7 @@ Tested in the UnifAI Team workspace `agent-tekos` (user screenshots 12:49 and 12
 **consultant-02** got a generic answer ("1 tool used" is the documentation retriever) and no `k8s.*` audit line at all:
 the tools are not offered to that persona. Not tested: Arkos (declares none), a refused `k8s.*` call (the model never
 sees the tool, so there is no deny line).
+
+Screenshots: [ai-ops-01 question](../../assets/img/unifai-tekos-k8s-ai-ops-01-question.png),
+[ai-ops-01 answer](../../assets/img/unifai-tekos-k8s-ai-ops-01-answer.png),
+[consultant-02 generic answer](../../assets/img/unifai-tekos-k8s-consultant-02-generic-answer.png).
