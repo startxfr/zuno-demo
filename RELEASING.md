@@ -198,7 +198,9 @@ version. A release reaches a cluster in four steps:
    (agents, corp policies) read the release at build time: rebuild them
    (`make d1 build ai-gateway`, `make d2 build mlops`).
 4. **Check.** `make d2 check agents` admits the lock again and runs the
-   acceptance gate against the release's bundles.
+   acceptance gate against the release's bundles. It also compares the digest the running mcp-gateway and a2a-gateway
+   fetch (their `okf-fetch` init container) with `platform/okf/stack-config.generated.yaml` and fails on a gap: the
+   gateways read the release only when a pod starts, so a promotion not rolled in step 3 shows up here (WP-208 D9).
 
 Nothing under `agents/` is ever edited here: there is no such directory.
 Locally, `python3 platform/okf/release_cache.py` extracts the locked release
