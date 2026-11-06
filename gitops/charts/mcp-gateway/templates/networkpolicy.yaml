@@ -86,3 +86,17 @@ spec:
         - protocol: TCP
           port: 8080
 {{- end }}
+{{- if .Values.playground.enabled }}
+    # WP-220: MaaS consumer portal playground (OGX stack + gen-ai-ui) calling the
+    # /mcp front-door with the user's token. Namespace-scoped, same trade-off as
+    # the Lightspeed rule above; see values.yaml `playground`.
+    - from:
+        {{- range .Values.playground.namespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+{{- end }}

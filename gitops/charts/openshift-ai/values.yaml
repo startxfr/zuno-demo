@@ -619,3 +619,16 @@ ogxServer:
   # path, so it worked before this fix too.
   vllmEndpoint: http://embeddings-predictor.zuno-ai-run.svc:8080/v1
 
+
+# WP-220 (2026-11-06): MCP servers listed in the MaaS consumer portal's playground
+# (ConfigMap gen-ai-aa-mcp-servers, templates/gen-ai-mcp-servers.yaml). One entry:
+# the Zuno MCP Gateway's /mcp front-door, which applies the signed-in user's groups.
+genAiMcpServers:
+  enabled: true
+  servers:
+    zuno-mcp-gateway:
+      url: http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/mcp
+      description: >-
+        Zuno MCP Gateway: Confluence search and read, technical-docs search, AAP audits and
+        read-only Kubernetes tools, filtered by your own groups. Authenticates with your own
+        OpenShift token.
