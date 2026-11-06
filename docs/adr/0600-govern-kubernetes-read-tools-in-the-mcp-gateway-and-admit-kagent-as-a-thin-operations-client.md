@@ -88,5 +88,12 @@ The binding registry maps one capability to one backend tool, so `k8s.resource.r
 `k8s.resource.list` (list). The backend is the upstream `kubernetes-mcp-server` v0.0.69 pinned by digest, in
 `read_only` mode with an `enabled_tools` allowlist and Secret and ConfigMap denied by kind. `metrics.query`
 needs `cluster-monitoring-view` (the namespaced Thanos port is unusable), so it reads the metrics of the whole
-cluster, which the user accepted. The entitled groups are `ocp-ai-ops` and `aap_ops`. Evidence:
+cluster, which the user accepted. The entitled groups were `ocp-ai-ops` and `aap_ops` (narrowed to `ocp-ai-ops` on 2026-11-06, see the amendment below). Evidence:
 [wp-206-k8s-mcp-spike](../roadmap/evidence/wp-206-k8s-mcp-spike.md).
+
+## Amendment (2026-11-06): UnifAI reaches the tools, operations group only
+
+Tekos (`answer-technical-question`, agents 0.14.0) declares the five `k8s.*` capabilities. The policy entries now admit
+`ocp-ai-ops` alone: `aap_ops` is also held by the consultant personas and the Dify and OpenClaw service accounts, and
+cluster logs are C2. Verified live with ai-ops-01 (one `k8s.events.read`, allowed) and consultant-02 (no `k8s.*` call).
+Arkos declares none. Evidence: [WP-208](../roadmap/work-packages/wp-208-five-experiences-demonstration.md).

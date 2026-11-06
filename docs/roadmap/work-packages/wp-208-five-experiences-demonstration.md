@@ -31,7 +31,7 @@ The rehearsal ran end to end on demo333 and the dashboard shows all five clients
 recorded with the closure: in the browser rehearsal the kagent refusal to read a Secret was **demonstrated at the model
 level, not at the tool level** (the agent declined from its prompt and made no tool call; the server-side refusal
 `resource not allowed: Kind=Secret` was proven earlier, in the WP-206 test and in the `downstream_error` of
-`k8s.resource.read`). Not shown: the `k8s.*` tools from UnifAI (no agent declares a task for them) and the Perses
+`k8s.resource.read`). Not shown: the Perses
 rendering (the vendor image has no UI).
 
 ## Known defects at v0.14 (2026-11-06)
@@ -46,3 +46,15 @@ acceptance, none is fixed by this work package.
 | D3 | Open WebUI loops in visible reasoning on a question outside its tools (cluster pods) and does not answer | Open, cause not investigated |
 | D4 | kagent: the browser sign-in as the user ends in 403 from oauth2-proxy; interface not seen live in the second run. The `k8s.*` refusal of a Secret was shown at model level, not tool level (see Result) | Open, handled as its own topic |
 | D5 | OpenClaw's onboarding answer comes from its own documents, not from Confluence | Accepted, demo wording to adjust |
+
+## Follow-up (2026-11-06): `k8s.*` from UnifAI
+
+Tekos 0.5.0 (agents release 0.14.0, promoted by zuno-demo PR #35) declares the five `k8s.*` read tools on
+`answer-technical-question`; `tool-policy.yaml` admits `ocp-ai-ops` only on them (`aap_ops` removed, so consultant-02 and
+the Dify/OpenClaw service accounts gain nothing). Live on demo333 after `make d2 install mcp` and `make d2 install unifai`.
+Tested in the UnifAI Team workspace `agent-tekos` (user screenshots 12:49 and 12:51): **ai-ops-01** got a grounded answer
+(pod `a2a-gateway-…`, startup probe failure on 15021); the mcp-gateway audit holds one line
+`tool=k8s.events.read agent=tekos task=answer-technical-question groups=[agent_tekos, ocp-ai-ops, …] allowed=True`.
+**consultant-02** got a generic answer ("1 tool used" is the documentation retriever) and no `k8s.*` audit line at all:
+the tools are not offered to that persona. Not tested: Arkos (declares none), a refused `k8s.*` call (the model never
+sees the tool, so there is no deny line).
