@@ -24,7 +24,8 @@ browser's shared sign-in session is not in group `ocp-ai-ops`; signed in as `ai-
 
 The Confluence Workflow ran at 11:07:22, about four minutes after the previous Dify call: 4.089 s, Confluence search 1.741 s,
 summary 1.996 s ([detail](wp-208-2026-11-06-6-dify-latence-detail.png), [trace](wp-208-2026-11-06-6-dify-latence-trace.png)).
-One run, not a proof. The token proxy now fails an MCP POST after 30 s (commit `6a275897`, image built from it and rolled in
+One run, not a proof. After the worker went from 1 to 4 slots (commit `fb4c7602`, 15:14 UTC restart), the same Workflow ran at 16:20:23 local
+time: search 1.101 s, summary 1.901 s, about 3 s in total (user's capture, not committed uncropped). The token proxy now fails an MCP POST after 30 s (commit `6a275897`, image built from it and rolled in
 `zuno-dify` and `zuno-kagent` on 2026-11-06). The 7-minute stall of 2026-11-05 was analysed in
 [the rehearsal record](wp-208-five-experiences-rehearsal.md): the wait was inside the Dify worker before the first request
 reached the proxy, so this timeout does not address it.
