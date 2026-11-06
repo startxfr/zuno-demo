@@ -249,7 +249,11 @@ def _candidate_max_tokens(
     max_model_len = cfg.get("max_model_len")
     if not max_tokens or not max_model_len:
         return max_tokens
-    room = int(max_model_len) - _estimate_prompt_tokens(messages, tools)
+    estimate = _estimate_prompt_tokens(messages, tools)
+    # WP-208 D8: char/4 only approximates the model's tokenizer. With no margin the cap filled the window to
+    # the token (32768 - 24605 = 8163 asked for a prompt of 24606 tokens) and vLLM answered 400 on the
+    # difference, on both entries of the model. Keep 5 % of the prompt, at least 256 tokens, free.
+    room = int(max_model_len) - estimate - max(256, estimate // 20)
     return min(max_tokens, room) if room > 0 else max_tokens
 
 

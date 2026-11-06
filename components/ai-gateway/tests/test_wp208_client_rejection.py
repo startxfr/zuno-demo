@@ -137,6 +137,25 @@ def test_a_400_then_a_real_failure_is_not_reported_as_a_400() -> None:
         raise AssertionError("expected a 502")
 
 
+def test_the_reply_cap_keeps_a_margin_under_the_window() -> None:
+    """The 2026-11-06 case: window 32768, prompt estimated 24605 tokens, caller asked for more than the
+    room. The cap used to be 32768 - 24605 = 8163, which vLLM refused for a prompt of 24606."""
+    class _M:
+        def __init__(self, n):
+            self.content = "x" * (4 * n)
+
+    messages = [_M(24604)]
+    estimate = app_main._estimate_prompt_tokens(messages, None)
+    assert estimate == 24605, estimate
+    cap = app_main._candidate_max_tokens(16000, {"max_model_len": 32768}, messages, None)
+    assert cap == 32768 - 24605 - 1230, cap
+    assert 24606 + cap <= 32768
+    # a small caller cap is untouched, a window that cannot be filled keeps the caller's cap as before
+    assert app_main._candidate_max_tokens(1024, {"max_model_len": 32768}, messages, None) == 1024
+    assert app_main._candidate_max_tokens(500, {}, messages, None) == 500
+    assert app_main._candidate_max_tokens(None, {"max_model_len": 32768}, messages, None) is None
+
+
 TESTS = [
     test_the_model_family_ignores_the_maas_suffix,
     test_only_the_models_own_refusals_count,
@@ -144,6 +163,7 @@ TESTS = [
     test_a_different_model_still_takes_over,
     test_a_real_failure_still_falls_back_to_the_sibling,
     test_a_400_then_a_real_failure_is_not_reported_as_a_400,
+    test_the_reply_cap_keeps_a_margin_under_the_window,
 ]
 
 
