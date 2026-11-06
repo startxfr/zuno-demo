@@ -200,9 +200,29 @@ What happened:
   unauthenticated request gets a 302 to the OpenShift OAuth server (client `data-science`), as designed.
 - No regression: MaaS without a token still answers 401, the four models are Ready, no unhealthy pod, DSC Ready.
 
-Not yet done: the interactive sign-in as `dev` and the key create, use, list and revoke cycle in the browser (needs the user's own login).
-Open questions for that run: which subscription the portal offers (expected `gpt-oss-20b-developer`), whether key events are audited, and
-whether the vendor policy also blocks the portal's calls to maas-api once a user is signed in.
+Interactive run (2026-11-05 evening to 2026-11-06, the user signing in as the static OpenShift user `dev`, identity provider
+`startx-htpasswd_auth`):
+
+- **Sign-in first failed with a 404 at `/oauth2/callback`.** OpenShift authenticated `dev`, then the return hit
+  `https://rh-ai.<domain>/oauth2/callback`, which no route served: the portal HTTPRoute has an explicit hostname, the vendor
+  `oauth-callback-route` (to kube-auth-proxy) has none, and Istio does not merge a hostname-less route into the virtual host of a
+  host-specific one. Fixed by the supplementary route `zuno-portal-oauth-callback` (chart template `maas-portal-oauth-callback.yaml`,
+  4766b438); the callback then answers 403 without a session cookie, as kube-auth-proxy does, and the browser sign-in succeeds.
+- **The portal opens**: Red Hat AI shell with "AI asset endpoints", "API keys" and "Playground". "AI asset endpoints" and "Playground" are
+  empty ("To begin you must deploy a model"): they list models flagged as AI assets in the `Startx default project`, and the local
+  models live in `zuno-ai-run`. Expected, and unrelated to the key flow.
+- **"API keys" fails with "maas-api is not available".** Not a network problem: maas-ui reaches maas-api, which answers
+  `GET /v1/tenants` with 500, "gateway openshift-ingress/maas-default-gateway is not configured with an external hostname (found internal
+  service name: maas-default-gateway-istio.openshift-ingress.svc.cluster.local). Please configure the Gateway with
+  spec.listeners[].hostname and use LoadBalancer service type". Our MaaS Gateway has no listener hostname and is reached through an
+  OpenShift Route, so maas-api cannot derive the external URL and the portal's key pages cannot load.
+- **Options recorded, none applied to the Gateway** (it carries every model call; a change regenerates the Kuadrant EnvoyFilters, and the
+  2026-11-05 outage and the EnvoyFilter size limit are recent): (A) leave the Gateway as is and mint keys through the maas-api REST call;
+  (B) add `hostname: maas.<domain>` to the `https` listener in `maas-gateway.yaml` (the seven attached routes have no hostname, so they
+  would inherit it; untested whether maas-api accepts that without a LoadBalancer Service); (C) prove B on a throwaway Gateway and
+  AITenant first. Preferred: A now, C only if the portal matters for the demo.
+
+Still open: whether key events are audited, and which subscriptions the portal would list for `dev` once maas-api can answer.
 
 ## Steps
 
