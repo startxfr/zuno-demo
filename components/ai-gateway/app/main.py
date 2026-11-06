@@ -24,7 +24,7 @@ from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, Tool
 
 from app import model_tasks, tool_markers
 from app import guardrails, maas_adapter, quota, quota_fail_modes, quota_windows, reasoning as reasoning_fallback, routing_decisions, semantic_cache
-from app.auth import CallerIdentity, validate_token
+from app.auth import CallerIdentity, require_admin, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
 from app.image_routing import ImageRoutingError, ImageRoutingTable
 from app.model_routing_policy import AdapterDeclaration, ModelRoutingPolicy
@@ -110,7 +110,7 @@ async def readyz() -> JSONResponse:
     )
 
 
-@app.post("/admin/reload-routing")
+@app.post("/admin/reload-routing", dependencies=[Depends(require_admin)])
 async def reload_routing() -> Dict[str, Any]:
     """Operational escape hatch: re-reads provider-routing.yaml,
     policies/model-routing/model-routing-policy.yaml and
@@ -136,7 +136,7 @@ async def reload_routing() -> Dict[str, Any]:
 # --------------------------------------------------------------------------
 
 
-@app.get("/admin/optimizer/audit")
+@app.get("/admin/optimizer/audit", dependencies=[Depends(require_admin)])
 async def optimizer_audit() -> Dict[str, Any]:
     return {
         "enabled": tuning_controller.policy.enabled,
@@ -145,7 +145,7 @@ async def optimizer_audit() -> Dict[str, Any]:
     }
 
 
-@app.post("/admin/optimizer/outcome")
+@app.post("/admin/optimizer/outcome", dependencies=[Depends(require_admin)])
 async def optimizer_outcome(payload: Dict[str, Any]) -> Dict[str, Any]:
     """Reports the observed evaluation-window metrics; the controller
     auto-rolls-back every open action on a trigger breach."""
@@ -156,13 +156,13 @@ async def optimizer_outcome(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {"rolled_back": [e.parameter for e in rolled_back]}
 
 
-@app.post("/admin/optimizer/kill")
+@app.post("/admin/optimizer/kill", dependencies=[Depends(require_admin)])
 async def optimizer_kill() -> Dict[str, Any]:
     reverted = tuning_controller.kill()
     return {"reverted": [e.parameter for e in reverted]}
 
 
-@app.post("/admin/optimizer/apply")
+@app.post("/admin/optimizer/apply", dependencies=[Depends(require_admin)])
 async def optimizer_apply(payload: Dict[str, Any]) -> JSONResponse:
     """Applies one recommendation (evaluations/routing_report.py's own
     entry format, or {parameter: cache_ttl, value: N}) within the

@@ -90,6 +90,10 @@ spec:
               value: {{ .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) | quote }}
             - name: KEYCLOAK_JWKS_URL
               value: {{ .Values.keycloakJwksUrl | quote }}
+            - name: JWT_AUDIENCE
+              value: {{ .Values.jwtAudience | quote }}
+            - name: JWT_AUDIENCE_REQUIRED
+              value: {{ .Values.jwtAudienceRequired | quote }}
             - name: LOCAL_MODEL_ENDPOINT
               value: {{ .Values.localModelEndpoint | quote }}
             - name: LOCAL_MODEL_NAME

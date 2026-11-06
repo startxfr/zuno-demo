@@ -136,6 +136,12 @@ Liveness always `200`. Readiness returns `503` until
 Re-reads `provider-routing.yaml` from disk without a pod restart (mirrors
 `mcp-gateway`'s `/admin/reload-policy`).
 
+**Authentication (ADR-0602 / WP-222).** Every `/admin/*` route (this one and `/admin/optimizer/*`) needs a Keycloak JWT
+(audience `zuno-admin-api`) whose `groups` include one of `ADMIN_GROUPS`
+(default `ocp-paas-ops,ocp-ai-ops`): no token gives `401`, another group `403`.
+`ADMIN_AUTH_MODE=off` restores the old network-only trust and is meant for
+break-glass only.
+
 ## Streaming and fallback
 
 Non-streaming requests try every eligible provider in order until one
