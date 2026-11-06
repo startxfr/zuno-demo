@@ -174,3 +174,20 @@ def test_a_missing_or_invalid_classification_is_c2():
     assert rag_query._classification({"classification": "c3"}) == "C3"
     assert rag_query._classification({"classification": "C4"}) == "C4"
     assert rag_query._classification({"classification": "C1"}) == "C1"
+
+
+def test_wp222_top_k_is_capped(monkeypatch):
+    """ADR-0603 / WP-222: a model-chosen top_k cannot exceed MAX_TOP_K."""
+    seen = []
+
+    def transport_handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"results": []})
+
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        rag_query.httpx, "AsyncClient",
+        lambda *a, **kw: real_client(*a, **{**kw, "transport": httpx.MockTransport(transport_handler)}),
+    )
+    asyncio.run(rag_query.handle({"query": "q", "top_k": 100000}, "u", bearer_token=JWT))
+    assert seen and all(r.url.params["top_k_results"] == str(rag_query.MAX_TOP_K) for r in seen)

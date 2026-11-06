@@ -19,7 +19,7 @@ ansible/confidential*.back
 # Python / Ansible
 __pycache__/
 *.pyc
-.venv/
+.venv*
 .ansible/
 *.retry
 

@@ -60,6 +60,13 @@ keycloakIssuer: ""
 # termination) inside the mesh/NetworkPolicy boundary (zuno-auth allows
 # zuno-ai-run).
 keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
+# ADR-0602 / WP-222: the audience every experience client's token carries (the maas-gateway-audience
+# mapper of realm-zuno.json: unifai, open-webui, dify, kagent, openclaw-*, zuno-evaluations,
+# zuno-stresstest), the same one a2a-gateway requires. Tokens of `openshift`, `aap` and `zuno-signer`
+# lack it and are refused. Empty = the audience is not checked (and jwtAudienceRequired must be false,
+# or the pod refuses to start).
+jwtAudience: zuno-admin-api
+jwtAudienceRequired: true
 
 # ADR-0415: components/mcp-gateway/app/handlers/image_gen.py's real
 # in-cluster call target.

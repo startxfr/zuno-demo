@@ -179,7 +179,7 @@ async def read_opportunity(query: str, limit: int = 5) -> Dict[str, Any]:
     escaped_query = query.replace("\\", "\\\\").replace("'", "\\'")
     soql = (
         "SELECT Id,Name,StageName,Amount,CloseDate,AccountId FROM Opportunity "
-        f"WHERE Name LIKE '%{escaped_query}%' ORDER BY LastModifiedDate DESC LIMIT {int(limit)}"
+        f"WHERE Name LIKE '%{escaped_query}%' ORDER BY LastModifiedDate DESC LIMIT {max(1, min(int(limit), 50))}"
     )
     async with _client() as client:
         resp = await client.get("/query", params={"q": soql})

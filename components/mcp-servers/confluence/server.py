@@ -46,6 +46,7 @@ from __future__ import annotations
 import hmac
 import math
 import os
+import re
 import string
 from contextlib import asynccontextmanager
 from typing import Any, Dict, List, Optional
@@ -154,6 +155,15 @@ def _significant_words(query: str) -> List[str]:
     ]
 
 
+_SPACE_KEY_RE = re.compile(r"[A-Za-z0-9_~-]{1,64}")
+_MAX_SEARCH_LIMIT = 50
+
+
+def _cql_escape(text: str) -> str:
+    """Escapes a value for use inside a double-quoted CQL string literal."""
+    return text.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def _cql_query_text(query: str) -> str:
     """Reduces a long, question-shaped query to its significant words for
     CQL's text~ operator; returns short queries unchanged."""
@@ -218,7 +228,12 @@ async def healthz() -> Dict[str, str]:
 @mcp_server.tool()
 async def search_pages(query: str, space: Optional[str] = None, limit: int = 10) -> Dict[str, Any]:
     """Search Confluence pages by text (CQL), optionally scoped to a space key."""
-    cql = f'type=page and text~"{_cql_query_text(query)}"'
+    # ADR-0602 / WP-222: both values are model-chosen and land inside a CQL
+    # string literal, so a quote in either would widen the query.
+    if space and not _SPACE_KEY_RE.fullmatch(space):
+        raise ValueError("space must be a Confluence space key (letters, digits, _ - ~)")
+    limit = max(1, min(int(limit), _MAX_SEARCH_LIMIT))
+    cql = f'type=page and text~"{_cql_escape(_cql_query_text(query))}"'
     if space:
         cql = f'space="{space}" and {cql}'
     async with _client() as client:

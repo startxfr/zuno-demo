@@ -34,6 +34,24 @@ KEYCLOAK_JWKS_URL = os.getenv(
 # service calls; set JWT_AUDIENCE to enforce `aud` checking once the
 # identity track assigns a client id to this gateway.
 JWT_AUDIENCE = os.getenv("JWT_AUDIENCE") or None
+
+
+def _truthy(value: Optional[str]) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+# ADR-0602 / WP-222: with JWT_AUDIENCE unset, any token the realm signs is
+# accepted, whichever client it was minted for. JWT_AUDIENCE_REQUIRED=true
+# turns that silent default into a startup failure. It stays off until the
+# Keycloak audience mapper is live, so enabling it is a deliberate step.
+if _truthy(os.getenv("JWT_AUDIENCE_REQUIRED")) and not JWT_AUDIENCE:
+    raise RuntimeError("JWT_AUDIENCE_REQUIRED is set but JWT_AUDIENCE is empty; refusing to start.")
+
+
+def admin_groups() -> List[str]:
+    """Groups allowed to call /admin/* (ADR-0602). Read per call."""
+    raw = os.getenv("ADMIN_GROUPS", "ocp-paas-ops,ocp-ai-ops")
+    return [g.strip() for g in raw.split(",") if g.strip()]
 JWT_LEEWAY_SECONDS = int(os.getenv("JWT_LEEWAY_SECONDS", "30"))
 
 _jwks_client: Optional[PyJWKClient] = None
@@ -237,4 +255,17 @@ def validate_token_or_kubernetes(
     logger.info(
         "per-user identity resolved via TokenReview: user=%s groups=%s", identity.sub, identity.groups
     )
+    return identity
+
+
+def require_admin(authorization: Optional[str] = Header(default=None)) -> CallerIdentity:
+    """Dependency for /admin/*: a valid token whose groups include one of
+    ADMIN_GROUPS. ADMIN_AUTH_MODE=off restores the old network-only trust
+    (ADR-0602 keeps it as an explicit, visible opt-out)."""
+    if (os.getenv("ADMIN_AUTH_MODE", "enforce") or "enforce").strip().lower() == "off":
+        return CallerIdentity(sub="admin-auth-off", groups=[], raw_claims={}, token="")
+    identity = validate_token(authorization)
+    if not set(identity.groups) & set(admin_groups()):
+        logger.warning("admin call refused for sub=%s", identity.sub)
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin group required.")
     return identity
