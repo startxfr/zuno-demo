@@ -11,7 +11,7 @@ user pastes their token in the portal's MCP panel (header X-MCP-Bearer); nothing
 secret is stored here. Reachability is granted by the `playground` peer of
 gitops/charts/mcp-gateway/templates/networkpolicy.yaml.
 */ -}}
-{{- if .Values.genAiMcpServers.enabled }}
+{{- if and .Values.maasGateway.enabled .Values.genAiMcpServers.enabled }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
