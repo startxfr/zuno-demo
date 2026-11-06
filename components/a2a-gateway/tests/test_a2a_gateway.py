@@ -447,6 +447,7 @@ class ApprovalTests(GatewayTestCase):
         self.assertEqual(self.tool_calls(), [])
         tool_message = self.down.llm_calls[1]["body"]["messages"][-1]
         self.assertIn("was not approved", tool_message["content"])
+        self.assertIn("do not ask for it again", tool_message["content"])
 
     async def test_an_unsupported_decision_counts_as_a_refusal(self) -> None:
         task = await self.start()
