@@ -169,7 +169,10 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#un
   - **R-537:** `unifai-rag-celery` rolled with the old and the new pod alive together, without scaling to 0.
 - **The write, once the AAP template was clean (2026-11-06, 16:12):** the first approved write failed downstream, unrelated to the approval: AAP
   answered 400 on the launch of Job Template `zuno-day0-check` (`'env' value missing`), because the template carried a required Survey
-  question `env` that is in no repository file and that the playbook does not use. The Survey was switched off (it already was, a minute
+  question `env` that is in no repository file and that the playbook does not use. AAP's activity stream shows who and when: the question
+  ("environement", "quel est l'env") was typed by hand in the AAP interface on 2026-09-29 12:56 with the shared `admin` account and the Survey
+  enabled 25 s later; it was switched off on 2026-11-06 at 16:11:01 and the question deleted at 16:15:56, both again by `admin` (not by the tool
+  nor by `aap_config`). So the agent-reachable audit has been broken since 2026-09-29 and nothing noticed it until the approval proof. The Survey was switched off (it already was, a minute
   earlier, by another actor) and the same round trip then ran end to end: approve, then AAP job 1329 (`zuno-day0-check`, launch type
   `manual`) started at 16:12:36, seconds after the answer, and the session completed. The original Survey spec is kept in
   `/var/tmp/aap_template16_original.json` on the operator's machine (question `env`, text, default `dev`, required).
