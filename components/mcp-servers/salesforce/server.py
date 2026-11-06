@@ -150,6 +150,10 @@ mcp_server = MCPServer(
 )
 
 
+
+# ADR-0603 / WP-222: ceiling for the model-chosen limit.
+MAX_OPPORTUNITY_LIMIT = 50
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Same requirement as confluence/server.py: the mounted MCP sub-app's
@@ -173,13 +177,16 @@ async def read_opportunity(query: str, limit: int = 5) -> Dict[str, Any]:
     free-text query against their Name (most-recently-modified first) -
     the live current-value verification `check-deal-status` falls back to
     when indexed `knowledge.sales` content could be stale (ADR-0205)."""
-    # SOQL has no query-parameter binding over REST; escape the one
-    # metacharacter that would otherwise break out of the string literal
-    # (Salesforce's own documented SOQL injection mitigation).
-    escaped_query = query.replace("\\", "\\\\").replace("'", "\\'")
+    # SOQL has no query-parameter binding over REST: escape the quote that
+    # would break out of the string literal (Salesforce's documented SOQL
+    # injection mitigation), plus the LIKE wildcards % and _ so a model-chosen
+    # query cannot widen the match (ADR-0603 / WP-222).
+    escaped_query = (
+        query.replace("\\", "\\\\").replace("'", "\\'").replace("%", "\\%").replace("_", "\\_")
+    )
     soql = (
         "SELECT Id,Name,StageName,Amount,CloseDate,AccountId FROM Opportunity "
-        f"WHERE Name LIKE '%{escaped_query}%' ORDER BY LastModifiedDate DESC LIMIT {max(1, min(int(limit), 50))}"
+        f"WHERE Name LIKE '%{escaped_query}%' ORDER BY LastModifiedDate DESC LIMIT {max(1, min(int(limit), MAX_OPPORTUNITY_LIMIT))}"
     )
     async with _client() as client:
         resp = await client.get("/query", params={"q": soql})

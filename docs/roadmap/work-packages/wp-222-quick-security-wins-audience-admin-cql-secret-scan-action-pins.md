@@ -80,3 +80,32 @@ ADR-0602 clauses 6 and 7; ADR-0603 clause 1 (M10, M11, M19, M21).
 
 - Blocking `/v1/messages` and `/v1/responses`: WP-220 verified those paths on purpose; metering belongs to WP-225.
 - Issuer and audience pinning in Authorino (the quota route) and JWKS over HTTPS: WP-224.
+
+## Review fixes (2026-11-07)
+
+A read-only review by a second session found the points below. Each one is fixed in a separate commit on the same branch.
+
+- **Stale comment:** both `auth.py` files claimed the audience flag "stays off". The charts set it, and the comment now
+  says so.
+- **`/admin/reload-policy` takes Keycloak JWTs only:** an OpenShift or ServiceAccount token gets `401`, unlike `/mcp`.
+  This is now stated in the `main.py` docstring and in both gateway READMEs, which also describe `ADMIN_GROUPS` and
+  `ADMIN_AUTH_MODE`.
+- **Confluence:**
+  - Personal space keys (`~john.doe`, `~557058:…`) are now accepted. A quote or a space still fails.
+  - `read_page` and `update_page` reject any `page_id` that is not numeric before it reaches a URL path.
+- **Salesforce:** the `LIKE` wildcards `%` and `_` are escaped. The ceiling is the named constant
+  `MAX_OPPORTUNITY_LIMIT`.
+- **`rag_query`:** a non-numeric `top_k` falls back to 5 instead of raising.
+- **`secret-scan.yml`:**
+  - Pull requests and pushes scan only the commits they bring, so an old, already-rotated finding no longer blocks
+    unrelated work. A weekly run and a manual run scan the whole history.
+  - The version is set once in `GITLEAKS_VERSION`. `.gitleaks.toml`, added in WP-223, is read automatically.
+- **`.gitignore`:** `.venv*` was too broad and is now `.venv` plus `.venv-*/`.
+- **Not changed:**
+  - The duplicated `auth.py`: the duplication is deliberate and documented in the module docstring.
+  - `importlib.reload` in the audience test: it is the only way to test an import-time guard.
+- **Verification:**
+  - New tests for personal space keys, numeric `page_id` and a non-numeric `top_k` all pass.
+  - The gateway suites keep the same failing set as before (ai-gateway 376 passed / 1 failed, mcp-gateway 127 passed /
+    12 failed / 4 errors, all pre-existing).
+  - A local gitleaks run on the branch's commit range finds no leaks.

@@ -49,6 +49,28 @@ def test_limit_is_capped() -> None:
     assert seen["cql"] == 'space="ARCHI" and type=page and text~"say \\"hi\\""'
 
 
+def test_personal_space_keys_are_accepted() -> None:
+    for good in ("ARCHI", "~john.doe", "~557058:3f1c2d4e-aaaa"):
+        assert server._SPACE_KEY_RE.fullmatch(good), good
+    for bad in ('~x" or space="HR', "~", "A B"):
+        assert not server._SPACE_KEY_RE.fullmatch(bad), bad
+
+
+def test_page_id_must_be_numeric() -> None:
+    for bad in ("../../admin", "123?expand=x", "12 3", ""):
+        try:
+            asyncio.run(server.read_page(bad))
+        except ValueError:
+            continue
+        raise AssertionError(f"read_page accepted {bad!r}")
+    try:
+        asyncio.run(server.update_page("../1", "<p>x</p>"))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("update_page accepted a path")
+
+
 if __name__ == "__main__":
     for n, f in sorted(globals().items()):
         if n.startswith("test_") and callable(f):

@@ -155,8 +155,18 @@ def _significant_words(query: str) -> List[str]:
     ]
 
 
-_SPACE_KEY_RE = re.compile(r"[A-Za-z0-9_~-]{1,64}")
+# Global keys are letters/digits; personal spaces are "~" + username or
+# account id (e.g. ~john.doe, ~557058:3f1c...). No quote or space can pass.
+_SPACE_KEY_RE = re.compile(r"~?[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}")
+# Confluence content ids are numeric; checked before they reach a URL path.
+_PAGE_ID_RE = re.compile(r"[0-9]{1,20}")
 _MAX_SEARCH_LIMIT = 50
+
+
+def _check_page_id(page_id: str) -> None:
+    """ADR-0603 / WP-222: page_id is model-chosen and lands in a URL path."""
+    if not _PAGE_ID_RE.fullmatch(str(page_id)):
+        raise ValueError("page_id must be a numeric Confluence content id")
 
 
 def _cql_escape(text: str) -> str:
@@ -231,7 +241,7 @@ async def search_pages(query: str, space: Optional[str] = None, limit: int = 10)
     # ADR-0602 / WP-222: both values are model-chosen and land inside a CQL
     # string literal, so a quote in either would widen the query.
     if space and not _SPACE_KEY_RE.fullmatch(space):
-        raise ValueError("space must be a Confluence space key (letters, digits, _ - ~)")
+        raise ValueError("space must be a Confluence space key (letters, digits, _ . : @ -, optional leading ~)")
     limit = max(1, min(int(limit), _MAX_SEARCH_LIMIT))
     cql = f'type=page and text~"{_cql_escape(_cql_query_text(query))}"'
     if space:
@@ -256,6 +266,7 @@ async def search_pages(query: str, space: Optional[str] = None, limit: int = 10)
 @mcp_server.tool()
 async def read_page(page_id: str) -> Dict[str, Any]:
     """Read a Confluence page's current content and metadata by id."""
+    _check_page_id(page_id)
     async with _client() as client:
         resp = await client.get(
             f"/content/{page_id}",
@@ -294,6 +305,7 @@ async def create_page(space_key: str, title: str, body_html: str, parent_id: Opt
 @mcp_server.tool()
 async def update_page(page_id: str, body_html: str, title: Optional[str] = None) -> Dict[str, Any]:
     """Update an existing Confluence page's content (and optionally its title) by id."""
+    _check_page_id(page_id)
     async with _client() as client:
         current_resp = await client.get(f"/content/{page_id}", params={"expand": "version,space"})
         if current_resp.status_code == 404:

@@ -191,3 +191,15 @@ def test_wp222_top_k_is_capped(monkeypatch):
     )
     asyncio.run(rag_query.handle({"query": "q", "top_k": 100000}, "u", bearer_token=JWT))
     assert seen and all(r.url.params["top_k_results"] == str(rag_query.MAX_TOP_K) for r in seen)
+
+
+def test_wp222_non_numeric_top_k_falls_back_to_the_default(monkeypatch):
+    seen = []
+    real_client = httpx.AsyncClient
+    monkeypatch.setattr(
+        rag_query.httpx, "AsyncClient",
+        lambda *a, **kw: real_client(*a, **{**kw, "transport": httpx.MockTransport(
+            lambda r: (seen.append(r), httpx.Response(200, json={"results": []}))[1])}),
+    )
+    asyncio.run(rag_query.handle({"query": "q", "top_k": "lots"}, "u", bearer_token=JWT))
+    assert seen and all(r.url.params["top_k_results"] == "5" for r in seen)

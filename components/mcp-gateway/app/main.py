@@ -103,6 +103,10 @@ async def reload_policy() -> Dict[str, Any]:
     bindings from disk without a pod restart, for the case where Track B's
     policy files, an agent definition or a binding change land after this
     pod already started.
+
+    ADR-0602 / WP-222: needs a Keycloak JWT whose groups include ADMIN_GROUPS
+    (require_admin). Unlike /mcp, an OpenShift or ServiceAccount token is
+    refused here (401): TokenReview identities carry no Keycloak groups.
     """
     global binding_coverage_error
     policy_store.reload()

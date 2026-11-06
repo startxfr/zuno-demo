@@ -42,8 +42,9 @@ def _truthy(value: Optional[str]) -> bool:
 
 # ADR-0602 / WP-222: with JWT_AUDIENCE unset, any token the realm signs is
 # accepted, whichever client it was minted for. JWT_AUDIENCE_REQUIRED=true
-# turns that silent default into a startup failure. It stays off until the
-# Keycloak audience mapper is live, so enabling it is a deliberate step.
+# turns that silent default into a startup failure. The charts set both
+# (audience zuno-admin-api, carried by every experience client through the
+# maas-gateway-audience mapper); the code default stays off for local runs.
 if _truthy(os.getenv("JWT_AUDIENCE_REQUIRED")) and not JWT_AUDIENCE:
     raise RuntimeError("JWT_AUDIENCE_REQUIRED is set but JWT_AUDIENCE is empty; refusing to start.")
 
