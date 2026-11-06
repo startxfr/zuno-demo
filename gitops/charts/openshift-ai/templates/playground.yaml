@@ -75,7 +75,10 @@ metadata:
   labels:
     zuno.io/managed-by: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "-20"
+    # Same wave as the Deployment that mounts it: the storage class binds on first
+    # use (WaitForFirstConsumer), so the claim stays Pending, hence "not healthy",
+    # until its pod exists. An earlier wave deadlocked the sync.
+    argocd.argoproj.io/sync-wave: "-10"
 spec:
   accessModes: [ReadWriteOnce]
   resources:
