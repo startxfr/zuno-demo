@@ -272,7 +272,7 @@ The question left open by section 7 was which field the limit reads, and whether
   and own it in the chart with the two-pointer list: undercounts, and freezes that model's subscriptions. (3) Upstream request to the
   maas-controller; the user deferred upstream issues earlier.
 
-## 10. Two-listener Gateway chart (proven on a throwaway Gateway, not yet live)
+## 10. Two-listener Gateway chart (proven on a throwaway Gateway, live since 2026-11-06)
 
 The portal's "API keys" page needs maas-api to report an external URL (section 8). Upstream `maas-api/internal/tenant/handler.go` takes the
 `hostname` of the first ready HTTPS listener that has an attached route, and only falls back to the Gateway address (which is the
@@ -390,6 +390,37 @@ route match count and the EnvoyFilter size; set both annotations through the mod
 matches fall; check a body-based call works and the path call 404s; record the new size; revert. Only if the saving is real and the
 clients can move to the body-based form does it make sense to turn `zuno-token-quota` back on. Until then it is a client migration, not a
 setting.
+
+## 14. Live results (2026-11-06, user go for all three, window announced to peers)
+
+**Two-listener Gateway (section 10), live.** The live Application `zuno-openshift-ai-d1` got `maasGateway.externalHostnameListener.enabled: true`
+(backups of the Application and the Gateway were taken first). Within about a minute `maas-default-gateway` listed `https-external`
+(`maas.apps.demo333.startx.fr`) then `https` (no hostname), both Accepted, Programmed, `attachedRoutes: 7`. Results:
+
+- `GET /maas-api/v1/tenants` answered 200 with `externalUrl: https://maas.apps.demo333.startx.fr` (it was a 500 before).
+- Without a token, MaaS still answers 401, on the external host and on the in-cluster Service name
+  (`maas-default-gateway-istio.openshift-ingress.svc`, the path of the ai-gateway, lightspeed and the provider endpoints), so the hostname-less
+  listener keeps serving them. The EnvoyFilter stayed at 1,336,461 bytes. DSC Ready.
+- The Gateway reported `Programmed=False` ("Failed to assign to any requested addresses") for under a minute while it reprogrammed, which made
+  the Argo app `Progressing`; it came back to `Programmed=True` and `Healthy` without intervention. `DNSReady=False` stays on the Gateway and on
+  `https-external` as predicted; `LoadBalancerReady=False` was already there before. Both are cosmetic here.
+- Not verified by me: the portal "API keys" page in a browser (needs the `dev` session); the user checks it.
+
+**model-based-routing-only: no effect on our models.** On `qwen35-9b-wesh`, the annotations were set first on `metadata.annotations`, then in
+`spec.annotations` (the location the MaaS doc names), with `model-based-routing-enabled` and `-only` both `"true"`. In both cases the managed
+HTTPRoute stayed at 15 matches after about a minute and the EnvoyFilter did not change. Likely cause (not proven in the controller code): our
+chart writes the route in `spec.router.route.http.spec`, so the controller has nothing to generate and strip. Pods were untouched, the
+annotations were removed, route and size are back to the baseline. Consequence: the 19-to-9 saving is not available to this chart as written;
+getting it would first need the chart to stop supplying its own route spec, which is a separate change.
+
+**MCPServer pilot.** Setting `mcplifecycleoperator: Managed` created the CRD `mcpservers.mcp.x-k8s.io` in version **v1alpha1** (the
+paper mapping of section 11 assumed v1beta1; the fields used were the same) and the operator pods came up in about a minute. A throwaway
+namespace carried one `MCPServer` for the pinned `kubernetes-mcp-server` digest with a ConfigMap mounted through `config.storage`.
+It produced a Deployment, a Service and a `status.address` (`http://k8s-mcp-pilot.<ns>.svc.cluster.local:8080/mcp`), and the operator's own
+handshake filled `status.serverInfo`. `initialize` and `tools/call` worked through a port-forward. Gaps against `gitops/charts/mcp-k8s`:
+the operator creates no ServiceAccount or RBAC (the call failed with "forbidden" as `default`), no NetworkPolicy and no per-namespace
+RoleBindings, and `status.capabilities` stayed empty. Verdict: usable for lifecycle (image, config, health, address), not a replacement for
+the chart's RBAC, so no migration. The namespace was deleted and the module set back to unset; the CRD stays installed, the DSC is Ready.
 
 ## Steps
 
