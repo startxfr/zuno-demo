@@ -33,7 +33,7 @@ model_config:
   file_upload:
     image: {detail: high, enabled: false, number_limits: 3, transfer_methods: [remote_url, local_file]}
   model:
-    completion_params: {max_tokens: 1024, temperature: 0.2}
+    completion_params: {max_tokens: 3072, temperature: 0.2}
     mode: chat
     name: auto
     provider: langgenius/openai_api_compatible/openai_api_compatible
