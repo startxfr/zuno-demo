@@ -128,8 +128,25 @@ def create_app(
     return app
 
 
+def configure_logging() -> None:
+    """Make the gateway's own INFO lines readable (`tasks/cancel agent=...`, approvals).
+
+    uvicorn configures only its own loggers; without a handler here every `a2a_gateway.*` INFO record is
+    dropped, which hid the gateway side of a cancel (UnifAI 0.1.60 retest, 2026-11-06).
+    """
+    gateway = logging.getLogger("a2a_gateway")
+    if gateway.handlers:
+        return
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s"))
+    gateway.addHandler(handler)
+    gateway.setLevel(logging.INFO)
+    gateway.propagate = False
+
+
 def get_app() -> FastAPI:
     from app.telemetry import init_telemetry
 
+    configure_logging()
     init_telemetry("a2a-gateway")
     return create_app()

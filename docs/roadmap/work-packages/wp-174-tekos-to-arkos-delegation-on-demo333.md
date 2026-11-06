@@ -78,12 +78,12 @@ Proofs made, against the list above:
 |---|---|---|
 | The chain in the audit line and the trace (`sub`, `delegated_by`, depth) | 0401, 0403 | made |
 | The number of calls per turn read from real traces; the cap was needed and fired | 0406 | made |
-| Classification on return: Tekos results join Arkos's C3 run | 0401 | not checked separately |
+| Classification on return: Tekos results join Arkos's C3 run | 0401 | made 2026-11-06: the gateway returns `zuno.classification` (C1, C3 when raised) |
 | Refusals: unentitled user, undeclared target, depth 2, cycle, half a chain, depth header mismatch, read-only delegated surface (`evaluations/arkos/security_checks.py`) | 0401, 0403, 0406 | made: 7 of 7 hold on 0.1.53 |
 | The cost lands on the initiating user; the cost of one delegating turn | 0406 | made: one scenario 21 turn as `eval-consultant-01` at the cap of 3 costs about 65,000 tokens and 24 calls: Arkos ~58,000 tokens in 16 calls, Tekos ~6,600 in 8 (all local gpt-oss-20b). The ai-gateway counters count each call once per Keycloak group of the caller (13 for this persona), so the raw sums first read were 13 times too high (`e9a67d3c`; the Tempo trace has 9 Arkos chat spans where the counters said 117 calls). No cost problem remains |
 | A delegation no longer awaited cancels the remote task | 0406 | made on UnifAI 0.1.57: with `timeoutSeconds: 1`, `a2a.timeout` then `a2a.task_cancelled`, span `mas.a2a_cancel=cancelled`, trace `54ebccfa482247d3ae41280e1dab4424` ([evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#unifai-v0157-on-demo333-the-cancel-on-timeout-is-proven-2026-11-04)). A user abort is not covered, by the decision of 2026-11-04 |
 | `X-Zuno-Max-Tokens` end to end | 0406 | made on v0.1.55: the model spans carry `mas.x_zuno_max_tokens=8192`, the declared value, and the ai-gateway cuts at the header (64 gives 64) |
-| Approval (ADR-0409) | 0409 | waits for WP-173 |
+| Approval (ADR-0409) | 0409 | gateway side live (agents v0.14.1, gateways build 10/41); waits for UnifAI 0.1.61 and `approval: ask` |
 
 The refusal checks were replayed as `eval-consultant-01` on 0.1.53. Three of them (undeclared target, depth limit, cycle)
 first failed with status 200, although the gateway was right. On `/mcp`, a refused chain gets `tools/list` 200 with an
@@ -140,3 +140,23 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#un
 See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#unifai-v0157-on-demo333-the-cancel-on-timeout-is-proven-2026-11-04).
 - The cancellation of an abandoned delegation is proven (ADR-0406 is `Implemented`); the A2A send is non-blocking when `timeoutSeconds` is set.
 - Still open: approval (ADR-0409, waits for WP-173), the intermittent empty final reply after a delegation (fix R-531 in 0.1.56 and 0.1.57, not yet re-measured), and turns where Arkos answers without delegating.
+
+## Progress (2026-11-06): UnifAI v0.1.60 and agents v0.14.1 on demo333
+
+- **Pinned and rolled:** UnifAI v0.1.60 (catalog `1df1594c`, five images) and agents v0.14.1 (`okf-corp@sha256:7b8319c8`); the mcp-gateway and
+  the a2a-gateway re-read the release at pod start and the a2a-gateway holds `delegation.write_allowed` (arkos / `draft-architecture-testimonial`).
+- **Cancel, end to end (R-529):** `user.session.submit`, then `session.cancel` 2 s after the agent-card GET: the worker logs `a2a.task_cancelled`
+  with the task id, `tasks/get` answers `canceled`, and the span `mas.node A2A: Tekos` carries `mas.a2a_interrupted=true`, `mas.a2a_task_id` and
+  `mas.a2a_cancel=cancelled` (Tempo, session `bbce89d0`).
+- **Classification on return (ADR-0403 clause 5):** the gateway returns `zuno.classification` on the completed task, C1 by default and C3 when the
+  caller raises it (live, both pass).
+- **Gateway cancel log:** the `tasks/cancel agent=... task_id=... caller=...` line was not visible because the `a2a_gateway` logger had no handler;
+  the gateway now configures it (`configure_logging`), live with the next gateway build.
+- **Arkos not delegating:** on the plain scenario 21 prompt Arkos answered "I will reach out to the technical consultant" without any tool call on 3 of 4
+  turns; the emitted blueprint still holds the `a2a-tekos` node, and a directive prompt delegates. This looks like model behaviour, not 0.1.60.
+- **Acceptance amended (same decision as [WP-173](wp-173-unifai-a2a-identity-server-and-approval.md), 2026-11-05):** the approval proof no longer
+  requires surviving a worker restart (a pending approval is lost with the worker and ends as a refusal after 300 s; persistence comes in a later
+  version).
+- **Still open, and the only thing that keeps this work package from `Done`:** the live approval proof (ADR-0409): it needs UnifAI 0.1.61 (the client
+  that reads `zuno.approval`, b9 step 5) pinned, `approval: ask` on the Arkos bundle (branch `wip/arkos-approval-ask`, held until 0.1.61), and a run
+  where Arkos delegates a write to itself-as-target through `draft-architecture-testimonial`.

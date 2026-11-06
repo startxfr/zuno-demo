@@ -365,6 +365,30 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class LoggingTests(unittest.TestCase):
+    def test_the_gateway_logger_emits_info_lines_once_configured(self) -> None:
+        import io
+        import logging
+
+        from app.main import configure_logging
+
+        gateway = logging.getLogger("a2a_gateway")
+        saved = (list(gateway.handlers), gateway.level, gateway.propagate)
+        gateway.handlers.clear()
+        try:
+            configure_logging()
+            configure_logging()  # idempotent: no second handler, no duplicated line
+            self.assertEqual(len(gateway.handlers), 1)
+            stream = io.StringIO()
+            gateway.handlers[0].setStream(stream)
+            logging.getLogger("a2a_gateway.executor").info("tasks/cancel agent=%s", "tekos")
+            self.assertEqual(stream.getvalue().count("tasks/cancel agent=tekos"), 1)
+        finally:
+            gateway.handlers[:] = saved[0]
+            gateway.setLevel(saved[1])
+            gateway.propagate = saved[2]
+
+
 class ApprovalTests(GatewayTestCase):
     """A delegated write waits for the initiating user's approval (ADR-0409, WP-173 step 5)."""
 
