@@ -105,3 +105,14 @@ then `keycloak` and `zunoapp`. Traps seen on the way:
 
 Not rotated: the MariaDB users (`mlpipeline`, `mlops`, `trillian`) live on the simulated external instance `zuno-ext-sim/ext-mariadb`
 of the frozen WP-143 pilot, whose credentials are not ours (ADR-0352); `aap/admin` is an AAP console password, not a database.
+## Handing out MaaS API keys: what the token limit does and does not cover (WP-220)
+
+Users create their own keys in the MaaS consumer portal, `https://rh-ai.<domain>/maas-consumer-portal` ("API keys"), on the subscription their
+group holds (`gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops`, `-ocp-paas-ops`, 5,000,000 tokens per hour each).
+
+- **The token limit counts OpenAI-format calls only.** MaaS 3.6 limits `/v1/chat/completions` and `/v1/embeddings` by reading `usage.total_tokens`.
+  A key used on the Anthropic Messages path (`/v1/messages`, which is what Claude Code uses) is authenticated and authorised, but it is **not**
+  token-limited: Anthropic replies carry no `total_tokens`. Measured on demo333: about 72,000 Anthropic tokens did not move the Limitador counter.
+  Do not present the 5,000,000 figure as a ceiling for such a key. Metering that path is WP-225; blocking it is not planned (WP-220 uses it on purpose).
+- **The playground's MCP connection needs the user's own OpenShift token** (`https://oauth-openshift.<domain>/oauth/token/request`, valid 24 hours).
+  Which tools the user sees depends on their group: `ocp-ai-ops` gets all nine, `ocp-ai-dev` gets none (`tool-policy.yaml`).
