@@ -85,6 +85,9 @@ workflow:
                 there.
                 Context:
                 {{#context#}}
+            - id: 00000000-0000-4000-8000-000000000002
+              role: user
+              text: '{{#sys.query#}}'
           context: {enabled: true, variable_selector: [knowledge, result]}
           vision: {enabled: false}
           memory: null
