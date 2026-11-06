@@ -80,6 +80,40 @@ spec:
       kind: ConfigMap
       name: maas-gateway-config
   listeners:
+{{- if .Values.maasGateway.externalHostnameListener.enabled }}
+    # WP-220 pilot 2: maas-api derives the external URL of the MaaS API from
+    # the first ready HTTPS listener's `hostname`; with none it falls back to
+    # the in-cluster Service name and answers 500 "not configured with an
+    # external hostname", so the consumer portal's "API keys" page cannot load.
+    # This listener MUST stay first (maas-api takes the first ready one) and the
+    # hostname-less `https` listener below MUST stay: every in-cluster client
+    # (ai-gateway, lightspeed, the provider endpoints) calls the Service name
+    # https://maas-default-gateway-istio.openshift-ingress.svc, a Host that
+    # this hostname listener does not match. Routes carry no hostnames, so they
+    # attach to both listeners. Same port and TLS secret on both.
+    - name: https-external
+      hostname: maas.{{ .Values.maasGateway.clusterBaseDomain }}
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: Selector
+          selector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                  - openshift-ingress
+                  - redhat-ods-applications
+                  - redhat-ai-gateway-infra
+                  - zuno-ai-run
+      tls:
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: maas-gateway-service-tls
+        mode: Terminate
+{{- end }}
     - name: https
       port: 443
       protocol: HTTPS
