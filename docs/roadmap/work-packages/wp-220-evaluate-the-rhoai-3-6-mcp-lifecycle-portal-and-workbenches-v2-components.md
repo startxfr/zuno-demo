@@ -249,6 +249,127 @@ Interactive run (2026-11-05 evening to 2026-11-06, the user signing in as the st
 
 Still open: whether key events are audited, and which subscriptions the portal would list for `dev` once maas-api can answer.
 
+## 9. Anthropic-format traffic is not counted by the MaaS token limit (2026-11-06)
+
+The question left open by section 7 was which field the limit reads, and whether it could count `input_tokens + output_tokens`.
+
+- **It is documented behaviour, not a defect.** The MaaS 3.6 documentation
+  (`docs/content/configuration-and-management/quota-and-access-configuration.md`, the warning "Token rate limiting and API format")
+  says token limits apply to `/v1/chat/completions` and `/v1/embeddings`; requests on `/v1/messages` (Anthropic Messages) or
+  `/v1/responses` are not subject to them. Limitador counts `usage.total_tokens`; Anthropic reports `input_tokens` and `output_tokens`
+  without a total, "so the rate limiting integration cannot extract the token count". Authentication, subscription validation and model
+  access still apply. This is what section 7 measured.
+- **The policy can be told which field to read, but not to add two.** Kuadrant's TokenRateLimitPolicy has
+  `spec.dataExtraction.response.totalTokens`, an ordered list (1 to 8) of JSON Pointers where the first that resolves to a number wins; the
+  built-in list starts with `/usage/total_tokens`. The CRD installed on demo333 has the field. A pointer returns one number, so the sum is
+  not expressible. The closest is `[/usage/total_tokens, /usage/input_tokens]`, which counts the prompt only for Anthropic replies
+  (the larger part for Claude Code, since the whole context is resent each turn) and misses the generated tokens.
+- **The maas-controller would wipe a hand edit.** It does not set `dataExtraction`, and on every reconcile it replaces the whole `spec` of
+  each managed TRLP (`maassubscription_controller.go`, `updateExistingTRLP`). The only durable ways are to opt a TRLP out of management
+  (then subscription changes stop reaching it) or to ask upstream for a pass-through.
+- **Options.** (1, recommended) Accept and document: Claude Code on a MaaS key is authenticated and authorised but not rate-limited by
+  MaaS; the 5,000,000 tokens per hour of `gpt-oss-20b-developer` is real only for OpenAI-format calls. (2) Opt the `gpt-oss-20b` TRLP out
+  and own it in the chart with the two-pointer list: undercounts, and freezes that model's subscriptions. (3) Upstream request to the
+  maas-controller; the user deferred upstream issues earlier.
+
+## 10. Two-listener Gateway chart (prepared, not pushed)
+
+The portal's "API keys" page needs maas-api to report an external URL (section 8). Upstream `maas-api/internal/tenant/handler.go` takes the
+`hostname` of the first ready HTTPS listener that has an attached route, and only falls back to the Gateway address (which is the
+in-cluster Service name here, then rejected). A LoadBalancer Service is not needed; the error text is misleading.
+
+A hostname on the single existing listener would break every in-cluster caller, because they send `Host: maas-default-gateway-istio.openshift-ingress.svc`
+(the ai-gateway, lightspeed and the four provider endpoints in `platform/ai-gateway/provider-routing.yaml`). The prepared change keeps both:
+
+- listener `https-external` (`hostname: maas.<clusterBaseDomain>`, port 443, same TLS secret and `allowedRoutes`) **first**;
+- the existing hostname-less `https` listener second.
+
+It sits behind `maasGateway.externalHostnameListener.enabled`, default `false`; rendered with the flag off, the chart is identical to
+today's, and with it on the Gateway has the two listeners in that order. It lives on the unpushed branch
+`wp-220-maas-gateway-two-listeners` (commit b8d0ee5c, in a separate git worktree) until a live proof exists. The first throwaway Gateway
+(own namespace) showed both listeners Accepted and Programmed without conflict, and a hostname-less route attached to both
+(`attachedRoutes: 1` each). Still unproven: the data plane (a request with the external host and SNI, a request with the Service name,
+one with an unknown host) and the effect on the Kuadrant objects (the policies target the Gateway without `sectionName`, so they
+should stay attached) and on the EnvoyFilter size. A second throwaway Gateway pod could not start in its own namespace because the mesh
+accepts certificate requests only from a fixed list of namespaces (`zuno-default-deny-other-namespaces` in `zuno-mesh`, which includes
+`openshift-ingress`); the test therefore needs `openshift-ingress` or a change to that list, and waits for the user's choice and for
+the pin window of zuno-demo-da to close.
+
+## 11. The k8s MCP server as an MCPServer (paper mapping, 2026-11-06)
+
+State today: the CRD `mcpservers.mcp.x-k8s.io` is not on the cluster (`mcplifecycleoperator` is Removed in the DSC). Mapping of
+`gitops/charts/mcp-k8s` onto the `mcp.x-k8s.io/v1beta1` `MCPServer` spec (upstream `api/v1beta1/mcpserver_types.go`):
+
+| Chart object | MCPServer field | Fit |
+|---|---|---|
+| Image `ghcr.io/containers/kubernetes-mcp-server@sha256:...`, pull policy | `spec.source.containerImage.ref`, `pullPolicy` (a digest is accepted and validated) | Fits |
+| `args: --config /etc/k8s-mcp/config.toml` | `spec.config.arguments` | Fits |
+| ConfigMap `k8s-mcp-config` mounted read-only | `spec.config.storage[]` (ConfigMap source, path, permissions); the ConfigMap itself stays in the chart | Fits |
+| Port 8080 | `spec.config.port` (required); `spec.config.path` defaults to `/mcp`, to confirm against the server | Fits, one check |
+| `replicas`, `resources` | `spec.runtime.replicas`, `runtime.resources` | Fits |
+| ServiceAccount `k8s-mcp` and its RoleBindings (`view` in 13 namespaces, `cluster-monitoring-view`) | `spec.runtime.security.serviceAccountName`; the SA and RBAC stay in the chart | Fits |
+| `runAsNonRoot`, seccomp, drop ALL, read-only root | `runtime.security.podSecurityContext` and `securityContext` | Fits |
+| Probes on `/healthz` | `runtime.health.livenessProbe`, `readinessProbe` (passed through unchanged) | Fits |
+| NetworkPolicy: ingress only from pods labelled `app.kubernetes.io/name: mcp-gateway` | `spec.network.ingressFrom` takes standard peers | Fits, with a cost: under the operator's "restricted" posture the list must also admit the operator's own pods (its handshake), which widens ADR-0037's "only the gateway" |
+| Service `k8s-mcp` (URL `http://k8s-mcp.zuno-ai-run.svc:8080` is in `tool-bindings.yaml`) | generated by the operator; its name must be checked, or use `serviceRef` | To verify |
+| `priorityClassName: zuno-workload-default` | no field | Gap (only in "bring your own workload" mode) |
+| `checksum/config` annotation that rolls the pod on a ConfigMap change | no field found | Gap: a config change would not restart the server |
+| Argo sync-wave annotations | `spec.extraAnnotations` (on generated objects) | Probably fits |
+| Tool inventory, address, capabilities | `status` (filled by the operator) | New: nothing consumes it, since `tool-bindings.yaml` is static |
+
+What is not lost: the k8s server has no gateway-token check and no ExternalSecret (the chart says so), so there is nothing of that kind to
+carry. The other four MCP servers do carry ExternalSecrets and the gateway token as env, which `config.env` and `config.envFrom` cover.
+Mesh: `zuno-ai-run` has no PeerAuthentication (permissive), so an operator handshake from a non-mesh pod is possible.
+
+**Verdict: a live pilot is reasonable, but the gain for this one server is modest** (the Deployment, Service and NetworkPolicy templates, 100 lines,
+become one object; the ConfigMap, ServiceAccount and RBAC stay, and there are two gaps and a wider ingress). Prerequisites, in order: DSC backup; user go; an announced window; set
+`mcplifecycleoperator: Managed` through a live patch (ArgoCD ignores the DSC `/spec`); check that the CRD appears and what the operator
+namespace and pods are; `kubectl apply --dry-run=server` of the MCPServer; then run it in a throwaway namespace next to the chart-managed
+server (same ConfigMap and RBAC) and compare the generated Deployment, Service and NetworkPolicy field by field before any switch.
+
+## 12. Workbench V2 scenario (design only, 2026-11-06)
+
+Facts: no Notebook v2 API is installed (`notebooks.kubeflow.org` is the classic one), `workbenchesV2` is Removed, and upstream says
+Notebooks v2 is unreleased. A pilot cannot run until enabling the component shows which CRDs it brings; this section is the scenario to
+test then.
+
+Scenario: a data scientist opens a workbench in `zuno-ai-build` and runs an MMLU-style check against `gpt-oss-20b` through MaaS, then writes
+the result to the existing S3 bucket. This reuses what already exists (the models, the developer-style subscription, the evaluation data).
+
+- **Key.** A MaaS key bound to a subscription, minted through the maas-api REST call today (the portal's key page once section 10 is
+  proven). It reaches the workbench as a Secret mounted as an environment variable (`MAAS_API_KEY`, `MAAS_BASE_URL`), never in an image. A
+  short TTL (days) and revocation at the end of the exercise.
+- **Image and storage.** One RHOAI-provided data-science image from the ImageStreams already on the cluster; a small PVC for the dataset.
+  Culling after a day of idleness.
+- **Network.** `zuno-ai-build` is not mesh-injected. The workbench reaches MaaS through the external route (`maas.<domain>`), so it needs
+  egress to the router and DNS; check the namespace's default-deny policy and that the key path (Authorino on the Gateway) accepts the call.
+- **Platform traps to expect** (the 3.6 upgrade showed them): SCC for the notebook pod, a vendor NetworkPolicy that allows only its own
+  ports, the Istio selector in `gitops/charts/service-mesh/templates/istio.yaml` that lists the classic controller pods.
+- **First live step, after a go.** Set `workbenches.workbenchesV2.managementState: Managed`, look at the new CRDs and pods, then decide
+  whether to continue. Revert by setting it back to `Removed`.
+
+## 13. model-based-routing-only: preparation (2026-11-06)
+
+What it does (MaaS 3.6, `subscription-cardinality.md`): with `serving.kserve.io/model-based-routing-only: "true"` on a model, the managed
+HTTPRoute drops the `/{namespace}/{name}/...` path tree and keeps header-based routing (the doc says 19 matches become 9; ours are 15 per
+model). It needs `serving.kserve.io/model-based-routing-enabled: "true"` first, which none of our four LLMInferenceServices carries.
+
+Why it is not a toggle here: every local-model caller uses the path form.
+
+- `platform/ai-gateway/provider-routing.yaml` (the four models, `https://maas-default-gateway-istio.openshift-ingress.svc/zuno-ai-run/<model>/v1`),
+  `gitops/charts/ai-gateway/values.yaml` and `gitops/charts/lightspeed-config/values.yaml` (the Service-name endpoint), the test scripts
+  `platform/testing/quota_counters_probe.py` and `token_quota_429.py`, and external users such as Claude Code with
+  `ANTHROPIC_BASE_URL=.../zuno-ai-run/gpt-oss-20b`.
+- The body-based call shape, `/v1/chat/completions` at the Gateway root with `model` in the body, is the one the ADR-0201 IPP anchor
+  workaround exists for (`gitops/charts/openshift-ai/templates/maas-gateway-ipp-anchor.yaml`: without it that shape 404s), so the annotation
+  would also depend on that workaround, and on the 3.6 IPP to Praxis change recorded in the upgrade guide.
+
+Test protocol, once the user allows a window: pick the lowest-stake model (`qwen35-9b-wesh`), accept that its path URL will 404; record the
+route match count and the EnvoyFilter size; set both annotations through the models chart (a live patch is reverted by selfHeal); check the
+matches fall; check a body-based call works and the path call 404s; record the new size; revert. Only if the saving is real and the
+clients can move to the body-based form does it make sense to turn `zuno-token-quota` back on. Until then it is a client migration, not a
+setting.
+
 ## Steps
 
 1. This evaluation (done, in review).
