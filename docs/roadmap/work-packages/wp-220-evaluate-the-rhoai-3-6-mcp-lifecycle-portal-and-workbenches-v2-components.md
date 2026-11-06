@@ -441,7 +441,24 @@ Decision (user, 2026-11-06): move the portal demo to the groups `ocp-paas-ops`, 
 - The OpenShift groups `ocp-ai-dev` and `ocp-paas-ops` do not exist before their first member signs in (Keycloak group sync creates them, as it did for
   `ocp-paas-dev`), so the first test is a sign-in as `ai-dev-01`.
 
-Result: pending the live run.
+Result of the first live run (user `ai-ops-01`, 2026-11-06): sign-in, subscription `gpt-oss-20b-ocp-ai-ops`, project list and playground creation work
+(`OGXServer lsd-genai-playground` plus a `genai-pgvector` pod appear in `zuno-playground`). The playground itself is not usable yet; three symptoms,
+one measured cause for the first two:
+
+- **Rollout loop (RHOAI 3.6 EA operator defect, measured).** The OGXServer the portal generates sets `spec.tls.trust.caCertificates` to two
+  sources (`odh-trusted-ca-bundle`, `ogx-router-ca-bundle`). The OGX operator rewrites the merged ConfigMap `lsd-genai-playground-ca-bundle` (241
+  certificates, 362 KB) about once a second, and the bytes alternate between two orderings of the same certificates (two SHA-256 values seen).
+  The Deployment carries `configmap.hash/ca-bundle: <resourceVersion>-...`, so every rewrite starts a rollout: 35 ReplicaSets in two minutes, pods
+  never Ready, `OGXServer` stuck in `Initializing`. `zuno-ogx` in `redhat-ods-applications` does not use this block and is stable.
+- **Model list shows one greyed model** (the inline `sentence-transformers` reranker): the stack never becomes available, so the models served through the
+  `genai-bff-proxy` provider cannot be listed. Expected to follow from the loop; not proven independently.
+- **File upload `Vector_store 'vs_...' not found`**: the server's kvstore is local SQLite, lost at each restart, so the vector store created before the
+  restart no longer exists. Same loop; `genai-pgvector` itself is Running.
+- **No MCP server**: the portal reads the ConfigMap `gen-ai-aa-mcp-servers` in `redhat-ods-applications`, which does not exist. It is an admin catalogue to be
+  written, separate from the loop.
+
+Next: once peers' windows allow it, try on `lsd-genai-playground` (a) a single CA source (`odh-trusted-ca-bundle` only) and (b) no `tls.trust` block
+(the stack already runs with `--insecure`); the portal BFF is the field manager, so check it does not put the block back.
 
 ## Steps
 
