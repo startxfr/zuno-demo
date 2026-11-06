@@ -73,6 +73,9 @@ class Binding:
     endpoint: Optional[Dict[str, str]] = None
     # in-process only: handler module name under app/handlers/
     handler: Optional[str] = None
+    # in-process only (WP-208 D3): the JSON schema advertised for the capability's arguments. Without
+    # it the model sees an open object and does not know which argument is required.
+    input_schema: Optional[Dict[str, Any]] = None
     # ADR-0119: this binding's `backend` entry in the top-level
     # `backends:` map, if any - set by BindingRegistry.reload(), never by
     # a caller. Used only as a fallback when `endpoint` is absent.
@@ -132,6 +135,7 @@ class BindingRegistry:
                         aliases=list(item.get("aliases", [])),
                         endpoint=item.get("endpoint"),
                         handler=item.get("handler"),
+                        input_schema=item.get("input_schema"),
                         backend_default_endpoint=backends_defaults.get(item["backend"]),
                     )
                     problem = _validate(binding)
