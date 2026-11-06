@@ -125,6 +125,15 @@ jobs:
           helm dependency build gitops/charts/postgresql
           python3 platform/security/check_workload_hardening.py
           python3 platform/security/tests/test_secret_env_names.py
+      # ADR-0602 clause 2 / WP-223: every ExternalSecret reads Vault through its
+      # namespace's own SecretStore and only the keys platform/vault/
+      # secret-access.yaml grants that namespace (no ClusterSecretStore). Renders
+      # every gitops/apps Application from a dependency-free chart copy, so it
+      # needs helm but no chart repository.
+      - name: Per-namespace Vault secret access (ADR-0602)
+        run: |
+          python3 platform/vault/check_secret_access.py
+          python3 platform/vault/tests/test_check_secret_access.py
 
   python:
     runs-on: ubuntu-latest

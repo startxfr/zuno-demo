@@ -132,8 +132,8 @@ platformNamespaces:
     description: >-
       PostgreSQL and pgvector, the platform's persistent data and RAG vector
       store.
-    # vault: ESO's ClusterSecretStore
-    # controller. keycloak: dedicated postgres database, ADR-0315.
+    # vault: ESO's SecretStore controller (ADR-0602/WP-223: one store per
+    # namespace, the controller still runs in zuno-vault). keycloak: dedicated postgres database, ADR-0315.
     # redhat-ods-applications: maas-api's dedicated maas database on
     # zuno-postgresql (MaaS prerequisite - see
     # gitops/charts/openshift-ai/templates/externalsecret-maas-db.yaml).

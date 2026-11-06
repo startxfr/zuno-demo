@@ -41,8 +41,8 @@ Two integration notes:
   never a literal in this repo.
 
 Applied by `install.yml`, once `external_secrets` (earlier in
-`day0_components`) has made the `vault-backend` `ClusterSecretStore`
-Ready - the `ExternalSecret`s above resolve against it. `postgresql`
+`day0_components`) has made the `zuno-auth` `SecretStore` `vault`
+Ready (ADR-0602/WP-223) - the `ExternalSecret`s above resolve against it. `postgresql`
 (also earlier in `day0_components`) is a prerequisite too, for the
 dedicated database `spec.db` points at - see "## Database" below.
 

@@ -25,6 +25,21 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-16"
 data:
+  # ADR-0602 clause 3 / ADR-0603 M5, M6 / WP-223: the realm settings the Job
+  # merges into the live realm (`kcadm update realms/zuno -f ... -m`). The
+  # brute-force keys are picked from files/realm-zuno.json itself, so a fresh
+  # import and a reconciled realm can never disagree; the hardened-only keys
+  # come from values (hardenedRealmSettings) and never enter the import file,
+  # which keeps a demo realm's first import demo-shaped.
+{{- $settings := pick $realm "bruteForceProtected" "permanentLockout" "failureFactor" "waitIncrementSeconds" "maxFailureWaitSeconds" "quickLoginCheckMilliSeconds" "minimumQuickLoginWaitSeconds" "maxDeltaTimeSeconds" }}
+{{- if ne (len $settings) 8 }}
+{{- fail "files/realm-zuno.json lost one of the eight brute-force keys realm-settings.json needs (ADR-0603 M5)" }}
+{{- end }}
+{{- if eq .Values.securityProfile "hardened" }}
+{{- $settings = merge (deepCopy .Values.hardenedRealmSettings) $settings }}
+{{- end }}
+  realm-settings.json: |
+{{ $settings | toPrettyJson | indent 4 }}
 {{- range $c := $realm.clients }}
   client-{{ $c.clientId }}.json: |
 {{ $c | toPrettyJson | indent 4 }}

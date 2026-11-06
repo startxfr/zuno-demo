@@ -1,6 +1,6 @@
 apiVersion: v2
 name: external-secrets
-description: Deploys the External Secrets Operator and the Vault-backed ClusterSecretStore used platform-wide.
+description: Deploys the External Secrets Operator and the per-namespace Vault-backed SecretStores (ADR-0602).
 type: application
 version: 0.1.0
 appVersion: "0.1.0"

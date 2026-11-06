@@ -1,5 +1,5 @@
 ---
-# External Secrets Operator install; the ClusterSecretStore/ExternalSecret
+# External Secrets Operator install; the SecretStores/ExternalSecret
 # operand is a separate Application (application-d1.yaml) applied after this one
 # is healthy.
 apiVersion: argoproj.io/v1alpha1

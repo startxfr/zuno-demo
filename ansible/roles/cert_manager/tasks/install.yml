@@ -281,6 +281,9 @@
     - (_cert_manager_acme_identity['consumers']['routerDefaultCert'] | bool)
       or (_cert_manager_acme_identity['consumers']['apiServerNamedCert'] | bool)
 
+- name: "cert_manager | resolve the service CA bundle Vault's listener certificate chains to (ADR-0602, WP-223)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_vault_ca_bundle.yml"
+
 - name: "cert_manager | apply the cert-manager GitOps Application (d1: Vault-backed ClusterIssuer + ADR-0211 ACME track)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -292,7 +295,8 @@
         ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/cert-manager/application-d1.yaml')
           | replace('apps.mycluster.example.com', cluster_base_domain)
           | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
-        | combine({'vaultServiceName': _cert_manager_vault_service_name}, recursive=True)
+        | combine({'vaultServiceName': _cert_manager_vault_service_name,
+                   'vaultCaBundle': vault_ca_bundle_b64}, recursive=True)
         | combine({'acme': _cert_manager_acme_identity}, recursive=True)
       }}
     gitops_app_wait_retries: 30

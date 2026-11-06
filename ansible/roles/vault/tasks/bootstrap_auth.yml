@@ -1,0 +1,54 @@
+---
+# ADR-0602 clause 1 / WP-223: the ONLY use of a root token in this
+# repository after initialization. Creates the Kubernetes auth method and
+# the vault-configurator role/policy, so the configure Job can log in as its
+# own ServiceAccount from then on; the caller revokes the root token once
+# that Job has succeeded.
+#
+# Run through k8s_exec inside the Vault pod, never through a Kubernetes
+# Secret: the token travels only in the exec request and lives in this
+# play's memory (no_log everywhere). Callers:
+#   - tasks/install.yml, right after `vault operator init` (fresh install);
+#   - playbooks/vault_migrate_kms_raft.yml, with the legacy root token read
+#     once from vault-bootstrap-credentials before that Secret is deleted.
+#
+# Inputs: vault_bootstrap_pod (pod name), vault_bootstrap_token.
+# Idempotent: auth enable tolerates "already in use"; policy/role writes
+# overwrite.
+- name: "vault | bootstrap the vault-configurator identity with the root token (one-time)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ vault_bootstrap_pod }}"
+    container: vault
+    command: "sh -c {{ _vault_bootstrap_script | quote }}"
+  vars:
+    # The policy text is the same file the configure Job mounts
+    # (kustomize/configure/vault-configurator.hcl) - one source.
+    _vault_bootstrap_script: |
+      set -eu
+      export VAULT_TOKEN={{ vault_bootstrap_token | quote }}
+      if ! out="$(vault auth enable kubernetes 2>&1)"; then
+        case "$out" in *"already in use"*) ;; *) echo "$out" >&2; exit 1 ;; esac
+      fi
+      vault write auth/kubernetes/config kubernetes_host=https://kubernetes.default.svc:443 >/dev/null
+      POLICY={{ lookup('ansible.builtin.file', zuno_repo_root ~ '/ansible/roles/vault/kustomize/configure/vault-configurator.hcl') | quote }}
+      printf '%s\n' "$POLICY" | vault policy write vault-configurator - >/dev/null
+      vault write auth/kubernetes/role/vault-configurator \
+        bound_service_account_names=vault-configure \
+        bound_service_account_namespaces=zuno-vault \
+        policies=vault-configurator \
+        ttl=15m >/dev/null
+      echo "vault-configurator bootstrapped"
+  register: _vault_bootstrap_result
+  changed_when: true
+  # The command line carries the root token; a failure result would print it.
+  no_log: true
+
+- name: "vault | fail with a token-free message if the bootstrap did not succeed"
+  ansible.builtin.fail:
+    msg: >-
+      The vault-configurator bootstrap failed (rc={{ _vault_bootstrap_result.rc | default('?') }}).
+      Output is suppressed because the command carried the root token. Re-run with the
+      same token after checking `vault status` in the Vault pod; on a fresh install the
+      token is in the recovery file written to the Ansible controller.
+  when: (_vault_bootstrap_result.rc | default(1)) != 0

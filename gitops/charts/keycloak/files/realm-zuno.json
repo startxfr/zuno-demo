@@ -11,6 +11,14 @@
     "accessTokenLifespan": 900,
     "ssoSessionIdleTimeout": 28800,
     "ssoSessionMaxLifespan": 36000,
+    "bruteForceProtected": true,
+    "permanentLockout": false,
+    "failureFactor": 30,
+    "waitIncrementSeconds": 60,
+    "maxFailureWaitSeconds": 900,
+    "quickLoginCheckMilliSeconds": 1000,
+    "minimumQuickLoginWaitSeconds": 60,
+    "maxDeltaTimeSeconds": 43200,
     "roles": {
         "client": {}
     },

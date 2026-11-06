@@ -1,23 +1,28 @@
 {{- if .Values.route.enabled }}
-# Fronts the upstream chart's "-ui" Service with an edge-terminated Route.
+# ADR-0602 clause 1 / WP-223: off by default (values.yaml route). Reencrypt,
+# not edge: the listener now serves TLS itself, and the router trusts the
+# service CA that signed it without a destinationCACertificate.
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
-  name: {{ include "vault.uiServiceName" . }}
+  name: {{ include "vault.serverServiceName" . }}
   namespace: {{ .Release.Namespace }}
   labels:
     app.kubernetes.io/name: vault
     app.kubernetes.io/component: ui
   annotations:
     argocd.argoproj.io/sync-wave: "-30"
+    {{- with .Values.route.ipWhitelist }}
+    haproxy.router.openshift.io/ip_whitelist: {{ . | quote }}
+    {{- end }}
 spec:
   host: {{ include "vault.routeHost" . }}
   to:
     kind: Service
-    name: {{ include "vault.uiServiceName" . }}
+    name: {{ include "vault.serverServiceName" . }}
   port:
-    targetPort: http
+    targetPort: https
   tls:
-    termination: edge
+    termination: reencrypt
     insecureEdgeTerminationPolicy: Redirect
 {{- end }}

@@ -4,7 +4,7 @@
 # names, *.mariadb-internal wildcards, localhost) that the shared
 # vault-issuer's pki/roles/cert-manager rightly refuses - this issuer
 # signs through the scoped pki/roles/mariadb instead (provisioned by
-# ansible/roles/vault's unseal-configure script, same isolation precedent
+# ansible/roles/vault's configure script, same isolation precedent
 # as pki/roles/istio). Same TokenRequest-based auth shape as
 # gitops/charts/cert-manager/templates/clusterissuer.yaml; the Vault
 # service name is stable platform infrastructure, referenced directly
@@ -19,7 +19,18 @@ metadata:
     argocd.argoproj.io/sync-wave: "-35"
 spec:
   vault:
-    server: "http://zuno-vault.zuno-vault.svc:8200"
+    # ADR-0602 clause 1 / WP-223: Vault's listener serves TLS with an
+    # OpenShift service-ca certificate. caBundle is that CA (base64 PEM),
+    # read by ansible/tasks/resolve_vault_ca_bundle.yml from the
+    # openshift-service-ca.crt ConfigMap and injected as vaultCaBundle - a
+    # ClusterIssuer cannot reference a ConfigMap. The service CA rotates
+    # (about yearly, with an overlap period): re-run the owning role
+    # (`make d0|d1 install ...`) after a rotation, or issuance fails with an
+    # x509 error once the old CA expires.
+    server: "https://zuno-vault.zuno-vault.svc:8200"
+    {{- with .Values.vaultCaBundle }}
+    caBundle: {{ . | quote }}
+    {{- end }}
     path: pki/sign/mariadb
     auth:
       kubernetes:

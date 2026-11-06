@@ -429,8 +429,8 @@ modelsS3:
   prefix: models
   endpoint: s3.eu-west-2.amazonaws.com
   region: eu-west-2
-  # Where the read credential lives in Vault (via the vault-backend
-  # ClusterSecretStore) - consumed by both s3-serving-credentials.yaml
+  # Where the read credential lives in Vault (via the namespace's own `vault`
+  # SecretStore, ADR-0602/WP-223) - consumed by both s3-serving-credentials.yaml
   # (classic predictor) and maas.yaml's ExternalSecret.
   externalSecret:
     remoteKey: rag/s3

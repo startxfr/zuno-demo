@@ -1,7 +1,7 @@
 {{- if .Values.aapConfig.enabled }}
 # Targeted widening beyond cluster-reader (ADR-0354 Security
-# considerations), same pattern as rolebinding-vault-secrets.yaml and
-# rolebinding-connectivity-link-secrets.yaml - but a real step up in
+# considerations), same pattern as rolebinding-connectivity-link-secrets.yaml
+# (and the former rolebinding-vault-secrets.yaml, removed by WP-223) - but a real step up in
 # risk level, not a routine one, and treated explicitly as such
 # (confirmed with the operator before landing, 2026-08-30).
 #

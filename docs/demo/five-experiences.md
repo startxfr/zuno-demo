@@ -34,8 +34,9 @@ flowchart LR
   `ocp-ai-ops`). Sign in once per experience.
 - Open in tabs:
   - Dify: `https://dify.apps.demo333.startx.fr` - Keycloak first (group `consultant`), then Dify's single local
-    administrator `dify-admin@zuno.local`; the password is in Vault `zuno/dify/admin` (the shared demo password followed by
-    `1`), never on screen. There is no per-person account in Dify (ADR-0599).
+    administrator `dify-admin@zuno.local`; the password is in Vault `zuno/dify/admin`, never on screen. On a `demo`-profile
+    cluster (demo333) it is the shared demo password followed by `1`; on a `hardened` one (ADR-0602) it is random - read it
+    with `vault kv get -field=password zuno/dify/admin`. There is no per-person account in Dify (ADR-0599).
   - kagent: `https://kagent.apps.demo333.startx.fr` - Keycloak sign-in as **ai-ops-01** (group `ocp-ai-ops`), no second login.
   - UnifAI and Open WebUI as in [the three-experiences script](three-experiences.md).
   - Grafana, dashboard **Zuno Platform / Five experiences** (last 1 hour, `client` = All).

@@ -8,7 +8,7 @@ drill" placeholder) — not when the mechanism merely exists.
 | Service | Mechanism | Schedule | RPO | RTO target | Restore drill executed? |
 |---|---|---|---|---|---|
 | PostgreSQL (`zuno-postgresql`) | pgBackRest via Crunchy PGO (`gitops/charts/postgresql`) | full weekly (Sun 02:00) + differential daily (02:00) | <= 24h | <= 4h | Not yet — operator follow-up |
-| Vault (`zuno-vault`) | CSI VolumeSnapshot of the data PVC (`gitops/charts/vault`, disabled by default) | daily (04:00) | <= 24h | <= 4h | Not yet — operator follow-up |
+| Vault (`zuno-vault`) | `vault operator raft snapshot` CronJob to a dedicated PVC + CSI VolumeSnapshot of the data PVC (`gitops/charts/vault`, ADR-0602/WP-223) | daily (04:30 raft, 04:00 CSI) | <= 24h | <= 4h | Yes on file storage (2026-08-18, 2026-08-25); raft snapshot restore not yet drilled |
 | Declarative configuration (GitOps: charts, ADRs, policy) | None needed — Git is the source of truth (ADR-0022) | N/A | 0 (every commit is a recovery point) | Time to `argocd app sync` from a known-good revision | N/A — no data to restore, only re-apply |
 
 ## PostgreSQL
@@ -140,27 +140,68 @@ The scratch cluster and its PVCs were deleted after verification.
 
 ### Backup mechanism
 
-Vault's storage backend is `file` (`gitops/charts/vault/values.yaml`'s
-`standalone.config`), not Raft — there is no `vault operator raft
-snapshot` API. Instead, `gitops/charts/vault/templates/cronjob-backup.yaml`
-(disabled by default, `backup.enabled`) creates a timestamped CSI
-`VolumeSnapshot` of the `data-zuno-vault-0` PVC daily and prunes to the
-newest N (`backup.retentionCount`, default 7). Confirmed live,
-2026-08-14: `csi-aws-vsc` (driver `ebs.csi.aws.com`) matches the PVC's
-`gp3-csi` provisioner. `ansible/roles/vault/tasks/precheck.yml` reports
-the most recent ready snapshot's age against the 24h RPO objective, same
-diagnostic-only pattern as PostgreSQL's check.
+ADR-0602 clause 1 / WP-223 moved Vault to integrated raft storage with AWS
+KMS auto-unseal (`docs/platform/vault-kms-raft-migration.md`). Two
+mechanisms run side by side:
+
+- **Raft snapshot** (`gitops/charts/vault/templates/cronjob-raft-snapshot.yaml`,
+  `raftSnapshot.*`): daily `vault operator raft snapshot save` to the
+  `vault-raft-snapshots` PVC, pruned to the newest 7 files. The CronJob
+  logs in through the Kubernetes auth role `raft-snapshot` (policy: read on
+  `sys/storage/raft/snapshot` only) as its own ServiceAccount; no token is
+  stored. Application-consistent and portable: the file restores into any
+  Vault that can use the same KMS key.
+- **CSI VolumeSnapshot** (`templates/cronjob-backup.yaml`, `backup.*`):
+  daily crash-consistent image of the whole `data-zuno-vault-0` PVC
+  (`csi-aws-vsc`, confirmed live 2026-08-14), pruned to the newest 7. The
+  fastest whole-volume restore, same region only.
+
+`ansible/roles/vault/tasks/precheck.yml` reports the most recent ready
+VolumeSnapshot's age against the 24h RPO objective, same diagnostic-only
+pattern as PostgreSQL's check.
+
+**What a restore needs besides the snapshot.** Raft data is encrypted by
+the seal: without the AWS KMS key (`zuno_vault_kms_key_id`, plus IAM
+credentials allowed to `kms:Decrypt` it) neither snapshot can be read -
+never schedule that key for deletion. Operations that need a root token
+afterwards (`vault operator generate-root`) need the **recovery keys** of
+the Vault the snapshot was taken from (`ansible/vault-recovery-<cluster>.json`
+at install time, then the operators' password manager): restoring a
+snapshot brings back that Vault's recovery configuration, not the
+current one's.
 
 ### Restore procedure
 
-1. Provision a new PVC from the snapshot (CSI `dataSource` pointing at
-   the chosen `VolumeSnapshot`, same storage class):
+**From a raft snapshot** (any Vault running this chart with the same KMS
+key - the live one, or a new one on a rebuilt cluster):
+
+1. Copy the snapshot out of the `vault-raft-snapshots` PVC (debug pod
+   mounting it, `oc cp`), or pick it in place.
+2. Get a token allowed to `update` `sys/storage/raft/snapshot` and
+   `sys/storage/raft/snapshot-force`: on the live Vault, `vault operator
+   generate-root` with 2 of its 3 recovery keys (revoke the token
+   afterwards).
+3. `vault operator raft snapshot restore <file>` on the same Vault, or
+   `vault operator raft snapshot restore -force <file>` on a new Vault (a
+   different raft cluster). Vault unseals itself through KMS afterwards.
+4. Verify: read a known secret path and compare with the value current at
+   the snapshot's time.
+5. On a new Vault: the restored data carries the OLD Vault's recovery keys
+   and Kubernetes auth configuration - re-run `make d0 install vault` (the
+   configure Job re-applies `auth/kubernetes/config` for the new cluster).
+
+**From a CSI VolumeSnapshot** (same region):
+
+1. Scale `statefulset/zuno-vault` to 0 (remove `syncPolicy.automated` from
+   `zuno-vault-d1` first so ArgoCD does not scale it back).
+2. Recreate `data-zuno-vault-0` with `dataSource` pointing at the chosen
+   `VolumeSnapshot`:
    ```yaml
    apiVersion: v1
    kind: PersistentVolumeClaim
    metadata:
-     name: data-zuno-vault-restore-test-0
-     namespace: zuno-vault-restore-drill
+     name: data-zuno-vault-0
+     namespace: zuno-vault
    spec:
      storageClassName: gp3-csi
      accessModes: ["ReadWriteOnce"]
@@ -172,16 +213,14 @@ diagnostic-only pattern as PostgreSQL's check.
        kind: VolumeSnapshot
        apiGroup: snapshot.storage.k8s.io
    ```
-2. Deploy a scratch Vault instance (same chart, different release name/
-   namespace, `dataStorage` pointed at the restored PVC instead of a
-   fresh one — mirror `gitops/charts/vault`'s own `standalone.config`).
-3. Unseal it with the same unseal key(s)/root token the live Vault uses
-   (this is a filesystem-level restore, not a fresh `vault operator
-   init` — the restored data directory already holds the sealed keyring).
-4. Verify: read a known secret path and confirm the value matches
-   what was current as of the snapshot's creation time.
-5. Record: wall-clock time from step 2 to step 4 passing, then delete
-   the scratch instance/PVC/namespace.
+3. Re-apply the Application (`make d0 install vault`). Vault starts on the
+   restored raft directory and unseals itself through KMS - no unseal step.
+4. Verify as above.
+
+**Drill records below predate WP-223** (file storage, Shamir seal, manual
+unseal with the live unseal key). The raft-snapshot restore path above has
+not been drilled yet; it is the first restore drill to run after the
+migration.
 
 **Restore drill executed: 2026-08-18 (roadmap WP-13).** Restored from
 the live `vault-data-20260818073439` snapshot (10h old at drill time,

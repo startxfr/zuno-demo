@@ -426,7 +426,8 @@ maasGateway:
 maasDb:
   enabled: false
   vaultPath: maas/postgresql-app
-  secretStoreName: vault-backend
+  # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
+  secretStoreName: vault
   refreshInterval: 1h
   # zuno-postgresql-primary, not -pgbouncer: pgBouncer runs in transaction
   # pooling mode (gitops/charts/postgresql values pgBouncer.poolMode), which
@@ -451,7 +452,8 @@ tracesS3:
   secretName: rhoai-traces-s3-credentials
   namespace: redhat-ods-monitoring
   vaultPath: rhoai/traces-s3
-  secretStoreName: vault-backend
+  # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
+  secretStoreName: vault
   refreshInterval: 1h
 
 # ADR-0522/WP-080: direct Route to Perses's own dashboards
@@ -601,7 +603,8 @@ ogxServer:
   replicas: 1
   credentials:
     vaultPath: ogx/postgresql-app
-    secretStoreName: vault-backend
+    # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
+    secretStoreName: vault
     refreshInterval: 1h
   pgvector:
     host: zuno-postgresql-primary.zuno-data.svc

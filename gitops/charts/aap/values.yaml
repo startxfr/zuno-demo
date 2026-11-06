@@ -79,7 +79,7 @@ operator:
     namespace: zuno-aap
 
 # Kubernetes Secret names populated by ExternalSecrets resolving against the
-# vault-backend ClusterSecretStore. Never hardcode values here.
+# namespace's own `vault` SecretStore (ADR-0602/WP-223). Never hardcode values here.
 adminSecretName: aap-admin
 
 # Dedicated Postgres databases (ADR-0315 pattern, repeated once per

@@ -12,7 +12,10 @@
 #
 # This Job closes that gap for clients, and ONLY for clients. See ADR-0530
 # clause 4: groups, users, realm roles, identity providers, client scopes and
-# realm settings are still create-only. The script says so out loud on every
+# realm settings are still create-only - except, since ADR-0602/WP-223, the
+# few realm settings listed in realm-settings.json (brute-force detection in
+# every profile; password policy and idle timeout in hardened), merged in so
+# that only those keys change. The script says so out loud on every
 # run, because a mechanism that reconciles half a realm while looking total
 # would be a worse trap than the one it replaces.
 #
@@ -66,6 +69,9 @@ spec:
               value: {{ .Values.clientReconcile.serverUrl | quote }}
             - name: KC_REALM
               value: zuno
+            # ADR-0602 / WP-223: demo | hardened (checks.yaml rejects others).
+            - name: KC_SECURITY_PROFILE
+              value: {{ .Values.securityProfile | quote }}
             - name: KC_ADMIN_USER
               valueFrom:
                 secretKeyRef:
@@ -118,10 +124,13 @@ spec:
               echo "ADR-0530: reconciling CLIENTS, plus (ADR-0581) the agent entitlement"
               echo "  GROUPS the admitted agents release declares - created when"
               echo "  missing, never deleted, membership never touched."
+              echo "  ADR-0602/WP-223: also the realm settings in realm-settings.json"
+              echo "  (profile $KC_SECURITY_PROFILE) - only those keys."
               echo "  NOT reconciled: users, realm roles, identity providers,"
-              echo "  client scopes, realm settings, and any other group. Those"
-              echo "  remain create-only - editing them in realm-zuno.json still"
-              echo "  has no effect on a live realm. See ADR-0530 clause 4."
+              echo "  client scopes, every other realm setting, and any other"
+              echo "  group. Those remain create-only - editing them in"
+              echo "  realm-zuno.json still has no effect on a live realm. See"
+              echo "  ADR-0530 clause 4."
 
               # kcadm writes its session to $HOME/.keycloak by default, and
               # this pod runs with a read-only root filesystem under an
@@ -170,6 +179,18 @@ spec:
                 exit 1
               fi
 
+              # ADR-0602 clause 3 / ADR-0603 M5, M6 / WP-223: realm settings.
+              # The import is create-only, so without this a live realm never
+              # gets brute-force protection (or, in hardened, the password
+              # policy and the one-hour idle timeout). -m for the same reason
+              # as the client update below: kcadm GETs the live realm, merges
+              # ONLY the keys of the file over it and PUTs the result, so every
+              # other realm setting, and anything changed in the admin console,
+              # is left as it is.
+              $KCADM update "realms/$KC_REALM" $CFG -f /realm/realm-settings.json -m
+              echo "realm settings applied ($KC_SECURITY_PROFILE profile):"
+              cat /realm/realm-settings.json
+
               # ADR-0595: the two permanent master-realm administrators. Created
               # when missing, password and the `admin` role re-applied on every
               # run so a rotated Vault value follows. Nothing is ever deleted,
@@ -193,6 +214,31 @@ spec:
               }
               ensure_master_admin "${KC_AUTOMATION_USER:-}" "${KC_AUTOMATION_PASSWORD:-}"
               ensure_master_admin "${KC_CONSOLE_USER:-}" "${KC_CONSOLE_PASSWORD:-}"
+
+              # ADR-0602 clause 3 / WP-223, hardened only: the console
+              # administrator (zuno-admin, the account humans type) must enrol
+              # an authenticator app at its next sign-in. NOT the automation
+              # account: every Job signs in with kcadm's password grant, and a
+              # pending required action makes Keycloak refuse that grant
+              # ("Account is not fully set up") - it would lock every Job out.
+              # Added only while the user has no OTP credential yet: once it
+              # has one, re-adding CONFIGURE_TOTP on every sync would make the
+              # person enrol a new device after each Job run. Setting
+              # requiredActions replaces the list; the console account carries
+              # no other required action (ensure_master_admin sets a
+              # non-temporary password).
+              if [ "$KC_SECURITY_PROFILE" = "hardened" ] && [ -n "${KC_CONSOLE_USER:-}" ] \
+                 && [ -n "${KC_CONSOLE_PASSWORD:-}" ]; then
+                cuid=$($KCADM get users -r master $CFG -q "username=$KC_CONSOLE_USER" -q exact=true \
+                         --fields id --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+                if $KCADM get "users/$cuid/credentials" -r master $CFG 2>/dev/null \
+                     | grep -Eq '"type" *: *"otp"'; then
+                  echo "master admin: $KC_CONSOLE_USER already has an OTP credential"
+                else
+                  $KCADM update "users/$cuid" -r master $CFG -s 'requiredActions=["CONFIGURE_TOTP"]'
+                  echo "master admin: $KC_CONSOLE_USER must configure TOTP at next sign-in (hardened)"
+                fi
+              fi
 
               created=0
               updated=0

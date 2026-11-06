@@ -1,11 +1,14 @@
 ---
-# Reuses install.yml's readiness signal: vault-backend ClusterSecretStore
-# Ready implies the operator/operand are installed too.
-- name: "external_secrets | look up the vault-backend ClusterSecretStore"
+# Reuses install.yml's readiness signal: the zuno-ai-run SecretStore `vault`
+# Ready implies the operator/operand are installed and Vault accepts the
+# per-namespace roles (ADR-0602/WP-223). zuno-ai-run is the one namespace
+# every install has a store in.
+- name: "external_secrets | look up the zuno-ai-run SecretStore"
   kubernetes.core.k8s_info:
     api_version: external-secrets.io/v1beta1
-    kind: ClusterSecretStore
-    name: vault-backend
+    kind: SecretStore
+    namespace: zuno-ai-run
+    name: vault
   register: _eso_store_lookup
 
 - name: "external_secrets | compute install state"

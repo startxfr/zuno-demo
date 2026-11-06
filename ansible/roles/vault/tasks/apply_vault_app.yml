@@ -1,0 +1,85 @@
+---
+# ADR-0602 clause 1 / WP-223: everything the zuno-vault-d1 Application needs
+# that git cannot hold - the KMS key, its region and the IAM credentials
+# Vault unseals with - then the Application itself. Shared by tasks/install.yml
+# and ansible/playbooks/vault_migrate_kms_raft.yml (which renders the
+# intermediate seal state through vault_seal_type: shamir).
+#
+# Inputs: confidential.yml already loaded by the caller; optional
+# vault_seal_type (awskms|shamir, default awskms), gitops_app_refresh.
+
+# No fallback and no "skip KMS" switch: awskms is the design (a Vault that
+# needs a human to unseal after every restart is the gap this closes), so a
+# missing value stops the run here, before anything is applied.
+- name: "vault | fail if the AWS KMS auto-unseal settings are missing from ansible/confidential.yml"
+  ansible.builtin.fail:
+    msg: >-
+      {{ _vault_kms_missing | join(', ') }} missing or still "xxxxxx" in
+      ansible/confidential.yml. Vault auto-unseals with AWS KMS (ADR-0602
+      clause 1): create the KMS key and the KMS-only IAM user described in
+      docs/platform/vault-kms-raft-migration.md ("Prerequisites") and fill
+      in the four zuno_vault_kms_* values (block "Vault auto-unseal" of
+      ansible/confidential.example.yml), then re-run.
+  vars:
+    _vault_kms_values:
+      zuno_vault_kms_key_id: "{{ zuno_vault_kms_key_id | default('xxxxxx', true) }}"
+      zuno_vault_kms_region: "{{ zuno_vault_kms_region | default('xxxxxx', true) }}"
+      zuno_vault_kms_access_key_id: "{{ zuno_vault_kms_access_key_id | default('xxxxxx', true) }}"
+      zuno_vault_kms_secret_access_key: "{{ zuno_vault_kms_secret_access_key | default('xxxxxx', true) }}"
+    _vault_kms_missing: >-
+      {{ _vault_kms_values | dict2items | selectattr('value', 'equalto', 'xxxxxx')
+         | map(attribute='key') | list }}
+  when: _vault_kms_missing | length > 0
+
+# Read by the Vault server through server.extraSecretEnvironmentVars
+# (gitops/charts/vault values.yaml). The StatefulSet is OnDelete: a rotated
+# key reaches Vault on the next pod restart, which auto-unseal now makes
+# safe to trigger (`oc delete pod zuno-vault-0 -n zuno-vault`).
+- name: "vault | create the vault-aws-kms Secret (KMS-only IAM credentials)"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: vault-aws-kms
+        namespace: zuno-vault
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      type: Opaque
+      stringData:
+        AWS_ACCESS_KEY_ID: "{{ zuno_vault_kms_access_key_id }}"
+        AWS_SECRET_ACCESS_KEY: "{{ zuno_vault_kms_secret_access_key }}"
+  no_log: true
+
+# Starts from the manifest's own values and merges only what is known at run
+# time, never replaces them wholesale (the cert_manager role documents the
+# ACME revert that replacing caused). Subscript ['values'], never .values
+# (the dict method of that name).
+- name: "vault | apply the Vault GitOps Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "vault"
+    gitops_app_phase: "d1"
+    # Static name matching application-d1.yaml - a zuno_id-derived name
+    # would create a second, independent Vault release.
+    gitops_app_name: "zuno-{{ gitops_component_name }}-d1"
+    # Not Healthy until initialized (the readiness probe runs `vault
+    # status`), so waiting here would deadlock a fresh install.
+    gitops_app_wait: false
+    gitops_app_extra_helm_values: >-
+      {{
+        ((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/apps/vault/application-d1.yaml')
+          | replace('apps.mycluster.example.com', cluster_base_domain)
+          | from_yaml)['spec']['source']['helm']['values'] | from_yaml)
+        | combine({
+            'route': {
+              'enabled': zuno_vault_route_enabled | default(false) | bool,
+              'ipWhitelist': zuno_vault_route_ip_whitelist | default('')
+            },
+            'vault': {
+              'seal': {'type': vault_seal_type | default('awskms')},
+              'kms': {'keyId': zuno_vault_kms_key_id, 'region': zuno_vault_kms_region}
+            }
+          }, recursive=True)
+      }}

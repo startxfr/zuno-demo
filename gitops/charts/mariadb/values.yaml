@@ -6,6 +6,14 @@
 mariadbOperand:
   enabled: false
 
+# ADR-0602 clause 1 / WP-223: base64 PEM of the OpenShift service CA that
+# signs Vault's listener certificate, set by ansible (ansible/roles/mariadb, internal mode) via
+# gitops_app_extra_helm_values from ansible/tasks/resolve_vault_ca_bundle.yml.
+# Empty renders the ClusterIssuer without caBundle (https against the
+# system trust store), which fails verification - loudly, on the issuer's
+# Ready condition - rather than falling back to http.
+vaultCaBundle: ""
+
 # subscription.name/operator.name/operator.channel/operator.source.name are
 # all discovered at run time by ansible/roles/mariadb/tasks/install.yml and
 # set via gitops_app_extra_helm_values (ADR-0048) - the known package name
@@ -151,7 +159,8 @@ credentials:
   # MariaDB's root user is fixed, unlike postgresql's configurable owner
   # role). Seeded by ansible/roles/vault/tasks/install.yml.
   rootVaultPath: mariadb/root
-  secretStoreName: vault-backend
+  # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
+  secretStoreName: vault
   refreshInterval: 1h
 
 # PhysicalBackup (k8s.mariadb.com/v1alpha1) only renders once real

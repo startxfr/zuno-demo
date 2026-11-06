@@ -379,7 +379,8 @@ resources:
 credentials:
   vaultPath: {name}/technical
   secretName: {name}-technical-credentials
-  secretStoreName: vault-backend
+  # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
+  secretStoreName: vault
   refreshInterval: 1h
 """
 
@@ -480,9 +481,11 @@ metadata:
     argocd.argoproj.io/sync-wave: "25"
 spec:
   refreshInterval: {{{{ .Values.credentials.refreshInterval }}}}
+  # ADR-0602/WP-223: the namespace's own SecretStore; the key must be listed
+  # for this namespace in platform/vault/secret-access.yaml.
   secretStoreRef:
     name: {{{{ .Values.credentials.secretStoreName }}}}
-    kind: ClusterSecretStore
+    kind: SecretStore
   target:
     name: {{{{ .Values.credentials.secretName }}}}
     creationPolicy: Owner
@@ -708,6 +711,8 @@ def main() -> int:
         f"flag this if forgotten).\n"
         f"  5. Add a '{name} MCP server tests' step to .github/workflows/lint.yml's python job.\n"
         f"  6. Seed zuno/{name}/technical in ansible/roles/vault/tasks/install.yml.\n"
+        f"  7. Grant {name}/technical to the chart's namespace in platform/vault/secret-access.yaml "
+        f"(ADR-0602/WP-223; python3 platform/vault/check_secret_access.py fails until you do).\n"
     )
     return 0
 

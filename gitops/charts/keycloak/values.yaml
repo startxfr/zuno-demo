@@ -41,13 +41,38 @@ topologySpreadConstraints:
 clusterBaseDomain: apps.mycluster.example.com
 
 # Kubernetes Secret names populated by ExternalSecrets resolving against the
-# vault-backend ClusterSecretStore. Never hardcode values here.
+# namespace's own SecretStore `vault` (ADR-0602 / WP-223). Never hardcode values here.
 adminSecretName: keycloak-admin
 # ADR-0595: the two permanent master-realm accounts that replace the temporary
 # bootstrap admin. automation: every Job and role (kcadm). console: the named
 # administrator humans sign in with. Both are Vault-seeded by the vault role.
 automationSecretName: keycloak-automation
 consoleSecretName: keycloak-console
+
+# ADR-0602 clause 3 / ADR-0603 M5, M6 / WP-223: demo | hardened. Set by
+# ansible/roles/keycloak from zuno_security_profile. The realm import is
+# create-only, so templates/configmap-clients.yaml renders realm-settings.json
+# and job-client-reconcile.yaml merges it into the LIVE realm on every sync:
+#   both profiles: the brute-force detection keys of files/realm-zuno.json
+#                  (lockout after 30 failures, 60 s steps, 15 min ceiling,
+#                  never permanent - a demo must not lock a presenter out for good);
+#   hardened:      hardenedRealmSettings below, plus a CONFIGURE_TOTP required
+#                  action on the master-realm console administrator.
+# Merge semantics: only listed keys change. Going back from hardened to demo
+# therefore does NOT remove the password policy or restore the idle timeout -
+# clear them in the admin console (Realm settings) if that is ever wanted.
+securityProfile: demo
+hardenedRealmSettings:
+  # Applies to every zuno-realm password set from now on (existing ones are
+  # checked at their next change). The shared persona password must comply:
+  # the eval-personas Job sets it with kcadm set-password, which enforces the
+  # policy - ansible/tasks/assert_security_profile.yml checks it up front.
+  passwordPolicy: "length(12) and digits(1) and notUsername"
+  # One idle hour (ADR-0603 M6). ssoSessionMaxLifespan deliberately stays at
+  # the realm file's 36000 s (10 h): it already bounds a session to a working
+  # day, and shortening it would only add mid-demo re-logins - the idle
+  # timeout is what closes an abandoned session.
+  ssoSessionIdleTimeout: 3600
 
 # ADR-0530/WP-091: templates/job-client-reconcile.yaml. The image is the same
 # RHBK server image the operator runs (kcadm.sh ships in it; nothing else in

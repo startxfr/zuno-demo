@@ -331,6 +331,37 @@ zuno_aws_route53_secret_access_key: "xxxxxx"
 # zuno_certmanager_route53_region: "eu-west-3"
 # zuno_certmanager_email: "dev+zuno-acme@example.org"
 
+# --- Vault auto-unseal with AWS KMS (ADR-0602 clause 1 / WP-223) -----------
+# REQUIRED: `make d0 install vault` stops if any of the four is missing.
+# Vault unseals itself with this KMS key after every restart (no unseal key
+# in the cluster, no human in the loop). Created once per cluster by an
+# operator - docs/platform/vault-kms-raft-migration.md "Prerequisites" has
+# the exact steps:
+#   1. KMS -> Create key: symmetric, Encrypt and decrypt, single-Region, in
+#      the cluster's region; alias e.g. alias/zuno-<cluster>-vault-unseal.
+#      Copy the key ARN.
+#   2. IAM -> Users -> Create user (e.g. zuno-<cluster>-vault-kms),
+#      programmatic access only, with ONLY this inline policy:
+#      {"Version": "2012-10-17", "Statement": [
+#        {"Effect": "Allow",
+#         "Action": ["kms:Encrypt", "kms:Decrypt", "kms:DescribeKey"],
+#         "Resource": "arn:aws:kms:<region>:<account>:key/<key-id>"}]}
+#   3. Create an access key -> copy both values (secret shown once).
+# Never delete or schedule deletion of the key: every Vault snapshot of this
+# cluster is unreadable without it. The access key can be rotated freely
+# (update here, re-run `make d0 install vault`, then
+# `oc delete pod zuno-vault-0 -n zuno-vault` - Vault unseals again by itself).
+zuno_vault_kms_key_id: "xxxxxx"            # key ARN (or key id / alias ARN)
+zuno_vault_kms_region: "xxxxxx"            # e.g. eu-west-1 (the key's region)
+zuno_vault_kms_access_key_id: "xxxxxx"
+zuno_vault_kms_secret_access_key: "xxxxxx"
+#
+# Optional: expose the Vault UI on a reencrypt Route for a session (off by
+# default; nothing in the platform uses it). Restrict it to your source
+# addresses with a space-separated CIDR list.
+# zuno_vault_route_enabled: false
+# zuno_vault_route_ip_whitelist: "203.0.113.10/32 198.51.100.0/24"
+
 # --- GitOps branch pin (ADR-0517 run / multi-cluster bring-up) --------------
 # Which git revision every ArgoCD Application syncs its charts from. The
 # committed manifests all say `targetRevision: main`; when this is set,
@@ -511,7 +542,11 @@ zuno_llm_provider_mistral_codestral_api_key: "xxxxxx"
 #   OVHcloud: https://www.ovhcloud.com/en/public-cloud/ai-endpoints/
 zuno_llm_provider_ovhcloud_api_key: "xxxxxx"
 
-# ADR-0595: the demo password, set ONCE here (this file is not in git; the
+# ADR-0595 / ADR-0602: the passwords, by security profile (zuno_security_profile,
+# group_vars main.yml; may also be set here or in ansible/clusters/<cluster>.yml).
+# zuno_security_profile: demo   # demo | hardened
+#
+# demo (default): the demo password, set ONCE here (this file is not in git; the
 # repository is public). Every admin, service and database password inherits it
 # through its own variable in ansible/inventories/demo/group_vars/all/passwords.yml,
 # so any single one can be overridden below without touching anything else:
@@ -519,10 +554,20 @@ zuno_llm_provider_ovhcloud_api_key: "xxxxxx"
 #   zuno_admin_aap_root_password: "..."
 #   zuno_personas_openclaw_ui_password: "..."
 # Left unset, each falls back to a generated 22-character value (deterministic
-# per component), never to a literal. A cluster that is already seeded keeps its
-# Vault values until the path is deleted and re-seeded (ADR-0345).
+# per component, guessable from the seed), never to a literal.
+#
+# hardened (WP-223): zuno_admin_mainpwd is NOT used for any infra credential and
+# there is no md5 fallback. Every admin, service and database password (and the
+# Dify admin and OpenClaw UI ones) is generated at random on first seed and lives
+# only in Vault - read them there (zuno/keycloak/console, zuno/aap/admin,
+# zuno/dify/admin, ...; docs/platform/operations.md). An override above still
+# wins if you set one. zuno_personas_mainpwd is REQUIRED: at least 12 characters
+# with a digit (the realm password policy), or the run stops.
+#
+# Either way, a cluster that is already seeded keeps its Vault values until the
+# path is deleted and re-seeded (ADR-0345).
 # zuno_admin_mainpwd: "choose-a-demo-password"
-# zuno_personas_mainpwd: "choose-a-demo-persona-password"
+# zuno_personas_mainpwd: "choose-a-demo-persona-password-1"
 
 # --- AAP Red Hat subscription activation (ADR-0354/WP-072 follow-up) -------
 # Set true to auto-activate AAP's Red Hat subscription at the end of

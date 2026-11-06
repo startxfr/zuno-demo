@@ -11,8 +11,11 @@ Positioned right after `vault` in `day0_components` (`ansible/playbooks/
 day0_{install,check}.yml`, reversed in `day0_uninstall.yml`): the `pki/`
 secrets engine and the `cert-manager-issuer` Kubernetes-auth role/policy
 this role's `ClusterIssuer` depends on are prepared by `vault`'s own
-bootstrap script (`ansible/roles/vault/kustomize/unseal-configure/
-configmap.yaml`). This role never writes to Vault directly - it only
+configure script (`ansible/roles/vault/kustomize/configure/
+configure.sh`). Since ADR-0602/WP-223 the issuer reaches Vault over https
+with the service-ca bundle (`vaultCaBundle`, from
+`ansible/tasks/resolve_vault_ca_bundle.yml`); re-run this role after a
+service CA rotation. This role never writes to Vault directly - it only
 discovers the Vault client Service (same `app.kubernetes.io/name=vault`
 label-selector lookup `vault`/`external_secrets` already use) and applies
 a declarative `ClusterIssuer` pointing at the already-configured backend.

@@ -160,7 +160,13 @@ mcp:
     # Seeded by ansible/roles/lightspeed_config/tasks/install.yml before this
     # Application is applied. If the ExternalSecret sits in SecretSyncedError,
     # that role step did not run.
-    vaultPath: zuno/lightspeed/mcp-token
+    #
+    # ADR-0602/WP-223: relative to the store's KV mount (path: zuno), like every
+    # other key. It read `zuno/lightspeed/mcp-token` until 2026-11-06, which
+    # resolved to zuno/data/zuno/lightspeed/mcp-token, a path nothing seeds, so
+    # serviceIdentity mode could not have synced (never rendered live: demo333
+    # runs perUser). Full Vault path: zuno/lightspeed/mcp-token.
+    vaultPath: lightspeed/mcp-token
 
 # ADR-0524 clause 1, TLS. maas-default-gateway's serving cert is issued by the
 # cluster's openshift-service-serving-signer, which is NOT in the Lightspeed

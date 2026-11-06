@@ -93,5 +93,6 @@ policyOperand:
 signerClientMirror:
   enabled: false
   vaultPath: keycloak/zuno-signer-client
-  secretStoreName: vault-backend
+  # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
+  secretStoreName: vault
   refreshInterval: 1h

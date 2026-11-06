@@ -21,7 +21,18 @@ metadata:
     argocd.argoproj.io/sync-wave: "-10"
 spec:
   vault:
-    server: "http://{{ .Values.vaultServiceName }}.zuno-vault.svc:8200"
+    # ADR-0602 clause 1 / WP-223: Vault's listener serves TLS with an
+    # OpenShift service-ca certificate. caBundle is that CA (base64 PEM),
+    # read by ansible/tasks/resolve_vault_ca_bundle.yml from the
+    # openshift-service-ca.crt ConfigMap and injected as vaultCaBundle - a
+    # ClusterIssuer cannot reference a ConfigMap. The service CA rotates
+    # (about yearly, with an overlap period): re-run the owning role
+    # (`make d0|d1 install ...`) after a rotation, or issuance fails with an
+    # x509 error once the old CA expires.
+    server: "https://{{ .Values.vaultServiceName }}.zuno-vault.svc:8200"
+    {{- with .Values.vaultCaBundle }}
+    caBundle: {{ . | quote }}
+    {{- end }}
     path: pki/sign/istio
     auth:
       kubernetes:

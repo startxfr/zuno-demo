@@ -43,16 +43,24 @@ test against (see the last clause).
 **The platform adopts a secure-by-default baseline for every boundary above, and keeps the permissive demo behaviour only
 as an explicit, named profile (WP-227).** Each clause is delivered by the work package named after it.
 
-1. **Vault (C1, WP-223).** Auto-unseal through a key the cluster does not hold (cloud KMS or an external transit
-   Vault). The initial root token is revoked after bootstrap and never stored in a cluster Secret. Raft storage in
-   place of `file`. Listener TLS on, with the Vault PKI already in place.
-2. **Secret reach (C2, WP-223).** No `ClusterSecretStore` that reads the whole tree. One `SecretStore` per namespace
-   with its own Vault role and policy, or a `ClusterSecretStore` with `conditions.namespaces` and a path prefix per
-   tenant. Creating an `ExternalSecret` is restricted by RBAC or admission.
-3. **Passwords (C5, WP-223).** Outside the demo profile, every component gets its own random value from Vault; the
-   `md5(org:env:seed)` fallback fails instead of guessing; the shared persona value never feeds an infrastructure
-   credential. The realm gets brute-force protection and a password policy. `directAccessGrantsEnabled` is removed from
-   `openshift` and `aap`, and the test clients exist only in non-production realms.
+1. **Vault (C1, WP-223).** Auto-unseal through an AWS KMS key the cluster does not hold, used by a dedicated IAM
+   identity limited to `kms:Encrypt`, `kms:Decrypt` and `kms:DescribeKey` on that key. This is a second
+   human-supplied credential next to the one ADR-0024 allows, accepted because nothing inside the cluster can unseal
+   Vault. The initial root token is used once over exec, revoked after bootstrap and never stored in a cluster Secret;
+   the configure Job and every Ansible seed log in through Kubernetes-auth roles (`vault-configurator`,
+   `ansible-seeder`) with one-hour tokens. Recovery keys are handed to the operator outside the cluster. Raft storage
+   in place of `file`. Listener TLS on, with an OpenShift service-CA certificate (no dependency on Vault's own PKI).
+   The UI Route is off by default. An existing Vault moves through a scripted in-place migration.
+2. **Secret reach (C2, WP-223).** No `ClusterSecretStore`. One `SecretStore` per namespace, each with its own Vault
+   role and a policy listing the exact keys the namespace reads, all taken from one table
+   (`platform/vault/secret-access.yaml`) that a check enforces. Whoever may create an `ExternalSecret` in a namespace
+   reaches only that namespace's keys.
+3. **Passwords (C5, WP-223).** A `zuno_security_profile` (`demo` or `hardened`) selects the scheme. In `hardened`
+   every infrastructure credential gets its own random value from Vault, the `md5(org:env:seed)` fallback fails
+   instead of guessing, and the shared persona value never feeds an infrastructure credential; the realm also gets a
+   password policy, a one-hour idle session and OTP for the console administrator. Both profiles get temporary
+   brute-force protection, applied to live realms by the reconcile Job. `directAccessGrantsEnabled` stays on for
+   `openshift` and `aap` **by decision of 2026-11-06**: headless `oc login` with a Keycloak password is kept.
 4. **Mesh (C3, WP-224).** `PeerAuthentication` STRICT mesh-wide, with the existing PostgreSQL and MariaDB exceptions
    written down per port. A deny-by-default `AuthorizationPolicy` per namespace keyed on SPIFFE principals.
 5. **GitOps (C4, WP-224).** The AppProject lists the kinds it may create, the controller loses the blanket

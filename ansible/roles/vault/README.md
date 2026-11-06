@@ -1,29 +1,54 @@
 # vault
 
-Installs Vault (via the `vault` GitOps Application, demo-grade single
-replica with file storage), initializes and unseals it, then configures the
-Kubernetes auth method and the `eso-reader` policy/role that
-`ansible/roles/external_secrets` binds its `ClusterSecretStore` to, plus
-the `pki/` secrets engine (a self-signed root CA, `common_name:
-zuno-demo.internal`) and the `cert-manager-issuer` policy/role that
-`ansible/roles/cert_manager` binds its `ClusterIssuer` to. Both are
-prepared by the same idempotent script,
-`ansible/roles/vault/kustomize/unseal-configure/configmap.yaml`, and each
-consumer only ever *references* them declaratively.
+Installs Vault (via the `vault` GitOps Application: raft storage, one
+replica ready to grow to three, AWS KMS auto-unseal, listener TLS from the
+OpenShift service CA - ADR-0602 clause 1 / WP-223), initializes it on the
+first run, then configures the Kubernetes auth method, the per-namespace
+External Secrets roles (`ns-<namespace>`, from
+`platform/vault/secret-access.yaml`), the `pki/` secrets engine (a
+self-signed root CA, `common_name: zuno-demo.internal`) and the
+`cert-manager-issuer`/`istio-issuer`/`mariadb-issuer` policies and roles
+the ClusterIssuers bind to, plus Transit and the audit device. All of it is
+prepared by one idempotent script, `kustomize/configure/configure.sh`, run
+by the `vault-configure` Job (`tasks/run_configure_job.yml`); each consumer
+only ever *references* it declaratively.
 
 `pki/roles/cert-manager`'s `allowed_domains` also includes the cluster's
 real apps wildcard domain (`${CLUSTER_BASE_DOMAIN}`, resolved early via
 `ansible/tasks/resolve_cluster_base_domain.yml` and injected into the
-unseal-configure Job's env), not just `zuno-demo.internal`/
+configure Job's env), not just `zuno-demo.internal`/
 `svc.cluster.local` - `ansible/roles/keycloak`'s Ingress requests a
 cert-manager cert for a public-facing hostname (`keycloak.<domain>`),
 which Vault's PKI role would otherwise reject as out of domain.
 
-This is the one role that cannot depend on Vault for its own bootstrap
-secret: `install.yml` captures the unseal key and root token into a
-Kubernetes `Secret` (`vault-bootstrap-credentials`) in a locked-down,
-admin-only namespace (`zuno-vault`) rather than requiring any
-external input.
+## Identities and the root token (ADR-0602 clause 1 / WP-223)
+
+- **Unseal**: AWS KMS, from the four `zuno_vault_kms_*` values of
+  `ansible/confidential.yml` (the IAM credentials go to the `vault-aws-kms`
+  Secret, the key ARN and region into the Application's values). The role
+  stops if any is missing. A restart no longer needs a human.
+- **Initialization** (first run only): `vault operator init
+  -recovery-shares=3 -recovery-threshold=2`. The JSON (recovery keys and
+  root token) is written once to `ansible/vault-recovery-<cluster>.json`
+  (mode 0600, gitignored) on the Ansible controller - never to a cluster
+  Secret. Move it to the operators' password manager and delete it.
+- **Root token**: used once, by `tasks/bootstrap_auth.yml` (through
+  `k8s_exec`, never a Secret), to create the `vault-configurator` role, then
+  revoked as soon as the configure Job has succeeded.
+- **vault-configurator** (ServiceAccount `vault-configure`): the configure
+  Job's identity - policies, auth, mounts, PKI, Transit keys, audit; no
+  access to `zuno/data/*`.
+- **ansible-seeder** (ServiceAccount `ansible-seeder`): every seed/read task
+  in `ansible/` logs in with `ansible/tasks/vault_login.yml` and uses
+  `zuno_vault_token` (create/read/update on the KV, read on `pki/cert/ca`,
+  1h TTL).
+- **raft-snapshot** (ServiceAccount `vault-raft-snapshot`): the chart's raft
+  snapshot CronJob.
+
+A Vault initialized before WP-223 (file storage, Shamir key and root token
+in `vault-bootstrap-credentials`) is refused by `install.yml`; migrate it
+with `ansible/playbooks/vault_migrate_kms_raft.yml`
+(`docs/platform/vault-kms-raft-migration.md`).
 
 `install.yml` also generates and seeds the secrets that can be
 self-generated (Keycloak admin, PostgreSQL app credentials, MariaDB root
@@ -46,4 +71,4 @@ never overwriting a real value however it got there.
 
 Vault's KV v2 secrets engine is mounted at `zuno/` (not the HashiCorp
 default `secret/`) - every platform secret lives under `zuno/<component>/
-<item>`, matching the `eso-reader` policy scope below.
+<item>`, the paths `platform/vault/secret-access.yaml` grants per namespace.

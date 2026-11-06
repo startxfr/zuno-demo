@@ -47,8 +47,9 @@ exception - it installs itself and creates the `AppProject` (`zuno`) every
 `Application.spec.project` references, so it applies raw manifests
 directly via `ansible/tasks/apply_kustomize.yml`. `admin_context` avoids
 this since Day 0 now runs `argocd` first - see `admin-context` in the
-table below. `vault`'s imperative unseal is a one-shot action, not a
-standing component.
+table below. `vault`'s imperative initialization (recovery keys, one-time
+root token bootstrap; AWS KMS unseals it afterwards, ADR-0602) is a
+one-shot action, not a standing component.
 
 ADR-0219
 retired the last remaining Ansible-applied schema ConfigMap
@@ -85,7 +86,7 @@ ExternalSecrets, the PostgresCluster/pgvector wiring, the discovered
 `ClusterPolicy`/`DataScienceCluster` specs, and operand CRs like
 `Kuadrant`/`KedaController`/`Kiali`/`OSSMConsole`/`MonitoringStack`/
 `OpenTelemetryCollector`/`TempoMonolithic`/`OperatorConfig`/
-`ClusterSecretStore`) stays as local templates.
+`SecretStore`) stays as local templates.
 
 `nfd`/`nvidia-gpu`/`openshift-ai`/`cert-manager` use that component's
 matching `cluster-xxx` chart (`cluster-nfd`/`cluster-gpu`/`cluster-ods`/
@@ -153,7 +154,7 @@ Directories present:
 | `nfd` | local chart, `gitops/charts/nfd` (ADR-0312 - `-d0`: startx `cluster-nfd` dependency, entirely - Namespace/OperatorGroup/Subscription; `-d1`: `cluster-nfd`'s own NodeFeatureDiscovery CR) |
 | `nvidia-gpu` | local chart, `gitops/charts/nvidia-gpu` (ADR-0312 - `-d0`: startx `cluster-gpu` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-gpu`'s own ClusterPolicy CR, spec injected once discovered - see that chart's README) |
 | `openshift-ai` | local chart, `gitops/charts/openshift-ai` (ADR-0312 - `-d0`: startx `cluster-ods` dependency for Namespace/OperatorGroup/Subscription; `-d1`: `cluster-ods`'s own DataScienceCluster CR, spec overridden in full - RawDeployment, not startx's Serverless-dependent default) |
-| `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`, no `OperatorGroup`), plus local `OperatorConfig`; `-d1`: ClusterSecretStore/cluster-domain ExternalSecret, rendered only once the discovered Vault Service name is supplied - see the `external_secrets` role's README) |
+| `external-secrets` | local chart, `gitops/charts/external-secrets` (ADR-0312 - `-d0`: startx `operator` dependency for the `Subscription` into `openshift-operators` (`AllNamespaces`, no `OperatorGroup`), plus local `OperatorConfig`; `-d1`: per-namespace SecretStores (ADR-0602)/cluster-domain ExternalSecret, rendered only once the discovered Vault Service name is supplied - see the `external_secrets` role's README) |
 | `smtp` | local chart, `gitops/charts/smtp` (`-d0`: zuno-ai-run Namespace; `-d1`: technical mail identity ExternalSecret) - no operator |
 | `observability` | local chart, `gitops/charts/observability` (`-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-opentelemetry-operator` Namespace/OperatorGroup/Subscription; `-d1`: shared OTLP Collector, exporting to both `debug` and `tempo`'s `otlp/tempo`) |
 | `service-mesh` | local chart, `gitops/charts/service-mesh` (`-d0`: startx `cluster-istio` dependency, `operatorIstio.enabled`, installs the servicemeshoperator3/Sail Operator; `-d1`: Vault-backed mesh CA (`clusterIssuer`/`istioCsr`), `istiocni` and the `istio` control plane itself, in zuno-mesh) |

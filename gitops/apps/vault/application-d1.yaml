@@ -1,7 +1,14 @@
 ---
-# Demo-grade Vault: single replica, file storage, no HA/auto-unseal. Application
-# name stays static ("zuno-vault-d1") to avoid ever creating a second, divergent
-# release.
+# Vault: raft storage (1 replica, 3-ready), AWS KMS auto-unseal, service-ca
+# listener TLS (ADR-0602 clause 1 / WP-223). Application name stays static
+# ("zuno-vault-d1") to avoid ever creating a second, divergent release.
+#
+# The KMS key and region are NOT here: ansible/roles/vault merges them into
+# these values at apply time (vault.kms.keyId from confidential.yml
+# zuno_vault_kms_key_id), the same "start from the manifest, merge what is
+# discovered at run time" pattern as ansible/roles/cert_manager. Without
+# them the chart refuses to render (vault.kms.keyId is `required`), which is
+# deliberate - see gitops/charts/vault/values.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -20,9 +27,11 @@ spec:
       # inherit "zuno-vault-d1" and break the chart's fixed-release-name
       # assumption.
       releaseName: zuno-vault
+      # route.enabled false (ADR-0602 clause 1): the Vault UI is not exposed
+      # unless an operator sets zuno_vault_route_enabled for a session.
       values: |
         route:
-          enabled: true
+          enabled: false
         global:
           clusterBaseDomain: apps.mycluster.example.com
   destination:
@@ -31,6 +40,9 @@ spec:
   syncPolicy:
     automated:
       prune: true
-      selfHeal: false # Vault's seal state is managed imperatively by the vault role; avoid ArgoCD fighting a sealed pod's restart behavior.
+      # Still false with auto-unseal: the StatefulSet is OnDelete and
+      # ansible/playbooks/vault_migrate_kms_raft.yml scales it to 0 while
+      # it migrates storage - ArgoCD must not put the pod back mid-way.
+      selfHeal: false
     syncOptions:
       - CreateNamespace=false
