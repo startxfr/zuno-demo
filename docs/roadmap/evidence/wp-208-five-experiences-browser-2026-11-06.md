@@ -67,3 +67,17 @@ the three example apps re-imported. Every BuildConfig output is back on `:latest
 - **D8:** an oversized prompt (45 072 tokens) is skipped by the pre-flight on the 32 768-token entries and served by `gpt-oss-20b` in one call; the
   400 path is tested in `components/ai-gateway/tests/test_wp208_client_rejection.py`.
 - **da's approval proof** re-run on the rebuilt gateways: no regression.
+
+## Re-test by the user after the fixes (2026-11-06, 17:40 to 17:43 local time)
+
+- **D3, Open WebUI:** "Which pods of zuno-ai-run are not Running, and how many are?" twice, as consultant-01. No loop: the model calls
+  `knowledge.tech.search`, `confluence.page.search` (and `gmail.message.read` in the first chat, marked with a red cross) and answers at once
+  that it has no cluster access, with the `oc get pods` command ([first](wp-208-2026-11-06-9-owui-d3-pods-1.png),
+  [second](wp-208-2026-11-06-9-owui-d3-pods-2.png)).
+- **D5, OpenClaw (the `consultant-02` instance, not `sale-01`):** "Cherche dans Confluence les pages d'onboarding". The assistant calls the
+  tool `Zuno Confluence-page-search` with `onboarding` and lists the six pages (MNGD2-AP001 to O0R12-WSCPJ) with their space
+  ([capture](wp-208-2026-11-06-9-openclaw-d5-confluence.png)).
+- **D2, Dify, still open:** the same imperative sentence typed in the **Zuno Technical Documentation** chatflow gets "Je ne trouve pas de
+  réponse directe à votre question dans le contexte fourni", while the citations show onboarding pages ([capture](wp-208-2026-11-06-9-dify-d2-avant.png)).
+  The chatflow answers questions, not search orders, and its prompt says to decline when the context does not answer. The 3072-token budget
+  fixed the unfinished-reasoning answers; this refusal is the prompt's strictness and is being measured (strict against relaxed prompt).
