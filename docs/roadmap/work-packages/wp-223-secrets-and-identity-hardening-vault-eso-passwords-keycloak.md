@@ -120,6 +120,19 @@ a PushSecret write, any key of `zuno/*`.
   `platform/vault/rehearsal/rehearse_kms_raft_migration.sh`). It caught one gap: a wrong KMS key or credential stops
   Vault from starting, so playbook step 0 now runs a real `kms:DescribeKey` before stopping anything.
 
+## Review fixes (2026-11-06, after the code review)
+
+Fixed on this branch after a read-only review of commit 4ef67d58:
+- Step 8 read `keys_b64`; the rekey JSON is `keys_base64`. The raw output is now saved first, and the share count is asserted.
+- The configure Job no longer deletes `eso-reader` while ExternalSecrets still use `vault-backend`; the retirement happens on the run after the syncs.
+- The migration playbook is resumable (`vault_migrate_resume_from`), with the snapshot looked up and the data probe optional.
+- Step 0 proves `kms:Encrypt` and `kms:Decrypt`, not only `DescribeKey`.
+- A failed first bootstrap can be resumed with `-e zuno_vault_resume_bootstrap=true` (root token read back from the recovery file).
+- `vault status` parsing no longer fails on an empty first reply; the seed-if-missing task seeds only on "no value found" (exit 2).
+- A key ending in `/*` in `secret-access.yaml` now also gets `list` on its metadata path (needed by `dataFrom.find`).
+- Brute-force protection is applied to the `master` realm as well.
+Not rehearsed again on a live Vault: the new resume path and the KMS round trip run only against a real cluster and key.
+
 ## Rollout (needs the user's go and the push)
 
 1. Run `ansible-playbook ansible/playbooks/vault_migrate_kms_raft.yml`, step by step: snapshot, file to raft, Shamir to

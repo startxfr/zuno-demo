@@ -191,6 +191,18 @@ spec:
               echo "realm settings applied ($KC_SECURITY_PROFILE profile):"
               cat /realm/realm-settings.json
 
+              # Review finding (WP-223): the master realm holds the console and
+              # automation administrators and had no lockout. Same temporary
+              # lockout as the zuno realm (never permanent, so a Job that
+              # logs in with the right password is not affected). -m merges
+              # only these keys over the live master realm.
+              $KCADM update realms/master $CFG -m \
+                -s bruteForceProtected=true -s permanentLockout=false \
+                -s failureFactor=30 -s waitIncrementSeconds=60 \
+                -s maxFailureWaitSeconds=900 -s quickLoginCheckMilliSeconds=1000 \
+                -s minimumQuickLoginWaitSeconds=60 -s maxDeltaTimeSeconds=43200
+              echo "master realm brute-force protection applied"
+
               # ADR-0595: the two permanent master-realm administrators. Created
               # when missing, password and the `admin` role re-applied on every
               # run so a rotated Vault value follows. Nothing is ever deleted,

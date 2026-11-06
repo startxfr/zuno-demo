@@ -128,7 +128,9 @@
 
 - name: "vault | parse status (the CLI exits non-zero while sealed; stdout is still valid JSON)"
   ansible.builtin.set_fact:
-    _vault_status: "{{ _vault_status_raw.stdout | default('{}') | from_json }}"
+    _vault_status: >-
+      {{ (_vault_status_raw.stdout if ((_vault_status_raw.stdout | default('')) is match('^\s*\{'))
+          else '{}') | from_json }}
 
 - name: "vault | resolve the cluster name (names the recovery file)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_name.yml"
@@ -178,6 +180,21 @@
           new one - store them in the operators' password manager, split
           across people, then delete the file.
 
+# Review finding (WP-223): the one-time root token lives only in a fact. If the
+# bootstrap or the configure Job fails after the first initialization, a re-run
+# skips the init block and has no token. With -e zuno_vault_resume_bootstrap=true
+# the token is read back from the recovery file written at init (it is revoked
+# at the end of this role, so a finished run leaves nothing to resume).
+- name: "vault | resume: read the one-time root token from the recovery file"
+  ansible.builtin.set_fact:
+    _vault_init_root_token: >-
+      {{ (lookup('ansible.builtin.file', zuno_repo_root ~ '/ansible/vault-recovery-' ~ cluster_name ~ '.json')
+          | from_json).root_token | default('') }}
+  when:
+    - zuno_vault_resume_bootstrap | default(false) | bool
+    - (_vault_init_root_token | default('')) | length == 0
+  no_log: true
+
 # AWS KMS unseals on its own - right after init, and after every restart.
 - name: "vault | wait for Vault to be initialized and unsealed (AWS KMS auto-unseal)"
   kubernetes.core.k8s_exec:
@@ -189,8 +206,9 @@
   failed_when: false
   changed_when: false
   until: >-
-    (_vault_unsealed_raw.stdout | default('{}') | from_json).initialized | default(false)
-    and not ((_vault_unsealed_raw.stdout | default('{}') | from_json).sealed | default(true))
+    ((_vault_unsealed_raw.stdout | default('')) is match('^\s*\{'))
+    and (_vault_unsealed_raw.stdout | from_json).initialized | default(false)
+    and not ((_vault_unsealed_raw.stdout | from_json).sealed | default(true))
   retries: 30
   delay: 10
 

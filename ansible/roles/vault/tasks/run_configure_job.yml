@@ -91,6 +91,9 @@
       {%- set lines = [] -%}
       {%- for key in spec['keys'] -%}
       {%- set _ = lines.append('path "zuno/data/' ~ key ~ '" {\n  capabilities = ["read"]\n}') -%}
+      {%- if key.endswith('/*') -%}
+      {%- set _ = lines.append('path "zuno/metadata/' ~ key ~ '" {\n  capabilities = ["list", "read"]\n}') -%}
+      {%- endif -%}
       {%- endfor -%}
       {%- set _ = out.update({'ns-' ~ ns ~ '.hcl': '# Rendered from platform/vault/secret-access.yaml (ADR-0602 clause 2).\n' ~ (lines | join('\n')) ~ '\n'}) -%}
       {%- endfor -%}
@@ -122,6 +125,35 @@
     name: vault-configure
     namespace: zuno-vault
     wait: true
+
+# Review finding (WP-223): the single eso-reader role must outlive the move of
+# every ExternalSecret to its per-namespace SecretStore, or each refresh fails
+# with "permission denied" in between. Retire it only when no ExternalSecret
+# still points at the old ClusterSecretStore; the run that follows the
+# external-secrets and application syncs does it.
+- name: "vault | list the ExternalSecrets still on the legacy vault-backend store"
+  kubernetes.core.k8s_info:
+    api_version: external-secrets.io/v1beta1
+    kind: ExternalSecret
+  register: _vault_all_external_secrets
+  failed_when: false
+
+- name: "vault | decide whether eso-reader can be retired"
+  ansible.builtin.set_fact:
+    _vault_retire_eso_reader: >-
+      {{ ((_vault_secret_access | length) > 0) and (_vault_all_external_secrets is not failed)
+         and ((_vault_all_external_secrets.resources | default([])
+               | selectattr('spec.secretStoreRef.name', 'equalto', 'vault-backend')
+               | list | length) == 0) }}
+
+- name: "vault | say why eso-reader is kept"
+  ansible.builtin.debug:
+    msg: >-
+      eso-reader is kept: {{ _vault_all_external_secrets.resources | default([])
+      | selectattr('spec.secretStoreRef.name', 'equalto', 'vault-backend') | list | length }}
+      ExternalSecret(s) still use the legacy vault-backend store. Run
+      `make d0 install vault` again once external-secrets and the applications have synced.
+  when: (_vault_secret_access | length) > 0 and not (_vault_retire_eso_reader | bool)
 
 - name: "vault | run the configure Job"
   kubernetes.core.k8s:
@@ -159,7 +191,7 @@
                   - name: CLUSTER_BASE_DOMAIN
                     value: "{{ cluster_base_domain }}"
                   - name: RETIRE_ESO_READER
-                    value: "{{ ((_vault_secret_access | length) > 0) | string | lower }}"
+                    value: "{{ _vault_retire_eso_reader | bool | string | lower }}"
                   - name: HOME
                     value: /tmp
                 volumeMounts:

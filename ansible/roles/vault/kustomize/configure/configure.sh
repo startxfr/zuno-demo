@@ -113,9 +113,9 @@ done
 
 # The single eso-reader role (read zuno/data/* for the ClusterSecretStore,
 # usable by an ExternalSecret in ANY namespace) is what clause 2 retires.
-# Deleted only once the per-namespace roles exist (RETIRE_ESO_READER is
-# set by ansible/roles/vault when secret-access.yaml lists namespaces):
-# deleting it first would break every ExternalSecret still on the old store.
+# Deleted only when RETIRE_ESO_READER=true. ansible/roles/vault sets it only
+# when secret-access.yaml lists namespaces AND no ExternalSecret still points at
+# the vault-backend store: deleting it earlier breaks every refresh in between.
 if [ "${RETIRE_ESO_READER:-false}" = "true" ] && [ "$found" -gt 0 ]; then
   vault delete auth/kubernetes/role/eso-reader >/dev/null
   vault policy delete eso-reader >/dev/null

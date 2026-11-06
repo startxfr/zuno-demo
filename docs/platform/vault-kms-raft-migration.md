@@ -178,6 +178,30 @@ only the recovery file has the (migrated) key.
 5. Re-run the old clients' revisions (ClusterIssuers on http) if they were
    already switched.
 
+### Resuming after a failure
+
+The playbook can be resumed: `-e vault_migrate_resume_from=N` (N from 1 to 7) skips the steps before N. The legacy
+Secret keeps the unseal key and the root token until step 7, so N cannot be above 7. The snapshot (rollback point) is looked up
+as the newest `vault-pre-kms-raft-*`, or given with `-e vault_migrate_snapshot_name=...`. The data comparison after steps 4 to 6 runs only if
+`-e vault_migrate_probe_expected=<value>` is given (the value of the probe path before the migration, printed by the first run).
+A failure in step 3 leaves Vault stopped: fix the cause, then resume from 3.
+
+### Key checks before anything is stopped
+
+Step 0 calls `kms:DescribeKey` and then a real `kms:Encrypt` / `kms:Decrypt` round trip, the two operations the `awskms` seal needs.
+A policy that allows DescribeKey only is refused here, not by a crash-looping Vault at step 5.
+
+### The `eso-reader` role
+
+The configure Job (step 6, and every `make d0 install vault`) deletes the old `eso-reader` role only when no ExternalSecret still points at the
+`vault-backend` store. Right after step 6 all 103 still do, so the role is kept; run `make d0 install vault` again once external-secrets and the
+applications have synced, and the role is retired.
+
+### Rekey output
+
+`vault operator rekey -format=json` returns the new shares under `keys_base64`. Step 8 writes the raw output to
+`ansible/vault-recovery-<cluster>.rekey-raw.json` (0600) before parsing it, so the shares cannot be lost to a parsing error.
+
 ## Restore from a raft snapshot
 
 See `docs/platform/backup-recovery.md`, section Vault: a raft snapshot

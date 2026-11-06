@@ -57,6 +57,15 @@
     vault_migrate_snapshot_class: csi-aws-vsc
     vault_migrate_image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/vault:1.17.2
     vault_migrate_rekey_recovery: false
+    # Resume after a failed run: -e vault_migrate_resume_from=N (1..7) skips the
+    # steps before N. The legacy Secret holds the unseal key and root token until
+    # step 7 deletes it, so N cannot be above 7. The snapshot name is looked up
+    # (newest vault-pre-kms-raft-*) unless -e vault_migrate_snapshot_name=... is
+    # given; the probe comparison is skipped unless -e vault_migrate_probe_expected=<value>
+    # (the value the probe path held before the migration) is given.
+    vault_migrate_resume_from: 0
+    vault_migrate_snapshot_name: ""
+    vault_migrate_probe_expected: ""
     # A KV path every seeded cluster has (ansible/roles/vault writes it on
     # each run), read back after each step as the "data survived" proof.
     vault_migrate_probe_path: zuno/platform/cluster-domain
@@ -128,6 +137,27 @@
       no_log: true
       when: _vm_aws_cli.rc == 0
 
+    # Review finding (WP-223): DescribeKey alone passes for an IAM policy that
+    # denies Encrypt or Decrypt, and Vault would then crash-loop at step 5 after
+    # it was stopped. Prove the two operations the awskms seal needs.
+    - name: "step 0 | prove the KMS key can encrypt and decrypt with the IAM credentials"
+      ansible.builtin.shell: |
+        set -e
+        d=$(mktemp -d); trap 'rm -rf "$d"' EXIT
+        printf probe > "$d/p"
+        aws kms encrypt --key-id "$ZUNO_KMS_KEY" --plaintext "fileb://$d/p" --query CiphertextBlob --output text | base64 -d > "$d/c"
+        test "$(aws kms decrypt --ciphertext-blob "fileb://$d/c" --query Plaintext --output text)" = "$(printf probe | base64)"
+      args:
+        executable: /bin/bash
+      environment:
+        ZUNO_KMS_KEY: "{{ zuno_vault_kms_key_id }}"
+        AWS_ACCESS_KEY_ID: "{{ zuno_vault_kms_access_key_id }}"
+        AWS_SECRET_ACCESS_KEY: "{{ zuno_vault_kms_secret_access_key }}"
+        AWS_DEFAULT_REGION: "{{ zuno_vault_kms_region }}"
+      changed_when: false
+      no_log: true
+      when: _vm_aws_cli.rc == 0
+
     - name: "step 0 | warn when the KMS key could not be checked"
       ansible.builtin.pause:
         prompt: >-
@@ -167,6 +197,7 @@
       register: _vm_status0
       failed_when: false
       changed_when: false
+      when: (vault_migrate_resume_from | int) == 0
 
     - name: "step 0 | assert Vault is initialized, unsealed, on file storage with the Shamir seal"
       ansible.builtin.assert:
@@ -180,6 +211,7 @@
           This playbook starts from an unsealed file/Shamir Vault (unseal it
           first if it is sealed: the pre-WP-223 vault-unseal-configure Job, or
           `vault operator unseal` in the pod).
+      when: (vault_migrate_resume_from | int) == 0
 
     - name: "step 0 | read the probe value (compared after every step)"
       kubernetes.core.k8s_exec:
@@ -191,6 +223,43 @@
       register: _vm_probe0
       changed_when: false
       no_log: true
+      when: (vault_migrate_resume_from | int) == 0
+
+    - name: "step 0 | refuse a resume point the legacy Secret cannot support"
+      ansible.builtin.fail:
+        msg: "vault_migrate_resume_from must be 0 to 7 (the legacy credentials are deleted by step 7)."
+      when: (vault_migrate_resume_from | int) < 0 or (vault_migrate_resume_from | int) > 7
+
+    - name: "step 0 | resume: take the probe value from -e vault_migrate_probe_expected"
+      ansible.builtin.set_fact:
+        _vm_probe0: {stdout: "{{ vault_migrate_probe_expected }}"}
+      when: (vault_migrate_resume_from | int) > 0 and (vault_migrate_probe_expected | length) > 0
+      no_log: true
+
+    - name: "step 0 | resume: list the pre-migration snapshots"
+      kubernetes.core.k8s_info:
+        api_version: snapshot.storage.k8s.io/v1
+        kind: VolumeSnapshot
+        namespace: "{{ vault_migrate_namespace }}"
+      register: _vm_snapshots
+      when: (vault_migrate_resume_from | int) > 1
+
+    - name: "step 0 | resume: name the snapshot (rollback point)"
+      ansible.builtin.set_fact:
+        _vm_snapshot_name: >-
+          {{ vault_migrate_snapshot_name if (vault_migrate_snapshot_name | length) > 0
+             else (_vm_snapshots.resources | map(attribute='metadata.name')
+                   | select('match', '^vault-pre-kms-raft-') | sort | last | default('unknown')) }}
+      when: (vault_migrate_resume_from | int) > 1
+
+    - name: "step 0 | confirm a resume"
+      ansible.builtin.pause:
+        prompt: >-
+          RESUMING at step {{ vault_migrate_resume_from }} on {{ cluster_name }}: the state asserts of step 0
+          and steps 1 to {{ (vault_migrate_resume_from | int) - 1 }} are skipped. Snapshot (rollback point):
+          {{ _vm_snapshot_name | default('none, step 1 will take one') }}.
+          Press Enter to continue, Ctrl-C then A to abort.
+      when: (vault_migrate_resume_from | int) > 0
 
     - name: "step 0 | confirm"
       ansible.builtin.pause:
@@ -200,498 +269,524 @@
           Every Vault consumer (External Secrets refreshes, cert-manager issuance,
           Ansible seeds) is unavailable from step 2 to the end of step 5 - typically
           10 to 20 minutes. Press Enter to take the CSI snapshot (step 1).
+      when: (vault_migrate_resume_from | int) == 0
 
     # ------------------------------------------------------------------ 1
-    - name: "step 1 | name the pre-migration snapshot"
-      ansible.builtin.set_fact:
-        _vm_snapshot_name: "vault-pre-kms-raft-{{ lookup('ansible.builtin.pipe', 'date -u +%Y%m%d%H%M%S') }}"
+    - name: "step 1 | (skipped when resuming from a later step)"
+      when: (vault_migrate_resume_from | int) <= 1
+      block:
+        - name: "step 1 | name the pre-migration snapshot"
+          ansible.builtin.set_fact:
+            _vm_snapshot_name: "vault-pre-kms-raft-{{ lookup('ansible.builtin.pipe', 'date -u +%Y%m%d%H%M%S') }}"
 
-    # Not labelled app.kubernetes.io/component=backup: the chart's daily
-    # CronJob prunes those to the newest 7, and this one is the rollback
-    # point - it must outlive a week of daily snapshots.
-    - name: "step 1 | create the VolumeSnapshot of {{ vault_migrate_pvc }}"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: snapshot.storage.k8s.io/v1
-          kind: VolumeSnapshot
-          metadata:
-            name: "{{ _vm_snapshot_name }}"
+        # Not labelled app.kubernetes.io/component=backup: the chart's daily
+        # CronJob prunes those to the newest 7, and this one is the rollback
+        # point - it must outlive a week of daily snapshots.
+        - name: "step 1 | create the VolumeSnapshot of {{ vault_migrate_pvc }}"
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: snapshot.storage.k8s.io/v1
+              kind: VolumeSnapshot
+              metadata:
+                name: "{{ _vm_snapshot_name }}"
+                namespace: "{{ vault_migrate_namespace }}"
+                labels:
+                  app.kubernetes.io/name: vault
+                  app.kubernetes.io/component: migration-rollback
+              spec:
+                volumeSnapshotClassName: "{{ vault_migrate_snapshot_class }}"
+                source:
+                  persistentVolumeClaimName: "{{ vault_migrate_pvc }}"
+
+        - name: "step 1 | wait for the snapshot to be ReadyToUse"
+          kubernetes.core.k8s_info:
+            api_version: snapshot.storage.k8s.io/v1
+            kind: VolumeSnapshot
             namespace: "{{ vault_migrate_namespace }}"
-            labels:
-              app.kubernetes.io/name: vault
-              app.kubernetes.io/component: migration-rollback
-          spec:
-            volumeSnapshotClassName: "{{ vault_migrate_snapshot_class }}"
-            source:
-              persistentVolumeClaimName: "{{ vault_migrate_pvc }}"
+            name: "{{ _vm_snapshot_name }}"
+          register: _vm_snapshot
+          until: (_vm_snapshot.resources[0].status.readyToUse | default(false)) | bool
+          retries: 60
+          delay: 10
 
-    - name: "step 1 | wait for the snapshot to be ReadyToUse"
-      kubernetes.core.k8s_info:
-        api_version: snapshot.storage.k8s.io/v1
-        kind: VolumeSnapshot
-        namespace: "{{ vault_migrate_namespace }}"
-        name: "{{ _vm_snapshot_name }}"
-      register: _vm_snapshot
-      until: (_vm_snapshot.resources[0].status.readyToUse | default(false)) | bool
-      retries: 60
-      delay: 10
-
-    - name: "step 1 | confirm"
-      ansible.builtin.pause:
-        prompt: >-
-          VolumeSnapshot {{ _vm_snapshot_name }} is ReadyToUse (the rollback point).
-          Press Enter to stop Vault (step 2: ArgoCD auto-sync off, StatefulSet to 0).
+        - name: "step 1 | confirm"
+          ansible.builtin.pause:
+            prompt: >-
+              VolumeSnapshot {{ _vm_snapshot_name }} is ReadyToUse (the rollback point).
+              Press Enter to stop Vault (step 2: ArgoCD auto-sync off, StatefulSet to 0).
 
     # ------------------------------------------------------------------ 2
-    # Otherwise a git push or an Application refresh during the migration
-    # would sync replicas back to 1 and start the OLD file-storage config on
-    # a half-migrated volume. Step 4's apply_gitops_app.yml restores
-    # automated sync from the committed manifest.
-    - name: "step 2 | turn off ArgoCD automated sync for zuno-vault-d1"
-      kubernetes.core.k8s:
-        state: patched
-        merge_type: merge
-        api_version: argoproj.io/v1alpha1
-        kind: Application
-        namespace: openshift-gitops
-        name: zuno-vault-d1
-        definition:
-          spec:
-            syncPolicy:
-              automated: null
+    - name: "step 2 | (skipped when resuming from a later step)"
+      when: (vault_migrate_resume_from | int) <= 2
+      block:
+        # Otherwise a git push or an Application refresh during the migration
+        # would sync replicas back to 1 and start the OLD file-storage config on
+        # a half-migrated volume. Step 4's apply_gitops_app.yml restores
+        # automated sync from the committed manifest.
+        - name: "step 2 | turn off ArgoCD automated sync for zuno-vault-d1"
+          kubernetes.core.k8s:
+            state: patched
+            merge_type: merge
+            api_version: argoproj.io/v1alpha1
+            kind: Application
+            namespace: openshift-gitops
+            name: zuno-vault-d1
+            definition:
+              spec:
+                syncPolicy:
+                  automated: null
 
-    - name: "step 2 | scale the Vault StatefulSet to 0"
-      kubernetes.core.k8s_scale:
-        api_version: apps/v1
-        kind: StatefulSet
-        namespace: "{{ vault_migrate_namespace }}"
-        name: zuno-vault
-        replicas: 0
-        wait: true
-        wait_timeout: 300
+        - name: "step 2 | scale the Vault StatefulSet to 0"
+          kubernetes.core.k8s_scale:
+            api_version: apps/v1
+            kind: StatefulSet
+            namespace: "{{ vault_migrate_namespace }}"
+            name: zuno-vault
+            replicas: 0
+            wait: true
+            wait_timeout: 300
 
-    - name: "step 2 | wait for the Vault pod to be gone (releases the RWO volume)"
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: "{{ vault_migrate_namespace }}"
-        name: "{{ vault_migrate_pod }}"
-      register: _vm_pod_gone
-      until: (_vm_pod_gone.resources | default([]) | length) == 0
-      retries: 30
-      delay: 10
+        - name: "step 2 | wait for the Vault pod to be gone (releases the RWO volume)"
+          kubernetes.core.k8s_info:
+            kind: Pod
+            namespace: "{{ vault_migrate_namespace }}"
+            name: "{{ vault_migrate_pod }}"
+          register: _vm_pod_gone
+          until: (_vm_pod_gone.resources | default([]) | length) == 0
+          retries: 30
+          delay: 10
 
     # ------------------------------------------------------------------ 3
-    # The file backend's entries are moved into file-legacy/ before the
-    # migration, so the source tree and the raft directory are siblings: a
-    # file-backend source rooted at /vault/data would otherwise list raft/
-    # (being written) as part of the data it copies. file-legacy/ is left on
-    # the volume after the migration (rollback material, a few MB); the
-    # runbook says when to delete it.
-    - name: "step 3 | render the migration config and script"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: v1
-          kind: ConfigMap
-          metadata:
-            name: vault-migrate
-            namespace: "{{ vault_migrate_namespace }}"
-            labels:
-              zuno.io/managed-by: zuno-ansible
-          data:
-            migrate.hcl: |
-              storage_source "file" {
-                path = "/vault/data/file-legacy"
-              }
-              storage_destination "raft" {
-                path    = "/vault/data/raft"
-                node_id = "{{ vault_migrate_pod }}"
-              }
-              cluster_addr = "https://{{ vault_migrate_pod }}.zuno-vault-internal:8201"
-            migrate.sh: |
-              set -eu
-              cd /vault/data
-              if [ -e raft/vault.db ]; then
-                echo "raft/vault.db already exists - refusing to migrate over it" >&2
-                exit 1
-              fi
-              mkdir -p file-legacy raft
-              for entry in *; do
-                case "$entry" in
-                  raft|file-legacy|lost+found) ;;
-                  *) mv "$entry" file-legacy/ ;;
-                esac
-              done
-              echo "file backend entries now under /vault/data/file-legacy:"
-              ls -la file-legacy
-              vault operator migrate -config=/config/migrate.hcl
-              ls -la raft
+    - name: "step 3 | (skipped when resuming from a later step)"
+      when: (vault_migrate_resume_from | int) <= 3
+      block:
+        # The file backend's entries are moved into file-legacy/ before the
+        # migration, so the source tree and the raft directory are siblings: a
+        # file-backend source rooted at /vault/data would otherwise list raft/
+        # (being written) as part of the data it copies. file-legacy/ is left on
+        # the volume after the migration (rollback material, a few MB); the
+        # runbook says when to delete it.
+        - name: "step 3 | render the migration config and script"
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: vault-migrate
+                namespace: "{{ vault_migrate_namespace }}"
+                labels:
+                  zuno.io/managed-by: zuno-ansible
+              data:
+                migrate.hcl: |
+                  storage_source "file" {
+                    path = "/vault/data/file-legacy"
+                  }
+                  storage_destination "raft" {
+                    path    = "/vault/data/raft"
+                    node_id = "{{ vault_migrate_pod }}"
+                  }
+                  cluster_addr = "https://{{ vault_migrate_pod }}.zuno-vault-internal:8201"
+                migrate.sh: |
+                  set -eu
+                  cd /vault/data
+                  if [ -e raft/vault.db ]; then
+                    echo "raft/vault.db already exists - refusing to migrate over it" >&2
+                    exit 1
+                  fi
+                  mkdir -p file-legacy raft
+                  for entry in *; do
+                    case "$entry" in
+                      raft|file-legacy|lost+found) ;;
+                      *) mv "$entry" file-legacy/ ;;
+                    esac
+                  done
+                  echo "file backend entries now under /vault/data/file-legacy:"
+                  ls -la file-legacy
+                  vault operator migrate -config=/config/migrate.hcl
+                  ls -la raft
 
-    - name: "step 3 | delete a previous migration Job"
-      kubernetes.core.k8s:
-        state: absent
-        api_version: batch/v1
-        kind: Job
-        namespace: "{{ vault_migrate_namespace }}"
-        name: vault-migrate
-        wait: true
-
-    - name: "step 3 | run vault operator migrate (file -> raft) on the data volume"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: batch/v1
-          kind: Job
-          metadata:
-            name: vault-migrate
+        - name: "step 3 | delete a previous migration Job"
+          kubernetes.core.k8s:
+            state: absent
+            api_version: batch/v1
+            kind: Job
             namespace: "{{ vault_migrate_namespace }}"
-            labels:
-              zuno.io/managed-by: zuno-ansible
-          spec:
-            backoffLimit: 0
-            template:
+            name: vault-migrate
+            wait: true
+
+        - name: "step 3 | run vault operator migrate (file -> raft) on the data volume"
+          kubernetes.core.k8s:
+            state: present
+            definition:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: vault-migrate
+                namespace: "{{ vault_migrate_namespace }}"
+                labels:
+                  zuno.io/managed-by: zuno-ansible
               spec:
-                restartPolicy: Never
-                automountServiceAccountToken: false
-                containers:
-                  - name: migrate
-                    image: "{{ vault_migrate_image }}"
-                    command: ["/bin/sh", "/config/migrate.sh"]
-                    env:
-                      - name: HOME
-                        value: /tmp
-                      - name: SKIP_SETCAP
-                        value: "true"
-                    securityContext:
-                      allowPrivilegeEscalation: false
-                      capabilities:
-                        drop: ["ALL"]
-                    volumeMounts:
+                backoffLimit: 0
+                template:
+                  spec:
+                    restartPolicy: Never
+                    automountServiceAccountToken: false
+                    containers:
+                      - name: migrate
+                        image: "{{ vault_migrate_image }}"
+                        command: ["/bin/sh", "/config/migrate.sh"]
+                        env:
+                          - name: HOME
+                            value: /tmp
+                          - name: SKIP_SETCAP
+                            value: "true"
+                        securityContext:
+                          allowPrivilegeEscalation: false
+                          capabilities:
+                            drop: ["ALL"]
+                        volumeMounts:
+                          - name: data
+                            mountPath: /vault/data
+                          - name: config
+                            mountPath: /config
+                          - name: tmp
+                            mountPath: /tmp
+                    volumes:
                       - name: data
-                        mountPath: /vault/data
+                        persistentVolumeClaim:
+                          claimName: "{{ vault_migrate_pvc }}"
                       - name: config
-                        mountPath: /config
+                        configMap:
+                          name: vault-migrate
                       - name: tmp
-                        mountPath: /tmp
-                volumes:
-                  - name: data
-                    persistentVolumeClaim:
-                      claimName: "{{ vault_migrate_pvc }}"
-                  - name: config
-                    configMap:
-                      name: vault-migrate
-                  - name: tmp
-                    emptyDir: {}
+                        emptyDir: {}
 
-    - name: "step 3 | wait for the migration Job"
-      kubernetes.core.k8s_info:
-        api_version: batch/v1
-        kind: Job
-        namespace: "{{ vault_migrate_namespace }}"
-        name: vault-migrate
-      register: _vm_job
-      until: >-
-        (_vm_job.resources[0].status.succeeded | default(0)) > 0 or
-        (_vm_job.resources[0].status.failed | default(0)) > 0
-      retries: 60
-      delay: 10
+        - name: "step 3 | wait for the migration Job"
+          kubernetes.core.k8s_info:
+            api_version: batch/v1
+            kind: Job
+            namespace: "{{ vault_migrate_namespace }}"
+            name: vault-migrate
+          register: _vm_job
+          until: >-
+            (_vm_job.resources[0].status.succeeded | default(0)) > 0 or
+            (_vm_job.resources[0].status.failed | default(0)) > 0
+          retries: 60
+          delay: 10
 
-    - name: "step 3 | fetch the migration Job's pod"
-      kubernetes.core.k8s_info:
-        kind: Pod
-        namespace: "{{ vault_migrate_namespace }}"
-        label_selectors:
-          - job-name=vault-migrate
-      register: _vm_job_pod
+        - name: "step 3 | fetch the migration Job's pod"
+          kubernetes.core.k8s_info:
+            kind: Pod
+            namespace: "{{ vault_migrate_namespace }}"
+            label_selectors:
+              - job-name=vault-migrate
+          register: _vm_job_pod
 
-    - name: "step 3 | read the migration log"
-      kubernetes.core.k8s_log:
-        namespace: "{{ vault_migrate_namespace }}"
-        name: "{{ _vm_job_pod.resources[0].metadata.name }}"
-      register: _vm_job_log
-      when: (_vm_job_pod.resources | default([]) | length) > 0
+        - name: "step 3 | read the migration log"
+          kubernetes.core.k8s_log:
+            namespace: "{{ vault_migrate_namespace }}"
+            name: "{{ _vm_job_pod.resources[0].metadata.name }}"
+          register: _vm_job_log
+          when: (_vm_job_pod.resources | default([]) | length) > 0
 
-    - name: "step 3 | show the migration log"
-      ansible.builtin.debug:
-        msg: "{{ _vm_job_log.log_lines | default(['no log']) }}"
+        - name: "step 3 | show the migration log"
+          ansible.builtin.debug:
+            msg: "{{ _vm_job_log.log_lines | default(['no log']) }}"
 
-    - name: "step 3 | fail if the migration did not succeed (Vault stays stopped; see Rollback)"
-      ansible.builtin.fail:
-        msg: >-
-          vault-migrate failed. Vault is scaled to 0 and ArgoCD auto-sync is
-          off. Fix the cause and re-run from step 3 (delete raft/ first if it
-          was half-written), or roll back from {{ _vm_snapshot_name }}
-          (docs/platform/vault-kms-raft-migration.md, Rollback).
-      when: (_vm_job.resources[0].status.succeeded | default(0)) == 0
+        - name: "step 3 | fail if the migration did not succeed (Vault stays stopped; see Rollback)"
+          ansible.builtin.fail:
+            msg: >-
+              vault-migrate failed. Vault is scaled to 0 and ArgoCD auto-sync is
+              off. Fix the cause and re-run with -e vault_migrate_resume_from=3
+              (add -e vault_migrate_probe_expected=<value> to keep the data check; delete raft/ first if it
+              was half-written), or roll back from {{ _vm_snapshot_name }}
+              (docs/platform/vault-kms-raft-migration.md, Rollback).
+          when: (_vm_job.resources[0].status.succeeded | default(0)) == 0
 
-    - name: "step 3 | confirm"
-      ansible.builtin.pause:
-        prompt: >-
-          Storage migrated to raft (log above). Press Enter to render the chart
-          as raft + TLS + seal "shamir" and start Vault (step 4).
+        - name: "step 3 | confirm"
+          ansible.builtin.pause:
+            prompt: >-
+              Storage migrated to raft (log above). Press Enter to render the chart
+              as raft + TLS + seal "shamir" and start Vault (step 4).
 
     # ------------------------------------------------------------------ 4
-    - name: "step 4 | apply the Vault Application: raft + TLS, seal still shamir"
-      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/apply_vault_app.yml"
-      vars:
-        vault_seal_type: shamir
-        gitops_app_refresh: true
+    - name: "step 4 | (skipped when resuming from a later step)"
+      when: (vault_migrate_resume_from | int) <= 4
+      block:
+        - name: "step 4 | apply the Vault Application: raft + TLS, seal still shamir"
+          ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/apply_vault_app.yml"
+          vars:
+            vault_seal_type: shamir
+            gitops_app_refresh: true
 
-    - name: "step 4 | wait for Vault to answer on raft (sealed, Shamir)"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: vault status -format=json
-      register: _vm_status4
-      failed_when: false
-      changed_when: false
-      until: >-
-        (_vm_status4.stdout | default('') | trim) is match('^\{')
-        and (_vm_status4.stdout | from_json).storage_type == 'raft'
-      retries: 60
-      delay: 10
+        - name: "step 4 | wait for Vault to answer on raft (sealed, Shamir)"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: vault status -format=json
+          register: _vm_status4
+          failed_when: false
+          changed_when: false
+          until: >-
+            (_vm_status4.stdout | default('') | trim) is match('^\{')
+            and (_vm_status4.stdout | from_json).storage_type == 'raft'
+          retries: 60
+          delay: 10
 
-    - name: "step 4 | unseal with the legacy key"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: "vault operator unseal {{ _vm_unseal_key | quote }}"
-      no_log: true
-      when: (_vm_status4.stdout | from_json).sealed
+        - name: "step 4 | unseal with the legacy key"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: "vault operator unseal {{ _vm_unseal_key | quote }}"
+          no_log: true
+          when: (_vm_status4.stdout | from_json).sealed
 
-    - name: "step 4 | read the probe value back from raft"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: >-
-          sh -c "VAULT_TOKEN={{ _vm_root_token }} vault kv get -field={{ vault_migrate_probe_field }} {{ vault_migrate_probe_path }}"
-      register: _vm_probe4
-      changed_when: false
-      retries: 6
-      delay: 10
-      until: _vm_probe4.rc == 0
-      no_log: true
+        - name: "step 4 | read the probe value back from raft"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: >-
+              sh -c "VAULT_TOKEN={{ _vm_root_token }} vault kv get -field={{ vault_migrate_probe_field }} {{ vault_migrate_probe_path }}"
+          register: _vm_probe4
+          changed_when: false
+          retries: 6
+          delay: 10
+          until: _vm_probe4.rc == 0
+          no_log: true
 
-    - name: "step 4 | assert the data survived the storage migration"
-      ansible.builtin.assert:
-        that:
-          - _vm_probe4.stdout == _vm_probe0.stdout
-        fail_msg: "The probe value read from raft differs from the one read before the migration."
-        success_msg: "Probe {{ vault_migrate_probe_path }} identical before and after (raft, TLS, Shamir)."
+        - name: "step 4 | assert the data survived the storage migration"
+          ansible.builtin.assert:
+            that:
+              - _vm_probe4.stdout == _vm_probe0.stdout
+            fail_msg: "The probe value read from raft differs from the one read before the migration."
+            success_msg: "Probe {{ vault_migrate_probe_path }} identical before and after (raft, TLS, Shamir)."
+          when: _vm_probe0 is defined
 
-    - name: "step 4 | confirm"
-      ansible.builtin.pause:
-        prompt: >-
-          Vault runs on raft with TLS and the data is intact. Press Enter to
-          migrate the seal to AWS KMS (step 5: chart seal "awskms", pod restart,
-          `vault operator unseal -migrate`).
+        - name: "step 4 | confirm"
+          ansible.builtin.pause:
+            prompt: >-
+              Vault runs on raft with TLS and the data is intact. Press Enter to
+              migrate the seal to AWS KMS (step 5: chart seal "awskms", pod restart,
+              `vault operator unseal -migrate`).
 
     # ------------------------------------------------------------------ 5
-    - name: "step 5 | apply the Vault Application: seal awskms"
-      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/apply_vault_app.yml"
-      vars:
-        vault_seal_type: awskms
-        gitops_app_refresh: true
+    - name: "step 5 | (skipped when resuming from a later step)"
+      when: (vault_migrate_resume_from | int) <= 5
+      block:
+        - name: "step 5 | apply the Vault Application: seal awskms"
+          ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/apply_vault_app.yml"
+          vars:
+            vault_seal_type: awskms
+            gitops_app_refresh: true
 
-    # The StatefulSet is OnDelete (upstream chart default): the new seal
-    # stanza only reaches Vault through a new pod.
-    - name: "step 5 | restart the Vault pod on the awskms config"
-      kubernetes.core.k8s:
-        state: absent
-        kind: Pod
-        namespace: "{{ vault_migrate_namespace }}"
-        name: "{{ vault_migrate_pod }}"
-        wait: true
+        # The StatefulSet is OnDelete (upstream chart default): the new seal
+        # stanza only reaches Vault through a new pod.
+        - name: "step 5 | restart the Vault pod on the awskms config"
+          kubernetes.core.k8s:
+            state: absent
+            kind: Pod
+            namespace: "{{ vault_migrate_namespace }}"
+            name: "{{ vault_migrate_pod }}"
+            wait: true
 
-    - name: "step 5 | wait for Vault to report a pending seal migration"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: vault status -format=json
-      register: _vm_status5
-      failed_when: false
-      changed_when: false
-      until: >-
-        (_vm_status5.stdout | default('') | trim) is match('^\{')
-        and ((_vm_status5.stdout | from_json).migration | default(false)
-             or not (_vm_status5.stdout | from_json).sealed)
-      retries: 60
-      delay: 10
+        - name: "step 5 | wait for Vault to report a pending seal migration"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: vault status -format=json
+          register: _vm_status5
+          failed_when: false
+          changed_when: false
+          until: >-
+            (_vm_status5.stdout | default('') | trim) is match('^\{')
+            and ((_vm_status5.stdout | from_json).migration | default(false)
+                 or not (_vm_status5.stdout | from_json).sealed)
+          retries: 60
+          delay: 10
 
-    - name: "step 5 | migrate the seal (unseal -migrate with the legacy key)"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: "vault operator unseal -migrate {{ _vm_unseal_key | quote }}"
-      no_log: true
-      when: (_vm_status5.stdout | from_json).sealed
+        - name: "step 5 | migrate the seal (unseal -migrate with the legacy key)"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: "vault operator unseal -migrate {{ _vm_unseal_key | quote }}"
+          no_log: true
+          when: (_vm_status5.stdout | from_json).sealed
 
-    - name: "step 5 | verify: unsealed, seal type awskms, recovery seal"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: vault status -format=json
-      register: _vm_status5b
-      failed_when: false
-      changed_when: false
-      until: >-
-        (_vm_status5b.stdout | default('') | trim) is match('^\{')
-        and not (_vm_status5b.stdout | from_json).sealed
-        and (_vm_status5b.stdout | from_json).type == 'awskms'
-      retries: 30
-      delay: 10
+        - name: "step 5 | verify: unsealed, seal type awskms, recovery seal"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: vault status -format=json
+          register: _vm_status5b
+          failed_when: false
+          changed_when: false
+          until: >-
+            (_vm_status5b.stdout | default('') | trim) is match('^\{')
+            and not (_vm_status5b.stdout | from_json).sealed
+            and (_vm_status5b.stdout | from_json).type == 'awskms'
+          retries: 30
+          delay: 10
 
-    - name: "step 5 | write the migrated recovery key to the Ansible controller (0600) before its Secret is deleted"
-      ansible.builtin.copy:
-        content: >-
-          {{ {
-               'recovery_keys_b64': [_vm_unseal_key],
-               'recovery_keys_shares': 1,
-               'recovery_keys_threshold': 1,
-               'root_token': _vm_root_token,
-               'note': 'Written by vault_migrate_kms_raft.yml: the pre-WP-223 Shamir unseal key, converted into the single recovery share by the seal migration. root_token is revoked by step 7. Run step 8 (vault_migrate_rekey_recovery=true) to replace it with 3 shares / threshold 2.'
-             } | to_nice_json }}
-        dest: "{{ zuno_repo_root }}/ansible/vault-recovery-{{ cluster_name }}.json"
-        mode: "0600"
-        backup: true
-      no_log: true
+        - name: "step 5 | write the migrated recovery key to the Ansible controller (0600) before its Secret is deleted"
+          ansible.builtin.copy:
+            content: >-
+              {{ {
+                   'recovery_keys_b64': [_vm_unseal_key],
+                   'recovery_keys_shares': 1,
+                   'recovery_keys_threshold': 1,
+                   'root_token': _vm_root_token,
+                   'note': 'Written by vault_migrate_kms_raft.yml: the pre-WP-223 Shamir unseal key, converted into the single recovery share by the seal migration. root_token is revoked by step 7. Run step 8 (vault_migrate_rekey_recovery=true) to replace it with 3 shares / threshold 2.'
+                 } | to_nice_json }}
+            dest: "{{ zuno_repo_root }}/ansible/vault-recovery-{{ cluster_name }}.json"
+            mode: "0600"
+            backup: true
+          no_log: true
 
-    - name: "step 5 | prove auto-unseal: restart the pod once more"
-      kubernetes.core.k8s:
-        state: absent
-        kind: Pod
-        namespace: "{{ vault_migrate_namespace }}"
-        name: "{{ vault_migrate_pod }}"
-        wait: true
+        - name: "step 5 | prove auto-unseal: restart the pod once more"
+          kubernetes.core.k8s:
+            state: absent
+            kind: Pod
+            namespace: "{{ vault_migrate_namespace }}"
+            name: "{{ vault_migrate_pod }}"
+            wait: true
 
-    - name: "step 5 | wait for Vault to unseal by itself through KMS"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: vault status -format=json
-      register: _vm_status5c
-      failed_when: false
-      changed_when: false
-      until: >-
-        (_vm_status5c.stdout | default('') | trim) is match('^\{')
-        and not (_vm_status5c.stdout | from_json).sealed
-      retries: 30
-      delay: 10
+        - name: "step 5 | wait for Vault to unseal by itself through KMS"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: vault status -format=json
+          register: _vm_status5c
+          failed_when: false
+          changed_when: false
+          until: >-
+            (_vm_status5c.stdout | default('') | trim) is match('^\{')
+            and not (_vm_status5c.stdout | from_json).sealed
+          retries: 30
+          delay: 10
 
-    - name: "step 5 | read the probe value after the seal migration and restart"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: >-
-          sh -c "VAULT_TOKEN={{ _vm_root_token }} vault kv get -field={{ vault_migrate_probe_field }} {{ vault_migrate_probe_path }}"
-      register: _vm_probe5
-      changed_when: false
-      no_log: true
+        - name: "step 5 | read the probe value after the seal migration and restart"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: >-
+              sh -c "VAULT_TOKEN={{ _vm_root_token }} vault kv get -field={{ vault_migrate_probe_field }} {{ vault_migrate_probe_path }}"
+          register: _vm_probe5
+          changed_when: false
+          no_log: true
 
-    - name: "step 5 | assert the data survived the seal migration"
-      ansible.builtin.assert:
-        that:
-          - _vm_probe5.stdout == _vm_probe0.stdout
-          - (_vm_status5c.stdout | from_json).type == 'awskms'
-          - (_vm_status5c.stdout | from_json).recovery_seal | default(false)
-        fail_msg: "Seal type, recovery seal or probe value is not what the migration should have produced: {{ _vm_status5c.stdout }}"
-        success_msg: >-
-          Seal awskms (recovery seal), auto-unsealed after a restart, probe intact.
-          Recovery key written to ansible/vault-recovery-{{ cluster_name }}.json.
+        - name: "step 5 | assert the data survived the seal migration"
+          ansible.builtin.assert:
+            that:
+              - _vm_probe5.stdout == _vm_probe0.stdout
+              - (_vm_status5c.stdout | from_json).type == 'awskms'
+              - (_vm_status5c.stdout | from_json).recovery_seal | default(false)
+            fail_msg: "Seal type, recovery seal or probe value is not what the migration should have produced: {{ _vm_status5c.stdout }}"
+            success_msg: >-
+              Seal awskms (recovery seal), auto-unsealed after a restart, probe intact.
+              Recovery key written to ansible/vault-recovery-{{ cluster_name }}.json.
+          when: _vm_probe0 is defined
 
-    - name: "step 5 | confirm"
-      ansible.builtin.pause:
-        prompt: >-
-          Vault auto-unseals with AWS KMS. Press Enter to create the
-          vault-configurator / ansible-seeder identities and run the configure
-          Job (step 6).
+        - name: "step 5 | confirm"
+          ansible.builtin.pause:
+            prompt: >-
+              Vault auto-unseals with AWS KMS. Press Enter to create the
+              vault-configurator / ansible-seeder identities and run the configure
+              Job (step 6).
 
     # ------------------------------------------------------------------ 6
-    - name: "step 6 | bootstrap vault-configurator with the legacy root token"
-      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/bootstrap_auth.yml"
-      vars:
-        vault_bootstrap_pod: "{{ vault_migrate_pod }}"
-        vault_bootstrap_token: "{{ _vm_root_token }}"
+    - name: "step 6 | (skipped when resuming from a later step)"
+      when: (vault_migrate_resume_from | int) <= 6
+      block:
+        - name: "step 6 | bootstrap vault-configurator with the legacy root token"
+          ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/bootstrap_auth.yml"
+          vars:
+            vault_bootstrap_pod: "{{ vault_migrate_pod }}"
+            vault_bootstrap_token: "{{ _vm_root_token }}"
 
-    - name: "step 6 | run the configure Job (per-namespace roles, seeder, raft-snapshot, https PKI URLs)"
-      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/run_configure_job.yml"
+        - name: "step 6 | run the configure Job (per-namespace roles, seeder, raft-snapshot, https PKI URLs)"
+          ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/roles/vault/tasks/run_configure_job.yml"
 
-    - name: "step 6 | log in as ansible-seeder"
-      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
+        - name: "step 6 | log in as ansible-seeder"
+          ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
 
-    - name: "step 6 | read the probe value as ansible-seeder (no root token)"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: >-
-          sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -field={{ vault_migrate_probe_field }} {{ vault_migrate_probe_path }}"
-      register: _vm_probe6
-      changed_when: false
-      no_log: true
+        - name: "step 6 | read the probe value as ansible-seeder (no root token)"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: >-
+              sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv get -field={{ vault_migrate_probe_field }} {{ vault_migrate_probe_path }}"
+          register: _vm_probe6
+          changed_when: false
+          no_log: true
 
-    - name: "step 6 | assert the seeder identity works"
-      ansible.builtin.assert:
-        that:
-          - _vm_probe6.stdout == _vm_probe0.stdout
-        success_msg: "ansible-seeder reads the probe path: every Ansible role can now work without the root token."
+        - name: "step 6 | assert the seeder identity works"
+          ansible.builtin.assert:
+            that:
+              - _vm_probe6.stdout == _vm_probe0.stdout
+            success_msg: "ansible-seeder reads the probe path: every Ansible role can now work without the root token."
+          when: _vm_probe0 is defined
 
-    - name: "step 6 | confirm"
-      ansible.builtin.pause:
-        prompt: >-
-          Identities work. Press Enter to REVOKE the legacy root token and delete
-          vault-bootstrap-credentials / vault-unseal-configure-credentials
-          (step 7). After this, a new root token needs the recovery key(s) in
-          ansible/vault-recovery-{{ cluster_name }}.json.
+        - name: "step 6 | confirm"
+          ansible.builtin.pause:
+            prompt: >-
+              Identities work. Press Enter to REVOKE the legacy root token and delete
+              vault-bootstrap-credentials / vault-unseal-configure-credentials
+              (step 7). After this, a new root token needs the recovery key(s) in
+              ansible/vault-recovery-{{ cluster_name }}.json.
 
     # ------------------------------------------------------------------ 7
-    - name: "step 7 | revoke the legacy root token"
-      kubernetes.core.k8s_exec:
-        namespace: "{{ vault_migrate_namespace }}"
-        pod: "{{ vault_migrate_pod }}"
-        container: vault
-        command: "sh -c {{ ('VAULT_TOKEN=' ~ (_vm_root_token | quote) ~ ' vault token revoke -self') | quote }}"
-      no_log: true
+    - name: "step 7 | (skipped when resuming from a later step)"
+      when: (vault_migrate_resume_from | int) <= 7
+      block:
+        - name: "step 7 | revoke the legacy root token"
+          kubernetes.core.k8s_exec:
+            namespace: "{{ vault_migrate_namespace }}"
+            pod: "{{ vault_migrate_pod }}"
+            container: vault
+            command: "sh -c {{ ('VAULT_TOKEN=' ~ (_vm_root_token | quote) ~ ' vault token revoke -self') | quote }}"
+          no_log: true
 
-    - name: "step 7 | delete the legacy Secrets (root token + unseal key copies)"
-      kubernetes.core.k8s:
-        state: absent
-        kind: Secret
-        namespace: "{{ vault_migrate_namespace }}"
-        name: "{{ _vm_legacy_name }}"
-      loop:
-        - vault-bootstrap-credentials
-        - vault-unseal-configure-credentials
-      loop_control:
-        loop_var: _vm_legacy_name
+        - name: "step 7 | delete the legacy Secrets (root token + unseal key copies)"
+          kubernetes.core.k8s:
+            state: absent
+            kind: Secret
+            namespace: "{{ vault_migrate_namespace }}"
+            name: "{{ _vm_legacy_name }}"
+          loop:
+            - vault-bootstrap-credentials
+            - vault-unseal-configure-credentials
+          loop_control:
+            loop_var: _vm_legacy_name
 
-    - name: "step 7 | delete the migration Job and ConfigMap"
-      kubernetes.core.k8s:
-        state: absent
-        api_version: "{{ _vm_tmp.api_version }}"
-        kind: "{{ _vm_tmp.kind }}"
-        namespace: "{{ vault_migrate_namespace }}"
-        name: vault-migrate
-      loop:
-        - {api_version: batch/v1, kind: Job}
-        - {api_version: v1, kind: ConfigMap}
-      loop_control:
-        loop_var: _vm_tmp
-        label: "{{ _vm_tmp.kind }}"
+        - name: "step 7 | delete the migration Job and ConfigMap"
+          kubernetes.core.k8s:
+            state: absent
+            api_version: "{{ _vm_tmp.api_version }}"
+            kind: "{{ _vm_tmp.kind }}"
+            namespace: "{{ vault_migrate_namespace }}"
+            name: vault-migrate
+          loop:
+            - {api_version: batch/v1, kind: Job}
+            - {api_version: v1, kind: ConfigMap}
+          loop_control:
+            loop_var: _vm_tmp
+            label: "{{ _vm_tmp.kind }}"
 
-    - name: "step 7 | forget the legacy credentials"
-      ansible.builtin.set_fact:
-        _vm_root_token: ""
-      no_log: true
+        - name: "step 7 | forget the legacy credentials"
+          ansible.builtin.set_fact:
+            _vm_root_token: ""
+          no_log: true
 
     # ------------------------------------------------------------------ 8
     # Rekey endpoints are authorized by the existing key shares, not by a
@@ -726,11 +821,30 @@
           register: _vm_rekey
           no_log: true
 
+        # Review finding (WP-223): the rekey JSON names the list `keys_base64`
+        # (not `keys_b64`). The new shares exist only in this registered result, so
+        # the raw output is written first, before anything can fail on its shape.
+        - name: "step 8 | keep the raw rekey output on the Ansible controller (0600) before parsing it"
+          ansible.builtin.copy:
+            content: "{{ _vm_rekey.stdout }}"
+            dest: "{{ zuno_repo_root }}/ansible/vault-recovery-{{ cluster_name }}.rekey-raw.json"
+            mode: "0600"
+          no_log: true
+
+        - name: "step 8 | check the rekey returned 3 shares"
+          ansible.builtin.assert:
+            that:
+              - ((_vm_rekey.stdout | from_json).keys_base64 | default([])) | length == 3
+            fail_msg: >-
+              The rekey did not return 3 shares under keys_base64. The raw output is in
+              ansible/vault-recovery-{{ cluster_name }}.rekey-raw.json: use it, do not re-run.
+          no_log: true
+
         - name: "step 8 | write the new recovery keys to the Ansible controller (0600)"
           ansible.builtin.copy:
             content: >-
               {{ {
-                   'recovery_keys_b64': (_vm_rekey.stdout | from_json).keys_b64,
+                   'recovery_keys_b64': (_vm_rekey.stdout | from_json).keys_base64,
                    'recovery_keys_shares': 3,
                    'recovery_keys_threshold': 2,
                    'note': 'Recovery keys after vault_migrate_kms_raft.yml step 8 (rekey -target=recovery). No root token exists; generate one with `vault operator generate-root` and 2 of these shares when needed.'
