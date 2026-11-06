@@ -37,7 +37,8 @@ rendering (the vendor image has no UI).
 ## Known defects at v0.14 (2026-11-06)
 
 Recorded with the second browser run ([evidence](../evidence/wp-208-five-experiences-browser-2026-11-06.md)); none blocks the
-acceptance, none is fixed by this work package (D4 turned out to be a wrong account).
+acceptance. `v0.14.0` shipped with them open; D2, D3, D5, D8, D9 and D10 are fixed in `v0.14.1` (2026-11-06), D1 is
+mitigated, D4 turned out to be a wrong account, D11 is open.
 
 | # | Defect | State |
 |---|---|---|
