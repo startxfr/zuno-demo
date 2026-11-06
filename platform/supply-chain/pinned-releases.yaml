@@ -396,3 +396,105 @@ releases:
     path: images.compiler.tag
     reason: rag-pipeline-compiler has no BuildConfig - unused by any template today
       per the chart's own comment
+- release_tag: v0.13.0
+  pinned_at: '2026-11-06T13:43:47Z'
+  pins:
+  - chart_values: gitops/charts/ai-gateway/values.yaml
+    path: image.tag
+    tag: v0.13.0
+    digest: sha256:96dbd2593b960de7706e478fa9ee0b4043d621dde705e5c784a570f13c8840a3
+    signed: true
+    signed_at: '2026-11-06T13:43:47Z'
+  - chart_values: gitops/charts/diagram-render/values.yaml
+    path: image.tag
+    tag: v0.13.0
+    digest: sha256:a469cac87915d67b29d73480f1ca1541f4d5271a2f24d8ba302dec13cc38d8ee
+    signed: true
+    signed_at: '2026-11-06T13:43:47Z'
+  - chart_values: gitops/charts/mcp-aap/values.yaml
+    path: image.tag
+    tag: v0.13.0
+    digest: sha256:2d5ac2c2d2ed11c02e52e3f6d1658370a4b71d8d5d04ce82346470839bd903ce
+    signed: true
+    signed_at: '2026-11-06T13:43:47Z'
+  - chart_values: gitops/charts/mcp-confluence/values.yaml
+    path: image.tag
+    tag: v0.13.0
+    digest: sha256:87a180fa67238fa06948b3fa9dcc4744315a9f6882196a87583904ee8055238d
+    signed: true
+    signed_at: '2026-11-06T13:43:47Z'
+  - chart_values: gitops/charts/mcp-gateway/values.yaml
+    path: image.tag
+    tag: v0.13.0
+    digest: sha256:92b1a0a91a7d88b6e8da16e59b8487b30f805468c9b2f33cbb33169dbd298233
+    signed: true
+    signed_at: '2026-11-06T13:43:47Z'
+  - chart_values: gitops/charts/mcp-git-forge/values.yaml
+    path: image.tag
+    tag: v0.13.0
+    digest: sha256:8789c7b497935b422a89c500027348c45effc53c203c0dc3eb092544c2d6788f
+    signed: true
+    signed_at: '2026-11-06T13:43:47Z'
+  - chart_values: gitops/charts/mcp-salesforce/values.yaml
+    path: image.tag
+    tag: v0.13.0
+    digest: sha256:997a800faf3ed76ca6bbb441ea80536bbb0dfda97e2d148c2030e7a3fc24f5a7
+    signed: true
+    signed_at: '2026-11-06T13:43:47Z'
+  - chart_values: gitops/charts/mlops/values.yaml
+    path: images.mlops.tag
+    tag: v0.13.0
+    digest: sha256:bc4e2cbb9272ff4fe88ec03d2369950e9bae8a5b5cdce4184b4c2767acb1f53c
+    signed: true
+    signed_at: '2026-11-06T13:43:47Z'
+- release_tag: v0.14.0
+  pinned_at: '2026-11-06T14:10:38Z'
+  pins:
+  - chart_values: gitops/charts/ai-gateway/values.yaml
+    path: image.tag
+    tag: v0.14.0
+    digest: sha256:2748d90c4ed02c5249cf8fc28d5603e034e99503a79fc6a0222b893d4ef29770
+    signed: true
+    signed_at: '2026-11-06T14:10:38Z'
+  - chart_values: gitops/charts/diagram-render/values.yaml
+    path: image.tag
+    tag: v0.14.0
+    digest: sha256:665d3880f6781e3d05ddb2edd9edaf30eccc8f06240557463f43801ca1eb7559
+    signed: true
+    signed_at: '2026-11-06T14:10:38Z'
+  - chart_values: gitops/charts/mcp-aap/values.yaml
+    path: image.tag
+    tag: v0.14.0
+    digest: sha256:dd0b8ebee5a18bcf6e8c2dec26bef2acc6f2eeb39b06d370b3e5a7c08c49d6a6
+    signed: true
+    signed_at: '2026-11-06T14:10:38Z'
+  - chart_values: gitops/charts/mcp-confluence/values.yaml
+    path: image.tag
+    tag: v0.14.0
+    digest: sha256:a56821b8b261f5c3821f265de65a3349be6296b673cee540f2b4bbff6fbf2b47
+    signed: true
+    signed_at: '2026-11-06T14:10:38Z'
+  - chart_values: gitops/charts/mcp-gateway/values.yaml
+    path: image.tag
+    tag: v0.14.0
+    digest: sha256:ba831f8960daef2df27957d1ec4d583cac99203f478ca628605e06a3a9e8d723
+    signed: true
+    signed_at: '2026-11-06T14:10:38Z'
+  - chart_values: gitops/charts/mcp-git-forge/values.yaml
+    path: image.tag
+    tag: v0.14.0
+    digest: sha256:aa45090e4563c0554faf2619111e2f695546c9a3e0d0cad5edcc4349438e2652
+    signed: true
+    signed_at: '2026-11-06T14:10:38Z'
+  - chart_values: gitops/charts/mcp-salesforce/values.yaml
+    path: image.tag
+    tag: v0.14.0
+    digest: sha256:775c7b997a9f488c7d5ae4ec25199e168332a126b1f8e412f276cb82fd127627
+    signed: true
+    signed_at: '2026-11-06T14:10:38Z'
+  - chart_values: gitops/charts/mlops/values.yaml
+    path: images.mlops.tag
+    tag: v0.14.0
+    digest: sha256:a8c8795bf6f60bdd9ecfb76aa23186dd2862ec49f88e8c71524bce0850609b68
+    signed: true
+    signed_at: '2026-11-06T14:10:38Z'
