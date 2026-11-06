@@ -18,7 +18,7 @@ by agent, and takes the caller's own `CheckResult`. A check that cannot apply is
 from __future__ import annotations
 
 import pathlib
-from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 
 import httpx
 import yaml
@@ -65,6 +65,13 @@ def allows_delegated_writes(roots: Roots) -> bool:
     return (_policy(roots, "limits/limits-policy.yaml").get("delegation") or {}).get("allow_write") is True
 
 
+def write_allowed_targets(roots: Roots) -> Set[Tuple[str, str]]:
+    """The `agent/task` targets a delegated call may write through (`delegation.write_allowed`, ADR-0409);
+    absent or unreadable means none, the gateway's own default."""
+    entries = (_policy(roots, "limits/limits-policy.yaml").get("delegation") or {}).get("write_allowed") or []
+    return {(e.get("agent"), e.get("task")) for e in entries if isinstance(e, dict) and e.get("agent") and e.get("task")}
+
+
 def declares_target(roots: Roots, delegator: str, target: str, target_task: str) -> bool:
     for root in _roots(roots):
         if not has_agent(root, delegator):
@@ -109,6 +116,8 @@ def delegation_surface(
         return skip(CheckResult, name, why)
     if allows_delegated_writes(root):
         return skip(CheckResult, name, "delegation.allow_write is true: delegated writes are governed by approval (ADR-0409)")
+    if (target, target_task) in write_allowed_targets(root):
+        return skip(CheckResult, name, f"{target}/{target_task} is in delegation.write_allowed: its writes ask for approval (ADR-0409)")
 
     def check() -> Any:
         base = {**auth_headers(persona), "X-Zuno-Agent": target, "X-Zuno-Task": target_task,

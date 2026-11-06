@@ -1110,18 +1110,34 @@ maas:
             - limit: 5000
               window: 1h
           priority: 1
-        # WP-220 pilot (2026-11-05, user go): a human developer key for Claude Code
-        # in VS Code against the local gpt-oss-20b. `user:` is the static
-        # OpenShift user `dev` (the one who signs in to the portal or mints a
-        # key); MaaSAuthPolicy gets the same subject from this entry. Priority
-        # 20 sits above the persona tier (10) and below Lightspeed (50). The
-        # ceiling is large because Claude Code resends its whole context every
-        # turn (about 40,000 tokens per call): 1,000,000/h would be about 25
-        # calls. It is a NEW rate (5,000,000/1h), so it adds one limit to the
-        # gateway wasm object of this model's 15 route matches; check the
-        # EnvoyFilter size (1.5 MiB etcd limit) after it is applied.
-        - name: gpt-oss-20b-developer
-          user: dev
+        # WP-220 (2026-11-05 pilot, 2026-11-06 moved to the demo groups): human
+        # keys for Claude Code in VS Code and the MaaS consumer portal against the
+        # local gpt-oss-20b. One subscription per demo group (the owner field takes a
+        # single group here; MaaSAuthPolicy gets the same subjects from these
+        # entries): ocp-ai-dev, ocp-ai-ops, ocp-paas-ops - the groups that already
+        # hold rights in the Zuno namespaces (gitops/charts/openshift-rbac-groups).
+        # The static OpenShift user `dev` is no longer a subscriber. Priority 20
+        # sits above the persona tier (10) and below Lightspeed (50). The ceiling is
+        # large because Claude Code resends its whole context every turn (about
+        # 40,000 tokens per call): 1,000,000/h would be about 25 calls. It is a NEW
+        # rate (5,000,000/1h), shared by the three entries, so it adds one limit to
+        # the gateway wasm object of this model's 15 route matches and each further
+        # entry only a predicate clause; check the EnvoyFilter size (1.5 MiB etcd
+        # limit) after it is applied.
+        - name: gpt-oss-20b-ocp-ai-dev
+          group: /ocp-ai-dev
+          tokenRateLimits:
+            - limit: 5000000
+              window: 1h
+          priority: 20
+        - name: gpt-oss-20b-ocp-ai-ops
+          group: /ocp-ai-ops
+          tokenRateLimits:
+            - limit: 5000000
+              window: 1h
+          priority: 20
+        - name: gpt-oss-20b-ocp-paas-ops
+          group: /ocp-paas-ops
           tokenRateLimits:
             - limit: 5000000
               window: 1h

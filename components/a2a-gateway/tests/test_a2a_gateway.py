@@ -389,6 +389,20 @@ class LoggingTests(unittest.TestCase):
             gateway.propagate = saved[2]
 
 
+class TokenWithoutSubjectTests(unittest.TestCase):
+    def test_a_token_without_a_subject_is_refused_so_it_cannot_be_an_approver(self) -> None:
+        from unittest import mock
+
+        from app.auth import AuthError, validate_token
+
+        with mock.patch("app.auth._get_jwks_client") as jwks, mock.patch("app.auth.jwt.decode", return_value={"groups": ["agent_beta"]}):
+            jwks.return_value.get_signing_key_from_jwt.return_value = mock.Mock(key="k")
+            with self.assertRaises(AuthError) as ctx:
+                validate_token("Bearer some-token")
+        self.assertEqual(ctx.exception.status, 401)
+        self.assertIn("sub", str(ctx.exception))
+
+
 class ApprovalTests(GatewayTestCase):
     """A delegated write waits for the initiating user's approval (ADR-0409, WP-173 step 5)."""
 
@@ -423,6 +437,32 @@ class ApprovalTests(GatewayTestCase):
     def tool_calls(self):
         return [c for c in self.down.mcp_calls if c["body"]["method"] == "tools/call"]
 
+    async def test_a_delegated_write_without_an_identity_never_runs(self) -> None:
+        """ADR-0409: a run with no identity binding has no approver, so it cannot write (no token, forged token)."""
+        self.down.llm_script = [self.WRITE_CALL, {"role": "assistant", "content": "done"}]
+        for token in ("", "forged"):
+            async with self.http(token, **self.CHAIN) as client:
+                r = await client.post("/agents/beta/", json={"jsonrpc": "2.0", "id": 1, "method": "message/send", "params": {}})
+            self.assertEqual(r.status_code, 401)
+        self.assertEqual(self.down.llm_calls, [])
+        self.assertEqual(self.tool_calls(), [])
+
+    async def test_a_forged_token_cannot_answer_a_pending_approval(self) -> None:
+        task = await self.start()
+        approval = task.status.message.metadata["zuno.approval"]
+        message = Message(
+            role=Role.user, message_id=uuid.uuid4().hex, task_id=task.id, context_id=task.context_id,
+            parts=[Part(root=DataPart(data={"zuno.approval": {"request_id": approval["request_id"], "decision": "approve"}}))],
+        )
+        async with self.http("forged", **self.CHAIN) as client:
+            r = await client.post("/agents/beta/", json={"jsonrpc": "2.0", "id": 2, "method": "message/send",
+                                                         "params": {"message": message.model_dump(mode="json", exclude_none=True)}})
+        self.assertEqual(r.status_code, 401)
+        self.assertEqual(self.tool_calls(), [], "the write did not run")
+        done = await self.answer(task, "approve")  # the real initiating user can still answer
+        self.assertEqual(done.status.state, TaskState.completed)
+        self.assertEqual(len(self.tool_calls()), 1)
+
     async def test_a_delegated_write_raises_an_approval_with_a_redacted_summary(self) -> None:
         task = await self.start()
         self.assertEqual(task.status.state, TaskState.input_required)
@@ -447,6 +487,7 @@ class ApprovalTests(GatewayTestCase):
         self.assertEqual(self.tool_calls(), [])
         tool_message = self.down.llm_calls[1]["body"]["messages"][-1]
         self.assertIn("was not approved", tool_message["content"])
+        self.assertIn("do not ask for it again", tool_message["content"])
 
     async def test_an_unsupported_decision_counts_as_a_refusal(self) -> None:
         task = await self.start()

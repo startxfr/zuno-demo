@@ -19,7 +19,9 @@ Run from the component directory:
 from __future__ import annotations
 
 import asyncio
+import inspect
 import os
+import re
 import sys
 import tempfile
 
@@ -323,6 +325,45 @@ def test_evaluate_treats_capability_and_alias_as_one_tool() -> None:
     assert not denied.allowed
 
 
+def test_in_process_bindings_declare_the_arguments_their_handler_reads() -> None:
+    """WP-208 D3: an in-process capability advertises its own schema (an open one left the model without
+    the required `query`). Every in-process binding declares an object schema, and every argument its
+    handler reads (`arguments.get("x")`) is named in it, so the two cannot drift apart."""
+    registry = BindingRegistry(REAL_BINDINGS_PATH)
+    checked = 0
+    for binding in registry._bindings:
+        if binding.transport != "in-process":
+            continue
+        schema = binding.input_schema
+        assert isinstance(schema, dict) and schema.get("type") == "object", (
+            f"{binding.capability}: in-process binding without an object input_schema"
+        )
+        properties = schema.get("properties") or {}
+        handler = downstream.IN_PROCESS_HANDLERS[binding.handler]
+        source = inspect.getsource(handler)
+        read = set(re.findall(r'arguments\.get\("(\w+)"', source)) | set(re.findall(r'arguments\["(\w+)"\]', source))
+        missing = read - set(properties)
+        assert not missing, f"{binding.capability}: handler reads {sorted(missing)} but the schema does not name them"
+        unknown_required = set(schema.get("required") or []) - set(properties)
+        assert not unknown_required, f"{binding.capability}: required {sorted(unknown_required)} is not a property"
+        checked += 1
+    assert checked >= 9, f"expected the nine in-process bindings, checked {checked}"
+
+
+def test_advertised_schema_uses_the_binding_declaration_when_no_backend_publishes_one() -> None:
+    from app.mcp_frontdoor import _input_schema
+
+    registry = BindingRegistry(REAL_BINDINGS_PATH)
+    binding = registry.resolve("knowledge.tech.search")
+    schema = _input_schema(binding, None)
+    assert schema["required"] == ["query"] and "query" in schema["properties"]
+    published = {"type": "object", "properties": {"x": {"type": "string"}}}
+    assert _input_schema(binding, published) is published
+    open_binding = Binding(capability="x.y.z", backend="b", transport="in-process", provider_tool="p",
+                           auth_mode="service-identity", handler="gmail")
+    assert _input_schema(open_binding, None)["properties"] == {}
+
+
 TESTS = [
     test_real_registry_loads_and_aliases_resolve,
     test_real_policy_names_are_fully_covered,
@@ -336,6 +377,8 @@ TESTS = [
     test_invoke_without_binding_is_deterministic_502,
     test_invoke_with_unknown_handler_is_deterministic_502,
     test_evaluate_treats_capability_and_alias_as_one_tool,
+    test_in_process_bindings_declare_the_arguments_their_handler_reads,
+    test_advertised_schema_uses_the_binding_declaration_when_no_backend_publishes_one,
 ]
 
 

@@ -31,6 +31,7 @@ export DEMO_PERSONA_PASSWORD=$(vault kv get -field=password zuno/keycloak/demo-p
 python3 run_acceptance_gate.py     # scenarios + security_checks + gate_checks, one exit code
 python3 run_scenarios.py           # just the 20 scenarios
 python3 security_checks.py         # just the security-negative checks
+python3 approval_proof.py approve|reject|silence [--rule]   # live proof of the human approval of a delegated write (ADR-0409); `approve` starts a real AAP job; see the script's docstring
 ```
 
 `AGENT=arkos`/`TASK_NAME=draft-architecture-testimonial` are set by the

@@ -79,6 +79,9 @@ zuno_unifai_bundle_settings:
     delegation:
       gatewayURL: http://a2a-gateway.zuno-ai-run.svc:8080
       maxRounds: 5
+      # ADR-0409: a delegated write the gateway proposes goes to the human of the session. Needs an
+      # unifai-operator >= 0.1.61 (older CRDs reject the field); unset = every request is rejected.
+      approval: ask
     ceilings:
       delegationTargets:
       - tekos/answer-technical-question
@@ -241,11 +244,11 @@ zuno_unifai_values:
       redis: quay.io/fedora/redis-7@sha256:0217e8a80a03c3e43c716a1c137e5e615c6bc583605a754000f6efa382349a5b  # 20250108
       redisInsight: docker.io/redis/redisinsight@sha256:85562d67a9128ac7f764bb3d1ac909fcf77708c7c8f55bd1605a85b3c4becc83  # 3.4.2
       temporal: docker.io/temporalio/temporal@sha256:ad4c82c97bd12b417d1ea942610dbcd511afb250c4d5ed26c694009533df447e  # was latest
-      backend: quay.io/zuno/unifai-backend@sha256:6f04cfcad3e63d516d316e2248660ed1bc31bcc24fa03df12ee12d75f18f59a0  # v0.1.60
-      identity: quay.io/zuno/unifai-identity@sha256:d37d59291fbc6d923f48617a00b64606546d0195c6b24b2c7022c4fa6e8c5466  # v0.1.60
-      multiagent: quay.io/zuno/unifai-multiagent@sha256:98747a47f5717be5dcee81fd3a39eaeb8ef048e63c9a84ae525fd33c20825eb8  # v0.1.60
-      rag: quay.io/zuno/unifai-rag@sha256:9ca46f39be38046c2f17a350545cd26d44a0d30523fe02c53635c8f4c8e906f4  # v0.1.60
-      ui: quay.io/zuno/unifai-ui@sha256:2aed9e830cfc83b04ec2e0addd81882f3560d88d1cfd6a1c22f430be05627b63  # v0.1.60
+      backend: quay.io/zuno/unifai-backend@sha256:972c6853c36b45850f63bb45bfa3eac8e45683c4e55319b26c7ded69c65ce353  # v0.1.61
+      identity: quay.io/zuno/unifai-identity@sha256:1edc47f37e505b3658dbaee2f69bd5e200aae6a7daed192b4f7cbe68af9ca80f  # v0.1.61
+      multiagent: quay.io/zuno/unifai-multiagent@sha256:bf839719c39c6b89cb13e26eabdfc290ed8f206036399136552063eba7bd0847  # v0.1.61
+      rag: quay.io/zuno/unifai-rag@sha256:9f4972dee45977d996b490af57fe3497b304cc7a8e24292b2a318ae5f9d31079  # v0.1.61
+      ui: quay.io/zuno/unifai-ui@sha256:f81499db2448ec039655b88f49f94796bb07810026982d3f3dcdac36c7ad9c0d  # v0.1.61
       # Reranker (Hugging Face TEI on CPU, upstream image, unsigned): pinned by digest like the other third-party images (tag cpu-1.9, 2026-10-31).
       reranker: ghcr.io/huggingface/text-embeddings-inference@sha256:2538ea1c9640d3763b15af668039d24172d063b42337b0c27796fc2be180c78d  # cpu-1.9
     backup:

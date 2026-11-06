@@ -42,6 +42,25 @@ platformNamespaces:
     allowedFromNamespaces: []
     extraLabels:
       zuno.io/managed: "true"
+  # WP-220 (2026-11-06): where the demo groups create playgrounds from the
+  # MaaS consumer portal (gen-ai-studio). The portal creates an OGXServer plus
+  # ConfigMaps in the selected project AS THE SIGNED-IN USER, so the project
+  # must be one where that user already has rights: zuno.io/managed=true gives
+  # ocp-ai-dev `edit` and ocp-ai-ops `admin` through gitops/charts/
+  # openshift-rbac-groups (ocp-paas-ops is cluster-admin everywhere), and
+  # opendatahub.io/dashboard=true makes the portal list it as a project. Not
+  # meshed and no GPU or Kueue label on purpose: an OGXServer here is a small
+  # client of the MaaS Gateway, nothing more. redhat-ods-applications is the
+  # one caller allowed in (gen-ai-ui and the OGX operator reach the server's
+  # Service from there); users arrive through the router, always allowed.
+  - name: zuno-playground
+    displayName: Zuno Playground
+    description: Playgrounds created by the demo groups from the MaaS consumer portal (WP-220).
+    allowedFromNamespaces:
+      - redhat-ods-applications
+    extraLabels:
+      zuno.io/managed: "true"
+      opendatahub.io/dashboard: "true"
   # ADR-0587/ADR-0588 (WP-179): Open WebUI, a user experience over the
   # governed chain. Outside the mesh like zuno-unifai. It reaches the
   # ai-gateway and the mcp-gateway through their NetworkPolicy peer on the

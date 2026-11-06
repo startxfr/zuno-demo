@@ -109,6 +109,31 @@ lightspeed:
     - knowledge.tech.search
     - aap.platform.audit
     - aap.cluster.audit
+    # WP-220 (2026-11-06, user go): the four read-only Kubernetes capabilities of
+    # ADR-0600 clause 1, for the MaaS consumer portal playground. The ceiling does
+    # not entitle anyone: the tool policy (zuno-demo-agents policies/tools/
+    # tool-policy.yaml) still limits each of them to allowed_groups ocp-ai-ops, so a
+    # portal user outside that group sees none of them in tools/list.
+    - k8s.resource.read
+    - k8s.resource.list
+    - k8s.events.read
+    - k8s.logs.read
+
+# WP-220 (2026-11-06): the MaaS consumer portal playground reaches the /mcp
+# front-door with the signed-in user's own token. Two callers, both listed by
+# namespace (the OGX server pod is operator-created and the portal BFF is a
+# vendor pod, neither carries a label this chart controls): the playground
+# namespace, where the OGX stack's MCP tool runtime runs, and
+# redhat-ods-applications, where gen-ai-ui checks tools and status. The user's
+# groups still decide what each caller may see (ADR-0036).
+playground:
+  # On by default: zuno-playground is a platform namespace (gitops/charts/namespaces) and
+  # the live Application's helm values are written by ansible, so a default keeps this
+  # change in git.
+  enabled: true
+  namespaces:
+    - zuno-playground
+    - redhat-ods-applications
 
 # ADR-0560/0563 (WP-151): namespace of the UnifAI stack whose multi-agent
 # pods may call this gateway. Empty = no UnifAI peer in the NetworkPolicy.

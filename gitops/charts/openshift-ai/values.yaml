@@ -402,6 +402,10 @@ maasGateway:
   # (templates/maas-portal-oauth-callback.yaml explains why it is needed).
   portalOauthCallback:
     enabled: true
+  # WP-220: /gen-ai route for the portal's own hostname, needed by the playground's OGX
+  # server (templates/maas-portal-genai-route.yaml explains why).
+  portalGenAiRoute:
+    enabled: true
   # ADR-0201: workaround for an RHOAI-side EnvoyFilter anchor mismatch that
   # leaves both inference-payload-processing ext_proc filters unattached,
   # which 404s the OpenAI-native /v1/chat/completions call shape and skips
@@ -619,3 +623,30 @@ ogxServer:
   # path, so it worked before this fix too.
   vllmEndpoint: http://embeddings-predictor.zuno-ai-run.svc:8080/v1
 
+
+# WP-220 (2026-11-06): MCP servers listed in the MaaS consumer portal's playground
+# (ConfigMap gen-ai-aa-mcp-servers, templates/gen-ai-mcp-servers.yaml). One entry:
+# the Zuno MCP Gateway's /mcp front-door, which applies the signed-in user's groups.
+genAiMcpServers:
+  enabled: true
+  servers:
+    zuno-mcp-gateway:
+      url: http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/mcp
+      description: >-
+        Zuno MCP Gateway: Confluence search and read, technical-docs search, AAP audits and
+        read-only Kubernetes tools, filtered by your own groups. Authenticates with your own
+        OpenShift token.
+
+# WP-220 (2026-11-06): ready-made playground for the MaaS consumer portal in zuno-playground
+# (templates/playground.yaml explains the three differences from the portal's own version).
+playground:
+  enabled: true
+  namespace: zuno-playground
+  models:
+    - gpt-oss-20b
+    - qwen3.5-9b
+    - qwen3.5-9b-wesh
+    - qwen3.6-27b-instruct
+  pgvector:
+    image: registry.redhat.io/rhel9/postgresql-16
+    storage: 5Gi

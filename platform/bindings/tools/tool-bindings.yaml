@@ -31,6 +31,13 @@
 #                  separately.
 #   handler:       in-process only - handler module name under
 #                  app/handlers/.
+#   input_schema:  in-process only - the JSON schema (type object) of the
+#                  capability's arguments, advertised in tools/list. A
+#                  streamable-http backend publishes its own; an in-process
+#                  handler has none, and without this the model sees an open
+#                  object and omits the required arguments (WP-208 D3).
+#                  tests/test_bindings.py fails when a handler reads an
+#                  argument this schema does not name.
 #   provider_tool: the backend's own native tool name invoked after
 #                  resolution (callers never see it).
 #
@@ -145,6 +152,7 @@ bindings:
     handler: rag_query
     provider_tool: search_technical_docs
     auth_mode: service-identity
+    input_schema: {"type": "object", "properties": {"query": {"type": "string", "description": "The question or keywords to look up in the technical documentation (Confluence wiki spaces and Red Hat product documentation)."}, "top_k": {"type": "integer", "description": "Number of passages to return (default 5)."}}, "required": ["query"]}
 
   # --- salesforce: real MCP server (ADR-0326/WP-33), streamable-HTTP
   #     transport - same shape as confluence above, templated from it.
@@ -187,6 +195,7 @@ bindings:
     handler: drive
     provider_tool: list_drive_files
     auth_mode: delegated-user
+    input_schema: {"type": "object", "properties": {"folder": {"type": "string", "description": "Drive folder to list (default \"My Drive\")."}}}
 
   # ADR-0326 (WP-31): Arkos's delegated Drive/Docs write - same in-process
   # demo backend as drive.document.search above, extended with two more
@@ -201,6 +210,7 @@ bindings:
     handler: drive_create
     provider_tool: create_document
     auth_mode: delegated-user
+    input_schema: {"type": "object", "properties": {"title": {"type": "string", "description": "Title of the new document."}, "content": {"type": "string", "description": "Text content of the new document."}}, "required": ["title"]}
 
   - capability: drive.document.update
     backend: google-workspace
@@ -208,6 +218,7 @@ bindings:
     handler: drive_update
     provider_tool: update_document
     auth_mode: delegated-user
+    input_schema: {"type": "object", "properties": {"document_id": {"type": "string", "description": "Identifier of the document to update."}, "content": {"type": "string", "description": "New text content of the document."}}, "required": ["document_id"]}
 
   - capability: gmail.message.read
     aliases: [read_gmail]
@@ -216,6 +227,7 @@ bindings:
     handler: gmail
     provider_tool: read_gmail
     auth_mode: delegated-user
+    input_schema: {"type": "object", "properties": {"query": {"type": "string", "description": "Gmail search expression (default \"in:inbox\")."}}}
 
   - capability: web.page.search
     aliases: [web_search]
@@ -224,6 +236,7 @@ bindings:
     handler: web_search
     provider_tool: web_search
     auth_mode: service-identity
+    input_schema: {"type": "object", "properties": {"query": {"type": "string", "description": "Web search query."}}, "required": ["query"]}
 
   - capability: email.report.send
     aliases: [send_technical_report_email]
@@ -232,6 +245,7 @@ bindings:
     handler: email_report
     provider_tool: send_technical_report_email
     auth_mode: service-identity
+    input_schema: {"type": "object", "properties": {"recipients": {"type": "array", "description": "Internal email addresses to send the report to.", "items": {"type": "string"}}, "subject": {"type": "string", "description": "Subject of the email."}, "body": {"type": "string", "description": "Body of the email."}}, "required": ["recipients", "subject", "body"]}
 
   # ADR-0340 (WP-32): no Workday backend exists yet (out of scope - see
   # that ADR's "Out of scope/deferred"). Registered with
@@ -371,6 +385,7 @@ bindings:
     handler: image_gen
     provider_tool: generate_image
     auth_mode: service-identity
+    input_schema: {"type": "object", "properties": {"prompt": {"type": "string", "description": "Description of the image to generate."}, "negative_prompt": {"type": "string", "description": "What the image must not contain."}}, "required": ["prompt"]}
 
   # ADR-0516: calls the real, in-cluster diagram-render service
   # (app/handlers/diagram_gen.py) - unlike image_gen above, never an
@@ -385,6 +400,7 @@ bindings:
     handler: diagram_gen
     provider_tool: generate_diagram
     auth_mode: service-identity
+    input_schema: {"type": "object", "properties": {"mermaid_source": {"type": "string", "description": "Mermaid source of the diagram to render."}, "alt": {"type": "string", "description": "Alternative text of the diagram."}}, "required": ["mermaid_source"]}
 
   # --- k8s: ADR-0600 clause 1. Four capabilities, all read; the server's own tool list is cut to these
   #     (enabled_tools in gitops/charts/mcp-k8s) and Secret/ConfigMap are denied by kind.

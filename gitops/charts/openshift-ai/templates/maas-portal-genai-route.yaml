@@ -1,0 +1,40 @@
+{{- if and .Values.maasGateway.enabled .Values.maasGateway.portalGenAiRoute.enabled }}
+# WP-220 (RHOAI 3.6.0-ea.2, demo333, 2026-11-06): the playground of the MaaS
+# consumer portal (gen-ai-studio) makes its OGX server call the portal BFF's
+# model proxy at https://rh-ai.<apps domain>/gen-ai/api/v1/genai-proxy/... .
+# On this cluster that URL answered 404, so every chat in the playground failed
+# with "Server error" (the OGX log shows "Provider SDK error", the BFF "Error code:
+# 404"). The vendor `rhods-dashboard` route that carries /gen-ai to the dashboard
+# has NO hostname, and Istio does not merge a hostname-less route into the virtual
+# host of a host-specific one - the portal's own route (hostnames: rh-ai.<domain>)
+# owns that host. Same cause as zuno-portal-oauth-callback; same remedy: give that
+# hostname its own /gen-ai rule, to the vendor route's backend. Additive: the
+# vendor objects are untouched. Authentication is the gateway's, as for every
+# other path on this host.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zuno-portal-genai
+  namespace: redhat-ods-applications
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: data-science-gateway
+      namespace: openshift-ingress
+  hostnames:
+    - rh-ai.{{ .Values.maasGateway.clusterBaseDomain }}
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /gen-ai
+      backendRefs:
+        - group: ""
+          kind: Service
+          name: rhods-dashboard
+          port: 8443
+          weight: 1
+{{- end }}

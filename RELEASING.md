@@ -87,7 +87,8 @@ v0.1, `v0.2.0` for v0.2, `v0.3.0` for v0.3, `v0.13.0` for v0.13. The bands, thei
 | `v0.1.1` | v0.1 (patch) | 2026-08-20 | `db0181ac` | no |
 | `v0.2.0` | v0.2 | 2026-09-05 | `7d6d91c1` | yes |
 | `v0.3.0` | v0.3 | 2026-10-22 | `8dcea46d` | yes |
-| `v0.13.0` | v0.13 | 2026-11-05 | `388555d6` | not run |
+| `v0.13.0` | v0.13 | 2026-11-05 | `388555d6` | yes (2026-11-06) |
+| `v0.14.0` | v0.14 | 2026-11-06 | `6b79cb7f` | yes (2026-11-06) |
 
 **The rule.**
 - **When.** A band is tagged when its ADRs are all closed and its work packages are Done or deferred by name, as of
@@ -197,7 +198,9 @@ version. A release reaches a cluster in four steps:
    (agents, corp policies) read the release at build time: rebuild them
    (`make d1 build ai-gateway`, `make d2 build mlops`).
 4. **Check.** `make d2 check agents` admits the lock again and runs the
-   acceptance gate against the release's bundles.
+   acceptance gate against the release's bundles. It also compares the digest the running mcp-gateway and a2a-gateway
+   fetch (their `okf-fetch` init container) with `platform/okf/stack-config.generated.yaml` and fails on a gap: the
+   gateways read the release only when a pod starts, so a promotion not rolled in step 3 shows up here (WP-208 D9).
 
 Nothing under `agents/` is ever edited here: there is no such directory.
 Locally, `python3 platform/okf/release_cache.py` extracts the locked release

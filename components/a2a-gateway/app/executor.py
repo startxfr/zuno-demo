@@ -233,7 +233,10 @@ class ZunoAgentExecutor(AgentExecutor):
             if decision == "approve" and name in offered:
                 result = await self._tools.call_tool(name, parse_arguments(function.get("arguments")), **common)
             else:
-                result = f"The operation {name} was not approved and was not run. {note}".strip()
+                # The caller's own model decides whether to ask again: say plainly that the user declined, so that it
+                # reports the refusal instead of delegating the same write once more (seen live: a request every 5 minutes).
+                result = (f"The operation {name} was not approved and was not run. The user declined it: do not ask for it "
+                          f"again, and tell the caller that it was declined. {note}").strip()
             messages.append({"role": "tool", "tool_call_id": call.get("id", ""), "content": result})
 
         while backlog or rounds_left > 0:  # the calls of the last assistant message are always answered

@@ -290,8 +290,9 @@ def _input_schema(binding: Any, published: Optional[Dict[str, Any]] = None) -> D
     available (`published`, read from the backend and cached by app/downstream.py)
     it is passed through unchanged, so the model knows the required arguments
     (an open schema made it omit them and get a 502 from the backend). Otherwise
-    - in-process handlers, a backend that cannot be read - an open object schema
-    is advertised and the backend rejects bad arguments with a clear error.
+    - in-process handlers (which declare theirs in the binding's `input_schema`, WP-208 D3: an open schema
+    left the model without the required `query` and it looped on empty calls), a backend that cannot be
+    read - an open object schema is advertised and the backend rejects bad arguments with a clear error.
 
     The one thing worth encoding is that arguments are an object, not an array,
     which is what every binding in platform/bindings/tools/tool-bindings.yaml
@@ -299,6 +300,9 @@ def _input_schema(binding: Any, published: Optional[Dict[str, Any]] = None) -> D
     """
     if isinstance(published, dict) and published.get("type") == "object":
         return published
+    declared = getattr(binding, "input_schema", None)
+    if isinstance(declared, dict) and declared.get("type") == "object":
+        return declared
     return {"type": "object", "properties": {}, "additionalProperties": True}
 
 

@@ -178,6 +178,10 @@ dify:
     extraEnv: &appEnv
       - name: DB_EXTRAS
         value: sslmode=require
+      # WP-208 D1: the worker's image default is `celery -P gevent -c 1`, one slot, so one stuck run (7 minutes on
+      # 2026-11-05, cause not established) also held every scheduled task. Read by the worker only.
+      - name: CELERY_WORKER_AMOUNT
+        value: "4"
       # Read by `celery beat` only (CELERY_<COMMAND>_<OPTION>): it writes its schedule file in the working
       # directory (/app/api), which restricted-v2's random uid cannot write. Shared list, harmless elsewhere.
       - name: CELERY_BEAT_SCHEDULE

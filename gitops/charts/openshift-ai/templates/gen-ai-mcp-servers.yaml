@@ -1,0 +1,27 @@
+{{- /*
+WP-220 (2026-11-06): the catalogue of MCP servers the MaaS consumer portal's playground
+offers (gen-ai-studio reads the ConfigMap `gen-ai-aa-mcp-servers` in the dashboard
+namespace; each key is a server, its value a JSON object with url, description, logo).
+Without it the playground's MCP tab says "No manual servers configured".
+
+The one entry is the Zuno MCP Gateway's /mcp front-door (ADR-0524), not a backend MCP
+server: it validates the signed-in user's token (TokenReview), derives tools/list from
+that user's groups (ADR-0036) and applies the same policy as every other caller. The
+user pastes their token in the portal's MCP panel (header X-MCP-Bearer); nothing
+secret is stored here. Reachability is granted by the `playground` peer of
+gitops/charts/mcp-gateway/templates/networkpolicy.yaml.
+*/ -}}
+{{- if and .Values.maasGateway.enabled .Values.genAiMcpServers.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gen-ai-aa-mcp-servers
+  namespace: redhat-ods-applications
+  labels:
+    zuno.io/managed-by: argocd
+data:
+  {{- range $name, $srv := .Values.genAiMcpServers.servers }}
+  {{ $name }}: |
+    {{ dict "url" $srv.url "description" $srv.description | toJson }}
+  {{- end }}
+{{- end }}

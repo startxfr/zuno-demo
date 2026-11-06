@@ -82,7 +82,7 @@ workflow:
             provider: langgenius/openai_api_compatible/openai_api_compatible
             name: auto
             mode: chat
-            completion_params: {temperature: 0.2, max_tokens: 1024}
+            completion_params: {temperature: 0.2, max_tokens: 3072}
           prompt_template:
             - id: 00000000-0000-4000-8000-000000000002
               role: system

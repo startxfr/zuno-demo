@@ -1,6 +1,6 @@
 # WP-220: Evaluate the RHOAI 3.6 MCP lifecycle, MaaS consumer portal and WorkbenchesV2 components
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-06: portal and playground piloted and proven live, MCPServer and model-based-routing-only tested, Workbenches V2 waits for an API; see section 19)
 - **ADRs:** [ADR-0571](../../adr/0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md), [ADR-0036](../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md)
 - **Depends on:** [WP-195](wp-195-update-every-operator-on-demo333-through-the-repository.md) (RHOAI 3.6.0-ea.2 live on demo333)
 - **Related:** [WP-152](wp-152-mcp-gateway-evaluation-and-mcp-north-side.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md), [WP-177](wp-177-finish-the-maas-quota-delegation.md), [WP-206](wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md)
@@ -267,12 +267,12 @@ The question left open by section 7 was which field the limit reads, and whether
 - **The maas-controller would wipe a hand edit.** It does not set `dataExtraction`, and on every reconcile it replaces the whole `spec` of
   each managed TRLP (`maassubscription_controller.go`, `updateExistingTRLP`). The only durable ways are to opt a TRLP out of management
   (then subscription changes stop reaching it) or to ask upstream for a pass-through.
-- **Options.** (1, recommended) Accept and document: Claude Code on a MaaS key is authenticated and authorised but not rate-limited by
+- **Options.** (1, recommended, **decided by the user on 2026-11-06**) Accept and document: Claude Code on a MaaS key is authenticated and authorised but not rate-limited by
   MaaS; the 5,000,000 tokens per hour of `gpt-oss-20b-developer` is real only for OpenAI-format calls. (2) Opt the `gpt-oss-20b` TRLP out
   and own it in the chart with the two-pointer list: undercounts, and freezes that model's subscriptions. (3) Upstream request to the
   maas-controller; the user deferred upstream issues earlier.
 
-## 10. Two-listener Gateway chart (proven on a throwaway Gateway, not yet live)
+## 10. Two-listener Gateway chart (proven on a throwaway Gateway, live since 2026-11-06)
 
 The portal's "API keys" page needs maas-api to report an external URL (section 8). Upstream `maas-api/internal/tenant/handler.go` takes the
 `hostname` of the first ready HTTPS listener that has an attached route, and only falls back to the Gateway address (which is the
@@ -391,17 +391,196 @@ matches fall; check a body-based call works and the path call 404s; record the n
 clients can move to the body-based form does it make sense to turn `zuno-token-quota` back on. Until then it is a client migration, not a
 setting.
 
+## 14. Live results (2026-11-06, user go for all three, window announced to peers)
+
+**Two-listener Gateway (section 10), live.** The live Application `zuno-openshift-ai-d1` got `maasGateway.externalHostnameListener.enabled: true`
+(backups of the Application and the Gateway were taken first). Within about a minute `maas-default-gateway` listed `https-external`
+(`maas.apps.demo333.startx.fr`) then `https` (no hostname), both Accepted, Programmed, `attachedRoutes: 7`. Results:
+
+- `GET /maas-api/v1/tenants` answered 200 with `externalUrl: https://maas.apps.demo333.startx.fr` (it was a 500 before).
+- Without a token, MaaS still answers 401, on the external host and on the in-cluster Service name
+  (`maas-default-gateway-istio.openshift-ingress.svc`, the path of the ai-gateway, lightspeed and the provider endpoints), so the hostname-less
+  listener keeps serving them. The EnvoyFilter stayed at 1,336,461 bytes. DSC Ready.
+- The Gateway reported `Programmed=False` ("Failed to assign to any requested addresses") for under a minute while it reprogrammed, which made
+  the Argo app `Progressing`; it came back to `Programmed=True` and `Healthy` without intervention. `DNSReady=False` stays on the Gateway and on
+  `https-external` as predicted; `LoadBalancerReady=False` was already there before. Both are cosmetic here.
+- Not verified by me: the portal "API keys" page in a browser (needs the `dev` session); the user checks it.
+
+**model-based-routing-only: no effect on our models.** On `qwen35-9b-wesh`, the annotations were set first on `metadata.annotations`, then in
+`spec.annotations` (the location the MaaS doc names), with `model-based-routing-enabled` and `-only` both `"true"`. In both cases the managed
+HTTPRoute stayed at 15 matches after about a minute and the EnvoyFilter did not change. Likely cause (not proven in the controller code): our
+chart writes the route in `spec.router.route.http.spec`, so the controller has nothing to generate and strip. Pods were untouched, the
+annotations were removed, route and size are back to the baseline. Consequence: the 19-to-9 saving is not available to this chart as written;
+getting it would first need the chart to stop supplying its own route spec, which is a separate change.
+
+**MCPServer pilot.** Setting `mcplifecycleoperator: Managed` created the CRD `mcpservers.mcp.x-k8s.io` in version **v1alpha1** (the
+paper mapping of section 11 assumed v1beta1; the fields used were the same) and the operator pods came up in about a minute. A throwaway
+namespace carried one `MCPServer` for the pinned `kubernetes-mcp-server` digest with a ConfigMap mounted through `config.storage`.
+It produced a Deployment, a Service and a `status.address` (`http://k8s-mcp-pilot.<ns>.svc.cluster.local:8080/mcp`), and the operator's own
+handshake filled `status.serverInfo`. `initialize` and `tools/call` worked through a port-forward. Gaps against `gitops/charts/mcp-k8s`:
+the operator creates no ServiceAccount or RBAC (the call failed with "forbidden" as `default`), no NetworkPolicy and no per-namespace
+RoleBindings, and `status.capabilities` stayed empty. Verdict: usable for lifecycle (image, config, health, address), not a replacement for
+the chart's RBAC, so no migration. The namespace was deleted and the module set back to unset; the CRD stays installed, the DSC is Ready.
+
+## 15. Playground for the demo groups (2026-11-06)
+
+The portal's playground failed for `dev` with `failed to create ConfigMap: configmaps is forbidden: User "dev" cannot create resource
+"configmaps" ... in the namespace "startx"`. The gen-ai-studio creates an `OGXServer` and ConfigMaps in the selected project as the signed-in
+user, `startx` is an example project that no platform group has rights in, and `dev` is a pilot account, not a demo user.
+
+Decision (user, 2026-11-06): move the portal demo to the groups `ocp-paas-ops`, `ocp-ai-ops` and `ocp-ai-dev` (Keycloak users `paas-ops-01`,
+`ai-ops-01`, `ai-dev-01`), in a dedicated namespace.
+
+- **Namespace `zuno-playground`** (`gitops/charts/namespaces/values.yaml`): labelled `zuno.io/managed=true`, which gives `ocp-ai-dev` `edit` and
+  `ocp-ai-ops` `admin` through `gitops/charts/openshift-rbac-groups` once its ansible role has been re-run (it discovers the labelled namespaces at
+  apply time; `ocp-paas-ops` is cluster-admin already), and `opendatahub.io/dashboard=true`, which makes the portal list it. Not meshed, no GPU quota.
+  The default-deny baseline admits `redhat-ods-applications` (gen-ai-ui and the OGX operator) and the router.
+- **MaaS access** (`gitops/charts/models/values.yaml`): `gpt-oss-20b-developer` (owner `dev`) is replaced by `gpt-oss-20b-ocp-ai-dev`,
+  `gpt-oss-20b-ocp-ai-ops` and `gpt-oss-20b-ocp-paas-ops`, same 5,000,000 tokens per hour and priority 20 (one rate, so only one limit is added to
+  the gateway wasm object). The `gpt-oss-20b-entitlement` policy takes the groups from these entries; `dev` is no longer an entitled user.
+- The OpenShift groups `ocp-ai-dev` and `ocp-paas-ops` do not exist before their first member signs in (Keycloak group sync creates them, as it did for
+  `ocp-paas-dev`), so the first test is a sign-in as `ai-dev-01`.
+
+Result of the first live run (user `ai-ops-01`, 2026-11-06): sign-in, subscription `gpt-oss-20b-ocp-ai-ops`, project list and playground creation work
+(`OGXServer lsd-genai-playground` plus a `genai-pgvector` pod appear in `zuno-playground`). The playground itself is not usable yet; three symptoms,
+one measured cause for the first two:
+
+- **Rollout loop (RHOAI 3.6 EA operator defect, measured).** The OGXServer the portal generates sets `spec.tls.trust.caCertificates` to two
+  sources (`odh-trusted-ca-bundle`, `ogx-router-ca-bundle`). The OGX operator rewrites the merged ConfigMap `lsd-genai-playground-ca-bundle` (241
+  certificates, 362 KB) about once a second, and the bytes alternate between two orderings of the same certificates (two SHA-256 values seen).
+  The Deployment carries `configmap.hash/ca-bundle: <resourceVersion>-...`, so every rewrite starts a rollout: 35 ReplicaSets in two minutes, pods
+  never Ready, `OGXServer` stuck in `Initializing`. `zuno-ogx` in `redhat-ods-applications` does not use this block and is stable.
+- **Model list shows one greyed model** (the inline `sentence-transformers` reranker): the stack never becomes available, so the models served through the
+  `genai-bff-proxy` provider cannot be listed. Expected to follow from the loop; not proven independently.
+- **File upload `Vector_store 'vs_...' not found`**: the server's kvstore is local SQLite, lost at each restart, so the vector store created before the
+  restart no longer exists. Same loop; `genai-pgvector` itself is Running.
+- **No MCP server**: the portal reads the ConfigMap `gen-ai-aa-mcp-servers` in `redhat-ods-applications`, which does not exist. It is an admin catalogue to be
+  written, separate from the loop.
+
+Live test (user go, option A, da's window open and no objection, one object only): with a single CA source (`odh-trusted-ca-bundle`) the loop
+continued (the merged bundle is about twice that source's size, so the operator also adds the system trust bundle; the rewrite stayed non-deterministic).
+With **no `spec.tls` block** (`oc patch ogxserver lsd-genai-playground --type merge -p '{"spec":{"tls":null}}'`) the OGXServer went `Ready` with one pod
+that stayed up (ReplicaSets stopped at 12, pod 83 s old and serving `/v1/providers`). The orphan `lsd-genai-playground-ca-bundle` ConfigMap is still
+rewritten, but nothing mounts it any more. Not durable: this is a live edit on an object the portal BFF created; a playground created again by the
+portal will carry the block again, so a lasting fix needs the portal-generated spec changed (not found yet) or the operator fixed. Backups of the
+OGXServer and its config are in the session scratchpad.
+
+## 16. Playground models and MCP (2026-11-06)
+
+**Models missing from the dropdown.** Measured: the portal's `/lsd/models` only returns what the OGX stack lists, and the stack's only LLM provider is
+`genai-bff-proxy` (a `remote::passthrough` that resolves models per request; its startup refresh is skipped with "forward_headers is configured but no
+matching keys found in provider data"). The BFF's `/genai-proxy/.../v1/models` answers 404. So the four MaaS models never reach the list. Live
+workaround, not durable (the ConfigMap `llama-stack-config` belongs to the portal BFF): the four models were added under `registered_resources.models` with
+`provider_id: genai-bff-proxy` and `model_type: llm`; the stack then lists `genai-bff-proxy/publishers/zuno-ai-run/models/<name>`. Whether chat through them
+works is for the user to confirm in the portal. A recreated playground brings the CA-bundle loop (section 15) and loses this edit again.
+
+**MCP (user go: option 1 and 2), prepared in git, not pushed while zuno-demo-da's window is open** (it changes the mcp-gateway Deployment):
+- `gitops/charts/openshift-ai/templates/gen-ai-mcp-servers.yaml`: ConfigMap `gen-ai-aa-mcp-servers` in `redhat-ods-applications` with one entry,
+  `zuno-mcp-gateway` -> `http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/mcp`, the `/mcp` front-door (ADR-0524) that validates the user's token by
+  TokenReview and derives `tools/list` from the user's groups.
+- `gitops/charts/mcp-gateway`: `frontdoorCapabilities` gains `k8s.resource.read`, `k8s.resource.list`, `k8s.events.read`, `k8s.logs.read` (ceiling only: the
+  tool policy in zuno-demo-agents already limits them to `ocp-ai-ops`, so no agents release is needed); new NetworkPolicy peer `playground` (namespaces
+  `zuno-playground` and `redhat-ods-applications`, port 8080), on by default.
+- Open question for the live test: how the portal passes the user's token to the MCP server (the BFF accepts an `X-MCP-Bearer` header; the OGX stack's own
+  tool runtime takes headers per tool). If it does not forward one, the front-door answers 401 and a user must paste a token.
+
+**Chat "Server error" in the playground (measured, then fixed in git, 1d6fab89).** The OGX log says "Provider SDK error" and the portal BFF "Response failed
+event ... Error code: 404": the stack calls the BFF model proxy at `https://rh-ai.<domain>/gen-ai/api/v1/genai-proxy/...`, and no HTTPRoute served `/gen-ai`
+on that host. The vendor `rhods-dashboard` route (which carries it) has no hostname, and the portal's route owns the `rh-ai` virtual host (same cause as
+`zuno-portal-oauth-callback`). Calling the dashboard Service directly answered 200 for `/gen-ai/api/v1/lsd/models` and `/genai-proxy/.../v1/models`. New
+HTTPRoute `zuno-portal-genai` (chart `openshift-ai`, flag `maasGateway.portalGenAiRoute`, on by default): host `rh-ai.<domain>`, PathPrefix `/gen-ai` to
+`rhods-dashboard:8443`. After sync: `/gen-ai/...` answers 302 without credentials and 200 with a bearer token, instead of 404.
+
+**MCP, live after the push.** `zuno-mcp-d1` synced (mcp-gateway rolled once, image unchanged), `MCP_FRONTDOOR_CAPABILITIES` carries the four `k8s.*`, the
+NetworkPolicy lists `zuno-playground` and `redhat-ods-applications`, the ConfigMap `gen-ai-aa-mcp-servers` exists. From the playground pod:
+`mcp-gateway /healthz` 200 and `POST /mcp` without a token 401 (reachable, authentication enforced). Not yet verified: tools listed for `ai-ops-01` in the portal.
+
+## 17. Closure of the portal and playground topic (2026-11-06)
+
+User-confirmed end to end on demo333 as `ai-ops-01` (group `ocp-ai-ops`), private window, `https://rh-ai.apps.demo333.startx.fr/maas-consumer-portal`:
+
+| Check | Result | Evidence |
+|---|---|---|
+| Sign-in with OpenShift, models list, API keys, subscriptions | works (`dev` earlier, then the group subscriptions) | sections 8, 10, 14 |
+| Playground created in project `zuno-playground` | works | section 15 |
+| Chat on `gpt-oss-20b` (111 T/s, TTFT 670 ms) | works | `docs/assets/img/wp220-portal-playground-chat-gpt-oss-20b.png` |
+| RAG on an uploaded PDF, answer cites the document (1 cited, 1 retrieved) | works | `docs/assets/img/wp220-portal-playground-rag-devis-cited.png` |
+| MCP server `zuno-mcp-gateway`, authorised with the user's own OpenShift token | "Connection successful", 9 of 9 tools active (2 Confluence, 1 technical-docs search, 2 AAP, 4 Kubernetes) | `docs/assets/img/wp220-portal-playground-mcp-connected-9-tools.png` |
+| Tool call from the chat (`confluence.page.search`, "no page found for ACM") | works through the gateway | `docs/assets/img/wp220-portal-playground-mcp-confluence-tool-response.png` |
+
+How the user gets the MCP token: `https://oauth-openshift.<domain>/oauth/token/request`, "Display Token", pasted in the MCP panel (it expires after 24 h by default).
+
+What is live and what is only a live edit:
+- In git and Argo-managed: namespace `zuno-playground`, the three `gpt-oss-20b-ocp-*` subscriptions, the two-listener MaaS Gateway (chart values, plus the live Application value
+  `externalHostnameListener`, which is not git-synced), `zuno-portal-oauth-callback`, `zuno-portal-genai`, the `gen-ai-aa-mcp-servers` ConfigMap, the four `k8s.*` capabilities
+  and the `playground` NetworkPolicy peer of `mcp-gateway`.
+- **Was live-edit only, now in git (see below)**: `spec.tls` removed from the OGXServer and the four models added to its ConfigMap.
+
+**Playground shipped in git (2026-11-06, user go A; 22f801e2).** `gitops/charts/openshift-ai/templates/playground.yaml` creates in `zuno-playground` the same objects the portal
+creates (OGXServer `lsd-genai-playground`, `llama-stack-config`, `genai-pgvector` with PVC, Service and NetworkPolicy) with no `spec.tls`, the four MaaS models registered and a pgvector password
+generated in-cluster by the ESO Password generator. The portal-created copy was deleted first (its pgvector database was initialised with a different password; the uploaded test PDF was lost).
+Two traps found on the way, both fixed:
+1. The PVC in an earlier sync wave than its Deployment deadlocked the sync (storage class binds on first use, so the claim stays Pending, not healthy). Same wave now.
+2. `zuno-openshift-ai-d0` and `-d1` both render this chart; d0 has no `maasGateway` value, so it rendered the same objects with the placeholder domain `apps.mycluster.example.com` and the two
+   Applications overwrote the stack ConfigMap in turn, restarting the OGX server at every sync. The playground and the MCP catalogue templates are now gated on `maasGateway.enabled` (d1 only).
+Result: d0 and d1 Synced and Healthy, OGXServer Ready with one stable pod (9 ReplicaSets after the settling, no growth), the stack lists the four `genai-bff-proxy/...` models, DSC Ready, MaaS 401 without
+token, EnvoyFilter unchanged at 1,336,461 bytes. A playground created from the portal in another namespace is still the vendor's version and will loop.
+
+Remaining work, none blocking this topic (the `ai-dev-01` flow was tested, see section 18): decide the Anthropic
+counting option (section 9, decided: option 1, accept and document); the V2 workbench pilot waits for an API that does not exist yet (section 12); MaaS 3.6 IPP-to-Praxis impact on the
+payload-processing workarounds and the Keycloak `apiKeyHelper` path were not verified; an upstream report for the OGX CA-bundle defect.
+
+## 18. Retest of the playground recreated from git (2026-11-06, 19:35-19:42 CET)
+
+User ran the flow in private windows against the chart-created playground (no "Create" click), then I checked the cluster read-only. Pod `lsd-genai-playground` had run 96 minutes
+with 0 restarts and no new ReplicaSet during the tests; OGXServer Ready.
+
+| Test | Result | Evidence (UI) | Cluster check |
+|---|---|---|---|
+| Chat as `ai-ops-01`, subscription `gpt-oss-20b-ocp-ai-ops`, 19:35 | works | `docs/assets/img/wp220-playground-chart-chat-ai-ops.png` | pod stable, 0 restarts |
+| RAG: upload `Devis.250302-21.pdf`, ask for the total, 19:37 | works, "1 cited, 1 retrieved" (amount masked in the capture) | `docs/assets/img/wp220-playground-chart-rag-devis.png` | pgvector holds 3 chunks in the vector store |
+| MCP `zuno-mcp-gateway` with the user's own OpenShift token, 19:38 | 9 of 9 tools | `docs/assets/img/wp220-playground-chart-mcp-9-tools.png` | gateway TokenReview: `ai-ops-01`, groups `ocp-ai-ops` |
+| Tool call `confluence.page.search`, 19:39 | called and allowed; Confluence returned no page for "portail MaaS" | `docs/assets/img/wp220-playground-chart-mcp-confluence-call.png` | gateway log: `caller=ai-ops-01 allowed=True` |
+| Chat as `ai-dev-01`, subscription `gpt-oss-20b-ocp-ai-dev`, 19:41 | works | `docs/assets/img/wp220-playground-chart-chat-ai-dev.png` | Group `ocp-ai-dev` holds `ai-dev-01`; gateway groups `agent_tekos`, `ocp-ai-dev` |
+| MCP as `ai-dev-01`, 19:42 | "Connection successful", **0 of 0 tools** (no `k8s.*`) | `docs/assets/img/wp220-playground-chart-mcp-ai-dev-0-tools.png` | `tool-policy.yaml` lists only `ocp-ai-ops` in `allowed_groups`: default deny |
+
+Notes:
+- The RAG answer shows a malformed citation marker (`.{{cit[1]ation:1}}`): the model wrote the marker badly and the portal rendered it as is. Cosmetic; the citation itself works.
+- `ocp-ai-dev` has no MCP tool at all, by policy. Decision (user, 2026-11-06): keep it, so the demo shows the difference between the two groups. Giving it read-only tools later is a policy change in `zuno-demo-agents`.
+- The MaaS Limitador counter probe (`platform/testing/quota_counters_probe.py`) read `OK: moved ['subscription']` (+29) on the same day: counters move again after the 3.6 EA upgrade.
+
+## 19. Acceptance (2026-11-06)
+
+The user accepted the work package on 2026-11-06 after the section 18 retest. Outcome per component:
+
+| Component | Decision | Where |
+|---|---|---|
+| MaaS consumer portal (`dashboard.maasConsumerPortal`) | **Adopted.** Live on demo333 for the three `ocp-*` groups: API keys, subscriptions, playground (chat, RAG, MCP with the user's own token). Everything is in git except the Application value `externalHostnameListener`, which is not git-synced | sections 8, 10, 14 to 18 |
+| MCP lifecycle operator (`mcpservers.mcp.x-k8s.io`, v1alpha1) | **Wait.** Tested as an `MCPServer` pilot; it creates no ServiceAccount, RBAC or NetworkPolicy, so the project's gateway and policy stay | sections 11, 14 |
+| Workbenches V2 | **Wait.** No Notebook v2 API on this EA, so no pilot is possible | section 12 |
+| `model-based-routing-only` | **No effect** while the models chart supplies its own `spec.router.route.http.spec` | sections 13, 14 |
+
+Pilot chosen: the portal, with the subscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops` (5,000,000 tokens per hour each, priority 20).
+The spikes of step 2 are recorded in sections 8 to 14 of this file; no separate evidence file was written.
+
+Decisions taken at closure: the Anthropic `/v1/messages` traffic stays uncounted by MaaS (section 9, option 1, to be documented wherever a Claude Code key is handed out);
+`ocp-ai-dev` keeps no MCP tool (section 18).
+
+Not done, none blocking, to be taken up when the cause clears: the V2 workbench pilot (needs the Notebook v2 API); the MaaS 3.6 IPP-to-Praxis impact on the payload-processing
+workarounds and the Keycloak `apiKeyHelper` path (unverified); an upstream report for the OGX CA-bundle defect (text drafted, not sent).
+
 ## Steps
 
-1. This evaluation (done, in review).
+1. This evaluation (done).
 2. Read-only spikes: the Kuadrant `MCPGatewayExtension`, `MCPServerRegistration` and `MCPVirtualServer` CRDs already on the cluster, to
-   see whether ADR-0011 rights can be expressed in Authorino; the portal's Keycloak sign-in; the `status` fields of `MCPServer`.
+   see whether ADR-0011 rights can be expressed in Authorino; the portal's Keycloak sign-in; the `status` fields of `MCPServer`
+   (done, recorded in sections 8 to 14 of this file).
 3. Pilot gate. Recommended first pilot: the portal (one DSC field, easy to revert). Second candidate: one MCP server (the upstream k8s
    server of WP-206) as an `MCPServer`. A pilot needs the user's go, an announced window, a DSC backup and a live patch, because ArgoCD
    ignores the DSC `/spec`.
-4. Test `model-based-routing-only` on one model and measure the EnvoyFilter size.
+4. Test `model-based-routing-only` on one model and measure the EnvoyFilter size (done, section 14).
 
 ## Acceptance
 
 The three evaluations are accepted or amended by the user, one pilot is chosen with its subscription and ceiling, and the spikes of
-step 2 are recorded in an evidence file.
+step 2 are recorded (met on 2026-11-06, section 19; the spikes live in sections 8 to 14, not in a separate evidence file).

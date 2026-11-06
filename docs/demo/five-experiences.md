@@ -59,6 +59,8 @@ flowchart LR
    applications are not affected).
 2. **The same question in UnifAI and Open WebUI.** Same persona, same documents, same entitlement: the three answers draw
    on the same sources. Say what differs: the interface.
+   In OpenClaw (sale-01's assistant) name Confluence in the question: *"Cherche dans Confluence les pages d'onboarding"*. A
+   bare question about "workshops d'onboarding" matches OpenClaw's own documents and it answers from those (WP-208 D5).
 3. **Same backend, five clients.** Dashboard row *Same backend, five experiences*: one series per client (`unifai`,
    `open-webui`, `openclaw-*`, `dify`, `kagent`) for calls, tokens, cost and guardrail evaluations. One gateway counted them all.
 4. **Same models and routing.** Row *Same models, same routing*: the provider follows the request's data classification,
@@ -81,6 +83,7 @@ flowchart LR
    the current state of the namespace and give me what you find."* As **ai-ops-01** Tekos calls `k8s.events.read` and
    answers from real pods and events. As **consultant-02** the same question gets a generic answer and no `k8s.*` call:
    the tools are offered to `ocp-ai-ops` only (agents release 0.14.0, Tekos 0.5.0). Arkos has none.
+   Tekos is reached only through that Team workspace: the personal chat list has no agent selector (WP-208 D10).
 
    ![ai-ops-01 asks Tekos about a pod in zuno-ai-run](../assets/img/unifai-tekos-k8s-ai-ops-01-question.png)
    ![Tekos answers from the real events of the namespace](../assets/img/unifai-tekos-k8s-ai-ops-01-answer.png)
