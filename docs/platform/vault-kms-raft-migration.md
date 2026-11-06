@@ -148,9 +148,11 @@ Store the three new keys like a fresh install's, and destroy the old one.
    which the TLS listener refuses - issuance (not existing certificates)
    is down for that window.
 3. `make d0 install external-secrets`: per-namespace SecretStores over
-   https. The configure Job removes the old `eso-reader` role as soon as
-   `platform/vault/secret-access.yaml` lists namespaces, so run this right
-   after step 1.
+   https, then sync the applications so every ExternalSecret moves off
+   `vault-backend`. The configure Job keeps the old `eso-reader` role until no
+   ExternalSecret references `vault-backend` any more, so run
+   `make d0 install vault` once more after this item to retire it (see
+   "The `eso-reader` role" below).
 4. After a week without a rollback, delete the old file data
    (`/vault/data/file-legacy`, a few MB) from a debug pod mounting the PVC,
    and the `vault-pre-kms-raft-*` VolumeSnapshot.
@@ -183,7 +185,7 @@ only the recovery file has the (migrated) key.
 The playbook can be resumed: `-e vault_migrate_resume_from=N` (N from 1 to 7) skips the steps before N. The legacy
 Secret keeps the unseal key and the root token until step 7, so N cannot be above 7. The snapshot (rollback point) is looked up
 as the newest `vault-pre-kms-raft-*`, or given with `-e vault_migrate_snapshot_name=...`. The data comparison after steps 4 to 6 runs only if
-`-e vault_migrate_probe_expected=<value>` is given (the value of the probe path before the migration, printed by the first run).
+`-e vault_migrate_probe_expected=<value>` is given (the value of the probe path before the migration; step 0 of the first run prints it as `probe ... = <value>`).
 A failure in step 3 leaves Vault stopped: fix the cause, then resume from 3.
 
 ### Key checks before anything is stopped

@@ -225,6 +225,13 @@
       no_log: true
       when: (vault_migrate_resume_from | int) == 0
 
+    # The probe is the cluster domain (zuno/platform/cluster-domain), not a
+    # secret: print it so a resumed run can pass -e vault_migrate_probe_expected.
+    - name: "step 0 | show the probe value (needed to resume with the data check)"
+      ansible.builtin.debug:
+        msg: "probe {{ vault_migrate_probe_path }} = {{ _vm_probe0.stdout }} (resume with -e vault_migrate_probe_expected=<this value>)"
+      when: (vault_migrate_resume_from | int) == 0
+
     - name: "step 0 | refuse a resume point the legacy Secret cannot support"
       ansible.builtin.fail:
         msg: "vault_migrate_resume_from must be 0 to 7 (the legacy credentials are deleted by step 7)."
