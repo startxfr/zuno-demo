@@ -422,6 +422,27 @@ the operator creates no ServiceAccount or RBAC (the call failed with "forbidden"
 RoleBindings, and `status.capabilities` stayed empty. Verdict: usable for lifecycle (image, config, health, address), not a replacement for
 the chart's RBAC, so no migration. The namespace was deleted and the module set back to unset; the CRD stays installed, the DSC is Ready.
 
+## 15. Playground for the demo groups (2026-11-06)
+
+The portal's playground failed for `dev` with `failed to create ConfigMap: configmaps is forbidden: User "dev" cannot create resource
+"configmaps" ... in the namespace "startx"`. The gen-ai-studio creates an `OGXServer` and ConfigMaps in the selected project as the signed-in
+user, `startx` is an example project that no platform group has rights in, and `dev` is a pilot account, not a demo user.
+
+Decision (user, 2026-11-06): move the portal demo to the groups `ocp-paas-ops`, `ocp-ai-ops` and `ocp-ai-dev` (Keycloak users `paas-ops-01`,
+`ai-ops-01`, `ai-dev-01`), in a dedicated namespace.
+
+- **Namespace `zuno-playground`** (`gitops/charts/namespaces/values.yaml`): labelled `zuno.io/managed=true`, which gives `ocp-ai-dev` `edit` and
+  `ocp-ai-ops` `admin` through `gitops/charts/openshift-rbac-groups` once its ansible role has been re-run (it discovers the labelled namespaces at
+  apply time; `ocp-paas-ops` is cluster-admin already), and `opendatahub.io/dashboard=true`, which makes the portal list it. Not meshed, no GPU quota.
+  The default-deny baseline admits `redhat-ods-applications` (gen-ai-ui and the OGX operator) and the router.
+- **MaaS access** (`gitops/charts/models/values.yaml`): `gpt-oss-20b-developer` (owner `dev`) is replaced by `gpt-oss-20b-ocp-ai-dev`,
+  `gpt-oss-20b-ocp-ai-ops` and `gpt-oss-20b-ocp-paas-ops`, same 5,000,000 tokens per hour and priority 20 (one rate, so only one limit is added to
+  the gateway wasm object). The `gpt-oss-20b-entitlement` policy takes the groups from these entries; `dev` is no longer an entitled user.
+- The OpenShift groups `ocp-ai-dev` and `ocp-paas-ops` do not exist before their first member signs in (Keycloak group sync creates them, as it did for
+  `ocp-paas-dev`), so the first test is a sign-in as `ai-dev-01`.
+
+Result: pending the live run.
+
 ## Steps
 
 1. This evaluation (done, in review).
