@@ -1035,7 +1035,7 @@ WP-208 shows the five experiences together. No cluster action while demo333 is b
 | WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Done (2026-11-05) | adapter built, signed and rolled; knowledge base registered in Dify; forbidden-space case not exercised |
 | WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Done | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
 | WP-207 | [wp-207](work-packages/wp-207-kagent-preparation-and-install.md) | 0600, 0601 | WP-202, WP-206 | Done | scratch spike in `zuno-kagent-scratch`; `make d2 install kagent` |
-| WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Done | live rehearsal on demo333 done 2026-11-05; second browser run 2026-11-06, known defects D1-D5 in the brief |
+| WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Done | live rehearsal on demo333 done 2026-11-05; second browser run 2026-11-06, known defects D1-D6 in the brief |
 
 ### Phase 50 — follow-up work from the ADR close-out (added 2026-11-05)
 
