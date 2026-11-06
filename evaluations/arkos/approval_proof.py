@@ -12,7 +12,8 @@ from the session's HITL stream (`GET session.subscribe`, event `approval_require
 - `reject`: nothing runs. `silence`: no answer for 330 s, the request ends as a refusal after about 300 s.
 - `--rounds N` (reject only): answer N successive requests of the same session, then wait for the next event. UnifAI
   0.1.62 caps a session at 3 approval requests (R-538): the 4th must end the run with "Approval cap reached for this
-  session (3 requests)". Arkos asks again every ~5 minutes after a refusal, so N=4 takes 15 to 20 minutes.
+  session (3 requests)". Tried live on 0.1.62 (2026-11-07, three runs): Arkos stops after the first refusal, so the cap
+  was never reached and the run exits 2; a finished session answers 409 to a new submit.
 - `--rule`: first sets the strongest session auto-approval rule (`approve_all`); the request must still appear and
   wait ("an auto-approval does not cross the hop"). Needs UnifAI >= 0.1.62: until the worker loads the session
   metadata for its gate (fork R-539) the rule is saved but never applied, and this check cannot pass.
@@ -43,6 +44,8 @@ sys.path.insert(0, str(HERE.parent / "common"))
 PERSONA = os.getenv("APPROVAL_PROOF_PERSONA", "eval-consultant-01")
 PROMPT = ("Call the Tekos delegation tool right now and ask it to launch a fresh cluster audit with its audit tool "
           "(aap.cluster.audit), then tell me the job link it returns. Do not answer from memory.")
+MULTI_PROMPT = ("Call the Tekos delegation tool four separate times in a row, one call per message, each asking it to launch a "
+                "fresh cluster audit with aap.cluster.audit. If one is declined, still make the next call. Report each result.")
 WAIT_REQUEST_SECONDS = 240
 SILENCE_SECONDS = 330
 NEXT_REQUEST_SECONDS = 420
@@ -86,7 +89,7 @@ def main(argv: list) -> int:
 
         threading.Thread(target=listen, daemon=True).start()
         time.sleep(2)
-        print("submit", c.post(f"{base}/user.session.submit", json={"sessionId": sid, "inputs": {"user_prompt": PROMPT}, **t._team_body()}).status_code, flush=True)
+        print("submit", c.post(f"{base}/user.session.submit", json={"sessionId": sid, "inputs": {"user_prompt": MULTI_PROMPT if rounds > 1 else PROMPT}, **t._team_body()}).status_code, flush=True)
         started = time.monotonic()
         seen: set = set()
 

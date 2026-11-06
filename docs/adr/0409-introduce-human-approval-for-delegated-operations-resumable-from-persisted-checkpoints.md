@@ -138,6 +138,16 @@ The proof that an auto-approval does not cross the hop could not be made on Unif
 `approve_all`) is saved but never reaches a session run by the Temporal worker, whose gate is built without the session metadata and
 logs `approve_all: False` (fork R-539, fix planned in 0.1.62). It is to be replayed once after 0.1.62 is pinned.
 
+Replayed on 2026-11-06 after UnifAI 0.1.62 was pinned on demo333 (catalog `sha256:b8586c96…`, five images, operator CSV 0.1.62): with a session
+`approve_all` rule set before the prompt, the Temporal worker now logs `approve_all: True` for the session, and the delegated write
+(`aap.cluster.audit`, `write`) still raised an `approval_required` that waited for a human answer (the a2a-gateway logged `approval requested`
+then `approval answered decision=reject`, nothing ran). An auto-approval therefore does not cross the hop. The proof script is
+`evaluations/arkos/approval_proof.py reject --rule`.
+
+The per-session cap of 3 approval requests (fork R-538, UnifAI 0.1.62) could not be reached live: in three runs on 2026-11-07 (one prompt per
+turn, a resubmit in the same session, one prompt asking for four delegations) Arkos stopped after the first refusal and the session completed,
+so no 4th request was raised. The cap is accepted as covered by the upstream tests; the gateway side needs no counter of its own.
+
 The "no identity binding" case is covered by gateway tests (2026-11-06): an anonymous or forged token is refused with 401 before the model or any tool
 is reached, a forged token cannot answer a pending approval (the write stays unrun and the real initiating user can still answer), and a token
 without a `sub` claim is refused. The write path needs a caller identity at every step, so no run without one can approve or write.
