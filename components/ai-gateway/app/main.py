@@ -831,6 +831,25 @@ def _maas_quota_denial(
     return maas_adapter.quota_exceeded_from(exc, candidate.name)
 
 
+# WP-208 D8: a request the model itself refuses as malformed or too long (HTTP 400, 413, 422) is refused by
+# every entry serving that same model. The `-maas` entry and the direct entry of one model (local-maas and
+# local, local-gpt-oss-maas and local-gpt-oss, ...) are the same weights over two paths, so replaying the
+# request on the sibling only doubles the error count and the load; a different model may still accept it
+# (a larger context window) and stays in the fallback order.
+_CLIENT_REJECTION_STATUSES = frozenset({400, 413, 422})
+
+
+def _client_rejection_status(exc: BaseException) -> Optional[int]:
+    status = getattr(exc, "status_code", None)
+    if status is None:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+    return status if isinstance(status, int) and status in _CLIENT_REJECTION_STATUSES else None
+
+
+def _model_family(provider_name: str) -> str:
+    return provider_name[: -len("-maas")] if provider_name.endswith("-maas") else provider_name
+
+
 def _note_maas_call(
     candidate: ProviderCandidate, cfg: Dict[str, Any], quota_class: str,
     sub: Optional[str], groups: Optional[List[str]], project_id: Optional[str],
@@ -1036,7 +1055,12 @@ async def _invoke_with_fallback(
             return ChatCompletionResponse(**cached)
 
     errors: List[str] = []
+    rejected_families: set = set()  # WP-208 D8
+    other_failure = False
     for idx, candidate in enumerate(candidates):
+        if _model_family(candidate.name) in rejected_families:
+            errors.append(f"{candidate.name}: skipped, the same model already rejected the request")
+            continue
         cfg = routing_table.provider_config(candidate.name)
         # ADR-0544 pre-flight: skip a candidate whose own max_model_len
         # (provider-routing.yaml) the prompt clearly can't fit, rather
@@ -1138,6 +1162,16 @@ async def _invoke_with_fallback(
                     "exceeded, not falling back", candidate.name, caller_sub,
                 )
                 raise quota_denial from exc
+            rejected_status = _client_rejection_status(exc)
+            if rejected_status is not None:
+                rejected_families.add(_model_family(candidate.name))
+                logger.warning(
+                    "provider '%s' rejected the request for caller=%s (HTTP %s), skipping its same-model sibling: %s: %s",
+                    candidate.name, caller_sub, rejected_status, type(exc).__name__, exc,
+                )
+                errors.append(f"{candidate.name}: {exc}")
+                continue
+            other_failure = True
             breaker.record_failure(candidate.name, exc)
             logger.warning(
                 "provider '%s' failed for caller=%s, trying next fallback: %s: %s",
@@ -1217,7 +1251,8 @@ async def _invoke_with_fallback(
     raise HTTPException(
         # ADR-0591 decision 6: nothing was even tried - every candidate was
         # skipped for availability - is a 503, distinct from real failures.
-        status_code=503 if _only_availability_skips(errors) else 502,
+        # WP-208 D8: a request every candidate refused as malformed or too long is the caller's, a 400.
+        status_code=400 if (rejected_families and not other_failure) else (503 if _only_availability_skips(errors) else 502),
         detail=f"all eligible providers failed for classification {classification}: {'; '.join(errors)}",
     )
 
@@ -1271,8 +1306,12 @@ async def _stream_completion(
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
     created = int(time.time())
     errors: List[str] = []
+    rejected_families: set = set()  # WP-208 D8
 
     for idx, candidate in enumerate(candidates):
+        if _model_family(candidate.name) in rejected_families:
+            errors.append(f"{candidate.name}: skipped, the same model already rejected the request")
+            continue
         cfg = routing_table.provider_config(candidate.name)
         # ADR-0544 pre-flight: skip a candidate whose own max_model_len
         # (provider-routing.yaml) the prompt clearly can't fit, rather
@@ -1411,6 +1450,15 @@ async def _stream_completion(
                     "falling back", candidate.name,
                 )
                 raise quota_denial from exc
+            rejected_status = None if sent_any else _client_rejection_status(exc)
+            if rejected_status is not None:
+                rejected_families.add(_model_family(candidate.name))
+                logger.warning(
+                    "provider '%s' rejected the request (HTTP %s), skipping its same-model sibling: %s: %s",
+                    candidate.name, rejected_status, type(exc).__name__, exc,
+                )
+                errors.append(f"{candidate.name}: {exc}")
+                continue
             breaker.record_failure(candidate.name, exc)
             logger.warning(
                 "provider '%s' failed mid-stream-setup: %s: %s", candidate.name, type(exc).__name__, exc,
