@@ -70,6 +70,8 @@ class GenerateTest(unittest.TestCase):
         self.assertEqual([b["name"] for b in config["unifai"]["bundles"]], ["alpha", "beta"])
         bundle = config["unifai"]["bundles"][0]
         self.assertTrue(bundle["reference"].endswith("a" * 64))
+        self.assertEqual(bundle["annotations"], {"unifai.startx.fr/reason": "promoted release v0.2.0"})
+        self.assertNotIn("unifai.startx.fr/actor", bundle["annotations"])
         self.assertEqual(bundle["ceilings"], {"toolCapabilities": ["search_confluence", "web_search"],
                                               "knowledgeDomains": ["knowledge.tech"],
                                               "minClassification": "C2"})

@@ -1,6 +1,6 @@
 # WP-164: Generate stack configuration from the corp release
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-05: the generator and its consumers are live on demo333; the per-agent limits travel through UnifAI and the ai-gateway, not Kuadrant, as the ADR-0581 amendment records)
 - **ADRs:** [ADR-0581](../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md)
 - **Depends on:** [WP-160](wp-160-admit-the-corp-okf-release-in-zuno-demo.md), [WP-163](wp-163-okf-v0-3-schema-and-consumers.md)
 - **Related:** [ADR-0530](../../adr/0530-reconcile-keycloak-clients-instead-of-relying-on-a-create-only-realm-import.md), [ADR-0570](../../adr/0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md), [WP-157](wp-157-slim-the-ai-gateway-via-maas.md), [WP-162](wp-162-keyless-okf-verification-in-unifai-operator.md)
@@ -343,3 +343,9 @@ on the run's `model_call` spans in Tempo.
     zuno-demo-agents v0.8.0 and live on demo333.
   - Operator 0.1.48 sends the task limits as `X-Zuno-Max-Tokens` (live).
 
+## Closure (2026-11-05)
+
+The Acceptance is met against what was built: `generate_stack_config.py --check` is green on devel, the step 7 promotion was proven on demo333 (2026-10-25), and a release that widens beyond the corp policies is refused at admission (`test_v03_widening_is_refused_at_admission`). The agent-derived values in `gitops/` are generated, except the eight `agent_*` groups of the realm import, which stay on purpose. Where the brief says otherwise, [the amendment of ADR-0581](../../adr/0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) replaces it:
+
+- the Steps and the estimated files that mention `quota-*.generated.yaml` and the absorption of `generate_quota_enforcement.py` are not what was built;
+- the line "no consumer reads the per-agent `models`, `guardrails` and `limits`" (2026-10-25) was overtaken by lots 1 to 3 (2026-10-31) for models and guardrails, and the limits go through UnifAI and the ai-gateway.

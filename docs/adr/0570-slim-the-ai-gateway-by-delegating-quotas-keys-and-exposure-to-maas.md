@@ -1,6 +1,6 @@
 # ADR-0570: Slim the ai-gateway by delegating quotas, keys and exposure to MaaS
 
-- **Status:** Partially implemented
+- **Status:** Implemented
 - **Target:** v0.11
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -323,3 +323,22 @@ group ceilings, and MaaS carries the per-subscription limits. See WP-195, "Quota
 ## Note (2026-11-05): the never-run checks have a deferred work package
 
 The checks V2, V3, V5, V6 and V11 are recorded as blocked in [WP-177](../roadmap/work-packages/wp-177-finish-the-maas-quota-delegation.md), and none can run today: V2, V3 and V5 need a SaaS ExternalModel through MaaS (vendor route defect), V6 cannot be exercised because personas no longer reach MaaS, and V11 needs a verified project id, which [ADR-0563](0563-forward-caller-identity-and-zuno-context-headers-from-unifai.md) records as not implemented. [WP-219](../roadmap/work-packages/wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md) holds them as a deferred package with the condition to resume. This ADR stays `Partially implemented`, with its own exit unchanged: remove `app/quota.py`, or amend it to accept the ledger as the permanent design.
+
+## Amendment (2026-11-05, closure) - the ledger is the permanent design for clause 2's user and group budgets
+
+The status moves from Partially implemented to Implemented, by user decision of 2026-11-05. This takes the exit this ADR named: it
+amends the decision to accept the ai-gateway quota ledger as the permanent design instead of removing `app/quota.py`.
+
+**What this does and does not say, clause by clause:**
+
+- **Clause 2, the budgets per user and per group, are enforced by the ai-gateway quota ledger, not by MaaS.** The gateway-level
+  `TokenRateLimitPolicy` `zuno-token-quota` is switched off on demo333 (ADR-0511's 2026-11-05 amendment; WP-195, "Quota counters after RHOAI
+  3.6.0-ea.2"), and before that the Kuadrant shim counted only the first two limits of a route. MaaS enforces the per-subscription budgets
+  only. Nothing in MaaS backs the user and group ceilings, so the ledger is a control that must stay healthy, not a leftover.
+- **Clause 3, the removal of `app/quota.py`, `quota_budgets.yaml` and the ledger calls, is cancelled.** The ledger stays.
+- **Clauses 1 and 4 for SaaS providers** keep their named exception (direct, with their keys).
+- **The checks V2, V3, V5, V6 and V11 are not run.** They are deferred to
+  [WP-219](../roadmap/work-packages/wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md), which holds the condition to resume. Implemented
+  here means the decision is built as amended, not that those five checks have passed.
+- **Re-opening:** if `zuno-token-quota` is turned back on (the `model-based-routing-only` levers of MaaS 3.6 are untested here), the ledger
+  and the gateway policy would both count the same budgets, and the double count has to be resolved first.

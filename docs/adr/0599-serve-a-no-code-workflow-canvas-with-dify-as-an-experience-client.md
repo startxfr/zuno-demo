@@ -111,3 +111,15 @@ The console asks the vector store for its retrieval settings; without `VECTOR_ST
 is not configured" and the home page shows the error. Dify therefore points at **pgvector in its own `dify` database**
 of zuno-postgresql (extension created by the postgresql chart's init SQL). Knowledge stays External Knowledge, there is
 no embedding model and the store holds nothing: the decision "no vector database of our own" stands.
+
+## Implementation note (2026-11-05, example applications)
+
+Three example applications are part of every install: an Agent (`agent-chat`), a Chatflow and a Workflow, kept as DSL files
+in `ansible/roles/dify/files/apps/` and imported by the configuration step (`POST /console/api/apps/imports`), once per
+name. Dify has no CRD; the DSL is its portable form. Facts found live: the MCP tools are named in a DSL by the **server
+identifier** (the agent and workflow runtimes resolve the provider by it, the database uuid is refused); the plain
+`dataset_ids` of an imported DSL are dropped, so the external knowledge base is attached through the draft APIs afterwards;
+`auto` and `zuno-code` are registered with `function_calling_type: tool_call` (tool calls checked through the token proxy
+and the ai-gateway). The legacy Agent type is used; the new `agent` type needs `dify-agent-backend`, which stays off.
+Known upstream defect (Dify 1.17.0): the console's Integrations, MCP page answers 500 when the server card is opened
+(`/tools/mcp` lists the identifier where `/mcp/tools/<id>` wants the uuid); the applications are not affected.

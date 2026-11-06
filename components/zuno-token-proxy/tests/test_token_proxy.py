@@ -233,3 +233,12 @@ class SettingsTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class McpTimeoutTests(unittest.TestCase):
+    def test_mcp_posts_fail_fast_and_models_keep_the_long_timeout(self) -> None:
+        from app.main import _timeout_for
+        s = Settings(token_url="t", client_id="c", client_secret="s")
+        self.assertEqual(_timeout_for(s, "mcp-gateway", "POST").read, 30.0)
+        self.assertEqual(_timeout_for(s, "mcp-gateway", "GET").read, 300.0)
+        self.assertEqual(_timeout_for(s, "ai-gateway", "POST").read, 300.0)

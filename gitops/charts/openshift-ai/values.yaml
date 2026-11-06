@@ -391,6 +391,17 @@ maasGateway:
   # Placeholder auto-substituted with the real cluster domain by
   # ansible/tasks/apply_gitops_app.yml (see gitops/apps/openshift-ai/application-d1.yaml).
   clusterBaseDomain: apps.mycluster.example.com
+  # WP-220 pilot 2 (prepared, NOT yet validated live): a second HTTPS listener
+  # carrying `hostname: maas.<clusterBaseDomain>`, placed before the hostname-less
+  # one, so that maas-api can report an external URL (portal "API keys" page).
+  # Off by default: turning it on changes the Gateway that carries every model
+  # call. See templates/maas-gateway.yaml for the constraints.
+  externalHostnameListener:
+    enabled: false
+  # WP-220 pilot 2: /oauth2 route for the MaaS consumer portal's own hostname
+  # (templates/maas-portal-oauth-callback.yaml explains why it is needed).
+  portalOauthCallback:
+    enabled: true
   # ADR-0201: workaround for an RHOAI-side EnvoyFilter anchor mismatch that
   # leaves both inference-payload-processing ext_proc filters unattached,
   # which 404s the OpenAI-native /v1/chat/completions call shape and skips

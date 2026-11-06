@@ -23,7 +23,7 @@ import httpx  # noqa: E402
 import yaml  # noqa: E402
 from a2a.client import A2ACardResolver, A2AClient  # noqa: E402
 from a2a.types import (  # noqa: E402
-    Message, MessageSendParams, Part, Role, SendMessageRequest, SendStreamingMessageRequest, TaskState, TextPart,
+    DataPart, Message, MessageSendParams, Part, Role, SendMessageRequest, SendStreamingMessageRequest, TaskState, TextPart,
 )
 
 from app import auth  # noqa: E402
@@ -90,6 +90,8 @@ class Downstream:
 
 
 class GatewayTestCase(unittest.IsolatedAsyncioTestCase):
+    LIMITS = "max_delegation_depth: 2\n"
+
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
         root = pathlib.Path(self._tmp.name) / "agents"
@@ -97,7 +99,7 @@ class GatewayTestCase(unittest.IsolatedAsyncioTestCase):
         _agent(root, "beta", ["agent_beta"])
         _agent(root, "idle", ["agent_alpha"], status="placeholder")
         limits = pathlib.Path(self._tmp.name) / "limits.yaml"
-        limits.write_text("max_delegation_depth: 2\n")
+        limits.write_text(self.LIMITS)
         self.down = Downstream()
         self.settings = Settings(
             agents_dir=str(root), limits_policy_path=str(limits), public_base_url="http://a2a.test", tools_enabled=True,
@@ -361,3 +363,151 @@ class CancelLoggingTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoggingTests(unittest.TestCase):
+    def test_the_gateway_logger_emits_info_lines_once_configured(self) -> None:
+        import io
+        import logging
+
+        from app.main import configure_logging
+
+        gateway = logging.getLogger("a2a_gateway")
+        saved = (list(gateway.handlers), gateway.level, gateway.propagate)
+        gateway.handlers.clear()
+        try:
+            configure_logging()
+            configure_logging()  # idempotent: no second handler, no duplicated line
+            self.assertEqual(len(gateway.handlers), 1)
+            stream = io.StringIO()
+            gateway.handlers[0].setStream(stream)
+            logging.getLogger("a2a_gateway.executor").info("tasks/cancel agent=%s", "tekos")
+            self.assertEqual(stream.getvalue().count("tasks/cancel agent=tekos"), 1)
+        finally:
+            gateway.handlers[:] = saved[0]
+            gateway.setLevel(saved[1])
+            gateway.propagate = saved[2]
+
+
+class ApprovalTests(GatewayTestCase):
+    """A delegated write waits for the initiating user's approval (ADR-0409, WP-173 step 5)."""
+
+    LIMITS = "max_delegation_depth: 2\ndelegation:\n  write_allowed:\n    - {agent: beta, task: ask}\n"
+    CHAIN = {"X-Zuno-Delegated-By": "alpha:ask", "X-Zuno-Delegation-Depth": "1"}
+    WRITE_CALL = {"role": "assistant", "content": "I will write the draft.", "tool_calls": [
+        {"id": "c1", "type": "function",
+         "function": {"name": "search_confluence", "arguments": '{"page": "draft", "api_key": "sekret"}'}}]}
+
+    def setUp(self) -> None:
+        super().setUp()
+        USERS["tok-both"] = auth.CallerIdentity("u-both", ["agent_alpha", "agent_beta"], {}, "tok-both")
+        self.addCleanup(USERS.pop, "tok-both", None)
+        self.down.tools = [{"name": "search_confluence", "description": "d", "inputSchema": {"type": "object"},
+                            "annotations": {"readOnlyHint": False}}]
+
+    async def answer(self, task, decision: str, request_id: str = ""):
+        approval = task.status.message.metadata["zuno.approval"]
+        message = Message(
+            role=Role.user, message_id=uuid.uuid4().hex, task_id=task.id, context_id=task.context_id,
+            parts=[Part(root=DataPart(data={"zuno.approval": {
+                "request_id": request_id or approval["request_id"], "decision": decision, "feedback": "because"}}))],
+        )
+        async with self.http("tok-both", **self.CHAIN) as client:
+            a2a = A2AClient(client, url="http://a2a.test/agents/beta/")
+            return (await a2a.send_message(SendMessageRequest(id="2", params=MessageSendParams(message=message)))).root.result
+
+    async def start(self):
+        self.down.llm_script = [self.WRITE_CALL, {"role": "assistant", "content": "done"}]
+        return (await self.send("beta", "tok-both", "write it", **self.CHAIN)).root.result
+
+    def tool_calls(self):
+        return [c for c in self.down.mcp_calls if c["body"]["method"] == "tools/call"]
+
+    async def test_a_delegated_write_raises_an_approval_with_a_redacted_summary(self) -> None:
+        task = await self.start()
+        self.assertEqual(task.status.state, TaskState.input_required)
+        approval = task.status.message.metadata["zuno.approval"]
+        self.assertEqual(approval["operation"], "search_confluence")
+        self.assertEqual(approval["args"], {"page": "draft", "api_key": "***"})
+        self.assertEqual(approval["reasoning"], "I will write the draft.")
+        self.assertTrue(approval["request_id"])
+        self.assertEqual(self.tool_calls(), [])
+
+    async def test_an_approval_lets_the_write_run_and_the_task_complete(self) -> None:
+        task = await self.start()
+        done = await self.answer(task, "approve")
+        self.assertEqual(done.status.state, TaskState.completed)
+        self.assertEqual(len(self.tool_calls()), 1)
+        self.assertEqual(done.metadata["zuno.classification"], "C1")
+
+    async def test_a_rejection_keeps_the_write_from_running(self) -> None:
+        task = await self.start()
+        done = await self.answer(task, "reject")
+        self.assertEqual(done.status.state, TaskState.completed)
+        self.assertEqual(self.tool_calls(), [])
+        tool_message = self.down.llm_calls[1]["body"]["messages"][-1]
+        self.assertIn("was not approved", tool_message["content"])
+
+    async def test_an_unsupported_decision_counts_as_a_refusal(self) -> None:
+        task = await self.start()
+        await self.answer(task, "modify")
+        self.assertEqual(self.tool_calls(), [])
+
+    async def test_silence_is_a_refusal(self) -> None:
+        from app import approvals
+        task = await self.start()
+        import time as _time  # the 300 s bound is checked against the monotonic clock: move it forward
+        real = _time.monotonic
+        self.addCleanup(setattr, _time, "monotonic", real)
+        _time.monotonic = lambda: real() + approvals.APPROVAL_TIMEOUT_SECONDS + 1
+        late = await self.answer(task, "approve")
+        self.assertEqual(late.status.state, TaskState.failed)
+        self.assertEqual(self.tool_calls(), [])
+
+    async def test_an_answer_with_the_wrong_request_id_is_refused(self) -> None:
+        task = await self.start()
+        refused = await self.answer(task, "approve", request_id="not-the-request")
+        self.assertEqual(refused.status.state, TaskState.failed)
+        self.assertEqual(self.tool_calls(), [])
+
+    async def test_a_write_target_not_on_the_list_gets_no_write_tool(self) -> None:
+        self.down.llm_script = [{"role": "assistant", "content": "no tools"}]
+        task = (await self.send("alpha", "tok-both", "x")).root.result  # direct call: not delegated
+        self.assertEqual(task.status.state, TaskState.completed)
+        self.assertNotIn("tools", self.down.llm_calls[0]["body"])
+
+    async def test_the_rest_of_the_calls_run_after_an_approval_even_in_the_last_round(self) -> None:
+        object.__setattr__(self.settings, "max_tool_rounds", 0)  # one round only (the settings are frozen)
+        self.down.tools.append({"name": "read_page", "description": "d", "inputSchema": {"type": "object"},
+                                "annotations": {"readOnlyHint": True}})
+        two_calls = dict(self.WRITE_CALL, tool_calls=self.WRITE_CALL["tool_calls"] + [
+            {"id": "c2", "type": "function", "function": {"name": "read_page", "arguments": "{}"}}])
+        self.down.llm_script = [two_calls, {"role": "assistant", "content": "done"}]
+        task = (await self.send("beta", "tok-both", "write it", **self.CHAIN)).root.result
+        done = await self.answer(task, "approve")
+        self.assertEqual(done.status.state, TaskState.completed)
+        sent = self.down.llm_calls[-1]["body"]["messages"]
+        ids = [m["tool_call_id"] for m in sent if m["role"] == "tool"]
+        self.assertEqual(ids, ["c1", "c2"])
+
+    async def test_the_summary_masks_nested_secrets_and_says_what_it_cuts(self) -> None:
+        from app.approvals import redact_arguments
+        summary = redact_arguments({"auth": {"password": "p"}, "text": "x" * 500, **{f"k{i}": i for i in range(25)}})
+        self.assertEqual(summary["auth"], {"password": "***"})
+        self.assertIn("more characters not shown", summary["text"])
+        self.assertIn("more keys not shown", summary["_truncated"])
+
+    async def test_another_caller_cannot_consume_the_approval(self) -> None:
+        USERS["tok-other"] = auth.CallerIdentity("u-other", ["agent_alpha", "agent_beta"], {}, "tok-other")
+        self.addCleanup(USERS.pop, "tok-other", None)
+        task = await self.start()
+        approval = task.status.message.metadata["zuno.approval"]
+        message = Message(
+            role=Role.user, message_id=uuid.uuid4().hex, task_id=task.id, context_id=task.context_id,
+            parts=[Part(root=DataPart(data={"zuno.approval": {"request_id": approval["request_id"], "decision": "approve"}}))],
+        )
+        async with self.http("tok-other", **self.CHAIN) as client:
+            a2a = A2AClient(client, url="http://a2a.test/agents/beta/")
+            refused = (await a2a.send_message(SendMessageRequest(id="3", params=MessageSendParams(message=message)))).root.result
+        self.assertEqual(refused.status.state, TaskState.failed)
+        self.assertEqual(self.tool_calls(), [])

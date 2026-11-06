@@ -38,8 +38,8 @@ timeout then rejects).
    `delegation.allow_write` stays `false` ([ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md)
    clause 5) until the end-to-end path is validated on demo333. When approval ships, the boolean is replaced by a list in
    `policies/limits/limits-policy.yaml`, `delegation.write_allowed: [{agent, task}]`: a write tool is allowed on a
-   delegated call only when the target `agent/task` is on it. The first entry is Arkos / `draft-architecture-testimonial`
-   (it carries `git.file.write` and `git.repository.create`); every later target stays read-only until reviewed and
+   delegated call only when the target `agent/task` is on it. The first entry is Tekos / `answer-technical-question`
+   (it carries `aap.cluster.audit`; see the amendment of 2026-11-06); every later target stays read-only until reviewed and
    listed. The list, its gateway check and its test ship in the same corp release as the approval (WP-173).
 6. **No approver, no write.** A run with no identity binding (a scheduled or internal run, ADR-0563) has nobody to ask;
    a delegated write in it is refused, never auto-approved.
@@ -96,3 +96,31 @@ are unchanged.
   later version that adds the checkpoint store. Every other proof of the list still applies.
 - **Order of the fork work (R-535):** 1 identity, 3 limits, 2 classification, 5 approval. Each step goes into a weekly
   release; the steps that change A2A behaviour get a canary on demo333.
+
+### Gateway contract of the approval (2026-11-05)
+
+Agreed with the fork (R-535) and implemented in `components/a2a-gateway` and `components/mcp-gateway`:
+
+- **Request.** On a delegated call to a target listed in `delegation.write_allowed`, a call of a write tool stops the turn at the
+  task state `input-required`, with `status.message.metadata["zuno.approval"] = {request_id, operation, args, reasoning}`
+  (`args` is a redacted summary: sensitive keys are masked, long values cut).
+- **Answer.** A message on the same `task_id` and `context_id` with a data part
+  `{"zuno.approval": {request_id, decision, feedback}}`. The gateway serves `approve` and `reject`; any other decision
+  (`modify`, `redirect`) counts as a refusal. Only the caller who started the task may answer.
+- **Silence is a refusal.** The state needed to go on is held in the gateway's memory for 300 seconds. An answer that comes later,
+  or after a restart, finds nothing to resume: the task fails and the write never runs. Until an answer arrives the task stays in
+  `input-required`. (The A2A SDK ends a turn at `input-required`, so no thread waits.)
+- **Both gateways check the list.** The a2a-gateway offers write tools to the model only for a listed target; the mcp-gateway
+  refuses a delegated write unless the executing `agent/task` is listed. `delegation.allow_write` stays honoured as the legacy
+  global switch, off by default. The list itself is in the corp policy of the agents release (`policies/limits/limits-policy.yaml`)
+  and is there (agents v0.14.1 carried an Arkos entry, replaced by Tekos / `answer-technical-question` on 2026-11-06).
+
+## Amendment 2026-11-06: the write target is Tekos, not Arkos
+
+The first `delegation.write_allowed` entry named Arkos / `draft-architecture-testimonial`, from the first direction of
+[WP-174](../roadmap/work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) (Tekos asks Arkos). The direction was reversed on
+2026-11-01: Arkos asks Tekos, Tekos declares no target, and nothing delegates to Arkos, so that entry could never be reached
+(found while preparing the live proof, after agents v0.14.1). The list holds the *target* of a delegation, so it now holds Tekos /
+`answer-technical-question`, whose `aap.cluster.audit` (`access: write`, a Day 0 health check run through AAP) is the only write tool a
+delegation can reach today. `approval: ask` goes on the delegating bundle, Arkos, as `spec.delegation.approval` (operator 0.1.61 or later).
+The Arkos entry is removed rather than kept dormant: a safety list should hold nothing that cannot fire.

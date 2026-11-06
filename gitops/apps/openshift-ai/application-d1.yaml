@@ -26,6 +26,11 @@ spec:
           # Placeholder auto-substituted with the real cluster domain by
           # ansible/tasks/apply_gitops_app.yml.
           clusterBaseDomain: apps.mycluster.example.com
+          # WP-220 pilot 2: second HTTPS listener carrying maas.<domain>, placed first,
+          # so maas-api reports an external URL (consumer portal "API keys" page).
+          # Proven on a throwaway Gateway before this was turned on.
+          externalHostnameListener:
+            enabled: true
         maasDb:
           enabled: true
         # ADR-0522/WP-079: RHOAI monitoring's Tempo traces S3 credential -

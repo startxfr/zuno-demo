@@ -30,12 +30,22 @@ two parts:
    - docling converts them;
    - qwen3-embedding (KServe) embeds them;
    - Qdrant stores them.
+
+   The Document Library shows each file with the status **Done** once it is embedded:
+
+   ![The Document Library with the uploaded files, status Done](../assets/img/unifai-rag-documents-done.png)
+
 3. Still in **Personal**, open the workflow `consultant-01-my-documents` and ask the questions of
    [questions.md](unifai-rag-upload/questions.md).
    - Every answer cites its document.
    - A question the documents do not cover gets "the documents do not say".
 4. Optional, for isolation:
-   - ask the team's `consultant-rag` the same question: it does not find your personal upload;
+   - ask the team's `consultant-rag` the same question: it does not find your personal upload. A team workflow runs as the team and
+     only finds the Confluence pages of your groups. Asked for the rental-car booking code that only the uploaded travel policy
+     holds, it answers that its documents do not say:
+
+     ![The team workflow answering that the documents do not hold the answer](../assets/img/unifai-rag-team-workflow-no-personal-upload.png)
+
    - sign in as **sale-01** and ask `sale-01-my-documents`: sale-01 gets no answer from consultant-01's uploads.
 
 ## 2. Resync a Confluence source on demand
@@ -63,6 +73,8 @@ Two sources sync every 6 hours, both scoped to the `consultant/confluence-*` gro
 
    The message ends with `N pages (1 changed, 0 deleted at the last sync)`.
 4. **Ask about the new word** in `consultant-rag` or `consultant-01-my-documents`. The answer quotes the edited page.
+
+   ![The personal RAG answering from the edited Confluence page, with its link and source](../assets/img/unifai-rag-personal-confluence-answer.png)
 
 ## If something goes wrong
 

@@ -30,6 +30,8 @@ class Settings:
     scope: str = ""
     refresh_ratio: float = 0.7
     upstream_timeout_s: float = 300.0
+    # WP-208 defect D1: an MCP call that gets no byte within this time fails fast instead of hanging for 300 s.
+    mcp_timeout_s: float = 30.0
     token_timeout_s: float = 10.0
     ca_bundle: Optional[str] = None
 
@@ -59,6 +61,7 @@ class Settings:
             scope=env.get("TOKEN_SCOPE", ""),
             refresh_ratio=ratio,
             upstream_timeout_s=float(env.get("UPSTREAM_TIMEOUT_S", "300")),
+            mcp_timeout_s=float(env.get("MCP_TIMEOUT_S", "30")),
             token_timeout_s=float(env.get("TOKEN_TIMEOUT_S", "10")),
             ca_bundle=env.get("CA_BUNDLE") or None,
         )

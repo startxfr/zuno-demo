@@ -1,0 +1,98 @@
+# Technical documentation Chatflow (zuno-demo ADR-0599, WP-205, WP-208): Start, knowledge retrieval over the
+# external base "Zuno technical documentation", LLM, Answer. configure.py attaches the base after the import
+# (Dify discards the plain dataset ids of a DSL: they are encrypted per workspace).
+app:
+  description: Answers from the Zuno technical documentation (Confluence and Red Hat product docs), with sources.
+  icon: "\U0001F4DA"
+  icon_background: '#E4FBCC'
+  icon_type: emoji
+  mode: advanced-chat
+  name: Zuno Technical Documentation
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+version: 0.7.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload: {enabled: false}
+    opening_statement: 'Ask a question about OpenShift, RHOAI or our internal procedures.'
+    retriever_resource: {enabled: true}
+    sensitive_word_avoidance: {enabled: false}
+    speech_to_text: {enabled: false}
+    suggested_questions: []
+    suggested_questions_after_answer: {enabled: false}
+    text_to_speech: {enabled: false, language: '', voice: ''}
+  graph:
+    edges:
+      - {id: start-knowledge, source: start, sourceHandle: source, target: knowledge, targetHandle: target, type: custom, data: {sourceType: start, targetType: knowledge-retrieval, isInIteration: false}}
+      - {id: knowledge-llm, source: knowledge, sourceHandle: source, target: llm, targetHandle: target, type: custom, data: {sourceType: knowledge-retrieval, targetType: llm, isInIteration: false}}
+      - {id: llm-answer, source: llm, sourceHandle: source, target: answer, targetHandle: target, type: custom, data: {sourceType: llm, targetType: answer, isInIteration: false}}
+    nodes:
+      - id: start
+        type: custom
+        position: {x: 80, y: 282}
+        positionAbsolute: {x: 80, y: 282}
+        width: 244
+        height: 54
+        sourcePosition: right
+        targetPosition: left
+        data: {type: start, title: Start, desc: '', selected: false, variables: []}
+      - id: knowledge
+        type: custom
+        position: {x: 380, y: 282}
+        positionAbsolute: {x: 380, y: 282}
+        width: 244
+        height: 90
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: knowledge-retrieval
+          title: Zuno technical documentation
+          desc: ''
+          selected: false
+          dataset_ids: []
+          query_variable_selector: [sys, query]
+          retrieval_mode: multiple
+          multiple_retrieval_config: {top_k: 4, score_threshold: null, reranking_enable: false}
+      - id: llm
+        type: custom
+        position: {x: 680, y: 282}
+        positionAbsolute: {x: 680, y: 282}
+        width: 244
+        height: 98
+        sourcePosition: right
+        targetPosition: left
+        data:
+          type: llm
+          title: LLM
+          desc: ''
+          selected: false
+          model:
+            provider: langgenius/openai_api_compatible/openai_api_compatible
+            name: auto
+            mode: chat
+            completion_params: {temperature: 0.2, max_tokens: 1024}
+          prompt_template:
+            - id: 00000000-0000-4000-8000-000000000001
+              role: system
+              text: |-
+                You answer questions about OpenShift, Red Hat OpenShift AI and our internal procedures, in the
+                language of the question. Use only the context below. Cite the source of each statement. If the
+                context does not answer the question, say so.
+                Context:
+                {{#context#}}
+          context: {enabled: true, variable_selector: [knowledge, result]}
+          vision: {enabled: false}
+          memory: null
+      - id: answer
+        type: custom
+        position: {x: 980, y: 282}
+        positionAbsolute: {x: 980, y: 282}
+        width: 244
+        height: 54
+        sourcePosition: right
+        targetPosition: left
+        data: {type: answer, title: Answer, desc: '', selected: false, variables: [], answer: '{{#llm.text#}}'}
+    viewport: {x: 0, y: 0, zoom: 1}

@@ -12,6 +12,7 @@ request without one. Ingress is limited to the namespace by NetworkPolicy; the p
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import asynccontextmanager
 from typing import AsyncIterator, Dict, Iterable, Optional, Tuple
 
@@ -46,6 +47,12 @@ def _response_headers(upstream: httpx.Headers) -> Dict[str, str]:
     return {k: v for k, v in upstream.items() if k.lower() not in _HOP_BY_HOP}
 
 
+def _timeout_for(settings: Settings, upstream_name: str, method: str) -> httpx.Timeout:
+    # MCP tool calls are short POSTs: fail fast. Model calls and the MCP event stream (GET) keep the long timeout.
+    read = settings.mcp_timeout_s if upstream_name == "mcp-gateway" and method == "POST" else settings.upstream_timeout_s
+    return httpx.Timeout(read, connect=10.0)
+
+
 def create_app(
     settings: Settings,
     token_transport: Optional[httpx.AsyncBaseTransport] = None,
@@ -57,6 +64,7 @@ def create_app(
     upstream_client = httpx.AsyncClient(
         transport=upstream_transport,
         timeout=httpx.Timeout(settings.upstream_timeout_s, connect=10.0),
+        limits=httpx.Limits(keepalive_expiry=2.0),
     )
     tokens = token_source or TokenSource(settings, token_client)
 
@@ -70,6 +78,7 @@ def create_app(
     app.state.tokens = tokens
 
     async def relay(request: Request, upstream_name: str, base: str, path: str, fixed: Dict[str, str]) -> Response:
+        started = time.monotonic()
         try:
             token = await tokens.get()
         except TokenUnavailable:
@@ -83,14 +92,18 @@ def create_app(
             url,
             headers=_request_headers(request.headers.items(), fixed, token),
             content=await request.body(),
+            timeout=_timeout_for(settings, upstream_name, request.method),
         )
         try:
             upstream = await upstream_client.send(outbound, stream=True)
         except httpx.HTTPError as exc:
-            logger.warning("%s unreachable: %s", upstream_name, exc)
+            logger.warning("%s unreachable after %.1fs: %s %r", upstream_name, time.monotonic() - started, type(exc).__name__, exc)
             metrics.inc("zuno_token_proxy_requests_total", upstream=upstream_name, code="502")
             return JSONResponse({"error": f"{upstream_name} unreachable"}, status_code=502)
         metrics.inc("zuno_token_proxy_requests_total", upstream=upstream_name, code=str(upstream.status_code))
+        waited = time.monotonic() - started
+        if waited > 10:
+            logger.warning("%s answered after %.1fs (%s %s)", upstream_name, waited, request.method, path)
         return StreamingResponse(
             upstream.aiter_raw(),
             status_code=upstream.status_code,

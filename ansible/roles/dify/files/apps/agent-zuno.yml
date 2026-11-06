@@ -1,0 +1,57 @@
+# Zuno Agent (zuno-demo ADR-0599, WP-208): the legacy Dify Agent app (agent-chat) calling the governed MCP tools
+# through the token proxy. Imported by ansible/roles/dify/files/configure.py, which attaches the external knowledge
+# base afterwards (Dify discards the plain dataset ids of an imported DSL). The MCP tools are addressed by the
+# server identifier (zuno-mcp-gateway): that is what the agent and workflow runtimes look the provider up by.
+app:
+  description: An assistant that searches Confluence and the technical documentation through the Zuno MCP gateway.
+  icon: "\U0001F916"
+  icon_background: '#FFEAD5'
+  icon_type: emoji
+  mode: agent-chat
+  name: Zuno Agent
+  use_icon_as_answer_icon: false
+dependencies: []
+kind: app
+model_config:
+  agent_mode:
+    enabled: true
+    max_iteration: 5
+    strategy: function_call
+    tools:
+      - {enabled: true, isDeleted: false, notAuthor: false, provider_id: zuno-mcp-gateway, provider_name: zuno-mcp-gateway, provider_type: mcp, tool_label: confluence.page.search, tool_name: confluence.page.search, tool_parameters: {}}
+      - {enabled: true, isDeleted: false, notAuthor: false, provider_id: zuno-mcp-gateway, provider_name: zuno-mcp-gateway, provider_type: mcp, tool_label: confluence.page.read, tool_name: confluence.page.read, tool_parameters: {}}
+  annotation_reply: {enabled: false}
+  chat_prompt_config: {}
+  completion_prompt_config: {}
+  dataset_configs:
+    datasets: {datasets: []}
+    retrieval_model: multiple
+    top_k: 4
+    reranking_enable: false
+  dataset_query_variable: ''
+  external_data_tools: []
+  file_upload:
+    image: {detail: high, enabled: false, number_limits: 3, transfer_methods: [remote_url, local_file]}
+  model:
+    completion_params: {max_tokens: 1024, temperature: 0.2}
+    mode: chat
+    name: auto
+    provider: langgenius/openai_api_compatible/openai_api_compatible
+  more_like_this: {enabled: false}
+  opening_statement: 'Hello, I am the Zuno Agent. Ask me about our Confluence pages or the technical documentation.'
+  pre_prompt: |-
+    You are the Zuno Agent, an assistant for consultants. Answer in the language of the question.
+    Use confluence.page.search to find internal pages and confluence.page.read to read one of them, and use the
+    knowledge base for product documentation. Cite the page titles or document sources you used. If a tool is
+    refused or returns nothing, say so and stop: never invent a page or a link.
+  prompt_type: simple
+  retriever_resource: {enabled: true}
+  sensitive_word_avoidance: {configs: [], enabled: false, type: ''}
+  speech_to_text: {enabled: false}
+  suggested_questions:
+    - Find our onboarding pages in Confluence
+    - How do I configure an OpenShift route with a custom certificate?
+  suggested_questions_after_answer: {enabled: false}
+  text_to_speech: {enabled: false}
+  user_input_form: []
+version: 0.7.0

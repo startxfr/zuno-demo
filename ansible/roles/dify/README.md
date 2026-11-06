@@ -25,3 +25,20 @@ token proxy of ADR-0601).
 
 The model provider, the MCP tool provider, the External Knowledge base (WP-205) and the per-person accounts are
 configured against the running Dify API by the next WP-204 step.
+
+## Example applications (WP-208)
+
+`files/apps/*.yml` are Dify DSL exports, imported by `files/configure.py` on every `make d2 install dify`, once per name
+(an existing application is left alone, its knowledge base is re-attached if missing):
+
+| File | Type | What it shows |
+|---|---|---|
+| `agent-zuno.yml` | Agent (`agent-chat`) | function calling on `auto`, the MCP tools `confluence.page.search` and `confluence.page.read`, the external knowledge base as context |
+| `chatflow-doc-technique.yml` | Chatflow (`advanced-chat`) | Start, knowledge retrieval over "Zuno technical documentation", LLM, Answer; published |
+| `workflow-recherche-confluence.yml` | Workflow | a topic goes through the MCP tool `confluence.page.search`, an LLM summarises; published |
+
+Rules learned live: the MCP tools are named in a DSL by the **server identifier** (`zuno-mcp-gateway`), not the database
+uuid; Dify drops the plain `dataset_ids` of an imported DSL, so the knowledge base is attached after the import; the
+models are registered with `function_calling_type: tool_call` (checked through the token proxy and the ai-gateway), which
+the Agent needs. To add an example, export an application from the console (without secrets), replace nothing
+instance-specific except what is described here, and drop the file in `files/apps/`.

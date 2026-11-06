@@ -31,12 +31,12 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
-| v0.9 | 6 | 1 | 8 | WP-145 |
+| v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 23 | 3 | 28 | WP-173, WP-174, WP-220 |
-| v0.12 | 8 | 2 | 9 | WP-161, WP-164 |
+| v0.11 | 23 | 2 | 28 | WP-173, WP-174, WP-220 |
+| v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
-| v0.14 | 3 | — | 7 | WP-208 |
+| v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 2 | 3 | WP-209, WP-221 |
 | v0.16 | 4 | 4 | 11 | WP-210, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
@@ -895,7 +895,7 @@ being discovered by whoever tries the next install.
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-144 | [wp-144](work-packages/wp-144-olm-catalog-drop-tolerance.md) | 0558 | none | Done (2026-09-14 - shared discovery task adopted by the twelve exact-name roles, readiness probe P8 live-verified on demo222 reporting 13 frozen Subscriptions and naming openshift-operators as the namespace where they block others) | decide per operator whether to drop each of the 13 frozen Subscriptions (forfeits its update path) or wait for the catalog to publish again - P8 reports, deliberately does not repair |
-| WP-145 | [wp-145](work-packages/wp-145-fleet-version-and-catalog-policy.md) | 0559 | WP-144 | Not started | blocked on measuring demo333 at its next power-on (powered off, reported 4.22 but unverified) - that single read-only measurement decides whether additional CatalogSources are justified |
+| WP-145 | [wp-145](work-packages/wp-145-fleet-version-and-catalog-policy.md) | 0559 | WP-144 | Done | measurement, known-good set and per-cluster pin keys delivered (CatalogSources not needed, WP-195); closed 2026-11-05 |
 | WP-195 | [wp-195](work-packages/wp-195-update-every-operator-on-demo333-through-the-repository.md) | 0559 | WP-145 | Done | every operator of demo333 updated through the repository (OCP 4.22.20, GitOps 1.22.3, RHOAI 3.6.0-ea.2, RHCL 1.5.0, Kueue 1.5.0); known-good set `platform/olm/known-good-demo333.yaml`; quota counters, TrustyAI and OGX fixed |
 
 ### Phase 44 — adopt UnifAI as the agent and RAG platform (added 2026-10-17)
@@ -951,10 +951,10 @@ frozen mirror.
 | WP-158 | [wp-158](work-packages/wp-158-bootstrap-the-zuno-demo-agents-repository.md) | 0576 | none | Done | repository, rulesets, quay.io repositories and robot, release GitHub App in place; releases v0.1.0, v0.1.1, v0.2.0 cut from it |
 | WP-159 | [wp-159](work-packages/wp-159-publish-and-sign-okf-releases-from-zuno-demo-agents.md) | 0577, 0578 | WP-158 | Done | publish.yml published and signed keyless v0.1.1 and v0.2.0 (per-agent and corp artifacts on quay.io) |
 | WP-160 | [wp-160](work-packages/wp-160-admit-the-corp-okf-release-in-zuno-demo.md) | 0580, 0578 | WP-159 | Done | v0.2.0 admitted offline and pinned in platform/okf/agents.lock by okf-promote (target branch devel) |
-| WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Operator pending | live and durable on demo333 since 2026-10-23 (okf-fetch on supply-chain-signer:latest built from devel); mlops and ai-gateway read the release at build time since WP-165 (ADR-0580 amendment) |
+| WP-161 | [wp-161](work-packages/wp-161-fetch-okf-content-at-pod-start.md) | 0580 | WP-160 | Done (2026-11-05: mcp-gateway's okf-fetch init container verifies the digest pinned in `platform/okf/agents.lock`, live on demo333 since 2026-10-23 and rolled by every promotion up to v0.13.0, where the pod verifies release 0.13.0; mlops and ai-gateway read the verified release at build time, see the deviations) | none |
 | WP-162 | [wp-162](work-packages/wp-162-keyless-okf-verification-in-unifai-operator.md) | 0578, 0577 | WP-159, WP-150 | Done | operator 0.1.25 on stable; five agents of release v0.1.1 verified keyless on demo333 |
 | WP-163 | [wp-163](work-packages/wp-163-okf-v0-3-schema-and-consumers.md) | 0579 | WP-158, WP-160 | Done (2026-10-24) | schemas, corp ceilings, narrowing rule, operator reader (0.1.27); tekos migrated to OKF v0.3 and live on release v0.4.0, the other seven bundles migrate with their own releases |
-| WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Repo work in review | generator and consumers live on demo333 (unifai role, Keycloak groups, mcp okf-fetch); step 7 proven 2026-10-25 with release 0.6.1 (exact generated diff, group created, task right live, bundle re-emitted, real 429); open: consumers of per-agent models/guardrails/limits |
+| WP-164 | [wp-164](work-packages/wp-164-generate-stack-configuration-from-the-corp-release.md) | 0581 | WP-160, WP-163 | Done (2026-11-05: live on demo333, per-agent limits through UnifAI and the ai-gateway, see the ADR-0581 amendment) | none |
 | WP-165 | [wp-165](work-packages/wp-165-cut-over-and-remove-agents-from-zuno-demo.md) | 0576, 0578, 0580 | WP-161, WP-162, WP-164, WP-156 | Done | agents/ removed, readers on the admitted release, Transit OKF chain gone (dc931dec); full promotion cycle live 2026-10-24 (release 0.3.0, PR #3, "— Tekos" answer on demo333) |
 | WP-168 | [wp-168](work-packages/wp-168-migrate-the-red-hat-product-documentation-to-unifai-rag.md) | 0568, 0575 | WP-156 | Done (2026-10-24) | Red Hat docs on UnifAI (38 web sources, 16/18 vs 13/18), rag-service and rag-ingestion retired on demo333 and in the repository; corpus scoped to 21 latest-version sources 2026-10-25 |
 | WP-169 | [wp-169](work-packages/wp-169-dedicated-evaluation-personas.md) | 0530 | none | Done | live on demo333 2026-10-23 (89ec9fba): five eval-* personas; harnesses switched (86ef03e4); platform/keycloak/tests now run in CI |
@@ -1035,7 +1035,7 @@ WP-208 shows the five experiences together. No cluster action while demo333 is b
 | WP-205 | [wp-205](work-packages/wp-205-dify-external-knowledge-adapter-over-the-mcp-gateway.md) | 0599 | WP-203, WP-204 | Done (2026-11-05) | adapter built, signed and rolled; knowledge base registered in Dify; forbidden-space case not exercised |
 | WP-206 | [wp-206](work-packages/wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md) | 0600 | none | Done | scratch spike in `zuno-k8smcp-scratch`; agents release with the new capabilities |
 | WP-207 | [wp-207](work-packages/wp-207-kagent-preparation-and-install.md) | 0600, 0601 | WP-202, WP-206 | Done | scratch spike in `zuno-kagent-scratch`; `make d2 install kagent` |
-| WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Repo work in review | live rehearsal on demo333 |
+| WP-208 | [wp-208](work-packages/wp-208-five-experiences-demonstration.md) | 0599, 0600 | WP-204, WP-205, WP-207 | Done | live rehearsal on demo333 done 2026-11-05; second browser run 2026-11-06, known defects D1-D10 in the brief |
 
 ### Phase 50 — follow-up work from the ADR close-out (added 2026-11-05)
 
@@ -1201,6 +1201,9 @@ moving.
 
 ## Change log
 
+- 2026-11-05 — ADR-0579 Implemented, with an amendment that records the accepted gaps (skills unused, `max_concurrent_requests` and `guardrails.categories` not consumed, v0.2 refused only once the last agent has moved). Band v0.12 now has no open ADR or work package.
+- 2026-11-05 — WP-164 Done and ADR-0581 Implemented, with an amendment: the quota script stays separate, the per-agent limits travel through UnifAI and the ai-gateway instead of Kuadrant policies, the file names are corrected, and the eight `agent_*` groups stay in the realm import. v0.12 keeps only ADR-0579.
+- 2026-11-05 — WP-161 Done: mcp-gateway's okf-fetch init container, live since 2026-10-23, verifies the pinned release and is rolled by every promotion (now v0.13.0). mlops and ai-gateway read the verified release at build time. WP-164 and ADR-0581 stay open: per-agent quota limits and the quota script are not done, see the WP.
 - 2026-11-05 — WP-221 added and ADR-0584 retargeted from v0.12 to v0.15: its lifecycle states, revocation list and audit events are not built, and WP-167 never carried them. The user asked for a work package and for unstarted work to follow later releases.
 - 2026-11-05 — WP-167 Done and ADR-0582 Implemented: the user repeated the per-agent sheet proof on UnifAI 0.1.59 as consultant-01 and sale-01. ADR-0584 stays `Accepted`: its lifecycle states, revocation list and audit events are not built and no work package carries them.
 - 2026-11-05 — Unstarted work follows the code releases (user decision). ADR-0565 moves to the new band v0.15; ADR-0110, ADR-0352, ADR-0556 and ADR-0557 move to the new band v0.16, with WP-209 and WP-210 to WP-218 following their ADRs. Closed ADRs, ADRs with a started package, and the past bands are untouched; the old bands v0.1 now has no open ADR or WP, and v0.9 keeps only ADR-0559 (WP-145, WP-195). See the ADR change log.

@@ -286,7 +286,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md) | Implemented | Adopt RHTAS as the artifact trust and supply-chain service |
 | [ADR-0549](0549-close-the-secnumcloud-supply-chain-gap-with-an-in-cluster-release-ledger.md) | Implemented | Close ADR-0111's last SecNumCloud gap with an in-cluster release ledger |
 | [ADR-0558](0558-tolerate-catalogs-that-stop-publishing-an-installed-operator.md) | Implemented | Tolerate catalogs that stop publishing an installed operator |
-| [ADR-0559](0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md) | Accepted | Follow the cluster's version and never branch the repository by OCP version |
+| [ADR-0559](0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md) | Implemented | Follow the cluster's version and never branch the repository by OCP version |
 
 ## v0.10
 
@@ -313,7 +313,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0567](0567-move-trustyai-guardrails-into-the-ai-gateway.md) | Implemented | Move TrustyAI guardrails into the ai-gateway |
 | [ADR-0568](0568-adopt-unifai-rag-on-qdrant-with-hybrid-search-and-rhoai-embeddings.md) | Implemented | Adopt UnifAI RAG on Qdrant with hybrid search and RHOAI embeddings |
 | [ADR-0569](0569-close-unifai-parity-gaps-generically.md) | Implemented | Close UnifAI parity gaps generically |
-| [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Partially implemented | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
+| [ADR-0570](0570-slim-the-ai-gateway-by-delegating-quotas-keys-and-exposure-to-maas.md) | Implemented | Slim the ai-gateway by delegating quotas, keys and exposure to MaaS |
 | [ADR-0571](0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md) | Implemented | Evaluate the RHOAI MCP gateway before extending mcp-gateway |
 | [ADR-0572](0572-scope-the-zuno-operator-to-the-platform-foundation.md) | Implemented | Scope the zuno operator to the platform foundation |
 | [ADR-0573](0573-pilot-unifai-on-demo333-with-tekos-before-cutting-demo222-over.md) | Implemented | Pilot UnifAI on demo333 with Tekos before cutting demo222 over |
@@ -329,9 +329,9 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0576](0576-extract-agent-definitions-and-corp-policies-into-the-zuno-demo-agents-repository.md) | Implemented | Extract agent definitions and corp policies into the zuno-demo-agents repository |
 | [ADR-0577](0577-publish-okf-as-per-agent-artifacts-plus-a-corp-index-artifact.md) | Implemented | Publish OKF as per-agent artifacts plus a corp index artifact |
 | [ADR-0578](0578-sign-okf-artifacts-keyless-with-github-oidc-and-verify-them-offline-by-identity.md) | Implemented | Sign OKF artifacts keyless with GitHub OIDC and verify them offline by identity |
-| [ADR-0579](0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md) | Accepted | Extend OKF to v0.3 with skills, model roles, guardrails and limits |
+| [ADR-0579](0579-extend-okf-to-v0-3-with-skills-model-roles-guardrails-and-limits.md) | Implemented | Extend OKF to v0.3 with skills, model roles, guardrails and limits |
 | [ADR-0580](0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md) | Implemented | Consume the corp OKF bundle by a single digest pin, promoted by pull request |
-| [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Accepted | Derive stack configuration from the admitted corp bundle |
+| [ADR-0581](0581-derive-stack-configuration-from-the-admitted-corp-bundle.md) | Implemented | Derive stack configuration from the admitted corp bundle |
 | [ADR-0582](0582-serve-a-per-agent-entry-and-descriptive-sheet-from-the-admitted-bundle.md) | Implemented | Serve a per-agent entry and descriptive sheet from the admitted bundle |
 | [ADR-0583](0583-require-group-visibility-and-object-level-authorisation-before-per-agent-entries.md) | Implemented | Require group visibility and object-level authorisation before per-agent entries |
 

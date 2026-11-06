@@ -1,6 +1,6 @@
 # WP-161: Fetch OKF content at pod start instead of baking it
 
-- **State:** Operator pending
+- **State:** Done (2026-11-05: mcp-gateway's okf-fetch init container verifies the digest pinned in `platform/okf/agents.lock`, live on demo333 since 2026-10-23 and rolled by every promotion up to v0.13.0, where the pod verifies release 0.13.0; mlops and ai-gateway read the verified release at build time, see the deviations)
 - **ADRs:** [ADR-0580](../../adr/0580-consume-the-corp-okf-bundle-by-a-single-digest-pin-promoted-by-pull-request.md)
 - **Depends on:** [WP-160](wp-160-admit-the-corp-okf-release-in-zuno-demo.md)
 - **Related:** [ADR-0561](../../adr/0561-adopt-unifai-as-the-agent-platform.md), [WP-156](wp-156-retire-zuno-agent-and-rag-code.md), [WP-165](wp-165-cut-over-and-remove-agents-from-zuno-demo.md)
@@ -146,3 +146,14 @@ identical to before on the tekos scenarios.
 
 - Hot reload through mcp-gateway's `/admin/reload-policy` instead of a
   rollout: worth it, given that a digest change is rare?
+
+## Closure (2026-11-05)
+
+Checked against the repository and demo333. The Acceptance is met, with these deviations from the brief, all recorded earlier in the ADR-0580 amendment:
+
+- **mlops is not an init container.** It has no Deployment, only pipeline components and a training runtime, so its image bakes `/okf/agents` and `/okf/policies` from a verified `okf-release` stage (`release_cache.py`, pinned by the lock). A release that does not verify fails the image build. So "neither image contains `agents/`" holds for mcp-gateway; the mlops image holds the verified release, not a copy from the repository. A promotion rolls mcp-gateway and is followed by an mlops and ai-gateway rebuild.
+- **The pod annotation is `zuno.startx.fr/okf-corp-reference`,** not `okf-corp-digest`. It carries the reference pinned in the lock (`quay.io/zuno/okf-corp@sha256:020f3810…`, release 0.13.0 on 2026-11-05).
+- **Egress:** the pull from quay.io works directly on demo333, so the registry mirror of step 3 is not needed there. Whether the internal registry stores referrers was not recorded.
+- **`supply-chain-signer` is pulled as `:latest`,** built from devel, not pinned by digest: intended, as the brief records.
+- **Not documented:** a forged digest keeping the live pod in `Init`. Fail-closed rests on the refusal of a dev-signed artifact in isolated pods (exit 1) and on the init-container semantics.
+- **Open question left as is:** hot reload through `/admin/reload-policy` instead of a rollout, which is optional.

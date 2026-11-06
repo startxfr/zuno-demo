@@ -41,3 +41,7 @@ dify_knowledge:
   kb_id: tech
   top_k: 5
   score_threshold: 0.0
+
+# Names of example applications to delete and import again from files/apps/ (use after editing a DSL):
+#   make d2 install dify -e '{"dify_reimport_apps": ["Zuno Confluence Search"]}'
+dify_reimport_apps: []

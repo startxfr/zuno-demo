@@ -315,6 +315,11 @@ def build(release_dir: Optional[pathlib.Path], reference: Optional[str]) -> dict
         bundles.append({
             "name": name,
             "reference": refs.get(name),
+            # ADR-0584 clause 6 (WP-221): unifai-operator copies these annotations into its events. The reason is
+            # known here; the actor is not (nothing in the promotion records who merges the pull request), so no
+            # actor annotation is written and the operator reports "unknown". A per-agent override, for a
+            # state change with a named approver, goes in zuno_unifai_bundle_settings.<agent>.annotations.
+            "annotations": {"unifai.startx.fr/reason": f"promoted release v{index['release']}"},
             "ceilings": {
                 "toolCapabilities": tools,
                 "knowledgeDomains": domains,

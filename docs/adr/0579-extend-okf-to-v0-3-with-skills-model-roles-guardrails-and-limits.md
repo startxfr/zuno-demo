@@ -1,6 +1,6 @@
 # ADR-0579: Extend OKF to v0.3 with skills, model roles, guardrails and limits
 
-- **Status:** Accepted
+- **Status:** Implemented (2026-11-05, WP-163 and WP-164: the v0.3 schema, the double narrowing check, the model roles and guardrail modes applied by the ai-gateway, and `memory.history` and the token limits applied through UnifAI, live on demo333; the gaps are recorded in the amendment of 2026-11-05)
 - **Target:** v0.12
 - **Date:** 2026-10-22
 - **Decision owners:** Zuno Demo architecture team
@@ -147,3 +147,21 @@ The field is additive, like the 2026-10-24 delegation fields, so `okf_version` i
 follows tekos scenario #11, where one turn looped about 50 rounds (zuno-demo-agents release 0.7.0;
 user decisions: v0.3 additive, the name `max_steps`, ceiling 30).
 
+## Amendment (2026-11-05): what is in effect, and the gaps accepted
+
+Checked clause by clause against the repository and the evidence of WP-163 and WP-164. The decision stands. The gaps below are accepted, not left open by accident.
+
+**In effect and live on demo333:**
+
+- **The schema and the narrowing.** The v0.3 schemas, and the check that a bundle may only narrow the corp policies, in the agents CI (`platform/okf/check_narrowing.py`) and at admission (`okf_narrowing.py` through `admit_okf_bundle.py`), with a refusal proven in the step 7 promotion.
+- **`zuno.models` roles** (clause 2, and the amendment of 2026-10-25 that lets roles reorder): applied by the ai-gateway through `model-routing.generated.yaml`. Tekos' first token went from 9.7 s to 2.0 s on 2026-10-31.
+- **`zuno.guardrails` modes** (clause 3): applied by the ai-gateway through `guardrails-modes.generated.yaml`, as the strictest of the class mode, the corp minimum and the agent mode.
+- **`zuno.limits`** (clause 4): `memory.history` is applied by the operator (arkos, 2026-10-31), and the task token limits reach the ai-gateway as `X-Zuno-Max-Tokens`. The per-agent limits do not go through Kuadrant policies (ADR-0581 amendment of 2026-11-05).
+- **Delegation fields** (amendment of 2026-10-24): `zuno.delegation.targets` and `limits.delegation.max_depth`, proven with ADR-0406.
+
+**Accepted gaps:**
+
+- **Clause 1, skills.** No agent declares `skills:` and there is no corp skill yet, so the skill path has no live proof. The operator appends a skill to the node's system message (operator 0.1.27). One deviation from the clause as written: the corp skills live under `policies/skills/` in the agents repository, not at its root (recorded in WP-163).
+- **Clause 3, `categories`.** `zuno.guardrails.categories` is validated and not read by any consumer. A mode stronger than the corp minimum, such as `block`, has not been seen live: only `observe` exists today.
+- **Clause 4, `max_concurrent_requests`.** It is a ceiling that no component enforces: the corp limits policy calls it a seed value. It is checked against its ceiling and nothing else. `max_steps` is applied by the operator's code and `quota_class` is only validated against the corp quota policy; no agent sets either yet, so there is no live proof for them.
+- **Clause 6, the end of v0.2.** The clause said v0.2 would stay readable until the end of v0.12 and then be refused. Six of the eight agents (comage, naveo, finage, advantage, cognos, soursage) still declare v0.2, and the validators and the consumers still accept both versions. **The date is replaced by a rule:** v0.2 stays readable while any agent declares it, and it is refused once the last agent has moved to v0.3. Moving the six bundles is a content change in the agents repository, with no date.

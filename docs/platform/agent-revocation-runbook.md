@@ -40,6 +40,13 @@ of ADR-0584). Record the person who approves; that name goes in the `actor` fiel
 4. **Then fix it properly.** Open a pull request in `zuno-demo-agents` that sets `zuno.status: retired` (or fixes the
    content), release it, and promote it. Remove the revocation entry in the same change that pins the release.
 
+## Who is recorded as the actor
+
+For a revocation, the `actor` of the list entry. For an ordinary promotion the bundle carries the reason "promoted release
+vX.Y.Z" and no actor, so the event says `unknown`: the promotion does not record who merges the pull request. For a state
+change with a named approver (`deprecated` or `retired`), set `annotations` with `unifai.startx.fr/actor` and
+`unifai.startx.fr/reason` for that agent in `zuno_unifai_bundle_settings`.
+
 ## What the operator does with the list
 
 - **Format.** Strict: each entry has `bundle`, `reason` and `actor`, and nothing else. The chart requires all three.
@@ -67,5 +74,8 @@ emitted. Count in hours, not minutes.
 
 ## Sessions
 
-An owner keeps access to the sessions of a withdrawn agent only as far as UnifAI allows it; the pilot of WP-221 records
-exactly what that is, and this section is completed with the result.
+Checked on demo333 on 2026-11-05 (UnifAI 0.1.59, [evidence](../roadmap/evidence/wp-221-session-pilot-2026-11-05.md)): when the
+workflow of a chat is deleted, as it is for a withdrawn agent, the owner still sees the session in the list and can open it,
+and cannot continue it: a new message is refused with "The workflow associated with this chat has been deleted and can no
+longer be continued". The right-hand workflow panel then shows a 404, which is harmless. The pilot used a workflow without
+an LLM, so it did not show whether an agent's own answers stay readable.

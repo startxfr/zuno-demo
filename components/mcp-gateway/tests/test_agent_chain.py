@@ -167,6 +167,13 @@ class VerifyAndEvaluate(unittest.TestCase):
         self.limits.allow_write = True
         self.assertTrue(self.decide(("alpha:ask", "1"), tool=WRITE).allowed)
 
+    def test_a_delegated_write_is_allowed_only_for_a_listed_target(self):
+        # ADR-0409 clause 5: delegation.write_allowed lists agent/task pairs; beta/ask is the executing target here.
+        self.limits.write_allowed = frozenset({("beta", "ask")})
+        self.assertTrue(self.decide(("alpha:ask", "1"), tool=WRITE).allowed)
+        self.limits.write_allowed = frozenset({("gamma", "ask")})
+        self.assertFalse(self.decide(("alpha:ask", "1"), tool=WRITE).allowed)
+
     def test_a_delegation_with_no_limits_object_is_refused_not_allowed(self):
         decision = evaluate(self.store, self.agents, READ, "beta", "ask", USER, "C2", [READ],
                             chain=parse_chain("alpha:ask", "1"), limits=None)

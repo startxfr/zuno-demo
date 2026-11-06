@@ -1,6 +1,6 @@
 # ADR-0559: Follow the cluster's version and never branch the repository by OCP version
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.9
 - **Date:** 2026-09-14
 - **Decision owners:** Zuno Demo architecture team
@@ -177,3 +177,11 @@ three ways, as cluster data rather than branches:
 
 The additional-CatalogSource path of clause 3 stays unneeded on 4.22: the
 `:v4.22` indexes serve every installed package.
+
+## Amendment (2026-11-05, closure)
+
+The status moves from Accepted to Implemented, by user decision of 2026-11-05. Delivered: the repository is not branched by OCP version
+(clause 1), the measurement that decided clause 3 ([WP-195](../roadmap/work-packages/wp-195-update-every-operator-on-demo333-through-the-repository.md)),
+the known-good version set as data (`platform/olm/known-good-demo333.yaml`), and the per-cluster pin keys with the place of `startingCSV`
+documented in `ansible/confidential.example.yml` ([WP-145](../roadmap/work-packages/wp-145-fleet-version-and-catalog-policy.md)). The
+additional CatalogSources of clause 3 were not needed on 4.22 and are not built; they stay a remedy if a catalog drops a package again.
