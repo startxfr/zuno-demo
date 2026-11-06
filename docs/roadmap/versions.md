@@ -22,7 +22,7 @@ state are not restated here.
 | v0.3 | `v0.3.0` | 2026-10-22 | in-cluster ledger run |
 | v0.4 to v0.12 | none | | never tagged; their content is in `v0.13.0` |
 | v0.13 | `v0.13.0` | 2026-11-05 | no open ADR or WP; ledger not run |
-| v0.14 | `v0.14.0` | to be cut | WP-208 Done with named exception: known defects D1 (Dify worker stall, cause open), D2, D3, D5, D6, D8, D9, D10 in its brief; ledger not run |
+| v0.14 | `v0.14.0` | 2026-11-06 | WP-208 Done with named exception: known defects D1 (Dify worker stall, cause open), D2, D3, D5, D6, D8, D9, D10 in its brief; ledger not run |
 | v0.14 | next | | `v0.14.0` once WP-208 is Done |
 | v0.15 | planned | | the classification floor (WP-209) and the agent lifecycle (WP-221) |
 | v0.16 | planned | | day-0 internal/external mode (WP-211 to WP-218), cluster-management decisions, page-level ACL (WP-210) |

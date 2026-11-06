@@ -88,6 +88,7 @@ v0.1, `v0.2.0` for v0.2, `v0.3.0` for v0.3, `v0.13.0` for v0.13. The bands, thei
 | `v0.2.0` | v0.2 | 2026-09-05 | `7d6d91c1` | yes |
 | `v0.3.0` | v0.3 | 2026-10-22 | `8dcea46d` | yes |
 | `v0.13.0` | v0.13 | 2026-11-05 | `388555d6` | not run |
+| `v0.14.0` | v0.14 | 2026-11-06 | `6b79cb7f` | not run |
 
 **The rule.**
 - **When.** A band is tagged when its ADRs are all closed and its work packages are Done or deferred by name, as of
