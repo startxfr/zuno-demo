@@ -402,6 +402,10 @@ maasGateway:
   # (templates/maas-portal-oauth-callback.yaml explains why it is needed).
   portalOauthCallback:
     enabled: true
+  # WP-220: /gen-ai route for the portal's own hostname, needed by the playground's OGX
+  # server (templates/maas-portal-genai-route.yaml explains why).
+  portalGenAiRoute:
+    enabled: true
   # ADR-0201: workaround for an RHOAI-side EnvoyFilter anchor mismatch that
   # leaves both inference-payload-processing ext_proc filters unattached,
   # which 404s the OpenAI-native /v1/chat/completions call shape and skips
