@@ -77,7 +77,13 @@ the three example apps re-imported. Every BuildConfig output is back on `:latest
 - **D5, OpenClaw (the `consultant-02` instance, not `sale-01`):** "Cherche dans Confluence les pages d'onboarding". The assistant calls the
   tool `Zuno Confluence-page-search` with `onboarding` and lists the six pages (MNGD2-AP001 to O0R12-WSCPJ) with their space
   ([capture](wp-208-2026-11-06-9-openclaw-d5-confluence.png)).
-- **D2, Dify, still open:** the same imperative sentence typed in the **Zuno Technical Documentation** chatflow gets "Je ne trouve pas de
-  réponse directe à votre question dans le contexte fourni", while the citations show onboarding pages ([capture](wp-208-2026-11-06-9-dify-d2-avant.png)).
-  The chatflow answers questions, not search orders, and its prompt says to decline when the context does not answer. The 3072-token budget
-  fixed the unfinished-reasoning answers; this refusal is the prompt's strictness and is being measured (strict against relaxed prompt).
+- **D2, Dify, the real cause:** in the **Zuno Technical Documentation** chatflow the model never received the user's question. The LLM node had
+  a system message and `memory: null`, so `sys.query` was not sent: the model saw the retrieved pages only. With the strict prompt, the
+  imperative sentence "Cherche dans Confluence les pages d'onboarding" got "Je ne trouve pas de réponse directe à votre question dans le contexte
+  fourni" ([capture](wp-208-2026-11-06-9-dify-d2-avant.png)); with the relaxed prompt it got "I'm ready to help. Please let me know what you'd like to
+  know", then the same for "internal onboarding procedures" and "about acm" ([capture](wp-208-2026-11-06-9-dify-d2-sans-question-1.png)), and
+  "Quels sont les workshops de onboarding disponibles ?" was answered about the cluster-operator onboarding procedure, which nobody asked
+  ([capture](wp-208-2026-11-06-9-dify-d2-sans-question-2.png)). A question that matches the retrieved page (how to reboot a node) still worked, since
+  the model could guess it from the context. Fix: a user message `{{#sys.query#}}` in the LLM node (commit `f6733e74`, app re-imported). The
+  user re-tested the new app and reported it works; no capture of that run was kept.
+  My own probe-pod measurements sent the question as a user message, which is why they never showed this.
