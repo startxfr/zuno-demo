@@ -465,6 +465,25 @@ rewritten, but nothing mounts it any more. Not durable: this is a live edit on a
 portal will carry the block again, so a lasting fix needs the portal-generated spec changed (not found yet) or the operator fixed. Backups of the
 OGXServer and its config are in the session scratchpad.
 
+## 16. Playground models and MCP (2026-11-06)
+
+**Models missing from the dropdown.** Measured: the portal's `/lsd/models` only returns what the OGX stack lists, and the stack's only LLM provider is
+`genai-bff-proxy` (a `remote::passthrough` that resolves models per request; its startup refresh is skipped with "forward_headers is configured but no
+matching keys found in provider data"). The BFF's `/genai-proxy/.../v1/models` answers 404. So the four MaaS models never reach the list. Live
+workaround, not durable (the ConfigMap `llama-stack-config` belongs to the portal BFF): the four models were added under `registered_resources.models` with
+`provider_id: genai-bff-proxy` and `model_type: llm`; the stack then lists `genai-bff-proxy/publishers/zuno-ai-run/models/<name>`. Whether chat through them
+works is for the user to confirm in the portal. A recreated playground brings the CA-bundle loop (section 15) and loses this edit again.
+
+**MCP (user go: option 1 and 2), prepared in git, not pushed while zuno-demo-da's window is open** (it changes the mcp-gateway Deployment):
+- `gitops/charts/openshift-ai/templates/gen-ai-mcp-servers.yaml`: ConfigMap `gen-ai-aa-mcp-servers` in `redhat-ods-applications` with one entry,
+  `zuno-mcp-gateway` -> `http://mcp-gateway.zuno-ai-run.svc.cluster.local:8080/mcp`, the `/mcp` front-door (ADR-0524) that validates the user's token by
+  TokenReview and derives `tools/list` from the user's groups.
+- `gitops/charts/mcp-gateway`: `frontdoorCapabilities` gains `k8s.resource.read`, `k8s.resource.list`, `k8s.events.read`, `k8s.logs.read` (ceiling only: the
+  tool policy in zuno-demo-agents already limits them to `ocp-ai-ops`, so no agents release is needed); new NetworkPolicy peer `playground` (namespaces
+  `zuno-playground` and `redhat-ods-applications`, port 8080), on by default.
+- Open question for the live test: how the portal passes the user's token to the MCP server (the BFF accepts an `X-MCP-Bearer` header; the OGX stack's own
+  tool runtime takes headers per tool). If it does not forward one, the front-door answers 401 and a user must paste a token.
+
 ## Steps
 
 1. This evaluation (done, in review).
