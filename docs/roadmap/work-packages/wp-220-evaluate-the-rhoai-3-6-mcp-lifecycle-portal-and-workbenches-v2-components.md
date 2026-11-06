@@ -180,6 +180,28 @@ wiring is still to be tested on one server.
   "gpt-oss-20b-developer"`, `"expiresIn": "30d"`); the plaintext key is shown once. Then Claude Code is tested against
   `https://maas.apps.demo333.startx.fr/zuno-ai-run/gpt-oss-20b` with `ANTHROPIC_AUTH_TOKEN` set to that key.
 
+### Pilot 1 results (2026-11-06, key minted by the user as `dev` through the maas-api REST call, subscription `gpt-oss-20b-developer`)
+
+Tested with curl against `https://maas.<domain>/zuno-ai-run/gpt-oss-20b`, headers as Claude Code sends them:
+
+| Request | Result |
+|---|---|
+| `GET /v1/models` with the key / without | 200 / 401 |
+| `POST /v1/messages` (Anthropic Messages API) | 200, a `thinking` block then the text answer |
+| `POST /v1/messages` with `stream: true` | 200, Anthropic SSE events (`message_start`, `content_block_delta`, ...) |
+| `POST /v1/messages` with a `tools` array | 200, `stop_reason: tool_use` with a well-formed `tool_use` block |
+| `POST /v1/messages/count_tokens` | 200, `input_tokens` returned |
+| `POST /v1/messages` with a 24,082-token system prompt, three times | 200 each; 5.9 s cold, about 0.5 s on the repeats (prefix cache) |
+
+The real Claude Code binary was not run: `claude` on the workstation is a podman wrapper that mounts the user's own `~/.claude.json`.
+
+**Finding: the subscription ceiling does not count Anthropic-format traffic.** Limitador's counter for `dev` stayed at 5,000,000 of
+5,000,000 after about 72,000 tokens sent through `/v1/messages`, and moved to 4,999,914 after one `POST /v1/chat/completions` of 86 tokens.
+The Anthropic response carries `usage.input_tokens` and `usage.output_tokens` but no `total_tokens`, which is what the MaaS token limit
+reads. So a Claude Code client is effectively uncapped by `gpt-oss-20b-developer`; the 5 M tokens per hour is real only for OpenAI-format
+calls. Harmless for this pilot (the user asked for wide ceilings) but it must not be sold as a quota. Not investigated: which field the
+generated TokenRateLimitPolicy reads, and whether a counter expression on `input_tokens + output_tokens` is possible in this build.
+
 ## 8. Pilot 2: MaaS consumer portal (2026-11-05, user go, OpenShift login)
 
 Window announced to the peer sessions and opened after zuno-demo-7e closed its Codestral-down drill (18:21Z). DSC `zuno-dsc` backed up
