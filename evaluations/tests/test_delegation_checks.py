@@ -37,7 +37,7 @@ def _md(front: dict) -> str:
     return "---\n" + yaml.safe_dump(front, sort_keys=False) + "---\nbody\n"
 
 
-def release(declared: bool, allow_write: bool = False, with_policy: bool = True) -> pathlib.Path:
+def release(declared: bool, allow_write: bool = False, with_policy: bool = True, write_allowed=None) -> pathlib.Path:
     root = pathlib.Path(tempfile.mkdtemp())
     zuno = {"name": "arkos", "status": "active", "tasks": ["draft-architecture-testimonial"]}
     if declared:
@@ -51,7 +51,8 @@ def release(declared: bool, allow_write: bool = False, with_policy: bool = True)
             {"tool": "legacy_unlabelled"}]}))
         (root / "policies" / "limits").mkdir()
         (root / "policies" / "limits" / "limits-policy.yaml").write_text(
-            yaml.safe_dump({"max_delegation_depth": 2, "delegation": {"allow_write": allow_write}}))
+            yaml.safe_dump({"max_delegation_depth": 2, "delegation": {
+                "allow_write": allow_write, **({"write_allowed": write_allowed} if write_allowed is not None else {})}}))
     return root
 
 
@@ -131,6 +132,16 @@ class Surface(unittest.TestCase):
         self.assertTrue(result.skipped)
         self.assertIn("allow_write", result.detail)
 
+    def test_a_write_allowed_target_skips_the_no_write_check(self):
+        listed = [{"agent": "tekos", "task": "answer-technical-question"}]
+        result = run(surface(release(True, write_allowed=listed)), FakeGateway())
+        self.assertTrue(result.skipped)
+        self.assertIn("write_allowed", result.detail)
+
+    def test_another_target_listed_in_write_allowed_does_not_skip_the_check(self):
+        other = [{"agent": "tekos", "task": "write-code"}]
+        self.assertFalse(run(surface(release(True, write_allowed=other)), FakeGateway(chained=(READ, WRITE))).passed)
+
 
 class Refusals(unittest.TestCase):
     def test_a_403_passes_and_anything_else_fails(self):
@@ -170,6 +181,10 @@ class Layouts(unittest.TestCase):
         self.assertEqual(dc.write_tools([empty, release(True)]), {WRITE, "legacy_unlabelled"})
         self.assertFalse(dc.allows_delegated_writes(empty), "absent limits policy means the gateway's default: false")
         self.assertTrue(dc.allows_delegated_writes([empty, release(True, allow_write=True)]))
+        self.assertEqual(dc.write_allowed_targets(empty), set())
+        listed = [{"agent": "tekos", "task": "answer-technical-question"}, {"bad": 1}]
+        self.assertEqual(dc.write_allowed_targets([empty, release(True, write_allowed=listed)]),
+                         {("tekos", "answer-technical-question")})
 
 
 class ArkosToTekos(unittest.TestCase):
