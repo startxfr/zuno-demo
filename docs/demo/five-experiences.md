@@ -94,6 +94,9 @@ flowchart LR
 
 ## What the script does not show
 
+- **Gmail.** Open WebUI offers the tool `gmail.message.read`; a model may try it and the chat shows a red cross. The gateway
+  refuses it (`delegated_credential_missing`): the tool needs a delegated Google token and no Google Workspace tenant is
+  connected to the demo. Say so if it appears; it is the delegation rule at work, not a fault (WP-208).
 - **A space the Dify persona is not entitled to** and a knowledge node typed by hand in a workflow beyond the one built in step 1.
 - **The shared quota** across the five: Dify and kagent are persona-keyed, so the stress test of the three-experiences
   script applies to them through consultant-02 and ai-ops-01; it is not part of this script (it needs a tight class,
