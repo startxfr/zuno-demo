@@ -33,7 +33,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 23 | 2 | 28 | WP-173, WP-174, WP-220 |
+| v0.11 | 23 | 2 | 28 | WP-173, WP-220 |
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
@@ -962,7 +962,7 @@ frozen mirror.
 | WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Done (2026-11-03) | merged on zuno-demo-agents devel (PR #9), released and admitted; fields and `access` live in the mcp-gateway |
 | WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Done (2026-11-03) | the gateway enforces the chain; delegated calls proven live on operator 0.1.53 (`delegated_by` in the audit) |
 | WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | step 6 (the operator refuses A2A and delegation targets) is live in operator 0.1.35; steps 1 to 5 wait for the user's priority |
-| WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Repo work merged | Arkos to Tekos works on operator 0.1.53 (scenario 21 3/3, at most 3 A2A per turn); refusals, cost and cancellation not proven yet |
+| WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Done (2026-11-06) | Arkos to Tekos works on operator 0.1.53 (scenario 21 3/3, at most 3 A2A per turn); refusals, cost and cancellation not proven yet |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Done (2026-10-25) | zuno-side A2A gateway live on demo333, 32 test blueprints (26 valid, 6 wait for placeholder agents), real delegated turns and the denial check proven |
 | WP-176 | [wp-176](work-packages/wp-176-verify-the-unifai-runtime-images-before-deploying-them.md) | 0586, 0353, 0574 | none | Done (2026-10-25) | live on demo333: the five application images (CI-signed, digest-pinned, verified before applying, drift checked), the third-party services and backup Jobs (pinned, unsigned), the operator 0.1.40 with its bundle and catalog (release identity, catalog pinned), the release path rehearsed with a `v0.0.0-rc1` tag; cluster-side admission is WP-178 |
 | WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Done (2026-10-25) | works with the Kuadrant two-limit ceiling: counters probe and Redis-backed quota ledger live on demo333 (budgets survive an ai-gateway restart); removing quota.py deferred until Kuadrant is fixed |
@@ -1220,6 +1220,11 @@ moving.
 - 2026-11-04 — WP-195 added to phase 43: every Subscription on demo333 said `AtLatestKnown` while seven operators had newer versions (RHOAI and GitOps behind unapproved Manual InstallPlans, rhcl on a channel that stops at 1.4.3, authorino/limitador/dns pinned by rhcl, Kueue on a frozen channel). A report-only audit (`make d3 check operators`), per-cluster channel pins and an RHOAI upgrade walk land in the repo; the live updates follow one go at a time.
 - 2026-11-04 — ADR-0596 and WP-194 added to phase 46: a code question in Open WebUI and OpenClaw was always answered by the local qwen model, since the experience clients had no task preferring Codestral and showed `auto` alone. A declared "Zuno Code" model maps to a `code` task, Codestral first and the local models as fallback; turns with tool results stay local (ADR-0594).
 - 2026-11-04 — ADR-0406 Implemented: the cancel of a delegation that times out is proven live on UnifAI 0.1.57 (`a2a.timeout`, then `a2a.task_cancelled`; trace `54ebccfa482247d3ae41280e1dab4424`). A user abort is not covered, by decision. WP-174 stays open on approval (ADR-0409, waits for WP-173), the empty final reply (fix R-531 shipped in 0.1.56, not yet re-measured) and the turns where Arkos answers without delegating.
+- 2026-11-06 — WP-174 Done. UnifAI 0.1.61 and agents v0.14.2 are live on demo333: the cancel of a delegation shows in the A2A span
+  (`mas.a2a_cancel`), and the human approval of a delegated write (ADR-0409) is proven live. The request reaches the session stream
+  in about 10 s, an approve runs the write (AAP job 1329), a reject and a silence of 300 s run nothing. `delegation.write_allowed` named
+  Arkos, which nothing delegates to; it now names Tekos / `answer-technical-question`. ADR-0409 stays Accepted until the refusal of a
+  write to an unlisted target, the non-crossing of an auto-approval and the no-identity case are shown.
 - 2026-11-03 — WP-172 Done: delegated calls reach the mcp-gateway live on operator 0.1.53 and the audit carries the
   chain. WP-174 records the working Arkos to Tekos delegation (scenario 21 3/3, the cap of 3 delegations fired). The
   refusals hold, so ADR-0401 and ADR-0403 are Implemented. ADR-0406 stays Accepted: the cancellation of a delegation no

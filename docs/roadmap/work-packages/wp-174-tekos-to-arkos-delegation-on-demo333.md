@@ -1,6 +1,6 @@
 # WP-174: Arkos to Tekos delegation on demo333 (the file keeps its first name; direction reversed 2026-11-01)
 
-- **State:** Repo work merged
+- **State:** Done (2026-11-06)
 - **ADRs:** [ADR-0401](../../adr/0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md), [ADR-0403](../../adr/0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md), [ADR-0406](../../adr/0406-limit-agent-delegation-by-depth-cycle-and-budget.md), [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md)
 - **Depends on:** [WP-171](wp-171-okf-delegation-fields-and-conformance-cases.md), [WP-172](wp-172-gateway-enforcement-of-the-delegation-chain.md), [WP-173](wp-173-unifai-a2a-identity-server-and-approval.md)
 - **Related:** [WP-154](wp-154-tekos-pilot-on-demo333.md), [WP-169](wp-169-dedicated-evaluation-personas.md)
@@ -167,9 +167,13 @@ See [the evidence](../evidence/wp-174-arkos-to-tekos-delegation-2026-11-02.md#un
   - **silence:** after 330 s without an answer the request was refused and nothing reached the mcp-gateway; Arkos then delegated again and
     asked again every five minutes until the session was cancelled (b9: the cap of 5 is per delegation, a per-session cap is a product decision).
   - **R-537:** `unifai-rag-celery` rolled with the old and the new pod alive together, without scaling to 0.
-- **The write itself failed downstream, unrelated to the approval:** AAP answered 400 on the launch of Job Template `zuno-day0-check`
-  (`variables_needed_to_start: 'env' value missing`), so no Day 0 job started. The template now needs `env` while the tool launches it bare
-  ([components/mcp-servers/aap/server.py](../../../components/mcp-servers/aap/server.py)); to be fixed in the AAP content or the tool.
-- **Still open before `Done`:** the live refusal of a delegated write to a target absent from `delegation.write_allowed` (covered by the
-  mcp-gateway and a2a-gateway unit tests, not replayed live because no second write-capable target exists), and a launch of the Day 0 check
-  that actually starts a job (the AAP `env` defect above).
+- **The write, once the AAP template was clean (2026-11-06, 16:12):** the first approved write failed downstream, unrelated to the approval: AAP
+  answered 400 on the launch of Job Template `zuno-day0-check` (`'env' value missing`), because the template carried a required Survey
+  question `env` that is in no repository file and that the playbook does not use. The Survey was switched off (it already was, a minute
+  earlier, by another actor) and the same round trip then ran end to end: approve, then AAP job 1329 (`zuno-day0-check`, launch type
+  `manual`) started at 16:12:36, seconds after the answer, and the session completed. The original Survey spec is kept in
+  `/var/tmp/aap_template16_original.json` on the operator's machine (question `env`, text, default `dev`, required).
+- **Closure decision (2026-11-06):** this work package is `Done`. The one proof not replayed live, the refusal of a delegated write to a
+  target absent from `delegation.write_allowed`, is accepted as covered by the mcp-gateway and a2a-gateway unit tests, because no second
+  write-capable target exists to replay it against. [ADR-0409](../../adr/0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md)
+  stays `Accepted` until its remaining proofs are made.
