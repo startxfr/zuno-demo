@@ -495,6 +495,33 @@ HTTPRoute `zuno-portal-genai` (chart `openshift-ai`, flag `maasGateway.portalGen
 NetworkPolicy lists `zuno-playground` and `redhat-ods-applications`, the ConfigMap `gen-ai-aa-mcp-servers` exists. From the playground pod:
 `mcp-gateway /healthz` 200 and `POST /mcp` without a token 401 (reachable, authentication enforced). Not yet verified: tools listed for `ai-ops-01` in the portal.
 
+## 17. Closure of the portal and playground topic (2026-11-06)
+
+User-confirmed end to end on demo333 as `ai-ops-01` (group `ocp-ai-ops`), private window, `https://rh-ai.apps.demo333.startx.fr/maas-consumer-portal`:
+
+| Check | Result | Evidence |
+|---|---|---|
+| Sign-in with OpenShift, models list, API keys, subscriptions | works (`dev` earlier, then the group subscriptions) | sections 8, 10, 14 |
+| Playground created in project `zuno-playground` | works | section 15 |
+| Chat on `gpt-oss-20b` (111 T/s, TTFT 670 ms) | works | `docs/assets/img/wp220-portal-playground-chat-gpt-oss-20b.png` |
+| RAG on an uploaded PDF, answer cites the document (1 cited, 1 retrieved) | works | `docs/assets/img/wp220-portal-playground-rag-devis-cited.png` |
+| MCP server `zuno-mcp-gateway`, authorised with the user's own OpenShift token | "Connection successful", 9 of 9 tools active (2 Confluence, 1 technical-docs search, 2 AAP, 4 Kubernetes) | `docs/assets/img/wp220-portal-playground-mcp-connected-9-tools.png` |
+| Tool call from the chat (`confluence.page.search`, "no page found for ACM") | works through the gateway | `docs/assets/img/wp220-portal-playground-mcp-confluence-tool-response.png` |
+
+How the user gets the MCP token: `https://oauth-openshift.<domain>/oauth/token/request`, "Display Token", pasted in the MCP panel (it expires after 24 h by default).
+
+What is live and what is only a live edit:
+- In git and Argo-managed: namespace `zuno-playground`, the three `gpt-oss-20b-ocp-*` subscriptions, the two-listener MaaS Gateway (chart values, plus the live Application value
+  `externalHostnameListener`, which is not git-synced), `zuno-portal-oauth-callback`, `zuno-portal-genai`, the `gen-ai-aa-mcp-servers` ConfigMap, the four `k8s.*` capabilities
+  and the `playground` NetworkPolicy peer of `mcp-gateway`.
+- **Live edits only, lost when the portal recreates the playground**: `spec.tls` removed from the OGXServer `lsd-genai-playground` (operator CA-bundle rollout loop, section 15) and the four
+  models added under `registered_resources.models` of its ConfigMap `llama-stack-config` (section 16).
+
+Remaining work, none blocking this topic: ship an OGXServer example in the chart (no `tls`, four models, pgvector) so the playground is reproducible and survives a recreation;
+test the same flow as `ai-dev-01` (the `ocp-ai-dev` group does not exist until that user signs in once; its users should see no `k8s.*` tools); decide the Anthropic
+counting option (section 9, recommended: accept and document); the V2 workbench pilot waits for an API that does not exist yet (section 12); MaaS 3.6 IPP-to-Praxis impact on the
+payload-processing workarounds and the Keycloak `apiKeyHelper` path were not verified; an upstream report for the OGX CA-bundle defect.
+
 ## Steps
 
 1. This evaluation (done, in review).
