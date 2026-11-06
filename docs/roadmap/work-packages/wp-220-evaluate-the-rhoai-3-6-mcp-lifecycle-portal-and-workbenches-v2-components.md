@@ -272,7 +272,7 @@ The question left open by section 7 was which field the limit reads, and whether
   and own it in the chart with the two-pointer list: undercounts, and freezes that model's subscriptions. (3) Upstream request to the
   maas-controller; the user deferred upstream issues earlier.
 
-## 10. Two-listener Gateway chart (prepared, not pushed)
+## 10. Two-listener Gateway chart (proven on a throwaway Gateway, not yet live)
 
 The portal's "API keys" page needs maas-api to report an external URL (section 8). Upstream `maas-api/internal/tenant/handler.go` takes the
 `hostname` of the first ready HTTPS listener that has an attached route, and only falls back to the Gateway address (which is the
@@ -284,16 +284,37 @@ A hostname on the single existing listener would break every in-cluster caller, 
 - listener `https-external` (`hostname: maas.<clusterBaseDomain>`, port 443, same TLS secret and `allowedRoutes`) **first**;
 - the existing hostname-less `https` listener second.
 
-It sits behind `maasGateway.externalHostnameListener.enabled`, default `false`; rendered with the flag off, the chart is identical to
-today's, and with it on the Gateway has the two listeners in that order. It lives on the unpushed branch
-`wp-220-maas-gateway-two-listeners` (commit b8d0ee5c, in a separate git worktree) until a live proof exists. The first throwaway Gateway
-(own namespace) showed both listeners Accepted and Programmed without conflict, and a hostname-less route attached to both
-(`attachedRoutes: 1` each). Still unproven: the data plane (a request with the external host and SNI, a request with the Service name,
-one with an unknown host) and the effect on the Kuadrant objects (the policies target the Gateway without `sectionName`, so they
-should stay attached) and on the EnvoyFilter size. A second throwaway Gateway pod could not start in its own namespace because the mesh
-accepts certificate requests only from a fixed list of namespaces (`zuno-default-deny-other-namespaces` in `zuno-mesh`, which includes
-`openshift-ingress`); the test therefore needs `openshift-ingress` or a change to that list, and waits for the user's choice and for
-the pin window of zuno-demo-da to close.
+It sits behind `maasGateway.externalHostnameListener.enabled`, default `false`; rendered with the flag off the chart is identical to
+today's, with it on the Gateway has the two listeners in that order. The chart is on `devel` with the flag off (fbf22cb4), and the flag is
+set to `true` in `gitops/apps/openshift-ai/application-d1.yaml` (a90dfe7d), which has no effect live because Applications are not
+git-synced and the live Application's `helm.values` is a text block.
+
+**Live proof on a throwaway Gateway (2026-11-06, demo333).** The first attempt, in its own namespace, could not start its Gateway pod:
+the mesh accepts certificate requests only from a fixed list of namespaces (`zuno-default-deny-other-namespaces` in `zuno-mesh`, which
+includes `openshift-ingress`). The second, with five `zuno-hostname-test-*` objects in `openshift-ingress` (all deleted afterwards), gave
+two listeners both Accepted and Programmed with `attachedRoutes: 1` each, and through a port-forward:
+
+| Request (Host / SNI) | Result |
+|---|---|
+| external host, external SNI | 200 |
+| Service name, Service name (what the ai-gateway, lightspeed and the providers send) | 200 |
+| external Host, Service-name SNI | 200 |
+| any Host, no SNI | 200 |
+| unknown host and SNI | 200 (the hostname-less listener catches it, as today) |
+| external SNI with the Service name as Host | 404 (does not occur: callers use a matching SNI) |
+| unknown path | 404 from the Gateway |
+
+Two things to know. The test backend sits behind `openshift-ingress-deny-all`, so it needed a NetworkPolicy of its own (a test artefact, not
+a chart concern). And with a hostname on a listener the cluster's Gateway controller adds `DNSReady=False` ("One or more listeners have DNS
+provisioning issues", no DNSRecord created); `LoadBalancerReady=False` is already there on `maas-default-gateway`, which stays Programmed
+and Argo-Healthy, so this is expected to be cosmetic, to confirm after the live change.
+
+**Not yet done: the live change.** It is one edit of the live Application's `helm.values` (add `externalHostnameListener.enabled: true`
+under `maasGateway`), which turns the Gateway that carries every model call. The auto-mode classifier refused it as a change to a shared
+resource, so it waits for the user's explicit go. Backups to take first: the Application and the Gateway YAML. Checks after: the Gateway
+has `https-external` then `https`; `GET /maas-api/v1/tenants` answers 200 with `https://maas.<domain>`; the portal "API keys" page loads;
+the four models answer from the ai-gateway; MaaS without a token is 401; the EnvoyFilter is still 1,336,461 bytes. Rollback: remove the
+flag from the Application values (or set it `false`).
 
 ## 11. The k8s MCP server as an MCPServer (paper mapping, 2026-11-06)
 
