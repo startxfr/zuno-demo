@@ -202,6 +202,9 @@ reads. So a Claude Code client is effectively uncapped by `gpt-oss-20b-developer
 calls. Harmless for this pilot (the user asked for wide ceilings) but it must not be sold as a quota. Not investigated: which field the
 generated TokenRateLimitPolicy reads, and whether a counter expression on `input_tokens + output_tokens` is possible in this build.
 
+**Outcome (2026-11-06, user):** Claude Code in VS Code worked against `gpt-oss-20b` with this key. The user then revoked it, and the
+revoked key is refused with 403 on `/v1/models`. Pilot 1 is done.
+
 ## 8. Pilot 2: MaaS consumer portal (2026-11-05, user go, OpenShift login)
 
 Window announced to the peer sessions and opened after zuno-demo-7e closed its Codestral-down drill (18:21Z). DSC `zuno-dsc` backed up
