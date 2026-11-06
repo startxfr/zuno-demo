@@ -1,6 +1,6 @@
 # ADR-0409: Introduce human approval for delegated operations, resumable from persisted checkpoints
 
-- **Status:** Accepted (2026-10-24) - the decisions below are settled; it becomes `Implemented` once the proofs of "Before Implemented" are made live (WP-173, WP-174)
+- **Status:** Implemented (2026-11-07, WP-173, WP-174: approve, reject and 300 s silence proven live on UnifAI 0.1.61; auto-approval does not cross the hop proven on 0.1.62; the refusal of an unlisted target and the run with no identity are covered by gateway tests, by decision)
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
