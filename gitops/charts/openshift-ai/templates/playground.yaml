@@ -1,0 +1,410 @@
+{{- /*
+WP-220 (2026-11-06): a ready-made playground for the MaaS consumer portal, in
+`zuno-playground`, so the demo does not depend on a user pressing "Create
+playground". Same objects and names the portal's gen-ai BFF creates (OGXServer
+`lsd-genai-playground`, its `llama-stack-config`, `genai-pgvector`), with the three
+differences that make it work on this cluster (measured, WP-220 sections 15-16):
+
+1. NO `spec.tls`. The BFF's version carries `tls.trust.caCertificates`; the RHOAI
+   3.6 EA OGX operator then rewrites the merged CA-bundle ConfigMap about once a
+   second in a non-deterministic certificate order, the pod template hash follows
+   its resourceVersion, and the server restarts endlessly (never Ready).
+2. The four MaaS models are registered in `registered_resources.models`. The
+   stack's only LLM provider is the BFF's `remote::passthrough`, which resolves models
+   per request and cannot list them, so without this the portal's model list shows
+   only the inline reranker.
+3. The pgvector password is generated in-cluster (ESO Password generator), never
+   stored in git.
+
+The BFF finds this OGXServer by namespace and uses it; it does not recreate it. If
+someone creates another playground from the portal in another namespace, that one
+is the vendor's version again and will loop. See WP-220 section 17.
+*/ -}}
+{{- if .Values.playground.enabled }}
+apiVersion: generators.external-secrets.io/v1alpha1
+kind: Password
+metadata:
+  name: genai-pgvector-password
+  namespace: {{ .Values.playground.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  length: 24
+  digits: 6
+  symbols: 0
+  noUpper: false
+  allowRepeat: true
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: genai-pgvector-credentials
+  namespace: {{ .Values.playground.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    gen-ai.opendatahub.io/pgvector: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-19"
+spec:
+  # "0": generate once. A refresh would change the password under a database that
+  # was initialised with the first one.
+  refreshInterval: "0"
+  target:
+    name: genai-pgvector-credentials
+    creationPolicy: Owner
+    template:
+      metadata:
+        labels:
+          gen-ai.opendatahub.io/pgvector: "true"
+      data:
+        password: "{{ "{{ .password }}" }}"
+  dataFrom:
+    - sourceRef:
+        generatorRef:
+          apiVersion: generators.external-secrets.io/v1alpha1
+          kind: Password
+          name: genai-pgvector-password
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: genai-pgvector-storage
+  namespace: {{ .Values.playground.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: {{ .Values.playground.pgvector.storage }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: genai-pgvector-init
+  namespace: {{ .Values.playground.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+data:
+  enable-pgvector.sh: |
+    #!/bin/bash
+    psql -U postgres -d "${POSTGRESQL_DATABASE}" -c "CREATE EXTENSION IF NOT EXISTS vector;"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genai-pgvector
+  namespace: {{ .Values.playground.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    gen-ai.opendatahub.io/pgvector: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: genai-pgvector
+      gen-ai.opendatahub.io/pgvector: "true"
+  template:
+    metadata:
+      labels:
+        app: genai-pgvector
+        gen-ai.opendatahub.io/pgvector: "true"
+    spec:
+      containers:
+        - name: postgresql
+          image: {{ .Values.playground.pgvector.image }}
+          env:
+            - name: POSTGRESQL_DATABASE
+              value: vectordb
+            - name: POSTGRESQL_USER
+              value: vectoruser
+            - name: POSTGRESQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: genai-pgvector-credentials
+                  key: password
+          ports:
+            - containerPort: 5432
+              protocol: TCP
+          startupProbe:
+            exec:
+              command: [pg_isready, -U, vectoruser, -d, vectordb]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 18
+          readinessProbe:
+            exec:
+              command: [pg_isready, -U, vectoruser, -d, vectordb]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: [pg_isready, -U, vectoruser, -d, vectordb]
+            periodSeconds: 20
+          resources:
+            requests: {cpu: 250m, memory: 256Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+            runAsNonRoot: true
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/pgsql/data
+            - name: init-scripts
+              mountPath: /opt/app-root/src/postgresql-start
+              readOnly: true
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: genai-pgvector-storage
+        - name: init-scripts
+          configMap:
+            name: genai-pgvector-init
+            defaultMode: 0755
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-pgvector
+  namespace: {{ .Values.playground.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    gen-ai.opendatahub.io/pgvector: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  selector:
+    app: genai-pgvector
+    gen-ai.opendatahub.io/pgvector: "true"
+  ports:
+    - name: postgresql
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: genai-pgvector
+  namespace: {{ .Values.playground.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  podSelector:
+    matchLabels:
+      app: genai-pgvector
+      gen-ai.opendatahub.io/pgvector: "true"
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: lsd-genai-playground
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llama-stack-config
+  namespace: {{ .Values.playground.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+    ogx.io/server: lsd-genai-playground
+    ogx.io/watch: "true"
+    opendatahub.io/dashboard: "true"
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+data:
+  config.yaml: |
+    version: '2'
+    distro_name: rh
+    apis:
+    - responses
+    - file_processors
+    - files
+    - inference
+    - tool_runtime
+    - vector_io
+    providers:
+      inference:
+      - provider_id: sentence-transformers
+        provider_type: inline::sentence-transformers
+        config:
+          trust_remote_code: false
+      - provider_id: genai-bff-proxy
+        provider_type: remote::passthrough
+        config:
+          api_key: ''
+          base_url: https://rh-ai.{{ .Values.maasGateway.clusterBaseDomain }}/gen-ai/api/v1/genai-proxy/ns/{{ .Values.playground.namespace }}
+          forward_headers:
+            inference_model_source_type: X-Inference-Model-Source-Type
+            maas_subscription: X-MaaS-Subscription
+      vector_io:
+      - provider_id: pgvector
+        provider_type: remote::pgvector
+        config:
+          db: ${env.PGVECTOR_DB:=vectordb}
+          distance_metric: COSINE
+          host: ${env.PGVECTOR_HOST}
+          password: ${env.PGVECTOR_PASSWORD:=}
+          persistence:
+            backend: kv_default
+            namespace: vector_io::pgvector
+          port: ${env.PGVECTOR_PORT:=5432}
+          user: ${env.PGVECTOR_USER:=vectoruser}
+      responses:
+      - provider_id: builtin
+        provider_type: inline::builtin
+        config:
+          persistence:
+            responses:
+              backend: sql_default
+              max_write_queue_size: 10000
+              num_writers: 4
+              table_name: responses
+      file_processors:
+      - provider_id: pypdf
+        provider_type: inline::pypdf
+        config: {}
+      files:
+      - provider_id: localfs-files
+        provider_type: inline::localfs
+        config:
+          metadata_store:
+            backend: sql_default
+            table_name: files_metadata
+          storage_dir: /opt/app-root/src/.llama/distributions/rh/files
+      tool_runtime:
+      - provider_id: file-search
+        provider_type: inline::file-search
+        config: {}
+      - provider_id: model-context-protocol
+        provider_type: remote::model-context-protocol
+        config: {}
+    metadata_store:
+      type: sqlite
+      db_path: /opt/app-root/src/.llama/distributions/rh/inference_store.db
+    storage:
+      backends:
+        kv_default:
+          db_path: /opt/app-root/src/.llama/distributions/rh/kvstore.db
+          type: kv_sqlite
+        sql_default:
+          db_path: /opt/app-root/src/.llama/distributions/rh/sql_store.db
+          type: sql_sqlite
+      stores:
+        connectors:
+          backend: sql_default
+          table_name: connectors
+        conversations:
+          backend: sql_default
+          table_name: openai_conversations
+        inference:
+          backend: sql_default
+          max_write_queue_size: 10000
+          num_writers: 4
+          table_name: inference_store
+        metadata:
+          backend: kv_default
+          namespace: registry
+        prompts:
+          backend: sql_default
+          table_name: prompts
+    vector_stores:
+      default_provider_id: pgvector
+      default_embedding_model:
+        provider_id: sentence-transformers
+        model_id: ibm-granite/granite-embedding-125m-english
+      annotation_prompt_params:
+        enable_annotations: true
+      file_ingestion_params:
+        default_chunk_overlap_tokens: 128
+        default_chunk_size_tokens: 512
+      chunk_retrieval_params:
+        chunk_multiplier: 5
+        default_reranker_strategy: rrf
+        default_search_mode: vector
+        max_tokens_in_context: 4000
+        rrf_impact_factor: 60
+        weighted_search_alpha: 0.5
+      file_batch_params:
+        cleanup_interval_seconds: 86400
+        file_batch_chunk_size: 10
+        max_concurrent_files_per_batch: 3
+    registered_resources:
+      models:
+      - provider_id: sentence-transformers
+        model_id: sentence-transformers/ibm-granite/granite-embedding-125m-english
+        provider_model_id: ibm-granite/granite-embedding-125m-english
+        model_type: embedding
+        metadata:
+          embedding_dimension: 768
+      {{- range .Values.playground.models }}
+      - provider_id: genai-bff-proxy
+        model_id: publishers/zuno-ai-run/models/{{ . }}
+        provider_model_id: publishers/zuno-ai-run/models/{{ . }}
+        model_type: llm
+      {{- end }}
+      vector_stores: []
+    external_providers_dir: /opt/app-root/.llama/providers.d
+    server:
+      port: 8321
+---
+apiVersion: ogx.io/v1beta1
+kind: OGXServer
+metadata:
+  name: lsd-genai-playground
+  namespace: {{ .Values.playground.namespace }}
+  labels:
+    opendatahub.io/dashboard: "true"
+    zuno.io/managed-by: argocd
+  annotations:
+    openshift.io/display-name: lsd-genai-playground
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  distribution:
+    name: rh
+  network:
+    port: 8321
+  overrideConfig:
+    key: config.yaml
+    name: llama-stack-config
+  workload:
+    replicas: 1
+    resources:
+      requests: {cpu: 250m, memory: 500Mi}
+      limits: {cpu: "2", memory: 12Gi}
+    overrides:
+      command: ["/bin/sh", "-c", "ogx run /etc/ogx/config.yaml --insecure"]
+      env:
+        - {name: VLLM_TLS_VERIFY, value: "false"}
+        - {name: FAISS_STORE_DIR, value: "~/.llama/faiss"}
+        - {name: SENTENCE_TRANSFORMERS_HOME, value: /opt/app-root/.cache/huggingface/hub}
+        - {name: HF_HUB_OFFLINE, value: "1"}
+        - {name: TRANSFORMERS_OFFLINE, value: "1"}
+        - {name: HF_DATASETS_OFFLINE, value: "1"}
+        - {name: PGVECTOR_HOST, value: "genai-pgvector.{{ .Values.playground.namespace }}.svc.cluster.local"}
+        - {name: PGVECTOR_PORT, value: "5432"}
+        - {name: PGVECTOR_DB, value: vectordb}
+        - {name: PGVECTOR_USER, value: vectoruser}
+        - name: PGVECTOR_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: genai-pgvector-credentials
+              key: password
+        - {name: OGX_CONFIG_DIR, value: /opt/app-root/src/.ogx/distributions/rh/}
+{{- end }}

@@ -636,3 +636,17 @@ genAiMcpServers:
         Zuno MCP Gateway: Confluence search and read, technical-docs search, AAP audits and
         read-only Kubernetes tools, filtered by your own groups. Authenticates with your own
         OpenShift token.
+
+# WP-220 (2026-11-06): ready-made playground for the MaaS consumer portal in zuno-playground
+# (templates/playground.yaml explains the three differences from the portal's own version).
+playground:
+  enabled: true
+  namespace: zuno-playground
+  models:
+    - gpt-oss-20b
+    - qwen3.5-9b
+    - qwen3.5-9b-wesh
+    - qwen3.6-27b-instruct
+  pgvector:
+    image: registry.redhat.io/rhel9/postgresql-16
+    storage: 5Gi
