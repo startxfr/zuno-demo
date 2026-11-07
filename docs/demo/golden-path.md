@@ -35,23 +35,20 @@ Personas and limits: the probes sign in as `eval-consultant-01` (`GOLDEN_PERSONA
 histories and quotas are untouched. The delegation moment spends one Arkos turn; if it fails with a quota refusal
 (429), the evaluation persona's budget is spent, not the platform broken.
 
-## 2. Screens (about 10 minutes)
+## 2. Screens (about 2 minutes, then 5 minutes by eye)
 
-Each line: where, what to do, what must be seen. Sign in as the persona the script uses.
+```bash
+make demo browser        # UnifAI, Open WebUI, kagent, Dify, OpenClaw: Keycloak sign-in, first screen, screenshots
+```
 
-- [ ] **UnifAI** (`https://unifai-ui-zuno-unifai.<apps domain>`, consultant-02): the `agent-tekos` team workspace opens
-      and Tekos answers a short question.
-- [ ] **Open WebUI** (`https://open-webui.<apps domain>`, sale-01): the models `Zuno` and `Zuno Code` are listed; one
-      answer; the tool list shows *Zuno tools*.
-- [ ] **OpenClaw** (`https://assistant-zuno-claw-sale-01.<apps domain>`): sign-in through Keycloak, then the Control UI;
-      "Cherche dans Confluence les pages d'onboarding" gets an answer citing Confluence.
-- [ ] **Dify** (`https://dify.<apps domain>`): Studio lists the three example applications; *Zuno Agent* answers "Find
-      our onboarding pages in Confluence". If a Workflow run stalls, stop and restart it (D1).
-- [ ] **kagent** (`https://kagent.<apps domain>`, ai-ops-01): the agent `zuno-sre` is ready and answers "Which pods of
-      zuno-ai-run are not Running?". Click **Skip wizard** on the first screen.
-- [ ] **Lightspeed** (OpenShift console, chat icon): one question about the cluster gets an answer.
+Each check signs in as the persona the script uses and fails on a JavaScript page error. OpenClaw's check also
+enters the Control UI password and proves its WebSocket connection to the gateway. The screenshots are written to the
+directory the run prints. What stays manual, because a person sees it better than a script:
+
+- [ ] **Lightspeed** in the OpenShift console (chat icon): the panel opens (its API is already proven by the probe).
 - [ ] **Grafana** (`zuno-monitoring`, *Zuno Platform / Five experiences*, last hour): one series per client
-      (`unifai`, `open-webui`, `openclaw-*`, `dify`, `kagent`) after the probes; the guardrails row shows evaluations.
-- [ ] **Tempo** (Grafana, Explore, Tempo): a trace opens in Grafana's UI, as shown on stage (the probe checks the
-      search; this checks the screen).
-- [ ] **Guardrails dashboard row**: the probe's DAN detection appears with outcome `detected` for `client="dify"`.
+      (`unifai`, `open-webui`, `openclaw-*`, `dify`, `kagent`) after the probes; the guardrails row shows the probe's
+      DAN detection for `client="dify"`.
+- [ ] **Tempo** (Grafana, Explore): a trace opens in the UI, as it will be shown on stage.
+- [ ] **Dify Studio** after its local sign-in (`dify-admin@zuno.local`, Vault `zuno/dify/admin`): the three example
+      applications are listed.

@@ -324,7 +324,7 @@ node that exists only while the demo is enabled, shown on 2026-11-09 as roadmap,
 
 **10 ADRs: ADR-0110, the hardening and delivery records, and the world model.** Open: ADR-0584, ADR-0602, ADR-0603,
 ADR-0604, ADR-0606, ADR-0608 (ADR-0607 and ADR-0609 Implemented 2026-11-07). Open work packages: WP-221, WP-224
-to WP-237, WP-241, WP-243 (WP-225 lots A, B and C Operator pending 2026-11-07).
+to WP-237, WP-241 (WP-225 lots A, B and C Operator pending 2026-11-07).
 
 ## v0.17
 
