@@ -10,7 +10,7 @@
 
 - name: "dify | get a Keycloak admin token"
   ansible.builtin.uri:
-    url: "{{ zuno_keycloak_url }}/realms/master/protocol/openid-connect/token"
+    url: "{{ zuno_keycloak_admin_token_url }}"
     method: POST
     body_format: form-urlencoded
     body:

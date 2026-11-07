@@ -620,3 +620,16 @@ against an external service simulated in a canary namespace of demo333
 ([ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md)). Vault (WP-212) cannot be held by
 a canary namespace; its work package names that step as not rehearsed and follows
 [ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md)'s backup and rollback rules. No decision clause changes.
+
+## Update (2026-11-07) - Keycloak external mode built (WP-211 lots A and B)
+
+Clauses 2 to 7 and 11 are delivered for Keycloak in the repository: the mode key and payload, the symmetric install,
+check and uninstall, the supplied CA, the realm content reconciled over the Admin REST API by the ADR-0530 Job, and
+the endpoint seams of every consumer (lot A, pushed; lot B). Decisions taken with the user: the platform never
+provisions the Google identity provider on an external Keycloak; the admin credential may be scoped to the realm
+`zuno`; the demo personas are opt-in; only the realm `zuno` is supported; the client secrets are written into the
+external Keycloak from Vault, since the file-vault SPI needs the pod; the keycloak database stays in the postgresql
+chart. Clauses 5 and 6 above still name agent-runtime, the six agent charts and the aiagent-operator, all retired with
+ADR-0561: the consumer list of the WP-211 brief replaces it. The live there-and-back (lot C) is not done, so the ADR
+stays `Partially implemented`.
+

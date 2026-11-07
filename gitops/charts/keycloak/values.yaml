@@ -3,6 +3,19 @@
 # Both default false so templates render nothing by default.
 keycloak:
   enabled: false
+  # ADR-0352/WP-211: true = this chart deploys the Keycloak (CR, Ingress, realm import, database
+  # secret). false = EXTERNAL mode: a Keycloak this platform does not own is used instead; only the
+  # consumer-side objects stay (client-secret ExternalSecrets, the client ConfigMap) and the
+  # reconcile Job targets keycloakExternal.url (templates/job-client-reconcile-external.yaml).
+  builtIn: true
+
+# ADR-0352/WP-211: used only when keycloak.builtIn is false (the role sets them from confidential.yml).
+keycloakExternal:
+  url: ""              # https://sso.corp.example.com, no realm path
+  realm: zuno          # the realm must be called zuno (the consumers' URLs write it)
+  adminRealm: zuno     # realm the admin credential signs in to; `master` for a master-realm admin
+  caConfigMap: ""      # ConfigMap (key ca-bundle.crt) in this namespace holding the external CA; "" = system trust
+  seedPersonas: false  # create the demo personas (and, with them, nothing else) when missing
 
 # Namespace for the Keycloak CR, KeycloakRealmImport and ExternalSecrets.
 # No Namespace template here - zuno-auth is created by gitops/charts/namespaces.

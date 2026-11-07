@@ -4,6 +4,14 @@
 # (ansible/playbooks/day0_install.yml, ADR-0421), fully ahead of this Day 1
 # role. No operator/PackageManifest discovery needed - OAuth is a
 # built-in cluster API, not OLM-installed.
+# ADR-0352 / WP-211: in external mode the CA that serves Keycloak is the SUPPLIED one (the external CA bundle of confidential.yml, resolved by resolve_keycloak_endpoint.yml),
+# never derived from a built-in Ingress that does not exist.
+- name: "openshift_oauth | resolve the cluster base domain"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+- name: "openshift_oauth | resolve the Keycloak endpoint and mode (ADR-0352, WP-211)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
 - name: "openshift_oauth | apply the openshift-oauth GitOps Application (d0: ExternalSecret into openshift-config)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
   vars:
@@ -72,6 +80,7 @@
     name: "{{ zuno_keycloak_cr_name | default('zuno') }}"
     namespace: zuno-auth
   register: _openshift_oauth_keycloak_ingress
+  when: not (zuno_keycloak_external_mode | bool)
 
 - name: "openshift_oauth | fail loudly if the Keycloak Ingress isn't available"
   ansible.builtin.fail:
@@ -79,7 +88,9 @@
       Ingress {{ zuno_keycloak_cr_name | default('zuno') }} (zuno-auth) not
       found - keycloak is not installed or not reconciled; check
       `make day0 check keycloak` before re-running.
-  when: (_openshift_oauth_keycloak_ingress.resources | default([]) | length) == 0
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - (_openshift_oauth_keycloak_ingress.resources | default([]) | length) == 0
 
 - name: "openshift_oauth | look up the Secret the Keycloak Ingress actually references"
   kubernetes.core.k8s_info:
@@ -88,6 +99,7 @@
     name: "{{ _openshift_oauth_keycloak_ingress.resources[0].spec.tls[0].secretName }}"
     namespace: zuno-auth
   register: _openshift_oauth_keycloak_ca
+  when: not (zuno_keycloak_external_mode | bool)
 
 - name: "openshift_oauth | record the missing/not-ready TLS secret finding before failing"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_blocked_finding.yml"
@@ -99,7 +111,9 @@
       cause: "cert-manager has not yet issued the certificate the keycloak Ingress currently references"
       solution: "Verify the relevant ClusterIssuer is Ready and the Certificate is Ready, then re-run"
       auto_fix: "make d0 reconcile keycloak"
-  when: (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
 
 - name: "openshift_oauth | fail loudly if the Keycloak serving TLS secret isn't available to copy"
   ansible.builtin.fail:
@@ -107,7 +121,9 @@
       Secret {{ _openshift_oauth_keycloak_ingress.resources[0].spec.tls[0].secretName }}
       (zuno-auth) not found - cert-manager must have issued it first;
       check `make day0 check keycloak` before re-running.
-  when: (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
+  when:
+    - not (zuno_keycloak_external_mode | bool)
+    - (_openshift_oauth_keycloak_ca.resources | default([]) | length) == 0
 
 # ACME-issued Secrets (Let's Encrypt via cert-manager) carry only
 # tls.crt/tls.key, no separate ca.crt - the chain is already in every
@@ -115,6 +131,7 @@
 # Vault-issued Secrets (vault-issuer) do carry ca.crt (a private root no
 # system store knows), which must be bundled explicitly.
 - name: "openshift_oauth | copy the Keycloak (if privately-issued) + router CAs into openshift-config as keycloak-serving-ca (key ca.crt) for openID.ca"
+  when: not (zuno_keycloak_external_mode | bool)
   kubernetes.core.k8s:
     state: present
     definition:
@@ -131,6 +148,23 @@
                else ''
              )
              + (_openshift_oauth_router_ca.resources[0].data['ca-bundle.crt']) }}
+
+# ADR-0352 / WP-211, external mode: the same ConfigMap built from the SUPPLIED CA bundle (empty = the external
+# certificate is publicly trusted, so only the router CA the oauth-server already needs is kept).
+- name: "openshift_oauth | publish the supplied Keycloak CA + router CA as keycloak-serving-ca (external mode)"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: keycloak-serving-ca
+        namespace: openshift-config
+      data:
+        ca.crt: >-
+          {{ ((zuno_keycloak_ca_pem + "\n") if (zuno_keycloak_ca_pem | length > 0) else '')
+             + (_openshift_oauth_router_ca.resources[0].data['ca-bundle.crt']) }}
+  when: zuno_keycloak_external_mode | bool
 
 # ADR-0347: cluster-wide complement to openID.ca above (defense in depth) -
 # proxy/cluster.spec.trustedCA is consumed by every operator whose
@@ -197,8 +231,9 @@
 - name: "openshift_oauth | decide whether this cluster has a private PKI root to trust cluster-wide"
   ansible.builtin.set_fact:
     _openshift_oauth_pki_root_pem: >-
-      {{ (_openshift_oauth_vault_pki_cm.resources | default([{}]) | first | default({})).get('data', {}).get('ca.crt', '')
-         or ((((_openshift_oauth_vault_root.resources | default([{}]))[0].data | default({})).get('ca.crt', '')) | b64decode) }}
+      {{ ((_openshift_oauth_vault_pki_cm.resources | default([{}]) | first | default({})).get('data', {}).get('ca.crt', '')
+         or ((((_openshift_oauth_vault_root.resources | default([{}]))[0].data | default({})).get('ca.crt', '')) | b64decode))
+         + (("\n" + zuno_keycloak_ca_pem) if (zuno_keycloak_ca_pem | default('') | length > 0) else '') }}
 - name: "openshift_oauth | reduce that to the boolean the three consumers key on"
   ansible.builtin.set_fact:
     _openshift_oauth_private_ca: >-

@@ -1,4 +1,4 @@
-{{- if .Values.keycloak.enabled }}
+{{- if and .Values.keycloak.enabled .Values.keycloak.builtIn }}
 # ADR-0530/WP-091: make files/realm-zuno.json authoritative for CLIENTS.
 #
 # The realm import next door only ever creates. The operator runs it with
