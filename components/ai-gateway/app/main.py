@@ -18,11 +18,13 @@ import time
 import uuid
 from typing import Any, AsyncIterator, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Response
+import httpx
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app import classification_floor, model_tasks, tool_markers
+from app import key_ceilings, metered_paths, stream_guard
 from app import guardrails, maas_adapter, quota, quota_fail_modes, quota_windows, reasoning as reasoning_fallback, routing_decisions, semantic_cache
 from app.auth import CallerIdentity, require_admin, validate_token
 from app.image_providers import ImageProviderFactoryError, generate_image
@@ -307,10 +309,11 @@ def _last_user_text(messages: List[ChatMessage]) -> str:
 
 async def _observed_stream(
     stream: AsyncIterator[str], *, prompt: str, agent: str, run_id: Optional[str], project_id: Optional[str],
+    extra: Optional[List[str]] = None,
 ) -> AsyncIterator[str]:
-    """Pass the SSE stream through untouched and, once it ends, hand the
-    accumulated reply to the fire-and-forget observer. Nothing is held back:
-    in a stream the reply is observed, never blocked (ADR-0567)."""
+    """Observe mode: pass the SSE stream through untouched and, once it ends,
+    hand the accumulated reply to the fire-and-forget observer. Nothing is held
+    back (ADR-0567); in block mode app/stream_guard.py is used instead."""
     reply: List[str] = []
     try:
         async for chunk in stream:
@@ -324,15 +327,50 @@ async def _observed_stream(
     finally:
         guardrails.observe_exchange(
             message=prompt, reply="".join(reply), agent=agent or "unknown",
-            run_id=run_id or "", project_id=project_id,
+            run_id=run_id or "", project_id=project_id, extra=extra or (),
         )
+
+
+def _chat_stream_events(stream: AsyncIterator[str]) -> AsyncIterator["tuple[str, str]"]:
+    """(raw SSE chunk, reply text it adds) for app/stream_guard.py: the content
+    delta, and the arguments of a tool-call delta (model output too)."""
+    async def events() -> AsyncIterator["tuple[str, str]"]:
+        try:
+            async for chunk in stream:
+                text = ""
+                if chunk.startswith("data: ") and not chunk.startswith("data: [DONE]"):
+                    try:
+                        delta = json.loads(chunk[6:])["choices"][0]["delta"]
+                        text = delta.get("content") or ""
+                        for call in delta.get("tool_calls") or []:
+                            text += (call.get("function") or {}).get("arguments") or ""
+                    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
+                        pass
+                yield chunk, text
+        finally:
+            close = getattr(stream, "aclose", None)
+            if close is not None:
+                await close()
+    return events()
+
+
+def _guarded_reply_evaluator(
+    *, agent: str, run_id: Optional[str], project_id: Optional[str],
+):
+    async def evaluate(text: str):
+        return await guardrails.evaluate(
+            [text], agent=agent or "unknown", run_id=run_id or "", project_id=project_id, mode="block",
+        )
+    return evaluate
 
 
 async def _guardrails_refusal(
     stage: str, detections: List[Dict[str, Any]], *, request_id: str, classification: str,
+    unavailable: bool = False,
 ) -> JSONResponse:
-    """400 for a blocked exchange, recorded in the routing-decisions store so
-    the caller's routing panel shows why nothing was served."""
+    """400 for a blocked exchange (503 for a fail-closed detector outage, ADR-0602
+    clause 8), recorded in the routing-decisions store so the caller's routing
+    panel shows why nothing was served."""
     await routing_decisions.set_routing_decision(
         request_id,
         {
@@ -340,12 +378,14 @@ async def _guardrails_refusal(
             "model": None,
             "kind": None,
             "classification": classification,
-            "blocked_by": "guardrails",
+            "blocked_by": "guardrails_unavailable" if unavailable else "guardrails",
             "guardrails_stage": stage,
             "fallback_used": False,
             "fallback_from": None,
         },
     )
+    if unavailable:
+        return JSONResponse(guardrails.unavailable_body(stage), status_code=503)
     return JSONResponse(guardrails.refusal_body(stage, detections), status_code=400)
 
 
@@ -494,15 +534,24 @@ async def chat_completions(
     # so a caller cannot get a laxer guardrails mode than the routing it is subject to.
     # ADR-0579: the calling agent's declared mode and the corp minimum can only harden it.
     gr_mode = guardrails.mode_for(classification, x_zuno_agent)
-    gr_prompt = _last_user_text(payload.messages) if gr_mode != "off" else ""
+    # ADR-0602 clause 8 (WP-225): the last user message AND the current turn's
+    # tool results are scanned (an injection planted in a page arrives as one).
+    gr_items = guardrails.chat_scan_items(payload.messages) if gr_mode != "off" else []
+    gr_prompt = next((it.text for it in gr_items if it.kind == "prompt"), "")
+    gr_extra = [it.text for it in gr_items if it.kind != "prompt"]
     if gr_mode == "block":
         found = await guardrails.evaluate(
-            [gr_prompt], agent=x_zuno_agent or "unknown", run_id=x_zuno_run_id.strip(),
+            [it.text for it in gr_items], agent=x_zuno_agent or "unknown", run_id=x_zuno_run_id.strip(),
             project_id=project_id, mode="block",
         )
         if found:
             return await _guardrails_refusal(
-                "prompt", found, request_id=request_id, classification=classification,
+                guardrails.stage_of(found, gr_items), found, request_id=request_id,
+                classification=classification,
+            )
+        if found is None and guardrails.fails_closed(classification):
+            return await _guardrails_refusal(
+                "prompt", [], request_id=request_id, classification=classification, unavailable=True,
             )
 
     # ADR-0591 decision 6: every eligible candidate is unavailable - answer now,
@@ -541,9 +590,18 @@ async def chat_completions(
             except StopAsyncIteration:
                 first_chunk = None
             stream = _prepend(first_chunk, stream)
-        if gr_mode != "off":
+        if gr_mode == "block":
+            # ADR-0602 clause 8: held back in segments and cut on a detection.
+            stream = stream_guard.guard(
+                _chat_stream_events(stream),
+                evaluate=_guarded_reply_evaluator(agent=x_zuno_agent, run_id=run_id, project_id=project_id),
+                error_event=stream_guard.openai_chat_error_event,
+                fail_closed=guardrails.fails_closed(classification),
+            )
+        elif gr_mode != "off":
             stream = _observed_stream(
                 stream, prompt=gr_prompt, agent=x_zuno_agent, run_id=run_id, project_id=project_id,
+                extra=gr_extra,
             )
         return StreamingResponse(
             stream,
@@ -588,10 +646,14 @@ async def chat_completions(
             return await _guardrails_refusal(
                 "reply", found, request_id=request_id, classification=classification,
             )
+        if found is None and guardrails.fails_closed(classification):
+            return await _guardrails_refusal(
+                "reply", [], request_id=request_id, classification=classification, unavailable=True,
+            )
         return result
     guardrails.observe_exchange(
         message=gr_prompt, reply=reply, agent=x_zuno_agent or "unknown",
-        run_id=x_zuno_run_id.strip(), project_id=project_id,
+        run_id=x_zuno_run_id.strip(), project_id=project_id, extra=gr_extra,
     )
     return result
 
@@ -1548,3 +1610,288 @@ async def _stream_completion(
     logger.error("all eligible providers failed for classification %s: %s", classification, "; ".join(errors))
     yield _sse_chunk(completion_id, created, "none", {}, finish_reason="error")
     yield "data: [DONE]\n\n"
+
+
+# ---------------------------------------------------------------------------
+# ADR-0602 clause 9 (WP-225 lot A): `/v1/messages` (Anthropic Messages) and
+# `/v1/responses` (OpenAI Responses), metered pass-through to a local model
+# that speaks the protocol. Off by default (404, as before); see
+# app/metered_paths.py. Open by decision: metered, never blocked by the
+# metering, and capped only when the chart sets a ceiling (app/key_ceilings.py).
+
+
+def _metered_upstream(
+    model: str, classification: str, local_only: bool, agent: str, task: str,
+) -> "tuple[Optional[str], Dict[str, Any], str]":
+    """(provider, cfg, "") for the first provider mapped to `model` that is
+    eligible for the effective classification and reachable, else (None, {}, why)."""
+    names = metered_paths.model_map().get(model or "")
+    if not names:
+        return None, {}, f"model {model!r} is not served on this path"
+    try:
+        eligible = {c.name for c in routing_table.candidates_for(
+            classification, local_only=local_only, exclude=model_routing_policy.exclude_for(agent, task),
+        )}
+    except RoutingError as exc:
+        return None, {}, str(exc)
+    for name in names:
+        try:
+            cfg = routing_table.provider_config(name)
+        except StopIteration:
+            continue
+        if cfg.get("kind", "saas") != "local" or not cfg.get("endpoint") or name not in eligible:
+            continue
+        if cfg.get("via_maas") and not maas_adapter.should_use_maas(cfg, "local"):
+            continue
+        if _availability_skip(ProviderCandidate(name=name, kind="local"), cfg):
+            continue
+        return name, cfg, ""
+    return None, {}, f"no provider serving {model!r} is eligible for classification {classification} and available"
+
+
+def _metered_upstream_headers(
+    cfg: Dict[str, Any], identity: CallerIdentity, request_id: str, quota_class: str,
+    project_id: Optional[str], forwarded: Dict[str, str],
+) -> Dict[str, str]:
+    headers = {"Content-Type": "application/json", "X-Zuno-Request-Id": request_id, **forwarded}
+    if cfg.get("via_maas"):
+        headers["Authorization"] = f"Bearer {maas_adapter._maas_bearer_token(identity.token)}"
+        if maas_adapter.gateway_identity_enabled():
+            headers.update(maas_adapter.attested_headers(maas_adapter.MaasCallContext(
+                sub=identity.persona, groups=tuple(identity.groups or ()),
+                quota_class=quota_class or "standard", project_id=project_id,
+            )))
+    else:
+        headers["Authorization"] = f"Bearer {os.getenv('LOCAL_MODEL_API_KEY', 'not-required')}"
+    return headers
+
+
+def _metered_client(cfg: Dict[str, Any]):
+    ca_bundle = os.getenv("LOCAL_GPT_OSS_CA_BUNDLE")
+    return httpx.AsyncClient(timeout=float(cfg.get("timeout_seconds", 60)), verify=ca_bundle or True)
+
+
+def _meter(identity: CallerIdentity, quota_class: str, project_id: Optional[str], prompt: int, completion: int) -> None:
+    """The same quota path as a chat call: the token-budget ledger, plus the
+    metered-path ceiling (a no-op unless configured)."""
+    tokens = prompt + completion
+    quota.ledger.consume(quota_class, identity.persona, identity.groups, project_id, tokens)
+    key_ceilings.ceilings.consume(identity.persona, identity.client, identity.groups, tokens)
+
+
+async def _metered_call(
+    api: str, body: Dict[str, Any], identity: CallerIdentity, *,
+    classification_header: str, local_only_header: str, agent: str, task: str,
+    request_id_header: str, run_id_header: str, quota_class_header: str, project_id_header: str,
+    forwarded: Dict[str, str], count_tokens: bool = False,
+) -> Response:
+    if not metered_paths.enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+    if not isinstance(body, dict):
+        return metered_paths.error(api, 400, "invalid_request", "the request body must be a JSON object")
+    set_caller_client(identity.client)
+    set_caller_persona(identity.persona)
+    set_caller_task(task)
+    # WP-209: the same effective level as a chat call.
+    classification = classification_floor.floors.effective(
+        classification_floor.declared_level(classification_header), agent, task,
+    ).effective
+    local_only = local_only_header.strip().lower() == "true" or model_routing_policy.local_only_for_classification(
+        agent, task, classification
+    )
+    request_id = request_id_header.strip() or str(uuid.uuid4())
+    run_id = run_id_header.strip() or None
+    quota_class, project_id = _platform_context(identity, quota_class_header, project_id_header)
+    model = str(body.get("model") or "")
+
+    provider, cfg, why = _metered_upstream(model, classification, local_only, agent, task)
+    if provider is None:
+        status = 404 if "not served" in why else 400
+        return metered_paths.error(api, status, "model_not_available", why)
+    upstream_body = {**body, "model": cfg.get("maas_model_ref", cfg.get("model", model))}
+    headers = _metered_upstream_headers(cfg, identity, request_id, quota_class, project_id, forwarded)
+
+    if count_tokens:
+        # Counting generates nothing: not metered, not scanned.
+        async with _metered_client(cfg) as client:
+            resp = await client.post(metered_paths.upstream_url(cfg, api, "/count_tokens"),
+                                     json=upstream_body, headers=headers)
+        return Response(resp.content, status_code=resp.status_code,
+                        media_type=resp.headers.get("content-type", "application/json"))
+
+    # The ceiling, then the token budget: both refuse in the protocol's 429 shape.
+    ceiling = key_ceilings.ceilings.check(identity.persona, identity.client, identity.groups)
+    if ceiling is not None:
+        logger.warning("metered-path ceiling reached: api=%s %s=%s ceiling=%d/%s",
+                       api, ceiling.dimension, ceiling.subject, ceiling.ceiling, ceiling.window)
+        return metered_paths.error(api, 429, "rate_limit_exceeded", ceiling.message(),
+                                   headers={"Retry-After": str(ceiling.retry_after)},
+                                   dimension=ceiling.dimension)
+    denial = quota.ledger.check(quota_class, identity.persona, identity.groups, project_id)
+    if denial is not None and _budget_fault_rides_through(denial, quota_class):
+        denial = None
+    if denial is not None:
+        return metered_paths.error(
+            api, 429, "quota_exceeded",
+            f"token budget exhausted: {denial.dimension} budget of {denial.budget} tokens per {denial.window}",
+            headers={"Retry-After": str(denial.retry_after)} if denial.retry_after else None,
+            dimension=denial.dimension,
+        )
+
+    gr_mode = guardrails.mode_for(classification, agent)
+    gr_items = metered_paths.scan_items(api, body) if gr_mode != "off" else []
+    gr_prompt = next((it.text for it in gr_items if it.kind == "prompt"), "")
+    gr_extra = [it.text for it in gr_items if it.kind != "prompt"]
+    fail_closed = guardrails.fails_closed(classification)
+    if gr_mode == "block":
+        found = await guardrails.evaluate(
+            [it.text for it in gr_items], agent=agent or "unknown", run_id=run_id or "",
+            project_id=project_id, mode="block",
+        )
+        if found:
+            stage = guardrails.stage_of(found, gr_items)
+            return metered_paths.error(api, 400, "guardrails_blocked",
+                                       f"the {stage} was refused by the guardrails policy", stage=stage,
+                                       detections=sorted({str(d.get("detection")) for d in found}))
+        if found is None and fail_closed:
+            return metered_paths.error(api, 503, "guardrails_unavailable",
+                                       guardrails.unavailable_body("prompt")["error"]["message"], stage="prompt")
+
+    url = metered_paths.upstream_url(cfg, api)
+    span_args = dict(
+        provider=provider, model=upstream_body["model"], classification=classification,
+        request_id=request_id, caller_sub=identity.sub, groups=identity.groups, agent=agent,
+        run_id=run_id, model_kind="local", project_id=project_id,
+    )
+
+    if not body.get("stream"):
+        with model_call_span(**span_args) as call:
+            try:
+                async with _metered_client(cfg) as client:
+                    resp = await client.post(url, json=upstream_body, headers=headers)
+            except httpx.HTTPError as exc:
+                breaker.record_failure(provider, exc)
+                logger.warning("metered upstream %s failed: %s: %s", provider, type(exc).__name__, exc)
+                return metered_paths.error(api, 502, "upstream_unavailable", f"the model behind {model!r} is unreachable")
+            if resp.status_code != 200:
+                return Response(resp.content, status_code=resp.status_code,
+                                media_type=resp.headers.get("content-type", "application/json"))
+            payload = resp.json()
+            prompt_tokens, completion_tokens = metered_paths.usage_of(api, payload)
+            call.record_usage(prompt_tokens=prompt_tokens, completion_tokens=completion_tokens)
+            _meter(identity, quota_class, project_id, prompt_tokens, completion_tokens)
+        if gr_mode == "block":
+            found = await guardrails.evaluate(
+                [metered_paths.reply_text(api, payload)], agent=agent or "unknown", run_id=run_id or "",
+                project_id=project_id, mode="block",
+            )
+            if found:
+                return metered_paths.error(api, 400, "guardrails_blocked",
+                                           "the reply was refused by the guardrails policy", stage="reply",
+                                           detections=sorted({str(d.get("detection")) for d in found}))
+            if found is None and fail_closed:
+                return metered_paths.error(api, 503, "guardrails_unavailable",
+                                           guardrails.unavailable_body("reply")["error"]["message"], stage="reply")
+        elif gr_mode == "observe":
+            guardrails.observe_exchange(message=gr_prompt, reply=metered_paths.reply_text(api, payload),
+                                        agent=agent or "unknown", run_id=run_id or "",
+                                        project_id=project_id, extra=gr_extra)
+        return JSONResponse(payload)
+
+    client = _metered_client(cfg)
+    try:
+        resp = await client.send(client.build_request("POST", url, json=upstream_body, headers=headers), stream=True)
+    except httpx.HTTPError as exc:
+        await client.aclose()
+        breaker.record_failure(provider, exc)
+        logger.warning("metered upstream %s failed: %s: %s", provider, type(exc).__name__, exc)
+        return metered_paths.error(api, 502, "upstream_unavailable", f"the model behind {model!r} is unreachable")
+    if resp.status_code != 200:
+        content = await resp.aread()
+        await resp.aclose()
+        await client.aclose()
+        return Response(content, status_code=resp.status_code,
+                        media_type=resp.headers.get("content-type", "application/json"))
+
+    async def events() -> AsyncIterator["tuple[str, str]"]:
+        meter = metered_paths.StreamMeter(api)
+        reply: List[str] = []
+        try:
+            with model_call_span(**span_args) as call:
+                try:
+                    async for raw, data in metered_paths.sse_events(resp.aiter_lines()):
+                        text = meter.observe(data)
+                        if text:
+                            reply.append(text)
+                        yield raw, text
+                finally:
+                    completion = meter.completion
+                    if not completion and reply:
+                        # Cut before the final usage event: estimate what was generated.
+                        completion = len("".join(reply)) // _CHARS_PER_TOKEN + 1
+                    call.record_usage(prompt_tokens=meter.prompt, completion_tokens=completion)
+                    _meter(identity, quota_class, project_id, meter.prompt, completion)
+        finally:
+            await resp.aclose()
+            await client.aclose()
+            if gr_mode == "observe":
+                guardrails.observe_exchange(message=gr_prompt, reply="".join(reply), agent=agent or "unknown",
+                                            run_id=run_id or "", project_id=project_id, extra=gr_extra)
+
+    if gr_mode == "block":
+        stream = stream_guard.guard(
+            events(),
+            evaluate=_guarded_reply_evaluator(agent=agent, run_id=run_id, project_id=project_id),
+            error_event=stream_guard.anthropic_error_event if api == metered_paths.ANTHROPIC
+            else stream_guard.responses_error_event,
+            fail_closed=fail_closed,
+        )
+    else:
+        async def stream_raw() -> AsyncIterator[str]:
+            inner = events()
+            try:
+                async for raw, _text in inner:
+                    yield raw
+            finally:
+                await inner.aclose()
+        stream = stream_raw()
+    return StreamingResponse(stream, media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+def _forwarded(request: Request) -> Dict[str, str]:
+    return {h: request.headers[h] for h in metered_paths.FORWARDED_HEADERS if h in request.headers}
+
+
+async def _metered_endpoint(api: str, request: Request, identity: CallerIdentity, count_tokens: bool = False) -> Response:
+    if not metered_paths.enabled():
+        raise HTTPException(status_code=404, detail="Not Found")
+    try:
+        body = await request.json()
+    except ValueError:
+        return metered_paths.error(api, 400, "invalid_request", "the request body is not valid JSON")
+    h = request.headers
+    return await _metered_call(
+        api, body, identity,
+        classification_header=h.get("X-Zuno-Data-Classification", ""),
+        local_only_header=h.get("X-Zuno-Local-Only", "false"),
+        agent=h.get("X-Zuno-Agent", ""), task=h.get("X-Zuno-Task", ""),
+        request_id_header=h.get("X-Zuno-Request-Id", ""), run_id_header=h.get("X-Zuno-Run-Id", ""),
+        quota_class_header=h.get("X-Zuno-Quota-Class", ""), project_id_header=h.get("X-Zuno-Project-Id", ""),
+        forwarded=_forwarded(request), count_tokens=count_tokens,
+    )
+
+
+@app.post("/v1/messages", dependencies=[Depends(adopt_incoming_trace_context)])
+async def anthropic_messages(request: Request, identity: CallerIdentity = Depends(validate_token)) -> Response:
+    return await _metered_endpoint(metered_paths.ANTHROPIC, request, identity)
+
+
+@app.post("/v1/messages/count_tokens", dependencies=[Depends(adopt_incoming_trace_context)])
+async def anthropic_count_tokens(request: Request, identity: CallerIdentity = Depends(validate_token)) -> Response:
+    return await _metered_endpoint(metered_paths.ANTHROPIC, request, identity, count_tokens=True)
+
+
+@app.post("/v1/responses", dependencies=[Depends(adopt_incoming_trace_context)])
+async def openai_responses(request: Request, identity: CallerIdentity = Depends(validate_token)) -> Response:
+    return await _metered_endpoint(metered_paths.RESPONSES, request, identity)

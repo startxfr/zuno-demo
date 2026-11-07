@@ -61,6 +61,14 @@
       # ADR-0579 (WP-164 lot 3): mount the generated per-agent guardrail modes.
       guardrails:
         modesGenerated: "{{ zuno_ai_gateway_guardrails_modes_generated | default(false) | bool }}"
+        # ADR-0602 clause 8 (WP-225): block fails closed from this class up.
+        failClosedFrom: "{{ zuno_ai_gateway_guardrails_fail_closed_from | default('C2') }}"
+      # ADR-0602 clause 9 (WP-225): metered /v1/messages and /v1/responses (off),
+      # the served models and the optional per-key ceilings (none by default).
+      meteredPaths:
+        enabled: "{{ zuno_ai_gateway_metered_paths | default(false) | bool }}"
+        models: "{{ zuno_ai_gateway_metered_paths_models | default({}) }}"
+        keyCeilings: "{{ zuno_ai_gateway_key_ceilings | default({}) }}"
       # ADR-0565 clause 5 (WP-209): mount the generated classification floors;
       # the level of a header-less call stays C1 unless a cluster sets C3.
       classification:

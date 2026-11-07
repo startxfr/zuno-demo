@@ -186,9 +186,11 @@ def test_observe_survives_a_failing_detector() -> None:
     assert r.status_code == 200
 
 
-def test_block_fails_open_when_the_detector_is_unavailable() -> None:
-    with _Env({"C2": "block"}, _boom):
-        r = _post("/v1/chat/completions", json=_BODY, headers=_HDR)
+def test_block_fails_open_at_c1_when_the_detector_is_unavailable() -> None:
+    # ADR-0602 clause 8 (WP-225): C1 keeps the old fail-open behaviour; C2 and
+    # above fail closed (tests/test_wp225_guardrails_metering.py).
+    with _Env({"C1": "block"}, _boom):
+        r = _post("/v1/chat/completions", json=_BODY, headers={**_HDR, "X-Zuno-Data-Classification": "C1"})
     assert r.status_code == 200
 
 

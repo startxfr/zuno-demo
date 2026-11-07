@@ -247,6 +247,10 @@ jobs:
           # WP-209 (ADR-0565 clause 5): effective = max(header, floor(agent, task)),
           # and the level of a header-less call (C1 shipped, C3 tested).
           python3 tests/test_wp209_classification_floor.py
+          # WP-225 lot A (ADR-0602 clauses 8, 9): block fails closed from C2, tool
+          # results scanned, streams cut on a detection, the classifier hook, and
+          # the metered /v1/messages and /v1/responses with the per-key ceiling.
+          python3 tests/test_wp225_guardrails_metering.py
       - name: supply-chain pin_release.py tests (ADR-0115)
         working-directory: platform/supply-chain
         run: |

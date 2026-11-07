@@ -132,6 +132,48 @@ routes under (client, `code`), whose generated policy entry puts
 ADR-0594's local-only rule still apply, so a turn with a tool result stays
 local. The `model_call` span carries `zuno.task`.
 
+### `POST /v1/messages`, `POST /v1/messages/count_tokens`, `POST /v1/responses` (ADR-0602 clause 9, WP-225)
+
+Off by default (`meteredPaths.enabled`; `404` when off). The Anthropic Messages
+and OpenAI Responses paths, as a metered pass-through (`app/metered_paths.py`):
+the body is forwarded as sent, `model` rewritten to the served name, to the first
+provider of `METERED_PATHS_MODELS[model]` that is `kind: local`, has an
+`endpoint`, is eligible for the call's effective classification (WP-209 floor
+included) and is available. The reply's usage (`input_tokens` +
+cache tokens + `output_tokens`; Responses `usage`) is counted on
+`zuno.model_tokens` and the token-budget ledger, as a chat call is, because MaaS
+counts neither path. Guardrails apply as on chat (below). `count_tokens` is
+forwarded unmetered.
+
+Open by decision: no ceiling unless `KEY_CEILINGS` (`meteredPaths.keyCeilings`)
+sets one per key (persona), per tenant (Keycloak group, one shared counter) or
+as a default; `exempt` lists personas or client ids never capped. Over a
+ceiling: `429` with `Retry-After`, Anthropic `{"type":"error","error":{"type":
+"rate_limit_error",...}}` or OpenAI `{"error":{"type":"tokens","code":
+"rate_limit_exceeded",...}}`. A Claude Code key minted on MaaS goes to MaaS
+directly and is not affected.
+
+### Guardrails (ADR-0567, ADR-0602 clause 8)
+
+Mode per effective classification: `off`, `observe` (evaluate after the reply,
+never alter it) or `block`. Scanned: the last user message and the current
+turn's tool results and retrieved context (`tool` messages; Anthropic
+`tool_result`, `document`, `search_result` blocks; Responses `*_call_output`
+items), and the reply. Not scanned: system prompts and earlier turns.
+
+In `block`:
+- a detection refuses with `400 guardrails_blocked` and its `stage` (`prompt`,
+  `tool_result`, `retrieved`, `reply`);
+- a detector or classifier outage refuses with `503 guardrails_unavailable`
+  from `GUARDRAILS_FAIL_CLOSED_FROM` up (default `C2`); C1 is served;
+- a streamed reply is held back by `GUARDRAILS_STREAM_HOLD_BACK_CHARS` (400; 0
+  buffers it all), checked with a 256-character overlap, and cut on a detection
+  with the protocol's error event (chat SSE `data: {"error":...}` then
+  `[DONE]`; Anthropic and Responses `event: error`).
+
+`GUARDRAILS_CLASSIFIER=detectors-api` adds a model-based classifier through the
+FMS Guardrails detector API (`app/guardrails_classifier.py`); off by default.
+
 ### `GET /healthz` / `GET /readyz`
 
 Liveness always `200`. Readiness returns `503` until

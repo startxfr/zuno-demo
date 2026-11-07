@@ -301,10 +301,11 @@ guardrails:
   nemoUrl: http://zuno-guardrails.zuno-ai-run.svc:80
   configId: zuno-observe
   timeoutSeconds: "10"
-  # off | observe | block, per DECLARED data classification
-  # (X-Zuno-Data-Classification). observe = evaluate after the response,
-  # never alter it; block = refuse a flagged prompt/reply with HTTP 400 (a
-  # streamed reply is observed, not blocked). Every class ships observe:
+  # off | observe | block, per EFFECTIVE data classification (the
+  # X-Zuno-Data-Classification header raised by the WP-209 floor and the
+  # ADR-0594 markers). observe = evaluate after the response, never alter it;
+  # block = refuse a flagged prompt, tool result or reply with HTTP 400, and
+  # cut a streamed reply on a detection (WP-225). Every class ships observe:
   # switching one to block is a values change, decided on evidence
   # (ADR-0534). An unlisted class is observe.
   modeByClassification:
@@ -317,6 +318,61 @@ guardrails:
   # minimum and the calling agent's `zuno.guardrails.mode`. Needs an image
   # with app/guardrails.py's AgentModes (ai-gateway after WP-164 lot 3).
   modesGenerated: false
+  # ADR-0602 clause 8 (WP-225 lot A). Each takes effect in `block` mode only;
+  # with every class on observe (above) nothing changes for a caller.
+  # The lowest class whose `block` fails CLOSED when the detector (or the
+  # classifier below) is unreachable or errors: the request is refused with a
+  # typed 503 instead of served unchecked. Below it (C1) a detector outage
+  # still lets the request through. "" = never fail closed.
+  failClosedFrom: C2
+  # Scan the current turn's tool results and retrieved context (OpenAI `tool`
+  # messages, Anthropic tool_result/document/search_result blocks, Responses
+  # *_call_output items) like the user's text. false = last user message only.
+  scanToolResults: true
+  # A streamed reply in block mode is held back until this many characters
+  # are pending, checked, then released or cut with the protocol's error event.
+  # 0 = buffer the whole reply and check it once at the end.
+  streamHoldBackChars: 400
+  # A model-based classifier next to the regular expressions
+  # (app/guardrails_classifier.py). Off: no model is wired by default.
+  # `detectors-api` calls any detector served through the FMS Guardrails
+  # detector API (TrustyAI's Hugging Face detector runtime): POST
+  # <url>/api/v1/text/contents with header detector-id. Its outage counts as
+  # a detector outage (failClosedFrom above).
+  classifier:
+    type: ""          # "" (off) | detectors-api
+    url: ""
+    detectorId: ""
+    threshold: "0.5"
+
+# ADR-0602 clause 9 (WP-225 lot A): the ai-gateway serves POST /v1/messages
+# (Anthropic Messages, with /v1/messages/count_tokens) and POST /v1/responses
+# (OpenAI Responses) as a metered pass-through to a local model that speaks
+# the protocol, because MaaS's token limits do not count either path. Usage is
+# counted on zuno_model_tokens and the token-budget ledger like a chat call;
+# guardrails and the WP-209 classification apply. Open by decision: metered,
+# not blocked. A Claude Code key minted on MaaS still goes to MaaS directly and
+# is unaffected. Off = the paths answer 404, as before.
+meteredPaths:
+  enabled: false
+  # The `model` a client sends -> provider-routing.yaml provider names, tried
+  # in order; the first `kind: local` one with an `endpoint`, eligible for the
+  # call's classification and available is used. Example:
+  #   gpt-oss-20b: [local-gpt-oss-maas, local-gpt-oss]
+  models: {}
+  # Optional per-key token ceiling on these two paths (app/key_ceilings.py).
+  # A key is the caller's persona (the person, or an OpenClaw persona); a
+  # tenant a Keycloak group, whose members share one counter. `default: 0` and
+  # no entries = no ceiling (today's behaviour). `exempt` (persona or Keycloak
+  # client id) is never capped, whatever the default. Over a ceiling the call
+  # gets the protocol's 429 (Anthropic rate_limit_error, OpenAI code
+  # rate_limit_exceeded) with Retry-After. Counters follow quotaLedger.store.
+  keyCeilings:
+    window: 1h
+    default: 0
+    keys: {}
+    tenants: {}
+    exempt: []
 
 # ADR-0594 (WP-191): signed classification markers on MCP tool results. The key
 # Secret is generated in zuno-ai-run by the mcp-gateway chart; both gateways read it.

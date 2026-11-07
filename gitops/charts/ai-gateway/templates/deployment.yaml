@@ -134,6 +134,39 @@ spec:
             # again within one interval (0 = at start only).
             - name: GUARDRAILS_WARMUP_INTERVAL_SECONDS
               value: {{ .Values.guardrails.warmUpIntervalSeconds | default 60 | quote }}
+            # ADR-0602 clause 8 (WP-225): block fails closed from this class up
+            # on a detector outage; tool results scanned; streams held back and cut.
+            {{- if and .Values.guardrails.failClosedFrom (not (has .Values.guardrails.failClosedFrom (list "C1" "C2" "C3" "C4"))) }}
+            {{- fail (printf "guardrails.failClosedFrom must be empty or C1 to C4, not %v" .Values.guardrails.failClosedFrom) }}
+            {{- end }}
+            - name: GUARDRAILS_FAIL_CLOSED_FROM
+              value: {{ .Values.guardrails.failClosedFrom | default "off" | quote }}
+            - name: GUARDRAILS_SCAN_TOOL_RESULTS
+              value: {{ .Values.guardrails.scanToolResults | quote }}
+            - name: GUARDRAILS_STREAM_HOLD_BACK_CHARS
+              value: {{ .Values.guardrails.streamHoldBackChars | quote }}
+            {{- with .Values.guardrails.classifier }}
+            {{- if .type }}
+            # WP-225: the model-based classifier next to the regular expressions.
+            - name: GUARDRAILS_CLASSIFIER
+              value: {{ .type | quote }}
+            - name: GUARDRAILS_CLASSIFIER_URL
+              value: {{ .url | quote }}
+            - name: GUARDRAILS_CLASSIFIER_DETECTOR_ID
+              value: {{ .detectorId | quote }}
+            - name: GUARDRAILS_CLASSIFIER_THRESHOLD
+              value: {{ .threshold | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.meteredPaths.enabled }}
+            # ADR-0602 clause 9 (WP-225): /v1/messages and /v1/responses, metered.
+            - name: METERED_PATHS_ENABLED
+              value: "true"
+            - name: METERED_PATHS_MODELS
+              value: {{ .Values.meteredPaths.models | toJson | quote }}
+            - name: KEY_CEILINGS
+              value: {{ .Values.meteredPaths.keyCeilings | toJson | quote }}
+            {{- end }}
             {{- if .Values.availability.readiness.enabled }}
             # ADR-0591 decisions 1-2: skip local models whose
             # LLMInferenceService is not Ready (polled with the projected
