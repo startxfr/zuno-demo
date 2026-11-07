@@ -17,3 +17,6 @@ regexes = [
   # fires on the shape `Authorization: Bearer <word>`).
   '''Authorization: Bearer placeholder\b''',
 ]
+# A literal placeholder, not a credential: commit 224615ab (WP-238) sent `Bearer placeholder` through OpenClaw's
+# egress proxy, which replaces it. The header is gone since; this keeps a full-history scan green.
+commits = ["224615ab387771fda0dd9788036ec5348704fa50"]

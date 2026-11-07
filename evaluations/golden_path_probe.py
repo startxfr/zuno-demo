@@ -396,7 +396,8 @@ def probe_kagent(ctx: Context) -> Result:
 
 
 _OPENCLAW_CURL = (
-    'curl -s -m 150 -w "\\nhttp=%{http_code}\\n" -H "Content-Type: application/json" -H "Authorization: Bearer placeholder" '
+    # No Authorization header: the operator's egress proxy injects the openclaw-<persona> token for this domain.
+    'curl -s -m 150 -w "\\nhttp=%{http_code}\\n" -H "Content-Type: application/json" '
     '-d \'{"model":"auto","max_tokens":64,"messages":[{"role":"user","content":"Say OK."}]}\' '
     "http://ai-gateway.zuno-ai-run.svc:8080/v1/chat/completions"
 )
