@@ -318,10 +318,11 @@ and WP-223 are Done and WP-224 is rolled out; the rest of WP-224, WP-225, WP-226
 outrunning robustness: a definition of done and a WIP limit of two new experiences per band (ADR-0606), pre-GA
 dependencies pinned, gated and scheduled (ADR-0607), the repository as the only source of cluster state (ADR-0608),
 rehearsals in canary namespaces of demo333 (ADR-0609). ADR-0110 sits here, `Implemented` on 2026-11-07. The world
-model (ADR-0604) joins this band when its branch lands; it is the band's first new experience under ADR-0606.
+model (ADR-0604, WP-228 to WP-237) is the band's first new experience under ADR-0606: a browser world model on a GPU
+node that exists only while the demo is enabled, shown on 2026-11-09 as roadmap, not live.
 
-**9 ADRs: ADR-0110 and the hardening and delivery records.** Open: ADR-0584, ADR-0602, ADR-0603, ADR-0606 to ADR-0609.
-Open work packages: WP-221, WP-224 to WP-227, WP-239 to WP-243.
+**10 ADRs: ADR-0110, the hardening and delivery records, and the world model.** Open: ADR-0584, ADR-0602, ADR-0603,
+ADR-0604, ADR-0606 to ADR-0609. Open work packages: WP-221, WP-224 to WP-237, WP-239 to WP-243.
 
 ## v0.17
 

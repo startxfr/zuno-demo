@@ -381,6 +381,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
 | [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Proposed | Harden the platform's trust boundaries before a customer runs it |
 | [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Proposed | Close the medium-severity security gaps found in the 2026-11-06 review |
+| [ADR-0604](0604-introduce-an-interactive-generative-world-model-experience.md) | Accepted | Introduce an interactive generative world-model experience on OpenShift AI and NVIDIA Blackwell |
 | [ADR-0606](0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md) | Accepted | Admit new experiences with a definition of done and a WIP limit |
 | [ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md) | Accepted | Pin, gate and schedule pre-GA dependencies |
 | [ADR-0608](0608-keep-the-repository-the-only-source-of-cluster-state.md) | Accepted | Keep the repository the only source of cluster state |

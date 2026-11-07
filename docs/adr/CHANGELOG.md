@@ -9,6 +9,15 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Renumbering and addition (2026-11-07) - the world-model ADR becomes ADR-0604, in v0.16
+
+The interactive generative world-model record was committed as a second `0602` file (a380cc77) while ADR-0602 already
+meant the trust-boundary hardening record cited by WP-222 to WP-227 and by the gateway charts. Two files with one number
+made the index check compare the wrong pair. The world-model record takes the next free number, ADR-0604, joins v0.16 as
+`Accepted` (its GPU acceptance cannot run before v0.15 is tagged; the 2026-11-09 demo shows it as roadmap), and was amended in place before any implementation with the user's decisions (an on-demand GPU node behind
+one switch, H.264 over WebSocket instead of WebRTC for v1, FLUX called inside its namespace, prompt enhancement through
+the ai-gateway). Its work packages are WP-228 to WP-237. ADR-0602 keeps its number and meaning.
+
 ## Addition, retarget and new band (2026-11-07) - ADR-0605 to ADR-0609, v0.15 re-scoped, v0.17 created
 
 A project review on 2026-11-07 found the platform's breadth ahead of its robustness: no check sends a real turn through

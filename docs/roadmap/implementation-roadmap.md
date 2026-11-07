@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 1 | 4 | WP-238 |
-| v0.16 | 9 | 7 | 15 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-239, WP-240, WP-241, WP-242, WP-243 |
+| v0.16 | 10 | 8 | 25 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-228, WP-229, WP-230, WP-231, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237, WP-239, WP-240, WP-241, WP-242, WP-243 |
 | v0.17 | 2 | 2 | 9 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -1064,6 +1064,25 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP-226 | [wp-226](work-packages/wp-226-supply-chain-and-dependency-hygiene-digests-enforce-lockfiles.md) | 0603 | WP-222 | Operator pending | committed locally on `wp-226-supply-chain`, not pushed; rebuilds, warn dry run, enforce, first rendered release and route-cert switch wait for the user's go |
 | WP-227 | [wp-227](work-packages/wp-227-hardened-deployment-profile.md) | 0602 | WP-223, WP-224, WP-225, WP-226 | Not started | scratch-cluster rehearsal |
 
+### Phase 51 — interactive world-model demo (added 2026-11-07)
+
+ADR-0604 adds a browser world-model experience (Waypoint-1.5-1B with FLUX.2 klein 4B) on one full RTX PRO 6000 in a node
+that exists only while `zuno_world_model_enabled` is on. Everything except WP-232 and WP-237 is built and verified without
+the GPU. The 2026-11-09 demo shows it as roadmap, not live; the user plans a world-model event within three weeks, so presentable-demo work comes first and phase-2 options wait.
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-228 | [wp-228](work-packages/wp-228-world-model-adr-0604-and-tracking.md) | 0604 | none | Repo work in review | committed on `wm-world-model`, not pushed; push waits for the user's go |
+| WP-229 | [wp-229](work-packages/wp-229-on-demand-world-model-gpu-pool.md) | 0604 | WP-228 | Not started | GPU Operator toleration in an announced maintenance window, with the user's go |
+| WP-230 | [wp-230](work-packages/wp-230-mirror-world-model-weights-to-s3.md) | 0604 | WP-228 | Not started | off-cluster copy of the weights to S3 |
+| WP-231 | [wp-231](work-packages/wp-231-world-model-gpu-runtime-image.md) | 0604 | WP-230 | Not started | build-node storage check, then the in-cluster build |
+| WP-232 | [wp-232](work-packages/wp-232-world-model-gpu-smoke-test.md) | 0604 | WP-229, WP-231 | Not started | one GPU window of about 3 h: enable, smoke Job, preset images, disable |
+| WP-233 | [wp-233](work-packages/wp-233-world-model-experience-client-and-prompt-enhancement.md) | 0604 | WP-228 | Not started | none expected: no agents-release task is needed (checked 2026-11-07); a live C1 probe with the user's go |
+| WP-234 | [wp-234](work-packages/wp-234-world-model-web-api-and-ui.md) | 0604 | WP-231, WP-233 | Not started | none (local end-to-end on mocks) |
+| WP-235 | [wp-235](work-packages/wp-235-world-model-gitops-integration.md) | 0604 | WP-229, WP-234 | Not started | none until WP-237 |
+| WP-236 | [wp-236](work-packages/wp-236-world-model-observability-and-demo-kit.md) | 0604 | WP-235 | Not started | none |
+| WP-237 | [wp-237](work-packages/wp-237-world-model-final-acceptance-and-rehearsal.md) | 0604 | WP-232, WP-236 | Not started | one GPU day: full cycle, measurements, recordings, rehearsal, disable |
+
 ### Phase 52 — a dependable demonstration, then governed growth (added 2026-11-07)
 
 The project review of 2026-11-07 found the platform's breadth ahead of its robustness: no check sends a real turn
@@ -1225,6 +1244,7 @@ moving.
 
 ## Change log
 
+- 2026-11-07 — ADR-0604 and WP-228 to WP-237 added in v0.16 (Phase 51): the world-model record committed as a second ADR-0602 is renumbered ADR-0604 and amended before implementation with the user's decisions (on-demand GPU node behind `zuno_world_model_enabled`, H.264 over WebSocket, FLUX inside the namespace, prompt enhancement through the ai-gateway). Only WP-232 and WP-237 use the GPU node.
 - 2026-11-07 — ADR-0605 to ADR-0609 and WP-238 to WP-243 added (Phase 52), from the project review of 2026-11-07. v0.15 becomes the demo-ready band: ADR-0565 (Implemented) and ADR-0605 (golden-path check and freeze window, WP-238), tagged before the demonstration of 2026-11-09. ADR-0584, ADR-0602 and ADR-0603 move to v0.16 with ADR-0606 (definition of done and WIP limit), ADR-0607 (pre-GA dependencies), ADR-0608 (drift) and ADR-0609 (canary rehearsals). ADR-0352 and ADR-0557 move to the new band v0.17. No decision clause of a moved record changes; each carries a dated amendment.
 - 2026-11-05 — ADR-0579 Implemented, with an amendment that records the accepted gaps (skills unused, `max_concurrent_requests` and `guardrails.categories` not consumed, v0.2 refused only once the last agent has moved). Band v0.12 now has no open ADR or work package.
 - 2026-11-05 — WP-164 Done and ADR-0581 Implemented, with an amendment: the quota script stays separate, the per-agent limits travel through UnifAI and the ai-gateway instead of Kuadrant policies, the file names are corrected, and the eight `agent_*` groups stay in the realm import. v0.12 keeps only ADR-0579.
