@@ -1,0 +1,24 @@
+{{- if and .Values.policyOperand.enabled .Values.policyOperand.registryCaBundle.enabled }}
+# WP-226 live finding (2026-11-07, warn dry run on demo333): the policy
+# webhook could not verify ANY image of the internal registry -
+# "Get https://image-registry.openshift-image-registry.svc:5000/v2/: x509:
+# certificate signed by unknown authority". The registry Service is served by
+# the OpenShift service CA, absent from the webhook image's trust store, so
+# warn mode reported every image as failed and enforce would have refused all
+# of them, signed ones included. The upstream chart mounts this ConfigMap at
+# /etc/custom-ca and sets SSL_CERT_DIR=/etc/custom-ca:/etc/ssl/certs, so the
+# system roots stay trusted.
+# Empty on purpose: the service-ca operator fills in service-ca.crt in
+# response to the annotation (same pattern as lightspeed-config's MaaS CA).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Values.policyOperand.registryCaBundle.configMapName }}
+  namespace: policy-controller-operator
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+    # Before the PolicyController (-5), whose webhook mounts it.
+    argocd.argoproj.io/sync-wave: "-6"
+{{- end }}

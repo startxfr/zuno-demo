@@ -57,6 +57,12 @@ operator:
 # cannot be committed) - see ansible/roles/rhtas_config/tasks/install.yml.
 policyOperand:
   enabled: false
+  # WP-226 (live finding 2026-11-07): the webhook must trust the OpenShift
+  # service CA to reach image-registry.openshift-image-registry.svc:5000,
+  # or it verifies no internal image at all.
+  registryCaBundle:
+    enabled: true
+    configMapName: zuno-policy-registry-service-ca
   trustRoot:
     tufMirrorUrl: http://tuf.zuno-rhtas.svc.cluster.local
     rootJsonBase64: ""
