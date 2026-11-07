@@ -196,17 +196,25 @@ label is gone, and two bounds have defaults (20 messages per JSON-RPC batch, 2 `
 ### The signed caller context
 
 A shared-credential server cannot scope its technical identity without knowing the caller, and a tool argument or a
-plain header is written by the caller. The mcp-gateway now sends two headers on every streamable-HTTP call, after the
-ADR-0011 decision (`app/caller_context.py`):
+plain header is written by the caller. After the ADR-0011 decision, the mcp-gateway sends two headers
+(`app/caller_context.py`), and only to bindings that declare `caller_context: true` in
+`platform/bindings/tools/tool-bindings.yaml`: confluence, git-forge, salesforce and aap. A third-party backend
+(kubernetes-mcp-server) never receives a caller's identity.
 
-- `X-Zuno-Caller-Context`: base64url JSON with `sub`, `groups`, `email`, `username`, `tool` (the backend's tool name)
-  and `iat`, all read from the validated token;
-- `X-Zuno-Caller-Signature`: HMAC-SHA256 of that value, with a key derived from the workload token every server
-  already holds (ADR-0037), under its own label.
+- `X-Zuno-Caller-Context`: base64url JSON with `aud` (the binding's backend name), `sub`, `groups`, `email`,
+  `email_verified`, `username`, `tool` (the backend's tool name) and `iat`, all read from the validated token;
+- `X-Zuno-Caller-Signature`: HMAC-SHA256 of that value, with a key derived per backend from the workload token every
+  server already holds (ADR-0037): `HMAC(token, "zuno-caller-context-v1:" + backend)`.
 
-Each server verifies it (`_verified_caller`, duplicated per server because an image is built from its own directory,
-ADR-0119). A missing, forged, tampered or stale context (over 300 s), or one minted for another tool, verifies as
-nothing. A server that needs a caller then refuses. The forwarded bearer is unchanged: replacing it is lot C (ADR-0602
+Each server verifies it (`_verified_caller`, four identical copies, because an image is built from its own directory,
+ADR-0119). The following verify as nothing: a missing, forged or tampered context, one older than 300 s or dated more
+than 30 s in the future, one signed or addressed for another backend, and one minted for another tool. A server that
+needs a caller then refuses. The headers are built from binding data and the validated identity only: an inbound
+`X-Zuno-Caller-*` header is never forwarded (tested).
+
+`gateway_token: false` on the five `k8s` bindings also stops X-Zuno-Gateway-Token going to kubernetes-mcp-server, which
+does not check it (calls and schema reads). The workday bindings are `provider-delegated` and refused before any call,
+so they send nothing. The forwarded bearer is unchanged: replacing it is lot C (ADR-0602
 clause 10, token exchange or a per-call assertion). The context is narrower. It tells a server which groups and which
 person to scope a call to, and nothing else.
 
@@ -219,13 +227,26 @@ person to scope a call to, and nothing else.
    - a search without a space is limited to the caller's spaces: in the CQL when they are literal keys, and always by a
      post-filter.
 
+   - `create_page` under a `parent_id` checks that the parent is a page of the same, allowed space;
+   - a refusal on a page named by id (`read_page`, `update_page`, a parent) answers "no Confluence page with id N" and
+     never names the page's space;
+   - the space is re-read in the PUT response of `update_page`, and a mismatch is logged as a warning. This is an
+     accepted race: the PUT names the checked space and the next version, so a page moved between the GET and the PUT
+     mostly fails as a version conflict, and a write that still lands elsewhere is visible in the log.
+
    `spaceAllowlist.scope: write` checks only the two writes.
 2. **git-forge repository allowlist (M12).** `repositoryAllowlist.groups` maps a group to patterns over
    `<provider>:<owner>/<repo>`. A repository created or forked without an owner is `<provider>:@self/<name>`. Once set:
    - `write_file` and `create_repository` are checked;
    - `fork_repository` is checked on its destination (write) and its source (read);
    - reads are checked, and listings are filtered;
-   - a target that is not a plain name (`..`, URL syntax) is refused, so `zuno-*` does not admit `zuno-x/../../prod`.
+   - a target that is not a plain name (`..`, URL syntax) is refused, so `zuno-*` does not admit `zuno-x/../../prod`;
+   - the name the provider resolved (`full_name`, `path_with_namespace`) is re-checked before a read, a write or a fork,
+     because PyGithub follows the 301 of a renamed or transferred repository (and GitLab serves a moved project under
+     its old path); a fork whose result lands outside the allowlist is reported as an error, naming the fork to remove.
+
+   Patterns are fnmatch, decided deliberately: `*` matches across `/`, so `gitlab:team/*` also admits the subgroups of
+   `team`. To stop at one level, list the repositories.
 
    `scope: write` checks only the three writes.
 3. **Email recipient allowlist (M12).** `emailReport.recipientAllowlist` in the mcp-gateway chart maps a group to
@@ -238,8 +259,16 @@ person to scope a call to, and nothing else.
    - `update_opportunity` checks the owner by a query before the PATCH, and answers another owner's record as a missing
      one.
 
+   The email counts only when the token's `email_verified` is `true`. The zuno realm does not set `verifyEmail` and a
+   user may edit their own email, so an unverified address names nobody: such a caller is refused before any lookup.
    A caller with no email, or no single matching User, is refused. `ownerScoping.allRecordsGroups` lists the groups
-   entitled to every record.
+   entitled to every record. `opportunity_id` is checked against the Salesforce record-id format (15 or 18
+   alphanumerics) on every `update_opportunity`, scoping on or off.
+
+   Follow-up (before owner scoping is enabled on a customer install, WP-227): map the caller by an identifier the user
+   cannot edit. Either a Keycloak attribute that only an administrator can write, carried as a claim, or the Salesforce
+   User's `FederationIdentifier` set to the Keycloak `sub`. In both cases, also make `email` admin-edit-only in the
+   realm's user profile.
 5. **Namespace matcher on `metrics.query` (M13).** `metricsQuery.namespacesByGroup` maps a group to namespaces (`*` is
    every namespace). Once set, the mcp-gateway rewrites the PromQL before it reaches mcp-k8s (`app/promql_scope.py`):
    - The query is tokenised with PromQL's lexical rules: the three string styles, comments, numbers, durations, label
@@ -264,9 +293,12 @@ person to scope a call to, and nothing else.
 7. **JSON-RPC batch bound (M15).** `jsonRpc.maxBatchSize` (20; 0 is unbounded). A larger batch, or an empty one, gets one
    JSON-RPC Invalid Request object (`-32600`, `id: null`), and no message of the batch is processed.
 8. **AAP launch limit (M15).** `clusterAudit.rateLimit.{launches,windowSeconds}` (2 per 900 s; 0 is no limit), per
-   caller `sub` from the signed context. Calls without a verified context share one bucket, so an old gateway or a
-   forged header is limited too. A launch that AAP refuses does not count. The count is in the pod (replicas 1), and a
-   restart resets it.
+   caller `sub` from the signed context. Calls without a verified context share one bucket (`<unverified>`), on
+   purpose: changing a header never buys a fresh allowance. **The mcp-gateway must therefore roll before mcp-aap:**
+   with an older gateway every caller shares that one bucket (2 launches per 15 minutes for the whole platform). A
+   launch whose POST AAP refused, or that never reached AAP, does not count. Once the POST has succeeded the launch
+   counts, even if the status read or the log tail after it fails. The count is in the pod (replicas 1), a restart
+   resets it, and the buckets whose stamps have all expired are dropped.
 
 New chart values (defaults in brackets):
 - `mcp-gateway`: `emailReport.recipientAllowlist` (`{}`), `metricsQuery.namespacesByGroup` (`{}`),
@@ -284,13 +316,17 @@ can say that the gateway adds a namespace matcher to every selector, so a model 
 be narrowed anyway.
 
 Tests (all in the CI list):
-- `components/mcp-gateway/tests/test_wp225_lot_b.py` (26);
-- `components/mcp-servers/confluence/tests/test_wp225_space_allowlist.py` (12);
-- `components/mcp-servers/git-forge/tests/test_wp225_repository_allowlist.py` (10);
-- `components/mcp-servers/salesforce/tests/test_wp225_owner_scoping.py` (9);
-- `components/mcp-servers/aap/tests/test_wp225_launch_rate_limit.py` (6).
+- `components/mcp-gateway/tests/test_wp225_lot_b.py` (34);
+- `components/mcp-servers/confluence/tests/test_wp225_space_allowlist.py` (17);
+- `components/mcp-servers/git-forge/tests/test_wp225_repository_allowlist.py` (12);
+- `components/mcp-servers/salesforce/tests/test_wp225_owner_scoping.py` (12);
+- `components/mcp-servers/aap/tests/test_wp225_launch_rate_limit.py` (8).
 
-The server tests sign with the gateway's own module, so the signer and the verifiers are tested together. The negative
+The server tests sign with the gateway's own module, so the signer and the verifiers are tested together. Every
+PromQL query the matcher rewrites in the tests is re-parsed by a real parser, promql-parser 0.11.0. It is a test-only
+hashed lock in `components/mcp-gateway/tests/requirements.txt`, compiled by `platform/python/compile_locks.py` and
+never in the image. The test asserts that each rewritten query parses and that every vector selector (each `or`
+branch included) carries the matcher. The negative
 tests include:
 - a space outside the caller's group is refused, with no Confluence call;
 - an unsigned, forged, stale, tampered or other-tool context is refused;
@@ -299,7 +335,13 @@ tests include:
 - PromQL escapes are neutralised or refused: a caller `namespace` matcher, `or` inside braces, a comment hiding a
   selector, a string that looks like a selector, `info()`, and malformed queries;
 - a batch past the bound is refused with nothing dispatched;
-- a third `cluster_audit` inside the window never reaches AAP.
+- a third `cluster_audit` inside the window never reaches AAP, and a launch that failed after its POST still counts;
+- an unverified email is refused for owner scoping, before any Salesforce call;
+- a renamed-repository redirect (`startxfr/zuno-old` resolving to `elsewhere/prod`) is refused before any read, write
+  or fork;
+- an inbound `X-Zuno-Caller-*` header is not forwarded, and kubernetes-mcp-server gets neither the context nor the
+  workload token;
+- a Unicode digit (`²`) in a PromQL query is a scope error, not an internal error.
 
 `test_wp190_persona.py` now pins the absence of the label. `test_mcp_protocol.py` of mcp-aap sets the limit to 0, because
 it launches many times.
@@ -310,13 +352,18 @@ Limits:
 - The other `k8s.*` reads (resources, events, logs) are still bounded by the namespaces of the mcp-k8s RoleBindings,
   not by the caller's groups.
 - The launch limit and the batch bound are per pod.
+- The rollout order matters: build and roll the mcp-gateway first, then the four servers. A server ahead of the gateway
+  sees no context. That is harmless while every scope value is empty, but the AAP limit then uses the shared bucket.
 
 ### Live probes (each needs the five images built, a sync, and the user's go)
+
+Roll the mcp-gateway first, then confluence, git-forge, salesforce and aap (see item 8 above for why).
 
 1. **Defaults change nothing visible.** After the builds and the syncs: a Tekos Confluence search and a git-forge read
    still answer, `aap.platform.audit` still answers, and a `metrics.query` returns the same series as before.
    `zuno_model_calls_total` has no `user` label, while `client`, `agent` and `group` are still there. The Usage & cost
    and Five experiences dashboards render.
+   kubernetes-mcp-server still answers without X-Zuno-Gateway-Token (it never checked it).
 2. **Context reaches the servers.** Set `spaceAllowlist.groups: {<group>: [<a real space>]}` on the live Application,
    for a group that the tool policy allows `confluence.page.create`. A user of that group creates a page in that space,
    and the same call in another space is refused with "outside the space allowlist". Then remove the value.

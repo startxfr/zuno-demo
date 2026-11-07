@@ -39,6 +39,7 @@ _spec.loader.exec_module(caller_context)
 
 BASE_URL = "http://localhost:8000"
 TOKEN = "test-workload-token"
+AUD = "aap"  # this server's backend name
 LIMIT = {"AAP_CLUSTER_AUDIT_RATE_LIMIT": "2", "AAP_CLUSTER_AUDIT_RATE_WINDOW_SECONDS": "900"}
 
 
@@ -46,7 +47,7 @@ class _Launcher:
     def __init__(self, fail=False):
         self.count, self.fail = 0, fail
 
-    async def __call__(self):
+    async def __call__(self, progress=None):
         self.count += 1
         if self.fail:
             raise ValueError("AAP Controller is unreachable")
@@ -55,7 +56,7 @@ class _Launcher:
 
 def _headers(sub):
     h = {"X-Zuno-Gateway-Token": TOKEN}
-    h.update(caller_context.build(sub=sub, groups=["ocp-ai-ops"], claims={}, tool="cluster_audit", workload_token=TOKEN))
+    h.update(caller_context.build(audience=AUD, sub=sub, groups=["ocp-ai-ops"], claims={}, tool="cluster_audit", workload_token=TOKEN))
     return h
 
 
@@ -116,6 +117,65 @@ async def test_a_refused_launch_does_not_count(transport):
         assert result.is_error and "unreachable" in _text(result), _text(result)
     ok = await _launch(transport, _headers("carol"), _Launcher(), LIMIT)
     assert not ok.is_error, _text(ok)
+
+
+class _NoClient:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        return False
+
+
+async def test_a_failure_after_a_successful_post_still_counts(transport):
+    """The real launch path: the POST succeeds (the job exists), then the status read
+    fails. The slot is kept, so retrying cannot launch past the limit."""
+    _reset()
+    posts = []
+
+    async def fake_request(client, method, path, **kwargs):
+        if method == "GET" and path.endswith("/job_templates/"):
+            return {"results": [{"id": 3, "name": server.JOB_TEMPLATE_NAME}]}
+        if method == "POST":
+            posts.append(path)
+            return {"id": 40 + len(posts)}
+        raise ValueError("AAP Controller did not answer within 20s (GET job status)")
+
+    async def launch(headers):
+        http_client = httpx2.AsyncClient(transport=transport, base_url=BASE_URL, headers=headers)
+        with mock.patch.object(server, "_client", lambda: _NoClient()), \
+                mock.patch.object(server, "_request", fake_request), mock.patch.dict(os.environ, LIMIT):
+            async with streamable_http_client(f"{BASE_URL}/mcp", http_client=http_client) as (read, write):
+                async with ClientSession(read, write) as session:
+                    await session.initialize()
+                    return await session.call_tool("cluster_audit", {})
+
+    for _ in range(2):
+        result = await launch(_headers("frank"))
+        assert result.is_error and "did not answer" in _text(result), _text(result)
+    refused = await launch(_headers("frank"))
+    assert refused.is_error and "rate limited" in _text(refused), _text(refused)
+    assert len(posts) == 2, posts
+
+
+async def test_a_failure_before_the_post_does_not_count_and_buckets_are_pruned(transport):
+    _reset()
+
+    async def fake_request(client, method, path, **kwargs):
+        raise ValueError("AAP Controller is unreachable")
+
+    with mock.patch.object(server, "_client", lambda: _NoClient()), \
+            mock.patch.object(server, "_request", fake_request), mock.patch.dict(os.environ, LIMIT):
+        for _ in range(3):
+            try:
+                await server.cluster_audit()
+            except ValueError:
+                pass
+    assert server._launches == {}, server._launches
+    with mock.patch.dict(os.environ, LIMIT):
+        server._reserve_launch("old", now=0.0)
+        server._reserve_launch("new", now=1000.0)
+    assert list(server._launches) == ["new"], server._launches
 
 
 async def test_window_expiry_frees_the_caller(transport):

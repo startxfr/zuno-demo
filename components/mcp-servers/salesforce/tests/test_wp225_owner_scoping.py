@@ -35,6 +35,7 @@ _spec.loader.exec_module(caller_context)
 
 BASE_URL = "http://localhost:8000"
 TOKEN = "test-workload-token"
+AUD = "salesforce"  # this server's backend name
 USER_ID = "005000000000001AAA"
 OPP_ID = "006000000000001AAA"
 ON = {"SALESFORCE_OWNER_SCOPING": "owner", "SALESFORCE_ALL_RECORDS_GROUPS": "sales-managers"}
@@ -76,9 +77,10 @@ class _Fake:
         return False
 
 
-def _headers(tool, groups, email="seller@example.com"):
+def _headers(tool, groups, email="seller@example.com", verified=True):
     h = {"X-Zuno-Gateway-Token": TOKEN}
-    h.update(caller_context.build(sub="u-1", groups=groups, claims={"email": email}, tool=tool, workload_token=TOKEN))
+    claims = {"email": email, "email_verified": verified}
+    h.update(caller_context.build(audience=AUD, sub="u-1", groups=groups, claims=claims, tool=tool, workload_token=TOKEN))
     return h
 
 
@@ -129,6 +131,35 @@ async def test_no_verified_caller_is_refused(transport):
     headers = {"X-Zuno-Gateway-Token": TOKEN, "X-Zuno-User-Email": "boss@example.com"}
     result = await _call(transport, headers, "read_opportunity", {"query": "Acme"}, fake, ON)
     assert result.is_error and fake.requests == [], _text(result)
+
+
+async def test_an_unverified_email_is_refused_before_any_lookup(transport):
+    """The realm does not verify emails and a user may edit their own: an email the
+    token does not mark verified (false, absent, or a non-boolean) names nobody."""
+    for verified in (False, None, "true"):
+        fake = _Fake([])
+        result = await _call(transport, _headers("read_opportunity", ["sales"], verified=verified),
+                             "read_opportunity", {"query": "Acme"}, fake, ON)
+        assert result.is_error and "verified email" in _text(result), (verified, _text(result))
+        assert fake.requests == [], verified
+
+
+async def test_a_context_signed_for_another_backend_is_refused(transport):
+    fake = _Fake([])
+    headers = {"X-Zuno-Gateway-Token": TOKEN}
+    headers.update(caller_context.build(audience="confluence", sub="u-1", groups=["sales"],
+                                        claims={"email": "seller@example.com", "email_verified": True},
+                                        tool="read_opportunity", workload_token=TOKEN))
+    result = await _call(transport, headers, "read_opportunity", {"query": "Acme"}, fake, ON)
+    assert result.is_error and fake.requests == [], _text(result)
+
+
+async def test_an_invalid_record_id_is_refused_even_with_scoping_off(transport):
+    for bad in ("../../sobjects/User/005", "006000000000001AAA?x=1", "short"):
+        fake = _Fake([])
+        result = await _call(transport, {"X-Zuno-Gateway-Token": TOKEN}, "update_opportunity",
+                             {"opportunity_id": bad, "stage": "Closed Won"}, fake, {"SALESFORCE_OWNER_SCOPING": "off"})
+        assert result.is_error and fake.requests == [], bad
 
 
 async def test_unknown_or_ambiguous_user_is_refused(transport):

@@ -164,20 +164,26 @@ async def _invoke_streamable_http(
     # ADR-0011 policy intersection already happened);
     # X-Zuno-Gateway-Token is the one that's actually enforced (ADR-0037).
     endpoint = binding.endpoint_url()
-    headers = {"Authorization": f"Bearer {bearer_token}", "X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN}
-    # ADR-0603 M12 (WP-225 lot B): who the call is for, signed, from the validated
-    # identity only (app/caller_context.py). A shared-credential server scopes its
-    # technical identity with it (space, repository, owner allowlists; AAP launch
-    # rate limit). A server that does not read it ignores it.
-    headers.update(
-        caller_context.build(
-            sub=caller_sub,
-            groups=caller_groups,
-            claims=caller_claims,
-            tool=binding.provider_tool or "",
-            workload_token=MCP_GATEWAY_WORKLOAD_TOKEN,
+    # The headers are built here from binding data and the validated identity only;
+    # nothing of the inbound request (an X-Zuno-Caller-* header included) is copied.
+    headers = {"Authorization": f"Bearer {bearer_token}"}
+    if binding.gateway_token:
+        headers["X-Zuno-Gateway-Token"] = MCP_GATEWAY_WORKLOAD_TOKEN
+    if binding.caller_context:
+        # ADR-0603 M12 (WP-225 lot B): who the call is for, signed for this backend
+        # only (app/caller_context.py). A shared-credential server scopes its
+        # technical identity with it (space, repository, owner allowlists; AAP
+        # launch rate limit). Sent only where the binding declares it.
+        headers.update(
+            caller_context.build(
+                sub=caller_sub,
+                groups=caller_groups,
+                claims=caller_claims,
+                tool=binding.provider_tool or "",
+                audience=binding.backend,
+                workload_token=MCP_GATEWAY_WORKLOAD_TOKEN,
+            )
         )
-    )
     try:
         http_client = httpx2.AsyncClient(timeout=DOWNSTREAM_TIMEOUT_SECONDS, headers=headers)
         async with streamable_http_client(endpoint, http_client=http_client) as (read, write):
@@ -257,8 +263,8 @@ def _tool_input_schema(tool: Any) -> Optional[Dict[str, Any]]:
     return schema if isinstance(schema, dict) else None
 
 
-async def _fetch_endpoint_schemas(endpoint: str) -> Dict[str, Dict[str, Any]]:
-    headers = {"X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN}
+async def _fetch_endpoint_schemas(endpoint: str, gateway_token: bool = True) -> Dict[str, Dict[str, Any]]:
+    headers = {"X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN} if gateway_token else {}
     http_client = httpx2.AsyncClient(timeout=SCHEMA_TIMEOUT_SECONDS, headers=headers)
     async with streamable_http_client(endpoint, http_client=http_client) as (read, write):
         async with ClientSession(read, write) as session:
@@ -270,12 +276,12 @@ async def _fetch_endpoint_schemas(endpoint: str) -> Dict[str, Dict[str, Any]]:
     }
 
 
-async def _endpoint_schemas(endpoint: str) -> Dict[str, Dict[str, Any]]:
+async def _endpoint_schemas(endpoint: str, gateway_token: bool = True) -> Dict[str, Dict[str, Any]]:
     cached = _SCHEMA_CACHE.get(endpoint)
     if cached and cached[0] > time.monotonic():
         return cached[1]
     try:
-        schemas = await asyncio.wait_for(_fetch_endpoint_schemas(endpoint), SCHEMA_TIMEOUT_SECONDS + 1)
+        schemas = await asyncio.wait_for(_fetch_endpoint_schemas(endpoint, gateway_token), SCHEMA_TIMEOUT_SECONDS + 1)
         _SCHEMA_CACHE[endpoint] = (time.monotonic() + SCHEMA_TTL_SECONDS, schemas)
     except BaseException as exc:  # noqa: BLE001 - includes the SDK's ExceptionGroup; never break a listing
         if isinstance(exc, (KeyboardInterrupt, SystemExit, asyncio.CancelledError)):
@@ -297,7 +303,9 @@ async def schemas_for(bindings: List[Binding]) -> Dict[str, Dict[str, Any]]:
             wanted.setdefault(binding.endpoint_url(), []).append(binding)
         except ValueError:
             continue
-    fetched = await asyncio.gather(*(_endpoint_schemas(endpoint) for endpoint in wanted))
+    fetched = await asyncio.gather(
+        *(_endpoint_schemas(endpoint, any(b.gateway_token for b in group)) for endpoint, group in wanted.items())
+    )
     out: Dict[str, Dict[str, Any]] = {}
     for (endpoint, group), schemas in zip(wanted.items(), fetched):
         for binding in group:

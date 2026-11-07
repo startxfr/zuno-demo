@@ -50,46 +50,134 @@ OPS = CallerIdentity(sub="ops-01", groups=["ocp-ai-ops"], raw_claims={"iss": "zu
                                                                          "preferred_username": "ops-01"}, token="jwt")
 
 
+def _decode(raw):
+    return json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
+
+
+class _Captured(Exception):
+    pass
+
+
+def _capture_outbound(binding_name, workload_token="wt"):
+    """Invoke the real downstream path for `binding_name` and return the headers of
+    the outbound HTTP client (the MCP session itself is stopped before any I/O)."""
+    captured = {}
+
+    class _Client:
+        def __init__(self, timeout=None, headers=None):
+            captured.update(headers or {})
+
+    def _stop(*_a, **_k):
+        raise _Captured()
+
+    binding = gateway_main.binding_registry.resolve(binding_name)
+    with mock.patch.object(downstream, "MCP_GATEWAY_WORKLOAD_TOKEN", workload_token), \
+            mock.patch.object(downstream.httpx2, "AsyncClient", _Client), \
+            mock.patch.object(downstream, "streamable_http_client", _stop):
+        try:
+            asyncio.run(downstream.invoke(binding, binding_name, {}, "ops-01", "jwt",
+                                          caller_groups=["ocp-ai-ops"], caller_claims=OPS.raw_claims))
+        except _Captured:
+            pass
+    return binding, captured
+
+
 class CallerContextTest(unittest.TestCase):
-    def test_signed_from_the_identity_and_verifiable(self):
-        h = caller_context.build(sub="s", groups=["b", "a", "a"], claims=OPS.raw_claims, tool="create_page",
-                                 workload_token="wt", now=1000)
+    def test_signed_from_the_identity_for_one_backend(self):
+        claims = {**OPS.raw_claims, "email_verified": True}
+        h = caller_context.build(sub="s", groups=["b", "a", "a"], claims=claims, tool="create_page",
+                                 audience="confluence", workload_token="wt", now=1000)
         raw, sig = h[caller_context.CONTEXT_HEADER], h[caller_context.SIGNATURE_HEADER]
-        expected = hmac.new(caller_context.derive_key("wt"), raw.encode(), hashlib.sha256).hexdigest()
+        expected = hmac.new(caller_context.derive_key("wt", "confluence"), raw.encode(), hashlib.sha256).hexdigest()
         self.assertEqual(sig, expected)
-        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
-        self.assertEqual(payload, {"v": 1, "sub": "s", "groups": ["a", "b"], "email": "ops@example.com",
-                                   "username": "ops-01", "tool": "create_page", "iat": 1000})
-        self.assertNotEqual(caller_context.derive_key("wt"), b"wt", "the key is derived, not the workload token")
+        self.assertEqual(_decode(raw), {"v": 1, "aud": "confluence", "sub": "s", "groups": ["a", "b"],
+                                        "email": "ops@example.com", "email_verified": True,
+                                        "username": "ops-01", "tool": "create_page", "iat": 1000})
+        self.assertNotEqual(caller_context.derive_key("wt", "confluence"), b"wt")
+        self.assertNotEqual(caller_context.derive_key("wt", "confluence"), caller_context.derive_key("wt", "aap"),
+                            "each backend has its own key")
 
-    def test_no_workload_token_no_headers(self):
-        self.assertEqual(caller_context.build(sub="s", groups=[], claims={}, tool="t", workload_token=""), {})
+    def test_email_verified_is_true_only_for_a_json_true(self):
+        for value in (False, None, "true", 1):
+            h = caller_context.build(sub="s", groups=[], claims={"email": "a@b", "email_verified": value},
+                                     tool="t", audience="salesforce", workload_token="wt")
+            self.assertIs(_decode(h[caller_context.CONTEXT_HEADER])["email_verified"], False, value)
 
-    def test_streamable_http_call_carries_the_context(self):
-        captured = {}
+    def test_no_workload_token_or_audience_no_headers(self):
+        self.assertEqual(caller_context.build(sub="s", groups=[], claims={}, tool="t", audience="aap",
+                                              workload_token=""), {})
+        self.assertEqual(caller_context.build(sub="s", groups=[], claims={}, tool="t", audience="",
+                                              workload_token="wt"), {})
+
+    def test_a_consuming_binding_gets_a_context_for_its_own_backend(self):
+        binding, captured = _capture_outbound("confluence.page.create")
+        self.assertTrue(binding.caller_context)
+        self.assertEqual(captured.get("X-Zuno-Gateway-Token"), "wt")
+        payload = _decode(captured[caller_context.CONTEXT_HEADER])
+        self.assertEqual((payload["aud"], payload["sub"], payload["groups"], payload["tool"]),
+                         ("confluence", "ops-01", ["ocp-ai-ops"], binding.provider_tool))
+        expected = hmac.new(caller_context.derive_key("wt", "confluence"),
+                            captured[caller_context.CONTEXT_HEADER].encode(), hashlib.sha256).hexdigest()
+        self.assertEqual(captured[caller_context.SIGNATURE_HEADER], expected)
+
+    def test_only_the_four_zuno_servers_consume_the_context(self):
+        consuming = {b.backend for b in gateway_main.binding_registry._bindings if b.caller_context}
+        self.assertEqual(consuming, {"confluence", "git-forge", "salesforce", "aap"})
+        for b in gateway_main.binding_registry._bindings:
+            if b.caller_context:
+                self.assertEqual(b.transport, "streamable-http", b.capability)
+
+    def test_a_third_party_backend_gets_neither_the_context_nor_the_workload_token(self):
+        binding, captured = _capture_outbound("metrics.query")
+        self.assertEqual(binding.backend, "k8s")
+        self.assertNotIn(caller_context.CONTEXT_HEADER, captured)
+        self.assertNotIn(caller_context.SIGNATURE_HEADER, captured)
+        self.assertNotIn("X-Zuno-Gateway-Token", captured)
+        self.assertEqual(captured["Authorization"], "Bearer jwt")
+
+    def test_inbound_caller_headers_are_never_forwarded(self):
+        """A caller that sends its own X-Zuno-Caller-* to the gateway: the outbound
+        call carries the gateway's context (for consuming backends) or none at all."""
+        forged = {"X-Zuno-Caller-Context": "Zm9yZ2Vk", "X-Zuno-Caller-Signature": "0" * 64,
+                  "X-Zuno-Data-Classification": "C2"}
+        seen = []
 
         class _Client:
             def __init__(self, timeout=None, headers=None):
-                captured.update(headers or {})
+                seen.append(dict(headers or {}))
 
-        class _Stop(Exception):
-            pass
+        def _stop(*_a, **_k):
+            raise _Captured()
 
-        def _fail(*_a, **_k):
-            raise _Stop()
+        gateway_main.app.dependency_overrides[validate_token_or_kubernetes] = lambda: OPS
+        env = {"MCP_FRONTDOOR_CAPABILITIES": "metrics.query,aap.platform.audit", "METRICS_NAMESPACES_BY_GROUP": ""}
+        try:
+            with mock.patch.dict(os.environ, env), \
+                    mock.patch.object(downstream, "MCP_GATEWAY_WORKLOAD_TOKEN", "wt"), \
+                    mock.patch.object(downstream.httpx2, "AsyncClient", _Client), \
+                    mock.patch.object(downstream, "streamable_http_client", _stop), \
+                    mock.patch.object(gateway_main, "invoke_downstream", downstream.invoke), \
+                    mock.patch.object(gateway_main, "policy_store", PolicyStore(
+                        _OKF_TOOL_POLICY_PATH, str(_REPO_ROOT / "policies/data-classification/classification.yaml"))):
+                client = TestClient(gateway_main.app, raise_server_exceptions=False)
+                for name in ("metrics.query", "aap.platform.audit"):
+                    client.post("/mcp", headers=forged, json={"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                                                              "params": {"name": name, "arguments": {"query": "up"}}})
+        finally:
+            gateway_main.app.dependency_overrides.clear()
+        self.assertEqual(len(seen), 2, seen)
+        k8s, aap = seen
+        self.assertNotIn("X-Zuno-Caller-Context", k8s)
+        self.assertNotIn("X-Zuno-Caller-Signature", k8s)
+        self.assertNotEqual(aap["X-Zuno-Caller-Context"], forged["X-Zuno-Caller-Context"])
+        self.assertNotEqual(aap["X-Zuno-Caller-Signature"], forged["X-Zuno-Caller-Signature"])
+        self.assertEqual(_decode(aap["X-Zuno-Caller-Context"])["aud"], "aap")
 
-        binding = gateway_main.binding_registry.resolve("confluence.page.create")
-        with mock.patch.object(downstream, "MCP_GATEWAY_WORKLOAD_TOKEN", "wt"), \
-                mock.patch.object(downstream.httpx2, "AsyncClient", _Client), \
-                mock.patch.object(downstream, "streamable_http_client", _fail):
-            with self.assertRaises(_Stop):
-                asyncio.run(downstream.invoke(binding, "confluence.page.create", {}, "ops-01", "jwt",
-                                              caller_groups=["ocp-ai-ops"], caller_claims=OPS.raw_claims))
-        self.assertIn(caller_context.CONTEXT_HEADER, captured)
-        raw = captured[caller_context.CONTEXT_HEADER]
-        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
-        self.assertEqual((payload["sub"], payload["groups"], payload["tool"]),
-                         ("ops-01", ["ocp-ai-ops"], binding.provider_tool))
+    def test_a_non_boolean_flag_fails_the_binding(self):
+        from app.bindings import Binding, _validate
+        bad = Binding(capability="x.y", backend="b", transport="streamable-http", provider_tool="t",
+                      auth_mode="service-identity", caller_context="yes")
+        self.assertIn("non-boolean caller_context", _validate(bad))
 
 
 class PromQLScopeTest(unittest.TestCase):
@@ -142,6 +230,70 @@ class PromQLScopeTest(unittest.TestCase):
                       'sum by (namespace="x") (up)', "up{a=(b)}", "", "   ", "rate(up[5m]", "rate(up[5m]))"):
             with self.assertRaises(PromQLScopeError, msg=query):
                 self.scoped(query)
+
+    def test_unicode_digits_and_spaces_are_a_scope_error_not_a_crash(self):
+        # "²".isdigit() is True; it must be refused as a character, never reach a
+        # regular expression that cannot match it (AttributeError, a 500).
+        for query in ("²", "up > ²", "rate(up[5²m])", "up\u2003+ up", "\u0663"):
+            with self.assertRaises(PromQLScopeError, msg=repr(query)):
+                self.scoped(query)
+
+    def test_the_metrics_tool_refuses_a_unicode_digit_cleanly(self):
+        """Through /mcp: the 400 of _authorize_and_invoke becomes a tool error naming
+        the scope failure, not an internal error."""
+        gateway_main.app.dependency_overrides[validate_token_or_kubernetes] = lambda: OPS
+        env = {"METRICS_NAMESPACES_BY_GROUP": json.dumps({"ocp-ai-ops": ["zuno-ai-run"]}),
+               "MCP_FRONTDOOR_CAPABILITIES": "metrics.query"}
+        try:
+            with mock.patch.dict(os.environ, env), mock.patch.object(gateway_main, "policy_store", PolicyStore(
+                    _OKF_TOOL_POLICY_PATH, str(_REPO_ROOT / "policies/data-classification/classification.yaml"))):
+                resp = TestClient(gateway_main.app).post("/mcp", headers={"X-Zuno-Data-Classification": "C2"}, json={
+                    "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                    "params": {"name": "metrics.query", "arguments": {"query": "up > ²"}}})
+        finally:
+            gateway_main.app.dependency_overrides.clear()
+        self.assertEqual(resp.status_code, 200, resp.text)
+        result = resp.json()["result"]
+        self.assertTrue(result["isError"], result)
+        self.assertIn("cannot be scoped", result["content"][0]["text"])
+
+    def test_every_rewritten_query_parses_and_every_selector_is_scoped(self):
+        """A real PromQL parser (promql-parser, tests/requirements.txt) reads each
+        rewritten query: it must parse, and every vector selector (each `or` branch
+        included) must carry the namespace matcher."""
+        try:
+            import promql_parser
+        except ImportError:
+            self.skipTest("promql-parser not installed (pip install --require-hashes -r tests/requirements.txt)")
+        queries = [
+            "up", 'up{job="x"}', '{__name__=~".+"}', 'up{a="b",}', "sum by (namespace) (rate(c[5m]))",
+            "a / on(pod) group_left(node) b", "max_over_time(rate(x[5m])[1h:5m])", "job:up:rate5m",
+            'up{namespace="openshift-etcd"}', 'up{namespace=~".*"} or vector(1)',
+            '{namespace="openshift-etcd" or __name__="up"}', 'up # }\n + on() group_left() kube_pod_info',
+            'label_replace(up, "namespace", "openshift-etcd", "", "")', 'up{a="} or vector(1) {"}',
+            "histogram_quantile(0.9, sum by (le) (rate(h_bucket[5m])))", "rate(x[5m:1m] offset 1h) > bool 0",
+            "count_values(\"namespace\", up)", "topk(3, up) unless on(job) down", "up @ start()", "-up",
+            "sum without (namespace) (up)", "absent(nonexistent_metric)", "1 + 1",
+        ]
+        unscoped = []
+
+        def visit(node):
+            if isinstance(node, promql_parser.VectorSelector):
+                groups = node.matchers.or_matchers or [node.matchers.matchers]
+                for group in groups:
+                    if not any(m.name == "namespace" and m.op == promql_parser.MatchOp.Re
+                               and m.value == "zuno-ai-run|zuno-data" for m in group):
+                        unscoped.append(str(node))
+            return True
+
+        for query in queries:
+            out = self.scoped(query)
+            try:
+                expr = promql_parser.parse(out)
+            except ValueError as exc:
+                self.fail(f"{query!r} rewritten to {out!r}, which does not parse: {exc}")
+            promql_parser.walk(expr, visit)
+        self.assertEqual(unscoped, [])
 
     def test_configured_namespaces_are_validated(self):
         with self.assertRaises(PromQLScopeError):

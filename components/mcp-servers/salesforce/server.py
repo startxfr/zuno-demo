@@ -87,21 +87,30 @@ GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 # ADR-0603 M12 (WP-225 lot B): the signed caller context.
 #
 # The gateway signs who a call is for (sub, groups, email, username, the tool,
-# a timestamp) from the token it has validated, and sends it as
+# a timestamp, this server's name) from the token it has validated, and sends it as
 # X-Zuno-Caller-Context / X-Zuno-Caller-Signature (components/mcp-gateway/app/
-# caller_context.py). The key is derived from the workload token this server
-# already holds. Duplicated in each server: an image is built from its own
+# caller_context.py), only to backends whose binding declares caller_context.
+# The key is derived per backend from the workload token this server already holds. Duplicated in each server: an image is built from its own
 # directory only (ADR-0119). A missing, forged, stale or other-tool context
 # verifies as None; a server that needs it then refuses (fail closed).
 # --------------------------------------------------------------------------
 
+# The audience of the caller context: this server's backend name in
+# platform/bindings/tools/tool-bindings.yaml.
+CALLER_CONTEXT_AUDIENCE = "salesforce"
 CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
 CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
 CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
+# A context dated in the future beyond clock skew is refused, so a signed context
+# cannot be minted to stay valid for longer than its age bound.
+CALLER_CONTEXT_MAX_SKEW_SECONDS = 30
 
 
 def _caller_context_key() -> bytes:
-    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), b"zuno-caller-context-v1", hashlib.sha256).digest()
+    # Per backend: HMAC(token, label + ":" + this server's name). A context signed
+    # for another backend does not verify here.
+    label = b"zuno-caller-context-v1:" + CALLER_CONTEXT_AUDIENCE.encode("utf-8")
+    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), label, hashlib.sha256).digest()
 
 
 def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
@@ -118,16 +127,20 @@ def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optiona
         payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
     except (ValueError, TypeError):
         return None
-    if not isinstance(payload, dict) or payload.get("v") != 1 or payload.get("tool") != tool:
+    if not isinstance(payload, dict) or payload.get("v") != 1:
+        return None
+    if payload.get("aud") != CALLER_CONTEXT_AUDIENCE or payload.get("tool") != tool:
         return None
     iat = payload.get("iat")
-    if not isinstance(iat, int) or abs(time.time() - iat) > CALLER_CONTEXT_MAX_AGE_SECONDS:
+    now = time.time()
+    if not isinstance(iat, int) or iat > now + CALLER_CONTEXT_MAX_SKEW_SECONDS or now - iat > CALLER_CONTEXT_MAX_AGE_SECONDS:
         return None
     groups = payload.get("groups")
     return {
         "sub": str(payload.get("sub") or ""),
         "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
         "email": str(payload.get("email") or "").lower(),
+        "email_verified": payload.get("email_verified") is True,
         "username": str(payload.get("username") or ""),
     }
 
@@ -149,7 +162,9 @@ def _caller(ctx: Optional[Context], tool: str) -> Optional[Dict[str, Any]]:
 # SALESFORCE_OWNER_SCOPING=owner (chart value ownerScoping.enabled) limits every
 # tool to the Opportunities the caller owns: the caller is the Salesforce User
 # whose Email is the email of the signed caller context (the validated token's
-# `email` claim). A caller in one of SALESFORCE_ALL_RECORDS_GROUPS
+# `email` claim), and only when the token's `email_verified` is true: the realm
+# does not verify emails and a user may edit their own, so an unverified address
+# names nobody and is refused. A caller in one of SALESFORCE_ALL_RECORDS_GROUPS
 # (ownerScoping.allRecordsGroups) is entitled to every record, as before. Off:
 # the behaviour before WP-225, every caller sees what the technical identity sees.
 # --------------------------------------------------------------------------
@@ -186,6 +201,10 @@ async def _owner_scope(client: httpx.AsyncClient, ctx: Optional[Context], tool: 
     email = caller["email"]
     if not email:
         raise PermissionError(f"{tool} is refused: owner scoping needs the caller's email, and the token carries none")
+    if not caller.get("email_verified"):
+        raise PermissionError(
+            f"{tool} is refused: owner scoping needs a verified email, and the token's email_verified is not true"
+        )
     soql = f"SELECT Id FROM User WHERE Email = {_soql_quote(email)} AND IsActive = true LIMIT 2"
     resp = await client.get("/query", params={"q": soql})
     resp.raise_for_status()
@@ -374,13 +393,14 @@ async def update_opportunity(
     if not request_body:
         raise ValueError("update_opportunity requires at least one of stage/amount/close_date")
 
+    # ADR-0603 M12: the id lands in a URL path; checked whether or not owner scoping is on.
+    if not _RECORD_ID_RE.fullmatch(str(opportunity_id)):
+        raise ValueError("opportunity_id must be a Salesforce record id (15 or 18 letters and digits)")
     async with _client() as client:
         owner_id = await _owner_scope(client, ctx, "update_opportunity")
         if owner_id:
             # ADR-0603 M12: the record must be the caller's before anything is written.
             # A record of someone else answers as a missing one (no existence oracle).
-            if not _RECORD_ID_RE.fullmatch(opportunity_id):
-                raise ValueError("opportunity_id must be a Salesforce record id")
             check = (
                 f"SELECT Id FROM Opportunity WHERE Id = {_soql_quote(opportunity_id)} "
                 f"AND OwnerId = {_soql_quote(owner_id)} LIMIT 1"

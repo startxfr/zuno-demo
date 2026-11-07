@@ -233,7 +233,7 @@ def test_schemas_for_reads_each_endpoint_once_and_survives_a_failing_backend() -
     binding = registry.resolve("git.repository.list")
     calls = []
 
-    async def fake_fetch(endpoint):
+    async def fake_fetch(endpoint, gateway_token=True):
         calls.append(endpoint)
         return {binding.provider_tool: {"inputSchema": _GIT_SCHEMA, "description": "d"}}
 
@@ -246,7 +246,7 @@ def test_schemas_for_reads_each_endpoint_once_and_survives_a_failing_backend() -
         assert first == {"git.repository.list": {"inputSchema": _GIT_SCHEMA, "description": "d"}}
         assert len(calls) == 1, calls  # cached
 
-        async def failing(endpoint):
+        async def failing(endpoint, gateway_token=True):
             raise OSError("backend down")
 
         downstream._SCHEMA_CACHE.clear()

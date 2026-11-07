@@ -80,6 +80,14 @@ class Binding:
     # `backends:` map, if any - set by BindingRegistry.reload(), never by
     # a caller. Used only as a fallback when `endpoint` is absent.
     backend_default_endpoint: Optional[Dict[str, str]] = None
+    # ADR-0603 M12 (WP-225 lot B): streamable-http only. `caller_context: true`
+    # sends the signed X-Zuno-Caller-* headers (app/caller_context.py) to this
+    # backend: only the Zuno servers that scope with it (confluence, git-forge,
+    # salesforce, aap) set it, so a third-party backend never receives a
+    # caller's identity. `gateway_token: false` withholds X-Zuno-Gateway-Token
+    # from a backend that does not check it (the upstream kubernetes-mcp-server).
+    caller_context: bool = False
+    gateway_token: bool = True
 
     def all_names(self) -> List[str]:
         """The capability plus its aliases - the equivalence set used for
@@ -137,6 +145,8 @@ class BindingRegistry:
                         handler=item.get("handler"),
                         input_schema=item.get("input_schema"),
                         backend_default_endpoint=backends_defaults.get(item["backend"]),
+                        caller_context=item.get("caller_context", False),
+                        gateway_token=item.get("gateway_token", True),
                     )
                     problem = _validate(binding)
                     if problem:
@@ -203,6 +213,9 @@ class BindingRegistry:
 
 
 def _validate(binding: Binding) -> Optional[str]:
+    for flag in ("caller_context", "gateway_token"):
+        if not isinstance(getattr(binding, flag), bool):
+            return f"binding '{binding.capability}' has a non-boolean {flag} {getattr(binding, flag)!r}"
     if binding.auth_mode not in VALID_AUTH_MODES:
         return (
             f"binding '{binding.capability}' has missing or unknown auth_mode "

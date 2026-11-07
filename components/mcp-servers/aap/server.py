@@ -87,21 +87,30 @@ GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 # ADR-0603 M12 (WP-225 lot B): the signed caller context.
 #
 # The gateway signs who a call is for (sub, groups, email, username, the tool,
-# a timestamp) from the token it has validated, and sends it as
+# a timestamp, this server's name) from the token it has validated, and sends it as
 # X-Zuno-Caller-Context / X-Zuno-Caller-Signature (components/mcp-gateway/app/
-# caller_context.py). The key is derived from the workload token this server
-# already holds. Duplicated in each server: an image is built from its own
+# caller_context.py), only to backends whose binding declares caller_context.
+# The key is derived per backend from the workload token this server already holds. Duplicated in each server: an image is built from its own
 # directory only (ADR-0119). A missing, forged, stale or other-tool context
 # verifies as None; a server that needs it then refuses (fail closed).
 # --------------------------------------------------------------------------
 
+# The audience of the caller context: this server's backend name in
+# platform/bindings/tools/tool-bindings.yaml.
+CALLER_CONTEXT_AUDIENCE = "aap"
 CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
 CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
 CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
+# A context dated in the future beyond clock skew is refused, so a signed context
+# cannot be minted to stay valid for longer than its age bound.
+CALLER_CONTEXT_MAX_SKEW_SECONDS = 30
 
 
 def _caller_context_key() -> bytes:
-    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), b"zuno-caller-context-v1", hashlib.sha256).digest()
+    # Per backend: HMAC(token, label + ":" + this server's name). A context signed
+    # for another backend does not verify here.
+    label = b"zuno-caller-context-v1:" + CALLER_CONTEXT_AUDIENCE.encode("utf-8")
+    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), label, hashlib.sha256).digest()
 
 
 def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
@@ -118,16 +127,20 @@ def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optiona
         payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
     except (ValueError, TypeError):
         return None
-    if not isinstance(payload, dict) or payload.get("v") != 1 or payload.get("tool") != tool:
+    if not isinstance(payload, dict) or payload.get("v") != 1:
+        return None
+    if payload.get("aud") != CALLER_CONTEXT_AUDIENCE or payload.get("tool") != tool:
         return None
     iat = payload.get("iat")
-    if not isinstance(iat, int) or abs(time.time() - iat) > CALLER_CONTEXT_MAX_AGE_SECONDS:
+    now = time.time()
+    if not isinstance(iat, int) or iat > now + CALLER_CONTEXT_MAX_SKEW_SECONDS or now - iat > CALLER_CONTEXT_MAX_AGE_SECONDS:
         return None
     groups = payload.get("groups")
     return {
         "sub": str(payload.get("sub") or ""),
         "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
         "email": str(payload.get("email") or "").lower(),
+        "email_verified": payload.get("email_verified") is True,
         "username": str(payload.get("username") or ""),
     }
 
@@ -148,14 +161,23 @@ def _caller(ctx: Optional[Context], tool: str) -> Optional[Dict[str, Any]]:
 #
 # At most AAP_CLUSTER_AUDIT_RATE_LIMIT launches per caller in any
 # AAP_CLUSTER_AUDIT_RATE_WINDOW_SECONDS (chart values clusterAudit.rateLimit.*),
-# 0 meaning no limit. The caller is the `sub` of the signed caller context; calls
-# without a verified context share one bucket, so an unscoped path is limited too.
-# The count lives in this pod (replicas: 1); a restart resets it. A launch that
-# AAP refuses does not count.
+# 0 meaning no limit. The caller is the `sub` of the signed caller context.
+#
+# The unverified bucket, deliberately: every call WITHOUT a verified context (an
+# mcp-gateway that does not send one yet, a forged or stale header) counts against
+# ONE shared bucket, UNVERIFIED_CALLER, so changing a header never buys a fresh
+# allowance. Consequence: until the mcp-gateway that signs the context is rolled,
+# every caller shares that one bucket (2 launches per 15 minutes for the whole
+# platform by default). Roll the mcp-gateway first, then this server.
+#
+# The count lives in this pod (replicas: 1); a restart resets it. A launch whose
+# POST AAP refused (or that never reached AAP) does not count; once the POST has
+# succeeded the launch counts, whatever happens after it. Buckets whose stamps
+# have all expired are dropped, so the map holds only callers of the last window.
 # --------------------------------------------------------------------------
 
 UNVERIFIED_CALLER = "<unverified>"
-_launches: Dict[str, Deque[float]] = collections.defaultdict(collections.deque)
+_launches: Dict[str, Deque[float]] = {}
 
 
 def _rate_limit() -> int:
@@ -184,9 +206,13 @@ def _reserve_launch(caller_key: str, now: Optional[float] = None) -> Optional[fl
         return None
     now = time.monotonic() if now is None else now
     window = _rate_window_seconds()
-    stamps = _launches[caller_key]
-    while stamps and now - stamps[0] >= window:
-        stamps.popleft()
+    for key in list(_launches):
+        bucket = _launches[key]
+        while bucket and now - bucket[0] >= window:
+            bucket.popleft()
+        if not bucket:
+            del _launches[key]
+    stamps = _launches.setdefault(caller_key, collections.deque())
     if len(stamps) >= limit:
         retry_after = int(window - (now - stamps[0])) + 1
         raise RateLimited(
@@ -200,10 +226,15 @@ def _reserve_launch(caller_key: str, now: Optional[float] = None) -> Optional[fl
 def _release_launch(caller_key: str, stamp: Optional[float]) -> None:
     if stamp is None:
         return
+    bucket = _launches.get(caller_key)
+    if bucket is None:
+        return
     try:
-        _launches[caller_key].remove(stamp)
+        bucket.remove(stamp)
     except ValueError:
         pass
+    if not bucket:
+        del _launches[caller_key]
 
 
 class AapConfigError(RuntimeError):
@@ -477,14 +508,19 @@ async def cluster_audit(ctx: Optional[Context] = None) -> Dict[str, Any]:
     caller = _caller(ctx, "cluster_audit")
     caller_key = (caller or {}).get("sub") or UNVERIFIED_CALLER
     stamp = _reserve_launch(caller_key)
+    progress = {"posted": False}
     try:
-        return await _launch_cluster_audit()
+        return await _launch_cluster_audit(progress)
     except Exception:
-        _release_launch(caller_key, stamp)
+        # Only a launch AAP never accepted gives its slot back: after a successful
+        # POST the job exists, so a failing follow-up read still counts.
+        if not progress["posted"]:
+            _release_launch(caller_key, stamp)
         raise
 
 
-async def _launch_cluster_audit() -> Dict[str, Any]:
+async def _launch_cluster_audit(progress: Optional[Dict[str, bool]] = None) -> Dict[str, Any]:
+    progress = progress if progress is not None else {}
     async with _client() as client:
         template = await _lookup_by_name(client, "job_templates", JOB_TEMPLATE_NAME)
 
@@ -495,6 +531,7 @@ async def _launch_cluster_audit() -> Dict[str, Any]:
         launched = await _request(
             client, "POST", f"/api/controller/v2/job_templates/{template['id']}/launch/"
         )
+        progress["posted"] = True
         job_id = launched.get("id") or launched.get("job")
         if not job_id:
             raise ValueError(

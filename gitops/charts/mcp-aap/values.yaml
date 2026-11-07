@@ -63,8 +63,10 @@ credentials:
 
 # ADR-0603 M15 (WP-225 lot B): at most `launches` cluster_audit launches per caller
 # (the `sub` of the caller context the mcp-gateway signs) in any `windowSeconds`.
-# Calls without a verified context share one bucket. Counted in the pod (replicas 1),
-# reset by a restart; a launch AAP refuses does not count. launches: 0 = no limit.
+# Calls without a verified context share one bucket, so roll the mcp-gateway (which
+# signs the context) before this server, or every caller shares that bucket. Counted
+# in the pod (replicas 1), reset by a restart; a launch whose POST AAP refused does not
+# count, one whose POST succeeded does. launches: 0 = no limit.
 clusterAudit:
   rateLimit:
     launches: 2

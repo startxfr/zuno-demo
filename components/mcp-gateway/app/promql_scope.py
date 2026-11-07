@@ -68,6 +68,10 @@ _NUMBER_RE = re.compile(
 _DURATION_RE = re.compile(r"(?:[0-9]+(?:ms|[smhdwy]))+")
 _OPERATORS = ("==", "!=", "<=", ">=", "=~", "!~", "+", "-", "*", "/", "%", "^", "<", ">", "=")
 _PUNCTUATION = "{}()[],:@"
+# ASCII only: str.isdigit()/isspace() also accept "²" or U+2003, which PromQL does
+# not, and which no regular expression below would match.
+_DIGITS = frozenset("0123456789")
+_SPACES = frozenset(" \t\n\r\f\v")
 
 
 class PromQLScopeError(ValueError):
@@ -86,9 +90,9 @@ def _tokenize(query: str) -> List[_Token]:
     bracket_depth = 0
     while i < n:
         ch = query[i]
-        if ch.isspace():
+        if ch in _SPACES:
             j = i
-            while j < n and query[j].isspace():
+            while j < n and query[j] in _SPACES:
                 j += 1
             tokens.append(_Token("ws", query[i:j]))
             i = j
@@ -119,8 +123,10 @@ def _tokenize(query: str) -> List[_Token]:
             tokens.append(_Token("string", query[i:j + 1]))
             i = j + 1
             continue
-        if ch.isdigit() or (ch == "." and i + 1 < n and query[i + 1].isdigit()):
+        if ch in _DIGITS or (ch == "." and i + 1 < n and query[i + 1] in _DIGITS):
             m = _NUMBERISH_RE.match(query, i)
+            if m is None:
+                raise PromQLScopeError(f"bad number at offset {i}")
             text = m.group(0)
             if not (_NUMBER_RE.fullmatch(text) or _DURATION_RE.fullmatch(text)):
                 raise PromQLScopeError(f"bad number or duration {text!r}")

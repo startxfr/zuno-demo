@@ -47,6 +47,16 @@
 # capabilities lacking a valid binding (ADR-0116 Operational
 # considerations).
 #
+# ADR-0603 M12 (WP-225 lot B), streamable-http only:
+#   caller_context: true   the gateway sends the signed X-Zuno-Caller-* headers
+#                          (caller sub, groups, email, signed for this backend
+#                          name). Only the Zuno servers that scope their shared
+#                          credential with it set it; default false, so a
+#                          third-party backend never receives a caller's identity.
+#   gateway_token: false   X-Zuno-Gateway-Token (ADR-0037) is not sent: for a
+#                          backend that does not check it (the upstream
+#                          kubernetes-mcp-server). Default true.
+#
 # ADR-0119: an optional top-level `backends:` map (backend name -> default
 # {env, default, path}) lets a streamable-http entry omit its own
 # `endpoint:` block when every capability of that backend shares one -
@@ -107,6 +117,7 @@ bindings:
       path: /mcp
     provider_tool: search_pages
     auth_mode: service-identity
+    caller_context: true
 
   - capability: confluence.page.read
     backend: confluence
@@ -117,6 +128,7 @@ bindings:
       path: /mcp
     provider_tool: read_page
     auth_mode: service-identity
+    caller_context: true
 
   - capability: confluence.page.create
     backend: confluence
@@ -127,6 +139,7 @@ bindings:
       path: /mcp
     provider_tool: create_page
     auth_mode: service-identity
+    caller_context: true
 
   - capability: confluence.page.update
     backend: confluence
@@ -137,6 +150,7 @@ bindings:
       path: /mcp
     provider_tool: update_page
     auth_mode: service-identity
+    caller_context: true
 
   # --- unifai-rag: UnifAI's RAG server (WP-156), NOT an MCP server -
   #     proxied via an in-process handler the same way image_gen/
@@ -165,6 +179,7 @@ bindings:
       path: /mcp
     provider_tool: read_opportunity
     auth_mode: service-identity
+    caller_context: true
 
   - capability: salesforce.opportunity.create
     backend: salesforce
@@ -175,6 +190,7 @@ bindings:
       path: /mcp
     provider_tool: create_opportunity
     auth_mode: service-identity
+    caller_context: true
 
   - capability: salesforce.opportunity.update
     backend: salesforce
@@ -185,6 +201,7 @@ bindings:
       path: /mcp
     provider_tool: update_opportunity
     auth_mode: service-identity
+    caller_context: true
 
   # --- demo-mode in-process handlers (replaced by real servers as their
   #     integrations land) ---
@@ -296,12 +313,14 @@ bindings:
     transport: streamable-http
     provider_tool: read_repository_content
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.repository.list
     backend: git-forge
     transport: streamable-http
     provider_tool: list_repositories
     auth_mode: service-identity
+    caller_context: true
 
   # ADR-0121: GitLab-only, any visibility (public/internal/private) -
   # this server never grants private GitHub access through any binding.
@@ -314,30 +333,35 @@ bindings:
     transport: streamable-http
     provider_tool: read_private_repository_content
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.repository.private.list
     backend: git-forge
     transport: streamable-http
     provider_tool: list_private_repositories
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.file.write
     backend: git-forge
     transport: streamable-http
     provider_tool: write_file
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.repository.create
     backend: git-forge
     transport: streamable-http
     provider_tool: create_repository
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.repository.fork
     backend: git-forge
     transport: streamable-http
     provider_tool: fork_repository
     auth_mode: service-identity
+    caller_context: true
 
   # Always refused by the server itself (never deletes) - still a real,
   # policy-gated capability so a caller gets a clear tool-level answer
@@ -347,6 +371,7 @@ bindings:
     transport: streamable-http
     provider_tool: delete_repository
     auth_mode: service-identity
+    caller_context: true
 
   # --- aap: Ansible Automation Platform audits (ADR-0355/WP-074).
   #     service-identity, but NOT the usual shared technical credential:
@@ -359,6 +384,7 @@ bindings:
     transport: streamable-http
     provider_tool: platform_audit
     auth_mode: service-identity
+    caller_context: true
 
   # The first capability in this file that RUNS automation rather than
   # reading state. Its blast radius is fixed by construction, not by
@@ -370,6 +396,7 @@ bindings:
     transport: streamable-http
     provider_tool: cluster_audit
     auth_mode: service-identity
+    caller_context: true
 
   # ADR-0415: not a demo-mode stub like the other in-process handlers
   # above - calls the real, already-deployed components/ai-gateway
@@ -409,27 +436,32 @@ bindings:
     transport: streamable-http
     provider_tool: resources_get
     auth_mode: service-identity
+    gateway_token: false
 
   - capability: k8s.resource.list
     backend: k8s
     transport: streamable-http
     provider_tool: resources_list
     auth_mode: service-identity
+    gateway_token: false
 
   - capability: k8s.events.read
     backend: k8s
     transport: streamable-http
     provider_tool: events_list
     auth_mode: service-identity
+    gateway_token: false
 
   - capability: k8s.logs.read
     backend: k8s
     transport: streamable-http
     provider_tool: pods_log
     auth_mode: service-identity
+    gateway_token: false
 
   - capability: metrics.query
     backend: k8s
     transport: streamable-http
     provider_tool: execute_instant_query
     auth_mode: service-identity
+    gateway_token: false

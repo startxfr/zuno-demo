@@ -40,6 +40,7 @@ _spec.loader.exec_module(caller_context)
 
 BASE_URL = "http://localhost:8000"
 TOKEN = "test-workload-token"
+AUD = "git-forge"  # this server's backend name
 ALLOWLIST = json.dumps({
     "consultant": ["github:startxfr/zuno-*", "gitlab:team/*"],
     "builders": ["github:@self/*"],
@@ -72,7 +73,7 @@ class _Recorder:
 
 def _headers(tool, groups):
     h = {"X-Zuno-Gateway-Token": TOKEN}
-    h.update(caller_context.build(sub="u-1", groups=groups, claims={}, tool=tool, workload_token=TOKEN))
+    h.update(caller_context.build(audience=AUD, sub="u-1", groups=groups, claims={}, tool=tool, workload_token=TOKEN))
     return h
 
 
@@ -182,6 +183,81 @@ async def test_a_traversal_in_an_allowed_prefix_is_refused(transport):
                              {**WRITE, "repo": repo}, rec, ON)
         assert result.is_error, repo
     assert rec.calls == []
+
+
+class _RedirectedRepo:
+    """What PyGithub returns for a renamed or transferred repository: get_repo follows
+    the 301, so the object is the repository at its new name."""
+    private = False
+
+    def __init__(self, full_name):
+        self.full_name = full_name
+        self.writes = []
+        self.forks = []
+
+    def get_contents(self, path, **kw):
+        raise AssertionError("nothing may be read from a redirected repository")
+
+    def create_file(self, *a, **kw):
+        self.writes.append(a)
+        raise AssertionError("nothing may be written to a redirected repository")
+
+    update_file = create_file
+
+    def create_fork(self, **kw):
+        self.forks.append(kw)
+        raise AssertionError("a redirected source may not be forked")
+
+
+class _RedirectingGithub:
+    def __init__(self, repo):
+        self.repo, self.asked = repo, []
+
+    def get_repo(self, name):
+        self.asked.append(name)
+        return self.repo
+
+
+async def _call_real(transport, headers, tool, args, github):
+    """Like _call, with the real provider helpers and a fake GitHub client."""
+    http_client = httpx2.AsyncClient(transport=transport, base_url=BASE_URL, headers=headers)
+    with mock.patch.object(server, "_github_client", lambda: github), mock.patch.dict(os.environ, ON):
+        async with streamable_http_client(f"{BASE_URL}/mcp", http_client=http_client) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                return await session.call_tool(tool, args)
+
+
+async def test_a_renamed_repository_redirect_is_rechecked(transport):
+    """`startxfr/zuno-old` passes the allowlist by name, but GitHub redirects it to
+    `elsewhere/prod`: the resolved name is checked before any read, write or fork."""
+    for tool, args in (
+        ("write_file", {**WRITE, "repo": "zuno-old"}),
+        ("read_repository_content", {"provider": "github", "owner": "startxfr", "repo": "zuno-old"}),
+        ("fork_repository", {"provider": "github", "owner": "startxfr", "repo": "zuno-old", "target_owner": "startxfr"}),
+    ):
+        repo = _RedirectedRepo("elsewhere/prod")
+        github = _RedirectingGithub(repo)
+        result = await _call_real(transport, _headers(tool, ["consultant"]), tool, args, github)
+        assert result.is_error and "elsewhere/prod" in _text(result), (tool, _text(result))
+        assert github.asked == ["startxfr/zuno-old"] and repo.writes == [] and repo.forks == [], tool
+
+
+async def test_a_fork_that_lands_outside_the_allowlist_is_reported(transport):
+    class _Fork:
+        name, full_name, html_url = "zuno-demo", "attacker/zuno-demo", "https://x"
+
+    class _Source(_RedirectedRepo):
+        def create_fork(self, **kw):
+            self.forks.append(kw)
+            return _Fork()
+
+    repo = _Source("startxfr/zuno-demo")
+    args = {"provider": "github", "owner": "startxfr", "repo": "zuno-demo", "target_owner": "startxfr"}
+    result = await _call_real(transport, _headers("fork_repository", ["consultant"]), "fork_repository", args,
+                              _RedirectingGithub(repo))
+    assert result.is_error and "attacker/zuno-demo" in _text(result), _text(result)
+    assert repo.forks == [{"organization": "startxfr"}]
 
 
 async def test_wildcard_group_reaches_any_repository(transport):

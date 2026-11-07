@@ -71,6 +71,7 @@ import fnmatch
 import hashlib
 import hmac
 import json
+import logging
 import os
 import re
 import time
@@ -100,26 +101,37 @@ HTTP_TIMEOUT_SECONDS = float(os.getenv("GIT_FORGE_HTTP_TIMEOUT_SECONDS", "20"))
 # components/mcp-servers/).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 
+logger = logging.getLogger("git_forge")
+
 
 # --------------------------------------------------------------------------
 # ADR-0603 M12 (WP-225 lot B): the signed caller context.
 #
 # The gateway signs who a call is for (sub, groups, email, username, the tool,
-# a timestamp) from the token it has validated, and sends it as
+# a timestamp, this server's name) from the token it has validated, and sends it as
 # X-Zuno-Caller-Context / X-Zuno-Caller-Signature (components/mcp-gateway/app/
-# caller_context.py). The key is derived from the workload token this server
-# already holds. Duplicated in each server: an image is built from its own
+# caller_context.py), only to backends whose binding declares caller_context.
+# The key is derived per backend from the workload token this server already holds. Duplicated in each server: an image is built from its own
 # directory only (ADR-0119). A missing, forged, stale or other-tool context
 # verifies as None; a server that needs it then refuses (fail closed).
 # --------------------------------------------------------------------------
 
+# The audience of the caller context: this server's backend name in
+# platform/bindings/tools/tool-bindings.yaml.
+CALLER_CONTEXT_AUDIENCE = "git-forge"
 CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
 CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
 CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
+# A context dated in the future beyond clock skew is refused, so a signed context
+# cannot be minted to stay valid for longer than its age bound.
+CALLER_CONTEXT_MAX_SKEW_SECONDS = 30
 
 
 def _caller_context_key() -> bytes:
-    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), b"zuno-caller-context-v1", hashlib.sha256).digest()
+    # Per backend: HMAC(token, label + ":" + this server's name). A context signed
+    # for another backend does not verify here.
+    label = b"zuno-caller-context-v1:" + CALLER_CONTEXT_AUDIENCE.encode("utf-8")
+    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), label, hashlib.sha256).digest()
 
 
 def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
@@ -136,16 +148,20 @@ def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optiona
         payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
     except (ValueError, TypeError):
         return None
-    if not isinstance(payload, dict) or payload.get("v") != 1 or payload.get("tool") != tool:
+    if not isinstance(payload, dict) or payload.get("v") != 1:
+        return None
+    if payload.get("aud") != CALLER_CONTEXT_AUDIENCE or payload.get("tool") != tool:
         return None
     iat = payload.get("iat")
-    if not isinstance(iat, int) or abs(time.time() - iat) > CALLER_CONTEXT_MAX_AGE_SECONDS:
+    now = time.time()
+    if not isinstance(iat, int) or iat > now + CALLER_CONTEXT_MAX_SKEW_SECONDS or now - iat > CALLER_CONTEXT_MAX_AGE_SECONDS:
         return None
     groups = payload.get("groups")
     return {
         "sub": str(payload.get("sub") or ""),
         "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
         "email": str(payload.get("email") or "").lower(),
+        "email_verified": payload.get("email_verified") is True,
         "username": str(payload.get("username") or ""),
     }
 
@@ -205,6 +221,10 @@ def _allowed(target: str, caller: Optional[Dict[str, Any]], allowlist: Dict[str,
 # identity itself, written "@self" ("github:@self/<name>"). Empty: no allowlist,
 # the behaviour before WP-225. Scope "all" checks reads, listings and writes;
 # "write" only write_file, create_repository and fork_repository.
+#
+# Matching is fnmatch, decided deliberately: `*` matches ACROSS "/", so
+# "gitlab:team/*" also admits every subgroup ("gitlab:team/sub/repo"). To stop at
+# one level, list the repositories themselves.
 REPOSITORY_ALLOWLIST_ENV = "GIT_FORGE_REPOSITORY_ALLOWLIST"
 SELF_OWNER = "@self"
 
@@ -289,8 +309,11 @@ def _gitlab_client() -> gitlab.Gitlab:
 # git.repository.read - read_repository_content / read_private_repository_content
 # --------------------------------------------------------------------------
 
-def _github_read_content(owner: str, repo: str, path: str, ref: Optional[str]) -> Dict[str, Any]:
+def _github_read_content(
+    owner: str, repo: str, path: str, ref: Optional[str], *, policy: Optional[_RepoPolicy] = None
+) -> Dict[str, Any]:
     gh_repo = _github_client().get_repo(f"{owner}/{repo}")
+    _check_resolved("github", getattr(gh_repo, "full_name", None), policy)
     # ADR-0121: unconditional, caller-independent - this server never reads
     # private GitHub content through any tool, including the private-scoped
     # one (which refuses provider="github" entirely - see its own docstring).
@@ -324,9 +347,11 @@ def _github_read_content(owner: str, repo: str, path: str, ref: Optional[str]) -
 
 
 def _gitlab_read_content(
-    owner: str, repo: str, path: str, ref: Optional[str], *, allow_private: bool
+    owner: str, repo: str, path: str, ref: Optional[str], *, allow_private: bool,
+    policy: Optional[_RepoPolicy] = None,
 ) -> Dict[str, Any]:
     project = _gitlab_client().projects.get(f"{owner}/{repo}")
+    _check_resolved("gitlab", getattr(project, "path_with_namespace", None), policy)
     if project.visibility != "public" and not allow_private:
         raise ValueError(
             f"{owner}/{repo} is not a public GitLab project (visibility="
@@ -489,6 +514,18 @@ def _gitlab_list_repos(owner: str, owner_type: str, *, allow_private: bool) -> L
     return _merge_top10(most_starred, most_active)
 
 
+def _check_resolved(provider: str, full_name: Optional[str], policy: Optional[_RepoPolicy]) -> None:
+    """ADR-0603 M12: the repository the provider actually resolved. PyGithub follows
+    a 301 for a renamed or transferred repository and GitLab serves a moved project
+    under its old path, so the name the caller passed may not be the repository
+    reached. Re-checked before anything is read or written."""
+    if policy is None:
+        return
+    if not full_name:
+        raise PermissionError("the provider did not report the repository's name; refused (ADR-0603 M12)")
+    _check_repo(f"{provider}:{full_name}", policy)
+
+
 def _filter_listing(provider: str, repos: List[Dict[str, Any]], policy: Optional[_RepoPolicy]) -> List[Dict[str, Any]]:
     """ADR-0603 M12: a listing keeps only the repositories the caller may reach."""
     if policy is None:
@@ -501,9 +538,11 @@ def _filter_listing(provider: str, repos: List[Dict[str, Any]], policy: Optional
 # --------------------------------------------------------------------------
 
 def _github_write_file(
-    owner: str, repo: str, path: str, content: str, commit_message: str, branch: Optional[str]
+    owner: str, repo: str, path: str, content: str, commit_message: str, branch: Optional[str],
+    *, policy: Optional[_RepoPolicy] = None,
 ) -> Dict[str, Any]:
     gh_repo = _github_client().get_repo(f"{owner}/{repo}")
+    _check_resolved("github", getattr(gh_repo, "full_name", None), policy)
     # ADR-0121: unconditional, caller-independent - this server only ever
     # writes to public repositories, on either provider.
     if gh_repo.private:
@@ -524,9 +563,11 @@ def _github_write_file(
 
 
 def _gitlab_write_file(
-    owner: str, repo: str, path: str, content: str, commit_message: str, branch: Optional[str]
+    owner: str, repo: str, path: str, content: str, commit_message: str, branch: Optional[str],
+    *, policy: Optional[_RepoPolicy] = None,
 ) -> Dict[str, Any]:
     project = _gitlab_client().projects.get(f"{owner}/{repo}")
+    _check_resolved("gitlab", getattr(project, "path_with_namespace", None), policy)
     # ADR-0121: unconditional, caller-independent - this server only ever
     # writes to public repositories, on either provider.
     if project.visibility != "public":
@@ -594,17 +635,39 @@ def _gitlab_create_repo(name: str, owner: Optional[str], private: bool, descript
 # git.repository.fork - fork_repository
 # --------------------------------------------------------------------------
 
-def _github_fork_repo(owner: str, repo: str, target_owner: Optional[str]) -> Dict[str, Any]:
+def _fork_landed(provider: str, full_name: Optional[str], policy: Optional[_RepoPolicy]) -> None:
+    """The fork exists by now; a destination outside the allowlist (a provider that
+    placed or renamed it unexpectedly) is reported, never returned as a success."""
+    try:
+        _check_resolved(provider, full_name, policy)
+    except PermissionError as exc:
+        logger.warning("fork landed outside the repository allowlist: %s", full_name)
+        raise PermissionError(f"the fork was created as {full_name!r}, outside the allowlist; remove it: {exc}") from exc
+
+
+def _github_fork_repo(
+    owner: str, repo: str, target_owner: Optional[str], *,
+    source_policy: Optional[_RepoPolicy] = None, target_policy: Optional[_RepoPolicy] = None,
+) -> Dict[str, Any]:
     gh_repo = _github_client().get_repo(f"{owner}/{repo}")
+    _check_resolved("github", getattr(gh_repo, "full_name", None), source_policy)
     kwargs = {"organization": target_owner} if target_owner else {}
     fork = gh_repo.create_fork(**kwargs)
+    if target_policy is not None and target_owner:
+        _fork_landed("github", getattr(fork, "full_name", None), target_policy)
     return {"name": fork.name, "full_name": fork.full_name, "url": fork.html_url}
 
 
-def _gitlab_fork_repo(owner: str, repo: str, target_owner: Optional[str]) -> Dict[str, Any]:
+def _gitlab_fork_repo(
+    owner: str, repo: str, target_owner: Optional[str], *,
+    source_policy: Optional[_RepoPolicy] = None, target_policy: Optional[_RepoPolicy] = None,
+) -> Dict[str, Any]:
     project = _gitlab_client().projects.get(f"{owner}/{repo}")
+    _check_resolved("gitlab", getattr(project, "path_with_namespace", None), source_policy)
     payload = {"namespace": target_owner} if target_owner else {}
     fork = project.forks.create(payload)
+    if target_policy is not None and target_owner:
+        _fork_landed("gitlab", getattr(fork, "path_with_namespace", None), target_policy)
     return {
         "name": fork.name,
         "full_name": getattr(fork, "path_with_namespace", fork.name),
@@ -687,10 +750,11 @@ async def read_repository_content(
     internal access, use read_private_repository_content instead (GitLab
     only - this server never grants private GitHub access)."""
     _require_provider(provider)
-    _check_repo(_repo_target(provider, owner, repo), _repo_policy(ctx, "read_repository_content", write=False))
+    policy = _repo_policy(ctx, "read_repository_content", write=False)
+    _check_repo(_repo_target(provider, owner, repo), policy)
     if provider == "github":
-        return _github_read_content(owner, repo, path, ref)
-    return _gitlab_read_content(owner, repo, path, ref, allow_private=False)
+        return _github_read_content(owner, repo, path, ref, policy=policy)
+    return _gitlab_read_content(owner, repo, path, ref, allow_private=False, policy=policy)
 
 
 @mcp_server.tool()
@@ -709,10 +773,9 @@ async def read_private_repository_content(
             "read_private_repository_content only supports provider='gitlab' "
             "- this server never grants private GitHub access (ADR-0121)"
         )
-    _check_repo(
-        _repo_target(provider, owner, repo), _repo_policy(ctx, "read_private_repository_content", write=False)
-    )
-    return _gitlab_read_content(owner, repo, path, ref, allow_private=True)
+    policy = _repo_policy(ctx, "read_private_repository_content", write=False)
+    _check_repo(_repo_target(provider, owner, repo), policy)
+    return _gitlab_read_content(owner, repo, path, ref, allow_private=True, policy=policy)
 
 
 @mcp_server.tool()
@@ -781,10 +844,11 @@ async def write_file(
 ) -> Dict[str, Any]:
     """Create or update a file in a GitHub or GitLab repository as a single commit."""
     _require_provider(provider)
-    _check_repo(_repo_target(provider, owner, repo), _repo_policy(ctx, "write_file", write=True))
+    policy = _repo_policy(ctx, "write_file", write=True)
+    _check_repo(_repo_target(provider, owner, repo), policy)
     if provider == "github":
-        return _github_write_file(owner, repo, path, content, commit_message, branch)
-    return _gitlab_write_file(owner, repo, path, content, commit_message, branch)
+        return _github_write_file(owner, repo, path, content, commit_message, branch, policy=policy)
+    return _gitlab_write_file(owner, repo, path, content, commit_message, branch, policy=policy)
 
 
 @mcp_server.tool()
@@ -814,11 +878,13 @@ async def fork_repository(
     namespace; omit it to fork into this server's own authenticated identity."""
     _require_provider(provider)
     # ADR-0603 M12: the fork is a write to its destination, and a read of its source.
-    _check_repo(_repo_target(provider, target_owner, repo), _repo_policy(ctx, "fork_repository", write=True))
-    _check_repo(_repo_target(provider, owner, repo), _repo_policy(ctx, "fork_repository", write=False))
+    target_policy = _repo_policy(ctx, "fork_repository", write=True)
+    source_policy = _repo_policy(ctx, "fork_repository", write=False)
+    _check_repo(_repo_target(provider, target_owner, repo), target_policy)
+    _check_repo(_repo_target(provider, owner, repo), source_policy)
     if provider == "github":
-        return _github_fork_repo(owner, repo, target_owner)
-    return _gitlab_fork_repo(owner, repo, target_owner)
+        return _github_fork_repo(owner, repo, target_owner, source_policy=source_policy, target_policy=target_policy)
+    return _gitlab_fork_repo(owner, repo, target_owner, source_policy=source_policy, target_policy=target_policy)
 
 
 @mcp_server.tool()

@@ -42,6 +42,7 @@ _spec.loader.exec_module(caller_context)
 
 BASE_URL = "http://localhost:8000"
 TOKEN = "test-workload-token"
+AUD = "confluence"  # this server's backend name
 ALLOWLIST = json.dumps({"consultant": ["TECH", "OPS"], "ocp-paas-ops": ["*"]})
 
 
@@ -87,7 +88,7 @@ def _page(page_id, space, title="Runbook"):
 
 def _headers(tool, groups, *, token=TOKEN, iat=None):
     h = {"X-Zuno-Gateway-Token": TOKEN}
-    h.update(caller_context.build(sub="u-1", groups=groups, claims={"email": "u1@example.com"},
+    h.update(caller_context.build(audience=AUD, sub="u-1", groups=groups, claims={"email": "u1@example.com"},
                                   tool=tool, workload_token=token, now=iat))
     return h
 
@@ -131,6 +132,56 @@ async def test_create_in_a_space_outside_the_callers_group_is_refused(transport)
     assert fake.requests == [], "no Confluence call may be made"
 
 
+async def test_create_under_a_parent_in_another_space_is_refused(transport):
+    fake = _Fake([_Resp(200, _page("77", "HR"))])
+    with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}):
+        result = await _call(transport, _headers("create_page", ["consultant"]), "create_page",
+                             {"space_key": "TECH", "title": "t", "body_html": "<p/>", "parent_id": "77"}, fake)
+    assert result.is_error and "no Confluence page with id 77" in _text(result), _text(result)
+    assert "HR" not in _text(result)
+    assert [r[0] for r in fake.requests] == ["GET"], "no POST may be sent"
+
+
+async def test_create_under_a_parent_of_another_allowed_space_is_refused(transport):
+    fake = _Fake([_Resp(200, _page("78", "OPS"))])
+    with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}):
+        result = await _call(transport, _headers("create_page", ["consultant"]), "create_page",
+                             {"space_key": "TECH", "title": "t", "body_html": "<p/>", "parent_id": "78"}, fake)
+    assert result.is_error and [r[0] for r in fake.requests] == ["GET"], _text(result)
+
+
+async def test_create_under_a_parent_in_the_same_space_passes(transport):
+    fake = _Fake([_Resp(200, _page("79", "TECH")), _Resp(200, _page("80", "TECH"))])
+    with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}):
+        result = await _call(transport, _headers("create_page", ["consultant"]), "create_page",
+                             {"space_key": "TECH", "title": "t", "body_html": "<p/>", "parent_id": "79"}, fake)
+    assert not result.is_error, _text(result)
+    assert [r[0] for r in fake.requests] == ["GET", "POST"]
+
+
+async def test_update_reporting_another_space_after_the_write_is_logged(transport):
+    fake = _Fake([_Resp(200, _page("5", "TECH")), _Resp(200, _page("5", "HR"))])
+    with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}), \
+            mock.patch.object(server.logger, "warning") as warned:
+        result = await _call(transport, _headers("update_page", ["consultant"]), "update_page",
+                             {"page_id": "5", "body_html": "<p/>"}, fake)
+    assert not result.is_error, _text(result)
+    assert warned.called and "after the write" in warned.call_args[0][0]
+
+
+async def test_a_context_for_another_backend_or_from_the_future_is_refused(transport):
+    other = {"X-Zuno-Gateway-Token": TOKEN}
+    other.update(caller_context.build(audience="git-forge", sub="u-1", groups=["ocp-paas-ops"], claims={},
+                                      tool="create_page", workload_token=TOKEN))
+    future = _headers("create_page", ["ocp-paas-ops"], iat=time.time() + 120)
+    with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}):
+        for name, headers in (("other backend", other), ("future iat", future)):
+            fake = _Fake([])
+            result = await _call(transport, headers, "create_page",
+                                 {"space_key": "HR", "title": "t", "body_html": "<p/>"}, fake)
+            assert result.is_error and fake.requests == [], name
+
+
 async def test_wildcard_group_reaches_any_space(transport):
     fake = _Fake([_Resp(200, _page("9", "HR"))])
     with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}):
@@ -144,7 +195,8 @@ async def test_update_of_a_page_in_another_space_is_refused_before_the_write(tra
     with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}):
         result = await _call(transport, _headers("update_page", ["consultant"]), "update_page",
                              {"page_id": "5", "body_html": "<p/>"}, fake)
-    assert result.is_error and "HR" in _text(result), _text(result)
+    assert result.is_error and "no Confluence page with id 5" in _text(result), _text(result)
+    assert "HR" not in _text(result), "the refusal must not name the page's space"
     assert [r[0] for r in fake.requests] == ["GET"], "the PUT must never be sent"
 
 
@@ -152,8 +204,8 @@ async def test_read_of_a_page_in_another_space_returns_nothing(transport):
     fake = _Fake([_Resp(200, {**_page("5", "HR", title="Salaries"), "body": {"storage": {"value": "secret"}}})])
     with mock.patch.dict(os.environ, {"CONFLUENCE_SPACE_ALLOWLIST": ALLOWLIST}):
         result = await _call(transport, _headers("read_page", ["consultant"]), "read_page", {"page_id": "5"}, fake)
-    assert result.is_error, _text(result)
-    assert "secret" not in _text(result) and "Salaries" not in _text(result)
+    assert result.is_error and "no Confluence page with id 5" in _text(result), _text(result)
+    assert "secret" not in _text(result) and "Salaries" not in _text(result) and "HR" not in _text(result)
 
 
 async def test_search_without_space_is_limited_to_the_callers_spaces(transport):
@@ -193,7 +245,7 @@ async def test_unsigned_or_forged_or_stale_or_other_tool_context_is_refused(tran
     stale = _headers("create_page", ["ocp-paas-ops"], iat=time.time() - 3600)
     other_tool = _headers("search_pages", ["ocp-paas-ops"])
     tampered = _headers("create_page", ["consultant"])
-    tampered["X-Zuno-Caller-Context"] = caller_context.build(
+    tampered["X-Zuno-Caller-Context"] = caller_context.build(audience=AUD, 
         sub="u-1", groups=["ocp-paas-ops"], claims={}, tool="create_page", workload_token=TOKEN
     )["X-Zuno-Caller-Context"]
     tampered["X-Zuno-Caller-Signature"] = "0" * 64

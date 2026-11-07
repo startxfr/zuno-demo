@@ -210,7 +210,9 @@ jobs:
           python3 tests/test_experience_clients.py
           # WP-225 lot B (ADR-0603 M12, M13, M15): the signed caller context, the
           # namespace matcher of metrics.query, the email recipient allowlist and
-          # the JSON-RPC batch bound.
+          # the JSON-RPC batch bound. promql-parser (test-only lock) re-parses every
+          # rewritten query.
+          pip install --require-hashes -r tests/requirements.txt
           python3 tests/test_wp225_lot_b.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).

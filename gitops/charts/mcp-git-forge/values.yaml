@@ -51,8 +51,10 @@ credentials:
 # ADR-0603 M12 (WP-225 lot B): the repositories each Keycloak group may reach through
 # the shared technical tokens, checked in the server against the caller context the
 # mcp-gateway signs. {group: [pattern]} over "<provider>:<owner>/<repo>", fnmatch,
-# case-insensitive; "*" is every repository. A repository created or forked without an
-# owner is "<provider>:@self/<name>". Empty: no allowlist, today's behaviour.
+# case-insensitive; "*" is every repository. `*` matches across "/" (fnmatch), so
+# "gitlab:team/*" also admits the subgroups of team; list repositories to be exact.
+# A repository created or forked without an owner is "<provider>:@self/<name>".
+# Empty: no allowlist, today's behaviour.
 #   groups:
 #     consultant: ["github:startxfr/zuno-*", "gitlab:zuno-team/*"]
 #     ocp-paas-ops: ["*"]

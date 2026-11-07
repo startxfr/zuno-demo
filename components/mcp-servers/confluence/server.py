@@ -48,6 +48,7 @@ import fnmatch
 import hashlib
 import hmac
 import json
+import logging
 import math
 import os
 import re
@@ -74,26 +75,37 @@ HTTP_TIMEOUT_SECONDS = float(os.getenv("CONFLUENCE_HTTP_TIMEOUT_SECONDS", "20"))
 # serving the gateway (same reasoning as salesforce/server.py).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
 
+logger = logging.getLogger("confluence_mcp")
+
 
 # --------------------------------------------------------------------------
 # ADR-0603 M12 (WP-225 lot B): the signed caller context.
 #
 # The gateway signs who a call is for (sub, groups, email, username, the tool,
-# a timestamp) from the token it has validated, and sends it as
+# a timestamp, this server's name) from the token it has validated, and sends it as
 # X-Zuno-Caller-Context / X-Zuno-Caller-Signature (components/mcp-gateway/app/
-# caller_context.py). The key is derived from the workload token this server
-# already holds. Duplicated in each server: an image is built from its own
+# caller_context.py), only to backends whose binding declares caller_context.
+# The key is derived per backend from the workload token this server already holds. Duplicated in each server: an image is built from its own
 # directory only (ADR-0119). A missing, forged, stale or other-tool context
 # verifies as None; a server that needs it then refuses (fail closed).
 # --------------------------------------------------------------------------
 
+# The audience of the caller context: this server's backend name in
+# platform/bindings/tools/tool-bindings.yaml.
+CALLER_CONTEXT_AUDIENCE = "confluence"
 CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
 CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
 CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
+# A context dated in the future beyond clock skew is refused, so a signed context
+# cannot be minted to stay valid for longer than its age bound.
+CALLER_CONTEXT_MAX_SKEW_SECONDS = 30
 
 
 def _caller_context_key() -> bytes:
-    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), b"zuno-caller-context-v1", hashlib.sha256).digest()
+    # Per backend: HMAC(token, label + ":" + this server's name). A context signed
+    # for another backend does not verify here.
+    label = b"zuno-caller-context-v1:" + CALLER_CONTEXT_AUDIENCE.encode("utf-8")
+    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), label, hashlib.sha256).digest()
 
 
 def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
@@ -110,16 +122,20 @@ def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optiona
         payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
     except (ValueError, TypeError):
         return None
-    if not isinstance(payload, dict) or payload.get("v") != 1 or payload.get("tool") != tool:
+    if not isinstance(payload, dict) or payload.get("v") != 1:
+        return None
+    if payload.get("aud") != CALLER_CONTEXT_AUDIENCE or payload.get("tool") != tool:
         return None
     iat = payload.get("iat")
-    if not isinstance(iat, int) or abs(time.time() - iat) > CALLER_CONTEXT_MAX_AGE_SECONDS:
+    now = time.time()
+    if not isinstance(iat, int) or iat > now + CALLER_CONTEXT_MAX_SKEW_SECONDS or now - iat > CALLER_CONTEXT_MAX_AGE_SECONDS:
         return None
     groups = payload.get("groups")
     return {
         "sub": str(payload.get("sub") or ""),
         "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
         "email": str(payload.get("email") or "").lower(),
+        "email_verified": payload.get("email_verified") is True,
         "username": str(payload.get("username") or ""),
     }
 
@@ -207,6 +223,15 @@ def _check_space(space_key: str, policy: Optional[Tuple[Dict[str, Any], Dict[str
         raise PermissionError(
             f"space {space_key!r} is outside the space allowlist of the caller's groups (ADR-0603 M12)"
         )
+
+
+def _check_page_space(page_id: str, space_key: str, policy: Optional[Tuple[Dict[str, Any], Dict[str, List[str]]]]) -> None:
+    """A page the caller names by id: outside the caller's spaces it answers as a
+    missing page, so the refusal tells nothing of where the page lives."""
+    try:
+        _check_space(space_key, policy)
+    except PermissionError:
+        raise ValueError(f"no Confluence page with id {page_id}") from None
 
 
 def _literal_spaces(policy: Tuple[Dict[str, Any], Dict[str, List[str]]]) -> Optional[List[str]]:
@@ -448,8 +473,8 @@ async def read_page(page_id: str, ctx: Optional[Context] = None) -> Dict[str, An
         payload = resp.json()
 
     # ADR-0603 M12: the space is known only once the page is fetched; nothing of
-    # a page outside the caller's spaces is returned.
-    _check_space((payload.get("space") or {}).get("key", ""), policy)
+    # a page outside the caller's spaces is returned, not even its space.
+    _check_page_space(page_id, (payload.get("space") or {}).get("key", ""), policy)
     return {"page": _summarize(payload)}
 
 
@@ -458,7 +483,21 @@ async def create_page(
     space_key: str, title: str, body_html: str, parent_id: Optional[str] = None, ctx: Optional[Context] = None
 ) -> Dict[str, Any]:
     """Create a new Confluence page in the given space, optionally under a parent page."""
-    _check_space(space_key, _space_policy(ctx, "create_page", write=True))
+    policy = _space_policy(ctx, "create_page", write=True)
+    _check_space(space_key, policy)
+    if parent_id and policy is not None:
+        # ADR-0603 M12: the parent must be a page of the same, allowed space; a parent
+        # elsewhere answers as a missing page.
+        _check_page_id(parent_id)
+        async with _client() as client:
+            parent_resp = await client.get(f"/content/{parent_id}", params={"expand": "space"})
+            if parent_resp.status_code == 404:
+                raise ValueError(f"no Confluence page with id {parent_id}")
+            parent_resp.raise_for_status()
+            parent_space = ((parent_resp.json().get("space") or {}).get("key")) or ""
+        _check_page_space(parent_id, parent_space, policy)
+        if parent_space.lower() != space_key.lower():
+            raise ValueError(f"no Confluence page with id {parent_id} in space {space_key!r}")
     request_body: Dict[str, Any] = {
         "type": "page",
         "title": title,
@@ -492,7 +531,8 @@ async def update_page(
         current_resp.raise_for_status()
         current = current_resp.json()
         # ADR-0603 M12: the page's own space, read before any write.
-        _check_space((current.get("space") or {}).get("key", ""), policy)
+        checked_space = (current.get("space") or {}).get("key", "")
+        _check_page_space(page_id, checked_space, policy)
         current_version = (current.get("version") or {}).get("number", 0)
 
         request_body: Dict[str, Any] = {
@@ -511,6 +551,16 @@ async def update_page(
         resp.raise_for_status()
         payload = resp.json()
 
+    # ADR-0603 M12, accepted race: the space is checked on the GET, and the PUT names
+    # that same space and the next version number, so a page moved in between mostly
+    # fails as a version conflict. If Confluence still reports another space, the
+    # write has happened; it is logged, not hidden.
+    written_space = (payload.get("space") or {}).get("key")
+    if policy is not None and written_space and written_space != checked_space:
+        logger.warning(
+            "update_page %s: checked space %r but Confluence reports %r after the write",
+            page_id, checked_space, written_space,
+        )
     return {"page": _summarize(payload), "updated": True}
 
 

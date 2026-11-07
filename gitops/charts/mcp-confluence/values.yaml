@@ -39,7 +39,8 @@ credentials:
 # ADR-0603 M12 (WP-225 lot B): the Confluence spaces each Keycloak group may reach
 # through the shared technical identity, checked in the server against the caller
 # context the mcp-gateway signs (never a tool argument). {group: [space key pattern]},
-# fnmatch, case-insensitive; "*" is every space. Empty: no allowlist, today's
+# fnmatch, case-insensitive; "*" is every space (a space key has no "/", so `*` and
+# `?` simply match characters of the key). Empty: no allowlist, today's
 # behaviour. Once set, a caller whose groups list no matching pattern is refused, and
 # a search without a space covers only the caller's spaces.
 #   groups:
