@@ -11,11 +11,6 @@ regexes = [
   # Secrets store every ExternalSecret references since WP-223: the match then runs from that
   # line to the ExternalSecret's remoteRef key, a Vault path, never a secret value.
   '''^kind:\s*SecretStore\b''',
-  # evaluations/golden_path_probe.py calls OpenClaw's gateway with the literal word
-  # `placeholder` as bearer: OpenClaw does not validate it, the ai-gateway sees the
-  # token its own client config injects. Not a credential (the curl-auth-header rule
-  # fires on the shape `Authorization: Bearer <word>`).
-  '''Authorization: Bearer placeholder\b''',
 ]
 # A literal placeholder, not a credential: commit 224615ab (WP-238) sent `Bearer placeholder` through OpenClaw's
 # egress proxy, which replaces it. The header is gone since; this keeps a full-history scan green.
