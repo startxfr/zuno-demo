@@ -1,8 +1,9 @@
 {{- /*
 WP-169: one line per evaluation persona for job-eval-personas.yaml:
 "<username> <group path> <group path> ...", the groups copied from the
-realm-zuno.json user named in copyOf, plus evalPersonasGroup when set. A copyOf that names no realm user fails
-the render rather than creating a persona without groups.
+realm-zuno.json user named in copyOf (or the explicit `groups` list when set, ADR-0610/WP-245: a probe persona
+that must hold exactly one business group), plus evalPersonasGroup when set. A copyOf that names no realm user
+fails the render rather than creating a persona without groups.
 */ -}}
 {{- if and .Values.keycloak.enabled .Values.evalPersonas }}
 {{- $realm := .Files.Get "files/realm-zuno.json" | fromJson }}
@@ -19,6 +20,8 @@ metadata:
 data:
   personas.txt: |
 {{- range $p := .Values.evalPersonas }}
+{{- $groups := $p.groups }}
+{{- if not $groups }}
 {{- $source := dict }}
 {{- range $u := $realm.users }}
 {{- if eq $u.username $p.copyOf }}{{ $source = $u }}{{ end }}
@@ -26,6 +29,8 @@ data:
 {{- if not $source.username }}
 {{- fail (printf "evalPersonas: %s copies %s, which is not a user of files/realm-zuno.json" $p.username $p.copyOf) }}
 {{- end }}
-    {{ $p.username }} {{ join " " $source.groups }}{{ with $.Values.evalPersonasGroup }} {{ . }}{{ end }}
+{{- $groups = $source.groups }}
+{{- end }}
+    {{ $p.username }} {{ join " " $groups }}{{ with $.Values.evalPersonasGroup }} {{ . }}{{ end }}
 {{- end }}
 {{- end }}

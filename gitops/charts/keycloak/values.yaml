@@ -204,6 +204,13 @@ evalPersonas:
     copyOf: finance-01
   - username: eval-board-01
     copyOf: board-01
+  # ADR-0610/WP-245: the Blender golden-path probe and prompt-set measurement sign in as this persona through the
+  # device flow of the public client `blender`; the workstation entry admits /ocp-ai-dev only. Explicit groups
+  # (not copyOf ai-dev-01, which would add /agent_tekos): /ocp-ai-dev plus evalPersonasGroup, nothing else
+  # (zuno-demo-3c review 2026-11-07). Its 429 counter and budget are its own.
+  - username: eval-ai-dev-01
+    groups:
+      - /ocp-ai-dev
   # Stresstest twins: the day-3 stresstest Jobs sign in as these
   # (EVAL_TWIN_PREFIX=stress-), so one stresstest run - about 160 model
   # calls, close to a whole 3M-token daily user budget since the Red Hat
