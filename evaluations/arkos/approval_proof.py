@@ -8,8 +8,10 @@ from the session's HITL stream (`GET session.subscribe`, event `approval_require
 
     python3 approval_proof.py approve|reject|silence [--rule] [--rounds N]
 
-- `approve`: the write reaches the mcp-gateway and AAP starts a REAL job (`zuno-day0-check`, about 6 minutes).
-- `reject`: nothing runs. `silence`: no answer for 330 s, the request ends as a refusal after about 300 s.
+- `approve`: the write reaches the mcp-gateway and AAP starts a REAL job (`zuno-day0-check`, about 6 minutes). It then
+  re-answers the same request id and a made-up one: both must give 409 `approval_not_pending` (UnifAI >= 0.1.64, R-542).
+- `reject`: nothing runs. `silence`: no answer for 330 s, the request ends as a refusal after about 300 s;
+  the script prints whether an expiry event reached the stream and the event types seen.
 - `--rounds N` (reject only): answer N successive requests of the same session, then wait for the next event. UnifAI
   0.1.62 caps a session at 3 approval requests (R-538): the 4th must end the run with "Approval cap reached for this
   session (3 requests)". Tried live on 0.1.62 (2026-11-07, three runs): Arkos stops after the first refusal, so the cap
@@ -114,10 +116,17 @@ def main(argv: list) -> int:
             if mode == "silence":
                 print("SILENCE: no answer for", SILENCE_SECONDS, "s", flush=True)
                 time.sleep(SILENCE_SECONDS)
+                expired = [e for e in events if "expire" in json.dumps(e).lower()]
+                print("EXPIRY event seen:", bool(expired), json.dumps(expired[0])[:300] if expired else "", flush=True)
+                print("EVENT types:", sorted({str(e.get("type")) for e in events}), flush=True)
             else:
                 feedback = "live proof - do not retry this operation"
                 d = c.post(f"{base}/session.approval", json={"sessionId": sid, "requestId": ev["request_id"], "decision": mode, "feedback": feedback, **t._team_body()})
                 print("ANSWER", mode, d.status_code, d.text[:140], flush=True)
+                # R-542 (UnifAI 0.1.64): an answered or unknown request must give 409 approval_not_pending, never 500.
+                for label, rid in (("STALE same id", ev["request_id"]), ("UNKNOWN made-up id", "00000000-dead-beef-0000-000000000000")):
+                    s = c.post(f"{base}/session.approval", json={"sessionId": sid, "requestId": rid, "decision": "approve", "feedback": "stale probe", **t._team_body()})
+                    print("PROBE", label, s.status_code, s.text[:200], flush=True)
         if rounds > 1 and mode == "reject":
             extra = next_request(NEXT_REQUEST_SECONDS)
             print("REQUEST after the cap:", "none (cap held)" if extra is None else json.dumps(extra)[:300], flush=True)
