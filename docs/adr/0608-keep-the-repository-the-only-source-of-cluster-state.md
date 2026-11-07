@@ -1,0 +1,73 @@
+# ADR-0608: Keep the repository the only source of cluster state
+
+- **Status:** Accepted
+- **Target:** v0.16
+- **Date:** 2026-11-07
+- **Decision owners:** Zuno Demo architecture team
+- **Related:** [ADR-0312](0312-route-operator-installs-through-argocd-applications.md), [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md), [ADR-0559](0559-follow-the-cluster-version-and-never-branch-by-ocp-version.md), [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md), [ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md)
+
+## Context
+
+The platform is meant to be rebuilt from this repository alone (ADR-0517, ADR-0547). The 2026-11-07 review found state
+on demo333 that the repository does not explain.
+
+### Findings
+
+| # | Finding | Evidence |
+|---|---|---|
+| F1 | Two operators run without a declaration. | `elasticsearch-eck-operator-certified` and `nfs-provisioner-operator` appear only in `platform/olm/known-good-demo333.yaml`; no role, chart or Application installs them. |
+| F2 | A chart depends on one of them. | `gitops/charts/unifai/values.yaml` sets `sharedStorageClass: nfs`, used by the `UnifaiStack` template. A fresh cluster built from the repository would have no `nfs` storage class. |
+| F3 | Rollouts apply objects by hand first. | WP-224 applied PeerAuthentications by hand in PERMISSIVE before ArgoCD owned them; nothing lists such objects or checks that they were adopted. |
+| F4 | Live state ran ahead of the records. | WP-223's Vault migration was live on demo333 while the tracker still said `Not started`; images have been built in the cluster from commits that were not yet pushed. |
+| F5 | The deployment branch is misdocumented. | `RELEASING.md` said `main` is what demo333 deploys. The manifests default to `main`, but `ansible/tasks/apply_gitops_app.yml` overrides it with `zuno_gitops_target_revision`, set outside the repository: 110 of the 112 live Applications tracked `devel` on 2026-11-07. |
+
+## Decision
+
+**Everything that runs on a cluster is declared in the repository, or listed as external with an owner, and a check
+reports anything else.**
+
+1. **Every Subscription is declared or listed as external.** An operator on the cluster is installed by a role or a
+   chart, or appears in an `external:` section of the known-good file with an owner and a reason. ECK is either declared
+   by a role or removed, by the owner's decision; nfs-provisioner gets a role, because the UnifAI chart depends on it.
+2. **A chart dependency is installed by the repository.** A storage class, CRD or operator that a chart needs is
+   installed by a role that runs before the chart, or the chart's precheck fails with the missing name.
+3. **Hand-applied objects are temporary.** An object applied by hand during a rollout carries the label
+   `zuno.io/applied-by-hand: <WP>`. It is adopted by ArgoCD or deleted before that work package can be `Done`.
+4. **Nothing goes live from an unpushed commit.** An in-cluster build and a pin start only from a commit that is on
+   `origin`, and the build records that commit.
+5. **Live state is recorded the same day.** A work package whose change is live gets its tracker row and brief updated
+   that day, even when the work is not finished (`Operator pending` exists for that).
+6. **`make d3 check drift` reports the gaps.** It lists undeclared Subscriptions (clause 1), missing chart dependencies
+   (clause 2), objects labelled `zuno.io/applied-by-hand` (clause 3) and running first-party images whose recorded
+   commit is not on `origin` (clause 4). It reports only until the first clean run, then fails on any finding.
+7. **The deployment branch is written down as it is.** `RELEASING.md` says which branch each cluster's Applications
+   track (`zuno_gitops_target_revision`, `devel` on demo333), that a push to that branch is a deployment, and that
+   `main` carries the tags. The value moves from the confidential file to `ansible/clusters/<cluster>.yml`, since it is
+   not a secret.
+
+## Alternatives considered
+
+- **Delete everything undeclared.** ECK may serve a purpose outside this repository; deleting it without its owner's
+  decision could break that. Rejected; clause 1 asks for the decision.
+- **Point the Applications at `main` and deploy by merge.** It would make a merge the deployment step, which is cleaner,
+  but it changes every Application and the daily flow of every working session. Not decided here; it can be a later ADR
+  once the drift check is clean.
+
+## Consequences
+
+- A rebuild from the repository gets the storage class UnifAI needs.
+- Rollouts keep their hand-applied first step, but each one is labelled and has an end.
+- The drift check is one more read-only probe, and it can join the golden-path baseline run (ADR-0605).
+
+## Security considerations
+
+An undeclared operator is an unreviewed cluster-scoped privilege. Clause 1 brings each one under review or removes it.
+
+## Operational considerations
+
+The drift check reads Subscriptions, labelled objects and pod images through the Kubernetes API and compares commits
+with `git ls-remote origin`. It changes nothing.
+
+## Work packages
+
+[WP-241](../roadmap/work-packages/wp-241-drift-check-nfs-provisioner-role-and-eck-decision.md).

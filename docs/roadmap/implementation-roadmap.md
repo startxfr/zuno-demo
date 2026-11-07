@@ -15,7 +15,7 @@ copy would drift unvalidated).
 Derived, not maintained by hand: a version's ADRs are the ADRs whose
 `**Target:**` names it, and its work packages are those whose tracker row
 cites one of them. A WP that advances ADRs in two versions is counted under
-both, so the WP column sums to more than the 120 tracked rows. "Open ADRs"
+both, so the WP column sums to more than the tracked rows. "Open ADRs"
 counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 `Superseded*` or `Deprecated` is closed. Regenerate after any status change;
 `platform/docs/check_docs.py` verifies the table against the ADR bodies.
@@ -37,8 +37,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
-| v0.15 | 4 | 3 | 8 | WP-221, WP-223, WP-224, WP-225, WP-226, WP-227 |
-| v0.16 | 4 | 2 | 11 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
+| v0.15 | 2 | 1 | 5 | WP-225, WP-238 |
+| v0.16 | 9 | 7 | 15 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-239, WP-240, WP-241, WP-242, WP-243 |
+| v0.17 | 2 | 2 | 9 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1063,6 +1064,23 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP-226 | [wp-226](work-packages/wp-226-supply-chain-and-dependency-hygiene-digests-enforce-lockfiles.md) | 0603 | WP-222 | Operator pending | committed locally on `wp-226-supply-chain`, not pushed; rebuilds, warn dry run, enforce, first rendered release and route-cert switch wait for the user's go |
 | WP-227 | [wp-227](work-packages/wp-227-hardened-deployment-profile.md) | 0602 | WP-223, WP-224, WP-225, WP-226 | Not started | scratch-cluster rehearsal |
 
+### Phase 52 — a dependable demonstration, then governed growth (added 2026-11-07)
+
+The project review of 2026-11-07 found the platform's breadth ahead of its robustness: no check sends a real turn
+through the experiences, pre-GA releases change live behaviour between two rehearsals, the cluster holds state the
+repository does not explain, and demo333 is the only cluster. It produced ADR-0605 to ADR-0609. WP-238 is the only one
+needed for the demonstration of 2026-11-09 09:00 (v0.15). WP-239 changes no live object. WP-240 to WP-243 follow the
+demonstration (v0.16). Phase 51 is held for the world model (ADR-0604).
+
+| WP | Brief | ADRs | Depends on | State | Operator actions remaining |
+|---|---|---|---|---|---|
+| WP-238 | [wp-238](work-packages/wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) | 0605 | none | Not started (2026-11-07: steps 1 and 2 drafted on the review branch) | dry run Sunday 2026-11-08 14:00, baseline at the start of the freeze (20:00), runs Monday 07:30 and 08:30 |
+| WP-239 | [wp-239](work-packages/wp-239-adr-numbering-check-template-and-band-hygiene.md) | 0606 | none | Repo work in review | none (repository and CI only); done on branch `adr-0605-0609-review`, Done once pushed and CI is green |
+| WP-240 | [wp-240](work-packages/wp-240-pre-ga-classes-known-good-gate-and-upgrade-runbook.md) | 0607 | WP-238 | Not started | regenerate the known-good file from demo333 outside a freeze |
+| WP-241 | [wp-241](work-packages/wp-241-drift-check-nfs-provisioner-role-and-eck-decision.md) | 0608 | WP-240 | Not started | the user decides on ECK; the nfs-provisioner role is adopted live in a window |
+| WP-242 | [wp-242](work-packages/wp-242-canary-namespace-pattern.md) | 0609 | none | Not started | one rehearsal of the pattern on demo333 |
+| WP-243 | [wp-243](work-packages/wp-243-browser-tests-for-every-experience.md) | 0606 | WP-238 | Not started | the tests run against demo333 |
+
 ### OKF stream phases
 
 The three phases below were tracked in a separate `okf-roadmap.md` until
@@ -1207,6 +1225,7 @@ moving.
 
 ## Change log
 
+- 2026-11-07 — ADR-0605 to ADR-0609 and WP-238 to WP-243 added (Phase 52), from the project review of 2026-11-07. v0.15 becomes the demo-ready band: ADR-0565 (Implemented) and ADR-0605 (golden-path check and freeze window, WP-238), tagged before the demonstration of 2026-11-09. ADR-0584, ADR-0602 and ADR-0603 move to v0.16 with ADR-0606 (definition of done and WIP limit), ADR-0607 (pre-GA dependencies), ADR-0608 (drift) and ADR-0609 (canary rehearsals). ADR-0352 and ADR-0557 move to the new band v0.17. No decision clause of a moved record changes; each carries a dated amendment.
 - 2026-11-05 — ADR-0579 Implemented, with an amendment that records the accepted gaps (skills unused, `max_concurrent_requests` and `guardrails.categories` not consumed, v0.2 refused only once the last agent has moved). Band v0.12 now has no open ADR or work package.
 - 2026-11-05 — WP-164 Done and ADR-0581 Implemented, with an amendment: the quota script stays separate, the per-agent limits travel through UnifAI and the ai-gateway instead of Kuadrant policies, the file names are corrected, and the eight `agent_*` groups stay in the realm import. v0.12 keeps only ADR-0579.
 - 2026-11-05 — WP-161 Done: mcp-gateway's okf-fetch init container, live since 2026-10-23, verifies the pinned release and is rolled by every promotion (now v0.13.0). mlops and ai-gateway read the verified release at build time. WP-164 and ADR-0581 stay open: per-agent quota limits and the quota script are not done, see the WP.

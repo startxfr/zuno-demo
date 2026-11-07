@@ -1,7 +1,7 @@
 # ADR-0603: Close the medium-severity security gaps found in the 2026-11-06 review
 
 - **Status:** Proposed
-- **Target:** v0.15
+- **Target:** v0.16 (retargeted from v0.15 on 2026-11-07, with ADR-0602: v0.15 became the demo-ready band of ADR-0605)
 - **Date:** 2026-11-06
 - **Decision owners:** Zuno Demo architecture team
 - **Related:** [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md), [ADR-0052](0052-harden-all-workloads-for-openshift-restricted-security-and-secnumcloud-objectives.md), [ADR-0535](0535-adopt-rhtas-as-the-artifact-trust-and-supply-chain-service.md), [ADR-0595](0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md)
@@ -106,3 +106,15 @@ which are allow-listed with a reason. Admin calls now need a token: use a token 
 ## Work packages
 
 WP-222 (shared with ADR-0602), WP-226.
+
+## Amendment (2026-11-07): retargeted to v0.16 with ADR-0602
+
+This record follows [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) into v0.16. No
+decision clause changes.
+
+- **Done or live on 2026-11-07:** WP-222; WP-223; the WP-224 rollout; the repository part of WP-226 (hashed lockfiles,
+  already in the live ai-gateway image).
+- **After the 2026-11-09 demonstration only:** the rest of WP-224, WP-225, and the live steps of WP-226
+  (`ClusterImagePolicy` from warn to enforce, digests rendered into the charts, `zuno_validate_route_certs`). Each one
+  rebuilds or rolls shared components, so none of them runs inside the freeze of
+  [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md).

@@ -107,8 +107,11 @@ v0.1, `v0.2.0` for v0.2, `v0.3.0` for v0.3, `v0.13.0` for v0.13. The bands, thei
   [implementation-roadmap.md](docs/roadmap/implementation-roadmap.md). The earlier tags were milestones of their band and
   were cut with a gap or two still named (v0.1 still lists ADR-0110, v0.2 WP-098), so a tagged band may carry a named
   exception, written in the tag message and in versions.md.
-- **Where.** On `main`, on the commit where the band closed. Never on `devel`. `main` is what ArgoCD deploys to demo333, so a
-  tag names something that ran.
+- **Where.** On `main`, on the commit where the band closed. Never on `devel`. The Applications are applied with
+  `zuno_gitops_target_revision` (`ansible/tasks/apply_gitops_app.yml`), which is `devel` on demo333 although the manifests
+  default to `main`: a push to `devel` is a deployment to demo333, and `main` is promoted from a `devel` commit that already
+  ran there, so a tag names something that ran. Before a live demonstration, promote the commit the golden-path check
+  passed on (ADR-0605).
 - **How.** An annotated tag: `git tag -a v0.X.0 <commit> -m "v0.X.0: <what the band delivered>"`, then
   `git push origin v0.X.0`. A tag push starts no workflow: `build-publish.yml` is manual-only (path 2 above).
 - **Patch tags.** `v0.X.1` for a fix on the band after its tag, as `v0.1.1` was.

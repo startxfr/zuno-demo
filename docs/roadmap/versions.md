@@ -25,8 +25,9 @@ state are not restated here.
 | v0.14 | `v0.14.0` | 2026-11-06 | WP-208 Done with named exception: known defects D1 (Dify worker stall, cause open), D2, D3, D5, D6, D8, D9, D10 in its brief; in-cluster ledger run 2026-11-06 |
 | v0.14 | `v0.14.1` | 2026-11-06 | patch: D2, D3, D8, D9, D10 fixed (D1 mitigated, cause open; D11 open); WP-220 portal playground; UnifAI 0.1.61; in-cluster ledger run 2026-11-07 |
 | v0.14 | `v0.14.2` | 2026-11-07 | patch: D1 closed as a known limit of Dify, D11 diagnostics, UnifAI 0.1.62 pin, ADR-0409 Implemented; in-cluster ledger run 2026-11-07 |
-| v0.15 | planned | | the classification floor (WP-209), the agent lifecycle (WP-221) and the security hardening of the 2026-11-06 review (WP-222 to WP-227) |
-| v0.16 | planned | | day-0 internal/external mode (WP-211 to WP-218), cluster-management decisions, page-level ACL (WP-210) |
+| v0.15 | planned 2026-11-08 | | demo-ready: the classification floor (ADR-0565, WP-209 Done) and the golden-path check and freeze window (ADR-0605, WP-238), before the demonstration of 2026-11-09; named exception expected: WP-225, which also cites ADR-0565 and belongs to the v0.16 hardening |
+| v0.16 | planned | | harden and govern: the security hardening (ADR-0602, ADR-0603), the agent lifecycle (WP-221), the delivery rules (ADR-0606), pre-GA dependencies (ADR-0607), drift (ADR-0608), canary rehearsals (ADR-0609), the world model (ADR-0604) |
+| v0.17 | planned | | platform modes: day-0 internal/external mode of the remaining components (WP-211 to WP-215, WP-218) and the remote ArgoCD (ADR-0557) |
 
 ## MVP / v0
 
@@ -297,29 +298,41 @@ Dify's knowledge node goes through an adapter over the mcp-gateway, kagent's
 cluster reading becomes governed mcp-gateway read tools that every experience
 can use, and a first-party token proxy gives both a refreshed Keycloak token.
 
-**3 ADRs, all `Proposed` (ADR-0599, ADR-0600, ADR-0601).** Open work packages: WP-204 to WP-208.
+**3 ADRs, all `Implemented` (ADR-0599, ADR-0600, ADR-0601).** No open work packages.
 
 ## v0.15
 
-Close the classification loop. The ai-gateway enforces the per-(agent, task) classification floor itself, so a caller can no
-longer lower a level by sending a lower header, and a request without a header is treated as `C3` once no current caller
-depends on the old `C1` default (ADR-0565 clause 5). The operator validation, the bundle overrides and the per-chunk
-classification are already done; ADR-0594's signed markers already raise a turn.
+Make the demonstration dependable. The ai-gateway enforces the per-(agent, task) classification floor itself, so a
+caller can no longer lower a level by sending a lower header (ADR-0565, WP-209 Done 2026-11-07; the header-less default
+stays `C1` by decision). A live demonstration is given only after a golden-path check that sends a real turn through
+each demonstration moment, inside a freeze window that starts with that check (ADR-0605, WP-238). The band was
+re-scoped on 2026-11-07 for the demonstration of 2026-11-09 09:00: the work that cannot close before it moved to v0.16.
 
-The band also holds the agent lifecycle: the `deprecated` and `retired` states, an incident revocation list and audit events (ADR-0584, WP-221), moved here from v0.12 on 2026-11-05 because none of it has started.
-
-The band also holds the security hardening that came out of the 2026-11-06 review: ADR-0602 (the findings that break a trust boundary: Vault, secret reach, mesh enforcement, GitOps scope, shared passwords, audience, guardrails, metering, delegated scope) and ADR-0603 (the medium findings, the supply chain and the hygiene gaps). Six work packages: quick wins first (WP-222), then secrets and identity (WP-223), network and GitOps (WP-224), the AI and agent surface (WP-225), the supply chain (WP-226) and a `hardened` deployment profile that switches them all on (WP-227).
-
-**4 ADRs: ADR-0565 `Partially implemented`, ADR-0584 `Accepted`, ADR-0602 and ADR-0603 `Proposed`.** Open work packages: WP-209 (Operator pending 2026-11-07), WP-221, WP-224 to WP-227 (WP-222 Done 2026-11-07, live checks waived; WP-223 Done 2026-11-07, demo333 Vault migrated; WP-224 rolled out 2026-11-07, Operator pending; WP-226 Operator pending 2026-11-07).
+**2 ADRs: ADR-0565 `Implemented`, ADR-0605 `Accepted`.** Open work packages: WP-238; WP-225 also cites ADR-0565 and is
+v0.16 work (named exception of the v0.15 tag).
 
 ## v0.16
 
-Run the day-0 platform services in internal or external mode, one component per work package (ADR-0352: keycloak, vault,
-postgresql, redis, aap, external_secrets, cert_manager, then argocd), and settle the cluster-management decisions it
-depends on: ADR-0557 (a remote ArgoCD, natively or through RHACM, study concluded) and ADR-0556 (the long-term `zuno`
-operator contract). The band also holds page-level Confluence ACL (ADR-0110, WP-210), to be built only if it is wanted.
+Harden the platform and govern its growth. The security hardening of the 2026-11-06 review (ADR-0602, ADR-0603): WP-222
+and WP-223 are Done and WP-224 is rolled out; the rest of WP-224, WP-225, WP-226's live steps and the `hardened` profile
+(WP-227) run after the demonstration. The agent lifecycle (ADR-0584, WP-221). The delivery rules that keep breadth from
+outrunning robustness: a definition of done and a WIP limit of two new experiences per band (ADR-0606), pre-GA
+dependencies pinned, gated and scheduled (ADR-0607), the repository as the only source of cluster state (ADR-0608),
+rehearsals in canary namespaces of demo333 (ADR-0609). ADR-0110 sits here, `Implemented` on 2026-11-07. The world
+model (ADR-0604) joins this band when its branch lands; it is the band's first new experience under ADR-0606.
 
-**4 ADRs: ADR-0352 and ADR-0110 `Partially implemented`, ADR-0557 `Accepted`, ADR-0556 `Proposed`.** Open work packages: WP-210 to WP-218.
+**9 ADRs: ADR-0110 and the hardening and delivery records.** Open: ADR-0584, ADR-0602, ADR-0603, ADR-0606 to ADR-0609.
+Open work packages: WP-221, WP-224 to WP-227, WP-239 to WP-243.
+
+## v0.17
+
+Run the remaining day-0 platform services in internal or external mode, one component per work package (ADR-0352:
+keycloak, vault, postgresql, redis, aap, then argocd; external_secrets and cert_manager are done, WP-216 and WP-217),
+each rehearsed against a service simulated in a canary namespace (ADR-0609), and implement the remote ArgoCD of ADR-0557
+with the argocd work package. Moved from v0.16 on 2026-11-07, after the hardening. ADR-0556 (the `zuno` operator) was
+deprecated on 2026-11-07.
+
+**2 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`.** Open work packages: WP-211 to WP-215, WP-218.
 
 ## OKF stream
 

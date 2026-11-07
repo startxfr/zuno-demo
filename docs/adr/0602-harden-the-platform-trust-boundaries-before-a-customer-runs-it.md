@@ -1,7 +1,7 @@
 # ADR-0602: Harden the platform's trust boundaries before a customer runs it
 
 - **Status:** Proposed
-- **Target:** v0.15
+- **Target:** v0.16 (retargeted from v0.15 on 2026-11-07: v0.15 became the demo-ready band of ADR-0605; the live part of the remaining work waits for the window after the 2026-11-09 demonstration)
 - **Date:** 2026-11-06
 - **Decision owners:** Zuno Demo architecture team
 - **Related:** [ADR-0011](0011-define-tool-authorization-as-policy-intersection.md), [ADR-0024](0024-use-vault-for-application-secrets.md), [ADR-0033](0033-derive-user-identity-only-from-validated-tokens.md), [ADR-0036](0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md), [ADR-0037](0037-protect-mcp-servers-with-network-and-workload-identity-boundaries.md), [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md), [ADR-0594](0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md), [ADR-0595](0595-set-demo-passwords-from-one-shared-value-through-one-variable-per-component.md), [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md)
@@ -140,3 +140,19 @@ package; a finding is closed when it is replayed, not when its package merges.
 ## Work packages
 
 WP-222 (quick wins, shared with ADR-0603), WP-223, WP-224, WP-225, WP-227.
+
+## Amendment (2026-11-07): retargeted to v0.16, sequenced around the 2026-11-09 demonstration
+
+v0.15 became the demo-ready band of [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md),
+tagged before the demonstration of 2026-11-09. This record moves to v0.16 with its open work packages. No decision
+clause changes; only the order of the live steps is set.
+
+- **Live on demo333 on 2026-11-07:** WP-222 (Done); WP-223 (Done: Vault on raft, AWS KMS auto-unseal, TLS); the WP-224
+  rollout (STRICT mTLS in `zuno-data`, `zuno-auth` and `zuno-ai-run`, the `zuno-ai-run` EgressFirewall owned by ArgoCD,
+  three AppProjects, the legacy `zuno` project deleted).
+- **After the demonstration only** (the freeze of ADR-0605 runs from 2026-11-08 20:00 until it ends): the `zuno-unifai`
+  egress canary of WP-224, WP-225 (lot A is built and off by default; lots B and C are not started), WP-227.
+- **WP-227 is rehearsed per namespace** ([ADR-0609](0609-rehearse-on-canary-namespaces-of-demo333.md)): its
+  namespace-scoped switches in a canary namespace, its cluster-scoped ones (Vault, mesh-wide settings, ArgoCD scope)
+  verified by its `make check` only and named as not rehearsed. There is no scratch cluster; demo333 stays on the `demo`
+  profile.

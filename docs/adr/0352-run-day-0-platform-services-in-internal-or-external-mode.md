@@ -1,7 +1,7 @@
 # ADR-0352: Run day-0 platform services in internal or external mode
 
 - **Status:** Partially implemented
-- **Target:** v0.16 (retargeted from v0.9 on 2026-11-05: all of its remaining work is not started, so it follows the code release that will carry it)
+- **Target:** v0.17 (retargeted from v0.16 on 2026-11-07: v0.16 holds the hardening and the delivery rules; the external mode of the remaining components follows it)
 - **Date:** 2026-08-17
 - **Amended:** 2026-09-10 (re-derived against the post-ADR-0421 component
   lists; AAP added as a vital Tier-A component; Day-1 externalization
@@ -610,3 +610,13 @@ key, symmetric gating of install, check and uninstall, the unmanaged-operator as
 (`ansible/tasks/assert_unmanaged_operator.yml`), the README unmanaged-install documents, and a live there-and-back on
 demo333. With MariaDB (WP-143) that is three of the components; the ADR stays `Partially implemented` for Keycloak,
 Vault, PostgreSQL, Redis, AAP and ArgoCD (WP-211 to WP-215, WP-218) and for the clause-10 Day-1 vital gate.
+
+## Amendment (2026-11-07): retargeted to v0.17, rehearsed in canary namespaces
+
+WP-216 (external_secrets) and WP-217 (cert_manager) are Done. The remaining components (WP-211 to WP-215, then WP-218
+for argocd) move to v0.17, after the hardening band. There is no second cluster: each "rehearsal there and back" runs
+against an external service simulated in a canary namespace of demo333
+([ADR-0609](0609-rehearse-on-canary-namespaces-of-demo333.md)), outside any freeze
+([ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md)). Vault (WP-212) cannot be held by
+a canary namespace; its work package names that step as not rehearsed and follows
+[ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md)'s backup and rollback rules. No decision clause changes.

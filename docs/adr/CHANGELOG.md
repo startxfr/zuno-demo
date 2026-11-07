@@ -9,6 +9,21 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition, retarget and new band (2026-11-07) - ADR-0605 to ADR-0609, v0.15 re-scoped, v0.17 created
+
+A project review on 2026-11-07 found the platform's breadth ahead of its robustness: no check sends a real turn through
+the experiences, pre-GA releases change live behaviour between two rehearsals, the cluster holds state the repository
+does not explain, two records shared the number 0602, and demo333 is the only cluster. It produced five records:
+ADR-0605 (golden-path check and freeze window) in v0.15, and ADR-0606 (definition of done and WIP limit), ADR-0607
+(pre-GA dependencies), ADR-0608 (the repository as the only source of cluster state) and ADR-0609 (canary rehearsals)
+in v0.16.
+
+With the owner's decision, v0.15 becomes the demo-ready band tagged before the demonstration of 2026-11-09: it keeps
+ADR-0565 and takes ADR-0605. ADR-0584, ADR-0602 and ADR-0603 move from v0.15 to v0.16, because their remaining work
+cannot close before the demonstration and its live part waits for the window after it. ADR-0352 and ADR-0557 move from
+v0.16 to the new band v0.17, after the hardening. Each moved record carries a dated amendment; no decision clause
+changes. `check_docs.py` now reports two files that share a number and verifies the bands v0.15 to v0.17.
+
 ## Addition (2026-11-06) - ADR-0602 and ADR-0603 join v0.15
 
 A review of the platform's trust boundaries produced two records: ADR-0602 for the findings that break a boundary (Vault,

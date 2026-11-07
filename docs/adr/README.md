@@ -74,6 +74,12 @@ ADR-0541 was the sole gap in the 05xx band and has since been taken (see the
 Renumbered records carry a `Renumbered:` line; a published ADR is never
 renumbered to close a cosmetic gap.
 
+A new number is reserved before the file is written: take the next free
+number from `origin` and every local branch, and tell every live working
+session (ADR-0606 clause 5, [parallel sessions](../platform/parallel-sessions.md)).
+`check_docs.py` fails when two files share a number. New records start from
+[TEMPLATE.md](TEMPLATE.md).
+
 ### Stub records
 
 Four rows marked *(stub)* have no file of their own: their text lives in
@@ -365,15 +371,25 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Implemented | Derive data classification from OKF and only allow raising it |
-| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
-| [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Proposed | Harden the platform's trust boundaries before a customer runs it |
-| [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Proposed | Close the medium-severity security gaps found in the 2026-11-06 review |
+| [ADR-0605](0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md) | Accepted | Gate every live demo on a golden-path check and a freeze window |
 
 ## v0.16
 
 | ADR | Status | Decision |
 |---|---|---|
 | [ADR-0110](0110-automate-document-acl-synchronization.md) | Implemented | Automate document ACL synchronization |
+| [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
+| [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Proposed | Harden the platform's trust boundaries before a customer runs it |
+| [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Proposed | Close the medium-severity security gaps found in the 2026-11-06 review |
+| [ADR-0606](0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md) | Accepted | Admit new experiences with a definition of done and a WIP limit |
+| [ADR-0607](0607-pin-gate-and-schedule-pre-ga-dependencies.md) | Accepted | Pin, gate and schedule pre-GA dependencies |
+| [ADR-0608](0608-keep-the-repository-the-only-source-of-cluster-state.md) | Accepted | Keep the repository the only source of cluster state |
+| [ADR-0609](0609-rehearse-on-canary-namespaces-of-demo333.md) | Accepted | Rehearse on canary namespaces of demo333 |
+
+## v0.17
+
+| ADR | Status | Decision |
+|---|---|---|
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Partially implemented | Run day-0 platform services in internal or external mode |
 | [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 

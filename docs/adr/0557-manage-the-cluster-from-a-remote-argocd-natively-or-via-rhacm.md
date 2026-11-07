@@ -3,7 +3,7 @@
 - **Status:** Accepted - the study concluded 2026-09-10 with its pick
   recorded (see Study); implementation awaits ADR-0352's argocd work
   package.
-- **Target:** v0.16 (retargeted from v0.9 on 2026-11-05: all of its remaining work is not started, so it follows the code release that will carry it)
+- **Target:** v0.17 (retargeted from v0.16 on 2026-11-07, with ADR-0352's argocd work package WP-218)
 - **Date:** 2026-09-10
 - **Decision owners:** Zuno Demo architecture team
 
@@ -233,3 +233,9 @@ Migration/evolution and Review evidence.
 - [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md)
 - [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md)
 - [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md)
+
+## Amendment (2026-11-07): retargeted to v0.17
+
+The implementation of this study's pick is ADR-0352's argocd work package, WP-218, which moved to v0.17. This record
+follows it. ADR-0556, listed among its related records, was deprecated on 2026-11-07; the pick (a remote ArgoCD,
+natively or through RHACM) does not depend on it. No decision clause changes.
