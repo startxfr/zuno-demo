@@ -126,6 +126,17 @@ class Delegation(unittest.TestCase):
         self.assertEqual(g.judge_delegation("").status, g.FAIL)
 
 
+class Tools(unittest.TestCase):
+    def test_pages_pass(self):
+        r = g.judge_tool({"status": 200, "server": "confluence", "ms": 472.5, "results": 5})
+        self.assertEqual(r.status, g.PASS)
+        self.assertIn("5 page(s)", r.detail)
+
+    def test_empty_or_refused_fail(self):
+        self.assertEqual(g.judge_tool({"status": 200, "server": "confluence", "results": 0}).status, g.FAIL)
+        self.assertEqual(g.judge_tool({"status": 403, "error": "denied"}).status, g.FAIL)
+
+
 class GuardrailsAndTrace(unittest.TestCase):
     def test_detection_line_for_dify_passes(self):
         log = ("INFO ai_gateway.guardrails guardrails clean (mode=observe): run_id= agent=open-webui contents=2\n"
@@ -282,7 +293,7 @@ class Aggregate(unittest.TestCase):
 
     def test_every_moment_has_a_probe(self):
         self.assertEqual(set(g.PROBES), {"unifai-tekos", "sovereignty", "open-webui", "zuno-code", "dify", "kagent",
-                                         "openclaw", "lightspeed", "guardrails", "trace", "delegation-approval",
+                                         "openclaw", "lightspeed", "tools", "guardrails", "trace", "delegation-approval",
                                          "world-model"})
         self.assertLess(list(g.PROBES).index("unifai-tekos"), list(g.PROBES).index("trace"))
 

@@ -24,6 +24,7 @@ ONLY=sovereignty,dify make demo golden-path   # some moments only
 | `dify`, `kagent` | One answer through the experience's own token proxy, from inside its pod |
 | `openclaw` | Every persona assistant answers from inside its pod through the operator's egress proxy (the `openclaw-<persona>` token is injected there) |
 | `lightspeed` | The OLSConfig API and console plugin are Ready, and Lightspeed answers one question (temporary port-forward, your OpenShift token; with a certificate login it falls back to `manual`) |
+| `tools` | `search_confluence` through the mcp-gateway REST path (consultant-01, Tekos's task, C2) is answered by the `confluence` MCP server with at least one page |
 | `guardrails` | The DAN prompt through Dify's token proxy is answered (observe mode) and the ai-gateway logs `guardrails DETECTED` for client `dify` |
 | `trace` | The trace of the `unifai-tekos` run is found in Tempo by its run id (temporary port-forward to `tempo-tempo`), with its gateway spans |
 | `world-model` | `roadmap` while `zuno_world_model_enabled` is false; once the demo is installed, a real world is created as `GOLDEN_WORLD_PERSONA` (ai-ops-01), video arrives, one edit is screened and applied, the session is released (run in the web pod); then it is required (ADR-0604, WP-235) |

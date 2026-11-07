@@ -16,6 +16,8 @@ One probe per demonstration moment, each a real call that must get a real answer
                        which injects the openclaw-<persona> token (the path every OpenClaw model call takes)
   lightspeed           the OLSConfig is Ready, then one question to its API (temporary port-forward, the operator's
                        OpenShift token)
+  tools                one governed tool call, `search_confluence` through the mcp-gateway REST path as the gateway
+                       persona for Tekos's task, answered by the confluence MCP server with at least one page
   guardrails           the DAN prompt through Dify's token proxy is answered (observe mode) and the ai-gateway logs a
                        `guardrails DETECTED` line for client dify
   trace                the trace of the unifai-tekos run is found in Tempo by its run id, with gateway spans
@@ -353,6 +355,42 @@ def _proxy_answer(moment: str, namespace: str) -> Result:
     return judge_proxy(moment, last_json_line(out.stdout), out.stderr)
 
 
+_TOOL_SNIPPET = r'''
+import json, sys, httpx
+token = sys.stdin.read().strip()
+h = {"Authorization": "Bearer " + token, "X-Zuno-Data-Classification": "C2", "X-Zuno-Agent": "tekos",
+     "X-Zuno-Task": "answer-technical-question"}
+try:
+    r = httpx.post("http://127.0.0.1:8080/v1/tools/search_confluence/invoke", headers=h, json={"query": "onboarding"},
+                   timeout=60)
+    d = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+    res = d.get("result") or {}
+    print(json.dumps({"status": r.status_code, "server": d.get("mcp_server"), "ms": d.get("duration_ms"),
+                      "results": len(res.get("results") or []) if isinstance(res, dict) else 0,
+                      "error": "" if r.status_code == 200 else r.text[:160]}))
+except Exception as e:
+    print(json.dumps({"status": 0, "error": str(e)[:160]}))
+'''
+
+
+def judge_tool(data: Dict) -> Result:
+    if data.get("status") == 200 and data.get("results", 0) > 0:
+        return Result("tools", PASS, f"search_confluence answered by the {data.get('server')} MCP server: "
+                                     f"{data['results']} page(s) in {data.get('ms')} ms")
+    if data.get("status") == 200:
+        return Result("tools", FAIL, f"search_confluence answered 200 with no page (server {data.get('server')})")
+    return Result("tools", FAIL, f"search_confluence: HTTP {data.get('status')} {data.get('error', '')}")
+
+
+def probe_tools(ctx: Context) -> Result:
+    out = oc("-n", "zuno-ai-run", "exec", "-i", "deploy/mcp-gateway", "-c", "mcp-gateway", "--", "python3", "-c",
+             _TOOL_SNIPPET, stdin=ctx.gateway_token(), timeout=120)
+    data = last_json_line(out.stdout)
+    if not data:
+        return Result("tools", FAIL, f"no result from the mcp-gateway pod: {out.stderr.strip()[:160]}")
+    return judge_tool(data)
+
+
 def judge_guardrails(log: str, client: str = "dify") -> Result:
     hits = [l for l in (log or "").splitlines() if "guardrails DETECTED" in l and f"agent={client}" in l]
     if hits:
@@ -654,6 +692,7 @@ PROBES: Dict[str, Callable[[Context], Result]] = {
     "kagent": probe_kagent,
     "openclaw": probe_openclaw,
     "lightspeed": probe_lightspeed,
+    "tools": probe_tools,
     "guardrails": probe_guardrails,
     "trace": probe_trace,
     "delegation-approval": probe_delegation_approval,
