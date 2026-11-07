@@ -267,12 +267,21 @@ def _open_webui_answer(ctx: Context, moment: str, want: str) -> Result:
         if not model:
             return Result(moment, FAIL, f"no {'zuno-code' if want == 'code' else 'Zuno'} model in Open WebUI: {ids}")
         prompt = "Write a one-line Python function that adds two numbers." if want == "code" else PROMPT
-        r = c.post(f"{ctx.open_webui}/api/chat/completions", headers=auth,
-                   json={"model": model, "stream": False, "messages": [{"role": "user", "content": prompt}]})
+        first_error = ""
+        for attempt in (1, 2):  # one retry on a transport error, never on an HTTP answer; the flake stays visible
+            try:
+                r = c.post(f"{ctx.open_webui}/api/chat/completions", headers=auth,
+                           json={"model": model, "stream": False, "messages": [{"role": "user", "content": prompt}]})
+                break
+            except Exception as exc:  # noqa: BLE001 - httpx transport errors (disconnect, timeout)
+                if attempt == 2:
+                    raise
+                first_error = f"{type(exc).__name__} on the first attempt, passed on retry; "
         body = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
         content = ((body.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
         if r.status_code == 200 and content.strip():
-            return Result(moment, PASS, f"model {model} answered ({len(content)} chars, served by {body.get('model', '?')})")
+            return Result(moment, PASS, f"{first_error}model {model} answered ({len(content)} chars, served by "
+                                        f"{body.get('model', '?')})")
         return Result(moment, FAIL, f"model {model}: HTTP {r.status_code} {str(body)[:200]}")
     finally:
         c.close()
