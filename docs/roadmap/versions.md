@@ -339,7 +339,7 @@ One new experience: Blender 3D objects generated as `bpy` scripts by `gpt-oss-20
 the user's own identity and a C3 floor (ADR-0610), the first of the band's two experience slots (ADR-0606 clause 2);
 its work package is opened when the band starts.
 
-**3 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`, ADR-0610 `Accepted`.** Open work packages: WP-211 to
+**3 ADRs: ADR-0352 `Partially implemented`, ADR-0557 `Accepted`, ADR-0610 `Partially implemented`.** Open work packages: WP-211 to
 WP-215, WP-218.
 
 ## OKF stream

@@ -5,13 +5,11 @@ Audience: the presenter, and the platform team preparing a workstation. Decision
 (Target v0.17), under [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md) and
 [ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md).
 
-> **Status: being rolled out on demo333 ([WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md)).**
-> The entry, the Keycloak client and the C3 floor come with WP-244; `gpt-oss-20b` answers first once the agents release
-> that declares `experience-clients/blender` is promoted (before that, the corp order answers, qwen3.6-27b first, slower).
-> The add-on was run in Blender 4.2.3 LTS (headless, 2026-11-07): it registers its five operators, **Run** builds a
-> sample table (six objects, a bevel modifier, a material) as one undo step, a script importing `os` is refused before
-> it runs, and a model answer wrapped in Markdown is reduced to its code. The first run against the live entry is
-> WP-244's acceptance check.
+> **Status: live on demo333 (2026-11-07, [WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md)).**
+> Signed in as ai-dev-01 through the device flow, three prompts went through `ai-gateway.apps.demo333.startx.fr`,
+> were floored to C3 and answered by `gpt-oss-20b` in 6.6 to 9.4 s; the scripts were replayed in Blender 4.2.3 LTS
+> (headless): two built their objects, one used an invented `bpy` argument and was rolled back (Run keeps nothing when
+> a script fails). Use only prompts known to work on stage (ADR-0610 clause 8).
 
 ## The message
 
@@ -75,11 +73,12 @@ oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run | grep workstation   
    only for a private CA, **CA file**.
 3. Click **Sign in**, then **Open sign-in page**: the browser shows Keycloak with the code displayed in the panel. Sign
    in as ai-dev-01. The panel turns to **Signed in**. No password and no key is ever typed into Blender.
-4. Enter a prompt, for example "A wooden table with 4 cylindrical legs and a small desk lamp on top", and click
-   **Generate script**. Blender stays responsive; the answer takes about 15 to 40 seconds.
+4. Enter a prompt, for example "A wooden table with 4 cylindrical legs and a small desk lamp on top" (measured: 8
+   objects) or "A low-poly pine tree on a small grassy hill" (3 objects and a modifier), and click **Generate script**.
+   Blender stays responsive; the answer streams in about 10 seconds.
 5. The script appears in the Text Editor as `zuno_3d_script.py`, with the result of the static check in the panel.
    Show the code: this is the point of the demonstration, the artist sees what will run.
-6. Click **Run script**. The objects appear as one undo step; select one and show its modifiers and dimensions in the
+6. Click **Run script**. The objects appear as one undo step (a script that fails keeps nothing); select one and show its modifiers and dimensions in the
    properties: they are editable, not a frozen mesh.
 7. Show the platform side: Grafana, dashboard **Zuno Platform / Five experiences** filtered on `client="blender"`
    (tokens counted against ai-dev-01), and in Tempo the `model_call` span with the C3 floor and the local
@@ -268,6 +267,40 @@ def _token(issuer, ctx):
     return None
 
 
+def _stream_chat(url, payload, ctx, token, timeout=240):
+    """POST with stream=true and join the content deltas. Streaming keeps bytes flowing, so a load balancer's idle
+    timeout (60 s on demo333's AWS ELB) cannot cut a long generation. Returns (status, text or error dict)."""
+    body = json.dumps(dict(payload, stream=True)).encode()
+    req = urllib.request.Request(url, data=body, method="POST", headers={
+        "Content-Type": "application/json", "Accept": "text/event-stream", "Authorization": f"Bearer {token}",
+        "X-Zuno-Agent": AGENT, "X-Zuno-Task": TASK})
+    try:
+        resp = urllib.request.urlopen(req, context=ctx, timeout=timeout)
+    except urllib.error.HTTPError as err:
+        try:
+            return err.code, json.loads(err.read().decode())
+        except ValueError:
+            return err.code, {"error": f"HTTP {err.code}"}
+    parts = []
+    with resp:
+        for raw in resp:
+            line = raw.decode("utf-8", "replace").strip()
+            if not line.startswith("data:"):
+                continue
+            data = line[5:].strip()
+            if data == "[DONE]":
+                break
+            try:
+                chunk = json.loads(data)
+            except ValueError:
+                continue
+            if chunk.get("error"):
+                return 502, chunk
+            for choice in chunk.get("choices") or []:
+                parts.append((choice.get("delta") or {}).get("content") or "")
+    return 200, "".join(parts)
+
+
 def _generate_job(gateway, issuer, ctx, prompt):
     token = _token(issuer, ctx)
     if not token:
@@ -277,16 +310,17 @@ def _generate_job(gateway, issuer, ctx, prompt):
                "messages": [{"role": "system", "content": SYSTEM_PROMPT},
                             {"role": "user", "content": f"Create this 3D object or scene: {prompt}"}]}
     try:
-        status, res = _post(f"{gateway.rstrip('/')}/v1/chat/completions", payload, ctx,
-                            headers={"Authorization": f"Bearer {token}", "X-Zuno-Agent": AGENT, "X-Zuno-Task": TASK},
-                            form=False, timeout=240)
-    except Exception as exc:  # network, TLS
+        status, res = _stream_chat(f"{gateway.rstrip('/')}/v1/chat/completions", payload, ctx, token)
+    except Exception as exc:  # network, TLS, a cut stream
         _state.update(busy=False, error=f"gateway unreachable: {exc}")
         return
     if status != 200:
         _state.update(busy=False, error=f"gateway answered {status}: {res.get('error', res)}")
         return
-    _state.update(busy=False, result=res["choices"][0]["message"]["content"] or "")
+    if not res.strip():
+        _state.update(busy=False, error="the model returned an empty answer")
+        return
+    _state.update(busy=False, result=res)
 
 
 def _poll():
@@ -384,12 +418,16 @@ class ZUNO3D_OT_run(bpy.types.Operator):
             return {"CANCELLED"}
         scope = {"__name__": "__zuno3d__", "bpy": bpy, "bmesh": bmesh, "mathutils": mathutils,
                  "math": math, "random": random}
+        before = set(bpy.data.objects)
         try:
             exec(compile(code, TEXT_NAME, "exec"), scope)  # after the check and the user's click only
         except Exception as exc:
-            self.report({"ERROR"}, f"Script failed: {exc}")
+            # All or nothing: a script that fails half-way (an invented API argument) leaves no partial objects.
+            for obj in set(bpy.data.objects) - before:
+                bpy.data.objects.remove(obj, do_unlink=True)
+            self.report({"ERROR"}, f"Script failed, nothing kept: {exc}")
             return {"CANCELLED"}
-        self.report({"INFO"}, "Objects created")
+        self.report({"INFO"}, f"{len(set(bpy.data.objects) - before)} objects created")
         return {"FINISHED"}
 
 

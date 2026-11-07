@@ -39,7 +39,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 1 | 4 | WP-238 |
 | v0.16 | 10 | 5 | 25 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-228, WP-229, WP-230, WP-231, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237 |
-| v0.17 | 3 | 3 | 10 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218, WP-244 |
+| v0.17 | 3 | 3 | 10 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -1107,7 +1107,7 @@ the 2026-11-09 demonstration); the freeze window still applies.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Operator pending | `make d2 install llm` and `make d1 install connectivity-link` after the push; the agents release with `experience-clients/blender` and its promotion (user) |
+| WP-244 | [wp-244](work-packages/wp-244-blender-workstation-experience-client.md) | 0610 | none | Done | none (live on demo333 2026-11-07; the clause 8 prompt set and a client probe remain under ADR-0610) |
 
 ### OKF stream phases
 

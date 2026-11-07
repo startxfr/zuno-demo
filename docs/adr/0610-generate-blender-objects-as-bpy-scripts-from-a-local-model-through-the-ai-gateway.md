@@ -1,6 +1,6 @@
 # ADR-0610: Generate Blender objects as bpy scripts from a local model through the ai-gateway
 
-- **Status:** Accepted
+- **Status:** Partially implemented
 - **Target:** v0.17
 - **Date:** 2026-11-07
 - **Decision owners:** Zuno Demo architecture team, with the DevOps / infrastructure and 3D content creation teams
@@ -195,3 +195,18 @@ builds, clause by clause, where it differs from the wording above:
   60 requests per user per 5 minutes. The ai-gateway's port 8080 already accepts callers outside the mesh
   (PeerAuthentication `ai-gateway-from-unmeshed-clients`), and its own audience check is live (`JWT_AUDIENCE_REQUIRED`).
 - **Clause 7.** demo333's routes serve the Let's Encrypt wildcard, so the add-on needs no CA file there.
+
+## Update 2026-11-07 (WP-244): live on demo333, first measurements
+
+- **Clauses 2 to 5 live.** Signed in as ai-dev-01 (device flow, client `blender`, group `ocp-ai-dev`), three prompts
+  went through `https://ai-gateway.apps.demo333.startx.fr`. The ai-gateway logged `classification raised by floor: C1 ->
+  C3 agent=blender task=bpy client=blender` for each and sent them to `gpt-oss-20b` through MaaS (agents release
+  v0.14.3, routing `prefer` gpt-oss-20b then qwen3.5-9b, six SaaS providers excluded). Without a token, or with a token
+  of a user outside the admitted group (ai-ops-01), the edge answers 401 and 403 before the model is reached; unrouted
+  paths answer 404; the 61st request of a user within five minutes answers 429.
+- **Transport.** A non-streamed generation is cut after 60 s by the load balancer in front of the router (no bytes
+  flow while the model works). The add-on streams (`stream: true`); answers then arrive in 6.6 to 9.4 s.
+- **Clause 6.** **Run** is all or nothing: a script that fails half-way removes the objects it created.
+- **Clause 8, first sample (3 prompts, gpt-oss-20b).** Table with lamp: 8 objects. Office chair: failed on an invented
+  argument (`primitive_cone_add(diameter1=...)`), rolled back. Pine tree on a hill: 3 objects and a modifier. 2 of 3
+  run; the full prompt set and the golden-path probe of clause 9 remain, hence `Partially implemented`.

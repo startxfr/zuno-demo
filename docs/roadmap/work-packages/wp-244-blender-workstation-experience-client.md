@@ -1,6 +1,6 @@
 # WP-244: Blender workstation experience client
 
-- **State:** Operator pending
+- **State:** Done
 - **ADRs:** [ADR-0610](../../adr/0610-generate-blender-objects-as-bpy-scripts-from-a-local-model-through-the-ai-gateway.md)
 - **Depends on:** none
 - **Related:** [ADR-0587](../../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md),
@@ -76,3 +76,10 @@ The add-on is a local file.
   without token) and the quota-demo routes are unchanged. The AuthPolicy did not publish the identity, so the
   RateLimitPolicy's `auth.identity.sub` counter could not resolve (WP-54 trap 1): fixed in the template; the 429 is
   proven only with a real token.
+- 2026-11-07 ~19:30 CET: acceptance run as ai-dev-01 (user signed in through the device flow). `GET /v1/models` 200; three
+  streamed generations floored C1 -> C3 and served by `gpt-oss-20b` via MaaS (agents release v0.14.3 promoted, routing
+  entry live) in 6.6, 9.4 and 7.7 s, all three pass the static check; replayed in Blender 4.2.3: 2 of 3 build their
+  objects, 1 fails on an invented argument and is rolled back. ai-ops-01 (group `ocp-ai-ops`) gets 403 at the edge.
+  The 61st request within 5 min answers 429 (57 GETs after 4 calls). Non-streamed calls are cut at 60 s by the load
+  balancer: the add-on streams. Remaining for ADR-0610 (not this WP): the full prompt set of clause 8 and a golden-path
+  probe for the client (clause 9), which needs a non-interactive token path.
