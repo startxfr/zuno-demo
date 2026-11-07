@@ -1,0 +1,101 @@
+{{/*
+ADR-0602 / WP-224, following ADR-0590: an OVN EgressFirewall (one per
+namespace, named default) that denies every destination outside the cluster
+except the hosts a platformNamespaces entry lists in .egressFirewall.
+In-cluster traffic (pod and Service networks, DNS) is not affected; the
+Kubernetes API is, because its Service DNATs to the control-plane node IPs,
+hence the nodeSelector rule when .egressFirewall.apiServer is true.
+
+Hosts come from values, each with a reason. The template fails on an empty
+host list (a deny-all with no allowlist is never what an entry means), and the
+last rule is always Deny 0.0.0.0/0 (platform/security/check_mesh_mtls.py
+refuses anything else).
+
+routeHosts are names of this cluster's own Routes (<name>.<clusterBaseDomain>):
+a pod that calls an in-cluster service through its public name leaves through
+the external load balancer. Nothing is rendered while clusterBaseDomain is
+empty: the d1 Application must pass it (ansible substitutes the placeholder),
+and check_mesh_mtls.py fails when zuno-ai-run has no EgressFirewall.
+
+Residual risks, accepted (ADR-0590): the Keycloak and Route names resolve to
+the shared router load balancer, so allowing one admits every *.apps Route at
+the IP level; a dnsName rule resolves to IPs, so any other name served by the
+same CDN or S3 front IPs is reachable too; DNS itself is in-cluster and stays
+open, so a compromised pod can still tunnel data through DNS queries.
+*/}}
+{{- if and .Values.policy.enabled .Values.clusterBaseDomain }}
+{{- range $entry := .Values.platformNamespaces }}
+{{- with $entry.egressFirewall }}
+{{- if not .hosts }}
+{{- fail (printf "platformNamespaces[%s].egressFirewall.hosts is empty: list the external hosts, or drop egressFirewall" $entry.name) }}
+{{- end }}
+apiVersion: k8s.ovn.org/v1
+kind: EgressFirewall
+metadata:
+  name: default
+  namespace: {{ $entry.name }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-50"
+spec:
+  egress:
+    {{- if .apiServer }}
+    # The Kubernetes API (controllers, schedulers and tools that watch it).
+    - type: Allow
+      to:
+        nodeSelector:
+          matchLabels:
+            node-role.kubernetes.io/control-plane: ""
+      ports:
+        - protocol: TCP
+          port: 6443
+    {{- end }}
+    {{- if .keycloak }}
+    # Keycloak's public issuer and JWKS (the gateways verify tokens against it).
+    - type: Allow
+      to:
+        dnsName: keycloak.{{ $.Values.clusterBaseDomain }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- range .routeHosts }}
+    # {{ required (printf "platformNamespaces[%s].egressFirewall.routeHosts[].reason is required" $entry.name) .reason }}
+    - type: Allow
+      to:
+        dnsName: {{ .name }}.{{ $.Values.clusterBaseDomain }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- range .hosts }}
+    # {{ required (printf "platformNamespaces[%s].egressFirewall.hosts[%s].reason is required" $entry.name .dnsName) .reason }}
+    - type: Allow
+      to:
+        dnsName: {{ required (printf "platformNamespaces[%s].egressFirewall.hosts[].dnsName is required" $entry.name) .dnsName }}
+      ports:
+        {{- range (.ports | default (list 443)) }}
+        - protocol: TCP
+          port: {{ . }}
+        {{- end }}
+    {{- end }}
+    {{- with .salesforce }}
+    {{- if .enabled }}
+    # mcp-salesforce (gitops/charts/mcp-salesforce): the org's instance host,
+    # read from the Vault secret's url at install time.
+    - type: Allow
+      to:
+        dnsName: {{ required (printf "platformNamespaces[%s].egressFirewall.salesforce.instanceHost is required when salesforce.enabled" $entry.name) .instanceHost }}
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- end }}
+    - type: Deny
+      to:
+        cidrSelector: 0.0.0.0/0
+---
+{{- end }}
+{{- end }}
+{{- end }}

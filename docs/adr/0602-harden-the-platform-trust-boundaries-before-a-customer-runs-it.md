@@ -61,15 +61,33 @@ as an explicit, named profile (WP-227).** Each clause is delivered by the work p
    password policy, a one-hour idle session and OTP for the console administrator. Both profiles get temporary
    brute-force protection, applied to live realms by the reconcile Job. `directAccessGrantsEnabled` stays on for
    `openshift` and `aap` **by decision of 2026-11-06**: headless `oc login` with a Keycloak password is kept.
-4. **Mesh (C3, WP-224).** `PeerAuthentication` STRICT mesh-wide, with the existing PostgreSQL and MariaDB exceptions
-   written down per port. A deny-by-default `AuthorizationPolicy` per namespace keyed on SPIFFE principals.
-5. **GitOps (C4, WP-224).** The AppProject lists the kinds it may create, the controller loses the blanket
-   `cluster-admin` binding, `main` requires reviews and signed commits, charts come over HTTPS and by digest, and
-   stateful resources carry `Prune=false`.
-6. **Audience (C6, WP-222 and WP-224).** ai-gateway and mcp-gateway require the audience `zuno-admin-api`, the one
-   every experience client already carries through the `maas-gateway-audience` mapper and that a2a-gateway already
-   requires; `JWT_AUDIENCE_REQUIRED=true` makes a gateway refuse to start without one (WP-222). Authorino reads JWKS
-   over HTTPS and pins `iss` and `aud` (WP-224).
+4. **Mesh (C3, WP-224).** `PeerAuthentication` STRICT on the namespaces whose workloads hold the platform's
+   secrets and identities: `zuno-data`, `zuno-auth`, `zuno-ai-run`. It is not mesh-wide: the router, the API server's
+   webhooks, vLLM's own TLS, OpenShift monitoring and the unmeshed experience and UnifAI namespaces all reach meshed
+   pods without Istio mTLS, and the RHOAI namespaces are vendor-managed. Every exception is a workload-scoped
+   PERMISSIVE port carrying a `zuno.io/permissive-reason` annotation that names its caller. `check_mesh_mtls.py`
+   enforces the reason and the namespace list. Fine-grained `AuthorizationPolicy` is **not** adopted (decision of
+   2026-11-06): NetworkPolicy already limits who may connect, and the cost of mapping every flow is not justified for
+   now.
+5. **GitOps (C4, WP-224).**
+   - The single `*/*` AppProject is split in three:
+     - `zuno-platform`: an explicit list of about 30 cluster-scoped kinds.
+     - `zuno-apps`: no cluster-scoped kind, no OLM objects, no ArgoCD objects.
+     - `zuno-bootstrap`: the app-of-apps only.
+   - No project may target `openshift-gitops`. `check_app_projects.py` keeps each Application inside its project.
+   - Outside the repository, the user's GitHub settings cover `main`: secret scanning with push protection, a ruleset
+     against force-push and deletion, and required checks.
+   - Required reviews and signed commits are left to the `hardened` profile (WP-227).
+   - **Still open:** the ArgoCD controller keeps its `cluster-admin` binding, and the plain-HTTP chart repository stays
+     in `sourceRepos`. The AppProjects bound what an Application may declare, not what the controller may do.
+6. **Audience and issuer (C6, WP-222 and WP-224).**
+   - ai-gateway and mcp-gateway require the audience `zuno-admin-api`, the one every experience client already carries
+     through the `maas-gateway-audience` mapper and that a2a-gateway already requires. `JWT_AUDIENCE_REQUIRED=true`
+     makes a gateway refuse to start without one (WP-222).
+   - Every token validator and fetcher uses Keycloak's public HTTPS Route, which serves a Let's Encrypt certificate
+     (WP-224). That covers the three gateways' JWKS, the Authorino AuthPolicy and the RAGAS evaluation token.
+   - Authorino pins `iss` through OIDC discovery and requires `aud` to include `zuno-admin-api`.
+   - The internal `http` service stays for `kcadm` administration only.
 7. **Admin routes (WP-222).** `/admin/*` on ai-gateway and mcp-gateway needs a valid token whose groups include
    `ADMIN_GROUPS` (default `ocp-paas-ops`, `ocp-ai-ops`). `ADMIN_AUTH_MODE=off` is the visible opt-out.
 8. **Guardrails (C7, WP-225).** In `block` mode a detector outage fails closed for classes C2 and above. Tool results and

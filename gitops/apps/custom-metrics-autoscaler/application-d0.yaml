@@ -16,7 +16,7 @@ metadata:
     # ahead of `openshift_ai` in day0_install.yml instead.
     argocd.argoproj.io/sync-wave: "-193"
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main

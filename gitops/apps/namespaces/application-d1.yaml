@@ -10,7 +10,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-199"
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -20,9 +20,14 @@ spec:
       values: |
         policy:
           enabled: true
+        # ADR-0602 / WP-224: the zuno-ai-run EgressFirewall allows the cluster's
+        # own Routes (Keycloak, UnifAI) by name; Ansible replaces the placeholder.
+        clusterBaseDomain: apps.mycluster.example.com
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-gitops
+    namespace: zuno-ai-run
+    # ADR-0602 clause 5 / WP-224: was openshift-gitops; only zuno-bootstrap may
+    # write there. Every namespaced object this renders names its namespace.
   syncPolicy:
     automated:
       prune: true

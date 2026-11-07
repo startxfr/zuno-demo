@@ -595,7 +595,9 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-142"
 spec:
-  project: zuno
+  # ADR-0602 clause 5 / WP-224: workloads live in zuno-apps (no cluster-scoped
+  # kind, no openshift-gitops destination).
+  project: zuno-apps
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -604,7 +606,7 @@ spec:
       releaseName: zuno-mcp-{name}-d0
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-gitops
+    namespace: zuno-ai-run
   syncPolicy:
     automated:
       prune: true
@@ -625,7 +627,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-141"
 spec:
-  project: zuno
+  project: zuno-apps
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main

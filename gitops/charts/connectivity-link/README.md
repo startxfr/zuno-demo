@@ -110,23 +110,31 @@ Gateways already use on this cluster (`data-science-gateway`,
 - `HTTPRoute` `tekos-quota-demo` (namespace `zuno-ai-run`) backing that
   hostname inside the mesh, backend `tekos-frontend:8080` — the same
   Service the real Route already fronts.
-- `AuthPolicy` `tekos-quota-demo-jwt` establishes JWT identity using
-  `jwksUrl` — the internal Keycloak Service endpoint
-  (`http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs`),
-  **not** `issuerUrl` (OIDC discovery against the external Route).
-  First attempt used `issuerUrl` and Authorino 500'd every request:
-  in-cluster OIDC discovery against the externally-issued Keycloak
-  route cert failed with `x509: certificate signed by unknown
-  authority` (Authorino doesn't trust that CA) — the same class of
-  problem ADR-0347/ADR-0411 solve for other in-cluster consumers, and
-  the same split-brain issuer/JWKS default every other Keycloak
-  consumer chart in this repo already carries. The internal endpoint
-  is plain HTTP, sidestepping TLS trust entirely. Once fixed,
+- `AuthPolicy` `tekos-quota-demo-jwt` establishes JWT identity by OIDC
+  discovery on the public HTTPS issuer (`issuerUrl:
+  https://keycloak.<cluster-domain>/realms/zuno`, from `clusterBaseDomain`
+  or `quotaEnforcement.keycloakIssuerUrl`) and refuses any token whose
+  `aud` does not include `quotaEnforcement.requiredAudience`
+  (`zuno-admin-api`, the audience every experience client carries) -
+  ADR-0602 clause 6 / WP-224. Once authenticated,
   `auth.identity.sub`/`auth.identity.groups` resolve for the
   RateLimitPolicy.
 
+  History: the first attempt (2026-08-18) used `issuerUrl` and Authorino
+  500'd every request with `x509: certificate signed by unknown
+  authority` - the Keycloak Route then served a Vault-issued certificate
+  Authorino does not trust. The workaround was `jwksUrl` on the plain-HTTP
+  in-cluster Service, which pinned neither `iss` nor `aud` and fetched the
+  signing keys unauthenticated. That reason is gone: since ADR-0211 the
+  Route serves the Let's Encrypt wildcard certificate (keycloak chart
+  `ingress.acmeWildcardTLS`). The template now refuses to render the
+  AuthPolicy unless `quotaEnforcement.keycloakAcmeWildcardTLS` is true, so
+  a cluster still on the Vault certificate fails at render time instead of
+  500ing at request time; `gitops/apps/connectivity-link/application-d1.yaml`
+  sets it to mirror the keycloak Application.
+
 **Pre-existing platform bug found and fixed (2026-08-18):** even after
-the `jwksUrl` fix, every request 500'd with `server: istio-envoy`
+the (since replaced) `jwksUrl` fix, every request 500'd with `server: istio-envoy`
 logging `kuadrant-wasm-shim: gRPC status code is not OK` — Envoy's
 ext_authz call to Authorino's gRPC listener itself, not an AuthConfig
 problem. Root cause: `templates/certificate.yaml`'s

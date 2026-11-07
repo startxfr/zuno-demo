@@ -32,7 +32,11 @@ ADR-0603 clause 4.
 4. Hashed lockfiles (`pip-compile --generate-hashes`) and one version per library across components; pin
    `kubernetes.core`; Dependabot for actions and Python.
 5. Triage the `validate_certs`/`insecure` hits: fix, or keep with a one-line reason in the file.
-6. `evaluations/.venv-gate`: run the untrack step left by WP-222 and decide whether to purge history.
+6. Test Jobs that `pip install` at start-up (the ADR-0053 acceptance gate in
+   `ansible/roles/agents/tasks/run_acceptance_gate.yml`, garak, ragas) run from a prebuilt image with hash-pinned
+   dependencies. Then remove the TEMPORARY `pypi.org` / `files.pythonhosted.org` entries from the zuno-ai-run
+   EgressFirewall (`gitops/charts/namespaces/values.yaml`, WP-224 rehearsal finding of 2026-11-07).
+7. `evaluations/.venv-gate`: run the untrack step left by WP-222 and decide whether to purge history.
 
 ## Verification
 

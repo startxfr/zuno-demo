@@ -96,10 +96,89 @@
   retries: 30
   delay: 10
 
-- name: "argocd | apply the zuno AppProject"
+# ADR-0602 clause 5 / WP-224: zuno-platform (operators, cluster config),
+# zuno-apps (workloads, no cluster-scoped kind), zuno-bootstrap (root
+# app-of-apps only), plus the legacy `zuno` project for the transition.
+- name: "argocd | apply the zuno-platform, zuno-apps and zuno-bootstrap AppProjects"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_kustomize.yml"
   vars:
     kustomize_dir: "{{ zuno_repo_root }}/ansible/roles/argocd/kustomize/appproject"
+
+# The legacy `zuno` project (clusterResourceWhitelist */*, every namespace)
+# is what WP-224 removes, but Applications move to the new projects only
+# when their own role re-applies them, one by one. Deleting it while one
+# still names it would freeze that Application (ArgoCD stops reconciling an
+# Application whose project is missing). So: delete it on the first run of
+# this role where no live Application names it any more - a no-op before.
+# Review finding (WP-224): without this, Applications move only when their
+# own role re-applies them, so the legacy project lived on indefinitely. Move
+# every live Application still in `zuno` to the project (and destination: a
+# project refuses a destination it does not list) its file in gitops/apps
+# declares. Only those two fields change; nothing is re-rendered or synced.
+- name: "argocd | find the repo Application files"
+  ansible.builtin.find:
+    paths: "{{ zuno_repo_root }}/gitops/apps"
+    patterns: "application-*.yaml"
+    recurse: true
+  register: _argocd_repo_app_files
+
+- name: "argocd | read the project and destination every repo Application declares"
+  ansible.builtin.set_fact:
+    _argocd_repo_app_projects: >-
+      {{ _argocd_repo_app_projects | default({}) | combine(dict(
+           _apps | map(attribute='metadata.name')
+           | zip(_apps | map(attribute='spec')))) }}
+  vars:
+    _apps: >-
+      {{ lookup('ansible.builtin.file', item) | ansible.builtin.from_yaml_all | list
+         | select('mapping') | selectattr('kind', 'defined') | selectattr('kind', 'equalto', 'Application') | list }}
+  loop: "{{ _argocd_repo_app_files.files | map(attribute='path') | sort }}"
+  loop_control:
+    label: "{{ item | basename }}"
+
+- name: "argocd | list the live Applications before the project migration"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+  register: _argocd_applications_before
+
+- name: "argocd | move the live Applications off the legacy zuno project (WP-224)"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: "{{ item.metadata.name }}"
+    definition:
+      spec:
+        project: "{{ _argocd_repo_app_projects[item.metadata.name].project }}"
+        destination: "{{ _argocd_repo_app_projects[item.metadata.name].destination }}"
+  loop: >-
+    {{ _argocd_applications_before.resources | default([])
+       | selectattr('spec.project', 'equalto', 'zuno')
+       | selectattr('metadata.name', 'in', _argocd_repo_app_projects | default({}))
+       | list }}
+  loop_control:
+    label: "{{ item.metadata.name }} -> {{ _argocd_repo_app_projects[item.metadata.name].project }}"
+
+- name: "argocd | list the Applications still in the legacy zuno AppProject"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+  register: _argocd_applications
+
+- name: "argocd | delete the legacy zuno AppProject once no Application names it (WP-224)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: argoproj.io/v1alpha1
+    kind: AppProject
+    name: zuno
+    namespace: openshift-gitops
+  when: >-
+    (_argocd_applications.resources | default([])
+     | selectattr('spec.project', 'equalto', 'zuno') | list | length) == 0
 
 # Must run before nfd/nvidia_gpu/openshift_ai/external_secrets, whose
 # install.yml waits on this Subscription health check existing.

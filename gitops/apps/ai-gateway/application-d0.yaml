@@ -8,7 +8,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "-120"
 spec:
-  project: zuno
+  project: zuno-apps
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main
@@ -17,7 +17,9 @@ spec:
       releaseName: zuno-ai-gateway-d0
   destination:
     server: https://kubernetes.default.svc
-    namespace: openshift-gitops
+    namespace: zuno-ai-run
+    # ADR-0602 clause 5 / WP-224: was openshift-gitops; only zuno-bootstrap may
+    # write there. Every namespaced object this renders names its namespace.
   syncPolicy:
     automated:
       prune: true

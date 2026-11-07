@@ -18,6 +18,11 @@ metadata:
 stringData:
   type: helm
   name: startx
-  project: zuno
+  # Global, not project-scoped (ADR-0602 clause 5 / WP-224): charts in both
+  # zuno-platform and zuno-apps depend on this repository, and a repository
+  # secret carries a single project. It holds no credential, so scoping it
+  # protected nothing. Empty rather than absent: the role applies with a
+  # merge patch, which would keep the old `zuno` value of a removed key.
+  project: ""
   enableOCI: "false"
   url: http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable

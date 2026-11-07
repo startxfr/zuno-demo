@@ -1,0 +1,39 @@
+---
+# ADR-0602 clause 5 / WP-224 (finding C4): workloads. No cluster-scoped kind
+# at all (an empty clusterResourceWhitelist allows none), no OLM object and
+# no ArgoCD object, and only the namespaces these Applications write. A
+# workload chart change - the most frequent kind of change - can therefore
+# no longer create a ClusterRoleBinding, install an operator or rewrite an
+# Application through the cluster-admin controller.
+#
+# Destinations come from the live status.resources namespaces (2026-11-06)
+# and `helm template` of every zuno-apps Application;
+# platform/gitops/check_app_projects.py keeps them in step. The namespaces
+# themselves are created by zuno-namespaces-d0 (zuno-platform), never by
+# CreateNamespace=true here (Namespace is cluster-scoped).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: zuno-apps
+  namespace: openshift-gitops
+  labels:
+    zuno.io/managed-by: zuno-ansible
+spec:
+  description: >-
+    Zuno workloads (ADR-0602 clause 5): gitops/apps Applications that render
+    namespaced kinds only, in zuno namespaces and the two RHOAI namespaces
+    the model catalogue writes
+  # The http S3 chart repository is a known risk (ADR-0602 C4); see
+  # appproject-platform.yaml.
+  sourceRepos:
+    - https://github.com/startxfr/zuno-demo.git
+    - http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: "zuno-*"}
+    # zuno-models-d1: MaaS model registrations and RHOAI serving runtimes.
+    - {server: https://kubernetes.default.svc, namespace: models-as-a-service}
+    - {server: https://kubernetes.default.svc, namespace: redhat-ods-applications}
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - {group: operators.coreos.com, kind: "*"}
+    - {group: argoproj.io, kind: "*"}

@@ -13,7 +13,7 @@ metadata:
     # GPU node should exist before the ClusterPolicy-ready wait).
     argocd.argoproj.io/sync-wave: "-208"
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main

@@ -87,10 +87,14 @@ spec:
             - name: http
               containerPort: 8080
           env:
+            {{- /* ADR-0602 clause 6 / WP-224: the JWKS defaults to the issuer's own HTTPS
+                 endpoint (public Route, Let's Encrypt), never an empty string - app/auth.py
+                 would take "" literally instead of its own default. */}}
+            {{- $issuer := .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) }}
             - name: KEYCLOAK_ISSUER
-              value: {{ .Values.keycloakIssuer | default (printf "https://keycloak.%s/realms/zuno" .Values.clusterBaseDomain) | quote }}
+              value: {{ $issuer | quote }}
             - name: KEYCLOAK_JWKS_URL
-              value: {{ .Values.keycloakJwksUrl | quote }}
+              value: {{ .Values.keycloakJwksUrl | default (printf "%s/protocol/openid-connect/certs" $issuer) | quote }}
             - name: JWT_AUDIENCE
               value: {{ .Values.jwtAudience | quote }}
             - name: AI_GATEWAY_URL

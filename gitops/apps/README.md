@@ -21,11 +21,24 @@ that chart's README). `namespaces` has real content on *both* sides: its `-d0`
 respectively, per ADR-0060 - moved from Day 1) - see
 `ansible/roles/namespaces/README.md`.
 
-Every `Application.spec.project` here is `zuno`, not ArgoCD's built-in
-`default` project - a dedicated `AppProject`
-(`ansible/roles/argocd/kustomize/appproject/appproject.yaml`) applied by
-the `argocd` role's `install.yml` once the `AppProject` CRD is
-Established.
+Every `Application.spec.project` here is one of two dedicated
+`AppProject`s (ADR-0602 clause 5 / WP-224), never ArgoCD's built-in
+`default` project, both applied by the `argocd` role's `install.yml` from
+`ansible/roles/argocd/kustomize/appproject/` once the `AppProject` CRD is
+Established:
+
+- `zuno-platform` - an Application that renders a cluster-scoped kind or
+  an OLM object (Subscription, OperatorGroup, CatalogSource), and the
+  no-op or namespaced sibling of such a component outside the `zuno-*`
+  namespaces. Its `clusterResourceWhitelist` lists the exact kinds rendered.
+- `zuno-apps` - everything else: no cluster-scoped kind, no
+  `operators.coreos.com` or `argoproj.io` kind, no `CreateNamespace=true`,
+  destinations `zuno-*`, `models-as-a-service`, `redhat-ods-applications`.
+
+No Application here may target `openshift-gitops` (only `zuno-bootstrap`,
+the root App-of-Apps' project, may). `platform/gitops/check_app_projects.py`
+renders every Application and fails on a kind or namespace its project does
+not allow; run it after adding an Application or a cluster-scoped template.
 
 The root App-of-Apps (`gitops/root-app-of-apps.yaml`), which recurses over
 this directory and manages every `application-d0.yaml`/`application-d1.yaml`
@@ -43,7 +56,7 @@ Zuno-authored manifests (Tekos FE/BFF, Agent Runtime, MCP Gateway, MCP tool
 servers, namespace/quota scaffolding).
 
 Not every component has an Application here. `argocd` is the sole
-exception - it installs itself and creates the `AppProject` (`zuno`) every
+exception - it installs itself and creates the `AppProject`s every
 `Application.spec.project` references, so it applies raw manifests
 directly via `ansible/tasks/apply_kustomize.yml`. `admin_context` avoids
 this since Day 0 now runs `argocd` first - see `admin-context` in the

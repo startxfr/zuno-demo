@@ -11,7 +11,7 @@ metadata:
     # Sync-wave only matters for the root App-of-Apps path; Ansible ignores it.
     argocd.argoproj.io/sync-wave: "-180"
 spec:
-  project: zuno
+  project: zuno-apps
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main

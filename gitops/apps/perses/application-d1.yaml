@@ -21,7 +21,7 @@ metadata:
   name: zuno-perses-d1
   namespace: openshift-gitops
 spec:
-  project: zuno
+  project: zuno-platform
   source:
     repoURL: https://github.com/startxfr/zuno-demo.git
     targetRevision: main

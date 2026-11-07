@@ -69,6 +69,11 @@
 # ansible/tasks/apply_gitops_app.yml's blanket string replace - safe with
 # any number of occurrences, confirmed against that task's own
 # implementation before adding more than the original one.
+#
+# The cluster's route domain, same placeholder convention (set in the
+# Application's values so the substitution reaches it). Feeds the default
+# Keycloak issuer of the quota route's AuthPolicy (ADR-0602 clause 6).
+clusterBaseDomain: apps.mycluster.example.com
 quotaEnforcement:
   enabled: true
   gateway:
@@ -83,11 +88,23 @@ quotaEnforcement:
       hostname: arkos-quota-demo.apps.mycluster.example.com
     - name: comage-quota-demo
       hostname: comage-quota-demo.apps.mycluster.example.com
-  # jwksUrl, not issuerUrl (OIDC discovery) - Authorino runs in-cluster and
-  # doesn't trust the CA signing the external Keycloak route's cert; the
-  # internal Service endpoint is plain HTTP, sidestepping TLS trust
-  # entirely - see this chart's README for details.
-  keycloakJwksUrl: http://zuno-service.zuno-auth.svc:8080/realms/zuno/protocol/openid-connect/certs
+  # ADR-0602 clause 6 / WP-224: the quota route's AuthPolicy validates
+  # tokens by OIDC discovery on the public HTTPS issuer. Empty means
+  # "https://keycloak.<clusterBaseDomain>/realms/zuno". The old jwksUrl on
+  # the plain-HTTP in-cluster Service (http://zuno-service.zuno-auth.svc:
+  # 8080/...) existed because the Keycloak Route served a Vault-issued
+  # certificate Authorino does not trust; since ADR-0211 the Route serves
+  # the Let's Encrypt wildcard certificate, so that reason is gone and the
+  # signing keys no longer cross the network unauthenticated.
+  keycloakIssuerUrl: ""
+  # Must mirror the keycloak chart's ingress.acmeWildcardTLS
+  # (gitops/apps/keycloak/application-d1.yaml): discovery over HTTPS only
+  # works on the Let's Encrypt certificate, so the AuthPolicy refuses to
+  # render (route.enabled) while this is false.
+  keycloakAcmeWildcardTLS: false
+  # The audience every experience client's token carries (maas-gateway-
+  # audience mapper, realm-zuno.json); the AuthPolicy refuses others.
+  requiredAudience: zuno-admin-api
   # WP-157 step 5 (ADR-0570 clause 2 as amended 2026-10-24, decisions
   # D1-D5): ADR-0511's token budgets as one gateway-level
   # TokenRateLimitPolicy, templates/quota-tokenratelimitpolicies.yaml -

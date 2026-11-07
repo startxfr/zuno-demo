@@ -134,6 +134,26 @@ jobs:
         run: |
           python3 platform/vault/check_secret_access.py
           python3 platform/vault/tests/test_check_secret_access.py
+      # ADR-0602 / WP-224: PeerAuthentications only in zuno-data, zuno-auth and
+      # zuno-ai-run, every plaintext port exception justified, and a deny-all
+      # EgressFirewall ending in Deny 0.0.0.0/0 in zuno-ai-run and zuno-unifai.
+      # Same hermetic rendering as the step above (helm, no chart repository).
+      - name: Targeted mesh mTLS and egress firewalls (ADR-0602)
+        run: |
+          python3 platform/security/check_mesh_mtls.py
+          python3 platform/security/tests/test_check_mesh_mtls.py
+      # ADR-0602 clause 5 / WP-224: every gitops/apps Application sits in
+      # zuno-platform or zuno-apps and renders only the cluster-scoped kinds
+      # and namespaces its AppProject allows. Renders WITH subcharts (the
+      # startx subcharts carry the Namespaces and OLM objects), so every
+      # dependency is built first; --strict-dependencies fails on a gap.
+      - name: ArgoCD AppProject split (ADR-0602)
+        run: |
+          helm repo add startx http://sx-helm-repository-prod.s3-website.eu-west-3.amazonaws.com/stable
+          for repo in https://borispolonsky.github.io/dify-helm https://charts.bitnami.com/bitnami https://charts.jetstack.io https://helm.openwebui.com https://helm.releases.hashicorp.com; do helm repo add "$(echo "$repo" | tr -c 'a-z0-9\n' '-')" "$repo"; done
+          for chart in gitops/charts/*/; do if grep -q '^dependencies:' "$chart/Chart.yaml"; then helm dependency build "$chart"; fi; done
+          python3 platform/gitops/check_app_projects.py --strict-dependencies
+          python3 platform/gitops/tests/test_check_app_projects.py
 
   python:
     runs-on: ubuntu-latest
