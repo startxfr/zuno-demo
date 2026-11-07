@@ -11,6 +11,26 @@
     build_image_name: world-model-runtime
     build_dockerfile_path: components/world-model-runtime/Dockerfile
     build_context_dir: "."
+    # Same reasoning as mlops_build (WP-087), for a bigger image: torch and the CUDA
+    # wheels are downloaded (about 9 GB), unpacked (about 10 GB) and committed as a
+    # layer in one build pod. Without a selector the pod can land on a control-plane
+    # node (about 25 GB free, shared with etcd) or on a UnifAI node (about 14 GB free,
+    # where a canary may be running). The GPU group is the only one with real headroom
+    # (95 to 135 GB free); its nvidia.com/gpu taint is PreferNoSchedule, so no
+    # toleration is needed, and the build uses no GPU. The limit keeps a runaway pod
+    # from pushing the node under its image-filesystem eviction threshold: the pod is
+    # evicted instead of the node's LLM pods.
+    build_node_selector:
+      machine.startx.io/group: gpu
+    build_resources:
+      requests:
+        cpu: "1"
+        memory: 4Gi
+        ephemeral-storage: 30Gi
+      limits:
+        cpu: "4"
+        memory: 12Gi
+        ephemeral-storage: 45Gi
 
 - name: "world_model_build | build world-model-web (the API and the PatternFly UI)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
