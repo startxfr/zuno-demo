@@ -158,6 +158,16 @@ its NetworkPolicy boundary (e.g. `gitops/charts/mcp-confluence`), since
 agent-runtime and the MCP servers share the `zuno-ai-run` namespace and a
 direct agent-runtime-to-MCP-server path must be forbidden.
 
+Since WP-225 lot B (ADR-0603 M12) it also sends `X-Zuno-Caller-Context` and
+`X-Zuno-Caller-Signature` (`app/caller_context.py`): the caller's `sub`, groups,
+email and username from the validated token, the backend tool name and a
+timestamp, signed with a key derived from the workload token. Confluence,
+git-forge, Salesforce and AAP use it for their space, repository and owner
+scoping and the `cluster_audit` launch limit. `metrics.query` PromQL gets a
+namespace matcher in every selector (`app/promql_scope.py`,
+`METRICS_NAMESPACES_BY_GROUP`), and a JSON-RPC batch on `/mcp` is bounded by
+`MCP_MAX_BATCH_SIZE` (one `-32600` Invalid Request past it).
+
 ## Policy intersection: all five factors
 
 This gateway authoritatively enforces the full intersection - any single

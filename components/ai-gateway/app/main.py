@@ -434,7 +434,7 @@ async def chat_completions(
     x_zuno_max_tokens: str = Header(default="", alias="X-Zuno-Max-Tokens"),
 ):
     set_caller_client(identity.client)  # ADR-0587: experience client on the metrics
-    set_caller_persona(identity.persona)  # ADR-0593: the `user` label and the per-user budget
+    set_caller_persona(identity.persona)  # ADR-0593: the zuno.persona span attribute and the per-user budget
     # ADR-0596: an experience client's declared model (e.g. zuno-code) selects
     # one of its tasks; the routing policy, never the name, picks the provider.
     x_zuno_task = model_tasks.task_for(identity.client, payload.model, x_zuno_task)

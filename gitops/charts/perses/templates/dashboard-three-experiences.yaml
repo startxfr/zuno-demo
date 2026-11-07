@@ -1,4 +1,6 @@
 {{- if .Values.perses.enabled }}
+# WP-225 lot B (ADR-0603 M15): no `user` label or variable; the "one budget" table is
+# by Keycloak group, as in the Grafana twin.
 # ADR-0587 (WP-184, WP-208): typed-schema translation of
 # gitops/charts/grafana/templates/dashboard-three-experiences.yaml - same panels,
 # same PromQL; same Perses conventions and caveats as dashboard-usage-cost.yaml
@@ -39,22 +41,6 @@ spec:
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
-      - kind: ListVariable
-        spec:
-          name: user
-          display:
-            name: user
-          allowAllValue: true
-          allowMultiple: true
-          plugin:
-            kind: PrometheusLabelValuesVariable
-            spec:
-              labelName: user
-              matchers:
-                - "zuno_model_calls_total"
-              datasource:
-                kind: PrometheusDatasource
-                name: prometheus
     panels:
       callsByClient:
         kind: Panel
@@ -74,7 +60,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (client) (increase(zuno_model_calls_total{client=~"$client", user=~"$user"}[$__range]))
+                      sum by (client) (increase(zuno_model_calls_total{client=~"$client"}[$__range]))
                     seriesNameFormat: "{{`{{client}}`}}"
       tokensByClient:
         kind: Panel
@@ -94,7 +80,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (client, kind) (increase(zuno_model_tokens_total{client=~"$client", user=~"$user"}[$__range]))
+                      sum by (client, kind) (increase(zuno_model_tokens_total{client=~"$client"}[$__range]))
                     seriesNameFormat: "{{`{{client}}`}} ({{`{{kind}}`}})"
       costByClient:
         kind: Panel
@@ -114,7 +100,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (client) (increase(zuno_model_cost_usd_total{client=~"$client", user=~"$user"}[$__range]))
+                      sum by (client) (increase(zuno_model_cost_usd_total{client=~"$client"}[$__range]))
                     seriesNameFormat: "{{`{{client}}`}}"
       guardrailsByClient:
         kind: Panel
@@ -154,7 +140,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (client, provider, outcome) (increase(zuno_model_calls_total{client=~"$client", user=~"$user"}[$__range]))
+                      sum by (client, provider, outcome) (increase(zuno_model_calls_total{client=~"$client"}[$__range]))
       skippedByClient:
         kind: Panel
         spec:
@@ -174,11 +160,11 @@ spec:
                       name: prometheus
                     query: >-
                       sum by (client, provider, reason) (increase(zuno_model_candidates_skipped_total{client=~"$client"}[$__range]))
-      userAcrossClients:
+      groupAcrossClients:
         kind: Panel
         spec:
           display:
-            name: "One user across the experiences: tokens (over range)"
+            name: "One group across the experiences: tokens (over range)"
           plugin:
             kind: Table
             spec: {}
@@ -192,7 +178,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (user, client) (increase(zuno_model_tokens_total{client=~"$client", user=~"$user"}[$__range]))
+                      sum by (group, client) (increase(zuno_model_tokens_by_group_total{client=~"$client"}[$__range]))
       errorRateByClient:
         kind: Panel
         spec:
@@ -211,7 +197,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (client) (increase(zuno_model_calls_total{client=~"$client", user=~"$user", outcome="error"}[$__range])) / sum by (client) (increase(zuno_model_calls_total{client=~"$client", user=~"$user"}[$__range]))
+                      sum by (client) (increase(zuno_model_calls_total{client=~"$client", outcome="error"}[$__range])) / sum by (client) (increase(zuno_model_calls_total{client=~"$client"}[$__range]))
       latencyP95ByClient:
         kind: Panel
         spec:
@@ -230,7 +216,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      histogram_quantile(0.95, sum by (le, client) (increase(zuno_model_call_duration_ms_milliseconds_bucket{client=~"$client", user=~"$user"}[$__range])))
+                      histogram_quantile(0.95, sum by (le, client) (increase(zuno_model_call_duration_ms_milliseconds_bucket{client=~"$client"}[$__range])))
       clusterReadsByTool:
         kind: Panel
         spec:
@@ -323,7 +309,7 @@ spec:
       - kind: Grid
         spec:
           display:
-            title: "Same user, one budget"
+            title: "One budget across the experiences"
             collapse:
               open: true
           items:
@@ -332,7 +318,7 @@ spec:
               width: 24
               height: 8
               content:
-                $ref: "#/spec/panels/userAcrossClients"
+                $ref: "#/spec/panels/groupAcrossClients"
       - kind: Grid
         spec:
           display:

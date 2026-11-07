@@ -35,3 +35,17 @@ credentials:
   # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
   secretStoreName: vault
   refreshInterval: 1h
+
+# ADR-0603 M12 (WP-225 lot B): the Confluence spaces each Keycloak group may reach
+# through the shared technical identity, checked in the server against the caller
+# context the mcp-gateway signs (never a tool argument). {group: [space key pattern]},
+# fnmatch, case-insensitive; "*" is every space. Empty: no allowlist, today's
+# behaviour. Once set, a caller whose groups list no matching pattern is refused, and
+# a search without a space covers only the caller's spaces.
+#   groups:
+#     consultant: [TECH, OPS]
+#     ocp-paas-ops: ["*"]
+# scope: "all" checks reads and writes; "write" only create_page and update_page.
+spaceAllowlist:
+  groups: {}
+  scope: all

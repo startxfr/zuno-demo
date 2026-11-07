@@ -144,6 +144,13 @@ spec:
               value: {{ .Values.aiGatewayUrl | quote }}
             - name: INTERNAL_EMAIL_DOMAINS
               value: {{ .Values.internalEmailDomains | quote }}
+            # ADR-0603 M12, M13, M15 (WP-225 lot B). "{}" = no allowlist / no matcher.
+            - name: EMAIL_RECIPIENT_ALLOWLIST
+              value: {{ .Values.emailReport.recipientAllowlist | default dict | toJson | quote }}
+            - name: METRICS_NAMESPACES_BY_GROUP
+              value: {{ .Values.metricsQuery.namespacesByGroup | default dict | toJson | quote }}
+            - name: MCP_MAX_BATCH_SIZE
+              value: {{ .Values.jsonRpc.maxBatchSize | quote }}
             - name: MCP_GATEWAY_WORKLOAD_TOKEN
               valueFrom:
                 secretKeyRef:

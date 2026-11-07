@@ -67,6 +67,12 @@ spec:
                 secretKeyRef:
                   name: mcp-gateway-workload-token
                   key: token
+            # ADR-0603 M12 (WP-225 lot B): the repositories each Keycloak group may
+            # reach, checked against the signed caller context. "{}" = no allowlist.
+            - name: GIT_FORGE_REPOSITORY_ALLOWLIST
+              value: {{ .Values.repositoryAllowlist.groups | default dict | toJson | quote }}
+            - name: GIT_FORGE_REPOSITORY_ALLOWLIST_SCOPE
+              value: {{ .Values.repositoryAllowlist.scope | quote }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

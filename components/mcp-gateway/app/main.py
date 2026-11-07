@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import uuid
 from typing import Any, Dict, Optional
@@ -25,7 +26,7 @@ from app.delegation import get_delegated_token
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
 from app.policy import PolicyDecision, PolicyStore, evaluate, evaluate_without_declaration
-from app import downstream, mcp_frontdoor
+from app import downstream, mcp_frontdoor, promql_scope
 from app.telemetry import adopt_incoming_trace_context, init_telemetry, tool_invoke_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -46,6 +47,24 @@ policy_store = PolicyStore()
 agent_declarations = AgentDeclarationStore()  # ADR-0036/0038: agents/<name>/agent.okf.md bundles
 binding_registry = BindingRegistry()  # ADR-0116: capability -> physical backend
 delegation_limits = DelegationLimits()  # ADR-0406: corp ceiling and the delegated-write flag
+
+
+DEFAULT_MAX_BATCH_SIZE = 20
+
+
+def max_batch_size() -> int:
+    """ADR-0603 M15: the most JSON-RPC messages one /mcp batch may carry
+    (MCP_MAX_BATCH_SIZE, read per call). 0 means unbounded, the behaviour before
+    WP-225; a malformed value keeps the default rather than lifting the bound."""
+    raw = os.getenv("MCP_MAX_BATCH_SIZE", "").strip()
+    if not raw:
+        return DEFAULT_MAX_BATCH_SIZE
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.error("MCP_MAX_BATCH_SIZE=%r is not an integer; using %d", raw, DEFAULT_MAX_BATCH_SIZE)
+        return DEFAULT_MAX_BATCH_SIZE
+    return max(0, value)
 
 
 def _binding_coverage_error() -> Optional[str]:
@@ -308,6 +327,21 @@ async def _authorize_and_invoke(
         # evaluated the specific calling subject before any shared
         # credential is used - no further gate needed here.
 
+        # ADR-0603 M13 (WP-225 lot B): a metrics query is restricted to the
+        # namespaces the caller's groups are entitled to, by a matcher added to
+        # every selector (app/promql_scope.py). Off when METRICS_NAMESPACES_BY_GROUP
+        # is empty.
+        try:
+            arguments = promql_scope.scope_arguments(binding.capability, arguments, identity.groups)
+        except PermissionError as exc:
+            call.outcome = "denied"
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except promql_scope.PromQLScopeError as exc:
+            call.outcome = "denied"
+            raise HTTPException(
+                status_code=400, detail=f"the metrics query cannot be scoped to a namespace: {exc}"
+            ) from exc
+
         try:
             result = await invoke_downstream(
                 binding,
@@ -317,6 +351,9 @@ async def _authorize_and_invoke(
                 identity.token,
                 delegated_token=delegated_token,
                 caller_groups=identity.groups,
+                # ADR-0603 M12: email and preferred_username for the signed caller
+                # context (app/caller_context.py), read from the validated token only.
+                caller_claims=identity.raw_claims,
             )
         except DownstreamError as exc:
             call.outcome = "downstream_error"
@@ -525,6 +562,23 @@ async def mcp_frontdoor_endpoint(
 
     # A JSON-RPC batch is a list. Notifications inside it produce no response,
     # and a batch of only notifications produces no response body at all.
+    # ADR-0603 M15 (WP-225 lot B): the batch is bounded. JSON-RPC 2.0 answers an
+    # empty batch, and here a batch past the bound, with ONE Invalid Request error
+    # whose id is null; no message of the batch is processed.
+    if isinstance(message, list):
+        limit = max_batch_size()
+        if not message or (limit and len(message) > limit):
+            reason = (
+                "empty batch"
+                if not message
+                else f"batch of {len(message)} messages exceeds the limit of {limit} (MCP_MAX_BATCH_SIZE)"
+            )
+            return JSONResponse(
+                status_code=200,
+                content=mcp_frontdoor.error_response(
+                    None, mcp_frontdoor.JsonRpcError(mcp_frontdoor.INVALID_REQUEST, f"Invalid Request: {reason}")
+                ),
+            )
     messages = message if isinstance(message, list) else [message]
     responses = []
     for msg in messages:

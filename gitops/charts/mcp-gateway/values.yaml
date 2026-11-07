@@ -77,6 +77,32 @@ aiGatewayUrl: http://ai-gateway.zuno-ai-run.svc:8080
 # handler (comma-separated). Override for the real environment.
 internalEmailDomains: zuno.example.internal
 
+# ADR-0603 M12 (WP-225 lot B): the recipients each Keycloak group may send the
+# technical report email to, on top of internalEmailDomains. {group: [address or
+# fnmatch pattern]}, case-insensitive, e.g. {board: ["*@zuno.example.internal"],
+# sales: ["sales-*@zuno.example.internal"]}. The groups are the caller's validated
+# token groups. Empty: no allowlist, today's behaviour; once set, a caller whose
+# groups match no pattern for a recipient is refused.
+emailReport:
+  recipientAllowlist: {}
+
+# ADR-0603 M13 (WP-225 lot B): the namespaces each Keycloak group may query through
+# metrics.query. When set, the gateway adds namespace=~"<namespaces>" to every
+# selector of the PromQL before it reaches mcp-k8s (app/promql_scope.py); a query it
+# cannot scope is refused, and a caller whose groups list no namespace is refused.
+# "*" is every namespace (no matcher). Empty: no matcher, today's behaviour.
+#   namespacesByGroup:
+#     ocp-ai-ops: [zuno-ai-run, zuno-ai-build, zuno-data, zuno-monitoring]
+#     ocp-paas-ops: ["*"]
+metricsQuery:
+  namespacesByGroup: {}
+
+# ADR-0603 M15 (WP-225 lot B): the most messages one JSON-RPC batch on /mcp may
+# carry. A larger (or empty) batch gets one Invalid Request error (-32600, id null)
+# and no message of it is processed. 0 = unbounded.
+jsonRpc:
+  maxBatchSize: 20
+
 # ADR-0524 clause 3 (WP-085 step 3): lets OpenShift Lightspeed reach this
 # gateway's MCP front-door (/mcp). Default false - the allow is scoped by
 # NAMESPACE rather than by pod label, because Lightspeed's pods are

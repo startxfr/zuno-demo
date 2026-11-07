@@ -3,6 +3,8 @@
 # (UnifAI, Open WebUI, OpenClaw, Dify, kagent; ADR-0599, ADR-0600, WP-208) on one governed backend. Built on the bounded
 # `client` label of WP-179 and the skipped-candidate counter of ADR-0591; the
 # classic row schema, for the reason dashboard-usage-cost.yaml's header gives.
+# WP-225 lot B (ADR-0603 M15): the `user` label and its variable are gone; the
+# "one budget" table is by Keycloak group (zuno_model_tokens_by_group_total).
 apiVersion: grafana.integreatly.org/v1beta1
 kind: GrafanaDashboard
 metadata:
@@ -67,26 +69,6 @@ spec:
             "refresh": 2,
             "type": "query",
             "sort": 1
-          },
-          {
-            "current": {
-              "text": "All",
-              "value": "$__all"
-            },
-            "datasource": {
-              "type": "prometheus",
-              "uid": "prometheus"
-            },
-            "definition": "label_values(zuno_model_calls_total, user)",
-            "includeAll": true,
-            "allValue": ".*",
-            "multi": true,
-            "name": "user",
-            "label": "user",
-            "query": "label_values(zuno_model_calls_total, user)",
-            "refresh": 2,
-            "type": "query",
-            "sort": 1
           }
         ]
       },
@@ -124,7 +106,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "expr": "sum by (client) (increase(zuno_model_calls_total{client=~\"$client\"}[$__range]))",
               "legendFormat": "{{`{{client}}`}}"
             }
           ],
@@ -150,7 +132,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (client, kind) (increase(zuno_model_tokens_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "expr": "sum by (client, kind) (increase(zuno_model_tokens_total{client=~\"$client\"}[$__range]))",
               "legendFormat": "{{`{{client}}`}} ({{`{{kind}}`}})"
             }
           ],
@@ -176,7 +158,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (client) (increase(zuno_model_cost_usd_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "expr": "sum by (client) (increase(zuno_model_cost_usd_total{client=~\"$client\"}[$__range]))",
               "legendFormat": "{{`{{client}}`}}"
             }
           ],
@@ -245,7 +227,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (client, provider, outcome) (increase(zuno_model_calls_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "expr": "sum by (client, provider, outcome) (increase(zuno_model_calls_total{client=~\"$client\"}[$__range]))",
               "legendFormat": "",
               "format": "table",
               "instant": true
@@ -284,7 +266,7 @@ spec:
         {
           "id": 102,
           "type": "row",
-          "title": "Same user, one budget",
+          "title": "One budget across the experiences",
           "collapsed": false,
           "gridPos": {
             "h": 1,
@@ -296,7 +278,7 @@ spec:
         },
         {
           "id": 7,
-          "title": "One user across the experiences: tokens (over range)",
+          "title": "One group across the experiences: tokens (over range)",
           "type": "table",
           "datasource": {
             "type": "prometheus",
@@ -314,13 +296,13 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (user, client) (increase(zuno_model_tokens_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "expr": "sum by (group, client) (increase(zuno_model_tokens_by_group_total{client=~\"$client\"}[$__range]))",
               "legendFormat": "",
               "format": "table",
               "instant": true
             }
           ],
-          "description": "The per-user ceilings of the ai-gateway's quota are one budget for all experiences (ADR-0587 decision 5): a user's tokens add up across clients."
+          "description": "The per-user ceilings of the ai-gateway's quota are one budget for all experiences (ADR-0587 decision 5). Since WP-225 lot B (ADR-0603 M15) no metric carries a per-user label: this table adds a Keycloak group's tokens across clients (one point per group of the caller, so sum it by group only). One person's tokens are in the token-budget ledger and in Tempo (zuno.user_sub, zuno.persona on the model_call span)."
         },
         {
           "id": 103,
@@ -356,7 +338,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", user=~\"$user\", outcome=\"error\"}[$__range])) / sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", user=~\"$user\"}[$__range]))",
+              "expr": "sum by (client) (increase(zuno_model_calls_total{client=~\"$client\", outcome=\"error\"}[$__range])) / sum by (client) (increase(zuno_model_calls_total{client=~\"$client\"}[$__range]))",
               "legendFormat": "",
               "format": "table",
               "instant": true
@@ -385,7 +367,7 @@ spec:
                 "type": "prometheus",
                 "uid": "prometheus"
               },
-              "expr": "histogram_quantile(0.95, sum by (le, client) (increase(zuno_model_call_duration_ms_milliseconds_bucket{client=~\"$client\", user=~\"$user\"}[$__range])))",
+              "expr": "histogram_quantile(0.95, sum by (le, client) (increase(zuno_model_call_duration_ms_milliseconds_bucket{client=~\"$client\"}[$__range])))",
               "legendFormat": "",
               "format": "table",
               "instant": true

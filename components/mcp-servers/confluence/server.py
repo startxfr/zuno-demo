@@ -43,17 +43,22 @@ Starlette-middleware pattern as salesforce.
 """
 from __future__ import annotations
 
+import base64
+import fnmatch
+import hashlib
 import hmac
+import json
 import math
 import os
 import re
 import string
+import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 import httpx
 from fastapi import FastAPI
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -68,6 +73,153 @@ HTTP_TIMEOUT_SECONDS = float(os.getenv("CONFLUENCE_HTTP_TIMEOUT_SECONDS", "20"))
 # ADR-0037: required, not optional - this server has no purpose other than
 # serving the gateway (same reasoning as salesforce/server.py).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
+
+
+# --------------------------------------------------------------------------
+# ADR-0603 M12 (WP-225 lot B): the signed caller context.
+#
+# The gateway signs who a call is for (sub, groups, email, username, the tool,
+# a timestamp) from the token it has validated, and sends it as
+# X-Zuno-Caller-Context / X-Zuno-Caller-Signature (components/mcp-gateway/app/
+# caller_context.py). The key is derived from the workload token this server
+# already holds. Duplicated in each server: an image is built from its own
+# directory only (ADR-0119). A missing, forged, stale or other-tool context
+# verifies as None; a server that needs it then refuses (fail closed).
+# --------------------------------------------------------------------------
+
+CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
+CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
+CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
+
+
+def _caller_context_key() -> bytes:
+    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), b"zuno-caller-context-v1", hashlib.sha256).digest()
+
+
+def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
+    if not headers or not GATEWAY_WORKLOAD_TOKEN:
+        return None
+    raw = headers.get(CALLER_CONTEXT_HEADER) or ""
+    signature = headers.get(CALLER_SIGNATURE_HEADER) or ""
+    if not raw or not signature:
+        return None
+    expected = hmac.new(_caller_context_key(), raw.encode("ascii", "replace"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("v") != 1 or payload.get("tool") != tool:
+        return None
+    iat = payload.get("iat")
+    if not isinstance(iat, int) or abs(time.time() - iat) > CALLER_CONTEXT_MAX_AGE_SECONDS:
+        return None
+    groups = payload.get("groups")
+    return {
+        "sub": str(payload.get("sub") or ""),
+        "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
+        "email": str(payload.get("email") or "").lower(),
+        "username": str(payload.get("username") or ""),
+    }
+
+
+def _caller(ctx: Optional[Context], tool: str) -> Optional[Dict[str, Any]]:
+    """The verified caller of this tool call, or None (no context, or not verified)."""
+    if ctx is None:
+        return None
+    try:
+        headers = ctx.headers
+    except Exception:  # noqa: BLE001 - outside a request (a direct call in a test)
+        return None
+    return _verified_caller(headers, tool)
+
+
+def _group_allowlist(env_name: str) -> Dict[str, List[str]]:
+    """A JSON object {Keycloak group: [pattern]} from `env_name`.
+
+    Empty or unset: {} (no allowlist, the behaviour before WP-225). Malformed: a
+    configured but empty allowlist, which refuses every caller (fail closed)."""
+    raw = os.getenv(env_name, "").strip()
+    if not raw:
+        return {}
+    try:
+        doc = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"": []}
+    if not isinstance(doc, dict):
+        return {"": []}
+    if not doc:
+        return {}  # "{}" (the chart default rendered as JSON) is no allowlist
+    return {
+        str(group): [str(p).strip() for p in patterns if isinstance(p, str) and p.strip()]
+        for group, patterns in doc.items()
+        if isinstance(patterns, list)
+    } or {"": []}
+
+
+def _allowed(target: str, caller: Optional[Dict[str, Any]], allowlist: Dict[str, List[str]]) -> bool:
+    """True when one of the caller's groups lists a pattern (fnmatch, case-insensitive)
+    matching `target`. No verified caller: False."""
+    if caller is None:
+        return False
+    target = target.lower()
+    for group in caller["groups"]:
+        for pattern in allowlist.get(group, ()):
+            if fnmatch.fnmatchcase(target, pattern.lower()):
+                return True
+    return False
+
+
+# ADR-0603 M12: the Confluence spaces each Keycloak group may reach through the
+# shared technical identity. CONFLUENCE_SPACE_ALLOWLIST is a JSON object
+# {group: [space key pattern]} (chart value spaceAllowlist.groups); "*" is every
+# space. Empty: no allowlist, the behaviour before WP-225. Scope "all" checks
+# reads and writes, "write" only create_page and update_page.
+SPACE_ALLOWLIST_ENV = "CONFLUENCE_SPACE_ALLOWLIST"
+
+
+def _space_allowlist_scope() -> str:
+    value = os.getenv("CONFLUENCE_SPACE_ALLOWLIST_SCOPE", "all").strip().lower()
+    return value if value in ("all", "write") else "all"
+
+
+def _space_policy(ctx: Optional[Context], tool: str, *, write: bool) -> Optional[Tuple[Dict[str, Any], Dict[str, List[str]]]]:
+    """None when no allowlist applies to this call; else the verified caller and the
+    allowlist. Raises PermissionError when an allowlist applies and the caller is not
+    verified (no signed context, or a forged or stale one)."""
+    allowlist = _group_allowlist(SPACE_ALLOWLIST_ENV)
+    if not allowlist or (not write and _space_allowlist_scope() == "write"):
+        return None
+    caller = _caller(ctx, tool)
+    if caller is None:
+        raise PermissionError(
+            f"{tool} is refused: a space allowlist is configured and the call carries no verified caller context"
+        )
+    return caller, allowlist
+
+
+def _check_space(space_key: str, policy: Optional[Tuple[Dict[str, Any], Dict[str, List[str]]]]) -> None:
+    if policy is None:
+        return
+    caller, allowlist = policy
+    if not _allowed(space_key or "", caller, allowlist):
+        raise PermissionError(
+            f"space {space_key!r} is outside the space allowlist of the caller's groups (ADR-0603 M12)"
+        )
+
+
+def _literal_spaces(policy: Tuple[Dict[str, Any], Dict[str, List[str]]]) -> Optional[List[str]]:
+    """The caller's allowed space keys when they are all literal keys, for a CQL
+    `space in (...)` clause; None when a pattern is a wildcard (post-filter only)."""
+    caller, allowlist = policy
+    keys: List[str] = []
+    for group in caller["groups"]:
+        for pattern in allowlist.get(group, ()):
+            if not _SPACE_KEY_RE.fullmatch(pattern) or any(c in pattern for c in "*?["):
+                return None
+            keys.append(pattern)
+    return sorted(set(keys))
 
 
 class ConfluenceConfigError(RuntimeError):
@@ -236,16 +388,31 @@ async def healthz() -> Dict[str, str]:
 
 
 @mcp_server.tool()
-async def search_pages(query: str, space: Optional[str] = None, limit: int = 10) -> Dict[str, Any]:
+async def search_pages(
+    query: str, space: Optional[str] = None, limit: int = 10, ctx: Optional[Context] = None
+) -> Dict[str, Any]:
     """Search Confluence pages by text (CQL), optionally scoped to a space key."""
     # ADR-0602 / WP-222: both values are model-chosen and land inside a CQL
     # string literal, so a quote in either would widen the query.
     if space and not _SPACE_KEY_RE.fullmatch(space):
         raise ValueError("space must be a Confluence space key (letters, digits, _ . : @ -, optional leading ~)")
+    policy = _space_policy(ctx, "search_pages", write=False)
+    if space:
+        _check_space(space, policy)
     limit = max(1, min(int(limit), _MAX_SEARCH_LIMIT))
     cql = f'type=page and text~"{_cql_escape(_cql_query_text(query))}"'
     if space:
         cql = f'space="{space}" and {cql}'
+    elif policy is not None:
+        # ADR-0603 M12: no space named, so the search covers only the caller's
+        # spaces - in CQL when they are literal keys, and always by the
+        # post-filter below.
+        literal = _literal_spaces(policy)
+        if literal is not None:
+            if not literal:
+                raise PermissionError("no Confluence space is allowed to the caller's groups (ADR-0603 M12)")
+            spaces = ",".join(f'"{key}"' for key in literal)
+            cql = f"space in ({spaces}) and {cql}"
     async with _client() as client:
         resp = await client.get(
             "/content/search",
@@ -260,13 +427,16 @@ async def search_pages(query: str, space: Optional[str] = None, limit: int = 10)
     # _is_relevant_result's own docstring for why this matters beyond
     # search quality.
     results = [r for r in results if _is_relevant_result(query, r.get("title") or "")]
+    if policy is not None:
+        results = [r for r in results if _allowed(r.get("space") or "", *policy)]
     return {"query": query, "results": results, "count": len(results)}
 
 
 @mcp_server.tool()
-async def read_page(page_id: str) -> Dict[str, Any]:
+async def read_page(page_id: str, ctx: Optional[Context] = None) -> Dict[str, Any]:
     """Read a Confluence page's current content and metadata by id."""
     _check_page_id(page_id)
+    policy = _space_policy(ctx, "read_page", write=False)
     async with _client() as client:
         resp = await client.get(
             f"/content/{page_id}",
@@ -277,12 +447,18 @@ async def read_page(page_id: str) -> Dict[str, Any]:
         resp.raise_for_status()
         payload = resp.json()
 
+    # ADR-0603 M12: the space is known only once the page is fetched; nothing of
+    # a page outside the caller's spaces is returned.
+    _check_space((payload.get("space") or {}).get("key", ""), policy)
     return {"page": _summarize(payload)}
 
 
 @mcp_server.tool()
-async def create_page(space_key: str, title: str, body_html: str, parent_id: Optional[str] = None) -> Dict[str, Any]:
+async def create_page(
+    space_key: str, title: str, body_html: str, parent_id: Optional[str] = None, ctx: Optional[Context] = None
+) -> Dict[str, Any]:
     """Create a new Confluence page in the given space, optionally under a parent page."""
+    _check_space(space_key, _space_policy(ctx, "create_page", write=True))
     request_body: Dict[str, Any] = {
         "type": "page",
         "title": title,
@@ -303,15 +479,20 @@ async def create_page(space_key: str, title: str, body_html: str, parent_id: Opt
 
 
 @mcp_server.tool()
-async def update_page(page_id: str, body_html: str, title: Optional[str] = None) -> Dict[str, Any]:
+async def update_page(
+    page_id: str, body_html: str, title: Optional[str] = None, ctx: Optional[Context] = None
+) -> Dict[str, Any]:
     """Update an existing Confluence page's content (and optionally its title) by id."""
     _check_page_id(page_id)
+    policy = _space_policy(ctx, "update_page", write=True)
     async with _client() as client:
         current_resp = await client.get(f"/content/{page_id}", params={"expand": "version,space"})
         if current_resp.status_code == 404:
             raise ValueError(f"no Confluence page with id {page_id}")
         current_resp.raise_for_status()
         current = current_resp.json()
+        # ADR-0603 M12: the page's own space, read before any write.
+        _check_space((current.get("space") or {}).get("key", ""), policy)
         current_version = (current.get("version") or {}).get("number", 0)
 
         request_body: Dict[str, Any] = {

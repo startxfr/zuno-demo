@@ -62,6 +62,11 @@ spec:
                 secretKeyRef:
                   name: mcp-gateway-workload-token
                   key: token
+            # ADR-0603 M12 (WP-225 lot B): owner scoping by the signed caller context.
+            - name: SALESFORCE_OWNER_SCOPING
+              value: {{ ternary "owner" "off" .Values.ownerScoping.enabled | quote }}
+            - name: SALESFORCE_ALL_RECORDS_GROUPS
+              value: {{ join "," (.Values.ownerScoping.allRecordsGroups | default list) | quote }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

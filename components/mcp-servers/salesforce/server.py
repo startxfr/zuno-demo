@@ -54,14 +54,19 @@ Starlette-middleware pattern as confluence.
 """
 from __future__ import annotations
 
+import base64
+import hashlib
 import hmac
+import json
 import os
+import re
+import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import httpx
 from fastapi import FastAPI
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -76,6 +81,123 @@ HTTP_TIMEOUT_SECONDS = float(os.getenv("SALESFORCE_HTTP_TIMEOUT_SECONDS", "20"))
 # ADR-0037: required, not optional - this server has no purpose other than
 # serving the gateway (same reasoning as confluence's server.py).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
+
+
+# --------------------------------------------------------------------------
+# ADR-0603 M12 (WP-225 lot B): the signed caller context.
+#
+# The gateway signs who a call is for (sub, groups, email, username, the tool,
+# a timestamp) from the token it has validated, and sends it as
+# X-Zuno-Caller-Context / X-Zuno-Caller-Signature (components/mcp-gateway/app/
+# caller_context.py). The key is derived from the workload token this server
+# already holds. Duplicated in each server: an image is built from its own
+# directory only (ADR-0119). A missing, forged, stale or other-tool context
+# verifies as None; a server that needs it then refuses (fail closed).
+# --------------------------------------------------------------------------
+
+CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
+CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
+CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
+
+
+def _caller_context_key() -> bytes:
+    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), b"zuno-caller-context-v1", hashlib.sha256).digest()
+
+
+def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
+    if not headers or not GATEWAY_WORKLOAD_TOKEN:
+        return None
+    raw = headers.get(CALLER_CONTEXT_HEADER) or ""
+    signature = headers.get(CALLER_SIGNATURE_HEADER) or ""
+    if not raw or not signature:
+        return None
+    expected = hmac.new(_caller_context_key(), raw.encode("ascii", "replace"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("v") != 1 or payload.get("tool") != tool:
+        return None
+    iat = payload.get("iat")
+    if not isinstance(iat, int) or abs(time.time() - iat) > CALLER_CONTEXT_MAX_AGE_SECONDS:
+        return None
+    groups = payload.get("groups")
+    return {
+        "sub": str(payload.get("sub") or ""),
+        "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
+        "email": str(payload.get("email") or "").lower(),
+        "username": str(payload.get("username") or ""),
+    }
+
+
+def _caller(ctx: Optional[Context], tool: str) -> Optional[Dict[str, Any]]:
+    """The verified caller of this tool call, or None (no context, or not verified)."""
+    if ctx is None:
+        return None
+    try:
+        headers = ctx.headers
+    except Exception:  # noqa: BLE001 - outside a request (a direct call in a test)
+        return None
+    return _verified_caller(headers, tool)
+
+
+# --------------------------------------------------------------------------
+# ADR-0603 M12 (WP-225 lot B): owner scoping.
+#
+# SALESFORCE_OWNER_SCOPING=owner (chart value ownerScoping.enabled) limits every
+# tool to the Opportunities the caller owns: the caller is the Salesforce User
+# whose Email is the email of the signed caller context (the validated token's
+# `email` claim). A caller in one of SALESFORCE_ALL_RECORDS_GROUPS
+# (ownerScoping.allRecordsGroups) is entitled to every record, as before. Off:
+# the behaviour before WP-225, every caller sees what the technical identity sees.
+# --------------------------------------------------------------------------
+
+# Salesforce record ids: 15 or 18 alphanumeric characters.
+_RECORD_ID_RE = re.compile(r"[A-Za-z0-9]{15}(?:[A-Za-z0-9]{3})?")
+
+
+def _soql_quote(value: str) -> str:
+    """A SOQL string literal (backslash and quote escaped)."""
+    return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+def _owner_scoping_enabled() -> bool:
+    return os.getenv("SALESFORCE_OWNER_SCOPING", "off").strip().lower() == "owner"
+
+
+def _all_records_groups() -> List[str]:
+    return [g.strip() for g in os.getenv("SALESFORCE_ALL_RECORDS_GROUPS", "").split(",") if g.strip()]
+
+
+async def _owner_scope(client: httpx.AsyncClient, ctx: Optional[Context], tool: str) -> Optional[str]:
+    """None when every record is allowed (scoping off, or an all-records group);
+    else the Salesforce User id the call is limited to. Raises PermissionError when
+    the caller cannot be identified: no verified context, no email, or no single
+    active Salesforce User with that email."""
+    if not _owner_scoping_enabled():
+        return None
+    caller = _caller(ctx, tool)
+    if caller is None:
+        raise PermissionError(f"{tool} is refused: owner scoping is on and the call carries no verified caller context")
+    if set(caller["groups"]) & set(_all_records_groups()):
+        return None
+    email = caller["email"]
+    if not email:
+        raise PermissionError(f"{tool} is refused: owner scoping needs the caller's email, and the token carries none")
+    soql = f"SELECT Id FROM User WHERE Email = {_soql_quote(email)} AND IsActive = true LIMIT 2"
+    resp = await client.get("/query", params={"q": soql})
+    resp.raise_for_status()
+    records = resp.json().get("records", [])
+    if len(records) != 1:
+        raise PermissionError(
+            f"{tool} is refused: owner scoping found {len(records)} active Salesforce users for the caller's email"
+        )
+    user_id = str(records[0].get("Id") or "")
+    if not _RECORD_ID_RE.fullmatch(user_id):
+        raise PermissionError(f"{tool} is refused: Salesforce returned an invalid user id")
+    return user_id
 
 
 class SalesforceConfigError(RuntimeError):
@@ -172,7 +294,7 @@ async def healthz() -> Dict[str, str]:
 
 
 @mcp_server.tool()
-async def read_opportunity(query: str, limit: int = 5) -> Dict[str, Any]:
+async def read_opportunity(query: str, limit: int = 5, ctx: Optional[Context] = None) -> Dict[str, Any]:
     """Read the current state of the Opportunity/Opportunities matching a
     free-text query against their Name (most-recently-modified first) -
     the live current-value verification `check-deal-status` falls back to
@@ -184,11 +306,15 @@ async def read_opportunity(query: str, limit: int = 5) -> Dict[str, Any]:
     escaped_query = (
         query.replace("\\", "\\\\").replace("'", "\\'").replace("%", "\\%").replace("_", "\\_")
     )
-    soql = (
-        "SELECT Id,Name,StageName,Amount,CloseDate,AccountId FROM Opportunity "
-        f"WHERE Name LIKE '%{escaped_query}%' ORDER BY LastModifiedDate DESC LIMIT {max(1, min(int(limit), MAX_OPPORTUNITY_LIMIT))}"
-    )
     async with _client() as client:
+        # ADR-0603 M12: only the caller's own records when owner scoping is on.
+        owner_id = await _owner_scope(client, ctx, "read_opportunity")
+        owner_clause = f" AND OwnerId = {_soql_quote(owner_id)}" if owner_id else ""
+        soql = (
+            "SELECT Id,Name,StageName,Amount,CloseDate,AccountId FROM Opportunity "
+            f"WHERE Name LIKE '%{escaped_query}%'{owner_clause} ORDER BY LastModifiedDate DESC "
+            f"LIMIT {max(1, min(int(limit), MAX_OPPORTUNITY_LIMIT))}"
+        )
         resp = await client.get("/query", params={"q": soql})
         resp.raise_for_status()
         payload = resp.json()
@@ -199,7 +325,12 @@ async def read_opportunity(query: str, limit: int = 5) -> Dict[str, Any]:
 
 @mcp_server.tool()
 async def create_opportunity(
-    name: str, stage: str, close_date: str, amount: Optional[float] = None, account_id: Optional[str] = None
+    name: str,
+    stage: str,
+    close_date: str,
+    amount: Optional[float] = None,
+    account_id: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Create a new Salesforce Opportunity."""
     request_body: Dict[str, Any] = {"Name": name, "StageName": stage, "CloseDate": close_date}
@@ -209,6 +340,11 @@ async def create_opportunity(
         request_body["AccountId"] = account_id
 
     async with _client() as client:
+        # ADR-0603 M12: a record created for a caller is owned by that caller, so
+        # the caller (and not the technical identity) can read and update it.
+        owner_id = await _owner_scope(client, ctx, "create_opportunity")
+        if owner_id:
+            request_body["OwnerId"] = owner_id
         resp = await client.post("/sobjects/Opportunity", json=request_body)
         if resp.status_code == 400:
             raise ValueError(f"Salesforce rejected opportunity creation: {resp.text}")
@@ -225,6 +361,7 @@ async def update_opportunity(
     stage: Optional[str] = None,
     amount: Optional[float] = None,
     close_date: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Update an existing Salesforce Opportunity's stage/amount/close date by id."""
     request_body: Dict[str, Any] = {}
@@ -238,6 +375,20 @@ async def update_opportunity(
         raise ValueError("update_opportunity requires at least one of stage/amount/close_date")
 
     async with _client() as client:
+        owner_id = await _owner_scope(client, ctx, "update_opportunity")
+        if owner_id:
+            # ADR-0603 M12: the record must be the caller's before anything is written.
+            # A record of someone else answers as a missing one (no existence oracle).
+            if not _RECORD_ID_RE.fullmatch(opportunity_id):
+                raise ValueError("opportunity_id must be a Salesforce record id")
+            check = (
+                f"SELECT Id FROM Opportunity WHERE Id = {_soql_quote(opportunity_id)} "
+                f"AND OwnerId = {_soql_quote(owner_id)} LIMIT 1"
+            )
+            owned = await client.get("/query", params={"q": check})
+            owned.raise_for_status()
+            if not owned.json().get("records"):
+                raise ValueError(f"no Salesforce opportunity with id {opportunity_id} owned by the caller")
         resp = await client.patch(f"/sobjects/Opportunity/{opportunity_id}", json=request_body)
         if resp.status_code == 404:
             raise ValueError(f"no Salesforce opportunity with id {opportunity_id}")

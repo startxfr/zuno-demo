@@ -208,6 +208,10 @@ jobs:
           python3 tests/test_agent_chain.py
           # ADR-0592 (WP-189): experience clients loaded next to the agents.
           python3 tests/test_experience_clients.py
+          # WP-225 lot B (ADR-0603 M12, M13, M15): the signed caller context, the
+          # namespace matcher of metrics.query, the email recipient allowlist and
+          # the JSON-RPC batch bound.
+          python3 tests/test_wp225_lot_b.py
           # pytest-style (monkeypatch fixture): the search_technical_docs
           # handler, UnifAI CONFLUENCE + WEB merge (WP-156, WP-168).
           pip install pytest
@@ -282,6 +286,8 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_mcp_protocol.py
+          # WP-225 lot B (ADR-0603 M12): the space allowlist from the signed caller context.
+          python3 tests/test_wp225_space_allowlist.py
       # ADR-0119: was missing (a real gap the new
       # check_mcp_server_conformance.py checker caught) - these tests
       # existed but never ran in CI.
@@ -290,16 +296,22 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_mcp_protocol.py
+          # WP-225 lot B (ADR-0603 M12): owner scoping from the signed caller context.
+          python3 tests/test_wp225_owner_scoping.py
       - name: git-forge MCP server tests (ADR-0120)
         working-directory: components/mcp-servers/git-forge
         run: |
           pip install -r requirements.txt
           python3 tests/test_mcp_protocol.py
+          # WP-225 lot B (ADR-0603 M12): the repository allowlist from the signed caller context.
+          python3 tests/test_wp225_repository_allowlist.py
       - name: aap MCP server tests (ADR-0355)
         working-directory: components/mcp-servers/aap
         run: |
           pip install -r requirements.txt
           python3 tests/test_mcp_protocol.py
+          # WP-225 lot B (ADR-0603 M15): the per-caller cluster_audit launch limit.
+          python3 tests/test_wp225_launch_rate_limit.py
       - name: evaluations quality gate tests (ADR-0107)
         working-directory: evaluations
         run: |

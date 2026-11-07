@@ -36,14 +36,19 @@ unscoped `zuno/aap/controller-token`.
 """
 from __future__ import annotations
 
+import base64
+import collections
+import hashlib
 import hmac
+import json
 import os
+import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Optional
+from typing import Any, Deque, Dict, List, Mapping, Optional
 
 import httpx
 from fastapi import FastAPI
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -76,6 +81,129 @@ PROJECT_NAME = os.getenv("AAP_PROJECT_NAME", "zuno-demo")
 # ADR-0037: required, not optional - this server has no purpose other than
 # serving the gateway (same reasoning as confluence/server.py).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
+
+
+# --------------------------------------------------------------------------
+# ADR-0603 M12 (WP-225 lot B): the signed caller context.
+#
+# The gateway signs who a call is for (sub, groups, email, username, the tool,
+# a timestamp) from the token it has validated, and sends it as
+# X-Zuno-Caller-Context / X-Zuno-Caller-Signature (components/mcp-gateway/app/
+# caller_context.py). The key is derived from the workload token this server
+# already holds. Duplicated in each server: an image is built from its own
+# directory only (ADR-0119). A missing, forged, stale or other-tool context
+# verifies as None; a server that needs it then refuses (fail closed).
+# --------------------------------------------------------------------------
+
+CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
+CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
+CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
+
+
+def _caller_context_key() -> bytes:
+    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), b"zuno-caller-context-v1", hashlib.sha256).digest()
+
+
+def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
+    if not headers or not GATEWAY_WORKLOAD_TOKEN:
+        return None
+    raw = headers.get(CALLER_CONTEXT_HEADER) or ""
+    signature = headers.get(CALLER_SIGNATURE_HEADER) or ""
+    if not raw or not signature:
+        return None
+    expected = hmac.new(_caller_context_key(), raw.encode("ascii", "replace"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("v") != 1 or payload.get("tool") != tool:
+        return None
+    iat = payload.get("iat")
+    if not isinstance(iat, int) or abs(time.time() - iat) > CALLER_CONTEXT_MAX_AGE_SECONDS:
+        return None
+    groups = payload.get("groups")
+    return {
+        "sub": str(payload.get("sub") or ""),
+        "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
+        "email": str(payload.get("email") or "").lower(),
+        "username": str(payload.get("username") or ""),
+    }
+
+
+def _caller(ctx: Optional[Context], tool: str) -> Optional[Dict[str, Any]]:
+    """The verified caller of this tool call, or None (no context, or not verified)."""
+    if ctx is None:
+        return None
+    try:
+        headers = ctx.headers
+    except Exception:  # noqa: BLE001 - outside a request (a direct call in a test)
+        return None
+    return _verified_caller(headers, tool)
+
+
+# --------------------------------------------------------------------------
+# ADR-0603 M15 (WP-225 lot B): a per-caller limit on cluster_audit launches.
+#
+# At most AAP_CLUSTER_AUDIT_RATE_LIMIT launches per caller in any
+# AAP_CLUSTER_AUDIT_RATE_WINDOW_SECONDS (chart values clusterAudit.rateLimit.*),
+# 0 meaning no limit. The caller is the `sub` of the signed caller context; calls
+# without a verified context share one bucket, so an unscoped path is limited too.
+# The count lives in this pod (replicas: 1); a restart resets it. A launch that
+# AAP refuses does not count.
+# --------------------------------------------------------------------------
+
+UNVERIFIED_CALLER = "<unverified>"
+_launches: Dict[str, Deque[float]] = collections.defaultdict(collections.deque)
+
+
+def _rate_limit() -> int:
+    try:
+        return max(0, int(os.getenv("AAP_CLUSTER_AUDIT_RATE_LIMIT", "2")))
+    except ValueError:
+        return 2
+
+
+def _rate_window_seconds() -> float:
+    try:
+        return max(1.0, float(os.getenv("AAP_CLUSTER_AUDIT_RATE_WINDOW_SECONDS", "900")))
+    except ValueError:
+        return 900.0
+
+
+class RateLimited(PermissionError):
+    pass
+
+
+def _reserve_launch(caller_key: str, now: Optional[float] = None) -> Optional[float]:
+    """Counts one launch for `caller_key` and returns its timestamp, or raises
+    RateLimited (with the wait in seconds) when the caller is at the limit."""
+    limit = _rate_limit()
+    if not limit:
+        return None
+    now = time.monotonic() if now is None else now
+    window = _rate_window_seconds()
+    stamps = _launches[caller_key]
+    while stamps and now - stamps[0] >= window:
+        stamps.popleft()
+    if len(stamps) >= limit:
+        retry_after = int(window - (now - stamps[0])) + 1
+        raise RateLimited(
+            f"cluster_audit is rate limited: {limit} launch(es) per {int(window)}s per caller "
+            f"(ADR-0603 M15); retry in {retry_after}s, or call platform_audit for the last run"
+        )
+    stamps.append(now)
+    return now
+
+
+def _release_launch(caller_key: str, stamp: Optional[float]) -> None:
+    if stamp is None:
+        return
+    try:
+        _launches[caller_key].remove(stamp)
+    except ValueError:
+        pass
 
 
 class AapConfigError(RuntimeError):
@@ -334,7 +462,7 @@ async def platform_audit(recent_jobs: int = 5) -> Dict[str, Any]:
 
 
 @mcp_server.tool()
-async def cluster_audit() -> Dict[str, Any]:
+async def cluster_audit(ctx: Optional[Context] = None) -> Dict[str, Any]:
     """Launch this cluster's Day 0 health check through Ansible Automation
     Platform and return immediately with the job id - it does NOT wait for
     the run to finish (the underlying playbook takes a few minutes). Takes
@@ -346,6 +474,17 @@ async def cluster_audit() -> Dict[str, Any]:
     empty this soon after launch). Include the url when telling the user
     the job was launched.
     """
+    caller = _caller(ctx, "cluster_audit")
+    caller_key = (caller or {}).get("sub") or UNVERIFIED_CALLER
+    stamp = _reserve_launch(caller_key)
+    try:
+        return await _launch_cluster_audit()
+    except Exception:
+        _release_launch(caller_key, stamp)
+        raise
+
+
+async def _launch_cluster_audit() -> Dict[str, Any]:
     async with _client() as client:
         template = await _lookup_by_name(client, "job_templates", JOB_TEMPLATE_NAME)
 

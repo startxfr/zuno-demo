@@ -35,3 +35,14 @@ credentials:
   # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
   secretStoreName: vault
   refreshInterval: 1h
+
+# ADR-0603 M12 (WP-225 lot B): owner scoping. When enabled, every tool is limited to
+# the Opportunities the caller owns: the caller is the active Salesforce User whose
+# Email is the `email` claim of the caller's token (signed by the mcp-gateway); a
+# record it creates is owned by it; an update of another owner's record is refused
+# before anything is written. A caller with none, or several, matching Users is
+# refused. Groups in allRecordsGroups are entitled to every record. Off: today's
+# behaviour, every caller sees what the technical identity sees.
+ownerScoping:
+  enabled: false
+  allRecordsGroups: []

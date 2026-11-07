@@ -67,6 +67,12 @@ spec:
                 secretKeyRef:
                   name: mcp-gateway-workload-token
                   key: token
+            # ADR-0603 M12 (WP-225 lot B): the spaces each Keycloak group may reach,
+            # checked against the signed caller context. "{}" = no allowlist.
+            - name: CONFLUENCE_SPACE_ALLOWLIST
+              value: {{ .Values.spaceAllowlist.groups | default dict | toJson | quote }}
+            - name: CONFLUENCE_SPACE_ALLOWLIST_SCOPE
+              value: {{ .Values.spaceAllowlist.scope | quote }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

@@ -1,4 +1,6 @@
 {{- if .Values.perses.enabled }}
+# WP-225 lot B (ADR-0603 M15): no `user` label; the "by user" panels and the $user
+# variable are by experience client, as in the Grafana twin.
 # WP-139: typed-schema translation of
 # gitops/charts/grafana/templates/dashboard-usage-cost.yaml (ADR-0029/
 # ADR-0413/ADR-0551). Same panels, same PromQL, same increase(...[$__range])
@@ -20,7 +22,7 @@
 # as both WP-138 pilots and dashboard-infra-data.yaml - see
 # dashboard-mesh-gateway.yaml's header for the confirmed-vs-best-effort
 # breakdown of plugin kinds. The ListVariable/PrometheusLabelValuesVariable
-# variable plugin (used here for $user/$group/$agent/$model/$provider)
+# variable plugin (used here for $client/$group/$agent/$model/$provider)
 # remains best-effort for the same reason as the pilots: no live RHOAI
 # example to confirm against.
 #
@@ -64,23 +66,23 @@ spec:
   config:
     display:
       name: "Usage & cost"
-      description: "ADR-0029/ADR-0413/ADR-0551/ADR-0552/ADR-0553: model calls/tokens/cost and API requests by user and Keycloak group, filterable by user/group/agent/model/provider. Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0553's dated correction note)."
+      description: "ADR-0029/ADR-0413/ADR-0551/ADR-0552/ADR-0553: model calls/tokens/cost and API requests by experience client and Keycloak group, filterable by client/group/agent/model/provider (no per-user label since WP-225 lot B, ADR-0603 M15). Perses duplicate of zuno-monitoring's Grafana dashboard, collocated in redhat-ods-monitoring for data-layer parity only - no confirmed visual rendering path shows custom dashboards on this cluster (see ADR-0553's dated correction note)."
     duration: 24h
     refreshInterval: 30s
     variables:
       - kind: ListVariable
         spec:
-          name: user
+          name: client
           display:
-            name: user
+            name: client
           allowAllValue: true
           allowMultiple: true
           plugin:
             kind: PrometheusLabelValuesVariable
             spec:
-              labelName: user
+              labelName: client
               matchers:
-                - "zuno_model_calls_by_group_total"
+                - "zuno_model_calls_total"
               datasource:
                 kind: PrometheusDatasource
                 name: prometheus
@@ -153,7 +155,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: "Model calls (top 20 users, over range)"
+            name: "Model calls (top 20 clients, over range)"
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -167,14 +169,14 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      topk(20, sum by (user)
-                      (increase(zuno_model_calls_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range])))
-                    seriesNameFormat: "{{`{{user}}`}}"
+                      topk(20, sum by (client)
+                      (increase(zuno_model_calls_total{client=~"$client", model=~"$model", provider=~"$provider"}[$__range])))
+                    seriesNameFormat: "{{`{{client}}`}}"
       estimatedCostByUser:
         kind: Panel
         spec:
           display:
-            name: "Estimated cost (top 20 users, over range)"
+            name: "Estimated cost (top 20 clients, over range)"
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -188,14 +190,14 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      topk(20, sum by (user)
-                      (increase(zuno_model_cost_usd_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range])))
-                    seriesNameFormat: "{{`{{user}}`}}"
+                      topk(20, sum by (client)
+                      (increase(zuno_model_cost_usd_total{client=~"$client", model=~"$model", provider=~"$provider"}[$__range])))
+                    seriesNameFormat: "{{`{{client}}`}}"
       apiRequestsByUser:
         kind: Panel
         spec:
           display:
-            name: "API requests (top 20 users, over range)"
+            name: "API requests (top 20 clients, over range)"
           plugin:
             kind: TimeSeriesChart
             spec: {}
@@ -209,14 +211,14 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      topk(20, sum by (user)
-                      (increase(zuno_model_calls_total{user=~"$user", agent=~"$agent"}[$__range])))
-                    seriesNameFormat: "{{`{{user}}`}}"
+                      topk(20, sum by (client)
+                      (increase(zuno_model_calls_total{client=~"$client", agent=~"$agent"}[$__range])))
+                    seriesNameFormat: "{{`{{client}}`}}"
       topTokenConsumers:
         kind: Panel
         spec:
           display:
-            name: "Top token consumers (over range)"
+            name: "Top token consumers by client (over range)"
           plugin:
             kind: Table
             spec: {}
@@ -230,8 +232,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      topk(20, sum by (user)
-                      (increase(zuno_model_tokens_total{user=~"$user"}[$__range])))
+                      topk(20, sum by (client)
+                      (increase(zuno_model_tokens_total{client=~"$client"}[$__range])))
       modelCallsByGroup:
         kind: Panel
         spec:
@@ -299,7 +301,7 @@ spec:
         kind: Panel
         spec:
           display:
-            name: "Model cost by user & agent (top 20, over range)"
+            name: "Model cost by client & agent (top 20, over range)"
             description: "zuno_model_cost_usd_total's agent label (ADR-0029) - populated once ai-gateway forwards X-Zuno-Agent into model_call_span, same redeploy this dashboard's other panels needed."
           plugin:
             kind: Table
@@ -314,8 +316,8 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      topk(20, sum by (user, agent)
-                      (increase(zuno_model_cost_usd_total{user=~"$user", agent=~"$agent"}[$__range])))
+                      topk(20, sum by (client, agent)
+                      (increase(zuno_model_cost_usd_total{client=~"$client", agent=~"$agent"}[$__range])))
       tokensByAgent:
         kind: Panel
         spec:
@@ -399,7 +401,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (client) (increase(zuno_model_calls_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range]))
+                      sum by (client) (increase(zuno_model_calls_total{client=~"$client", model=~"$model", provider=~"$provider"}[$__range]))
                     seriesNameFormat: "{{`{{client}}`}}"
       tokensConsumedByClient:
         kind: Panel
@@ -419,7 +421,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (client, kind) (increase(zuno_model_tokens_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range]))
+                      sum by (client, kind) (increase(zuno_model_tokens_total{client=~"$client", model=~"$model", provider=~"$provider"}[$__range]))
                     seriesNameFormat: "{{`{{client}}`}} ({{`{{kind}}`}})"
       estimatedCostByClient:
         kind: Panel
@@ -439,7 +441,7 @@ spec:
                       kind: PrometheusDatasource
                       name: prometheus
                     query: >-
-                      sum by (client) (increase(zuno_model_cost_usd_total{user=~"$user", model=~"$model", provider=~"$provider"}[$__range]))
+                      sum by (client) (increase(zuno_model_cost_usd_total{client=~"$client", model=~"$model", provider=~"$provider"}[$__range]))
                     seriesNameFormat: "{{`{{client}}`}}"
       guardrailsEvaluationsByClient:
         kind: Panel
@@ -465,7 +467,7 @@ spec:
       - kind: Grid
         spec:
           display:
-            title: "By user"
+            title: "By client (top 20)"
             collapse:
               open: true
           items:

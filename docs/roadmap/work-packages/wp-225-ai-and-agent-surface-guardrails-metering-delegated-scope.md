@@ -1,6 +1,6 @@
 # WP-225: AI and agent surface: guardrails, metering, delegated scope (delivers ADR-0602, ADR-0603)
 
-- **State:** Operator pending (lot A, 2026-11-07); lots B and C Not started
+- **State:** Operator pending (lots A and B, 2026-11-07); lot C Not started
 - **ADRs:** ADR-0602, ADR-0603
 - **Depends on:** WP-222, WP-209 (classification floor; do not duplicate its work)
 - **Blocks:** WP-227
@@ -43,13 +43,14 @@ past the key ceiling on `/v1/messages` is refused; a space outside the caller's 
 ## Lots
 
 The brief is delivered in three lots. Lot A is the ai-gateway (clauses 8 and 9). Lot B is delegated scope in the MCP servers
-(repository change 3). Lot C is the mcp-gateway, the a2a-gateway and the metrics (repository changes 4 and 5).
+and the metrics items (repository change 3 and the three items of change 5). Lot C is the mcp-gateway identity path and the
+a2a-gateway (repository change 4).
 
 | Lot | Scope | State |
 |---|---|---|
 | A | guardrails (C7) and metering (C8) in the ai-gateway | Operator pending |
-| B | space, repository and recipient allowlists; Salesforce owner scoping; namespace matcher (ADR-0603 clause 3) | Not started |
-| C | token exchange or a signed assertion; REST entitlement; Dify and token-proxy callers; signed a2a chain; metrics hygiene | Not started |
+| B | space, repository and recipient allowlists; Salesforce owner scoping; namespace matcher; no per-user label; JSON-RPC batch bound; AAP launch limit (ADR-0603 M12, M13, M15) | Operator pending |
+| C | token exchange or a signed assertion; REST entitlement; Dify and token-proxy callers; signed a2a chain (ADR-0603 M14) | Not started |
 
 ## Lot A: guardrails and metering (Operator pending, 2026-11-07)
 
@@ -184,3 +185,152 @@ Limits:
 6. **Ceiling.** Set `keyCeilings: {default: 1000, exemptPersonas: [<the developer persona>]}`. A second `/v1/messages` call from
    another persona returns 429 `rate_limit_error` with `Retry-After`, and the exempt persona is still served. Then reset
    `default: 0`.
+
+## Lot B: delegated scope and metrics hygiene (Operator pending, 2026-11-07)
+
+Committed locally on `wp-225-lot-b`, cut from `wp-225-ai-surface` (lot A). Not pushed. Not live. Every scope check is off
+until its chart value is set, so a merge changes no caller, with two exceptions that apply at once: the per-user metric
+label is gone, and two bounds have defaults (20 messages per JSON-RPC batch, 2 `cluster_audit` launches per caller per
+15 minutes). The pod templates of the five charts gain always-rendered variables, so the sync rolls each pod once.
+
+### The signed caller context
+
+A shared-credential server cannot scope its technical identity without knowing the caller, and a tool argument or a
+plain header is written by the caller. The mcp-gateway now sends two headers on every streamable-HTTP call, after the
+ADR-0011 decision (`app/caller_context.py`):
+
+- `X-Zuno-Caller-Context`: base64url JSON with `sub`, `groups`, `email`, `username`, `tool` (the backend's tool name)
+  and `iat`, all read from the validated token;
+- `X-Zuno-Caller-Signature`: HMAC-SHA256 of that value, with a key derived from the workload token every server
+  already holds (ADR-0037), under its own label.
+
+Each server verifies it (`_verified_caller`, duplicated per server because an image is built from its own directory,
+ADR-0119). A missing, forged, tampered or stale context (over 300 s), or one minted for another tool, verifies as
+nothing. A server that needs a caller then refuses. The forwarded bearer is unchanged: replacing it is lot C (ADR-0602
+clause 10, token exchange or a per-call assertion). The context is narrower. It tells a server which groups and which
+person to scope a call to, and nothing else.
+
+### What was built
+
+1. **Confluence space allowlist (M12).** `spaceAllowlist.groups` maps a Keycloak group to space-key patterns (fnmatch,
+   case-insensitive, `*` for every space). Once set:
+   - `create_page` and a `search_pages` that names a space are checked before Confluence is called;
+   - `update_page` and `read_page` are checked on the page's own space, before the write or the return;
+   - a search without a space is limited to the caller's spaces: in the CQL when they are literal keys, and always by a
+     post-filter.
+
+   `spaceAllowlist.scope: write` checks only the two writes.
+2. **git-forge repository allowlist (M12).** `repositoryAllowlist.groups` maps a group to patterns over
+   `<provider>:<owner>/<repo>`. A repository created or forked without an owner is `<provider>:@self/<name>`. Once set:
+   - `write_file` and `create_repository` are checked;
+   - `fork_repository` is checked on its destination (write) and its source (read);
+   - reads are checked, and listings are filtered;
+   - a target that is not a plain name (`..`, URL syntax) is refused, so `zuno-*` does not admit `zuno-x/../../prod`.
+
+   `scope: write` checks only the three writes.
+3. **Email recipient allowlist (M12).** `emailReport.recipientAllowlist` in the mcp-gateway chart maps a group to
+   recipient patterns, on top of `internalEmailDomains`. The handler is in-process, so the groups are the validated
+   token's. One recipient outside the caller's patterns refuses the whole send.
+4. **Salesforce owner scoping (M12).** With `ownerScoping.enabled`, the caller is the single active Salesforce User whose
+   `Email` is the token's `email` claim (from the signed context):
+   - `read_opportunity` adds `OwnerId = <that user>`;
+   - `create_opportunity` sets `OwnerId` to that user;
+   - `update_opportunity` checks the owner by a query before the PATCH, and answers another owner's record as a missing
+     one.
+
+   A caller with no email, or no single matching User, is refused. `ownerScoping.allRecordsGroups` lists the groups
+   entitled to every record.
+5. **Namespace matcher on `metrics.query` (M13).** `metricsQuery.namespacesByGroup` maps a group to namespaces (`*` is
+   every namespace). Once set, the mcp-gateway rewrites the PromQL before it reaches mcp-k8s (`app/promql_scope.py`):
+   - The query is tokenised with PromQL's lexical rules: the three string styles, comments, numbers, durations, label
+     lists and the subquery colon.
+   - `namespace=~"<allowed>"` is added to every vector selector: a bare name, a selector with matchers, a nameless
+     `{__name__=...}`, and each alternative of a Prometheus 3 `or` inside braces.
+   - Matchers are ANDed, so a caller's own `namespace` matcher can only narrow the result.
+   - `info()` is refused, and so is any token PromQL would not accept.
+   - A caller whose groups list no namespace is refused.
+
+   A metric without a `namespace` label then selects nothing, which is intended. The server's ServiceAccount keeps
+   `cluster-monitoring-view` (Thanos 9091 needs it); the matcher is the boundary.
+6. **No per-user metric label (M15).** The ai-gateway counters (`zuno_model_calls`, `zuno_model_tokens`,
+   `zuno_model_cost_usd`, the duration histogram and the two `_by_group` counters) lose `user`; `client`, `agent` and
+   `group` stay. The persona moves to the span (`zuno.persona`, next to `zuno.user_sub`). The mcp-gateway counter never
+   carried a user. Dashboards:
+   - Usage & cost (Grafana and Perses): the `$user` variable becomes `$client`, and the "by user" panels are by client.
+   - Five experiences: the `$user` variable is gone, and the "one budget" table is by group and client
+     (`zuno_model_tokens_by_group_total`).
+
+   No alert used the label. A per-person view reads Tempo or the token-budget ledger.
+7. **JSON-RPC batch bound (M15).** `jsonRpc.maxBatchSize` (20; 0 is unbounded). A larger batch, or an empty one, gets one
+   JSON-RPC Invalid Request object (`-32600`, `id: null`), and no message of the batch is processed.
+8. **AAP launch limit (M15).** `clusterAudit.rateLimit.{launches,windowSeconds}` (2 per 900 s; 0 is no limit), per
+   caller `sub` from the signed context. Calls without a verified context share one bucket, so an old gateway or a
+   forged header is limited too. A launch that AAP refuses does not count. The count is in the pod (replicas 1), and a
+   restart resets it.
+
+New chart values (defaults in brackets):
+- `mcp-gateway`: `emailReport.recipientAllowlist` (`{}`), `metricsQuery.namespacesByGroup` (`{}`),
+  `jsonRpc.maxBatchSize` (`20`);
+- `mcp-confluence`: `spaceAllowlist.groups` (`{}`), `spaceAllowlist.scope` (`all`);
+- `mcp-git-forge`: `repositoryAllowlist.groups` (`{}`), `repositoryAllowlist.scope` (`all`);
+- `mcp-salesforce`: `ownerScoping.enabled` (`false`), `ownerScoping.allRecordsGroups` (`[]`);
+- `mcp-aap`: `clusterAudit.rateLimit.launches` (`2`), `clusterAudit.rateLimit.windowSeconds` (`900`).
+
+A malformed allowlist or mapping fails closed (every caller refused). An empty one (`{}`) is off. The hardened profile
+(WP-227) is where these get values; no group-to-space, repository or namespace mapping is decided here.
+
+No change is needed in zuno-demo-agents. Optionally, the `metrics.query` description in `policies/tools/tool-policy.yaml`
+can say that the gateway adds a namespace matcher to every selector, so a model does not try to widen a query that will
+be narrowed anyway.
+
+Tests (all in the CI list):
+- `components/mcp-gateway/tests/test_wp225_lot_b.py` (26);
+- `components/mcp-servers/confluence/tests/test_wp225_space_allowlist.py` (12);
+- `components/mcp-servers/git-forge/tests/test_wp225_repository_allowlist.py` (10);
+- `components/mcp-servers/salesforce/tests/test_wp225_owner_scoping.py` (9);
+- `components/mcp-servers/aap/tests/test_wp225_launch_rate_limit.py` (6).
+
+The server tests sign with the gateway's own module, so the signer and the verifiers are tested together. The negative
+tests include:
+- a space outside the caller's group is refused, with no Confluence call;
+- an unsigned, forged, stale, tampered or other-tool context is refused;
+- a repository outside the group, and a traversal inside an allowed prefix, are refused;
+- another owner's Salesforce record is refused before the PATCH;
+- PromQL escapes are neutralised or refused: a caller `namespace` matcher, `or` inside braces, a comment hiding a
+  selector, a string that looks like a selector, `info()`, and malformed queries;
+- a batch past the bound is refused with nothing dispatched;
+- a third `cluster_audit` inside the window never reaches AAP.
+
+`test_wp190_persona.py` now pins the absence of the label. `test_mcp_protocol.py` of mcp-aap sets the limit to 0, because
+it launches many times.
+
+Limits:
+- The context is as strong as the workload token: whoever holds it can sign a context. That was already true of the
+  calls themselves (ADR-0037). Lot C's per-call assertion is the stronger answer.
+- The other `k8s.*` reads (resources, events, logs) are still bounded by the namespaces of the mcp-k8s RoleBindings,
+  not by the caller's groups.
+- The launch limit and the batch bound are per pod.
+
+### Live probes (each needs the five images built, a sync, and the user's go)
+
+1. **Defaults change nothing visible.** After the builds and the syncs: a Tekos Confluence search and a git-forge read
+   still answer, `aap.platform.audit` still answers, and a `metrics.query` returns the same series as before.
+   `zuno_model_calls_total` has no `user` label, while `client`, `agent` and `group` are still there. The Usage & cost
+   and Five experiences dashboards render.
+2. **Context reaches the servers.** Set `spaceAllowlist.groups: {<group>: [<a real space>]}` on the live Application,
+   for a group that the tool policy allows `confluence.page.create`. A user of that group creates a page in that space,
+   and the same call in another space is refused with "outside the space allowlist". Then remove the value.
+3. **Repository allowlist.** With `repositoryAllowlist.groups: {<an Arkos group>: ["github:<the demo org>/<a test repo>"]}`,
+   a `write_file` to that repository commits, and one to another repository of the same org is refused before GitHub is
+   called (the GitHub audit log shows no request). Then remove the value.
+4. **Namespace matcher.** With `metricsQuery.namespacesByGroup: {ocp-ai-ops: [zuno-ai-run]}`, `ai-ops-01` runs
+   `kube_pod_info{namespace="openshift-etcd"}` and gets no series, and `kube_pod_info` returns only `zuno-ai-run` pods.
+   `info(up)` is refused. Then remove the value.
+5. **Batch bound.** Send a batch of 21 `ping` messages to `/mcp` with a user token. The answer is one object with
+   `error.code: -32600`.
+6. **AAP launch limit.** Launch `aap.cluster.audit` three times as `ai-ops-01` within 15 minutes. The third is refused
+   with "rate limited", and the AAP job list shows two jobs.
+7. **Salesforce owner scoping.** Waits on WP-101 (no Salesforce org is wired). With `ownerScoping.enabled` and a sandbox
+   user whose email matches `sale-01`, `read_opportunity` returns only that user's records.
+8. **Email allowlist.** With `emailReport.recipientAllowlist: {sales: ["sales-*@<internal domain>"]}`, a send by `sale-01`
+   to `ceo@<internal domain>` answers `sent: false`. The handler is demo-mode, so nothing is sent either way.

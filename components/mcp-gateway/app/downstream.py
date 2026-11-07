@@ -24,6 +24,7 @@ from mcp.client.session import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 
+from app import caller_context
 from app.bindings import Binding
 from app.handlers import diagram_gen, drive, email_report, gmail, image_gen, rag_query, web_search
 
@@ -94,13 +95,21 @@ async def invoke(
     bearer_token: str,
     delegated_token: Optional[str] = None,
     caller_groups: Optional[List[str]] = None,
+    caller_claims: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     if binding is None:
         # Fail closed (ADR-0116): deterministic error, no backend contacted.
         raise DownstreamError(502, f"no backend binding registered for tool '{tool_name}'")
 
     if binding.transport == "streamable-http":
-        return await _invoke_streamable_http(binding, arguments, bearer_token)
+        return await _invoke_streamable_http(
+            binding,
+            arguments,
+            bearer_token,
+            caller_sub=caller_sub,
+            caller_groups=caller_groups,
+            caller_claims=caller_claims,
+        )
 
     if binding.transport == "in-process":
         handler = IN_PROCESS_HANDLERS.get(binding.handler or "")
@@ -134,7 +143,13 @@ async def invoke(
 
 
 async def _invoke_streamable_http(
-    binding: Binding, arguments: Dict[str, Any], bearer_token: str
+    binding: Binding,
+    arguments: Dict[str, Any],
+    bearer_token: str,
+    *,
+    caller_sub: str = "",
+    caller_groups: Optional[List[str]] = None,
+    caller_claims: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     # ADR-0043: real, standards-compliant MCP servers (streamable-HTTP
     # transport, e.g. components/mcp-servers/salesforce/server.py mounted at
@@ -150,6 +165,19 @@ async def _invoke_streamable_http(
     # X-Zuno-Gateway-Token is the one that's actually enforced (ADR-0037).
     endpoint = binding.endpoint_url()
     headers = {"Authorization": f"Bearer {bearer_token}", "X-Zuno-Gateway-Token": MCP_GATEWAY_WORKLOAD_TOKEN}
+    # ADR-0603 M12 (WP-225 lot B): who the call is for, signed, from the validated
+    # identity only (app/caller_context.py). A shared-credential server scopes its
+    # technical identity with it (space, repository, owner allowlists; AAP launch
+    # rate limit). A server that does not read it ignores it.
+    headers.update(
+        caller_context.build(
+            sub=caller_sub,
+            groups=caller_groups,
+            claims=caller_claims,
+            tool=binding.provider_tool or "",
+            workload_token=MCP_GATEWAY_WORKLOAD_TOKEN,
+        )
+    )
     try:
         http_client = httpx2.AsyncClient(timeout=DOWNSTREAM_TIMEOUT_SECONDS, headers=headers)
         async with streamable_http_client(endpoint, http_client=http_client) as (read, write):

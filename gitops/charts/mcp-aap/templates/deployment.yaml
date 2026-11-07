@@ -64,6 +64,11 @@ spec:
                 secretKeyRef:
                   name: mcp-gateway-workload-token
                   key: token
+            # ADR-0603 M15 (WP-225 lot B): cluster_audit launches per caller and window.
+            - name: AAP_CLUSTER_AUDIT_RATE_LIMIT
+              value: {{ .Values.clusterAudit.rateLimit.launches | quote }}
+            - name: AAP_CLUSTER_AUDIT_RATE_WINDOW_SECONDS
+              value: {{ .Values.clusterAudit.rateLimit.windowSeconds | quote }}
             # The AAP Gateway's public Route, for building human-facing job
             # links (server.py's _job_url) - never used for this pod's own
             # API calls, which go through AAP_BASE_URL's in-cluster Service.
