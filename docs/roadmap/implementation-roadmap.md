@@ -1080,7 +1080,7 @@ the GPU. The 2026-11-09 demo shows it as roadmap, not live; the user plans a wor
 | WP-233 | [wp-233](work-packages/wp-233-world-model-experience-client-and-prompt-enhancement.md) | 0604 | WP-228 | Repo work in review | seed Vault (`make d0 install vault`, new key and zuno-auth grant) before the push; the push rolls Keycloak (KC_VAULT item) and the ai-gateway; the group is created by the WP-235 role |
 | WP-234 | [wp-234](work-packages/wp-234-world-model-web-api-and-ui.md) | 0604 | WP-231, WP-233 | Repo work in review | none until the build: the image needs `make d2 build world-model` (user's go); the local browser end-to-end on mocks passes |
 | WP-235 | [wp-235](work-packages/wp-235-world-model-gitops-integration.md) | 0604 | WP-229, WP-234 | Repo work in review | the push needs `make d0 install vault` first (SecretStore role), then ArgoCD adds the SecretStore and aap-config reconciles; the install itself waits for WP-237 |
-| WP-236 | [wp-236](work-packages/wp-236-world-model-observability-and-demo-kit.md) | 0604 | WP-235 | Not started | none |
+| WP-236 | [wp-236](work-packages/wp-236-world-model-observability-and-demo-kit.md) | 0604 | WP-235 | Repo work in review | the dashboard rolls out with grafana; the runbook is rehearsed in WP-237 |
 | WP-237 | [wp-237](work-packages/wp-237-world-model-final-acceptance-and-rehearsal.md) | 0604 | WP-232, WP-236 | Not started | one GPU day: full cycle, measurements, recordings, rehearsal, disable |
 
 ### Phase 52 — a dependable demonstration, then governed growth (added 2026-11-07)

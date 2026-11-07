@@ -1,0 +1,33 @@
+# ADR-0604 (WP-236): the three curated scenes of the world-model demo. Read by ansible/roles/world_model and passed to the
+# chart as `presets`; world-model-web serves them at /api/presets. Each is a real FLUX.2 klein first image (a fixed seed
+# makes it repeatable), then a mid-session "event" that edits the current frame. Waypoint-1.5 takes no text: the event is
+# a world edit (ADR-0604 D3), screened like any prompt. Keep every text under 300 characters, in English, without people
+# or brands: components/world-model-web/tests/test_presets.py enforces the length and the deny list.
+#
+# `image:` (a PNG next to this file) would skip the image model and start instantly. None are shipped: the pre-generated
+# first images come with the GPU smoke test (WP-232) and are stored in S3 for a later lot.
+presets:
+  - id: warehouse
+    title: "Logistics warehouse"
+    description: "A vast warehouse, steel racking and forklifts. The business scene: a digital-twin style walk-through."
+    prompt: "a vast modern logistics warehouse, tall steel racking, pallets and forklifts, bright industrial lighting, first-person view"
+    seed: 11
+    event:
+      title: "A fire alarm sounds"
+      prompt: "a red alarm light flashes and thick smoke fills the aisles between the racking"
+  - id: city
+    title: "City at night"
+    description: "A quiet street under streetlights. Then the weather changes."
+    prompt: "a quiet city street at night, warm streetlights, dry pavement, parked cars, first-person view"
+    seed: 22
+    event:
+      title: "Heavy rain starts"
+      prompt: "heavy rain starts to fall and the pavement turns into mirrors reflecting every streetlight"
+  - id: village
+    title: "Snowy village, then a volcano"
+    description: "A medieval village at dusk. The spectacular one."
+    prompt: "a snowy medieval village at dusk, wooden houses with lit windows, cinematic first-person view"
+    seed: 33
+    event:
+      title: "The sky turns red"
+      prompt: "the sky turns red and a volcano erupts beyond the village, glowing ash falling over the rooftops"
