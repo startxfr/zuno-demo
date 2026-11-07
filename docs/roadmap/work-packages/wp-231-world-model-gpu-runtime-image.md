@@ -58,6 +58,17 @@ the build role in WP-234.
 Before the first build, check the ephemeral storage of the nodes that run builds (a CUDA image is about 10 GB; DiskPressure
 on a master has cascaded before). Then `make d2 build world-model`.
 
+**Done 2026-11-07 (Saturday evening, with the user's go).** Both images are built in `zuno-ai-build` from devel 0b15d325 and
+signed keyless by RHTAS: `world-model-runtime` sha256:1f34dab4 (3.0 GB compressed, 5 min 38 s) and `world-model-web`
+sha256:ec6ca759 (70 MB). Two things the first real build taught:
+
+- The runtime build pod is pinned to the GPU group (`machine.startx.io/group=gpu`, ephemeral request 30Gi, limit 45Gi, as
+  mlops): without it the pod can land on a control-plane node (about 25 GB free) or on a UnifAI node (about 14 GB free). The
+  GPU nodes carry the LLM pods, so the build was watched: free disk on the build node went from 92 to 81 GiB and came back,
+  no DiskPressure, no model pod restart.
+- Build 1 failed at the last Dockerfile step (see Verification); build 2, queued behind it, was cancelled. The role forces a
+  second Build after the BuildConfig's own first one, so a new component always makes two serial builds.
+
 ## Verification
 
 Tests pass locally; the smoke Job manifest passes `oc apply --dry-run=client`. The image build checks that torch,
