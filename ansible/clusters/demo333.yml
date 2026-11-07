@@ -322,6 +322,14 @@ zuno_ai_gateway_guardrails_modes_generated: true
 # decision) and the per-client floor stays empty. Needs an image from 4a214782
 # or later.
 zuno_ai_gateway_classification_floors_generated: true
+# ADR-0610 (WP-244, user go 2026-11-07 for the weekend rush): every call of the Blender add-on (Keycloak
+# client `blender`, never an agent, so none of its calls names a known agent) is at least C3: only local
+# models answer it.
+zuno_ai_gateway_classification_client_floors:
+  blender: C3
+# ADR-0610 (WP-244): admit zuno-agent-gateway in the ai-gateway's NetworkPolicy; pairs with
+# zuno_connectivity_link_workstation_entry below.
+zuno_ai_gateway_workstation_entry: true
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,

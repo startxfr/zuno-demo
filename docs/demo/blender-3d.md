@@ -5,10 +5,11 @@ Audience: the presenter, and the platform team preparing a workstation. Decision
 (Target v0.17), under [ADR-0587](../adr/0587-admit-additional-user-experiences-over-the-one-governed-backend.md) and
 [ADR-0606](../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md).
 
-> **Status: target procedure, not yet runnable.** The external entry to the ai-gateway, the Keycloak client `blender`,
-> the `zuno-3d` model alias and the C3 floor arrive with the ADR-0610 work package (v0.17). Until then the add-on below
-> has no gateway to reach. The add-on was checked outside Blender only (syntax, static check, TLS settings); its first
-> run in Blender is part of the work package.
+> **Status: being rolled out on demo333 ([WP-244](../roadmap/work-packages/wp-244-blender-workstation-experience-client.md)).**
+> The entry, the Keycloak client and the C3 floor come with WP-244; `gpt-oss-20b` answers first once the agents release
+> that declares `experience-clients/blender` is promoted (before that, the corp order answers, qwen3.6-27b first, slower).
+> The add-on was checked outside Blender (syntax, static check, TLS settings); its first run in Blender is part of
+> WP-244.
 
 ## The message
 
@@ -21,7 +22,7 @@ identity, counted in the same dashboards.
 flowchart LR
   B[Blender add-on<br/>workstation] -->|device sign-in| KC[Keycloak realm zuno<br/>client blender]
   B -->|HTTPS, verified TLS,<br/>user's JWT| KE[Kuadrant entry<br/>/v1/chat/completions, /v1/models]
-  KE --> GW[ai-gateway<br/>zuno-3d -> task bpy<br/>floor C3, quota, telemetry]
+  KE --> GW[ai-gateway<br/>agent blender, task bpy<br/>floor C3, quota, telemetry]
   GW --> M[MaaS -> vLLM<br/>gpt-oss-20b, fallback qwen3.5-9b]
 ```
 
@@ -32,7 +33,7 @@ Workstation:
 - Blender 4.0 or newer (it ships Python with `certifi`, which the add-on uses for TLS).
 - HTTPS reach to the ai-gateway hostname `https://ai-gateway.apps.<cluster-domain>` and to Keycloak
   `https://keycloak.apps.<cluster-domain>`.
-- A `zuno` account; for the demo, the persona **consultant-02**.
+- A `zuno` account in an admitted group (demo333: `ocp-ai-dev`); for the demo, the persona **ai-dev-01**.
 - Only on a cluster whose routes do not serve the Let's Encrypt wildcard (ADR-0211): the cluster's CA certificate as a
   PEM file. Never disable certificate verification instead.
 
@@ -41,22 +42,25 @@ Platform:
 - `gpt-oss-20b` and `qwen3.5-9b` served in `zuno-ai-run` (already the case; nothing to deploy for the models).
 - The ADR-0610 work package rolled out.
 
-## Day 1: platform changes (by the work package, through GitOps)
+## Day 1: platform changes (WP-244, through GitOps)
 
 Everything below lands as commits and is synced by ArgoCD (ADR-0608). Nothing is applied by hand.
 
-| Change | Where |
-|---|---|
-| Public Keycloak client `blender`, device authorization grant only, `maas-gateway-audience` mapper | `gitops/charts/keycloak/files/realm-zuno.json`, plus the reconcile path used for the other experience clients |
-| `blender` in `experienceClients`, `classification.clientFloors: {blender: C3}`, `zuno-3d=bpy:Zuno 3D` in `toolMarker.modelTaskAliases` | `gitops/charts/ai-gateway/values.yaml` |
-| Experience client `blender` with task `bpy`, routed `gpt-oss-20b` first, `qwen3.5-9b` after, no SaaS, no tools | the agents release (ADR-0592) |
-| HTTPRoute (two paths), AuthPolicy (issuer, audience, `azp`), per-user RateLimitPolicy, reencrypt Route | the Kuadrant entry, on the pattern of `gitops/charts/connectivity-link/templates/quota-demo-*.yaml` |
+| Change | Where | Applied by |
+|---|---|---|
+| Public Keycloak client `blender`, device authorization grant only, `maas-gateway-audience` mapper | `gitops/charts/keycloak/files/realm-zuno.json` | the push (client-reconcile Job) |
+| `blender` in `experienceClients` | `gitops/charts/ai-gateway/values.yaml` | the push |
+| `classification.clientFloors: {blender: C3}`, NetworkPolicy peer for zuno-agent-gateway | `ansible/clusters/<cluster>.yml` (`zuno_ai_gateway_classification_client_floors`, `zuno_ai_gateway_workstation_entry`) | `make d1 install llm` |
+| Route `ai-gateway.apps.<domain>`, HTTPRoute (two paths), AuthPolicy (issuer, audience, `azp: blender`, group `ocp-ai-dev`), RateLimitPolicy (60 requests per user per 5 min) | `gitops/charts/connectivity-link/templates/workstation-entry.yaml`, on in `gitops/apps/connectivity-link/application-d1.yaml` | `make d1 install connectivity-link` |
+| Experience client `blender`, task `bpy`, `models.preferred: [reasoning]` (`gpt-oss-20b` first), no tools, C3 | `experience-clients/blender/` in zuno-demo-agents | the agents release and its promotion |
+
+The ai-gateway's per-persona token budgets apply on top of the entry's request rate.
 
 Read-only checks once synced:
 
 ```bash
 oc get llminferenceservice -n zuno-ai-run                       # gpt-oss-20b and qwen35-9b Ready
-oc get httproute,authpolicy,ratelimitpolicy -A | grep -i blender # Accepted and Enforced
+oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run | grep workstation   # Accepted and Enforced
 ```
 
 ## Day 2: install the add-on and run the demo
@@ -68,7 +72,7 @@ oc get httproute,authpolicy,ratelimitpolicy -A | grep -i blender # Accepted and 
    (`https://ai-gateway.apps.<cluster-domain>`), **Issuer** (`https://keycloak.apps.<cluster-domain>/realms/zuno`) and,
    only for a private CA, **CA file**.
 3. Click **Sign in**, then **Open sign-in page**: the browser shows Keycloak with the code displayed in the panel. Sign
-   in as consultant-02. The panel turns to **Signed in**. No password and no key is ever typed into Blender.
+   in as ai-dev-01. The panel turns to **Signed in**. No password and no key is ever typed into Blender.
 4. Enter a prompt, for example "A wooden table with 4 cylindrical legs and a small desk lamp on top", and click
    **Generate script**. Blender stays responsive; the answer takes about 15 to 40 seconds.
 5. The script appears in the Text Editor as `zuno_3d_script.py`, with the result of the static check in the panel.
@@ -76,7 +80,7 @@ oc get httproute,authpolicy,ratelimitpolicy -A | grep -i blender # Accepted and 
 6. Click **Run script**. The objects appear as one undo step; select one and show its modifiers and dimensions in the
    properties: they are editable, not a frozen mesh.
 7. Show the platform side: Grafana, dashboard **Zuno Platform / Five experiences** filtered on `client="blender"`
-   (tokens counted against consultant-02), and in Tempo the `model_call` span with the C3 floor and the local
+   (tokens counted against ai-dev-01), and in Tempo the `model_call` span with the C3 floor and the local
    provider.
 
 Named limits to say out loud:
@@ -116,7 +120,10 @@ import bmesh
 import bpy
 import mathutils
 
-MODEL = "zuno-3d"
+# ADR-0610: the ai-gateway routes on (agent, task); the model name is not a routing input.
+MODEL = "auto"
+AGENT = "blender"
+TASK = "bpy"
 CLIENT_ID = "blender"
 TEXT_NAME = "zuno_3d_script.py"
 SYSTEM_PROMPT = (
@@ -269,7 +276,8 @@ def _generate_job(gateway, issuer, ctx, prompt):
                             {"role": "user", "content": f"Create this 3D object or scene: {prompt}"}]}
     try:
         status, res = _post(f"{gateway.rstrip('/')}/v1/chat/completions", payload, ctx,
-                            headers={"Authorization": f"Bearer {token}"}, form=False, timeout=240)
+                            headers={"Authorization": f"Bearer {token}", "X-Zuno-Agent": AGENT, "X-Zuno-Task": TASK},
+                            form=False, timeout=240)
     except Exception as exc:  # network, TLS
         _state.update(busy=False, error=f"gateway unreachable: {exc}")
         return
@@ -396,7 +404,7 @@ class ZUNO3D_PT_panel(bpy.types.Panel):
         box.prop(s, "gateway_url")
         box.prop(s, "issuer_url")
         box.prop(s, "ca_file")
-        col.label(text=f"Model: {MODEL}   Status: {_state['status']}")
+        col.label(text=f"Task: {AGENT}/{TASK}   Status: {_state['status']}")
         if _state["user_code"]:
             col.label(text=f"Code: {_state['user_code']}")
             col.operator("zuno3d.open_browser", icon="URL")

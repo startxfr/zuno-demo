@@ -242,6 +242,15 @@ experienceClients:
   - world-model
   - zuno-evaluations
   - zuno-stresstest
+  # ADR-0610 (WP-244): the Blender add-on, a workstation client (public Keycloak client, device sign-in).
+  - blender
+
+# ADR-0610 (WP-244): admit the Kuadrant gateway that fronts this service for workstation clients
+# (NetworkPolicy peer). The entry itself (Route, HTTPRoute, AuthPolicy) is the connectivity-link chart's
+# workstationEntry; turn both on together. Off by default; a cluster turns it on with
+# zuno_ai_gateway_workstation_entry in ansible/clusters/<cluster>.yml.
+workstationEntry:
+  enabled: false
 
 # ADR-0593/ADR-0601 (WP-202): Keycloak clients whose tokens may carry the
 # hardcoded `persona` claim (an entry ending in `*` is a prefix). The quota and
