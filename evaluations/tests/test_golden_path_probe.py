@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import pathlib
 import sys
+import json
+import types
 import unittest
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
@@ -143,6 +145,67 @@ class GuardrailsAndTrace(unittest.TestCase):
         self.assertIn("2 span(s)", r.detail)
 
 
+class WorldModel(unittest.TestCase):
+    OK = {"runtime_ready": True, "engine": "waypoint-1.5-1b", "encoder": "nvenc", "create_status": 201, "frames": 30,
+          "first_keyframe": True, "edit_status": 202, "edit_result": "applied", "edit_ms": 1800, "released": True}
+
+    def with_(self, **kw):
+        return g.judge_world({**self.OK, **kw})
+
+    def test_a_full_run_passes_and_says_what_ran(self):
+        r = g.judge_world(self.OK)
+        self.assertEqual(r.status, g.PASS)
+        self.assertIn("waypoint-1.5-1b, nvenc", r.detail)
+        self.assertIn("1.8 s", r.detail)
+
+    def test_every_broken_link_fails(self):
+        for kw, text in (
+            ({"runtime_ready": False}, "not ready"),
+            ({"create_status": 409}, "another world"),
+            ({"create_status": 503}, "refused"),
+            ({"released": False}, "released"),
+            ({"frames": 3}, "only 3"),
+            ({"first_keyframe": False}, "keyframe"),
+            ({"edit_status": 422}, "HTTP 422"),
+            ({"edit_result": "failed"}, "failed"),
+            ({"edit_result": None}, "without an answer"),
+        ):
+            with self.subTest(kw=kw):
+                r = self.with_(**kw)
+                self.assertEqual(r.status, g.FAIL)
+                self.assertIn(text, r.detail)
+
+    def test_nothing_printed_fails(self):
+        self.assertEqual(g.judge_world({}).status, g.FAIL)
+
+    def test_not_installed_is_roadmap_and_it_asks_argo_by_its_full_name(self):
+        calls = []
+        saved = g.oc
+
+        def fake(*args, **kw):
+            calls.append(args)
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="NotFound")
+
+        g.oc = fake
+        try:
+            r = g.probe_world_model(None)
+        finally:
+            g.oc = saved
+        self.assertEqual((r.status, r.required), (g.ROADMAP, False))
+        self.assertIn("applications.argoproj.io", calls[0])
+        self.assertNotIn("application", calls[0])
+
+    def test_a_held_gpu_is_never_called_a_pass(self):
+        self.assertEqual(self.with_(released=False, frames=40).status, g.FAIL)
+
+    def test_the_in_pod_script_is_valid_python_and_takes_its_config_from_one_place(self):
+        script = g.WORLD_PROBE_SCRIPT.replace("__CFG__", json.dumps({"base": "http://x", "token": "t", "frames": 1,
+                                                                    "edit": "e", "seconds": 1}))
+        compile(script, "world_probe", "exec")
+        self.assertEqual(g.WORLD_PROBE_SCRIPT.count("__CFG__"), 1)
+        self.assertNotIn("print(token", g.WORLD_PROBE_SCRIPT)
+
+
 class Aggregate(unittest.TestCase):
     def test_last_json_line(self):
         self.assertEqual(g.last_json_line("noise\n{\"a\": 1}\ntrailing"), {"a": 1})
@@ -152,6 +215,14 @@ class Aggregate(unittest.TestCase):
         results = [g.Result("dify", g.PASS, ""), g.Result("lightspeed", g.MANUAL, "", required=False),
                    g.Result("world-model", g.ROADMAP, "", required=False)]
         self.assertEqual(g.exit_code(results), 0)
+
+    def test_the_world_model_row_becomes_required_once_it_has_a_verdict(self):
+        for status, required in ((g.ROADMAP, False), (g.PASS, True), (g.FAIL, True)):
+            g.PROBES["world-model"], saved = (lambda ctx, s=status: g.Result("world-model", s, "")), g.PROBES["world-model"]
+            try:
+                self.assertEqual(g.run_one("world-model", None).required, required, status)
+            finally:
+                g.PROBES["world-model"] = saved
 
     def test_a_required_failure_fails_the_run(self):
         results = [g.Result("dify", g.FAIL, ""), g.Result("world-model", g.ROADMAP, "", required=False)]

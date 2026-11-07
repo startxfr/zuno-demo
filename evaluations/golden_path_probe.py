@@ -19,7 +19,9 @@ One probe per demonstration moment, each a real call that must get a real answer
   guardrails           the DAN prompt through Dify's token proxy is answered (observe mode) and the ai-gateway logs a
                        `guardrails DETECTED` line for client dify
   trace                the trace of the unifai-tekos run is found in Tempo by its run id, with gateway spans
-  world-model          roadmap until ADR-0604 ships a probe (WP-235)
+  world-model          ADR-0604: while the demo is installed, a real world is created as a presenter persona, video
+                       arrives (first frame a keyframe), one world edit is screened and applied, and the session is
+                       released; run inside the web pod. Roadmap while zuno_world_model_enabled is false
 
 Read-only with respect to the platform: the UnifAI sessions it creates are deleted, the approval request is rejected
 and its session cancelled, and Open WebUI's chat-completions API stores no chat. It spends a few hundred tokens per
@@ -36,7 +38,8 @@ Exit code 0 when every required moment passes, 1 otherwise. `manual` and `roadma
 
 Environment, all optional: OC_CONTEXT (an explicit `oc --context`), GOLDEN_PERSONA (UnifAI and Open WebUI persona,
 default eval-consultant-01), GOLDEN_GATEWAY_PERSONA (the persona of the ai-gateway token, default consultant-01),
-GOLDEN_VERIFY_TLS=1 (verify the routes' certificates), GOLDEN_SKIP (comma list of moments to skip).
+GOLDEN_VERIFY_TLS=1 (verify the routes' certificates), GOLDEN_SKIP (comma list of moments to skip),
+GOLDEN_WORLD_PERSONA (the presenter of the world-model moment, default ai-ops-01, group ocp-ai-ops).
 """
 from __future__ import annotations
 
@@ -121,19 +124,23 @@ class Context:
         self.open_webui = f"https://open-webui.{self.domain}"
         self.tekos_run_id = ""  # set by unifai-tekos, read by trace
 
-    def gateway_token(self) -> str:
-        """A zuno-evaluations token of the gateway persona, the token WP-209's live probe used."""
+    def persona_token(self, username: str) -> str:
+        """A zuno-evaluations token of a demo persona (the client carries the audience and groups mappers)."""
         import httpx
 
         r = httpx.post(
             f"{self.keycloak}/realms/zuno/protocol/openid-connect/token",
             data={"grant_type": "password", "client_id": "zuno-evaluations", "client_secret": self._eval_secret,
-                  "username": self.gateway_persona, "password": self.password},
+                  "username": username, "password": self.password},
             timeout=30, verify=VERIFY_TLS,
         )
         if r.status_code != 200:
-            raise RuntimeError(f"Keycloak refused the zuno-evaluations token: HTTP {r.status_code}")
+            raise RuntimeError(f"Keycloak refused the zuno-evaluations token of {username}: HTTP {r.status_code}")
         return r.json()["access_token"]
+
+    def gateway_token(self) -> str:
+        """A zuno-evaluations token of the gateway persona, the token WP-209's live probe used."""
+        return self.persona_token(self.gateway_persona)
 
     def env(self) -> Dict[str, str]:
         """The environment the existing UnifAI harnesses read (approval_proof.py, unifai_target.py)."""
@@ -501,8 +508,114 @@ def judge_lightspeed(conds: List[Dict]) -> Result:
     return Result("lightspeed", PASS, f"API and console plugin Ready{note}")
 
 
+# ADR-0604: the world-model moment. Run INSIDE the web pod (python3 - on stdin): the image already has httpx and
+# websockets, so the probe adds no dependency, and it exercises the in-cluster path (web to runtime to GPU) with a real
+# presenter token. The token is spliced into the script text on stdin, never into the command line. It prints one JSON line.
+WORLD_PROBE_SCRIPT = r"""
+import asyncio, json, time
+import httpx, websockets
+
+CFG = __CFG__
+BASE = CFG["base"]
+H = {"Authorization": "Bearer " + CFG["token"]}
+
+
+async def main():
+    out = {}
+    async with httpx.AsyncClient(timeout=120) as c:
+        status = (await c.get(BASE + "/api/status", headers=H)).json()
+        out.update(runtime_ready=status.get("runtime_ready"), engine=status.get("engine"), encoder=status.get("encoder"),
+                   image=status.get("image"))
+        if not status.get("runtime_ready"):
+            return out
+        presets = (await c.get(BASE + "/api/presets", headers=H)).json().get("presets", [])
+        body = {"preset_id": presets[0]["id"]} if presets else {"prompt": "a quiet city street at night"}
+        created = await c.post(BASE + "/api/worlds", json=body, headers=H)
+        out["create_status"] = created.status_code
+        if created.status_code != 201:
+            out["error"] = created.text[:200]
+            return out
+        sid = created.json()["session_id"]
+        try:
+            url = BASE.replace("http://", "ws://", 1) + "/api/sessions/" + sid + "/stream"
+            async with websockets.connect(url, additional_headers=H, max_size=8 << 20) as ws:
+                frames, first_key, edited_at = 0, None, None
+                deadline = time.time() + CFG["seconds"]
+                while time.time() < deadline:
+                    msg = await asyncio.wait_for(ws.recv(), 30)
+                    if isinstance(msg, bytes):
+                        if msg[:1] == b"V":
+                            frames += 1
+                            if first_key is None:
+                                first_key = bool(msg[1] & 1)
+                        if frames >= CFG["frames"] and edited_at is None:
+                            edited_at = time.time()
+                            r = await c.post(BASE + "/api/sessions/" + sid + "/prompts", json={"prompt": CFG["edit"]}, headers=H)
+                            out["edit_status"] = r.status_code
+                            if r.status_code != 202:
+                                break
+                    else:
+                        ev = json.loads(msg)
+                        if ev.get("type") == "state" and ev.get("encoder"):
+                            out["encoder"] = ev["encoder"]
+                        if ev.get("type") == "prompt" and ev.get("status") in ("applied", "failed", "rejected"):
+                            out["edit_result"] = ev["status"]
+                            out["edit_ms"] = ev.get("apply_ms")
+                            break
+                out.update(frames=frames, first_keyframe=first_key)
+        finally:
+            out["released"] = (await c.delete(BASE + "/api/sessions/" + sid, headers=H)).status_code == 204
+    return out
+
+
+print(json.dumps(asyncio.run(main())))
+"""
+
+WORLD_FRAMES = 12  # video messages to see before the edit
+WORLD_EDIT = "the sky turns red"
+
+
+def judge_world(s: Dict) -> Result:
+    """One summary of the in-pod run to a verdict. Pure, so every branch is tested without a cluster."""
+    if not s:
+        return Result("world-model", FAIL, "the probe printed nothing (the exec failed or the pod is not running)")
+    if not s.get("runtime_ready"):
+        return Result("world-model", FAIL, "the GPU runtime is not ready (models still loading, or no GPU node)")
+    if s.get("create_status") != 201:
+        why = {409: "the GPU already serves another world", 429: "the hourly limit", 503: "the runtime refused"}
+        return Result("world-model", FAIL, f"creating a world answered HTTP {s.get('create_status')}"
+                      f" ({why.get(s.get('create_status'), s.get('error', ''))})")
+    if not s.get("released"):
+        return Result("world-model", FAIL, "the session could not be released: the GPU may still be held")
+    frames = s.get("frames", 0)
+    if frames < WORLD_FRAMES:
+        return Result("world-model", FAIL, f"only {frames} video message(s) arrived, expected {WORLD_FRAMES}")
+    if not s.get("first_keyframe"):
+        return Result("world-model", FAIL, "the stream did not open on a keyframe: a browser could not decode it")
+    if s.get("edit_status") != 202:
+        return Result("world-model", FAIL, f"the world edit answered HTTP {s.get('edit_status')}, expected 202")
+    if s.get("edit_result") != "applied":
+        return Result("world-model", FAIL, f"the world edit ended {s.get('edit_result') or 'without an answer'}")
+    ms = s.get("edit_ms")
+    took = f" in {ms / 1000:.1f} s" if isinstance(ms, (int, float)) else ""
+    return Result("world-model", PASS,
+                  f"world created, {frames} frames ({s.get('engine')}, {s.get('encoder')}), edit applied{took}, session released")
+
+
 def probe_world_model(ctx: Context) -> Result:
-    return Result("world-model", ROADMAP, "shown as roadmap until ADR-0604 ships a probe (WP-235)", required=False)
+    # The full resource name: `oc get application` is ambiguous and answers from app.k8s.io, so it would say
+    # "not found" for an installed demo and the probe would wrongly report roadmap.
+    app = oc("get", "applications.argoproj.io", "zuno-world-model-d1", "-n", "openshift-gitops", "-o", "name")
+    if app.returncode != 0:
+        return Result("world-model", ROADMAP, "not installed (zuno_world_model_enabled is false): shown as roadmap, not live",
+                      required=False)
+    persona = os.getenv("GOLDEN_WORLD_PERSONA", "ai-ops-01")
+    script = WORLD_PROBE_SCRIPT.replace("__CFG__", json.dumps(
+        {"base": "http://127.0.0.1:8080", "token": ctx.persona_token(persona), "frames": WORLD_FRAMES,
+         "edit": WORLD_EDIT, "seconds": 120}))
+    run = oc("exec", "-i", "-n", "zuno-world-model", "deploy/world-model-web", "-c", "web", "--", "python3", "-",
+             stdin=script, timeout=240)
+    return judge_world(last_json_line(run.stdout))
 
 
 PROBES: Dict[str, Callable[[Context], Result]] = {
@@ -528,7 +641,9 @@ def run_one(name: str, ctx: Context) -> Result:
         res = PROBES[name](ctx)
     except Exception as exc:  # noqa: BLE001 - one broken moment never hides the others
         res = Result(name, FAIL, f"{type(exc).__name__}: {str(exc)[:200]}")
-    res.required = name not in OPTIONAL
+    # An optional moment becomes required once it has a verdict: the world-model row is roadmap while the demo is off,
+    # and a failing probe of an installed demo must fail the run.
+    res.required = name not in OPTIONAL or res.status in (PASS, FAIL)
     res.seconds = round(time.monotonic() - started, 1)
     return res
 

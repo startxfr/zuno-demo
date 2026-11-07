@@ -122,7 +122,10 @@ def _video(message: bytes):
 def test_health_ready_and_metrics(client):
     assert client.get("/healthz").json() == {"status": "ok"}
     assert client.get("/readyz").status_code == 200
+    # The encoder is probed at startup, so the preflight knows it before the first stream.
+    assert client.get("/internal/status").json()["encoder"] == "x264"
     body = client.get("/metrics").text
+    assert 'zuno_world_encoder_info{encoder="x264"} 1.0' in body
     assert "zuno_world_engine_info" in body and "session" not in body.split("zuno_world_active_sessions")[0][-50:]
 
 

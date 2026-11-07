@@ -51,6 +51,11 @@ playbooks, AAP survey and both workflows, hardening lists, the secret grants and
 and `platform/world-model/tests/check_pins.py`. Findings: the model bucket is in `eu-west-2` (not the cluster's region);
 the Keycloak access token lives 15 minutes so the front door must refresh it; `fetch_models.py` now lives in the chart (one source).
 
+The golden-path probe of ADR-0605 clause 1 (item 5) is in `evaluations/golden_path_probe.py`: roadmap while the demo is off,
+and while it is installed a real world is created as ai-ops-01 inside the web pod (no new dependency), video must arrive on a
+keyframe, one world edit must be applied, and the session is released; it then becomes a required moment. The runtime now
+probes its H.264 encoder at startup (not ready without one), which the preflight reads.
+
 **Live effects of the push:** the external-secrets Application adds a SecretStore in `zuno-world-model` (the Vault role
 `ns-zuno-world-model` must exist first: `make d0 install vault` from this tree) and `aap-config` reconciles the new workflow
 node. Nothing else: no Application is applied while the switch is off.
