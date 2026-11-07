@@ -19,6 +19,10 @@ spec:
       values: |
         # Substituted by ansible/tasks/apply_gitops_app.yml - feeds the chart's derived keycloak issuer.
         clusterBaseDomain: apps.mycluster.example.com
+        # WP-225 lot C, rollout step 2 (signer first): the a2a-gateway signs X-Zuno-Agent-Chain with
+        # Vault a2a/agent-chain private_key. Verification is off until the verifiers hold the public key.
+        agentChain:
+          sign: true
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
