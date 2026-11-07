@@ -24,6 +24,7 @@ state are not restated here.
 | v0.13 | `v0.13.0` | 2026-11-05 | no open ADR or WP; in-cluster ledger run 2026-11-06 |
 | v0.14 | `v0.14.0` | 2026-11-06 | WP-208 Done with named exception: known defects D1 (Dify worker stall, cause open), D2, D3, D5, D6, D8, D9, D10 in its brief; in-cluster ledger run 2026-11-06 |
 | v0.14 | `v0.14.1` | 2026-11-06 | patch: D2, D3, D8, D9, D10 fixed (D1 mitigated, cause open; D11 open); WP-220 portal playground; UnifAI 0.1.61; in-cluster ledger run 2026-11-07 |
+| v0.14 | `v0.14.2` | 2026-11-07 | patch: D1 closed as a known limit of Dify, D11 diagnostics, UnifAI 0.1.62 pin, ADR-0409 Implemented; in-cluster ledger run 2026-11-07 |
 | v0.15 | planned | | the classification floor (WP-209) and the agent lifecycle (WP-221) |
 | v0.16 | planned | | day-0 internal/external mode (WP-211 to WP-218), cluster-management decisions, page-level ACL (WP-210) |
 
