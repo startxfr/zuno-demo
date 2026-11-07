@@ -25,7 +25,7 @@ state are not restated here.
 | v0.14 | `v0.14.0` | 2026-11-06 | WP-208 Done with named exception: known defects D1 (Dify worker stall, cause open), D2, D3, D5, D6, D8, D9, D10 in its brief; in-cluster ledger run 2026-11-06 |
 | v0.14 | `v0.14.1` | 2026-11-06 | patch: D2, D3, D8, D9, D10 fixed (D1 mitigated, cause open; D11 open); WP-220 portal playground; UnifAI 0.1.61; in-cluster ledger run 2026-11-07 |
 | v0.14 | `v0.14.2` | 2026-11-07 | patch: D1 closed as a known limit of Dify, D11 diagnostics, UnifAI 0.1.62 pin, ADR-0409 Implemented; in-cluster ledger run 2026-11-07 |
-| v0.15 | planned | | the classification floor (WP-209) and the agent lifecycle (WP-221) |
+| v0.15 | planned | | the classification floor (WP-209), the agent lifecycle (WP-221) and the security hardening of the 2026-11-06 review (WP-222 to WP-227) |
 | v0.16 | planned | | day-0 internal/external mode (WP-211 to WP-218), cluster-management decisions, page-level ACL (WP-210) |
 
 ## MVP / v0
@@ -308,7 +308,9 @@ classification are already done; ADR-0594's signed markers already raise a turn.
 
 The band also holds the agent lifecycle: the `deprecated` and `retired` states, an incident revocation list and audit events (ADR-0584, WP-221), moved here from v0.12 on 2026-11-05 because none of it has started.
 
-**2 ADRs: ADR-0565 `Partially implemented`, ADR-0584 `Accepted`.** Open work packages: WP-209, WP-221.
+The band also holds the security hardening that came out of the 2026-11-06 review: ADR-0602 (the findings that break a trust boundary: Vault, secret reach, mesh enforcement, GitOps scope, shared passwords, audience, guardrails, metering, delegated scope) and ADR-0603 (the medium findings, the supply chain and the hygiene gaps). Six work packages: quick wins first (WP-222), then secrets and identity (WP-223), network and GitOps (WP-224), the AI and agent surface (WP-225), the supply chain (WP-226) and a `hardened` deployment profile that switches them all on (WP-227).
+
+**4 ADRs: ADR-0565 `Partially implemented`, ADR-0584 `Accepted`, ADR-0602 and ADR-0603 `Proposed`.** Open work packages: WP-209, WP-221, WP-222 to WP-227.
 
 ## v0.16
 

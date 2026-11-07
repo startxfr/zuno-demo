@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 
 from app.agent_chain import Chain, ChainError, DelegationLimits, parse_chain
 from app.agent_declarations import AgentDeclarationStore
-from app.auth import CallerIdentity, validate_token, validate_token_or_kubernetes
+from app.auth import CallerIdentity, require_admin, validate_token, validate_token_or_kubernetes
 from app.bindings import BindingRegistry
 from app.delegation import get_delegated_token
 from app.downstream import DownstreamError
@@ -96,13 +96,17 @@ async def readyz() -> JSONResponse:
     )
 
 
-@app.post("/admin/reload-policy")
+@app.post("/admin/reload-policy", dependencies=[Depends(require_admin)])
 async def reload_policy() -> Dict[str, Any]:
     """Operational escape hatch: re-reads tool-policy.yaml,
     classification.yaml, the agents/ OKF bundles and the ADR-0116 tool
     bindings from disk without a pod restart, for the case where Track B's
     policy files, an agent definition or a binding change land after this
     pod already started.
+
+    ADR-0602 / WP-222: needs a Keycloak JWT whose groups include ADMIN_GROUPS
+    (require_admin). Unlike /mcp, an OpenShift or ServiceAccount token is
+    refused here (401): TokenReview identities carry no Keycloak groups.
     """
     global binding_coverage_error
     policy_store.reload()

@@ -61,6 +61,9 @@ def _from_unifai(match: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+MAX_TOP_K = 20
+
+
 async def _search_unifai(query: str, top_k: int, bearer_token: str, source_type: str) -> Dict[str, Any]:
     params = {
         "query": query,
@@ -94,7 +97,13 @@ async def handle(
     query = str(arguments.get("query", "")).strip()
     if not query:
         return {"error": "query is required"}
-    top_k = int(arguments.get("top_k", 5) or 5)
+    # ADR-0603 / WP-222: top_k is model-chosen; without a ceiling one call can
+    # ask UnifAI for any number of passages per source type.
+    try:
+        top_k = int(arguments.get("top_k", 5) or 5)
+    except (TypeError, ValueError):
+        top_k = 5  # a non-numeric value from the model falls back to the default
+    top_k = max(1, min(top_k, MAX_TOP_K))
 
     if not bearer_token:
         return {"error": "technical-docs search needs the caller's bearer token"}
