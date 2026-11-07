@@ -1,4 +1,7 @@
 {{- if .Values.classification.floorsGenerated }}
+{{- if not (.Files.Get "files/classification-floors.generated.yaml") }}
+{{- fail "classification.floorsGenerated is true but files/classification-floors.generated.yaml is missing or empty (run platform/okf/generate_stack_config.py)" }}
+{{- end }}
 # ADR-0565 clause 5 (WP-209): the classification floor of every (agent, task),
 # generated from the admitted agents release by
 # platform/okf/generate_stack_config.py. The gateway routes a call at

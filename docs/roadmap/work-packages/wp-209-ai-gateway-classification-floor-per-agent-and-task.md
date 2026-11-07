@@ -163,3 +163,13 @@ header-less cases at `C1`, and exactly one log line
 - A request with a header lower than the agent's floor is routed and counted at the floor, with a unit test and a live probe through the gateway. **Unit test done; live probe pending (above).**
 - Without a header, the request is treated as `C3` and no listed caller breaks (`make d3 test` and the three experiences' checks stay green). **Deferred by user decision: the default stays `C1`; the flip waits for the UnifAI shared LLM to send a header (option A, B or C above).**
 - The drift check fails on a stale floor file. **Done (unit test and a real `--check` run).**
+
+### Known gap (review, 2026-11-07)
+
+The (agent, task) key comes from `X-Zuno-Agent` / `X-Zuno-Task`, which the caller sets. ADR-0565 accepts this only
+because a caller that omits them falls to the C3 default. With the default at `C1`, a caller that sends `C1` and
+omits the agent, names an unknown agent, or claims a C1-floor agent (`tekos`) is not raised. The floor therefore
+protects against a mis-rendered level on a correctly identified agent, not against a hand-written UnifAI LLM resource.
+Even after the flip to C3, claiming the lowest-floor agent still lowers the call. Closing it needs a verifiable agent
+identity (an operator-signed header in the style of the ADR-0594 markers, or the `agent_chain` of WP-225 lot C).
+Agent and task now match case-insensitively, so `Cognos` no longer escapes the `cognos` floor.

@@ -8,6 +8,7 @@ Run from this directory:
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import sys
 import tempfile
@@ -103,6 +104,39 @@ def test_a_broken_reload_keeps_the_floors_already_loaded() -> None:
         assert f.floor_for("cognos", "coming-soon") == "C3"
     finally:
         os.unlink(fh.name)
+
+
+def test_agent_and_task_match_case_insensitively() -> None:
+    f = _floors()
+    assert f.effective("C1", "Cognos", "Coming-Soon").effective == "C3"
+    assert f.effective("C1", " COMAGE ", "").effective == "C2"
+
+
+def test_a_file_that_is_not_a_mapping_does_not_crash_and_keeps_the_floors() -> None:
+    for bad in (["cognos"], "just a string", 42):
+        assert classification_floor.ClassificationFloors(_write_raw(bad)).agents == {}
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
+        yaml.safe_dump(_FLOORS, fh)
+    try:
+        f = classification_floor.ClassificationFloors(fh.name)
+        with open(fh.name, "w", encoding="utf-8") as out:
+            yaml.safe_dump(["not", "a", "mapping"], out)
+        f.reload()
+        assert f.floor_for("cognos", "coming-soon") == "C3"
+    finally:
+        os.unlink(fh.name)
+
+
+def _write_raw(doc) -> str:
+    with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
+        yaml.safe_dump(doc, fh)
+    return fh.name
+
+
+def test_admin_reload_routing_also_reloads_the_floors() -> None:
+    with mock.patch.object(classification_floor.floors, "reload") as reload_floors:
+        asyncio.run(app_main.reload_routing())
+    reload_floors.assert_called_once()
 
 
 def test_the_default_when_absent_is_c1_and_c3_is_supported() -> None:

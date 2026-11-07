@@ -125,6 +125,7 @@ async def reload_routing() -> Dict[str, Any]:
     image_routing_table.reload()
     model_routing_policy.reload()
     tuning_controller.reload_policy()
+    classification_floor.floors.reload()
     return {"loaded": routing_table.loaded}
 
 

@@ -89,13 +89,21 @@ class ClassificationFloors:
             with open(self.path, "r", encoding="utf-8") as fh:
                 doc = yaml.safe_load(fh) or {}
         except FileNotFoundError:
-            logger.info("no classification floors at %s; the declared level is used as is", self.path)
+            # A set path means the chart turned the floors on: a missing file is an error, not a quiet no-op.
+            logger.error("classification floors enabled but %s is missing; no floor applies", self.path)
             return
         except Exception as exc:  # noqa: BLE001 - keep the floors already loaded
             logger.error("failed to read classification floors %s: %s", self.path, exc)
             return
+        if not isinstance(doc, dict):
+            logger.error("classification floors %s is not a mapping (%s); keeping the floors already loaded",
+                         self.path, type(doc).__name__)
+            return
         self.agents = self._parse(doc.get("agents"))
-        logger.info("loaded classification floors from %s (%d agent(s))", self.path, len(self.agents))
+        if not self.agents:
+            logger.error("classification floors %s holds no agent; no floor applies", self.path)
+        else:
+            logger.info("loaded classification floors from %s (%d agent(s))", self.path, len(self.agents))
 
     @staticmethod
     def _level(raw: Any, where: str) -> Optional[str]:
@@ -111,20 +119,21 @@ class ClassificationFloors:
         for agent, entry in (raw or {}).items() if isinstance(raw, dict) else []:
             if not isinstance(entry, dict):
                 continue
-            agent = str(agent).strip()
+            agent = str(agent).strip().lower()
             tasks = {}
             for task, level in (entry.get("tasks") or {}).items() if isinstance(entry.get("tasks"), dict) else []:
                 parsed = cls._level(level, f"{agent}/{task}")
                 if parsed:
-                    tasks[str(task).strip()] = parsed
+                    tasks[str(task).strip().lower()] = parsed
             out[agent] = {"floor": cls._level(entry.get("floor"), agent), "tasks": tasks}
         return out
 
     def floor_for(self, agent: str, task: str) -> Optional[str]:
-        entry = self.agents.get((agent or "").strip())
+        # Case-insensitive on both sides: `Cognos` must not escape the `cognos` floor.
+        entry = self.agents.get((agent or "").strip().lower())
         if entry is None:
             return None
-        return entry["tasks"].get((task or "").strip()) or entry["floor"]
+        return entry["tasks"].get((task or "").strip().lower()) or entry["floor"]
 
     def effective(self, declared: str, agent: str, task: str) -> FloorDecision:
         floor = self.floor_for(agent, task)
