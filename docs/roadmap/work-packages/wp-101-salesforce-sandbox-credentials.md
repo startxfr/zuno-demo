@@ -1,6 +1,6 @@
 # WP-101: Provision a real Salesforce sandbox credential
 
-- **State:** Not started (2026-08-30).
+- **State:** Abandoned (2026-11-07, user decision) - no Salesforce sandbox org is planned; the live Salesforce gate stays uncovered (code tested on mocks). Reopen if a customer or partner brings a sandbox org and a technical user
 - **ADRs:** ADR-0512 (residual gap owner), ADR-0528 (its deferred live pass),
   ADR-0218 (the `fetch-salesforce` v0.7 cadence this also unblocks).
 - **Depends on:** none in-repo - this is an operator/infra provisioning task.

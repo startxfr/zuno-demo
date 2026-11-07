@@ -26,9 +26,9 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.1 | 28 | — | 18 | — |
 | v0.2 | 14 | — | 19 | — |
 | v0.3 | 15 | — | 19 | — |
-| v0.4 | 30 | 4 | 31 | WP-101 |
-| v0.5 | 13 | — | 18 | WP-101 |
-| v0.6 | 4 | — | 6 | WP-101 |
+| v0.4 | 30 | 4 | 31 | — |
+| v0.5 | 13 | — | 18 | — |
+| v0.6 | 4 | — | 6 | — |
 | v0.7 | 9 | 1 | 19 | — |
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 6 | — | 8 | — |
@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 4 | 4 | 8 | WP-221, WP-223, WP-224, WP-225, WP-226, WP-227 |
-| v0.16 | 4 | 4 | 11 | WP-210, WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
+| v0.16 | 4 | 3 | 11 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
 Version *goals* live in [versions.md](versions.md); per-ADR status lives in
@@ -534,7 +534,7 @@ changes, closing all three notes' live-pass follow-ups once a credential exists.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-101 | [wp-101](work-packages/wp-101-salesforce-sandbox-credentials.md) | 0512, 0528, 0218 | none | Not started (2026-08-30) | obtain a sandbox org + technical-user token, seed Vault, restore the salesforce-mcp install path, then run the three confirming live passes (Comage freshness read/write, ADR-0528's 404/403/503 causes, `fetch-salesforce` one-shot KFP run) |
+| WP-101 | [wp-101](work-packages/wp-101-salesforce-sandbox-credentials.md) | 0512, 0528, 0218 | none | Abandoned (2026-11-07) | user decision: no Salesforce sandbox org planned; reopen if one is brought |
 
 ### Phase 26 — adopt RHTAS as the artifact trust service (added 2026-08-30; split into WP-110/WP-111 2026-09-02)
 ADR-0535 supersedes ADR-0420, replacing Phase 12's in-cluster Vault Transit
@@ -1044,7 +1044,7 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-209 | [wp-209](work-packages/wp-209-ai-gateway-classification-floor-per-agent-and-task.md) | 0565 | none | Done (2026-11-07) | floors live on demo333 (image d849b322), cognos C1->C3 proven; header-less default stays C1 by user decision, so ADR-0565 stays Partially implemented |
-| WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110 | none | Not started | only if page-level ACL is wanted; change in the fork's Confluence connector, sent to the fork session as a patch |
+| WP-210 | [wp-210](work-packages/wp-210-page-level-confluence-acl-in-the-fork-connector.md) | 0110 | none | Abandoned (2026-11-07) | user decision: per-source aclGroups is the contract, page-level ACL not needed; ADR-0110 Implemented |
 | WP-211 | [wp-211](work-packages/wp-211-keycloak-internal-external-mode.md) | 0352 | WP-143 | Not started | cluster rehearsal there-and-back on a simulated external Keycloak |
 | WP-212 | [wp-212](work-packages/wp-212-vault-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal; who unseals in external mode |
 | WP-213 | [wp-213](work-packages/wp-213-postgresql-internal-external-mode.md) | 0352 | WP-143, WP-211 | Not started | cluster rehearsal |
