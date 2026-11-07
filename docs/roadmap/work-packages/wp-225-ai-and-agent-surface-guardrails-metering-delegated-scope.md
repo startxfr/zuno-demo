@@ -1,6 +1,6 @@
 # WP-225: AI and agent surface: guardrails, metering, delegated scope (delivers ADR-0602, ADR-0603)
 
-- **State:** Operator pending (lots A, B and C, 2026-11-07)
+- **State:** Done (2026-11-07, user decision). Lots A, B and C are on `devel` and live on demo333 with the scope checks that the demo allows; the switches that stay off are listed in [post-demo-hardening.md](../post-demo-hardening.md)
 - **ADRs:** ADR-0602, ADR-0603
 - **Depends on:** WP-222, WP-209 (classification floor; do not duplicate its work)
 - **Blocks:** WP-227
