@@ -30,7 +30,7 @@ import pathlib
 import re
 import sys
 from collections import defaultdict
-from typing import Dict, List, Tuple
+from typing import Dict, FrozenSet, List, Tuple
 
 from packaging.requirements import InvalidRequirement, Requirement
 
@@ -46,20 +46,22 @@ ORPHAN_GLOBS = ("components/*/requirements.txt", "components/*/*/requirements.tx
 
 # Libraries allowed at more than one version across components, each with the
 # reason. Keep this empty unless two components genuinely cannot share one.
-# ADR-0604 (WP-231): the world-model GPU runtime runs Overworld world_engine at commit 68b31639,
-# whose pyproject pins torch==2.11.0, triton==3.6.0 and accelerate==1.12.0 (the stack it is tested
-# with), while components/mlops trains on torch 2.15. The two never share an image or a process, so
-# the torch family (and setuptools, which world_engine's build needs below 82) may differ.
-_WORLD_MODEL_TORCH_PIN = ("world-model-runtime/gpu follows world_engine 68b31639's torch==2.11.0 stack; "
-                          "mlops runs another image (ADR-0604 WP-231)")
-MULTI_VERSION_ALLOWED: Dict[str, str] = {
-    name: _WORLD_MODEL_TORCH_PIN
-    for name in (
-        "torch", "triton", "accelerate", "setuptools", "cuda-toolkit", "nvidia-cublas", "nvidia-cuda-cupti",
-        "nvidia-cuda-nvrtc", "nvidia-cuda-runtime", "nvidia-cudnn-cu13", "nvidia-cufft", "nvidia-cufile",
-        "nvidia-cusolver", "nvidia-cusparse", "nvidia-cusparselt-cu13", "nvidia-nccl-cu13", "nvidia-nvjitlink",
-        "nvidia-nvshmem-cu13", "nvidia-nvtx",
-    )
+# Libraries allowed at more than one version, ONLY between the components named, each with its reason.
+# A third component drifting on one of them is still caught.
+# ADR-0604 (WP-231): world_engine 68b31639 (the world-model GPU runtime) pins torch==2.11.0,
+# triton==3.6.0 and accelerate==1.12.0, the stack it is tested with; mlops trains on torch 2.15. The
+# two never share an image or a process.
+_WM_VS_MLOPS = frozenset({"components/world-model-runtime/gpu", "components/mlops"})
+MULTI_VERSION_ALLOWED: Dict[str, Tuple[FrozenSet[str], str]] = {
+    "torch": (_WM_VS_MLOPS, "world_engine 68b31639 pins torch==2.11.0; mlops runs torch 2.15 in another image"),
+    "triton": (_WM_VS_MLOPS, "world_engine pins triton==3.6.0, the release matching torch 2.11"),
+    "accelerate": (_WM_VS_MLOPS, "world_engine pins accelerate==1.12.0"),
+    "setuptools": (_WM_VS_MLOPS, "world-model GPU lock resolves setuptools for world_engine's build backend"),
+    **{name: (_WM_VS_MLOPS, "CUDA 13.0 wheels of torch 2.11 (world-model) vs CUDA 13.2 of torch 2.15 (mlops)")
+       for name in ("cuda-toolkit", "nvidia-cublas", "nvidia-cuda-cupti", "nvidia-cuda-nvrtc",
+                    "nvidia-cuda-runtime", "nvidia-cudnn-cu13", "nvidia-cufft", "nvidia-cufile",
+                    "nvidia-cusolver", "nvidia-cusparse", "nvidia-cusparselt-cu13", "nvidia-nccl-cu13",
+                    "nvidia-nvjitlink", "nvidia-nvshmem-cu13", "nvidia-nvtx")},
 }
 
 
@@ -150,7 +152,8 @@ def check(dirs: List[pathlib.Path], constraints_file: pathlib.Path = CONSTRAINTS
             continue
         text = lock.read_text()
         head = "\n".join(text.splitlines()[:8])
-        if "pip-compile" not in head and not (str(rel) in UV_LOCKS and "uv pip compile" in head):
+        uv_ok = str(rel) in UV_LOCKS and "uv pip compile" in head and "--generate-hashes" in head
+        if "pip-compile" not in head and not uv_ok:
             problems.append(f"{rel}/requirements.txt: not a pip-compile output"
                             + (" (this lock is compiled with uv, see compile_locks.UV_LOCKS)" if str(rel) in UV_LOCKS else ""))
         if locked_python(text) != expected_python(str(rel)):
@@ -177,7 +180,9 @@ def check(dirs: List[pathlib.Path], constraints_file: pathlib.Path = CONSTRAINTS
                                 f"{constraints[name]}")
             seen[name][version].append(str(rel))
     for name, versions in sorted(seen.items()):
-        if len(versions) > 1 and name not in MULTI_VERSION_ALLOWED:
+        components = {c for comps in versions.values() for c in comps}
+        allowed = MULTI_VERSION_ALLOWED.get(name)
+        if len(versions) > 1 and not (allowed and components <= allowed[0]):
             listing = "; ".join(f"{v} in {', '.join(c)}" for v, c in sorted(versions.items()))
             problems.append(f"{name} is locked at {len(versions)} versions: {listing}")
     return problems
