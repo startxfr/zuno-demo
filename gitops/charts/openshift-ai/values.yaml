@@ -406,6 +406,10 @@ maasGateway:
   # server (templates/maas-portal-genai-route.yaml explains why).
   portalGenAiRoute:
     enabled: true
+  # 2026-11-07: /, /mlflow and /catalog/ for the same hostname, or the RHOAI dashboard
+  # itself answers 404 there (templates/maas-portal-dashboard-route.yaml).
+  portalDashboardRoute:
+    enabled: true
   # ADR-0201: workaround for an RHOAI-side EnvoyFilter anchor mismatch that
   # leaves both inference-payload-processing ext_proc filters unattached,
   # which 404s the OpenAI-native /v1/chat/completions call shape and skips

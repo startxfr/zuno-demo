@@ -584,3 +584,14 @@ workarounds and the Keycloak `apiKeyHelper` path (unverified); an upstream repor
 
 The three evaluations are accepted or amended by the user, one pilot is chosen with its subscription and ceiling, and the spikes of
 step 2 are recorded (met on 2026-11-06, section 19; the spikes live in sections 8 to 14, not in a separate evidence file).
+
+## Update (2026-11-07) - the portal hostname had taken the RHOAI dashboard down
+
+`https://rh-ai.apps.demo333.startx.fr/` answered 404, and so did `/mlflow` and `/catalog/`; only `/gen-ai`,
+`/maas-consumer-portal` and `/oauth2` worked. Same mechanism as the two earlier fixes: the consumer portal's operator-owned
+HTTPRoute sets `hostnames: rh-ai.<domain>`, Istio gives that host its own virtual host, and the vendor routes
+`rhods-dashboard`, `mlflow` and `model-catalog` (no hostname) are no longer served there. Fix:
+`templates/maas-portal-dashboard-route.yaml` (`maasGateway.portalDashboardRoute.enabled`) copies their rules onto the
+hostname, additively. Live 2026-11-07: `zuno-portal-dashboard` Accepted, then with a bearer token `/` 200 "Red Hat
+OpenShift AI", `/maas-consumer-portal/` 200 "MaaS Consumer Portal", `/mlflow/` 200, `/gen-ai/` 200. After any RHOAI
+upgrade, compare these rules with the vendor routes.
