@@ -16,6 +16,31 @@ spec:
     path: gitops/charts/mcp-confluence
     helm:
       releaseName: zuno-mcp-confluence-d1
+      values: |
+        # WP-225 lot C, rollout step 3 (user's go 2026-11-07): verify the mcp-gateway's per-call assertion
+        # (public half of Vault mcp/gateway-call-assertion). Not required yet: a call without an assertion
+        # is still served until callAssertion.required is switched on, one server at a time, later.
+        # WP-225 lot B (user's go 2026-11-07): the dev and ops groups reach the SXSI space only. A caller whose
+        # groups list no entry is refused once an allowlist is set, so the groups the tool policy already lets
+        # use Confluence keep every space ("*"): consultant, board, cdp, lightspeed_readonly. Add a group here
+        # before it needs Confluence.
+        spaceAllowlist:
+          groups:
+            ocp-ai-dev: ["SXSI"]
+            ocp-ai-ops: ["SXSI"]
+            ocp-paas-dev: ["SXSI"]
+            ocp-paas-ops: ["SXSI"]
+            aap_ops: ["SXSI"]
+            consultant: ["*"]
+            board: ["*"]
+            cdp: ["*"]
+            lightspeed_readonly: ["*"]
+          scope: all
+        callAssertion:
+          publicKey: |
+            -----BEGIN PUBLIC KEY-----
+            MCowBQYDK2VwAyEAlIAapqkGwFneDh3ZM2/thjjJbQa5ZnOq7S4Ro0Ju6FQ=
+            -----END PUBLIC KEY-----
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run
