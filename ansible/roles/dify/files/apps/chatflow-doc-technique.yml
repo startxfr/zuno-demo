@@ -79,10 +79,15 @@ workflow:
               role: system
               text: |-
                 You answer questions about OpenShift, Red Hat OpenShift AI and our internal procedures, in the
-                language of the question. Use only the context below. Cite the source of each statement. If the
-                context does not answer the question, say so.
+                language of the question. Answer from the context below, which holds titles and excerpts of the best
+                matching pages. List what the context shows that is relevant to the request (page titles and
+                references count), cite the source of each item, and say what is missing only if nothing relevant is
+                there.
                 Context:
                 {{#context#}}
+            - id: 00000000-0000-4000-8000-000000000002
+              role: user
+              text: '{{#sys.query#}}'
           context: {enabled: true, variable_selector: [knowledge, result]}
           vision: {enabled: false}
           memory: null

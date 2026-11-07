@@ -94,6 +94,9 @@ flowchart LR
 
 ## What the script does not show
 
+- **Gmail.** Open WebUI offers the tool `gmail.message.read`; a model may try it and the chat shows a red cross. The gateway
+  refuses it (`delegated_credential_missing`): the tool needs a delegated Google token and no Google Workspace tenant is
+  connected to the demo. Say so if it appears; it is the delegation rule at work, not a fault (WP-208).
 - **A space the Dify persona is not entitled to** and a knowledge node typed by hand in a workflow beyond the one built in step 1.
 - **The shared quota** across the five: Dify and kagent are persona-keyed, so the stress test of the three-experiences
   script applies to them through consultant-02 and ai-ops-01; it is not part of this script (it needs a tight class,
@@ -106,6 +109,7 @@ flowchart LR
   then the controller logs. The database password trap is in the WP-207 evidence.
 - A `k8s.*` call is refused for an operations persona: check that the mcp-gateway runs agents v0.13.0 or later
   (`okf-fetch` says `VERIFIED … release 0.13.0`) and that its image carries the `k8s` bindings.
+- A Dify Workflow run shows no progress after a few seconds: it is the known stall of Dify 1.17.0 (about one run in four, 190 s to 8 minutes before the first tool call, WP-208 D1). Stop it and start it again: the next run takes about 3 seconds.
 - No series for `kagent` or `dify`: the export and scrape take about a minute, and the series live in `prometheus-k8s`
   (openshift-monitoring), not in the user-workload Prometheus.
 

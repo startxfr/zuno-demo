@@ -1,6 +1,6 @@
 # WP-220: Evaluate the RHOAI 3.6 MCP lifecycle, MaaS consumer portal and WorkbenchesV2 components
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-06: portal and playground piloted and proven live, MCPServer and model-based-routing-only tested, Workbenches V2 waits for an API; see section 19)
 - **ADRs:** [ADR-0571](../../adr/0571-evaluate-the-rhoai-mcp-gateway-before-extending-mcp-gateway.md), [ADR-0036](../../adr/0036-enforce-the-complete-mcp-authorization-intersection-in-the-gateway.md)
 - **Depends on:** [WP-195](wp-195-update-every-operator-on-demo333-through-the-repository.md) (RHOAI 3.6.0-ea.2 live on demo333)
 - **Related:** [WP-152](wp-152-mcp-gateway-evaluation-and-mcp-north-side.md), [WP-164](wp-164-generate-stack-configuration-from-the-corp-release.md), [WP-177](wp-177-finish-the-maas-quota-delegation.md), [WP-206](wp-206-kubernetes-read-tools-behind-the-mcp-gateway.md)
@@ -267,7 +267,7 @@ The question left open by section 7 was which field the limit reads, and whether
 - **The maas-controller would wipe a hand edit.** It does not set `dataExtraction`, and on every reconcile it replaces the whole `spec` of
   each managed TRLP (`maassubscription_controller.go`, `updateExistingTRLP`). The only durable ways are to opt a TRLP out of management
   (then subscription changes stop reaching it) or to ask upstream for a pass-through.
-- **Options.** (1, recommended) Accept and document: Claude Code on a MaaS key is authenticated and authorised but not rate-limited by
+- **Options.** (1, recommended, **decided by the user on 2026-11-06**) Accept and document: Claude Code on a MaaS key is authenticated and authorised but not rate-limited by
   MaaS; the 5,000,000 tokens per hour of `gpt-oss-20b-developer` is real only for OpenAI-format calls. (2) Opt the `gpt-oss-20b` TRLP out
   and own it in the chart with the two-pointer list: undercounts, and freezes that model's subscriptions. (3) Upstream request to the
   maas-controller; the user deferred upstream issues earlier.
@@ -527,7 +527,7 @@ Result: d0 and d1 Synced and Healthy, OGXServer Ready with one stable pod (9 Rep
 token, EnvoyFilter unchanged at 1,336,461 bytes. A playground created from the portal in another namespace is still the vendor's version and will loop.
 
 Remaining work, none blocking this topic (the `ai-dev-01` flow was tested, see section 18): decide the Anthropic
-counting option (section 9, recommended: accept and document); the V2 workbench pilot waits for an API that does not exist yet (section 12); MaaS 3.6 IPP-to-Praxis impact on the
+counting option (section 9, decided: option 1, accept and document); the V2 workbench pilot waits for an API that does not exist yet (section 12); MaaS 3.6 IPP-to-Praxis impact on the
 payload-processing workarounds and the Keycloak `apiKeyHelper` path were not verified; an upstream report for the OGX CA-bundle defect.
 
 ## 18. Retest of the playground recreated from git (2026-11-06, 19:35-19:42 CET)
@@ -549,17 +549,38 @@ Notes:
 - `ocp-ai-dev` has no MCP tool at all, by policy. Decision (user, 2026-11-06): keep it, so the demo shows the difference between the two groups. Giving it read-only tools later is a policy change in `zuno-demo-agents`.
 - The MaaS Limitador counter probe (`platform/testing/quota_counters_probe.py`) read `OK: moved ['subscription']` (+29) on the same day: counters move again after the 3.6 EA upgrade.
 
+## 19. Acceptance (2026-11-06)
+
+The user accepted the work package on 2026-11-06 after the section 18 retest. Outcome per component:
+
+| Component | Decision | Where |
+|---|---|---|
+| MaaS consumer portal (`dashboard.maasConsumerPortal`) | **Adopted.** Live on demo333 for the three `ocp-*` groups: API keys, subscriptions, playground (chat, RAG, MCP with the user's own token). Everything is in git except the Application value `externalHostnameListener`, which is not git-synced | sections 8, 10, 14 to 18 |
+| MCP lifecycle operator (`mcpservers.mcp.x-k8s.io`, v1alpha1) | **Wait.** Tested as an `MCPServer` pilot; it creates no ServiceAccount, RBAC or NetworkPolicy, so the project's gateway and policy stay | sections 11, 14 |
+| Workbenches V2 | **Wait.** No Notebook v2 API on this EA, so no pilot is possible | section 12 |
+| `model-based-routing-only` | **No effect** while the models chart supplies its own `spec.router.route.http.spec` | sections 13, 14 |
+
+Pilot chosen: the portal, with the subscriptions `gpt-oss-20b-ocp-ai-dev`, `-ocp-ai-ops` and `-ocp-paas-ops` (5,000,000 tokens per hour each, priority 20).
+The spikes of step 2 are recorded in sections 8 to 14 of this file; no separate evidence file was written.
+
+Decisions taken at closure: the Anthropic `/v1/messages` traffic stays uncounted by MaaS (section 9, option 1, to be documented wherever a Claude Code key is handed out);
+`ocp-ai-dev` keeps no MCP tool (section 18).
+
+Not done, none blocking, to be taken up when the cause clears: the V2 workbench pilot (needs the Notebook v2 API); the MaaS 3.6 IPP-to-Praxis impact on the payload-processing
+workarounds and the Keycloak `apiKeyHelper` path (unverified); an upstream report for the OGX CA-bundle defect (text drafted, not sent: [evidence/wp-220-ogx-ca-bundle-vendor-report.md](../evidence/wp-220-ogx-ca-bundle-vendor-report.md)).
+
 ## Steps
 
-1. This evaluation (done, in review).
+1. This evaluation (done).
 2. Read-only spikes: the Kuadrant `MCPGatewayExtension`, `MCPServerRegistration` and `MCPVirtualServer` CRDs already on the cluster, to
-   see whether ADR-0011 rights can be expressed in Authorino; the portal's Keycloak sign-in; the `status` fields of `MCPServer`.
+   see whether ADR-0011 rights can be expressed in Authorino; the portal's Keycloak sign-in; the `status` fields of `MCPServer`
+   (done, recorded in sections 8 to 14 of this file).
 3. Pilot gate. Recommended first pilot: the portal (one DSC field, easy to revert). Second candidate: one MCP server (the upstream k8s
    server of WP-206) as an `MCPServer`. A pilot needs the user's go, an announced window, a DSC backup and a live patch, because ArgoCD
    ignores the DSC `/spec`.
-4. Test `model-based-routing-only` on one model and measure the EnvoyFilter size.
+4. Test `model-based-routing-only` on one model and measure the EnvoyFilter size (done, section 14).
 
 ## Acceptance
 
 The three evaluations are accepted or amended by the user, one pilot is chosen with its subscription and ceiling, and the spikes of
-step 2 are recorded in an evidence file.
+step 2 are recorded (met on 2026-11-06, section 19; the spikes live in sections 8 to 14, not in a separate evidence file).

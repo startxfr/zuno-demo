@@ -303,7 +303,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 | [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Accepted | Adopt A2A as the inter-agent protocol |
 | [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) | Implemented | Propagate the user's identity and the delegation chain across agent-to-agent calls |
 | [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Implemented | Limit agent delegation by depth, cycle and budget |
-| [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Accepted | Introduce human approval for delegated operations, resumable from persisted checkpoints |
+| [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Implemented | Introduce human approval for delegated operations, resumable from persisted checkpoints |
 | [ADR-0560](0560-keep-the-ai-gateway-as-the-policy-router-in-front-of-unifai.md) | Implemented | Keep the ai-gateway as the policy router in front of UnifAI |
 | [ADR-0561](0561-adopt-unifai-as-the-agent-platform.md) | Implemented | Adopt UnifAI as the agent platform |
 | [ADR-0562](0562-authenticate-unifai-against-the-zuno-keycloak-realm.md) | Implemented | Authenticate UnifAI against the zuno Keycloak realm |
@@ -366,6 +366,8 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Partially implemented | Derive data classification from OKF and only allow raising it |
 | [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
+| [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Proposed | Harden the platform's trust boundaries before a customer runs it |
+| [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Proposed | Close the medium-severity security gaps found in the 2026-11-06 review |
 
 ## v0.16
 

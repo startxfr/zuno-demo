@@ -89,7 +89,19 @@
     executable: /bin/bash
   register: _dify_cfg_out
   changed_when: "'registered' in _dify_cfg_out.stdout or 'installed' in _dify_cfg_out.stdout or 'created' in _dify_cfg_out.stdout"
+  # no_log hides the administrator password, and with it the reason of a failure (WP-208 D11).
+  # configure.py never prints the password: its failures are single lines starting with FAIL,
+  # shown below, then the play stops.
+  failed_when: false
   no_log: true
+
+- name: "dify | show why the configuration failed (FAIL lines only, never the whole output)"
+  ansible.builtin.fail:
+    msg: >-
+      configure.py exited {{ _dify_cfg_out.rc }}:
+      {{ (_dify_cfg_out.stdout_lines | select('match', '^FAIL') | list)
+         + (_dify_cfg_out.stderr_lines | default([]) | reject('search', 'assword') | list)[-5:] }}
+  when: _dify_cfg_out.rc | default(1) != 0
 
 - name: "dify | configuration result"
   ansible.builtin.debug:

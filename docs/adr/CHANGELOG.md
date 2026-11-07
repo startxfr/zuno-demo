@@ -9,6 +9,13 @@ index states what is true now; this file records how it got there.
 
 Per-ADR status is *not* recorded here. The index is the sole authority for it.
 
+## Addition (2026-11-06) - ADR-0602 and ADR-0603 join v0.15
+
+A review of the platform's trust boundaries produced two records: ADR-0602 for the findings that break a boundary (Vault,
+secret reach, mesh enforcement, GitOps scope, shared passwords, token audience, guardrails, metering, delegated scope) and
+ADR-0603 for the medium findings, the supply chain and the hygiene gaps. Both are `Proposed` in v0.15 with WP-222 to WP-227.
+ADR-0565 clause 5 already owns caller-declared classification, so ADR-0602 refers to it instead of repeating it.
+
 ## Retarget (2026-11-05) - ADR-0584 follows the code release that will build it
 
 ADR-0584 (agent lifecycle states, roles and incident revocation) moves from v0.12 to v0.15. WP-167, the only work package that cited it, delivers ADR-0582 and the group visibility of ADR-0583, and builds none of ADR-0584's clauses 3 to 6; the new WP-221 does. v0.12 therefore keeps no unstarted ADR.

@@ -33,11 +33,11 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 23 | 2 | 28 | WP-173, WP-174, WP-220 |
+| v0.11 | 23 | 1 | 28 | — |
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
-| v0.15 | 2 | 2 | 3 | WP-209, WP-221 |
+| v0.15 | 4 | 4 | 8 | WP-209, WP-221, WP-223, WP-224, WP-225, WP-226, WP-227 |
 | v0.16 | 4 | 4 | 11 | WP-210, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -961,8 +961,8 @@ frozen mirror.
 | WP-170 | [wp-170](work-packages/wp-170-agent-delegation-contract-and-adrs.md) | 0401, 0402, 0403, 0406, 0409 | none | Done | the four records accepted 2026-10-24 (Implemented after WP-174's live proofs) |
 | WP-171 | [wp-171](work-packages/wp-171-okf-delegation-fields-and-conformance-cases.md) | 0401, 0406 | WP-170 | Done (2026-11-03) | merged on zuno-demo-agents devel (PR #9), released and admitted; fields and `access` live in the mcp-gateway |
 | WP-172 | [wp-172](work-packages/wp-172-gateway-enforcement-of-the-delegation-chain.md) | 0401, 0403, 0406 | WP-170, WP-171 | Done (2026-11-03) | the gateway enforces the chain; delegated calls proven live on operator 0.1.53 (`delegated_by` in the audit) |
-| WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Not started | step 6 (the operator refuses A2A and delegation targets) is live in operator 0.1.35; steps 1 to 5 wait for the user's priority |
-| WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Repo work merged | Arkos to Tekos works on operator 0.1.53 (scenario 21 3/3, at most 3 A2A per turn); refusals, cost and cancellation not proven yet |
+| WP-173 | [wp-173](work-packages/wp-173-unifai-a2a-identity-server-and-approval.md) | 0402, 0403, 0406, 0409 | WP-170 | Done (2026-11-06) | the fork work is live on UnifAI 0.1.61 (identity, classification, limits, approval relay); persistence of a pending approval is deferred and ADR-0409 stays Accepted |
+| WP-174 | [wp-174](work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md) | 0401, 0403, 0406, 0409 | WP-171, WP-172, WP-173 | Done (2026-11-06) | Arkos to Tekos works on operator 0.1.53 (scenario 21 3/3, at most 3 A2A per turn); refusals, cost and cancellation not proven yet |
 | WP-175 | [wp-175](work-packages/wp-175-a2a-gateway-and-persona-test-blueprints.md) | 0585, 0402, 0403, 0406 | WP-172 | Done (2026-10-25) | zuno-side A2A gateway live on demo333, 32 test blueprints (26 valid, 6 wait for placeholder agents), real delegated turns and the denial check proven |
 | WP-176 | [wp-176](work-packages/wp-176-verify-the-unifai-runtime-images-before-deploying-them.md) | 0586, 0353, 0574 | none | Done (2026-10-25) | live on demo333: the five application images (CI-signed, digest-pinned, verified before applying, drift checked), the third-party services and backup Jobs (pinned, unsigned), the operator 0.1.40 with its bundle and catalog (release identity, catalog pinned), the release path rehearsed with a `v0.0.0-rc1` tag; cluster-side admission is WP-178 |
 | WP-177 | [wp-177](work-packages/wp-177-finish-the-maas-quota-delegation.md) | 0570 | WP-157 | Done (2026-10-25) | works with the Kuadrant two-limit ceiling: counters probe and Redis-backed quota ledger live on demo333 (budgets survive an ai-gateway restart); removing quota.py deferred until Kuadrant is fixed |
@@ -1055,7 +1055,13 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP-218 | [wp-218](work-packages/wp-218-argocd-internal-external-mode.md) | 0352 | WP-143, ADR-0557 decision | Not started | waits for ADR-0557's mechanism |
 | WP-219 | [wp-219](work-packages/wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md) | 0570 | WP-177 | Closed — deferred | every check is blocked: vendor route defect (V2, V3, V5), personas get 401 from MaaS (V6), no verified project id (V11) |
 | WP-221 | [wp-221](work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md) | 0584 | WP-167 | Not started (2026-11-05: go given by the user, the fork session builds the operator part as soon as it can) | the fork session builds the operator part, a release with the user's go, one pilot on demo333 |
-| WP-220 | [wp-220](work-packages/wp-220-evaluate-the-rhoai-3-6-mcp-lifecycle-portal-and-workbenches-v2-components.md) | 0571 | WP-195 | Repo work in review | evaluation of three RHOAI 3.6 components; a pilot needs the user's go |
+| WP-220 | [wp-220](work-packages/wp-220-evaluate-the-rhoai-3-6-mcp-lifecycle-portal-and-workbenches-v2-components.md) | 0571 | WP-195 | Done | portal adopted and live; MCP lifecycle operator and Workbenches V2 wait |
+| WP-222 | [wp-222](work-packages/wp-222-quick-security-wins-audience-admin-cql-secret-scan-action-pins.md) | 0602, 0603 | none | Done | merged to `devel` locally, not pushed; live checks waived by the user; push, gateway builds and sync wait for the user's go |
+| WP-223 | [wp-223](work-packages/wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) | 0602, 0603 | WP-222 | Not started | cluster rehearsal; needs the user's choice of unseal backend |
+| WP-224 | [wp-224](work-packages/wp-224-network-and-gitops-hardening-mesh-egress-appproject-jwks.md) | 0602, 0603 | WP-222 | Not started | cluster rehearsal, namespace by namespace |
+| WP-225 | [wp-225](work-packages/wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) | 0602, 0603, 0565 | WP-222, WP-209 | Not started | classification itself stays with WP-209 |
+| WP-226 | [wp-226](work-packages/wp-226-supply-chain-and-dependency-hygiene-digests-enforce-lockfiles.md) | 0603 | WP-222 | Not started | every release pin needs the user's go |
+| WP-227 | [wp-227](work-packages/wp-227-hardened-deployment-profile.md) | 0602 | WP-223, WP-224, WP-225, WP-226 | Not started | scratch-cluster rehearsal |
 
 ### OKF stream phases
 
@@ -1208,6 +1214,9 @@ moving.
 - 2026-11-05 — WP-167 Done and ADR-0582 Implemented: the user repeated the per-agent sheet proof on UnifAI 0.1.59 as consultant-01 and sale-01. ADR-0584 stays `Accepted`: its lifecycle states, revocation list and audit events are not built and no work package carries them.
 - 2026-11-05 — Unstarted work follows the code releases (user decision). ADR-0565 moves to the new band v0.15; ADR-0110, ADR-0352, ADR-0556 and ADR-0557 move to the new band v0.16, with WP-209 and WP-210 to WP-218 following their ADRs. Closed ADRs, ADRs with a started package, and the past bands are untouched; the old bands v0.1 now has no open ADR or WP, and v0.9 keeps only ADR-0559 (WP-145, WP-195). See the ADR change log.
 - 2026-11-05 — `v0.13.0` tagged on `main` (`388555d6`): the first platform tag since `v0.3.0`, so that tags follow the roadmap bands again. The rule (a tag per band, on `main`, annotated, the in-cluster ledger as a separate step) is in RELEASING.md and the tag table in versions.md. v0.4 to v0.12 are not tagged retroactively; the next tag is `v0.14.0`.
+- 2026-11-07 — WP-222 Done (user decision): the reviewed security quick wins (gateway audience `zuno-admin-api`, authenticated `/admin/*` routes, Confluence CQL and page-id checks, input ceilings, secret scan, SHA-pinned actions, venv out of git) are merged into `devel` locally, not pushed. Named exception: the live checks (audience, admin routes, CQL) were not run; the user closed the package without them. ADR-0602 and ADR-0603 stay `Proposed`, with WP-223 to WP-227 open.
+- 2026-11-06 — WP-220 Done: the user accepted it after a retest on demo333 of the playground shipped by the `openshift-ai` chart (chat, RAG, MCP with the user's own token as `ai-ops-01`; `ai-dev-01` sees no MCP tool by policy). The MaaS consumer portal is adopted for the three `ocp-*` groups; the MCP lifecycle operator and Workbenches V2 wait; Anthropic-format traffic stays uncounted by MaaS (accepted).
+- 2026-11-06 — ADR-0602, ADR-0603 and WP-222 to WP-227 added, all in v0.15: a read-only review of the platform's trust boundaries (identity, secrets, network, the AI and agent surface, the supply chain). Findings are not replayed on a cluster. WP-222 (quick wins) is committed locally and not pushed, because both repositories are public.
 - 2026-11-05 — WP-220 added (evaluation, no cluster change): what the RHOAI 3.6 MCP lifecycle operator, MaaS consumer portal and WorkbenchesV2 would bring to this project, which custom code each could replace, and the questions that gate a pilot. It also records that the MaaS 3.6 documentation describes the WP-195 quota incident (gateway wasm object size) and its levers.
 - 2026-11-05 — ADR-0567 Implemented with an amendment: the builtin guardrail detectors and the smoke orchestrator stay as a documented fallback (decision 5's deletion is no longer decided). WP-219 added, deferred: it holds ADR-0570's never-run checks, each blocked (vendor route defect, personas 401 on MaaS, no verified project id).
 - 2026-11-05 — ADR-0561 Implemented (ADR close-out): the replacement of the first-party agent stack by UnifAI is carried out and its security gate (ADR-0563) is cleared. The ai-gateway classification floor it relies on is WP-209, still open.
@@ -1220,6 +1229,11 @@ moving.
 - 2026-11-04 — WP-195 added to phase 43: every Subscription on demo333 said `AtLatestKnown` while seven operators had newer versions (RHOAI and GitOps behind unapproved Manual InstallPlans, rhcl on a channel that stops at 1.4.3, authorino/limitador/dns pinned by rhcl, Kueue on a frozen channel). A report-only audit (`make d3 check operators`), per-cluster channel pins and an RHOAI upgrade walk land in the repo; the live updates follow one go at a time.
 - 2026-11-04 — ADR-0596 and WP-194 added to phase 46: a code question in Open WebUI and OpenClaw was always answered by the local qwen model, since the experience clients had no task preferring Codestral and showed `auto` alone. A declared "Zuno Code" model maps to a `code` task, Codestral first and the local models as fallback; turns with tool results stay local (ADR-0594).
 - 2026-11-04 — ADR-0406 Implemented: the cancel of a delegation that times out is proven live on UnifAI 0.1.57 (`a2a.timeout`, then `a2a.task_cancelled`; trace `54ebccfa482247d3ae41280e1dab4424`). A user abort is not covered, by decision. WP-174 stays open on approval (ADR-0409, waits for WP-173), the empty final reply (fix R-531 shipped in 0.1.56, not yet re-measured) and the turns where Arkos answers without delegating.
+- 2026-11-06 — WP-174 Done. UnifAI 0.1.61 and agents v0.14.2 are live on demo333: the cancel of a delegation shows in the A2A span
+  (`mas.a2a_cancel`), and the human approval of a delegated write (ADR-0409) is proven live. The request reaches the session stream
+  in about 10 s, an approve runs the write (AAP job 1329), a reject and a silence of 300 s run nothing. `delegation.write_allowed` named
+  Arkos, which nothing delegates to; it now names Tekos / `answer-technical-question`. ADR-0409 stays Accepted until the refusal of a
+  write to an unlisted target, the non-crossing of an auto-approval and the no-identity case are shown.
 - 2026-11-03 — WP-172 Done: delegated calls reach the mcp-gateway live on operator 0.1.53 and the audit carries the
   chain. WP-174 records the working Arkos to Tekos delegation (scenario 21 3/3, the cap of 3 delegations fired). The
   refusals hold, so ADR-0401 and ADR-0403 are Implemented. ADR-0406 stays Accepted: the cancellation of a delegation no
@@ -1407,3 +1421,4 @@ moving.
   fixed: renamed roadmap-container entries in `ADR_INDEX_EXCLUDED_FILES`,
   status normalization for ` - see …` / linked-Superseded forms); 35 briefs
   authored (13 + 9 + 13).
+- 2026-11-07 — ADR-0409 Implemented. UnifAI 0.1.62 is pinned on demo333; with a session `approve_all` rule the worker applies it (R-539) and the delegated write still waits for the user. The per-session cap of 3 requests (R-538) could not be reached live (Arkos stops after the first refusal) and is covered upstream.

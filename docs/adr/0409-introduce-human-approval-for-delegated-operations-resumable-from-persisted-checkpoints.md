@@ -1,6 +1,6 @@
 # ADR-0409: Introduce human approval for delegated operations, resumable from persisted checkpoints
 
-- **Status:** Accepted (2026-10-24) - the decisions below are settled; it becomes `Implemented` once the proofs of "Before Implemented" are made live (WP-173, WP-174)
+- **Status:** Implemented (2026-11-07, WP-173, WP-174: approve, reject and 300 s silence proven live on UnifAI 0.1.61; auto-approval does not cross the hop proven on 0.1.62; the refusal of an unlisted target and the run with no identity are covered by gateway tests, by decision)
 - **Target:** v0.11
 - **Date:** 2026-10-24
 - **Decision owners:** Zuno Demo architecture team
@@ -124,3 +124,31 @@ The first `delegation.write_allowed` entry named Arkos / `draft-architecture-tes
 `answer-technical-question`, whose `aap.cluster.audit` (`access: write`, a Day 0 health check run through AAP) is the only write tool a
 delegation can reach today. `approval: ask` goes on the delegating bundle, Arkos, as `spec.delegation.approval` (operator 0.1.61 or later).
 The Arkos entry is removed rather than kept dormant: a safety list should hold nothing that cannot fire.
+
+## Progress 2026-11-06: the approval round trip is proven live
+
+On demo333 (UnifAI 0.1.61, agents v0.14.2, `approval: ask` on Arkos), an approval raised by Tekos reached the initiating user on the
+session that started the chain (`approval_required`, about 10 s), an approve let the write reach the mcp-gateway (one call), a reject
+and a silence of 300 s ran no write, and the session's auto-approval rules were not used. Still to show before `Implemented`: a live
+refusal of a delegated write to a target absent from `delegation.write_allowed`, that an auto-approval set for another run does not
+cross the hop, and that a run with no identity binding cannot write. See the evidence in
+[WP-174](../roadmap/work-packages/wp-174-tekos-to-arkos-delegation-on-demo333.md).
+
+The proof that an auto-approval does not cross the hop could not be made on UnifAI 0.1.61: a session rule (`session.approval.rule`,
+`approve_all`) is saved but never reaches a session run by the Temporal worker, whose gate is built without the session metadata and
+logs `approve_all: False` (fork R-539, fix planned in 0.1.62). It is to be replayed once after 0.1.62 is pinned.
+
+Replayed on 2026-11-06 after UnifAI 0.1.62 was pinned on demo333 (catalog `sha256:b8586c96…`, five images, operator CSV 0.1.62): with a session
+`approve_all` rule set before the prompt, the Temporal worker now logs `approve_all: True` for the session, and the delegated write
+(`aap.cluster.audit`, `write`) still raised an `approval_required` that waited for a human answer (the a2a-gateway logged `approval requested`
+then `approval answered decision=reject`, nothing ran). An auto-approval therefore does not cross the hop. The proof script is
+`evaluations/arkos/approval_proof.py reject --rule`.
+
+The per-session cap of 3 approval requests (fork R-538, UnifAI 0.1.62) could not be reached live: in three runs on 2026-11-07 (one prompt per
+turn, a resubmit in the same session, one prompt asking for four delegations) Arkos stopped after the first refusal and the session completed,
+so no 4th request was raised. The cap is accepted as covered by the upstream tests; the gateway side needs no counter of its own.
+
+The "no identity binding" case is covered by gateway tests (2026-11-06): an anonymous or forged token is refused with 401 before the model or any tool
+is reached, a forged token cannot answer a pending approval (the write stays unrun and the real initiating user can still answer), and a token
+without a `sub` claim is refused. The write path needs a caller identity at every step, so no run without one can approve or write.
+

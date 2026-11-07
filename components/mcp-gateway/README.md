@@ -76,6 +76,14 @@ Re-reads the policy files and the `agents/` OKF bundles from disk without
 a pod restart - use this if Track B's policy files or an agent definition
 land in the image/mount after this pod already started.
 
+**Authentication (ADR-0602 / WP-222).** Every `/admin/*` route needs a Keycloak JWT
+(audience `zuno-admin-api`) whose `groups` include one of `ADMIN_GROUPS`
+(default `ocp-paas-ops,ocp-ai-ops`): no token gives `401`, another group `403`.
+`ADMIN_AUTH_MODE=off` restores the old network-only trust and is meant for
+break-glass only.
+Unlike `/mcp`, this route does not accept an OpenShift or ServiceAccount
+token (TokenReview identities carry no Keycloak groups): such a call gets `401`.
+
 ## Tools routed
 
 | Tool | Downstream |
