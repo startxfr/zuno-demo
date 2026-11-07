@@ -1,13 +1,20 @@
 # ADR-0604 WP-232: the GPU smoke test of the world-model runtime image, run once on the on-demand node
 # (`make d0 install world-model-gpu` first). It prints one JSON report and changes nothing.
 #
-#   oc -n zuno-world-model create configmap world-model-fetch --from-file=gitops/charts/world-model/files/fetch_models.py
+# Prerequisites, rendered from the chart so that the later Day-2 install adopts them instead of fighting them: the
+# ServiceAccounts (the runtime one is granted pull access to zuno-ai-build by the build role), the ExternalSecrets
+# (the Vault grants of platform/vault/secret-access.yaml; world-model-s3 gives read access to the model bucket) and
+# the fetch script ConfigMap.
+#
+#   helm template wm gitops/charts/world-model -n zuno-world-model --set global.zuno.clusterBaseDomain=<apps domain> \
+#     --show-only templates/serviceaccounts.yaml --show-only templates/externalsecrets.yaml \
+#     --show-only templates/configmaps.yaml | oc -n zuno-world-model apply -f -
+#   oc -n zuno-world-model wait --for=condition=Ready externalsecret/world-model-s3 --timeout=120s
 #   oc -n zuno-world-model apply -f platform/world-model/tests/gpu-smoke-job.yaml
 #   oc -n zuno-world-model logs job/world-model-gpu-smoke -c smoke > report.json
 #
-# The init container copies the pinned weights (models.lock.yaml) from S3 with the credentials of
-# the world-model-s3 Secret (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY). The world-model chart
-# (WP-235) renders it from Vault; for a smoke run before WP-235, create it by hand with the user's go.
+# The init container copies the pinned weights (models.lock.yaml) from S3 with the credentials of the
+# world-model-s3 Secret (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -25,6 +32,7 @@ spec:
         app.kubernetes.io/name: world-model-gpu-smoke
     spec:
       restartPolicy: Never
+      serviceAccountName: world-model-runtime
       nodeSelector:
         zuno.io/gpu-workload: world-model
       tolerations:
