@@ -152,7 +152,7 @@ class Context:
 # -- probes --------------------------------------------------------------------------------------------------------
 
 
-def probe_unifai_tekos(ctx: Context) -> Result:
+def _unifai_tekos_once(ctx: Context) -> Result:
     from unifai_target import UnifaiTarget
 
     t = UnifaiTarget(ctx.password, ui_url=ctx.unifai, agent="tekos", team_name="agent-tekos")
@@ -167,6 +167,17 @@ def probe_unifai_tekos(ctx: Context) -> Result:
         return Result("unifai-tekos", PASS, f"answer in {run.seconds:.0f} s via {where}; {deleted} session(s) deleted")
     return Result("unifai-tekos", FAIL, f"HTTP {run.status}, empty answer={not run.reply.strip()}, "
                                         f"{str(run.raw.get('text') or run.raw.get('error') or '')[:160]}")
+
+
+def probe_unifai_tekos(ctx: Context) -> Result:
+    """One retry on a transport error (a disconnect on the UI route), never on an answer; the flake stays visible."""
+    try:
+        return _unifai_tekos_once(ctx)
+    except Exception as exc:  # noqa: BLE001 - httpx transport errors raised during the sign-in or the stream
+        first = f"{type(exc).__name__} on the first attempt, passed on retry; "
+    res = _unifai_tekos_once(ctx)
+    res.detail = first + res.detail if res.status == PASS else res.detail
+    return res
 
 
 _GATEWAY_SNIPPET = r'''
