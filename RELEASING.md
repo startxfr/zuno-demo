@@ -124,7 +124,8 @@ v0.1, `v0.2.0` for v0.2, `v0.3.0` for v0.3, `v0.13.0` for v0.13. The bands, thei
 
 **Bands not tagged.** v0.4 to v0.12 were never tagged: work moved from `v0.3.0` straight to the demo333 pilot and the
 UnifAI adoption, and the bands were closed in the roadmap without a tag. They are not tagged retroactively, so `v0.13.0`
-contains all of their content. The next tag is `v0.15.0`.
+contains all of their content. The next tag is `v0.14.3` (2026-11-08, a patch cut before the demonstration of 2026-11-09, by user decision);
+`v0.15.0` follows once the v0.15 band closes and more content has joined it.
 
 ## Path 2's process, once a maintainer is ready to cut `v0.1.0` via Quay
 
