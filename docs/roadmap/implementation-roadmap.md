@@ -1093,7 +1093,7 @@ demonstration (v0.16). Phase 51 is held for the world model (ADR-0604).
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-238 | [wp-238](work-packages/wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) | 0605 | none | Not started (2026-11-07: steps 1 and 2 drafted on the review branch) | dry run Sunday 2026-11-08 14:00, baseline at the start of the freeze (20:00), runs Monday 07:30 and 08:30 |
+| WP-238 | [wp-238](work-packages/wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) | 0605 | none | Repo work in review | first live run with the user's go, then the dry run Sunday 2026-11-08 14:00, baseline at the start of the freeze (20:00), runs Monday 07:30 and 08:30 |
 | WP-239 | [wp-239](work-packages/wp-239-adr-numbering-check-template-and-band-hygiene.md) | 0606 | none | Repo work in review | none (repository and CI only); done on branch `adr-0605-0609-review`, Done once pushed and CI is green |
 | WP-240 | [wp-240](work-packages/wp-240-pre-ga-classes-known-good-gate-and-upgrade-runbook.md) | 0607 | WP-238 | Not started | regenerate the known-good file from demo333 outside a freeze |
 | WP-241 | [wp-241](work-packages/wp-241-drift-check-nfs-provisioner-role-and-eck-decision.md) | 0608 | WP-240 | Not started | the user decides on ECK; the nfs-provisioner role is adopted live in a window |

@@ -140,7 +140,7 @@ DAY3_VERBS := test stresstest backup restore check admit run release scenario-fa
 # install/operational action with its own AAP Job/Workflow Template.
 # "all-check" is WP-136's suggested alias for "check" - it dispatches to
 # the same playbook, never a second implementation.
-DEMO_VERBS := check all-check reset step-1 step-2 step-3 step-4 step-5
+DEMO_VERBS := check all-check golden-path reset step-1 step-2 step-3 step-4 step-5
 
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
 # recipe below sources to route mutating/read verbs through AAP when
@@ -300,6 +300,8 @@ if [[ -z "$$verb" ]]; then \
     'Usage: make demo <verb>' \
     '' \
     '  check       Read-only presenter preflight - app/project/model/failover-topology/training readiness' \
+    '  golden-path One real call per demonstration moment (ADR-0605): UnifAI, sovereignty, delegation+approval,' \
+    '              Open WebUI, Zuno Code, Dify, kagent; OpenClaw/Lightspeed status; run before and during a freeze' \
     '  all-check   Alias for check' \
     '  reset       Idempotent recovery to a safe demo baseline (uncordons any node the failover drill left cordoned)' \
     '  step-1..5   Print each presenter step'"'"'s objective/UI/prompt/expected routing - never submits chat on your' \

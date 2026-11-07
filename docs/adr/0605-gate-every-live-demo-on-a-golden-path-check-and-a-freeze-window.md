@@ -45,7 +45,8 @@ that check and ends with the demonstration.**
    | Sovereignty | One restricted (C3) turn answered by a local model, one seeded guardrails detection, and the quota and trace evidence of that turn (Tempo search by run id). | ai-gateway audit line, `zuno_guardrails_*`, ADR-0543 |
    | World model | Added when ADR-0604 ships a probe. Until then the demonstration presents it as roadmap, not live. | ADR-0604 |
 
-   The probes run as `make demo check`, which keeps its read-only contract (ADR-0550). Moments that only a person can
+   The probes run as `make demo golden-path` (`evaluations/golden_path_probe.py`), next to the webinar preflight
+   `make demo check`, with the same read-only contract (ADR-0550). Moments that only a person can
    see on a screen get a manual checklist with the expected screen, in the demo-day runbook (clause 5).
 
 2. **The golden path runs four times.** A dry run the day before (failures are fixed then), the baseline run that opens
@@ -63,8 +64,8 @@ that check and ends with the demonstration.**
    - one break-glass change is allowed only with the owner's explicit go, names one change, and is followed by a full
      golden-path run.
 
-4. **The baseline is recorded at the start of the freeze.** `python3 platform/olm/audit_operator_updates.py --format
-   known-good` regenerates `platform/olm/known-good-<cluster>.yaml`, and the running digests of the gateways, UnifAI and
+4. **The baseline is recorded at the start of the freeze.** `python3 platform/olm/audit_operator_updates.py --oc-context
+   <context> --format known-good` regenerates `platform/olm/known-good-<cluster>.yaml`, and the running digests of the gateways, UnifAI and
    the experience clients (already read by their role checks) are written into the demo-day runbook as the rollback
    point. Both are committed locally during the freeze and pushed after it.
 

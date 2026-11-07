@@ -1,0 +1,36 @@
+---
+# `make demo golden-path` (ADR-0605 clause 1, WP-238). One real call per demonstration moment, through
+# evaluations/golden_path_probe.py: a Tekos turn in UnifAI, the sovereignty routing (Arkos kept local at C3),
+# a delegation whose approval request is rejected, one answer each through Open WebUI, Zuno Code, Dify's and
+# kagent's token proxies, and the status of OpenClaw and Lightspeed (their question is a manual checklist step,
+# docs/demo/golden-path.md).
+#
+# Read-only with respect to the platform: the probe deletes the UnifAI sessions it creates, rejects the
+# approval request (nothing runs) and cancels its session. Allowed during a freeze (docs/demo/freeze-protocol.md).
+#
+# Runs on the operator's workstation, not from AAP: the probe uses `oc` (logged in to the cluster) to read
+# credentials and to exec into the gateway and token-proxy pods. Set OC_CONTEXT to pin a context.
+- name: "Demo golden path: one real call per demonstration moment (ADR-0605)"
+  hosts: localhost
+  gather_facts: false
+  vars:
+    golden_only: "{{ lookup('ansible.builtin.env', 'ONLY') | default('', true) }}"
+  tasks:
+    - name: "golden-path | run the probe (about 10 to 15 minutes; the delegation moment is the longest)"
+      ansible.builtin.command:
+        argv: "{{ ['python3', zuno_repo_root ~ '/evaluations/golden_path_probe.py']
+                  + (['--only', golden_only] if golden_only | length > 0 else []) }}"
+      register: _golden
+      changed_when: false
+      failed_when: false
+
+    - name: "golden-path | report"
+      ansible.builtin.debug:
+        msg: "{{ _golden.stdout_lines + (_golden.stderr_lines | select('match', '.*(Error|Traceback).*') | list) }}"
+
+    - name: "golden-path | fail if a required moment failed"
+      ansible.builtin.fail:
+        msg: >-
+          A required demonstration moment failed (see the report above). Inside a freeze, switch that moment to its
+          fallback in the demo-day runbook; do not open a fix (ADR-0605 clause 2).
+      when: _golden.rc != 0

@@ -89,6 +89,9 @@ jobs:
           python3 platform/okf/tests/test_okf_conformance.py
           python3 components/mcp-gateway/tests/test_okf_conformance.py
           python3 evaluations/tests/test_okf_hook.py
+      # ADR-0605 (WP-238): how each demonstration moment's live answer is judged.
+      - name: Golden-path probe judgement tests (ADR-0605)
+        run: python3 evaluations/tests/test_golden_path_probe.py
       - name: Validate knowledge-domain descriptors and references (ADR-0202/ADR-0203)
         run: python3 platform/docs/check_knowledge_refs.py
       - name: Verify generated quota enforcement matches the released quota-policy.yaml (ADR-0511)

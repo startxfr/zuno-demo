@@ -1,11 +1,11 @@
 # WP-238: Golden-path check, freeze protocol and demo-day runbook
 
-- **State:** Not started (2026-11-07: steps 1 and 2 drafted on the review branch)
+- **State:** Repo work in review
 - **ADRs:** [ADR-0605](../../adr/0605-gate-every-live-demo-on-a-golden-path-check-and-a-freeze-window.md)
 - **Depends on:** none
 - **Related:** [WP-136](wp-136-webinar-demo-orchestration.md) (`make demo check`), [WP-208](wp-208-five-experiences-demonstration.md) (the five-experiences script and its known defects), [WP-174](wp-174-tekos-to-arkos-delegation-on-demo333.md) (the delegation check)
 - **Target:** v0.15
-- **Estimated files touched:** ~10: `ansible/playbooks/demo_check.yml`, one new probe under `evaluations/`, `Makefile` (help text only), `docs/demo/freeze-protocol.md`, `docs/demo/golden-path.md`, `docs/demo/demo-day-2026-11-09.md`, `RELEASING.md`, the tracker and this brief
+- **Estimated files touched:** ~12: `evaluations/golden_path_probe.py` and its test, `ansible/playbooks/demo_golden_path.yml`, `Makefile` (the `golden-path` demo verb), the CI step, `docs/demo/freeze-protocol.md`, `docs/demo/golden-path.md`, `docs/demo/demo-day-2026-11-09.md`, `RELEASING.md`, the tracker and this brief
 
 > Why: the demonstration of 2026-11-09 09:00 has four moments, and no check today sends a real turn through any of the
 > five experiences. The freeze procedure that protected earlier demonstrations is not in the repository, and a push to
@@ -13,7 +13,7 @@
 
 ## Goal
 
-`make demo check` proves each demonstration moment with a real call, the freeze has a written protocol, and the
+`make demo golden-path` proves each demonstration moment with a real call, the freeze has a written protocol, and the
 2026-11-09 demonstration has a runbook with its fallbacks.
 
 ## Steps
@@ -24,8 +24,8 @@
    green control plane is not a working path; prove it with a run.
 2. **Deployment branch** (`RELEASING.md`). Say what is true: the live Applications track `devel` with automated sync, so
    a push to `devel` is a deployment; `main` carries the tags.
-3. **Probes** (ADR-0605 clause 1). Extend `ansible/playbooks/demo_check.yml` with a golden-path section, one
-   `Day2Result`-shaped row per moment, and keep its read-only contract:
+3. **Probes** (ADR-0605 clause 1). `evaluations/golden_path_probe.py`, run by `make demo golden-path`
+   (`ansible/playbooks/demo_golden_path.yml`), one row per moment, read-only:
    - UnifAI: `evaluations/demo_presenter_probe.py` signs in; add one Tekos turn in the `agent-tekos` workspace, then
      cancel the session (`session.cancel`).
    - Open WebUI, OpenClaw, Dify, kagent, Zuno Code: run the role prechecks, then get one model answer under the
@@ -50,7 +50,7 @@
 
 ## Acceptance
 
-- `make demo check` reports one row per moment, each pass or fail with its evidence, in about 15 minutes.
+- `make demo golden-path` reports one row per moment, each pass or fail with its evidence, in about 15 minutes.
 - The dry run and the baseline run are recorded in the runbook; every failure has an owner or a fallback.
 - `docs/demo/freeze-protocol.md` exists, and the freeze of 2026-11-08 20:00 was announced and acknowledged by every live
   working session.
