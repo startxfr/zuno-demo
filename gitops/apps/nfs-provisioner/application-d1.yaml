@@ -1,0 +1,36 @@
+---
+# The NFSProvisioner operand (not the operator, see application-d0.yaml):
+# the NFS server and the `nfs` StorageClass that gitops/charts/unifai's
+# sharedStorageClass names (ADR-0608 clause 2). Same name and spec as the
+# object created by hand on demo333. See gitops/charts/nfs-provisioner/values.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-nfs-provisioner-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-185"
+spec:
+  project: zuno-platform
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/nfs-provisioner
+    helm:
+      releaseName: zuno-nfs-provisioner-d1
+      values: |
+        nfsProvisioner:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nfs-provisioner
+  syncPolicy:
+    automated:
+      # The NFSProvisioner itself carries Prune=false (see its template): a
+      # values change never prunes the NFS server holding UnifAI's shared
+      # volumes. Removal goes through `make d1 uninstall nfs-provisioner`,
+      # which refuses while a volume uses the class.
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

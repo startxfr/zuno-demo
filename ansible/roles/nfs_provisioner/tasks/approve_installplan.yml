@@ -1,0 +1,93 @@
+---
+# ADR-0607 clause 2: the Subscription is Manual, and only the InstallPlan that
+# installs exactly the pinned CSV is approved (same rule as
+# ansible/roles/openclaw/tasks/approve_installplan.yml and openshift_ai).
+# An operator that already runs the pin needs nothing: that is the adoption
+# case on demo333 (installed by hand, Automatic, InstallPlan approved). An
+# upgrade InstallPlan the catalog offers later is left pending and reported:
+# moving the pin is a commit with the owner's go (ADR-0607 clause 3).
+- name: "nfs_provisioner | wait for the Subscription to run the pin or reference an InstallPlan"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    namespace: "{{ _nfsp_namespace }}"
+    name: "{{ _nfsp_subscription }}"
+  register: _nfsp_sub
+  until: >-
+    (_nfsp_sub.resources | default([]) | length) > 0 and
+    (((_nfsp_sub.resources[0].status | default({})).installedCSV | default('')) == _nfsp_pinned_csv
+     or ((_nfsp_sub.resources[0].status | default({})).installPlanRef.name | default('')) | length > 0)
+  retries: 60
+  delay: 10
+
+- name: "nfs_provisioner | note the installed CSV and the referenced InstallPlan"
+  ansible.builtin.set_fact:
+    _nfsp_installed_csv: "{{ (_nfsp_sub.resources[0].status | default({})).installedCSV | default('') }}"
+    _nfsp_ip_name: "{{ ((_nfsp_sub.resources[0].status | default({})).installPlanRef | default({})).name | default('') }}"
+
+- name: "nfs_provisioner | read the referenced InstallPlan"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    namespace: "{{ _nfsp_namespace }}"
+    name: "{{ _nfsp_ip_name }}"
+  register: _nfsp_ip
+  when: _nfsp_ip_name | length > 0
+
+- name: "nfs_provisioner | note what the InstallPlan installs"
+  ansible.builtin.set_fact:
+    _nfsp_ip_csvs: "{{ ((_nfsp_ip.resources | default([]) | first | default({})).spec | default({})).clusterServiceVersionNames | default([]) }}"
+    _nfsp_ip_approved: "{{ ((_nfsp_ip.resources | default([]) | first | default({})).spec | default({})).approved | default(false) | bool }}"
+
+# Covers a first install whose plan is for another CSV, and an operator that
+# OLM already moved past the pin (OLM never downgrades, ADR-0607 F5).
+- name: "nfs_provisioner | refuse an InstallPlan for another CSV"
+  ansible.builtin.assert:
+    that: _nfsp_ip_csvs == [_nfsp_pinned_csv]
+    fail_msg: >-
+      The {{ _nfsp_subscription }} Subscription runs
+      '{{ _nfsp_installed_csv | default('nothing', true) }}' and its InstallPlan
+      {{ _nfsp_ip_name }} installs {{ _nfsp_ip_csvs }}, not the pinned
+      {{ _nfsp_pinned_csv }}: not approved. Move the pin in
+      gitops/charts/nfs-provisioner/values.yaml with the owner's go (ADR-0607
+      clause 3, docs/platform/pre-ga-upgrade.md), then re-run; OLM never
+      downgrades an operator that already runs a later CSV.
+  when: _nfsp_installed_csv != _nfsp_pinned_csv
+
+- name: "nfs_provisioner | approve the pinned InstallPlan"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: operators.coreos.com/v1alpha1
+    kind: InstallPlan
+    namespace: "{{ _nfsp_namespace }}"
+    name: "{{ _nfsp_ip_name }}"
+    definition:
+      spec:
+        approved: true
+  when:
+    - _nfsp_installed_csv != _nfsp_pinned_csv
+    - not (_nfsp_ip_approved | bool)
+
+- name: "nfs_provisioner | report an upgrade left unapproved"
+  ansible.builtin.debug:
+    msg: >-
+      {{ _nfsp_pinned_csv }} runs as pinned. InstallPlan {{ _nfsp_ip_name }}
+      offers {{ _nfsp_ip_csvs }} and stays unapproved: an upgrade moves the pin
+      in gitops/charts/nfs-provisioner/values.yaml with the owner's go
+      (ADR-0607 clause 3).
+  when:
+    - _nfsp_installed_csv == _nfsp_pinned_csv
+    - _nfsp_ip_csvs | length > 0
+    - _nfsp_ip_csvs != [_nfsp_pinned_csv]
+    - not (_nfsp_ip_approved | bool)
+
+- name: "nfs_provisioner | wait for the pinned CSV to succeed"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ _nfsp_namespace }}"
+    name: "{{ _nfsp_pinned_csv }}"
+  register: _nfsp_csv
+  until: (_nfsp_csv.resources | default([{}]))[0].status.phase | default('') == 'Succeeded'
+  retries: 60
+  delay: 10

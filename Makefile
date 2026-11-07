@@ -41,7 +41,9 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # ("lightspeed-config") - an OLSConfig created in Day 1 would reference a
 # MaaS model and an MCP endpoint that don't exist until Day 2, and would
 # sit Degraded for the whole window while ArgoCD self-healed it back.
-DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config
+# "nfs-provisioner" (ADR-0608/WP-241) needs only OLM and provides the `nfs`
+# StorageClass that Day 2's "unifai" uses for its shared volumes.
+DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler nfs-provisioner redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aap-execution-environment
 DAY1_VERBS := check install build uninstall reconcile all reinstall
 

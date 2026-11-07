@@ -19,6 +19,7 @@
       - nfd
       - nvidia_gpu
       - custom_metrics_autoscaler
+      - nfs_provisioner
       - redis
       - observability
       - service_mesh

@@ -87,7 +87,7 @@ prepares (see that role's README). Consumed by `keycloak`'s Ingress and
 
 **Vendored startx charts**: `machines`, `nfd`, `nvidia-gpu`, `openshift-ai`,
 `cert-manager`, `keycloak`, `postgresql`, `connectivity-link`, `lws`,
-`jobset`, `kueue`, `external-secrets`, `custom-metrics-autoscaler`, `kiali`,
+`jobset`, `nfs-provisioner`, `kueue`, `external-secrets`, `custom-metrics-autoscaler`, `kiali`,
 `mesh-monitoring`, `observability` and `tempo` vendor a chart from the
 [startx `helm-repository`](https://helm-repository.readthedocs.io) as a
 Helm `dependencies:` entry, rather than hand-authoring their own
@@ -111,7 +111,7 @@ subscribe into the shared `openshift-operators` namespace (`AllNamespaces`,
 no `project`/`OperatorGroup`); `connectivity-link` still depends on
 `project` for its Kuadrant operand namespace (`kuadrant-system`).
 `jobset`/`kueue`/`lws`/`custom-metrics-autoscaler`/`kiali`/
-`mesh-monitoring`/`observability`/`tempo` each depend on both `project`
+`mesh-monitoring`/`observability`/`tempo`/`nfs-provisioner` each depend on both `project`
 and `operator` for their own dedicated operator namespace + `OperatorGroup`
 (`openshift-{jobset,kueue,lws}-operator` for the first three): `kueue`'s
 CSV only supports `AllNamespaces`, while `jobset`'s and `lws`'s CSVs only
@@ -175,6 +175,7 @@ Directories present:
 | `lws` | local chart, `gitops/charts/lws` (ADR-0317 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-lws-operator` Namespace/OperatorGroup (`OwnNamespace` - the operator's CSV doesn't support `AllNamespaces`, confirmed against a real cluster after subscribing via the shared `openshift-operators` namespace's `AllNamespaces` OperatorGroup left the CSV Failed)/Subscription; `-d1` is a no-op, no singleton operand CR exists for LeaderWorkerSet) |
 | `custom-metrics-autoscaler` | local chart, `gitops/charts/custom-metrics-autoscaler` (ADR-0318 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-keda` Namespace/OperatorGroup/Subscription (`OwnNamespace`, per Red Hat's documented install procedure); `-d1`: minimal `KedaController` operand CR) |
 | `jobset` | local chart, `gitops/charts/jobset` (ADR-0318 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-jobset-operator` Namespace/OperatorGroup (`OwnNamespace` - the operator's CSV doesn't support `AllNamespaces`, confirmed against a real cluster after subscribing via the shared `openshift-operators` namespace's `AllNamespaces` OperatorGroup left the CSV Failed)/Subscription; `-d1`: minimal, cluster-scoped `JobSetOperator` operand CR, `managementState: Managed`) |
+| `nfs-provisioner` | local chart, `gitops/charts/nfs-provisioner` (ADR-0608 - `-d0`: startx `project`+`operator` dependencies for the `nfs-provisioner` Namespace/OperatorGroup (`OwnNamespace`)/Subscription, pinned by `startingCSV` with `Manual` approval (ADR-0607, a pre-GA `alpha` community operator); `-d1`: the `NFSProvisioner` operand, which runs the NFS server and creates the `nfs` StorageClass `unifai`'s `sharedStorageClass` names. Same names and spec as the install made by hand on demo333, so the first run adopts it - see `ansible/roles/nfs_provisioner/README.md`) |
 | `kueue` | local chart, `gitops/charts/kueue` (ADR-0321 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-kueue-operator` Namespace/OperatorGroup (`AllNamespaces` - the operator's CSV doesn't support any other install mode, confirmed against a real cluster); `-d1`: singleton `Kueue` operand CR plus default `ResourceFlavor`/`ClusterQueue`/`LocalQueue` - installed ahead of `openshift-ai`, whose `DataScienceCluster` sets `kueue.managementState: Unmanaged` to defer to this operator) |
 | `tempo` | local chart, `gitops/charts/tempo` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-tempo-operator` Namespace/OperatorGroup/Subscription; `-d1`: demo-scale `TempoMonolithic` in zuno-monitoring, storing traces exported by `observability`'s Collector) |
 | `mesh-monitoring` | local chart, `gitops/charts/mesh-monitoring` (ADR-0312 - `-d0`: startx `project`+`operator` dependencies for the dedicated `openshift-cluster-observability-operator` Namespace/OperatorGroup/Subscription; `-d1`: `MonitoringStack` + ServiceMonitor/PodMonitor scraping istiod and mesh Envoy sidecars in zuno-mesh - no OpenShift User Workload Monitoring exists in this repo to use instead) |

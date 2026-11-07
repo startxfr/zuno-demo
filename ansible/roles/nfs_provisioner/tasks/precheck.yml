@@ -1,0 +1,46 @@
+---
+# State detection (never fails).
+- name: "nfs_provisioner | read the chart values"
+  ansible.builtin.include_tasks: load_values.yml
+
+- name: "nfs_provisioner | check the nfs-provisioner Application (d0)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-nfs-provisioner-d0"
+
+- name: "nfs_provisioner | save the d0 check result"
+  ansible.builtin.set_fact:
+    _nfsp_d0_installed: "{{ _state_check_result }}"
+
+- name: "nfs_provisioner | check the nfs-provisioner Application (d1)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/check_gitops_app_state.yml"
+  vars:
+    gitops_app_name: "zuno-nfs-provisioner-d1"
+
+- name: "nfs_provisioner | look up the NFSProvisioner instance"
+  kubernetes.core.k8s_info:
+    api_version: cache.jhouse.com/v1alpha1
+    kind: NFSProvisioner
+    namespace: "{{ _nfsp_cr_namespace }}"
+    name: "{{ _nfsp_cr_name }}"
+  register: _nfsp_cr_lookup
+
+- name: "nfs_provisioner | look up the StorageClass it provides"
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    name: "{{ _nfsp_storage_class }}"
+  register: _nfsp_sc_lookup
+
+- name: "nfs_provisioner | compute install state"
+  ansible.builtin.set_fact:
+    _state_is_installed: >-
+      {{
+        _nfsp_d0_installed
+        and _state_check_result
+        and (_nfsp_cr_lookup.resources | default([]) | length) > 0
+        and (_nfsp_sc_lookup.resources | default([]) | length) > 0
+      }}
+
+- name: "nfs_provisioner | record install state"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/record_state.yml"

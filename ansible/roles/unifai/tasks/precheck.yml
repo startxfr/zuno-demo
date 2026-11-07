@@ -5,3 +5,30 @@
       The unifai client secret is seeded at Vault keycloak/unifai by
       `make d0 install vault` (idempotent, seeds only missing paths) and
       read by both Keycloak and the UnifaiStack.
+
+# ADR-0608 clause 2 (WP-241): the UnifaiStack's shared volumes use the class
+# named by stack.sharedStorageClass, which no OpenShift cluster ships (`nfs`
+# comes from the Day 1 nfs-provisioner component). Without it the stack's
+# PVCs would sit Pending; fail here instead, with the missing name. An
+# override in zuno_unifai_values is honoured when it is loaded (install.yml
+# loads it before this file).
+- name: "unifai | precheck - resolve the shared StorageClass name"
+  ansible.builtin.set_fact:
+    _unifai_shared_storage_class: "{{ ((zuno_unifai_values | default({})).stack | default({})).sharedStorageClass | default((lookup('ansible.builtin.file', zuno_repo_root + '/gitops/charts/unifai/values.yaml') | from_yaml).stack.sharedStorageClass, true) }}"
+
+- name: "unifai | precheck - look up the shared StorageClass"
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    name: "{{ _unifai_shared_storage_class }}"
+  register: _unifai_shared_storage_class_lookup
+
+- name: "unifai | precheck - the shared StorageClass must exist"
+  ansible.builtin.fail:
+    msg: >-
+      StorageClass '{{ _unifai_shared_storage_class }}' does not exist on this
+      cluster. The UnifaiStack's shared volumes need it
+      (stack.sharedStorageClass, gitops/charts/unifai/values.yaml). The Day 1
+      component nfs-provisioner provides 'nfs': `make d1 install
+      nfs-provisioner` (ADR-0608 clause 2).
+  when: (_unifai_shared_storage_class_lookup.resources | default([]) | length) == 0

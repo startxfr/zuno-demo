@@ -11,6 +11,11 @@
     file: "{{ zuno_repo_root }}/ansible/confidential.yml"
   when: (zuno_repo_root + '/ansible/confidential.yml') is file
 
+# ADR-0608 clause 2 (WP-241): fail before anything is applied when a dependency
+# the chart needs is missing (the shared StorageClass, see precheck.yml).
+- name: "unifai | precheck"
+  ansible.builtin.include_tasks: precheck.yml
+
 - name: "unifai | resolve the cluster base domain"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
 

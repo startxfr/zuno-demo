@@ -19,6 +19,16 @@ that the repository does not explain.
 
 1. **nfs-provisioner:** a role that installs it before UnifAI and a UnifAI precheck that fails when the `nfs` storage
    class is missing.
+
+   *Repo work in review (2026-11-07):* the commit
+   `feat(wp-241): nfs-provisioner Day 1 component and the UnifAI StorageClass precheck (ADR-0608)` pushed to devel on
+   2026-11-07, not applied. It adds the Day 1 component `nfs-provisioner`
+   (`ansible/roles/nfs_provisioner`, `gitops/charts/nfs-provisioner`, `gitops/apps/nfs-provisioner`), pinned by
+   `startingCSV: nfs-provisioner-operator.v0.0.9` with `Manual` approval (ADR-0607), and the UnifAI precheck on
+   `stack.sharedStorageClass`. The chart carries the names and spec read live on demo333, so the first run adopts the
+   hand-made install; the known metadata and Subscription differences are listed in
+   `ansible/roles/nfs_provisioner/README.md`, with the steps to run before it. The live adoption is done later, in a
+   window, with the user's go.
 2. **ECK:** ask the user who uses it. Then either declare it with a role, or remove it in a window. **Decided
    2026-11-07:** unused, uninstalled after the 2026-11-09 demonstration; listed in
    `platform/drift/external-operators.yaml` until then.

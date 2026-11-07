@@ -13,7 +13,7 @@ which is not an addressable component).
 Verbs: `check`, `install`, `uninstall`, `reconcile`, `all`, `reinstall`.
 
 **Day 1** — the AI-platform-operator stack (ADR-0060/ADR-0421): `smtp`, `nfd`,
-`nvidia-gpu`, `custom-metrics-autoscaler`, `redis`, `observability`,
+`nvidia-gpu`, `custom-metrics-autoscaler`, `nfs-provisioner`, `redis`, `observability`,
 `service-mesh`, `mesh-monitoring`, `kiali`, `grafana`, `mariadb`, `tempo`,
 `openshift-oauth`, `connectivity-link`, `lws`, `jobset`, `kueue`,
 `openshift-ai`, `lightspeed`, `rhtas`, `aiagent-operator`. Buildable:
