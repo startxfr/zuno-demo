@@ -263,3 +263,8 @@ renders a service-CA-injected ConfigMap and passes it as the upstream chart's `w
 (`SSL_CERT_DIR=/etc/custom-ca:/etc/ssl/certs`, system roots kept). Re-run the dry run after the sync before any switch
 to enforce.
 
+Re-run after the sync (2026-11-07): the signed `ai-gateway@sha256:d849b322…` passes the policy, and the unsigned
+`python:3.11-slim` fails on its signature, not on TLS any more. `zuno-first-party-images` is switched to `enforce` in
+git. Opted-in namespaces at the switch: unifai-operator and zuno-unifai, with no first-party image, plus the test
+namespace.
+
