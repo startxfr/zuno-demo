@@ -193,3 +193,21 @@ channel proxy only has `submit()`. The human approval of a delegated write (ADR-
 not work on 0.1.63; it worked on 0.1.61 and 0.1.62. The gate does not cover this case. Decision (user, 2026-11-07): keep
 0.1.63 in place and wait for 0.1.64; no approval proof, no release from `devel` until then. The live proof of R-540 (409
 `approval_not_pending` on a stale request) waits for 0.1.64 as well.
+
+## Progress (2026-11-07, evening): UnifAI 0.1.64 pinned, the approval relay works again
+
+UnifAI 0.1.64 (fork R-542, `channel.is_pending()` on the Redis channel proxy) was pinned on demo333 with the user's go (catalog
+`sha256:f0c3cf5d…`, five images; `devel` commits d236620f and 0435ddc9); the operator CSV is Succeeded and the seven pods run the
+release digests. Live proofs, persona `eval-consultant-01`, Arkos to Tekos `aap.cluster.audit` (`write`), script
+`evaluations/arkos/approval_proof.py`:
+
+| Proof | Raw answer |
+|---|---|
+| Approve | request shown after 10 s, `POST /session.approval` approve answers 200 `{"status":"submitted"}`, session COMPLETED |
+| Answered request id again | 409 `{"code":"approval_not_pending", ...}` (R-540) |
+| Made-up request id | 409 `{"code":"approval_not_pending", ...}`, never a 500 (R-542 fixed) |
+| No answer for 330 s | `{"type":"approval_expired","request_id":"9a75ff43…","node":"a2a-tekos"}` reaches the stream; the run was then cancelled (cancel 200) |
+
+Not checked: that the AAP job of the approved run started on the AAP side. The script now runs the two stale probes after an
+approve and prints the expiry event and the event types seen after a silence. A first silent run (2026-11-07) had not logged
+the stream; the replay did.

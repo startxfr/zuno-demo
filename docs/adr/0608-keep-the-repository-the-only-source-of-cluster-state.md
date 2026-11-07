@@ -1,6 +1,6 @@
 # ADR-0608: Keep the repository the only source of cluster state
 
-- **Status:** Accepted
+- **Status:** Implemented
 - **Target:** v0.16
 - **Date:** 2026-11-07
 - **Decision owners:** Zuno Demo architecture team
@@ -27,7 +27,8 @@ on demo333 that the repository does not explain.
 reports anything else.**
 
 1. **Every Subscription is declared or listed as external.** An operator on the cluster is installed by a role or a
-   chart, or appears in an `external:` section of the known-good file with an owner and a reason. ECK is either declared
+   chart, or appears in `platform/drift/external-operators.yaml` with an owner and a reason (a file of its own: the
+   known-good file is regenerated at every pin). ECK is either declared
    by a role or removed, by the owner's decision; nfs-provisioner gets a role, because the UnifAI chart depends on it.
 2. **A chart dependency is installed by the repository.** A storage class, CRD or operator that a chart needs is
    installed by a role that runs before the chart, or the chart's precheck fails with the missing name.
@@ -71,3 +72,25 @@ with `git ls-remote origin`. It changes nothing.
 ## Work packages
 
 [WP-241](../roadmap/work-packages/wp-241-drift-check-nfs-provisioner-role-and-eck-decision.md).
+
+## Update 2026-11-07 (WP-241): the drift check runs
+
+`platform/drift/check_drift.py`, run by `make d3 check drift` (report-only until `zuno_drift_strict`), first run on
+demo333 on 2026-11-07: two undeclared Subscriptions (nfs-provisioner-operator, elasticsearch-eck-operator-certified),
+no missing storage class, no hand-applied or unowned security object in zuno-* namespaces, no first-party image built
+from a commit missing on origin. Decisions of the owner the same day: ECK is unused and is uninstalled after the
+demonstration of 2026-11-09 (listed in `platform/drift/external-operators.yaml` until then); nfs-provisioner gets its
+role this weekend and is adopted live with the owner's go. The skip on an AAP execution environment (no `oc`, no git
+checkout) is deliberate: the check runs from a workstation.
+
+## Update 2026-11-07 (WP-241): implemented
+
+nfs-provisioner was adopted live on demo333 with the owner's go (one AppProject destination applied from
+`ansible/roles/argocd/kustomize/appproject`, then `make d1 install nfs-provisioner`): same NFS server pod with no
+restart, the `NFSProvisioner` at generation 1, the three UnifAI volumes still Bound; the only change is the
+Subscription's ADR-0607 pin (`Manual`, `startingCSV` v0.0.9). The known-good file was regenerated and its gate passes.
+`make d3 check drift` is clean and runs in strict mode on demo333 (`zuno_drift_strict: true`). ECK stays listed in
+`platform/drift/external-operators.yaml` until it is uninstalled after the 2026-11-09 demonstration, which is an
+operation, not a gap in this record. Clause 3's label is in `docs/platform/parallel-sessions.md`; clause 4 holds
+because OpenShift builds label their images with `io.openshift.build.commit.id`, which the drift check reads; clause 7
+is in `RELEASING.md`.

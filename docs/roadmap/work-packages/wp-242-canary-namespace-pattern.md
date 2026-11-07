@@ -1,6 +1,6 @@
 # WP-242: Canary namespace pattern on demo333
 
-- **State:** Not started
+- **State:** Done (2026-11-07)
 - **ADRs:** [ADR-0609](../../adr/0609-rehearse-on-canary-namespaces-of-demo333.md)
 - **Depends on:** none
 - **Related:** [WP-179](wp-179-common-preparation-for-experience-clients.md) (the scratch namespaces), [WP-227](wp-227-hardened-deployment-profile.md), [WP-211](wp-211-keycloak-internal-external-mode.md)
@@ -30,3 +30,11 @@ page says what can and cannot be rehearsed there.
 - A canary namespace is created and removed by the task, and nothing outside it can reach it.
 - WP-227 and WP-211 cite the pattern in their steps.
 - ADR-0609 can then move to `Implemented`.
+
+## Result (2026-11-07)
+
+Steps 1 to 3 are in the repository (`ansible/tasks/canary_namespace.yml`, `ansible/playbooks/canary_namespace.yml`,
+`docs/platform/canary-rehearsal.md`, the `canaries` check of `platform/drift/check_drift.py`). Step 4 was replaced by a
+rehearsal of the pattern itself, `zuno-canary-wp-242`: created, checked (labels, quota, default-deny policy, restricted
+pod security refusing a pod without a security context), DNS resolved and the ai-gateway unreachable (curl exit 28),
+then removed. The simulated external Keycloak stays the first step of WP-211, which cites this pattern.

@@ -1,6 +1,6 @@
 # WP-240: Pre-GA classes, known-good gate and upgrade runbook
 
-- **State:** Not started
+- **State:** Done (2026-11-07)
 - **ADRs:** [ADR-0607](../../adr/0607-pin-gate-and-schedule-pre-ga-dependencies.md)
 - **Depends on:** [WP-238](wp-238-golden-path-check-freeze-protocol-and-demo-day-runbook.md) (the golden-path run that follows an upgrade)
 - **Related:** [WP-195](wp-195-update-every-operator-on-demo333-through-the-repository.md) (the known-good file and the audit)

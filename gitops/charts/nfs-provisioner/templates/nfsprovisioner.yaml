@@ -1,0 +1,22 @@
+{{- if .Values.nfsProvisioner.enabled }}
+# The operand the operator reconciles into the NFS server Deployment, its
+# backing PVC and the StorageClass named spec.scForNFS (ADR-0608 clause 2:
+# gitops/charts/unifai's sharedStorageClass). Same name, namespace and spec
+# as the object created by hand on demo333, so the first sync adopts it.
+# Prune=false: deleting this object deletes the NFS server and, with it, every
+# volume of the `nfs` class (UnifAI's shared storage). A values change that
+# stops rendering it must leave it in place; only the role's uninstall, which
+# refuses while a volume uses the class, removes it (Application cascade).
+apiVersion: cache.jhouse.com/v1alpha1
+kind: NFSProvisioner
+metadata:
+  name: {{ .Values.nfsProvisioner.name }}
+  namespace: {{ .Values.nfsProvisioner.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  {{- toYaml .Values.nfsProvisioner.spec | nindent 2 }}
+{{- end }}

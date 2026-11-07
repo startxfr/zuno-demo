@@ -1,0 +1,15 @@
+{{- /* Fails the render if the operator is enabled without a discovered channel/catalog source, or without its ADR-0607 pin. */ -}}
+{{- if .Values.operator.enabled -}}
+{{- if not .Values.operator.subscription.operator.channel -}}
+{{- fail "operator.subscription.operator.channel must be set via gitops_app_extra_helm_values (ADR-0048)" -}}
+{{- end -}}
+{{- if not .Values.operator.subscription.operator.source.name -}}
+{{- fail "operator.subscription.operator.source.name must be set via gitops_app_extra_helm_values (ADR-0048)" -}}
+{{- end -}}
+{{- if or (not .Values.operator.subscription.operator.csv) (not .Values.operator.subscription.version) -}}
+{{- fail "operator.subscription.operator.csv and operator.subscription.version build the pinned startingCSV and must both be set (ADR-0607)" -}}
+{{- end -}}
+{{- if ne .Values.operator.subscription.operator.installPlanApproval "Manual" -}}
+{{- fail "operator.subscription.operator.installPlanApproval must stay Manual: the operator is pre-GA and its catalog is not pinned by digest (ADR-0607 clause 2)" -}}
+{{- end -}}
+{{- end -}}

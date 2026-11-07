@@ -1,0 +1,85 @@
+---
+# ADR-0604 D5 (WP-229): the on-demand world-model GPU node. One MachineSet,
+# zuno-gpu-world-model-a, rendered from the same chart as the GPU fleet but
+# under its own Application, so switching the demo on and off never re-applies
+# zuno-machines-d0 (the fleet, its MachineAutoscaler and the ClusterAutoscaler
+# singleton).
+#
+# Applied and deleted ONLY by ansible/roles/world_model_gpu, run locally
+# (`make d0 install|uninstall world-model-gpu`): the AAP installer credential
+# has no Machine API rights by design. Deleting this Application cascades to
+# the MachineSet, its Machine and the EC2 instance.
+#
+# The list below is complete on purpose: the chart's own default list is the
+# GPU fleet, and a raw apply of this file (root-app-of-apps bootstrap) must not
+# render a second copy of it. The role replaces the placeholders (ami, security
+# group, subnet, cluster id and region) with this cluster's identity.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-machines-world-model-d0
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-207"
+spec:
+  project: zuno-platform
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/machines
+    helm:
+      releaseName: zuno-machines-world-model-d0
+      values: |
+        cluster-machine:
+          cluster:
+            autoscaler:
+              enabled: false # the ClusterAutoscaler stays owned by zuno-machines-d0
+          machineAutoscaler:
+            enabled: false # no scale-from-zero: the switch decides
+          machineSet:
+            enabled: true
+            list:
+              - name: zuno-gpu-world-model-a
+                az: a
+                type: worker
+                group: gpu-world-model
+                ami: ami-mycluster-placeholder
+                # One full RTX PRO 6000 Blackwell (96 GB), 16 vCPU, 128 GiB:
+                # Waypoint + FLUX + the encoder in one pod (ADR-0604 D5).
+                instanceType: g7e.4xlarge
+                securityGroupName: mycluster-infraid-node
+                subnet_name: mycluster-infraid-subnet-private-a
+                blockDevices: |-
+                  - ebs:
+                      encrypted: true
+                      iops: 0
+                      volumeSize: 250
+                      volumeType: gp3
+                replicas: 1
+                additionnalsLabels: |-
+                  nvidia.com/mig.config: all-disabled
+                  zuno.io/gpu-workload: world-model
+                # Only the world-model runtime tolerates this taint. The GPU
+                # Operator DaemonSets get a toleration for it in
+                # ansible/roles/nvidia_gpu (an announced window: it may restart
+                # the driver on the MIG fleet), or the node never advertises
+                # its GPU.
+                additionnalsTaints: |-
+                  - key: zuno.io/gpu-world-model
+                    value: "true"
+                    effect: NoSchedule
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: openshift-machine-api
+  ignoreDifferences:
+    - group: machine.openshift.io
+      kind: MachineSet
+      jsonPointers:
+        - /spec/replicas
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false
+      - RespectIgnoreDifferences=true

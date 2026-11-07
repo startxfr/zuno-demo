@@ -1,0 +1,148 @@
+---
+# ADR-0604 (WP-235): the world-model experience follows ONE switch, zuno_world_model_enabled, the same one the Day-0
+# component world-model-gpu follows. On: needs the GPU node, seeds Vault, creates the Keycloak group, applies the
+# Application and waits for the pods. Off: removes what is left, so `make d2 install all` (and the AAP install workflow)
+# costs nothing while the demo is off.
+- name: "world-model | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
+- name: "world-model | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _world_model_confidential_file
+
+- name: "world-model | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _world_model_confidential_file.stat.exists
+
+# ---------------------------------------------------------------- switch off
+- name: "world-model | switch off: converge to no application"
+  when: not (zuno_world_model_enabled | bool)
+  block:
+    - name: "world-model | look up the Application"
+      kubernetes.core.k8s_info:
+        api_version: argoproj.io/v1alpha1
+        kind: Application
+        namespace: openshift-gitops
+        name: "{{ world_model_app_name }}"
+      register: _world_model_app
+
+    - name: "world-model | delete the Application (cascades to the Deployments, Route and Secrets)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+      vars:
+        gitops_app_name: "{{ world_model_app_name }}"
+      when: (_world_model_app.resources | default([])) | length > 0
+
+    - name: "world-model | say what the switch means"
+      ansible.builtin.debug:
+        msg: >-
+          zuno_world_model_enabled is false: the world-model demo is not installed
+          ({{ 'removed now' if (_world_model_app.resources | default([])) | length > 0 else 'it was not present' }}).
+          Set it to true in ansible/clusters/<cluster>.yml, then `make d0 install world-model-gpu` and
+          `make d2 install world-model`, to run it.
+
+# ----------------------------------------------------------------- switch on
+- name: "world-model | switch on: install the experience"
+  when: zuno_world_model_enabled | bool
+  block:
+    # Fail fast and name the fix: without the node the runtime would sit Pending for 25 minutes.
+    - name: "world-model | look up the GPU node"
+      kubernetes.core.k8s_info:
+        kind: Node
+        label_selectors:
+          - "{{ world_model_gpu_node_label }}"
+      register: _world_model_nodes
+
+    - name: "world-model | require the on-demand GPU node, with its whole GPU"
+      ansible.builtin.assert:
+        that:
+          - (_world_model_nodes.resources | default([]) | length) == 1
+          - (_world_model_nodes.resources[0].status.allocatable['nvidia.com/gpu'] | default('0') | string) == '1'
+        fail_msg: >-
+          No ready world-model GPU node ({{ world_model_gpu_node_label }}, nvidia.com/gpu: 1). Run
+          `make d0 install world-model-gpu` first (about 15 minutes), then this again.
+
+    - name: "world-model | resolve the cluster base domain"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_base_domain.yml"
+
+    - name: "world-model | seed the Vault paths"
+      ansible.builtin.include_tasks: seed_vault.yml
+
+    - name: "world-model | create the Keycloak group"
+      ansible.builtin.include_tasks: keycloak_group.yml
+
+    - name: "world-model | read the cluster networks"
+      kubernetes.core.k8s_info:
+        api_version: config.openshift.io/v1
+        kind: Network
+        name: cluster
+      register: _world_model_network
+
+    - name: "world-model | fail if the cluster networks are unknown"
+      ansible.builtin.fail:
+        msg: "Network.config.openshift.io/cluster has no clusterNetwork/serviceNetwork: the egress policy cannot exclude them."
+      when: >-
+        (_world_model_network.resources | default([]) | length) == 0 or
+        (_world_model_network.resources[0].spec.clusterNetwork | default([]) | length) == 0 or
+        (_world_model_network.resources[0].spec.serviceNetwork | default([]) | length) == 0
+
+    - name: "world-model | compute the cluster networks"
+      ansible.builtin.set_fact:
+        _world_model_cluster_cidrs: >-
+          {{ (_world_model_network.resources[0].spec.clusterNetwork | map(attribute='cidr') | list)
+             + _world_model_network.resources[0].spec.serviceNetwork }}
+
+    - name: "world-model | look for the curated scenes"
+      ansible.builtin.stat:
+        path: "{{ zuno_repo_root }}/{{ world_model_presets_file }}"
+      register: _world_model_presets_stat
+
+    - name: "world-model | read the curated scenes"
+      ansible.builtin.set_fact:
+        _world_model_presets: >-
+          {{ ((lookup('ansible.builtin.file', zuno_repo_root ~ '/' ~ world_model_presets_file) | from_yaml).presets | default([]))
+             if _world_model_presets_stat.stat.exists else [] }}
+
+    - name: "world-model | apply the Application (d1)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+      vars:
+        gitops_component_name: "world-model"
+        gitops_app_phase: "d1"
+        gitops_app_name: "{{ world_model_app_name }}"
+        gitops_app_extra_helm_values:
+          global:
+            zuno:
+              clusterBaseDomain: "{{ cluster_base_domain }}"
+              routeHost: "world-model.{{ cluster_base_domain }}"
+          egress:
+            clusterCIDRs: "{{ _world_model_cluster_cidrs }}"
+          modelStorage:
+            bucket: "{{ zuno_models_s3_bucket | default('zuno-demo-sources') }}"
+            prefix: "{{ zuno_models_s3_prefix | default('models') }}/{{ world_model_s3_prefix_suffix }}"
+            region: "{{ zuno_models_s3_region | default('eu-west-2') }}"
+          presets: "{{ _world_model_presets }}"
+
+    - name: "world-model | wait for the Deployments to be available (the runtime loads two models)"
+      kubernetes.core.k8s_info:
+        kind: Deployment
+        namespace: "{{ world_model_namespace }}"
+        name: "{{ item }}"
+      register: _world_model_deploy
+      until: >-
+        (_world_model_deploy.resources | default([]) | length > 0) and
+        ((_world_model_deploy.resources[0].status.availableReplicas | default(0)) >= 1)
+      retries: "{{ world_model_wait_retries }}"
+      delay: "{{ world_model_wait_delay }}"
+      loop:
+        - world-model-web
+        - world-model-front-door
+        - world-model-runtime
+
+    - name: "world-model | installed"
+      ansible.builtin.debug:
+        msg: >-
+          The world-model demo is at https://world-model.{{ cluster_base_domain }} behind Keycloak (realm zuno, groups
+          {{ world_model_group }}, ocp-ai-ops, ocp-paas-ops). `make d2 check world-model` is the preflight. The GPU node
+          bills by the hour: when you are done, `make d2 uninstall world-model`, then
+          `make d0 uninstall world-model-gpu`, then set zuno_world_model_enabled to false.

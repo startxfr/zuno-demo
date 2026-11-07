@@ -1,0 +1,101 @@
+# ADR-0604 WP-232: the GPU smoke test of the world-model runtime image, run once on the on-demand node
+# (`make d0 install world-model-gpu` first). It prints one JSON report and changes nothing.
+#
+# Prerequisites, rendered from the chart so that the later Day-2 install adopts them instead of fighting them: the
+# ServiceAccounts (the runtime one is granted pull access to zuno-ai-build by the build role), the ExternalSecrets
+# (the Vault grants of platform/vault/secret-access.yaml; world-model-s3 gives read access to the model bucket) and
+# the fetch script ConfigMap.
+#
+#   helm template wm gitops/charts/world-model -n zuno-world-model --set global.zuno.clusterBaseDomain=<apps domain> \
+#     --show-only templates/serviceaccounts.yaml --show-only templates/externalsecrets.yaml \
+#     --show-only templates/configmaps.yaml | oc -n zuno-world-model apply -f -
+#   oc -n zuno-world-model wait --for=condition=Ready externalsecret/world-model-s3 --timeout=120s
+#   oc -n zuno-world-model apply -f platform/world-model/tests/gpu-smoke-job.yaml
+#   oc -n zuno-world-model logs job/world-model-gpu-smoke -c smoke > report.json
+#
+# The init container copies the pinned weights (models.lock.yaml) from S3 with the credentials of the
+# world-model-s3 Secret (AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: world-model-gpu-smoke
+  labels:
+    app.kubernetes.io/name: world-model-gpu-smoke
+    zuno.io/managed-by: manual
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: world-model-gpu-smoke
+    spec:
+      restartPolicy: Never
+      serviceAccountName: world-model-runtime
+      nodeSelector:
+        zuno.io/gpu-workload: world-model
+      tolerations:
+        - key: zuno.io/gpu-world-model
+          operator: Exists
+          effect: NoSchedule
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: models
+          emptyDir:
+            sizeLimit: 40Gi
+        - name: tmp
+          emptyDir: {}
+        - name: fetch
+          configMap:
+            name: world-model-fetch
+      initContainers:
+        - name: fetch-models
+          # The storage-initializer image the models chart already mirrors: it ships boto3.
+          image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/odh-kserve-storage-initializer-rhel9:rhel9
+          command: ["python3", "/fetch/fetch_models.py", "/models"]
+          env:
+            - {name: WORLD_MODEL_S3_BUCKET, value: zuno-demo-sources}
+            - {name: WORLD_MODEL_S3_PREFIX, value: models/world-model}
+            - {name: AWS_REGION, value: eu-west-2}  # the model bucket's region, not the cluster's
+            - name: WORLD_MODEL_REVISIONS
+              value: >-
+                {"Overworld/Waypoint-1.5-1B": "391f92827075edcf4a8b3c8a2ddae010698f8636",
+                "Overworld-Models/taehv1_5": "a0253886b13b9c4c3bd224bd479be03f5988a3df",
+                "black-forest-labs/FLUX.2-klein-4B": "e7b7dc27f91deacad38e78976d1f2b499d76a294"}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: {secretKeyRef: {name: world-model-s3, key: AWS_ACCESS_KEY_ID}}
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: {secretKeyRef: {name: world-model-s3, key: AWS_SECRET_ACCESS_KEY}}
+          resources:
+            requests: {cpu: 500m, memory: 512Mi}
+            limits: {cpu: "2", memory: 2Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: models, mountPath: /models}
+            - {name: fetch, mountPath: /fetch, readOnly: true}
+      containers:
+        - name: smoke
+          image: image-registry.openshift-image-registry.svc:5000/zuno-ai-build/world-model-runtime:latest
+          command: ["python", "-m", "app.smoke"]
+          env:
+            - {name: WORLD_MODEL_ENGINE, value: waypoint}
+            - {name: WORLD_MODEL_IMAGE, value: flux2}
+            - {name: WORLD_MODEL_ENCODER, value: auto}
+            - {name: NVIDIA_DRIVER_CAPABILITIES, value: "compute,utility,video"}
+            - {name: SMOKE_QUANTS, value: "none,intw8a8,fp8w8a8,nvfp4"}
+            - {name: SMOKE_STEPS, value: "100"}
+          resources:
+            requests: {cpu: "6", memory: 48Gi}
+            limits: {cpu: "14", memory: 100Gi, nvidia.com/gpu: "1"}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: models, mountPath: /models}
+            - {name: tmp, mountPath: /tmp}

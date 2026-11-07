@@ -1,0 +1,65 @@
+---
+# ADR-0604 (WP-231) "world-model" build component: the GPU runtime image
+# (components/world-model-runtime: Waypoint-1.5 + FLUX.2 klein + H.264 encoder),
+# consumed by gitops/charts/world-model as zuno-ai-build/world-model-runtime:latest.
+# A CUDA image of about 10 GB: check the build nodes' ephemeral storage first
+# (a heavy build has pushed a master into DiskPressure before). The web image
+# (components/world-model-web: the API and the UI, no GPU) is small.
+- name: "world_model_build | build world-model-runtime"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: world-model-runtime
+    build_dockerfile_path: components/world-model-runtime/Dockerfile
+    build_context_dir: "."
+    # Same reasoning as mlops_build (WP-087), for a bigger image: torch and the CUDA
+    # wheels are downloaded (about 9 GB), unpacked (about 10 GB) and committed as a
+    # layer in one build pod. Without a selector the pod can land on a control-plane
+    # node (about 25 GB free, shared with etcd) or on a UnifAI node (about 14 GB free,
+    # where a canary may be running). The GPU group is the only one with real headroom
+    # (95 to 135 GB free); its nvidia.com/gpu taint is PreferNoSchedule, so no
+    # toleration is needed, and the build uses no GPU. The limit keeps a runaway pod
+    # from pushing the node under its image-filesystem eviction threshold: the pod is
+    # evicted instead of the node's LLM pods.
+    build_node_selector:
+      machine.startx.io/group: gpu
+    build_resources:
+      requests:
+        cpu: "1"
+        memory: 4Gi
+        ephemeral-storage: 30Gi
+      limits:
+        cpu: "4"
+        memory: 12Gi
+        ephemeral-storage: 45Gi
+
+- name: "world_model_build | build world-model-web (the API and the PatternFly UI)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_openshift_build.yml"
+  vars:
+    build_image_name: world-model-web
+    build_dockerfile_path: components/world-model-web/Dockerfile
+    build_context_dir: "."
+
+# Pull access for the world-model ServiceAccounts only (not every ServiceAccount
+# of the namespace), like token_proxy_build.
+- name: "world_model_build | grant the world-model ServiceAccounts image-pull access"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: "{{ sa }}-image-puller"
+        namespace: zuno-ai-build
+        labels:
+          zuno.io/managed-by: zuno-ansible
+      subjects:
+        - kind: ServiceAccount
+          name: "{{ sa }}"
+          namespace: "{{ world_model_namespace }}"
+      roleRef:
+        kind: ClusterRole
+        name: system:image-puller
+        apiGroup: rbac.authorization.k8s.io
+  loop: "{{ world_model_image_pullers }}"
+  loop_control:
+    loop_var: sa

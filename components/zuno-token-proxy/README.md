@@ -16,6 +16,9 @@ through this proxy, deployed in its own namespace by
   while it is valid; with none, every relayed call is `503` and nothing is sent.
 - **Headers.** The client's `Authorization` (a dummy key) is dropped. `AI_HEADERS` and
   `MCP_HEADERS` (JSON objects) replace any header of the same name.
+- **Callers (WP-225 lot C).** With `INBOUND_KEYS_FILE` (one key per line, at least 24
+  characters), a request must carry `Authorization: Bearer <key>`; anything else is `401`
+  and nothing is fetched or relayed. Unset: no inbound check (NetworkPolicy only).
 - **Metrics.** `zuno_token_proxy_refresh_total{result}`,
   `zuno_token_proxy_requests_total{upstream,code}`.
 
@@ -25,6 +28,7 @@ through this proxy, deployed in its own namespace by
 | `AI_GATEWAY_URL`, `MCP_GATEWAY_URL` | upstreams (default the `zuno-ai-run` services) |
 | `AI_HEADERS`, `MCP_HEADERS` | fixed headers, e.g. `{"X-Zuno-Agent": "dify", "X-Zuno-Task": "chat"}` |
 | `TOKEN_SCOPE`, `REFRESH_RATIO`, `UPSTREAM_TIMEOUT_S`, `TOKEN_TIMEOUT_S`, `CA_BUNDLE` | optional |
+| `INBOUND_KEYS_FILE` | optional (WP-225 lot C): the keys a caller must present |
 
 Tests (Keycloak and both gateways faked, clock injected):
 

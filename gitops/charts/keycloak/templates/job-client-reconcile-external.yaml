@@ -1,0 +1,292 @@
+{{- if and .Values.keycloak.enabled (not .Values.keycloak.builtIn) }}
+{{- if not .Values.keycloakExternal.url }}
+{{- fail "keycloak.builtIn is false (external mode) but keycloakExternal.url is empty" }}
+{{- end }}
+# ADR-0352/WP-211: the reconcile Job of EXTERNAL mode, the counterpart of job-client-reconcile.yaml (which only
+# renders for the built-in instance and is left untouched).
+#
+# What changes when Keycloak is a service this platform does not own:
+#   - nothing imports the realm and no file-vault SPI resolves ${vault.<key>}: this Job creates the realm when
+#     missing (only if its credential is allowed to), substitutes the placeholders itself from the SAME projected
+#     Secrets the built-in pod mounts (templates/_helpers.tpl), and writes each client with its real secret;
+#   - the master realm is the owner's: no brute-force change, no master administrators, no TOTP enrolment;
+#   - the credential is the one in `adminSecretName` (seeded from confidential.yml by the keycloak role), which
+#     signs in to keycloakExternal.adminRealm: a user scoped to the realm `zuno` is enough, a master-realm admin
+#     can also create the realm;
+#   - create-if-missing only, as ADR-0530 clause 4 for the internal mode: the clients (merged, -m, as internally),
+#     the realm settings of realm-settings.json (merged, only those keys), the service-account role mappings, every
+#     group of the realm file, and the demo personas only when keycloakExternal.seedPersonas.
+# NOT done here, by decision (WP-211 D3): the Google identity provider. Federation is the external owner's.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zuno-keycloak-client-reconcile
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: keycloak
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/sync-wave: "-5"
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 900
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: keycloak-client-reconcile
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: kcadm
+          image: {{ .Values.clientReconcile.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          env:
+            - name: KC_SERVER
+              value: {{ .Values.keycloakExternal.url | trimSuffix "/" | quote }}
+            - name: KC_REALM
+              value: {{ .Values.keycloakExternal.realm | quote }}
+            - name: KC_ADMIN_REALM
+              value: {{ .Values.keycloakExternal.adminRealm | quote }}
+            - name: KC_SECURITY_PROFILE
+              value: {{ .Values.securityProfile | quote }}
+            - name: KC_SEED_PERSONAS
+              value: {{ .Values.keycloakExternal.seedPersonas | quote }}
+            - name: KC_ADMIN_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.adminSecretName }}
+                  key: username
+            - name: KC_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.adminSecretName }}
+                  key: password
+          volumeMounts:
+            - name: realm
+              mountPath: /realm
+              readOnly: true
+            - name: vault-secrets
+              mountPath: /opt/keycloak/vault
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.keycloakExternal.caConfigMap }}
+            - name: external-ca
+              mountPath: /ca
+              readOnly: true
+            {{- end }}
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              # bash 5.2 expands "&" in a replacement string; a secret may hold one.
+              shopt -u patsub_replacement 2>/dev/null || true
+
+              echo "ADR-0352/WP-211: EXTERNAL Keycloak $KC_SERVER, realm $KC_REALM (sign-in realm $KC_ADMIN_REALM)."
+              echo "  Created when missing, never deleted: the realm (if the credential may), clients (merged),"
+              echo "  service-account role mappings, groups$( [ "$KC_SEED_PERSONAS" = true ] && echo ', demo personas')."
+              echo "  Only the keys of realm-settings.json are merged into the realm."
+              echo "  NOT touched: the master realm, other realms, users, the Google identity provider."
+
+              KCADM="/opt/keycloak/bin/kcadm.sh"
+              CFG="--config /tmp/kcadm.config"
+
+              # Trust: the supplied CA (clause 6: supplied, never derived). kcadm is Java, so the PEM bundle is
+              # split into one file per certificate and imported into a PKCS12 truststore.
+              if [ -s /ca/ca-bundle.crt ]; then
+                n=0; cur=""
+                while IFS= read -r line; do
+                  case "$line" in
+                    *"BEGIN CERTIFICATE"*) cur="/tmp/ca-$n.pem"; : > "$cur"; n=$((n+1)) ;;
+                  esac
+                  [ -n "$cur" ] && printf '%s\n' "$line" >> "$cur"
+                  case "$line" in *"END CERTIFICATE"*) cur="" ;; esac
+                done < /ca/ca-bundle.crt
+                if [ "$n" -eq 0 ]; then
+                  echo "ERROR: /ca/ca-bundle.crt holds no certificate (zuno_keycloak_external_ca_bundle is not a PEM bundle)" >&2
+                  exit 1
+                fi
+                for i in $(seq 0 $((n-1))); do
+                  keytool -importcert -noprompt -alias "ext-$i" -file "/tmp/ca-$i.pem" \
+                    -keystore /tmp/external-ca.p12 -storetype PKCS12 -storepass changeit >/dev/null
+                done
+                # `config truststore` writes it into the kcadm config; a --truststore flag on
+                # `config credentials` alone is not kept for the commands that follow.
+                $KCADM config truststore $CFG --trustpass changeit /tmp/external-ca.p12
+                echo "trust: $n supplied CA certificate(s)"
+              else
+                echo "trust: system certificate store (zuno_keycloak_external_ca_bundle is empty)"
+              fi
+
+              login_error=""
+              ready=""
+              for attempt in $(seq 1 24); do
+                if login_error=$($KCADM config credentials $CFG --server "$KC_SERVER" --realm "$KC_ADMIN_REALM" \
+                     --user "$KC_ADMIN_USER" --password "$KC_ADMIN_PASSWORD" 2>&1); then
+                  ready=yes; break
+                fi
+                # A rejected credential never gets better by waiting: fail at once, with the cause.
+                if printf '%s' "$login_error" | grep -qiE 'invalid_grant|invalid user credentials|unauthorized_client|invalid_client'; then
+                  echo "ERROR: $KC_SERVER refused the credential of '$KC_ADMIN_USER' in realm '$KC_ADMIN_REALM' ($(printf '%s' "$login_error" | tail -1))." >&2
+                  echo "  Check zuno_keycloak_external_admin_username/_password and zuno_keycloak_external_admin_realm." >&2
+                  exit 1
+                fi
+                if printf '%s' "$login_error" | grep -qi 'realm does not exist'; then
+                  echo "ERROR: the sign-in realm '$KC_ADMIN_REALM' does not exist on $KC_SERVER." >&2
+                  echo "  A credential scoped to realm zuno needs the owner to create an empty realm '$KC_REALM' first;" >&2
+                  echo "  a master-realm admin (zuno_keycloak_external_admin_realm: master) lets this Job create it." >&2
+                  exit 1
+                fi
+                echo "waiting for the external Keycloak (attempt $attempt): $(printf '%s' "$login_error" | tail -1)"
+                sleep 5
+              done
+              if [ -z "$ready" ]; then
+                echo "ERROR: could not sign in to $KC_SERVER realm '$KC_ADMIN_REALM' as '$KC_ADMIN_USER'." >&2
+                echo "  Causes: unreachable URL, a CA that does not match, a wrong credential, or the realm '$KC_ADMIN_REALM'" >&2
+                echo "  does not exist yet (a user scoped to realm zuno cannot create it: pre-create it, or use a" >&2
+                echo "  master-realm admin with zuno_keycloak_external_admin_realm: master)." >&2
+                exit 1
+              fi
+              echo "signed in as $KC_ADMIN_USER"
+
+              if ! $KCADM get "realms/$KC_REALM" $CFG --fields realm >/dev/null 2>&1; then
+                if create_err=$($KCADM create realms $CFG -s "realm=$KC_REALM" -s enabled=true 2>&1); then
+                  echo "created realm $KC_REALM"
+                else
+                  echo "ERROR: realm '$KC_REALM' does not exist and it could not be created: $(printf '%s' "$create_err" | tail -1)" >&2
+                  echo "  Ask the owner of the external Keycloak to create an empty realm '$KC_REALM', or use a master-realm admin." >&2
+                  exit 1
+                fi
+              fi
+
+              $KCADM update "realms/$KC_REALM" $CFG -f /realm/realm-settings.json -m
+              echo "realm settings applied ($KC_SECURITY_PROFILE profile): $(tr -d '\n ' < /realm/realm-settings.json)"
+
+              # Replace every ${vault.<key>} (the realm file's own placeholder) and ${DEMO_PERSONAS_PASSWORD}
+              # of $1 with the value of its projected Secret file; write the result to $2. Returns 1, naming the
+              # key, when a value is missing: a placeholder must never reach Keycloak as a literal secret.
+              VAULT_DIR=/opt/keycloak/vault
+              materialize() {
+                content=$(cat "$1")
+                for ph in $(grep -oE '\$\{(vault\.)?[A-Za-z0-9_]+\}' "$1" | sort -u); do
+                  name=${ph#'${'}; name=${name%'}'}
+                  case "$name" in vault.*) key=${name#vault.} ;; *) key=${name,,} ;; esac
+                  f="$VAULT_DIR/zuno_${key//_/__}"
+                  if [ ! -s "$f" ]; then
+                    echo "missing secret value for $ph (expected file $f)" >&2
+                    return 1
+                  fi
+                  val=$(cat "$f")
+                  content=${content//"$ph"/"$val"}
+                done
+                printf '%s' "$content" > "$2"
+              }
+
+              created=0; updated=0; skipped=0
+              for f in /realm/client-*.json; do
+                [ -e "$f" ] || continue
+                base=$(basename "$f"); cid=${base#client-}; cid=${cid%.json}
+                if ! materialize "$f" "/tmp/$base"; then
+                  echo "SKIPPED client $cid: its secret is not in Vault yet (run the vault role)" >&2
+                  skipped=$((skipped + 1)); continue
+                fi
+                id=$($KCADM get clients -r "$KC_REALM" $CFG -q "clientId=$cid" --fields id \
+                       --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+                if [ -z "$id" ]; then
+                  $KCADM create clients -r "$KC_REALM" $CFG -f "/tmp/$base"
+                  echo "created client $cid"; created=$((created + 1))
+                else
+                  # -m: merge over the live client, as the internal Job (a bare -f would drop what Keycloak maintains)
+                  $KCADM update "clients/$id" -r "$KC_REALM" $CFG -f "/tmp/$base" -m
+                  echo "updated client $cid"; updated=$((updated + 1))
+                fi
+                rm -f "/tmp/$base"
+              done
+
+              mapped=0
+              for f in /realm/svcroles-*.txt; do
+                [ -e "$f" ] || continue
+                base=$(basename "$f"); cid=${base#svcroles-}; cid=${cid%.txt}
+                while read -r container role; do
+                  [ -n "${container:-}" ] && [ -n "${role:-}" ] || continue
+                  $KCADM add-roles -r "$KC_REALM" $CFG --uusername "service-account-$cid" \
+                    --cclientid "$container" --rolename "$role" \
+                    || echo "NOTE: could not grant $container/$role to service-account-$cid (client skipped?)"
+                  mapped=$((mapped + 1))
+                done < "$f"
+              done
+
+              # Groups of the realm file, create-if-missing, never deleted, membership never touched.
+              groups_created=0; groups_present=0
+              if [ -e /realm/realm-groups.txt ]; then
+                while read -r parent name; do
+                  [ -n "${name:-}" ] || continue
+                  if [ "$parent" = "-" ]; then
+                    gid=$($KCADM get groups -r "$KC_REALM" $CFG -q "search=$name" -q exact=true --fields id \
+                            --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+                    if [ -n "$gid" ]; then groups_present=$((groups_present + 1))
+                    else $KCADM create groups -r "$KC_REALM" $CFG -s "name=$name"; echo "created group $name"; groups_created=$((groups_created + 1)); fi
+                  else
+                    pid=$($KCADM get groups -r "$KC_REALM" $CFG -q "search=$parent" -q exact=true --fields id \
+                            --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+                    [ -n "$pid" ] || { echo "NOTE: parent group $parent not found, subgroup $name skipped"; continue; }
+                    if $KCADM get "groups/$pid/children" -r "$KC_REALM" $CFG -q first=0 -q max=1000 --fields name --format csv --noquotes 2>/dev/null \
+                         | tr -d '\r"' | grep -Fxq "$name"; then groups_present=$((groups_present + 1))
+                    else $KCADM create "groups/$pid/children" -r "$KC_REALM" $CFG -s "name=$name"; echo "created group $parent/$name"; groups_created=$((groups_created + 1)); fi
+                  fi
+                done < /realm/realm-groups.txt
+              fi
+
+              personas_created=0; personas_present=0
+              if [ "$KC_SEED_PERSONAS" = true ]; then
+                for f in /realm/persona-*.json; do
+                  [ -e "$f" ] || continue
+                  base=$(basename "$f"); u=${base#persona-}; u=${u%.json}
+                  uid=$($KCADM get users -r "$KC_REALM" $CFG -q "username=$u" -q exact=true --fields id \
+                          --format csv --noquotes 2>/dev/null | head -1 | tr -d '\r" ')
+                  if [ -n "$uid" ]; then personas_present=$((personas_present + 1)); continue; fi
+                  if materialize "$f" "/tmp/$base"; then
+                    $KCADM create users -r "$KC_REALM" $CFG -f "/tmp/$base"
+                    echo "created persona $u"; personas_created=$((personas_created + 1))
+                    rm -f "/tmp/$base"
+                  else
+                    echo "SKIPPED persona $u: demo-personas-password is not in Vault yet" >&2
+                    skipped=$((skipped + 1))
+                  fi
+                done
+              fi
+
+              echo "reconcile complete: $created clients created, $updated updated, $mapped role mappings, $groups_created groups created, $groups_present present, $personas_created personas created, $personas_present present, $skipped skipped"
+              if [ "$skipped" -gt 0 ]; then
+                echo "ERROR: $skipped item(s) skipped for a missing secret value; failing so the sync shows it" >&2
+                exit 1
+              fi
+      volumes:
+        - name: realm
+          configMap:
+            name: zuno-keycloak-clients
+        - name: vault-secrets
+          projected:
+            sources:
+              {{- include "keycloak.vaultSources" . | nindent 14 }}
+        - name: tmp
+          emptyDir: {}
+        {{- if .Values.keycloakExternal.caConfigMap }}
+        - name: external-ca
+          configMap:
+            name: {{ .Values.keycloakExternal.caConfigMap }}
+        {{- end }}
+{{- end }}

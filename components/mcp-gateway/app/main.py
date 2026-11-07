@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 import uuid
 from typing import Any, Dict, Optional
@@ -17,15 +18,21 @@ from typing import Any, Dict, Optional
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from app.agent_chain import Chain, ChainError, DelegationLimits, parse_chain
+from app.agent_chain import Chain, ChainError, DelegationLimits, Hop, parse_chain
 from app.agent_declarations import AgentDeclarationStore
 from app.auth import CallerIdentity, require_admin, validate_token, validate_token_or_kubernetes
 from app.bindings import BindingRegistry
 from app.delegation import get_delegated_token
 from app.downstream import DownstreamError
 from app.downstream import invoke as invoke_downstream
-from app.policy import PolicyDecision, PolicyStore, evaluate, evaluate_without_declaration
-from app import downstream, mcp_frontdoor
+from app.policy import (
+    PolicyDecision,
+    PolicyStore,
+    agent_entitlement_refusal,
+    evaluate,
+    evaluate_without_declaration,
+)
+from app import downstream, mcp_frontdoor, promql_scope, signed_chain
 from app.telemetry import adopt_incoming_trace_context, init_telemetry, tool_invoke_span
 
 logging.basicConfig(level="INFO", format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -46,6 +53,24 @@ policy_store = PolicyStore()
 agent_declarations = AgentDeclarationStore()  # ADR-0036/0038: agents/<name>/agent.okf.md bundles
 binding_registry = BindingRegistry()  # ADR-0116: capability -> physical backend
 delegation_limits = DelegationLimits()  # ADR-0406: corp ceiling and the delegated-write flag
+
+
+DEFAULT_MAX_BATCH_SIZE = 20
+
+
+def max_batch_size() -> int:
+    """ADR-0603 M15: the most JSON-RPC messages one /mcp batch may carry
+    (MCP_MAX_BATCH_SIZE, read per call). 0 means unbounded, the behaviour before
+    WP-225; a malformed value keeps the default rather than lifting the bound."""
+    raw = os.getenv("MCP_MAX_BATCH_SIZE", "").strip()
+    if not raw:
+        return DEFAULT_MAX_BATCH_SIZE
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.error("MCP_MAX_BATCH_SIZE=%r is not an integer; using %d", raw, DEFAULT_MAX_BATCH_SIZE)
+        return DEFAULT_MAX_BATCH_SIZE
+    return max(0, value)
 
 
 def _binding_coverage_error() -> Optional[str]:
@@ -162,6 +187,40 @@ def _read_chain(delegated_by: str, depth: str) -> Chain:
         return parse_chain(delegated_by, depth)
     except ChainError as exc:
         raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+
+def _resolve_agent(
+    chain_header: str,
+    agent: str,
+    task: str,
+    delegated_by: str,
+    depth: str,
+    identity: CallerIdentity,
+) -> "tuple[str, str, Chain]":
+    """ADR-0603 M14 (WP-225 lot C): the agent, task and delegators of one call.
+
+    With AGENT_CHAIN_VERIFY on and a valid X-Zuno-Agent-Chain (signed by the
+    a2a-gateway, bound to this bearer, app/signed_chain.py), they come from the
+    chain: a disagreeing X-Zuno-Agent / X-Zuno-Task is ignored and logged, and the
+    verified hops replace X-Zuno-Delegated-By. Otherwise (no chain, verification
+    off, or a chain that does not verify) the caller's headers apply, as before.
+    The result still goes through evaluate() and, for a chain, verify_chain()."""
+    resolved = signed_chain.resolve(
+        chain_header, agent, task, token=identity.token, audience="mcp-gateway", log=logger
+    )
+    if not resolved.verified:
+        return agent, task, _read_chain(delegated_by, depth)
+    try:
+        declared = parse_chain(delegated_by, depth).render()
+    except ChainError:
+        declared = f"<malformed {delegated_by!r}>"
+    chain = Chain(tuple(Hop(a, t) for a, t in resolved.hops or ()))
+    if declared and declared != chain.render():
+        logger.warning(
+            "X-Zuno-Delegated-By %s disagrees with the verified agent chain %r; the header is ignored",
+            declared, chain.render(),
+        )
+    return resolved.agent, resolved.task, chain
 
 
 async def _authorize_and_invoke(
@@ -308,6 +367,21 @@ async def _authorize_and_invoke(
         # evaluated the specific calling subject before any shared
         # credential is used - no further gate needed here.
 
+        # ADR-0603 M13 (WP-225 lot B): a metrics query is restricted to the
+        # namespaces the caller's groups are entitled to, by a matcher added to
+        # every selector (app/promql_scope.py). Off when METRICS_NAMESPACES_BY_GROUP
+        # is empty.
+        try:
+            arguments = promql_scope.scope_arguments(binding.capability, arguments, identity.groups)
+        except PermissionError as exc:
+            call.outcome = "denied"
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except promql_scope.PromQLScopeError as exc:
+            call.outcome = "denied"
+            raise HTTPException(
+                status_code=400, detail=f"the metrics query cannot be scoped to a namespace: {exc}"
+            ) from exc
+
         try:
             result = await invoke_downstream(
                 binding,
@@ -317,6 +391,9 @@ async def _authorize_and_invoke(
                 identity.token,
                 delegated_token=delegated_token,
                 caller_groups=identity.groups,
+                # ADR-0603 M12: email and preferred_username for the signed caller
+                # context (app/caller_context.py), read from the validated token only.
+                caller_claims=identity.raw_claims,
             )
         except DownstreamError as exc:
             call.outcome = "downstream_error"
@@ -355,9 +432,12 @@ async def invoke_tool(
     x_zuno_run_id: str = Header(default="", alias="X-Zuno-Run-Id"),
     x_zuno_delegated_by: str = Header(default="", alias="X-Zuno-Delegated-By"),
     x_zuno_delegation_depth: str = Header(default="", alias="X-Zuno-Delegation-Depth"),
+    x_zuno_agent_chain: str = Header(default="", alias=signed_chain.HEADER),
 ) -> Dict[str, Any]:
     classification = x_zuno_data_classification.upper()
-    chain = _read_chain(x_zuno_delegated_by, x_zuno_delegation_depth)
+    x_zuno_agent, x_zuno_task, chain = _resolve_agent(
+        x_zuno_agent_chain, x_zuno_agent, x_zuno_task, x_zuno_delegated_by, x_zuno_delegation_depth, identity
+    )
 
     raw_body = await request.body()
     if raw_body:
@@ -452,6 +532,7 @@ async def mcp_frontdoor_endpoint(
     x_zuno_task: str = Header(default="", alias="X-Zuno-Task"),
     x_zuno_delegated_by: str = Header(default="", alias="X-Zuno-Delegated-By"),
     x_zuno_delegation_depth: str = Header(default="", alias="X-Zuno-Delegation-Depth"),
+    x_zuno_agent_chain: str = Header(default="", alias=signed_chain.HEADER),
 ) -> JSONResponse:
     # ADR-0571 (WP-152): a caller that declares an agent (UnifAI forwards
     # X-Zuno-Agent/X-Zuno-Task with the user's own Keycloak JWT, ADR-0563) gets
@@ -459,7 +540,11 @@ async def mcp_frontdoor_endpoint(
     # that agent task's declared tools. A caller without one keeps ADR-0524's
     # deployment-time ceiling. An OpenShift token (TokenReview) cannot declare
     # an agent: agents are Keycloak-realm callers only.
-    agent_name, task_name = x_zuno_agent.strip(), x_zuno_task.strip()
+    # WP-225 lot C: a verified X-Zuno-Agent-Chain names the agent instead.
+    agent_name, task_name, chain = _resolve_agent(
+        x_zuno_agent_chain, x_zuno_agent.strip(), x_zuno_task.strip(),
+        x_zuno_delegated_by, x_zuno_delegation_depth, identity,
+    )
     agent_mode = bool(agent_name)
     if agent_mode and "tokenReview" in identity.raw_claims:
         raise HTTPException(
@@ -470,13 +555,13 @@ async def mcp_frontdoor_endpoint(
         # entitle (ADR-0040, zuno.access.groups). An agent declaring no group is
         # refused, never open to everyone. An unknown agent falls through to an
         # empty surface below.
+        # The same check evaluate() applies to every tool call on both front
+        # doors (app/policy.py); here it also refuses the listing up front.
         agent = agent_declarations.get(agent_name)
-        if agent is not None and not set(agent.access_groups) & set(identity.groups):
-            raise HTTPException(
-                status_code=403, detail=f"caller is not entitled to agent '{agent_name}' (ADR-0040)"
-            )
+        refusal = agent_entitlement_refusal(agent, identity.groups) if agent is not None else None
+        if refusal:
+            raise HTTPException(status_code=403, detail=refusal)
     classification = x_zuno_data_classification.upper()
-    chain = _read_chain(x_zuno_delegated_by, x_zuno_delegation_depth)
     if chain and not agent_mode:
         raise HTTPException(status_code=403, detail="a delegation chain requires an X-Zuno-Agent declaration")
     surface = _agent_surface(identity, agent_name, task_name, classification, chain) if agent_mode else None
@@ -525,6 +610,23 @@ async def mcp_frontdoor_endpoint(
 
     # A JSON-RPC batch is a list. Notifications inside it produce no response,
     # and a batch of only notifications produces no response body at all.
+    # ADR-0603 M15 (WP-225 lot B): the batch is bounded. JSON-RPC 2.0 answers an
+    # empty batch, and here a batch past the bound, with ONE Invalid Request error
+    # whose id is null; no message of the batch is processed.
+    if isinstance(message, list):
+        limit = max_batch_size()
+        if not message or (limit and len(message) > limit):
+            reason = (
+                "empty batch"
+                if not message
+                else f"batch of {len(message)} messages exceeds the limit of {limit} (MCP_MAX_BATCH_SIZE)"
+            )
+            return JSONResponse(
+                status_code=200,
+                content=mcp_frontdoor.error_response(
+                    None, mcp_frontdoor.JsonRpcError(mcp_frontdoor.INVALID_REQUEST, f"Invalid Request: {reason}")
+                ),
+            )
     messages = message if isinstance(message, list) else [message]
     responses = []
     for msg in messages:

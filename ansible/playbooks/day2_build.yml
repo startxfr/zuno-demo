@@ -25,6 +25,8 @@
       - token_proxy_build
       # ADR-0599 (WP-205): the Dify External Knowledge adapter.
       - dify_knowledge_build
+      # ADR-0604 (WP-231): the world-model GPU runtime (CUDA, about 10 GB).
+      - world_model_build
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

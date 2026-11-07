@@ -1,0 +1,32 @@
+# ADR-0604 (WP-235): the world-model experience in zuno-world-model. Applied and deleted ONLY by
+# ansible/roles/world_model, which follows zuno_world_model_enabled (it needs the on-demand GPU node of
+# gitops/apps/machines-world-model). The role passes the cluster values: global.zuno, egress.clusterCIDRs, presets.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-world-model-d1
+  namespace: openshift-gitops
+  annotations:
+    argocd.argoproj.io/sync-wave: "-56"
+spec:
+  project: zuno-apps
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/world-model
+    helm:
+      releaseName: zuno-world-model-d1
+      values: |
+        global:
+          zuno:
+            clusterBaseDomain: apps.mycluster.example.com
+            routeHost: world-model.apps.mycluster.example.com
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zuno-world-model
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false

@@ -40,6 +40,14 @@ zuno_mariadb_backup_s3_region: "eu-central-1"
 # run after this change rebuilds each image from devel.
 zuno_build_git_ref: "devel"
 
+# ADR-0604 (WP-229, WP-235): the world-model demo and its on-demand GPU node
+# (zuno-gpu-world-model-a, g7e.4xlarge). false = no node and no app; the Day-0
+# role world_model_gpu and the Day-2 role world_model both converge to it.
+# Turning it on starts billing a GPU instance: enable it ~40 minutes before
+# use and back to false (then `make d2 uninstall world-model` and
+# `make d0 uninstall world-model-gpu`) right after. An alert fires after 8 h.
+zuno_world_model_enabled: false
+
 # UnifAI stack on demo333 (WP-154/WP-168): the non-secret overrides that were
 # only kept in a private vars file until now. They are deep-merged over the
 # role defaults by ansible/roles/unifai (zuno_unifai_values); bundle settings
@@ -314,6 +322,14 @@ zuno_ai_gateway_guardrails_modes_generated: true
 # decision) and the per-client floor stays empty. Needs an image from 4a214782
 # or later.
 zuno_ai_gateway_classification_floors_generated: true
+# ADR-0610 (WP-244, user go 2026-11-07 for the weekend rush): every call of the Blender add-on (Keycloak
+# client `blender`, never an agent, so none of its calls names a known agent) is at least C3: only local
+# models answer it.
+zuno_ai_gateway_classification_client_floors:
+  blender: C3
+# ADR-0610 (WP-244): admit zuno-agent-gateway in the ai-gateway's NetworkPolicy; pairs with
+# zuno_connectivity_link_workstation_entry below.
+zuno_ai_gateway_workstation_entry: true
 # ADR-0511/ADR-0528 (2f981d17): Keycloak clients whose calls may set a
 # non-standard quota class and a project id. Only zuno-stresstest, the
 # confidential, password-grant-only client of the day-3 stresstest Jobs,
@@ -372,3 +388,15 @@ zuno_connectivity_link_channel: "stable-1.5"
 # edge from 1.4, so the switch is followed by deleting CSV kueue-operator.v1.4.3
 # by hand (CRDs, CRs and the operand stay); see the WP-195 K2 plan.
 zuno_kueue_channel: "stable-v1.5"
+
+# ADR-0608 clause 6 (WP-241): `make d3 check drift` fails on any finding. Switched on 2026-11-07 after the first
+# clean run (nfs-provisioner adopted, ECK listed in platform/drift/external-operators.yaml until its removal).
+zuno_drift_strict: true
+
+# WP-225 lot C, rollout step 2 (user's go 2026-11-07): the ai-gateway verifies the a2a-gateway's
+# signed agent chain. The public half of Vault a2a/agent-chain; a chain-less call keeps today's behaviour.
+zuno_ai_gateway_agent_chain_verify: true
+zuno_ai_gateway_agent_chain_public_key: |
+  -----BEGIN PUBLIC KEY-----
+  MCowBQYDK2VwAyEAZf7wMyaRz0Oc2DX0exW8YAsUIVlFtD8rKnaQ5PBrqPg=
+  -----END PUBLIC KEY-----

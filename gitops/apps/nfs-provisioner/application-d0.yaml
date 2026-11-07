@@ -1,0 +1,47 @@
+---
+# NFS Provisioner operator install (ADR-0608 clause 1, WP-241); the
+# NFSProvisioner operand is a separate Application (application-d1.yaml)
+# applied once this one is healthy. Namespace, OperatorGroup and Subscription
+# carry the names of the objects installed by hand on demo333, so the first
+# apply adopts them. The Subscription is Manual + startingCSV (ADR-0607): the
+# nfs_provisioner role approves only the pinned InstallPlan.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zuno-nfs-provisioner-d0
+  namespace: openshift-gitops
+  annotations:
+    # Sync-wave only matters for the root App-of-Apps path; Ansible orders
+    # this in day1_install.yml, well before Day 2's unifai.
+    argocd.argoproj.io/sync-wave: "-186"
+spec:
+  project: zuno-platform
+  source:
+    repoURL: https://github.com/startxfr/zuno-demo.git
+    targetRevision: main
+    path: gitops/charts/nfs-provisioner
+    helm:
+      releaseName: zuno-nfs-provisioner-d0
+      values: |
+        project:
+          enabled: true
+        operator:
+          enabled: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: nfs-provisioner
+  ignoreDifferences:
+    # OLM rewrites this annotation at runtime; ignored to avoid permanent ArgoCD drift.
+    - group: operators.coreos.com
+      kind: OperatorGroup
+      jsonPointers:
+        - /metadata/annotations/olm.providedAPIs
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Creates nfs-provisioner on a fresh cluster; an existing namespace is
+      # left as it is (the project chart's PreSync hook only adds labels and
+      # annotations to it).
+      - CreateNamespace=true

@@ -32,6 +32,9 @@ import sys
 os.environ.setdefault("MCP_GATEWAY_WORKLOAD_TOKEN", "test-workload-token")
 os.environ.setdefault("AAP_API_TOKEN", "test-token")
 os.environ.setdefault("AAP_BASE_URL", "http://aap.zuno-aap.svc")
+# WP-225 lot B: these tests launch cluster_audit many times; the per-caller
+# launch limit has its own tests (tests/test_wp225_launch_rate_limit.py).
+os.environ.setdefault("AAP_CLUSTER_AUDIT_RATE_LIMIT", "0")
 os.environ.setdefault("AAP_CONTROLLER_UI_URL", "https://aap.apps.demo333.startx.fr")
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

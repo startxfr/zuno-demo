@@ -152,3 +152,9 @@ The "no identity binding" case is covered by gateway tests (2026-11-06): an anon
 is reached, a forged token cannot answer a pending approval (the write stays unrun and the real initiating user can still answer), and a token
 without a `sub` claim is refused. The write path needs a caller identity at every step, so no run without one can approve or write.
 
+
+## Progress 2026-11-07: the stale-request and expiry cases are proven on UnifAI 0.1.64
+
+On demo333 with UnifAI 0.1.64 (fork R-542): an approve answers 200; an answered request id and a made-up one both answer
+409 `approval_not_pending` (HTTP 500 on 0.1.63); a request left unanswered for 330 s puts an `approval_expired` event on the
+session stream. Details in the WP-174 brief.

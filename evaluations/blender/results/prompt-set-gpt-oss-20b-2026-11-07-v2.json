@@ -1,0 +1,881 @@
+{
+  "date": "2026-11-07",
+  "persona": "eval-ai-dev-01",
+  "gateway": "https://ai-gateway.apps.demo333.startx.fr",
+  "repeats": 2,
+  "prompts": [
+    {
+      "id": "table-lamp",
+      "prompt": "A wooden table with 4 cylindrical legs and a small desk lamp on top",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "8 objects, 0 modifiers, 8 materials",
+        "8 objects, 0 modifiers, 8 materials"
+      ],
+      "mean_seconds": 13.1,
+      "stage_ready": true
+    },
+    {
+      "id": "pine-hill",
+      "prompt": "A low-poly pine tree on a small grassy hill",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "5 objects, 0 modifiers, 5 materials",
+        "5 objects, 0 modifiers, 5 materials"
+      ],
+      "mean_seconds": 8.3,
+      "stage_ready": true
+    },
+    {
+      "id": "office-chair",
+      "prompt": "A modern ergonomic office chair with five wheels",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "9 objects, 0 modifiers, 8 materials",
+        "9 objects, 0 modifiers, 9 materials"
+      ],
+      "mean_seconds": 8.5,
+      "stage_ready": true
+    },
+    {
+      "id": "simple-chair",
+      "prompt": "A simple wooden chair with four legs and a backrest",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "6 objects, 0 modifiers, 6 materials",
+        "6 objects, 0 modifiers, 6 materials"
+      ],
+      "mean_seconds": 6.7,
+      "stage_ready": true
+    },
+    {
+      "id": "house",
+      "prompt": "A small house with a pitched roof, a door and two windows",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "5 objects, 0 modifiers, 4 materials",
+        "5 objects, 0 modifiers, 4 materials"
+      ],
+      "mean_seconds": 7.8,
+      "stage_ready": true
+    },
+    {
+      "id": "car",
+      "prompt": "A low-poly car with four wheels",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "5 objects, 0 modifiers, 5 materials",
+        "5 objects, 0 modifiers, 5 materials"
+      ],
+      "mean_seconds": 5.1,
+      "stage_ready": true
+    },
+    {
+      "id": "rocket",
+      "prompt": "A cartoon rocket with three fins on a launch pad",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "6 objects, 0 modifiers, 6 materials",
+        "6 objects, 0 modifiers, 6 materials"
+      ],
+      "mean_seconds": 9.9,
+      "stage_ready": true
+    },
+    {
+      "id": "castle",
+      "prompt": "A small castle with four corner towers and a gate",
+      "successes": 1,
+      "runs": 2,
+      "reasons": [
+        "Blender: Error: Script failed, nothing kept: Error: Object 'Ground' already in collection 'Collection'",
+        "12 objects, 0 modifiers, 8 materials"
+      ],
+      "mean_seconds": 10.3,
+      "stage_ready": false
+    },
+    {
+      "id": "mug",
+      "prompt": "A coffee mug with a handle on a saucer",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "3 objects, 0 modifiers, 3 materials",
+        "4 objects, 0 modifiers, 4 materials"
+      ],
+      "mean_seconds": 7.4,
+      "stage_ready": true
+    },
+    {
+      "id": "bookshelf",
+      "prompt": "A bookshelf with three shelves and a few books",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "13 objects, 0 modifiers, 3 materials",
+        "18 objects, 0 modifiers, 14 materials"
+      ],
+      "mean_seconds": 9.7,
+      "stage_ready": true
+    },
+    {
+      "id": "street-lamp",
+      "prompt": "A street lamp on a round base",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "4 objects, 0 modifiers, 4 materials",
+        "4 objects, 0 modifiers, 4 materials"
+      ],
+      "mean_seconds": 6.8,
+      "stage_ready": true
+    },
+    {
+      "id": "bench",
+      "prompt": "A park bench with a backrest and metal legs",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "6 objects, 0 modifiers, 3 materials",
+        "6 objects, 0 modifiers, 3 materials"
+      ],
+      "mean_seconds": 7.3,
+      "stage_ready": true
+    }
+  ],
+  "stage_ready": [
+    "table-lamp",
+    "pine-hill",
+    "office-chair",
+    "simple-chair",
+    "house",
+    "car",
+    "rocket",
+    "mug",
+    "bookshelf",
+    "street-lamp",
+    "bench"
+  ],
+  "runs": [
+    {
+      "id": "table-lamp",
+      "prompt": "A wooden table with 4 cylindrical legs and a small desk lamp on top",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 13.9,
+      "lines": 61,
+      "script": "table-lamp-1.py",
+      "check": [],
+      "blender": {
+        "script": "table-lamp-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 8,
+        "modifiers": 0,
+        "materials": 8,
+        "names": [
+          "LampBase",
+          "LampBulb",
+          "LampShade",
+          "Leg_1",
+          "Leg_2",
+          "Leg_3",
+          "Leg_4",
+          "TableTop"
+        ],
+        "render": "table-lamp-1.png"
+      },
+      "ok": true,
+      "reason": "8 objects, 0 modifiers, 8 materials"
+    },
+    {
+      "id": "table-lamp",
+      "prompt": "A wooden table with 4 cylindrical legs and a small desk lamp on top",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 12.2,
+      "lines": 58,
+      "script": "table-lamp-2.py",
+      "check": [],
+      "blender": {
+        "script": "table-lamp-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 8,
+        "modifiers": 0,
+        "materials": 8,
+        "names": [
+          "LampBase",
+          "LampBulb",
+          "LampShade",
+          "Leg_-1.35_-0.45",
+          "Leg_-1.35_0.45",
+          "Leg_1.35_-0.45",
+          "Leg_1.35_0.45",
+          "TableTop"
+        ],
+        "render": "table-lamp-2.png"
+      },
+      "ok": true,
+      "reason": "8 objects, 0 modifiers, 8 materials"
+    },
+    {
+      "id": "pine-hill",
+      "prompt": "A low-poly pine tree on a small grassy hill",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 7.3,
+      "lines": 42,
+      "script": "pine-hill-1.py",
+      "check": [],
+      "blender": {
+        "script": "pine-hill-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 5,
+        "names": [
+          "Foliage_0",
+          "Foliage_1",
+          "Foliage_2",
+          "Hill",
+          "Trunk"
+        ],
+        "render": "pine-hill-1.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 5 materials"
+    },
+    {
+      "id": "pine-hill",
+      "prompt": "A low-poly pine tree on a small grassy hill",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 9.4,
+      "lines": 65,
+      "script": "pine-hill-2.py",
+      "check": [],
+      "blender": {
+        "script": "pine-hill-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 5,
+        "names": [
+          "Foliage_0",
+          "Foliage_1",
+          "Foliage_2",
+          "Grass_Hill",
+          "Trunk"
+        ],
+        "render": "pine-hill-2.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 5 materials"
+    },
+    {
+      "id": "office-chair",
+      "prompt": "A modern ergonomic office chair with five wheels",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 8.6,
+      "lines": 55,
+      "script": "office-chair-1.py",
+      "check": [],
+      "blender": {
+        "script": "office-chair-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 9,
+        "modifiers": 0,
+        "materials": 8,
+        "names": [
+          "Backrest",
+          "LeftArm",
+          "RightArm",
+          "Seat",
+          "Wheel_-0.75_-0.75",
+          "Wheel_-0.75_0.75",
+          "Wheel_0.75_-0.75",
+          "Wheel_0.75_0.75"
+        ],
+        "render": "office-chair-1.png"
+      },
+      "ok": true,
+      "reason": "9 objects, 0 modifiers, 8 materials"
+    },
+    {
+      "id": "office-chair",
+      "prompt": "A modern ergonomic office chair with five wheels",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 8.4,
+      "lines": 48,
+      "script": "office-chair-2.py",
+      "check": [],
+      "blender": {
+        "script": "office-chair-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 9,
+        "modifiers": 0,
+        "materials": 9,
+        "names": [
+          "Armrest_-1",
+          "Armrest_1",
+          "Backrest",
+          "Seat",
+          "Wheel_0",
+          "Wheel_1",
+          "Wheel_2",
+          "Wheel_3"
+        ],
+        "render": "office-chair-2.png"
+      },
+      "ok": true,
+      "reason": "9 objects, 0 modifiers, 9 materials"
+    },
+    {
+      "id": "simple-chair",
+      "prompt": "A simple wooden chair with four legs and a backrest",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 6.8,
+      "lines": 40,
+      "script": "simple-chair-1.py",
+      "check": [],
+      "blender": {
+        "script": "simple-chair-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 6,
+        "modifiers": 0,
+        "materials": 6,
+        "names": [
+          "Backrest",
+          "Leg_1",
+          "Leg_2",
+          "Leg_3",
+          "Leg_4",
+          "Seat"
+        ],
+        "render": "simple-chair-1.png"
+      },
+      "ok": true,
+      "reason": "6 objects, 0 modifiers, 6 materials"
+    },
+    {
+      "id": "simple-chair",
+      "prompt": "A simple wooden chair with four legs and a backrest",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 6.6,
+      "lines": 45,
+      "script": "simple-chair-2.py",
+      "check": [],
+      "blender": {
+        "script": "simple-chair-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 6,
+        "modifiers": 0,
+        "materials": 6,
+        "names": [
+          "Backrest",
+          "Leg_1",
+          "Leg_2",
+          "Leg_3",
+          "Leg_4",
+          "Seat"
+        ],
+        "render": "simple-chair-2.png"
+      },
+      "ok": true,
+      "reason": "6 objects, 0 modifiers, 6 materials"
+    },
+    {
+      "id": "house",
+      "prompt": "A small house with a pitched roof, a door and two windows",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 8.1,
+      "lines": 57,
+      "script": "house-1.py",
+      "check": [],
+      "blender": {
+        "script": "house-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 4,
+        "names": [
+          "HouseBase",
+          "HouseDoor",
+          "HouseRoof",
+          "Window1",
+          "Window2"
+        ],
+        "render": "house-1.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 4 materials"
+    },
+    {
+      "id": "house",
+      "prompt": "A small house with a pitched roof, a door and two windows",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 7.4,
+      "lines": 53,
+      "script": "house-2.py",
+      "check": [],
+      "blender": {
+        "script": "house-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 4,
+        "names": [
+          "Door",
+          "HouseBase",
+          "Roof",
+          "Window1",
+          "Window2"
+        ],
+        "render": "house-2.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 4 materials"
+    },
+    {
+      "id": "car",
+      "prompt": "A low-poly car with four wheels",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 5.2,
+      "lines": 35,
+      "script": "car-1.py",
+      "check": [],
+      "blender": {
+        "script": "car-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 5,
+        "names": [
+          "CarBody",
+          "Wheel1",
+          "Wheel2",
+          "Wheel3",
+          "Wheel4"
+        ],
+        "render": "car-1.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 5 materials"
+    },
+    {
+      "id": "car",
+      "prompt": "A low-poly car with four wheels",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 5.0,
+      "lines": 35,
+      "script": "car-2.py",
+      "check": [],
+      "blender": {
+        "script": "car-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 5,
+        "names": [
+          "CarBody",
+          "Wheel1",
+          "Wheel2",
+          "Wheel3",
+          "Wheel4"
+        ],
+        "render": "car-2.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 5 materials"
+    },
+    {
+      "id": "rocket",
+      "prompt": "A cartoon rocket with three fins on a launch pad",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 8.9,
+      "lines": 74,
+      "script": "rocket-1.py",
+      "check": [],
+      "blender": {
+        "script": "rocket-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 6,
+        "modifiers": 0,
+        "materials": 6,
+        "names": [
+          "Fin1",
+          "Fin2",
+          "Fin3",
+          "LaunchPad",
+          "RocketBody",
+          "RocketNose"
+        ],
+        "render": "rocket-1.png"
+      },
+      "ok": true,
+      "reason": "6 objects, 0 modifiers, 6 materials"
+    },
+    {
+      "id": "rocket",
+      "prompt": "A cartoon rocket with three fins on a launch pad",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 11.0,
+      "lines": 76,
+      "script": "rocket-2.py",
+      "check": [],
+      "blender": {
+        "script": "rocket-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 6,
+        "modifiers": 0,
+        "materials": 6,
+        "names": [
+          "Fin1",
+          "Fin2",
+          "Fin3",
+          "LaunchPad",
+          "RocketBody",
+          "RocketNose"
+        ],
+        "render": "rocket-2.png"
+      },
+      "ok": true,
+      "reason": "6 objects, 0 modifiers, 6 materials"
+    },
+    {
+      "id": "castle",
+      "prompt": "A small castle with four corner towers and a gate",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 9.2,
+      "lines": 73,
+      "script": "castle-1.py",
+      "check": [],
+      "blender": {
+        "script": "castle-1.py",
+        "outcome": "CANCELLED",
+        "error": "Error: Script failed, nothing kept: Error: Object 'Ground' already in collection 'Collection'",
+        "check": [],
+        "objects": 0,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [],
+        "render": ""
+      },
+      "ok": false,
+      "reason": "Blender: Error: Script failed, nothing kept: Error: Object 'Ground' already in collection 'Collection'"
+    },
+    {
+      "id": "castle",
+      "prompt": "A small castle with four corner towers and a gate",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 11.5,
+      "lines": 92,
+      "script": "castle-2.py",
+      "check": [],
+      "blender": {
+        "script": "castle-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 12,
+        "modifiers": 0,
+        "materials": 8,
+        "names": [
+          "BackWall",
+          "CastleBase",
+          "FrontWall",
+          "GateBase",
+          "GateDoor",
+          "Ground",
+          "LeftWall",
+          "RightWall"
+        ],
+        "render": "castle-2.png"
+      },
+      "ok": true,
+      "reason": "12 objects, 0 modifiers, 8 materials"
+    },
+    {
+      "id": "mug",
+      "prompt": "A coffee mug with a handle on a saucer",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 6.7,
+      "lines": 56,
+      "script": "mug-1.py",
+      "check": [],
+      "blender": {
+        "script": "mug-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 3,
+        "modifiers": 0,
+        "materials": 3,
+        "names": [
+          "MugBody",
+          "MugHandle",
+          "Saucer"
+        ],
+        "render": "mug-1.png"
+      },
+      "ok": true,
+      "reason": "3 objects, 0 modifiers, 3 materials"
+    },
+    {
+      "id": "mug",
+      "prompt": "A coffee mug with a handle on a saucer",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 8.1,
+      "lines": 45,
+      "script": "mug-2.py",
+      "check": [],
+      "blender": {
+        "script": "mug-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 4,
+        "modifiers": 0,
+        "materials": 4,
+        "names": [
+          "MugBody",
+          "MugHandle",
+          "MugRim",
+          "Saucer"
+        ],
+        "render": "mug-2.png"
+      },
+      "ok": true,
+      "reason": "4 objects, 0 modifiers, 4 materials"
+    },
+    {
+      "id": "bookshelf",
+      "prompt": "A bookshelf with three shelves and a few books",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 7.9,
+      "lines": 61,
+      "script": "bookshelf-1.py",
+      "check": [],
+      "blender": {
+        "script": "bookshelf-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 13,
+        "modifiers": 0,
+        "materials": 3,
+        "names": [
+          "Book_1",
+          "Book_2",
+          "Book_3",
+          "Book_4",
+          "Book_5",
+          "Book_6",
+          "Book_7",
+          "Book_8"
+        ],
+        "render": "bookshelf-1.png"
+      },
+      "ok": true,
+      "reason": "13 objects, 0 modifiers, 3 materials"
+    },
+    {
+      "id": "bookshelf",
+      "prompt": "A bookshelf with three shelves and a few books",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 11.4,
+      "lines": 80,
+      "script": "bookshelf-2.py",
+      "check": [],
+      "blender": {
+        "script": "bookshelf-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 18,
+        "modifiers": 0,
+        "materials": 14,
+        "names": [
+          "Base",
+          "Book1",
+          "Book10",
+          "Book11",
+          "Book12",
+          "Book2",
+          "Book3",
+          "Book4"
+        ],
+        "render": "bookshelf-2.png"
+      },
+      "ok": true,
+      "reason": "18 objects, 0 modifiers, 14 materials"
+    },
+    {
+      "id": "street-lamp",
+      "prompt": "A street lamp on a round base",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 6.9,
+      "lines": 43,
+      "script": "street-lamp-1.py",
+      "check": [],
+      "blender": {
+        "script": "street-lamp-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 4,
+        "modifiers": 0,
+        "materials": 4,
+        "names": [
+          "LampBase",
+          "LampBulb",
+          "LampHead",
+          "LampPole"
+        ],
+        "render": "street-lamp-1.png"
+      },
+      "ok": true,
+      "reason": "4 objects, 0 modifiers, 4 materials"
+    },
+    {
+      "id": "street-lamp",
+      "prompt": "A street lamp on a round base",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 6.6,
+      "lines": 43,
+      "script": "street-lamp-2.py",
+      "check": [],
+      "blender": {
+        "script": "street-lamp-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 4,
+        "modifiers": 0,
+        "materials": 4,
+        "names": [
+          "Base",
+          "Bulb",
+          "LampHead",
+          "Pole"
+        ],
+        "render": "street-lamp-2.png"
+      },
+      "ok": true,
+      "reason": "4 objects, 0 modifiers, 4 materials"
+    },
+    {
+      "id": "bench",
+      "prompt": "A park bench with a backrest and metal legs",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 7.0,
+      "lines": 47,
+      "script": "bench-1.py",
+      "check": [],
+      "blender": {
+        "script": "bench-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 6,
+        "modifiers": 0,
+        "materials": 3,
+        "names": [
+          "Backrest",
+          "Leg_1",
+          "Leg_2",
+          "Leg_3",
+          "Leg_4",
+          "Seat"
+        ],
+        "render": "bench-1.png"
+      },
+      "ok": true,
+      "reason": "6 objects, 0 modifiers, 3 materials"
+    },
+    {
+      "id": "bench",
+      "prompt": "A park bench with a backrest and metal legs",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 7.6,
+      "lines": 50,
+      "script": "bench-2.py",
+      "check": [],
+      "blender": {
+        "script": "bench-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 6,
+        "modifiers": 0,
+        "materials": 3,
+        "names": [
+          "Backrest",
+          "FrontLeftLeg",
+          "FrontRightLeg",
+          "LeftLeg",
+          "RightLeg",
+          "Seat"
+        ],
+        "render": "bench-2.png"
+      },
+      "ok": true,
+      "reason": "6 objects, 0 modifiers, 3 materials"
+    }
+  ],
+  "successes": 23,
+  "success_rate": 0.958
+}

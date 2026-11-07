@@ -61,6 +61,14 @@
 # A live `oc patch clusterpolicy` is NOT an alternative: zuno-nvidia-gpu-d1
 # has selfHeal and owns the spec through its helm values - the day-2 path
 # for any strategy change is re-running this role.
+# ADR-0604 D5 (WP-229): zuno.io/gpu-world-model is the taint of the on-demand
+# world-model node (zuno-gpu-world-model-a). Without this toleration the driver
+# and device plugin never run there and the node never advertises its GPU.
+# Changing this list changes every operand DaemonSet, which makes the existing
+# driver pods outdated: with driver.upgradePolicy.autoUpgrade true the controller
+# would delete the LLM pods and restart the driver node by node on the MIG fleet.
+# nvidia_gpu_driver_auto_upgrade (defaults/main.yml) is therefore false: the
+# toleration lands with no restart, and re-enabling it is an announced window.
 - name: "nvidia_gpu | overlay the zuno ClusterPolicy overrides and serialize"
   ansible.builtin.set_fact:
     # Serialized to a YAML string with `to_nice_yaml`, not left as a Jinja
@@ -73,8 +81,10 @@
             'mig': {'strategy': 'mixed'},
             'daemonsets': {'tolerations': [
               {'key': 'nvidia.com/gpu', 'operator': 'Exists', 'effect': 'NoSchedule'},
-              {'key': 'zuno.io/gpu-burst', 'operator': 'Exists', 'effect': 'NoSchedule'}
-            ]}
+              {'key': 'zuno.io/gpu-burst', 'operator': 'Exists', 'effect': 'NoSchedule'},
+              {'key': 'zuno.io/gpu-world-model', 'operator': 'Exists', 'effect': 'NoSchedule'}
+            ]},
+            'driver': {'upgradePolicy': {'autoUpgrade': nvidia_gpu_driver_auto_upgrade | bool}}
           }, recursive=True)
         | to_nice_yaml
       }}

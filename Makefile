@@ -16,7 +16,7 @@ EXTRA_VARS ?=
 # out to Day 1 in exchange (see Day 1 comment below) - this is the
 # "always-on infra" split ADR-0418's Context section had deferred to a
 # future ADR.
-DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault external-secrets cert-manager machines postgresql keycloak aap aap-config
+DAY0_COMPONENTS := admin-context argocd namespaces openshift-rbac-groups vault external-secrets cert-manager machines postgresql keycloak aap aap-config world-model-gpu
 DAY0_VERBS := check install uninstall reconcile all reinstall
 
 # Day 1 is the remainder of the AI-platform-operator stack (mesh, Kueue,
@@ -41,7 +41,9 @@ DAY0_VERBS := check install uninstall reconcile all reinstall
 # ("lightspeed-config") - an OLSConfig created in Day 1 would reference a
 # MaaS model and an MCP endpoint that don't exist until Day 2, and would
 # sit Degraded for the whole window while ArgoCD self-healed it back.
-DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config
+# "nfs-provisioner" (ADR-0608/WP-241) needs only OLM and provides the `nfs`
+# StorageClass that Day 2's "unifai" uses for its shared volumes.
+DAY1_RUN_COMPONENTS := smtp nfd nvidia-gpu custom-metrics-autoscaler nfs-provisioner redis observability service-mesh mesh-monitoring kiali grafana perses mariadb tempo openshift-oauth connectivity-link lws jobset kueue openshift-ai lightspeed rhtas rhtas-config
 DAY1_BUILD_COMPONENTS := ai-gateway supply-chain-signer aap-execution-environment
 DAY1_VERBS := check install build uninstall reconcile all reinstall
 
@@ -74,9 +76,9 @@ DAY1_VERBS := check install build uninstall reconcile all reinstall
 # (DAY3_CHECK_ONLY_COMPONENTS): "check" accepts it, every mutating verb
 # rejects it cleanly instead of dying inside Ansible on a missing
 # tasks/install.yml.
-DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent
+DAY2_RUN_COMPONENTS := namespaces llm models mcp agents mlops trustyai-config mlflow lightspeed-config unifai open-webui openclaw dify kagent world-model
 DAY2_CHECK_ONLY_COMPONENTS := supply-chain
-DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge
+DAY2_BUILD_COMPONENTS := mcp mlops trustyai-eval token-proxy dify-knowledge world-model
 DAY2_VERBS := check install build uninstall reconcile all reinstall
 # Day 2 components with a targeted tasks/reconcile.yml. `reconcile` is limited
 # to them: a Day 2 reconcile never falls back to re-installing a component.
@@ -113,7 +115,7 @@ DAY3_BACKUP_COMPONENTS := postgresql unifai
 # OLSConfig operand is absent, and vice versa.
 # "operators" (2026-11-04): report-only audit of the OLM operators that can be
 # updated (platform/olm/audit_operator_updates.py, ansible/roles/operators).
-DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators
+DAY3_CHECK_ONLY_COMPONENTS := lightspeed lightspeed-config trustyai-config mlflow operators drift
 # WP-126: triggering a real pipeline run spends real, costly compute (a GPU
 # burst-node scale-up, several minutes of training) against an
 # already-installed platform - the same tier as backup/restore, never
@@ -140,7 +142,7 @@ DAY3_VERBS := test stresstest backup restore check admit run release scenario-fa
 # install/operational action with its own AAP Job/Workflow Template.
 # "all-check" is WP-136's suggested alias for "check" - it dispatches to
 # the same playbook, never a second implementation.
-DEMO_VERBS := check all-check golden-path reset step-1 step-2 step-3 step-4 step-5
+DEMO_VERBS := check all-check golden-path browser reset step-1 step-2 step-3 step-4 step-5
 
 # ADR-0418 clause 6/WP-097: shared shell functions every day1/day2/day3
 # recipe below sources to route mutating/read verbs through AAP when
@@ -301,7 +303,8 @@ if [[ -z "$$verb" ]]; then \
     '' \
     '  check       Read-only presenter preflight - app/project/model/failover-topology/training readiness' \
     '  golden-path One real call per demonstration moment (ADR-0605): UnifAI, sovereignty, delegation+approval,' \
-    '              Open WebUI, Zuno Code, Dify, kagent; OpenClaw/Lightspeed status; run before and during a freeze' \
+    '              Open WebUI, Zuno Code, Dify, kagent, OpenClaw, Lightspeed, guardrails, Tempo trace' \
+    '  browser     One browser check per experience (ADR-0606/WP-243): Keycloak sign-in, first screen, screenshots' \
     '  all-check   Alias for check' \
     '  reset       Idempotent recovery to a safe demo baseline (uncordons any node the failover drill left cordoned)' \
     '  step-1..5   Print each presenter step'"'"'s objective/UI/prompt/expected routing - never submits chat on your' \

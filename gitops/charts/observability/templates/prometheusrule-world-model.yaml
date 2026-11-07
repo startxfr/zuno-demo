@@ -1,0 +1,42 @@
+{{- /*
+ADR-0604 D5 (WP-229): a cost guard for the on-demand world-model GPU node.
+The node (MachineSet zuno-gpu-world-model-a, g7e.4xlarge) exists only while
+zuno_world_model_enabled is on, and nothing in the cluster deletes Machines by
+itself (no in-cluster credential holds Machine API rights). This alert only
+reports a node left running; turning the demo off stays a human action
+(`make d2 uninstall world-model`, then `make d0 uninstall world-model-gpu`).
+
+mapi_machine_created_timestamp_seconds is a platform metric of the
+machine-api operator; zuno-monitoring carries
+openshift.io/cluster-monitoring=true, so this rule is evaluated by the
+platform Prometheus, which sees it (checked live 2026-11-07). Same gating as
+prometheusrule-slo.yaml: rendered by zuno-observability-d1 only.
+*/ -}}
+{{- if and .Values.collector.enabled .Values.alerting.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zuno-world-model-cost
+  namespace: zuno-monitoring
+  labels:
+    zuno.io/managed-by: argocd
+spec:
+  groups:
+    - name: zuno-world-model-cost
+      rules:
+        - alert: ZunoWorldModelGpuNodeUpTooLong
+          expr: >-
+            (time() - mapi_machine_created_timestamp_seconds{name=~"zuno-gpu-world-model-a-.*"})
+            > {{ .Values.alerting.worldModelGpuMaxHours | default 8 }} * 3600
+          for: 5m
+          labels:
+            severity: warning
+            adr: ADR-0604
+          annotations:
+            summary: "World-model GPU node {{ "{{" }} $labels.name {{ "}}" }} has been up for more than {{ .Values.alerting.worldModelGpuMaxHours | default 8 }} hours"
+            description: >-
+              The on-demand world-model GPU node (g7e.4xlarge) is still running.
+              If the demo is over: set zuno_world_model_enabled to false in
+              ansible/clusters/<cluster>.yml, run `make d2 uninstall world-model`,
+              then `make d0 uninstall world-model-gpu`. See docs/demo/world-model.md.
+{{- end }}

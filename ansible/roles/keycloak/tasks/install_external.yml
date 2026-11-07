@@ -1,0 +1,104 @@
+---
+# ADR-0352 clause 4 (WP-211): external mode. A Keycloak this platform does not own is used.
+# Nothing is deployed: neither the RHBK operator (-d0) nor the built-in instance of -d1. This file
+# (1) asserts the endpoint and the admin credential, (2) seeds the credential into the Vault path the
+# consumer ExternalSecret already reads, (3) publishes the supplied CA, in zuno-auth for the reconcile
+# Job. The -d1 Application (client-secret ExternalSecrets, the client ConfigMap and the reconcile Job,
+# which creates the realm content in the external Keycloak) is applied by install.yml afterwards.
+- name: "keycloak | assert the external endpoint and the admin credential"
+  ansible.builtin.include_tasks: assert_external.yml
+  vars:
+    keycloak_assert_hard_fail: true
+
+- name: "keycloak | find the Vault server pod"
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: zuno-vault
+    label_selectors:
+      - "app.kubernetes.io/name=vault"
+      - "component=server"
+  register: _keycloak_vault_pod
+
+- name: "keycloak | log in to Vault as ansible-seeder"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
+
+# Overwrites the internally generated bootstrap credential at zuno/keycloak/admin: the Secret
+# zuno-auth/keycloak-admin, which the reconcile Job and the consumer roles read, then holds the external
+# one. The vault role seeds create-if-missing (ADR-0345), so a later `make d0 install vault` keeps it.
+- name: "keycloak | seed the external admin credential into Vault (zuno/keycloak/admin)"
+  kubernetes.core.k8s_exec:
+    namespace: zuno-vault
+    pod: "{{ _keycloak_vault_pod.resources[0].metadata.name }}"
+    container: vault
+    command: >-
+      sh -c "VAULT_TOKEN={{ zuno_vault_token }} vault kv put zuno/keycloak/admin
+      username={{ zuno_keycloak_external_admin_username | quote }}
+      password={{ zuno_keycloak_external_admin_password | quote }}"
+  no_log: true
+
+- name: "keycloak | ask External Secrets to refresh keycloak-admin now"
+  kubernetes.core.k8s:
+    state: patched
+    api_version: external-secrets.io/v1beta1
+    kind: ExternalSecret
+    namespace: zuno-auth
+    name: keycloak-admin
+    definition:
+      metadata:
+        annotations:
+          force-sync: "{{ lookup('ansible.builtin.pipe', 'date +%s') }}"
+  failed_when: false
+
+- name: "keycloak | wait for the Secret zuno-auth/keycloak-admin to carry the external username"
+  kubernetes.core.k8s_info:
+    kind: Secret
+    namespace: zuno-auth
+    name: keycloak-admin
+  register: _keycloak_admin_secret
+  until: >-
+    (_keycloak_admin_secret.resources | default([]) | length) > 0 and
+    (_keycloak_admin_secret.resources[0].data.username | default('') | b64decode) == zuno_keycloak_external_admin_username
+  retries: 24
+  delay: 5
+  no_log: true
+  failed_when: false
+
+- name: "keycloak | fail if the Secret did not follow Vault"
+  ansible.builtin.fail:
+    msg: >-
+      zuno-auth/keycloak-admin still holds the previous username after two minutes: the ExternalSecret did not
+      refresh. Check `oc -n zuno-auth get externalsecret keycloak-admin` (the -d1 Application creates it; on a first
+      install run this role again once it exists).
+  when: >-
+    (_keycloak_admin_secret.resources | default([]) | length) > 0 and
+    (_keycloak_admin_secret.resources[0].data.username | default('') | b64decode) != zuno_keycloak_external_admin_username
+
+- name: "keycloak | publish the supplied CA in zuno-auth for the reconcile Job"
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: keycloak-external-ca
+        namespace: zuno-auth
+        labels:
+          zuno.io/managed-by: ansible
+      data:
+        ca-bundle.crt: "{{ zuno_keycloak_ca_pem }}"
+  when: zuno_keycloak_ca_pem | length > 0
+
+- name: "keycloak | remove a stale supplied-CA ConfigMap (the external certificate is publicly trusted)"
+  kubernetes.core.k8s:
+    state: absent
+    api_version: v1
+    kind: ConfigMap
+    name: keycloak-external-ca
+    namespace: zuno-auth
+  when: zuno_keycloak_ca_pem | length == 0
+
+- name: "keycloak | external-mode summary"
+  ansible.builtin.debug:
+    msg: >-
+      External Keycloak {{ zuno_keycloak_url }} verified (TLS, sign-in as {{ zuno_keycloak_external_admin_username }}
+      in realm {{ zuno_keycloak_admin_realm }}). Nothing was deployed; the reconcile Job creates the realm content.

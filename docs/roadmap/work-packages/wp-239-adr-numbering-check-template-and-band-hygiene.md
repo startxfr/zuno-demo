@@ -1,6 +1,6 @@
 # WP-239: ADR numbering check, record template and band hygiene
 
-- **State:** Repo work in review
+- **State:** Done (2026-11-07)
 - **ADRs:** [ADR-0606](../../adr/0606-admit-new-experiences-with-a-definition-of-done-and-a-wip-limit.md)
 - **Depends on:** none
 - **Related:** [ADR-0323](../../adr/0323-establish-canonical-generated-and-validated-platform-documentation.md) (the documentation checks)

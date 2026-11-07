@@ -1,0 +1,17 @@
+{
+  "description": "ADR-0610 clause 8: the fixed prompt set measured against the platform's local model through the Blender workstation entry. Only prompts that succeed in every repeat are shown on stage.",
+  "prompts": [
+    {"id": "table-lamp", "prompt": "A wooden table with 4 cylindrical legs and a small desk lamp on top"},
+    {"id": "pine-hill", "prompt": "A low-poly pine tree on a small grassy hill"},
+    {"id": "office-chair", "prompt": "A modern ergonomic office chair with five wheels"},
+    {"id": "simple-chair", "prompt": "A simple wooden chair with four legs and a backrest"},
+    {"id": "house", "prompt": "A small house with a pitched roof, a door and two windows"},
+    {"id": "car", "prompt": "A low-poly car with four wheels"},
+    {"id": "rocket", "prompt": "A cartoon rocket with three fins on a launch pad"},
+    {"id": "castle", "prompt": "A small castle with four corner towers and a gate"},
+    {"id": "mug", "prompt": "A coffee mug with a handle on a saucer"},
+    {"id": "bookshelf", "prompt": "A bookshelf with three shelves and a few books"},
+    {"id": "street-lamp", "prompt": "A street lamp on a round base"},
+    {"id": "bench", "prompt": "A park bench with a backrest and metal legs"}
+  ]
+}

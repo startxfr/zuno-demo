@@ -68,6 +68,7 @@ secretStores:
     - zuno-openwebui
     - zuno-rhtas
     - zuno-unifai
+    - zuno-world-model
 operatorconfig:
   enabled: false
 

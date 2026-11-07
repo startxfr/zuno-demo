@@ -292,13 +292,14 @@ def client_label(azp: Optional[str]) -> str:
     return "other"
 
 
-# ADR-0593: the persona of the request (CallerIdentity.persona), the value of
-# the `user` label. The raw token `sub` stays in the span (zuno.user_sub).
+# ADR-0593: the persona of the request (CallerIdentity.persona). Since WP-225 lot B
+# (ADR-0603 M15) a span attribute only (zuno.persona), no longer the `user` metric
+# label. The raw token `sub` stays in the span (zuno.user_sub).
 _caller_persona: ContextVar[str] = ContextVar("zuno_caller_persona", default="")
 
 
 def set_caller_persona(persona: Optional[str]) -> None:
-    """Remember this request's persona for the `user` label of model_call_span.
+    """Remember this request's persona for the zuno.persona attribute of model_call_span.
     Called once per handler, after token validation."""
     _caller_persona.set(persona or "")
 
@@ -457,6 +458,9 @@ def model_call_span(
     point per group, which multiplied every per-user sum by the caller's
     group count (13x for eval-consultant-01, WP-174), the same defect
     agent-bff had (3f74e4b0).
+    Since WP-225 lot B (ADR-0603 M15) the counters carry no `user` label
+    at all: the "by user" view is the span (zuno.user_sub, zuno.persona)
+    and the token-budget ledger, never a metric series per person.
 
     `agent` (ADR-0029's "by user, agent, task, model and provider" bullet,
     also never wired until now): the X-Zuno-Agent header agent-runtime
@@ -501,6 +505,11 @@ def model_call_span(
             span.set_attribute("zuno.adapter", adapter)
         if caller_sub:
             span.set_attribute("zuno.user_sub", caller_sub)
+        persona = _caller_persona.get()
+        if persona:
+            # ADR-0593: the persona was the `user` metric label until WP-225 lot B
+            # (ADR-0603 M15); it stays on the span only.
+            span.set_attribute("zuno.persona", persona)
         if groups:
             span.set_attribute("zuno.groups", groups)
         if agent:
@@ -537,8 +546,11 @@ def model_call_span(
             latency_ms = (time.monotonic() - start) * 1000.0
             span.set_attribute("zuno.latency_ms", latency_ms)
             span.set_attribute("zuno.outcome", outcome)
-            attrs = {"provider": provider, "model": model, "outcome": outcome, "user": _caller_persona.get() or caller_sub or "", "agent": agent or "",
-                     "client": client}
+            # ADR-0603 M15 (WP-225 lot B): no per-user label. A person's id on every
+            # series was personal data in Prometheus and one series set per user;
+            # the per-client label stays. Per-user views read the span
+            # (zuno.user_sub, zuno.persona) or the token-budget ledger.
+            attrs = {"provider": provider, "model": model, "outcome": outcome, "agent": agent or "", "client": client}
             group_list = groups or [""]
             if _model_call_counter is not None:
                 _model_call_counter.add(1, attrs)

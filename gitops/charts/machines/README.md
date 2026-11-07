@@ -15,6 +15,7 @@ false in `values.yaml`; `-d1` is a `noop` placeholder.
 | MachineSet `zuno-gpu-c` (replicas 1) | Second permanent inference node: g7e.4xlarge, eu-west-2c, MIG `all-balanced` - symmetric with `zuno-gpu-a` (WP-083; replicas set by hand, see below) |
 | MachineSet `zuno-gpu-burst-a` (replicas 0) | Burst training node: g7e.2xlarge, MIG disabled (whole 96GB `nvidia.com/gpu`), tainted `zuno.io/gpu-burst=true:NoSchedule` |
 | MachineAutoscaler `zuno-gpu-burst-a` (min 0 / max 1) | Scale-from-zero for the burst set |
+| MachineSet `zuno-gpu-world-model-a` (separate Application `zuno-machines-world-model-d0`) | ADR-0604: the world-model demo's on-demand node, g7e.4xlarge, MIG disabled, taint `zuno.io/gpu-world-model`; exists only while `zuno_world_model_enabled` is on (`ansible/roles/world_model_gpu`) |
 | ClusterAutoscaler `default` | Cluster singleton; scale-down enabled (`unneededTime: 10m`) so the burst node disappears after training |
 
 `nvidia.com/mig.config` node labels are acted on by the GPU Operator's

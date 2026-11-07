@@ -20,6 +20,14 @@ spec:
         # as gitops/apps/mcp/application-d1.yaml) - feeds the chart's
         # AAP_CONTROLLER_UI_URL (server.py's _job_url).
         clusterBaseDomain: apps.mycluster.example.com
+        # WP-225 lot C, rollout step 3 (user's go 2026-11-07): verify the mcp-gateway's per-call assertion
+        # (public half of Vault mcp/gateway-call-assertion). Not required yet: a call without an assertion
+        # is still served until callAssertion.required is switched on, one server at a time, later.
+        callAssertion:
+          publicKey: |
+            -----BEGIN PUBLIC KEY-----
+            MCowBQYDK2VwAyEAlIAapqkGwFneDh3ZM2/thjjJbQa5ZnOq7S4Ro0Ju6FQ=
+            -----END PUBLIC KEY-----
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

@@ -22,7 +22,7 @@ spec:
           image: {{ .Values.frontDoor.image }}
           args:
             - --provider=oidc
-            - --oidc-issuer-url=https://keycloak.{{ .Values.global.zuno.clusterBaseDomain }}/realms/zuno
+            - --oidc-issuer-url={{ .Values.global.zuno.keycloakIssuerUrl | default (printf "https://keycloak.%s/realms/zuno" .Values.global.zuno.clusterBaseDomain) }}
             - --client-id={{ .Values.frontDoor.clientId }}
             - --redirect-url=https://{{ .Values.global.zuno.routeHost }}/oauth2/callback
             - --upstream=http://dify-nginx:8080

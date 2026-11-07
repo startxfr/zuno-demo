@@ -112,8 +112,11 @@ def test_a_client_floor_applies_only_when_no_known_agent_is_named() -> None:
         assert classification_floor.client_floors() == {"unifai": "C2"}
         assert f.effective("C1", "", "", "unifai").effective == "C2"
         assert f.effective("C1", "hand-built", "x", "unifai").effective == "C2"
-        # a known agent keeps its own floor, even a lower one (closed by WP-225 lot C)
-        assert f.effective("C1", "tekos", "answer-technical-question", "unifai").effective == "C1"
+        # WP-225 lot C review: an unverified agent never drops below the client floor
+        # (the higher of the two); a verified agent keys on its own floor alone.
+        assert f.effective("C1", "tekos", "answer-technical-question", "unifai").effective == "C2"
+        assert f.effective("C1", "tekos", "answer-technical-question", "unifai",
+                           agent_verified=True).effective == "C1"
         assert f.effective("C1", "cognos", "coming-soon", "unifai").effective == "C3"
         assert f.effective("C1", "", "", "open-webui").effective == "C1"
     assert f.effective("C1", "", "", "unifai").effective == "C1"

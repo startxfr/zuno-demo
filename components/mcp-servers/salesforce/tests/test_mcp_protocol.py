@@ -195,7 +195,7 @@ async def test_update_opportunity_patches_then_reads_back_the_current_state(tran
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 result = await session.call_tool(
-                    "update_opportunity", {"opportunity_id": "006XX", "stage": "Closed Won", "amount": 50000}
+                    "update_opportunity", {"opportunity_id": "006XX0000000001AAA", "stage": "Closed Won", "amount": 50000}
                 )
 
     assert not result.is_error, result.content
@@ -206,9 +206,9 @@ async def test_update_opportunity_patches_then_reads_back_the_current_state(tran
     assert len(fake_client.requests) == 2
     patch_method, patch_path, patch_kwargs = fake_client.requests[0]
     get_method, get_path, _ = fake_client.requests[1]
-    assert patch_method == "PATCH" and patch_path == "/sobjects/Opportunity/006XX"
+    assert patch_method == "PATCH" and patch_path == "/sobjects/Opportunity/006XX0000000001AAA"
     assert patch_kwargs["json"] == {"StageName": "Closed Won", "Amount": 50000}
-    assert get_method == "GET" and get_path == "/sobjects/Opportunity/006XX"
+    assert get_method == "GET" and get_path == "/sobjects/Opportunity/006XX0000000001AAA"
 
 
 async def test_update_opportunity_with_no_fields_is_a_tool_error_not_a_no_op_call(transport) -> None:

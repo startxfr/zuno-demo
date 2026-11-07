@@ -66,11 +66,12 @@ def higher(a: str, b: Optional[str]) -> str:
 def client_floors() -> Dict[str, str]:
     """Per-client floors (chart `classification.clientFloors`, env `CLASSIFICATION_CLIENT_FLOORS="unifai=C2,x=C3"`).
 
-    Read on every call. Applied only when the call names no known agent: the
-    agent and task headers are set by the caller, so a token of a client that
-    hosts hand-written workflows (UnifAI) must not escape every floor by
-    omitting X-Zuno-Agent or naming an unknown one (WP-209 review). A
-    verifiable agent identity closes the rest (WP-225 lot C)."""
+    Read on every call. Applied to every call whose agent is not verified, as
+    the higher of it and the agent's own floor: the agent and task headers are
+    set by the caller, so a token of a client that hosts hand-written workflows
+    (UnifAI) must not escape the floor by omitting X-Zuno-Agent, naming an
+    unknown agent (WP-209 review) or naming a low-floor one (WP-225 lot C
+    review). Only an agent from a verified a2a-gateway chain skips it."""
     out: Dict[str, str] = {}
     for part in os.getenv("CLASSIFICATION_CLIENT_FLOORS", "").split(","):
         if not part.strip():
@@ -156,10 +157,19 @@ class ClassificationFloors:
             return None
         return entry["tasks"].get((task or "").strip().lower()) or entry["floor"]
 
-    def effective(self, declared: str, agent: str, task: str, client: str = "") -> FloorDecision:
+    def effective(
+        self, declared: str, agent: str, task: str, client: str = "", agent_verified: bool = False
+    ) -> FloorDecision:
+        """max(header, floor). The floor is the (agent, task) floor and, unless the
+        agent comes from a verified a2a-gateway chain (WP-225 lot C), also the
+        per-client floor: the higher of the two. The agent header is written by
+        the caller, so naming a low-floor agent (`tekos`) must never drop a call
+        below its client's floor (WP-225 lot C review). A verified agent keys on
+        its own floor alone."""
         floor = self.floor_for(agent, task)
-        if floor is None and client:
-            floor = client_floors().get(client.strip())
+        if client and not agent_verified:
+            client_floor = client_floors().get(client.strip())
+            floor = higher(floor, client_floor) if floor else client_floor
         return FloorDecision(declared=declared, floor=floor, effective=higher(declared, floor))
 
 

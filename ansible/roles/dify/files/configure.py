@@ -1,7 +1,7 @@
 # Run inside the Dify api pod by `make d2 configure dify` (ADR-0599 decision 3). Idempotent: creates the single local
 # administrator, installs the OpenAI-compatible provider plugin, registers the models behind the token proxy and the
 # governed MCP gateway as a tool. The input is one JSON object on stdin (the password never reaches argv or a log):
-# {email, password, pkg, models: [{name, mode, context}], proxy, mcp_name}
+# {email, password, pkg, models: [{name, mode, context}], proxy, mcp_name, proxy_key (WP-225 lot C, may be empty)}
 import base64
 import json
 import sys
@@ -78,7 +78,8 @@ def credentials(m):
         "model": m["name"], "model_type": "llm",
         "credentials": {
             "mode": m["mode"], "context_size": str(m["context"]), "max_tokens_to_sample": "4096",
-            "display_name": m["name"], "api_key": "dummy-dropped-by-the-token-proxy",
+            # WP-225 lot C: the token proxy's inbound key when it asks for one; the proxy drops it either way.
+            "display_name": m["name"], "api_key": IN.get("proxy_key") or "dummy-dropped-by-the-token-proxy",
             "endpoint_url": IN["proxy"] + "/v1", "endpoint_model_name": m["name"],
             "function_calling_type": "tool_call", "stream_function_calling": "supported",
             "vision_support": "no_support", "structured_output_support": "not_supported",
@@ -98,15 +99,19 @@ for m in IN["models"]:
     print("model:", m["name"], "registered")
 
 # 4. MCP tool
+MCP_PROVIDER = {
+    "server_url": IN["proxy"] + "/mcp", "name": IN["mcp_name"], "icon": "🛠️", "icon_type": "emoji",
+    "icon_background": "#FFEAD5", "server_identifier": "zuno-mcp-gateway",
+    # WP-225 lot C: the token proxy's inbound key, when it asks for one.
+    "headers": {"Authorization": "Bearer " + IN["proxy_key"]} if IN.get("proxy_key") else {},
+    "timeout": 30, "sse_read_timeout": 300,
+}
 tools = call("GET", "/workspaces/current/tools/mcp")
-if any(t.get("name") == IN["mcp_name"] for t in (tools if isinstance(tools, list) else tools.get("data", []))):
+mcp_registered = any(t.get("name") == IN["mcp_name"] for t in (tools if isinstance(tools, list) else tools.get("data", [])))
+if mcp_registered:
     print("mcp: already registered")
 else:
-    call("POST", "/workspaces/current/tool-provider/mcp", json={
-        "server_url": IN["proxy"] + "/mcp", "name": IN["mcp_name"], "icon": "🛠️", "icon_type": "emoji",
-        "icon_background": "#FFEAD5", "server_identifier": "zuno-mcp-gateway", "headers": {},
-        "timeout": 30, "sse_read_timeout": 300,
-    })
+    call("POST", "/workspaces/current/tool-provider/mcp", json=MCP_PROVIDER)
     print("mcp: registered")
 
 # The registration leaves the server unauthorised with no tool ("Serveur Non Configuré" in the console):
@@ -118,6 +123,11 @@ mcp = next((p for p in providers if p.get("type") == "mcp" and p.get("name") == 
 if mcp is None:
     print("FAIL mcp provider not found in /tool-providers")
     sys.exit(1)
+if mcp_registered and IN.get("proxy_key"):
+    # WP-225 lot C review: a provider registered before inbound auth was turned on has no key and would get 401 from
+    # the token proxy; update it in place (same name and identifier, the key header added). Idempotent.
+    call("PUT", "/workspaces/current/tool-provider/mcp", json={**MCP_PROVIDER, "provider_id": mcp["id"]})
+    print("mcp: headers updated")
 if not mcp.get("is_team_authorization"):
     call("POST", "/workspaces/current/tool-provider/mcp/auth", json={"provider_id": mcp["id"]})
     print("mcp: authorised")

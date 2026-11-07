@@ -1,0 +1,161 @@
+---
+# ADR-0604 D5 (WP-229): the on-demand world-model GPU node follows ONE switch,
+# zuno_world_model_enabled. On: render zuno-gpu-world-model-a through its own
+# Application (gitops/apps/machines-world-model) and wait until the node
+# advertises one whole GPU. Off: remove what is left, so `make d0 install all`
+# costs nothing while the demo is off. Run locally only: the AAP installer
+# credential has no Machine API rights (aap-config clusterrole-installer.yaml).
+
+# Committed per-cluster switch first, then the workstation override (later
+# include_vars wins), as load_cluster_vars.yml documents.
+- name: "world-model-gpu | load the committed per-cluster variables"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_cluster_vars.yml"
+
+- name: "world-model-gpu | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _world_model_gpu_confidential_file
+
+- name: "world-model-gpu | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _world_model_gpu_confidential_file.stat.exists
+
+- name: "world-model-gpu | look up the world-model application and the node's Application"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: "{{ item }}"
+  loop:
+    - "{{ world_model_gpu_dependent_app }}"
+    - "{{ world_model_gpu_app_name }}"
+  register: _world_model_gpu_apps
+
+- name: "world-model-gpu | record what exists"
+  ansible.builtin.set_fact:
+    _world_model_gpu_dependent_present: "{{ (_world_model_gpu_apps.results[0].resources | default([])) | length > 0 }}"
+    _world_model_gpu_app_present: "{{ (_world_model_gpu_apps.results[1].resources | default([])) | length > 0 }}"
+
+# ---------------------------------------------------------------- switch off
+- name: "world-model-gpu | switch off: converge to no GPU node"
+  when: not (zuno_world_model_enabled | bool)
+  block:
+    - name: "world-model-gpu | refuse to remove the node under the running demo"
+      ansible.builtin.fail:
+        msg: >-
+          zuno_world_model_enabled is false but {{ world_model_gpu_dependent_app }}
+          is still installed. Uninstall the world-model application (the Day-2
+          component, WP-235) first, then run this again: removing the node under
+          the runtime would leave it Pending.
+      when: _world_model_gpu_dependent_present | bool
+
+    - name: "world-model-gpu | delete the node's Application (cascades to the MachineSet and the EC2 instance)"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/delete_gitops_app.yml"
+      vars:
+        gitops_app_name: "{{ world_model_gpu_app_name }}"
+        gitops_app_delete_wait_timeout: 600
+      when: _world_model_gpu_app_present | bool
+
+    - name: "world-model-gpu | say what the switch means"
+      ansible.builtin.debug:
+        msg: >-
+          zuno_world_model_enabled is false: no world-model GPU node
+          ({{ 'removed now' if _world_model_gpu_app_present | bool else 'none was present' }}).
+          Set it to true in ansible/clusters/<cluster>.yml to provision one.
+
+# ----------------------------------------------------------------- switch on
+- name: "world-model-gpu | switch on: render and wait for the GPU node"
+  when: zuno_world_model_enabled | bool
+  block:
+    - name: "world-model-gpu | resolve this cluster's AWS identity"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_cluster_aws_identity.yml"
+
+    - name: "world-model-gpu | read the Application's own values"
+      ansible.builtin.set_fact:
+        _world_model_gpu_values_raw: >-
+          {{ (lookup('ansible.builtin.file',
+                     zuno_repo_root + '/gitops/apps/machines-world-model/application-d0.yaml')
+              | from_yaml)['spec']['source']['helm']['values'] | from_yaml }}
+        _world_model_gpu_az_overrides: "{{ zuno_machines_az_override | default({}) }}"
+
+    - name: "world-model-gpu | resolve the MachineSet's availability zone"
+      ansible.builtin.set_fact:
+        _world_model_gpu_entry: >-
+          {{ _world_model_gpu_values_raw['cluster-machine']['machineSet']['list'][0]
+             | combine({'az': _world_model_gpu_az_overrides[world_model_gpu_machineset]}
+                       if world_model_gpu_machineset in _world_model_gpu_az_overrides else {}) }}
+
+    - name: "world-model-gpu | fail if the zone has no installer subnet"
+      ansible.builtin.fail:
+        msg: >-
+          {{ world_model_gpu_machineset }} wants availability zone
+          '{{ cluster_aws_identity.region }}{{ _world_model_gpu_entry.az }}', but no
+          installer MachineSet exists there to read the subnet from (discovered:
+          {{ cluster_aws_identity.subnetByAz.keys() | list }}). Set
+          zuno_machines_az_override['{{ world_model_gpu_machineset }}'] to a zone
+          that has one and offers g7e.
+      when: (cluster_aws_identity.region ~ _world_model_gpu_entry.az) not in cluster_aws_identity.subnetByAz
+
+    - name: "world-model-gpu | build the values with this cluster's identity"
+      ansible.builtin.set_fact:
+        _world_model_gpu_values: >-
+          {{ _world_model_gpu_values_raw | combine({'cluster-machine': {
+               'cluster': {'id': cluster_aws_identity.id,
+                           'region': cluster_aws_identity.region},
+               'machineSet': {'list': [_world_model_gpu_entry | combine({
+                 'ami': cluster_aws_identity.ami,
+                 'securityGroupName': cluster_aws_identity.securityGroupName,
+                 'subnet_name': cluster_aws_identity.subnetByAz[cluster_aws_identity.region ~ _world_model_gpu_entry.az]
+               })]}}}, recursive=True) }}
+
+    # The chart's default list is the GPU fleet: if the injected list were ever
+    # lost, this Application would render a second copy of the fleet, and
+    # turning one autoscaler toggle on would take the ClusterAutoscaler
+    # singleton away from zuno-machines-d0.
+    - name: "world-model-gpu | refuse to apply anything but the one world-model MachineSet"
+      ansible.builtin.assert:
+        that:
+          - _world_model_gpu_values['cluster-machine']['machineSet']['enabled'] | bool
+          - not (_world_model_gpu_values['cluster-machine']['machineAutoscaler']['enabled'] | bool)
+          - not (_world_model_gpu_values['cluster-machine']['cluster']['autoscaler']['enabled'] | bool)
+          - (_world_model_gpu_values['cluster-machine']['machineSet']['list'] | length) == 1
+          - _world_model_gpu_values['cluster-machine']['machineSet']['list'][0]['name'] == world_model_gpu_machineset
+          - "'placeholder' not in _world_model_gpu_values['cluster-machine']['machineSet']['list'][0]['ami']"
+        fail_msg: "The world-model values are not exactly one resolved MachineSet: {{ _world_model_gpu_values }}"
+
+    - name: "world-model-gpu | apply the node's Application"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+      vars:
+        gitops_component_name: "machines-world-model"
+        gitops_app_phase: "d0"
+        gitops_app_name: "{{ world_model_gpu_app_name }}"
+        gitops_app_extra_helm_values: "{{ _world_model_gpu_values }}"
+        gitops_app_wait_retries: 60
+        gitops_app_wait_delay: 15
+
+    # Ready node, MIG explicitly disabled by the mig-manager, and the device
+    # plugin advertising one whole GPU: only then can the runtime schedule.
+    - name: "world-model-gpu | wait for the node to advertise one whole GPU"
+      kubernetes.core.k8s_info:
+        kind: Node
+        label_selectors:
+          - "{{ world_model_gpu_node_label }}"
+      register: _world_model_gpu_nodes
+      until: >-
+        (_world_model_gpu_nodes.resources | default([]) | length) == 1 and
+        (_world_model_gpu_nodes.resources[0].status.conditions | default([])
+           | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list) == ['True'] and
+        (_world_model_gpu_nodes.resources[0].metadata.labels['nvidia.com/mig.config.state'] | default('')) == 'success' and
+        (_world_model_gpu_nodes.resources[0].status.allocatable['nvidia.com/gpu'] | default('0') | string) == '1'
+      retries: "{{ world_model_gpu_wait_retries }}"
+      delay: "{{ world_model_gpu_wait_delay }}"
+
+    - name: "world-model-gpu | report the node"
+      ansible.builtin.debug:
+        msg: >-
+          World-model GPU node ready: {{ _world_model_gpu_nodes.resources[0].metadata.name }}
+          ({{ _world_model_gpu_nodes.resources[0].metadata.labels['nvidia.com/gpu.product'] | default('?') }},
+          driver {{ _world_model_gpu_nodes.resources[0].metadata.labels['nvidia.com/cuda.driver-version.full'] | default('?') }}).
+          It costs money until the world-model application is uninstalled and
+          `make d0 uninstall world-model-gpu` has run (an alert fires after 8 hours).

@@ -1,0 +1,101 @@
+---
+# ADR-0352 / WP-211: the one place that says where Keycloak is.
+#
+# Every Ansible task that calls Keycloak or hands its URL to a workload reads these
+# facts instead of building `https://keycloak.<domain>` itself. Internal mode (the
+# default, `zuno_keycloak_mode` absent) reproduces exactly the strings the callers
+# used to write by hand, so including this file changes nothing there. External mode
+# (`zuno_keycloak_mode: external`, ansible/confidential.yml) resolves the same facts
+# from the `zuno_keycloak_external_*` payload.
+#
+# An include, not group_vars: the AAP Controller inventory has no group_vars
+# directory (see gitops/charts/aap-config/templates/ansibleinventory.yaml), so a
+# variable defined there would be undefined in every AAP-launched job. For the same
+# reason external mode needs ansible/confidential.yml, which AAP checkouts do not
+# carry: run the keycloak-dependent roles locally while it is external.
+#
+# Needs: cluster_base_domain (ansible/tasks/resolve_cluster_base_domain.yml).
+# Sets:
+#   zuno_keycloak_external_mode  bool
+#   zuno_keycloak_url            public base URL, no realm path
+#   zuno_keycloak_host           host part of it (EgressFirewall dnsName)
+#   zuno_keycloak_realm          zuno
+#   zuno_keycloak_issuer_url     <url>/realms/<realm>
+#   zuno_keycloak_token_url      <issuer>/protocol/openid-connect/token
+#   zuno_keycloak_auth_url       <issuer>/protocol/openid-connect/auth
+#   zuno_keycloak_jwks_url       <issuer>/protocol/openid-connect/certs
+#   zuno_keycloak_internal_url   in-cluster URL of the built-in instance; the public URL in external mode
+#   zuno_keycloak_admin_realm    realm the admin credential signs in to (master | the external one)
+#   zuno_keycloak_admin_token_url  password-grant token endpoint of that realm
+#   zuno_keycloak_ca_pem         external CA bundle, "" = system trust (always "" in internal mode)
+- name: "keycloak-endpoint | check for ansible/confidential.yml (the mode and the external payload)"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _keycloak_endpoint_confidential
+
+- name: "keycloak-endpoint | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _keycloak_endpoint_confidential.stat.exists
+
+- name: "keycloak-endpoint | fail on an unknown mode value (ADR-0352 clause 1; absent means internal)"
+  ansible.builtin.fail:
+    msg: "zuno_keycloak_mode is '{{ zuno_keycloak_mode }}' - expected 'internal' or 'external'."
+  when: (zuno_keycloak_mode | default('internal')) not in ['internal', 'external']
+
+- name: "keycloak-endpoint | validate the external payload (fail fast, before any apply)"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_keycloak_mode is 'external' but {{ _kc.name }} {{ _kc.why }} in ansible/confidential.yml
+      (ADR-0352 clause 2, see ansible/confidential.example.yml).
+  when:
+    - (zuno_keycloak_mode | default('internal')) == 'external'
+    - _kc.bad | bool
+  loop_control:
+    loop_var: _kc
+    label: "{{ _kc.name }}"
+  loop:
+    - name: zuno_keycloak_external_url
+      why: "is missing or still the 'xxxxxx' sentinel"
+      bad: "{{ (zuno_keycloak_external_url | default('xxxxxx')) in ['xxxxxx', ''] }}"
+    - name: zuno_keycloak_external_url
+      why: "must start with https:// (the endpoint has to be TLS-verifiable) and carry no realm path"
+      bad: "{{ not ((zuno_keycloak_external_url | default('https://x')) is match('^https://[^/]+/?$')) }}"
+    - name: zuno_keycloak_external_realm
+      why: "must be 'zuno': the consumers write the realm into their URLs, no other name is supported (WP-211)"
+      bad: "{{ (zuno_keycloak_external_realm | default('zuno')) != 'zuno' }}"
+    - name: zuno_keycloak_external_admin_username
+      why: "is missing or still the 'xxxxxx' sentinel"
+      bad: "{{ (zuno_keycloak_external_admin_username | default('xxxxxx')) in ['xxxxxx', ''] }}"
+    - name: zuno_keycloak_external_admin_password
+      why: "is missing or still the 'xxxxxx' sentinel"
+      bad: "{{ (zuno_keycloak_external_admin_password | default('xxxxxx')) in ['xxxxxx', ''] }}"
+
+- name: "keycloak-endpoint | resolve the endpoint (built-in instance)"
+  ansible.builtin.set_fact:
+    zuno_keycloak_external_mode: false
+    zuno_keycloak_url: "https://keycloak.{{ cluster_base_domain }}"
+    zuno_keycloak_realm: zuno
+    zuno_keycloak_internal_url: "http://zuno-service.zuno-auth.svc:8080"
+    zuno_keycloak_admin_realm: master
+    zuno_keycloak_ca_pem: ""
+  when: (zuno_keycloak_mode | default('internal')) == 'internal'
+
+- name: "keycloak-endpoint | resolve the endpoint (external Keycloak)"
+  ansible.builtin.set_fact:
+    zuno_keycloak_external_mode: true
+    zuno_keycloak_url: "{{ zuno_keycloak_external_url | regex_replace('/+$', '') }}"
+    zuno_keycloak_realm: zuno
+    zuno_keycloak_internal_url: "{{ zuno_keycloak_external_url | regex_replace('/+$', '') }}"
+    zuno_keycloak_admin_realm: "{{ zuno_keycloak_external_admin_realm | default('zuno') }}"
+    zuno_keycloak_ca_pem: "{{ zuno_keycloak_external_ca_bundle | default('') }}"
+  when: (zuno_keycloak_mode | default('internal')) == 'external'
+
+- name: "keycloak-endpoint | derive the realm URLs"
+  ansible.builtin.set_fact:
+    zuno_keycloak_host: "{{ zuno_keycloak_url | regex_replace('^https?://', '') }}"
+    zuno_keycloak_issuer_url: "{{ zuno_keycloak_url }}/realms/{{ zuno_keycloak_realm }}"
+    zuno_keycloak_token_url: "{{ zuno_keycloak_url }}/realms/{{ zuno_keycloak_realm }}/protocol/openid-connect/token"
+    zuno_keycloak_auth_url: "{{ zuno_keycloak_url }}/realms/{{ zuno_keycloak_realm }}/protocol/openid-connect/auth"
+    zuno_keycloak_jwks_url: "{{ zuno_keycloak_url }}/realms/{{ zuno_keycloak_realm }}/protocol/openid-connect/certs"
+    zuno_keycloak_admin_token_url: "{{ zuno_keycloak_url }}/realms/{{ zuno_keycloak_admin_realm }}/protocol/openid-connect/token"

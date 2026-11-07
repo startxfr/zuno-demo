@@ -66,10 +66,17 @@ call that needs them).
 from __future__ import annotations
 
 import asyncio
+import base64
+import fnmatch
+import hashlib
 import hmac
+import json
+import logging
 import os
+import re
+import time
 from contextlib import asynccontextmanager
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple
 from urllib.parse import quote
 
 import gitlab
@@ -77,7 +84,7 @@ import gitlab.exceptions
 from fastapi import FastAPI
 from github import Auth, Github
 from github.GithubException import UnknownObjectException
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -93,6 +100,175 @@ HTTP_TIMEOUT_SECONDS = float(os.getenv("GIT_FORGE_HTTP_TIMEOUT_SECONDS", "20"))
 # serving the gateway (same reasoning as every other server in
 # components/mcp-servers/).
 GATEWAY_WORKLOAD_TOKEN = os.getenv("MCP_GATEWAY_WORKLOAD_TOKEN", "")
+
+logger = logging.getLogger("git_forge")
+
+
+# --------------------------------------------------------------------------
+# ADR-0603 M12 (WP-225 lot B): the signed caller context.
+#
+# The gateway signs who a call is for (sub, groups, email, username, the tool,
+# a timestamp, this server's name) from the token it has validated, and sends it as
+# X-Zuno-Caller-Context / X-Zuno-Caller-Signature (components/mcp-gateway/app/
+# caller_context.py), only to backends whose binding declares caller_context.
+# The key is derived per backend from the workload token this server already holds. Duplicated in each server: an image is built from its own
+# directory only (ADR-0119). A missing, forged, stale or other-tool context
+# verifies as None; a server that needs it then refuses (fail closed).
+# --------------------------------------------------------------------------
+
+# The audience of the caller context: this server's backend name in
+# platform/bindings/tools/tool-bindings.yaml.
+CALLER_CONTEXT_AUDIENCE = "git-forge"
+CALLER_CONTEXT_HEADER = "x-zuno-caller-context"
+CALLER_SIGNATURE_HEADER = "x-zuno-caller-signature"
+CALLER_CONTEXT_MAX_AGE_SECONDS = int(os.getenv("CALLER_CONTEXT_MAX_AGE_SECONDS", "300"))
+# A context dated in the future beyond clock skew is refused, so a signed context
+# cannot be minted to stay valid for longer than its age bound.
+CALLER_CONTEXT_MAX_SKEW_SECONDS = 30
+
+
+def _caller_context_key() -> bytes:
+    # Per backend: HMAC(token, label + ":" + this server's name). A context signed
+    # for another backend does not verify here.
+    label = b"zuno-caller-context-v1:" + CALLER_CONTEXT_AUDIENCE.encode("utf-8")
+    return hmac.new(GATEWAY_WORKLOAD_TOKEN.encode("utf-8"), label, hashlib.sha256).digest()
+
+
+def _verified_caller(headers: Optional[Mapping[str, str]], tool: str) -> Optional[Dict[str, Any]]:
+    if not headers or not GATEWAY_WORKLOAD_TOKEN:
+        return None
+    raw = headers.get(CALLER_CONTEXT_HEADER) or ""
+    signature = headers.get(CALLER_SIGNATURE_HEADER) or ""
+    if not raw or not signature:
+        return None
+    expected = hmac.new(_caller_context_key(), raw.encode("ascii", "replace"), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(expected, signature):
+        return None
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)))
+    except (ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("v") != 1:
+        return None
+    if payload.get("aud") != CALLER_CONTEXT_AUDIENCE or payload.get("tool") != tool:
+        return None
+    iat = payload.get("iat")
+    now = time.time()
+    if not isinstance(iat, int) or iat > now + CALLER_CONTEXT_MAX_SKEW_SECONDS or now - iat > CALLER_CONTEXT_MAX_AGE_SECONDS:
+        return None
+    groups = payload.get("groups")
+    return {
+        "sub": str(payload.get("sub") or ""),
+        "groups": [str(g) for g in groups] if isinstance(groups, list) else [],
+        "email": str(payload.get("email") or "").lower(),
+        "email_verified": payload.get("email_verified") is True,
+        "username": str(payload.get("username") or ""),
+    }
+
+
+def _caller(ctx: Optional[Context], tool: str) -> Optional[Dict[str, Any]]:
+    """The verified caller of this tool call, or None (no context, or not verified)."""
+    if ctx is None:
+        return None
+    try:
+        headers = ctx.headers
+    except Exception:  # noqa: BLE001 - outside a request (a direct call in a test)
+        return None
+    return _verified_caller(headers, tool)
+
+
+def _group_allowlist(env_name: str) -> Dict[str, List[str]]:
+    """A JSON object {Keycloak group: [pattern]} from `env_name`.
+
+    Empty or unset: {} (no allowlist, the behaviour before WP-225). Malformed: a
+    configured but empty allowlist, which refuses every caller (fail closed)."""
+    raw = os.getenv(env_name, "").strip()
+    if not raw:
+        return {}
+    try:
+        doc = json.loads(raw)
+    except json.JSONDecodeError:
+        return {"": []}
+    if not isinstance(doc, dict):
+        return {"": []}
+    if not doc:
+        return {}  # "{}" (the chart default rendered as JSON) is no allowlist
+    return {
+        str(group): [str(p).strip() for p in patterns if isinstance(p, str) and p.strip()]
+        for group, patterns in doc.items()
+        if isinstance(patterns, list)
+    } or {"": []}
+
+
+def _allowed(target: str, caller: Optional[Dict[str, Any]], allowlist: Dict[str, List[str]]) -> bool:
+    """True when one of the caller's groups lists a pattern (fnmatch, case-insensitive)
+    matching `target`. No verified caller: False."""
+    if caller is None:
+        return False
+    target = target.lower()
+    for group in caller["groups"]:
+        for pattern in allowlist.get(group, ()):
+            if fnmatch.fnmatchcase(target, pattern.lower()):
+                return True
+    return False
+
+
+# ADR-0603 M12: the repositories each Keycloak group may reach through the shared
+# technical tokens. GIT_FORGE_REPOSITORY_ALLOWLIST is a JSON object
+# {group: [pattern]} (chart value repositoryAllowlist.groups) over targets written
+# "<provider>:<owner>/<repo>", e.g. "github:startxfr/zuno-*", "gitlab:team/*", "*".
+# A repository created or forked without an owner lands under the technical
+# identity itself, written "@self" ("github:@self/<name>"). Empty: no allowlist,
+# the behaviour before WP-225. Scope "all" checks reads, listings and writes;
+# "write" only write_file, create_repository and fork_repository.
+#
+# Matching is fnmatch, decided deliberately: `*` matches ACROSS "/", so
+# "gitlab:team/*" also admits every subgroup ("gitlab:team/sub/repo"). To stop at
+# one level, list the repositories themselves.
+REPOSITORY_ALLOWLIST_ENV = "GIT_FORGE_REPOSITORY_ALLOWLIST"
+SELF_OWNER = "@self"
+
+_RepoPolicy = Tuple[Dict[str, Any], Dict[str, List[str]]]
+
+
+def _repository_allowlist_scope() -> str:
+    value = os.getenv("GIT_FORGE_REPOSITORY_ALLOWLIST_SCOPE", "all").strip().lower()
+    return value if value in ("all", "write") else "all"
+
+
+def _repo_policy(ctx: Optional[Context], tool: str, *, write: bool) -> Optional[_RepoPolicy]:
+    """None when no allowlist applies to this call; else the verified caller and the
+    allowlist. Raises PermissionError when one applies and the caller is not verified."""
+    allowlist = _group_allowlist(REPOSITORY_ALLOWLIST_ENV)
+    if not allowlist or (not write and _repository_allowlist_scope() == "write"):
+        return None
+    caller = _caller(ctx, tool)
+    if caller is None:
+        raise PermissionError(
+            f"{tool} is refused: a repository allowlist is configured and the call carries no verified caller context"
+        )
+    return caller, allowlist
+
+
+def _repo_target(provider: str, owner: Optional[str], repo: str) -> str:
+    return f"{provider}:{(owner or SELF_OWNER).strip()}/{repo.strip()}"
+
+
+# A provider, an owner (a GitLab owner may hold subgroups: "group/sub") and a
+# repository name. No "..", no URL syntax: a target that passes the allowlist must
+# also be the repository the provider call reaches.
+_TARGET_RE = re.compile(r"(github|gitlab):(@self|[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)*)/[A-Za-z0-9_.-]+")
+
+
+def _check_repo(target: str, policy: Optional[_RepoPolicy]) -> None:
+    if policy is None:
+        return
+    if not _TARGET_RE.fullmatch(target) or ".." in target:
+        raise PermissionError(f"repository {target!r} is not a plain <provider>:<owner>/<repo> name (ADR-0603 M12)")
+    if not _allowed(target, *policy):
+        raise PermissionError(
+            f"repository {target!r} is outside the repository allowlist of the caller's groups (ADR-0603 M12)"
+        )
 
 Provider = Literal["github", "gitlab"]
 
@@ -133,8 +309,11 @@ def _gitlab_client() -> gitlab.Gitlab:
 # git.repository.read - read_repository_content / read_private_repository_content
 # --------------------------------------------------------------------------
 
-def _github_read_content(owner: str, repo: str, path: str, ref: Optional[str]) -> Dict[str, Any]:
+def _github_read_content(
+    owner: str, repo: str, path: str, ref: Optional[str], *, policy: Optional[_RepoPolicy] = None
+) -> Dict[str, Any]:
     gh_repo = _github_client().get_repo(f"{owner}/{repo}")
+    _check_resolved("github", getattr(gh_repo, "full_name", None), policy)
     # ADR-0121: unconditional, caller-independent - this server never reads
     # private GitHub content through any tool, including the private-scoped
     # one (which refuses provider="github" entirely - see its own docstring).
@@ -168,9 +347,11 @@ def _github_read_content(owner: str, repo: str, path: str, ref: Optional[str]) -
 
 
 def _gitlab_read_content(
-    owner: str, repo: str, path: str, ref: Optional[str], *, allow_private: bool
+    owner: str, repo: str, path: str, ref: Optional[str], *, allow_private: bool,
+    policy: Optional[_RepoPolicy] = None,
 ) -> Dict[str, Any]:
     project = _gitlab_client().projects.get(f"{owner}/{repo}")
+    _check_resolved("gitlab", getattr(project, "path_with_namespace", None), policy)
     if project.visibility != "public" and not allow_private:
         raise ValueError(
             f"{owner}/{repo} is not a public GitLab project (visibility="
@@ -333,14 +514,35 @@ def _gitlab_list_repos(owner: str, owner_type: str, *, allow_private: bool) -> L
     return _merge_top10(most_starred, most_active)
 
 
+def _check_resolved(provider: str, full_name: Optional[str], policy: Optional[_RepoPolicy]) -> None:
+    """ADR-0603 M12: the repository the provider actually resolved. PyGithub follows
+    a 301 for a renamed or transferred repository and GitLab serves a moved project
+    under its old path, so the name the caller passed may not be the repository
+    reached. Re-checked before anything is read or written."""
+    if policy is None:
+        return
+    if not full_name:
+        raise PermissionError("the provider did not report the repository's name; refused (ADR-0603 M12)")
+    _check_repo(f"{provider}:{full_name}", policy)
+
+
+def _filter_listing(provider: str, repos: List[Dict[str, Any]], policy: Optional[_RepoPolicy]) -> List[Dict[str, Any]]:
+    """ADR-0603 M12: a listing keeps only the repositories the caller may reach."""
+    if policy is None:
+        return repos
+    return [r for r in repos if _allowed(f"{provider}:{r.get('full_name', '')}", *policy)]
+
+
 # --------------------------------------------------------------------------
 # git.file.write - write_file (create-or-update, one commit)
 # --------------------------------------------------------------------------
 
 def _github_write_file(
-    owner: str, repo: str, path: str, content: str, commit_message: str, branch: Optional[str]
+    owner: str, repo: str, path: str, content: str, commit_message: str, branch: Optional[str],
+    *, policy: Optional[_RepoPolicy] = None,
 ) -> Dict[str, Any]:
     gh_repo = _github_client().get_repo(f"{owner}/{repo}")
+    _check_resolved("github", getattr(gh_repo, "full_name", None), policy)
     # ADR-0121: unconditional, caller-independent - this server only ever
     # writes to public repositories, on either provider.
     if gh_repo.private:
@@ -361,9 +563,11 @@ def _github_write_file(
 
 
 def _gitlab_write_file(
-    owner: str, repo: str, path: str, content: str, commit_message: str, branch: Optional[str]
+    owner: str, repo: str, path: str, content: str, commit_message: str, branch: Optional[str],
+    *, policy: Optional[_RepoPolicy] = None,
 ) -> Dict[str, Any]:
     project = _gitlab_client().projects.get(f"{owner}/{repo}")
+    _check_resolved("gitlab", getattr(project, "path_with_namespace", None), policy)
     # ADR-0121: unconditional, caller-independent - this server only ever
     # writes to public repositories, on either provider.
     if project.visibility != "public":
@@ -431,17 +635,39 @@ def _gitlab_create_repo(name: str, owner: Optional[str], private: bool, descript
 # git.repository.fork - fork_repository
 # --------------------------------------------------------------------------
 
-def _github_fork_repo(owner: str, repo: str, target_owner: Optional[str]) -> Dict[str, Any]:
+def _fork_landed(provider: str, full_name: Optional[str], policy: Optional[_RepoPolicy]) -> None:
+    """The fork exists by now; a destination outside the allowlist (a provider that
+    placed or renamed it unexpectedly) is reported, never returned as a success."""
+    try:
+        _check_resolved(provider, full_name, policy)
+    except PermissionError as exc:
+        logger.warning("fork landed outside the repository allowlist: %s", full_name)
+        raise PermissionError(f"the fork was created as {full_name!r}, outside the allowlist; remove it: {exc}") from exc
+
+
+def _github_fork_repo(
+    owner: str, repo: str, target_owner: Optional[str], *,
+    source_policy: Optional[_RepoPolicy] = None, target_policy: Optional[_RepoPolicy] = None,
+) -> Dict[str, Any]:
     gh_repo = _github_client().get_repo(f"{owner}/{repo}")
+    _check_resolved("github", getattr(gh_repo, "full_name", None), source_policy)
     kwargs = {"organization": target_owner} if target_owner else {}
     fork = gh_repo.create_fork(**kwargs)
+    if target_policy is not None and target_owner:
+        _fork_landed("github", getattr(fork, "full_name", None), target_policy)
     return {"name": fork.name, "full_name": fork.full_name, "url": fork.html_url}
 
 
-def _gitlab_fork_repo(owner: str, repo: str, target_owner: Optional[str]) -> Dict[str, Any]:
+def _gitlab_fork_repo(
+    owner: str, repo: str, target_owner: Optional[str], *,
+    source_policy: Optional[_RepoPolicy] = None, target_policy: Optional[_RepoPolicy] = None,
+) -> Dict[str, Any]:
     project = _gitlab_client().projects.get(f"{owner}/{repo}")
+    _check_resolved("gitlab", getattr(project, "path_with_namespace", None), source_policy)
     payload = {"namespace": target_owner} if target_owner else {}
     fork = project.forks.create(payload)
+    if target_policy is not None and target_owner:
+        _fork_landed("gitlab", getattr(fork, "path_with_namespace", None), target_policy)
     return {
         "name": fork.name,
         "full_name": getattr(fork, "path_with_namespace", fork.name),
@@ -515,7 +741,8 @@ async def healthz() -> Dict[str, str]:
 
 @mcp_server.tool()
 async def read_repository_content(
-    provider: Provider, owner: str, repo: str, path: str = "", ref: Optional[str] = None
+    provider: Provider, owner: str, repo: str, path: str = "", ref: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Read a file's content, or list a directory, in a PUBLIC GitHub or
     GitLab repository. Refuses if the repository is private, on either
@@ -523,14 +750,17 @@ async def read_repository_content(
     internal access, use read_private_repository_content instead (GitLab
     only - this server never grants private GitHub access)."""
     _require_provider(provider)
+    policy = _repo_policy(ctx, "read_repository_content", write=False)
+    _check_repo(_repo_target(provider, owner, repo), policy)
     if provider == "github":
-        return _github_read_content(owner, repo, path, ref)
-    return _gitlab_read_content(owner, repo, path, ref, allow_private=False)
+        return _github_read_content(owner, repo, path, ref, policy=policy)
+    return _gitlab_read_content(owner, repo, path, ref, allow_private=False, policy=policy)
 
 
 @mcp_server.tool()
 async def read_private_repository_content(
-    provider: Provider, owner: str, repo: str, path: str = "", ref: Optional[str] = None
+    provider: Provider, owner: str, repo: str, path: str = "", ref: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Read a file's content, or list a directory, in a GitLab repository
     regardless of visibility (public, internal, or private). GitLab only -
@@ -543,11 +773,15 @@ async def read_private_repository_content(
             "read_private_repository_content only supports provider='gitlab' "
             "- this server never grants private GitHub access (ADR-0121)"
         )
-    return _gitlab_read_content(owner, repo, path, ref, allow_private=True)
+    policy = _repo_policy(ctx, "read_private_repository_content", write=False)
+    _check_repo(_repo_target(provider, owner, repo), policy)
+    return _gitlab_read_content(owner, repo, path, ref, allow_private=True, policy=policy)
 
 
 @mcp_server.tool()
-async def list_repositories(provider: Provider, owner: str, owner_type: Literal["user", "organization"]) -> Dict[str, Any]:
+async def list_repositories(
+    provider: Provider, owner: str, owner_type: Literal["user", "organization"], ctx: Optional[Context] = None
+) -> Dict[str, Any]:
     """List up to 10 of the most-starred and up to 10 of the most-recently-
     active PUBLIC repositories owned by a GitHub user/organization or a
     GitLab user/group - not the full repository list. Private/internal
@@ -555,6 +789,7 @@ async def list_repositories(provider: Provider, owner: str, owner_type: Literal[
     private/internal listings, use list_private_repositories instead
     (GitLab only)."""
     _require_provider(provider)
+    policy = _repo_policy(ctx, "list_repositories", write=False)
     # asyncio.to_thread: _github_list_repos/_gitlab_list_repos are
     # synchronous, blocking calls (PyGithub/python-gitlab both wrap
     # `requests`) that page through the account's full repo list -
@@ -569,11 +804,14 @@ async def list_repositories(provider: Provider, owner: str, owner_type: Literal[
         if provider == "github"
         else asyncio.to_thread(_gitlab_list_repos, owner, owner_type, allow_private=False)
     )
+    repos = _filter_listing(provider, repos, policy)
     return {"owner": owner, "owner_type": owner_type, "repositories": repos, "count": len(repos)}
 
 
 @mcp_server.tool()
-async def list_private_repositories(provider: Provider, owner: str, owner_type: Literal["user", "organization"]) -> Dict[str, Any]:
+async def list_private_repositories(
+    provider: Provider, owner: str, owner_type: Literal["user", "organization"], ctx: Optional[Context] = None
+) -> Dict[str, Any]:
     """List up to 10 of the most-starred and up to 10 of the most-recently-
     active repositories (public, internal, AND private) owned by a GitLab
     user/group - not the full repository list, and not a private-only
@@ -585,9 +823,11 @@ async def list_private_repositories(provider: Provider, owner: str, owner_type: 
             "list_private_repositories only supports provider='gitlab' "
             "- this server never grants private GitHub access (ADR-0121)"
         )
+    policy = _repo_policy(ctx, "list_private_repositories", write=False)
     # See list_repositories's own comment for why this is offloaded to a
     # thread rather than called directly.
     repos = await asyncio.to_thread(_gitlab_list_repos, owner, owner_type, allow_private=True)
+    repos = _filter_listing(provider, repos, policy)
     return {"owner": owner, "owner_type": owner_type, "repositories": repos, "count": len(repos)}
 
 
@@ -600,12 +840,15 @@ async def write_file(
     content: str,
     commit_message: str,
     branch: Optional[str] = None,
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Create or update a file in a GitHub or GitLab repository as a single commit."""
     _require_provider(provider)
+    policy = _repo_policy(ctx, "write_file", write=True)
+    _check_repo(_repo_target(provider, owner, repo), policy)
     if provider == "github":
-        return _github_write_file(owner, repo, path, content, commit_message, branch)
-    return _gitlab_write_file(owner, repo, path, content, commit_message, branch)
+        return _github_write_file(owner, repo, path, content, commit_message, branch, policy=policy)
+    return _gitlab_write_file(owner, repo, path, content, commit_message, branch, policy=policy)
 
 
 @mcp_server.tool()
@@ -615,11 +858,13 @@ async def create_repository(
     owner: Optional[str] = None,
     private: bool = True,
     description: str = "",
+    ctx: Optional[Context] = None,
 ) -> Dict[str, Any]:
     """Create a new repository. `owner` is a GitHub organization or a GitLab
     namespace (user/group); omit it to create under this server's own
     authenticated identity."""
     _require_provider(provider)
+    _check_repo(_repo_target(provider, owner, name), _repo_policy(ctx, "create_repository", write=True))
     if provider == "github":
         return _github_create_repo(name, owner, private, description)
     return _gitlab_create_repo(name, owner, private, description)
@@ -627,14 +872,19 @@ async def create_repository(
 
 @mcp_server.tool()
 async def fork_repository(
-    provider: Provider, owner: str, repo: str, target_owner: Optional[str] = None
+    provider: Provider, owner: str, repo: str, target_owner: Optional[str] = None, ctx: Optional[Context] = None
 ) -> Dict[str, Any]:
     """Fork a repository. `target_owner` forks into a specific organization/
     namespace; omit it to fork into this server's own authenticated identity."""
     _require_provider(provider)
+    # ADR-0603 M12: the fork is a write to its destination, and a read of its source.
+    target_policy = _repo_policy(ctx, "fork_repository", write=True)
+    source_policy = _repo_policy(ctx, "fork_repository", write=False)
+    _check_repo(_repo_target(provider, target_owner, repo), target_policy)
+    _check_repo(_repo_target(provider, owner, repo), source_policy)
     if provider == "github":
-        return _github_fork_repo(owner, repo, target_owner)
-    return _gitlab_fork_repo(owner, repo, target_owner)
+        return _github_fork_repo(owner, repo, target_owner, source_policy=source_policy, target_policy=target_policy)
+    return _gitlab_fork_repo(owner, repo, target_owner, source_policy=source_policy, target_policy=target_policy)
 
 
 @mcp_server.tool()
@@ -666,6 +916,228 @@ class GatewayTokenMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+# --------------------------------------------------------------------------
+# BEGIN call-assertion verifier (WP-225 lot C)
+#
+# ADR-0602 clause 10 / ADR-0603 M14: the per-call assertion. With
+# MCP_OUTBOUND_IDENTITY=assertion the gateway sends, instead of the caller's
+# bearer, a JWT it signs with a key only it holds (EdDSA, typ zuno-call+jwt; see
+# components/mcp-gateway/app/call_assertion.py): iss mcp-gateway, aud this
+# server's backend name, sub the caller, act the gateway, tool the backend tool
+# name, exp at most 60 s after iat, jti. This server holds the public key
+# (MCP_CALL_ASSERTION_PUBLIC_KEY, PEM) and verifies it here, before any MCP
+# handling. A forged, expired, too long-lived or misaddressed assertion is
+# refused (401). A tools/call whose name is not the assertion's tool, whose
+# arguments do not match its `args` hash, or whose jti was already consumed, is
+# refused (403); a body that is not JSON 400, one past the size cap 413. With
+# MCP_CALL_ASSERTION_REQUIRED=true a request without a valid assertion is
+# refused; without it a request carrying no assertion is served as before.
+# This block is byte-identical in confluence, git-forge, salesforce and aap
+# (each image is built from its own directory, ADR-0119); the lot C tests
+# compare the copies.
+# --------------------------------------------------------------------------
+
+import logging as _assertion_logging  # noqa: E402 - part of the self-contained block
+
+import jwt as _assertion_jwt  # noqa: E402
+from cryptography.hazmat.primitives import serialization as _assertion_serialization  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as _AssertionPublicKey  # noqa: E402
+
+_ASSERTION_LOG = _assertion_logging.getLogger("zuno.call_assertion")
+CALL_ASSERTION_TYPE = "zuno-call+jwt"
+CALL_ASSERTION_ISSUER = "mcp-gateway"
+CALL_ASSERTION_MAX_TTL_SECONDS = 60
+CALL_ASSERTION_LEEWAY_SECONDS = 5
+# The largest request body read to check a tools/call (git.file.write carries a whole
+# file): MCP_CALL_ASSERTION_MAX_BODY_BYTES, chart callAssertion.maxBodyBytes. A larger
+# body is refused with 413.
+CALL_ASSERTION_DEFAULT_MAX_BODY_BYTES = 16 * 1024 * 1024
+_CALL_ASSERTION_KEYS: Dict[str, Any] = {}
+_CALL_ASSERTION_SEEN: Dict[str, float] = {}
+
+
+class CallAssertionError(ValueError):
+    """The assertion is not acceptable; the message is safe to return."""
+
+
+def _call_assertion_required() -> bool:
+    return os.getenv("MCP_CALL_ASSERTION_REQUIRED", "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _call_assertion_max_body_bytes() -> int:
+    raw = os.getenv("MCP_CALL_ASSERTION_MAX_BODY_BYTES", "").strip()
+    try:
+        value = int(raw) if raw else CALL_ASSERTION_DEFAULT_MAX_BODY_BYTES
+    except ValueError:
+        value = CALL_ASSERTION_DEFAULT_MAX_BODY_BYTES
+    return value if value > 0 else CALL_ASSERTION_DEFAULT_MAX_BODY_BYTES
+
+
+def _call_assertion_args_hash(arguments: Any) -> str:
+    """sha256 of the canonical JSON of tools/call params.arguments (the `args` claim)."""
+    canonical = json.dumps(arguments if arguments is not None else {}, sort_keys=True, separators=(",", ":"),
+                           ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _call_assertion_public_key() -> Any:
+    pem = os.getenv("MCP_CALL_ASSERTION_PUBLIC_KEY", "").strip()
+    if not pem:
+        return None
+    if pem not in _CALL_ASSERTION_KEYS:
+        try:
+            key = _assertion_serialization.load_pem_public_key(pem.encode("utf-8"))
+        except ValueError:
+            key = None
+        if not isinstance(key, _AssertionPublicKey):
+            _ASSERTION_LOG.error("MCP_CALL_ASSERTION_PUBLIC_KEY is not an Ed25519 public key; every assertion is refused")
+            key = None
+        _CALL_ASSERTION_KEYS[pem] = key
+    return _CALL_ASSERTION_KEYS[pem]
+
+
+def _call_assertion_type(token: str) -> str:
+    try:
+        return str(_assertion_jwt.get_unverified_header(token).get("typ") or "")
+    except _assertion_jwt.PyJWTError:
+        return ""
+
+
+def _verify_call_assertion(token: str, key: Any, now: Optional[float] = None) -> Dict[str, Any]:
+    if key is None:
+        raise CallAssertionError("no call-assertion public key is configured")
+    try:
+        claims = _assertion_jwt.decode(
+            token,
+            key,
+            algorithms=["EdDSA"],
+            audience=CALLER_CONTEXT_AUDIENCE,
+            issuer=CALL_ASSERTION_ISSUER,
+            options={"require": ["exp", "iat", "aud", "iss", "sub", "jti"], "verify_exp": False, "verify_iat": False},
+        )
+    except _assertion_jwt.PyJWTError as exc:
+        raise CallAssertionError(f"invalid call assertion: {exc}") from exc
+    current = time.time() if now is None else now
+    iat, exp = claims.get("iat"), claims.get("exp")
+    if not isinstance(iat, int) or not isinstance(exp, int) or exp < iat or exp - iat > CALL_ASSERTION_MAX_TTL_SECONDS:
+        raise CallAssertionError("call assertion lifetime is not within 60 seconds")
+    if iat > current + CALL_ASSERTION_LEEWAY_SECONDS or current > exp + CALL_ASSERTION_LEEWAY_SECONDS:
+        raise CallAssertionError("call assertion expired or not yet valid")
+    act = claims.get("act")
+    if not isinstance(act, dict) or act.get("sub") != CALL_ASSERTION_ISSUER:
+        raise CallAssertionError("call assertion has no gateway actor")
+    if not isinstance(claims.get("tool"), str) or not isinstance(claims.get("jti"), str):
+        raise CallAssertionError("call assertion has no tool or jti")
+    if "args" in claims and not isinstance(claims["args"], str):
+        raise CallAssertionError("call assertion has a malformed args hash")
+    return claims
+
+
+def _consume_call_assertion(jti: str, exp: int, now: Optional[float] = None) -> bool:
+    """True the first time a jti is used for a tools/call; False on a replay."""
+    current = time.time() if now is None else now
+    for seen, until in list(_CALL_ASSERTION_SEEN.items()):
+        if until < current:
+            del _CALL_ASSERTION_SEEN[seen]
+    if jti in _CALL_ASSERTION_SEEN:
+        return False
+    _CALL_ASSERTION_SEEN[jti] = exp + CALL_ASSERTION_LEEWAY_SECONDS
+    return True
+
+
+def _called_tools(body: bytes) -> Optional[List[Any]]:
+    """The tools/call messages of a body: [(name, arguments)]; None when the body is not JSON."""
+    if not body:
+        return []
+    try:
+        message = json.loads(body)
+    except (ValueError, UnicodeDecodeError):
+        return None
+    messages = message if isinstance(message, list) else [message]
+    calls = []
+    for item in messages:
+        if isinstance(item, dict) and item.get("method") == "tools/call":
+            params = item.get("params") if isinstance(item.get("params"), dict) else {}
+            calls.append((str(params.get("name") or ""), params.get("arguments")))
+    return calls
+
+
+class CallAssertionMiddleware:
+    """Pure ASGI, so the body read for a tools/call is replayed to the MCP app intact."""
+
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send) -> None:
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        key, required = _call_assertion_public_key(), _call_assertion_required()
+        if not required and not os.getenv("MCP_CALL_ASSERTION_PUBLIC_KEY", "").strip():
+            await self.app(scope, receive, send)
+            return
+        headers = {k.decode("latin-1").lower(): v.decode("latin-1") for k, v in scope.get("headers") or []}
+        auth = headers.get("authorization", "")
+        token = auth[7:].strip() if auth[:7].lower() == "bearer " else ""
+        if not token or _call_assertion_type(token) != CALL_ASSERTION_TYPE:
+            if required:
+                await JSONResponse({"detail": "a gateway call assertion is required"}, status_code=401)(scope, receive, send)
+                return
+            await self.app(scope, receive, send)
+            return
+        try:
+            claims = _verify_call_assertion(token, key)
+        except CallAssertionError as exc:
+            _ASSERTION_LOG.warning("call assertion refused: %s", exc)
+            await JSONResponse({"detail": str(exc)}, status_code=401)(scope, receive, send)
+            return
+        chunks, size, more, limit = [], 0, True, _call_assertion_max_body_bytes()
+        while more:
+            message = await receive()
+            if message.get("type") != "http.request":
+                break
+            chunk = message.get("body", b"")
+            size += len(chunk)
+            if size > limit:
+                await JSONResponse({"detail": "request body too large"}, status_code=413)(scope, receive, send)
+                return
+            chunks.append(chunk)
+            more = message.get("more_body", False)
+        body = b"".join(chunks)
+        called = _called_tools(body)
+        if called is None:
+            await JSONResponse({"detail": "the request body is not JSON"}, status_code=400)(scope, receive, send)
+            return
+        if called:
+            names = [name for name, _ in called]
+            if len(called) != 1 or names[0] != claims["tool"]:
+                _ASSERTION_LOG.warning("call assertion for tool %r refused for tools/call %s", claims["tool"], names)
+                await JSONResponse({"detail": "the call assertion was minted for another tool"}, status_code=403)(scope, receive, send)
+                return
+            if "args" in claims and claims["args"] != _call_assertion_args_hash(called[0][1]):
+                _ASSERTION_LOG.warning("call assertion for tool %r refused: the arguments differ", claims["tool"])
+                await JSONResponse({"detail": "the call assertion was minted for other arguments"}, status_code=403)(scope, receive, send)
+                return
+            if not _consume_call_assertion(claims["jti"], claims["exp"]):
+                _ASSERTION_LOG.warning("call assertion replay refused (jti %s)", claims["jti"])
+                await JSONResponse({"detail": "the call assertion was already used"}, status_code=403)(scope, receive, send)
+                return
+        sent = False
+
+        async def replay():
+            nonlocal sent
+            if not sent:
+                sent = True
+                return {"type": "http.request", "body": body, "more_body": False}
+            return await receive()
+
+        await self.app(scope, replay, send)
+
+
+# END call-assertion verifier (WP-225 lot C)
+# --------------------------------------------------------------------------
+
+
 mcp_asgi_app: ASGIApp = mcp_server.streamable_http_app(
     streamable_http_path="/mcp",
     transport_security=TransportSecuritySettings(
@@ -678,4 +1150,6 @@ mcp_asgi_app: ASGIApp = mcp_server.streamable_http_app(
     ),
 )
 mcp_asgi_app.add_middleware(GatewayTokenMiddleware)
+# WP-225 lot C: added last, so it runs first (outermost), ahead of the workload-token check.
+mcp_asgi_app.add_middleware(CallAssertionMiddleware)
 app.mount("/", mcp_asgi_app)

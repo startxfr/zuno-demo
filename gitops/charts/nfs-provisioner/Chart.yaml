@@ -1,0 +1,20 @@
+apiVersion: v2
+name: nfs-provisioner
+description: >-
+  NFS Provisioner operator (community-operators, channel alpha - a pre-GA
+  dependency pinned by startingCSV with Manual approval, ADR-0607) and its
+  NFSProvisioner operand, which creates the `nfs` StorageClass that
+  gitops/charts/unifai's sharedStorageClass names (ADR-0608 clauses 1 and
+  2). Declares the install that ran by hand on demo333 so that the first
+  run adopts it; see values.yaml for every field matched against the live
+  objects.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: operator
+    version: "21.3.277"
+    repository: "alias:startx"
+  - name: project
+    version: "21.3.277"
+    repository: "alias:startx"

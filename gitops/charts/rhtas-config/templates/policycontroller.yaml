@@ -50,6 +50,13 @@ spec:
     webhook:
       failurePolicy: Ignore
       name: webhook
+      {{- if .Values.policyOperand.registryCaBundle.enabled }}
+      # WP-226: trust the service CA that serves the internal registry
+      # (templates/configmap-registry-ca.yaml).
+      registryCaBundle:
+        name: {{ .Values.policyOperand.registryCaBundle.configMapName }}
+        key: service-ca.crt
+      {{- end }}
       namespaceSelector:
         matchExpressions:
           - key: policy.rhtas.com/include

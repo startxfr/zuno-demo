@@ -38,8 +38,10 @@ import app.main as gateway_main  # noqa: E402
 from app import delegation  # noqa: E402
 from app.auth import CallerIdentity, validate_token  # noqa: E402
 
+# agent_tekos: since WP-225 lot C the REST path checks the caller's entitlement to the
+# agent it names (ADR-0040), as /mcp always did.
 _FAKE_IDENTITY = CallerIdentity(
-    sub="consultant-1", groups=["consultant"], raw_claims={}, token="caller-jwt"
+    sub="consultant-1", groups=["consultant", "agent_tekos"], raw_claims={}, token="caller-jwt"
 )
 
 

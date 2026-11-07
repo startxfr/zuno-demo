@@ -29,6 +29,18 @@ spec:
         # and no configured capability list.
         lightspeed:
           enabled: true
+        # WP-225 lot C, rollout steps 2 and 3 (user's go 2026-11-07): verify the a2a-gateway's signed
+        # agent chain (the public half of Vault a2a/agent-chain), and sign a per-call assertion for the
+        # Zuno MCP servers instead of forwarding the caller's bearer. Servers ignore it until they hold
+        # the public key (gitops/apps/mcp-*); enforcing it (callAssertion.required) is a later, separate step.
+        agentChain:
+          verify: true
+          publicKey: |
+            -----BEGIN PUBLIC KEY-----
+            MCowBQYDK2VwAyEAZf7wMyaRz0Oc2DX0exW8YAsUIVlFtD8rKnaQ5PBrqPg=
+            -----END PUBLIC KEY-----
+        outboundIdentity:
+          mode: assertion
   destination:
     server: https://kubernetes.default.svc
     namespace: zuno-ai-run

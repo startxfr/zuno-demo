@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 
+from app import signed_chain
+
 logger = logging.getLogger("a2a_gateway.clients")
 
 CLASSIFICATIONS = ("C1", "C2", "C3")
@@ -29,7 +31,27 @@ class DownstreamError(RuntimeError):
     """A model or tool call failed; the message is safe to show the caller."""
 
 
-def _downstream_headers(token: str, agent: str, task: str, classification: str, run_id: str, extra: Dict[str, str]) -> Dict[str, str]:
+def _signed_chain(audience: str, token: str, agent: str, task: str, extra: Dict[str, str]) -> Dict[str, str]:
+    """ADR-0603 M14 (WP-225 lot C): the X-Zuno-Agent-Chain this gateway signs for one
+    downstream call: the agent it runs, the task, the delegators the executor has
+    already checked (verify_chain), bound to the caller's bearer and addressed to the
+    receiving gateway (app/signed_chain.py). Empty unless AGENT_CHAIN_SIGNING_KEY_FILE
+    names a usable key (the chart value agentChain.sign), so the default changes nothing."""
+    key = signed_chain.private_key_from_env()
+    if key is None:
+        return {}
+    try:
+        hops = signed_chain.parse_hops(extra.get("X-Zuno-Delegated-By"))
+        value = signed_chain.sign(private_key=key, audience=audience, token=token, agent=agent, task=task, hops=hops)
+    except signed_chain.ChainSignatureError as exc:
+        logger.warning("no agent chain signed for %s/%s: %s", agent, task, exc)
+        return {}
+    return {signed_chain.HEADER: value}
+
+
+def _downstream_headers(
+    token: str, agent: str, task: str, classification: str, run_id: str, extra: Dict[str, str], audience: str = "",
+) -> Dict[str, str]:
     headers = {
         "Authorization": f"Bearer {token}",
         "X-Zuno-Agent": agent,
@@ -38,6 +60,8 @@ def _downstream_headers(token: str, agent: str, task: str, classification: str, 
         "X-Zuno-Run-Id": run_id,
     }
     headers.update({k: v for k, v in extra.items() if v})
+    if audience:
+        headers.update(_signed_chain(audience, token, agent, task, extra))
     return headers
 
 
@@ -65,7 +89,7 @@ class AiGatewayClient:
             response = await self._client.post(
                 f"{self._base}/v1/chat/completions",
                 json=body,
-                headers=_downstream_headers(token, agent, task, classification, run_id, chain_headers),
+                headers=_downstream_headers(token, agent, task, classification, run_id, chain_headers, "ai-gateway"),
             )
         except httpx.HTTPError as exc:
             logger.warning("ai-gateway unreachable: %s", exc)
@@ -106,13 +130,13 @@ class McpGatewayClient:
 
     async def list_tools(self, *, token: str, agent: str, task: str, classification: str, run_id: str,
                          chain_headers: Dict[str, str]) -> List[Dict[str, Any]]:
-        headers = _downstream_headers(token, agent, task, classification, run_id, chain_headers)
+        headers = _downstream_headers(token, agent, task, classification, run_id, chain_headers, "mcp-gateway")
         result = await self._rpc("tools/list", {}, headers)
         return list(result.get("tools") or [])
 
     async def call_tool(self, name: str, arguments: Dict[str, Any], *, token: str, agent: str, task: str,
                         classification: str, run_id: str, chain_headers: Dict[str, str]) -> str:
-        headers = _downstream_headers(token, agent, task, classification, run_id, chain_headers)
+        headers = _downstream_headers(token, agent, task, classification, run_id, chain_headers, "mcp-gateway")
         result = await self._rpc("tools/call", {"name": name, "arguments": arguments}, headers)
         text = "\n".join(
             str(part.get("text", "")) for part in (result.get("content") or []) if isinstance(part, dict)

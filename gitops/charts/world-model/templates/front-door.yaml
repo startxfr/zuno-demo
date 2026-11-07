@@ -1,0 +1,96 @@
+# ADR-0604 D1: oauth2-proxy admits the groups and forwards the user's access token (the API validates it again).
+# It is the only thing in the namespace with a Route.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: world-model-front-door
+  labels:
+    app.kubernetes.io/name: world-model-front-door
+    zuno.io/managed-by: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: world-model-front-door
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: world-model-front-door
+    spec:
+      serviceAccountName: world-model-front-door
+      automountServiceAccountToken: false
+      {{- include "world-model.podSecurity" . | nindent 6 }}
+      containers:
+        - name: oauth2-proxy
+          image: {{ .Values.images.frontDoor }}
+          args:
+            - --provider=oidc
+            - --oidc-issuer-url={{ include "world-model.keycloakIssuer" . }}
+            - --client-id={{ .Values.frontDoor.clientId }}
+            - --redirect-url=https://{{ .Values.global.zuno.routeHost }}/oauth2/callback
+            - --upstream=http://world-model-web:8080
+            - --http-address=0.0.0.0:4180
+            - --email-domain=*
+            {{- range .Values.frontDoor.allowedGroups }}
+            - --allowed-group={{ . }}
+            {{- end }}
+            - --oidc-groups-claim=groups
+            - --scope=openid email profile
+            - --code-challenge-method=S256
+            - --reverse-proxy=true
+            - --skip-provider-button=true
+            # The upstream validates the token itself: forward it, and keep it fresh.
+            - --pass-access-token=true
+            - --cookie-refresh={{ .Values.frontDoor.cookieRefresh }}
+            - --cookie-name={{ .Values.frontDoor.cookieName }}
+            - --cookie-secure=true
+            - --cookie-samesite=lax
+            # The session WebSocket and the video frames must not be buffered.
+            - --flush-interval=50ms
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: world-model-front-door, key: client-secret}}
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom: {secretKeyRef: {name: world-model-front-door, key: cookie-secret}}
+          ports:
+            - {name: http, containerPort: 4180}
+          readinessProbe:
+            httpGet: {path: /ping, port: 4180}
+          livenessProbe:
+            httpGet: {path: /ping, port: 4180}
+            initialDelaySeconds: 10
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          {{- include "world-model.containerSecurity" . | nindent 10 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: world-model-front-door
+  labels:
+    app.kubernetes.io/name: world-model-front-door
+    zuno.io/managed-by: argocd
+spec:
+  selector:
+    app.kubernetes.io/name: world-model-front-door
+  ports:
+    - {name: http, port: 4180, targetPort: 4180}
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: world-model
+  labels:
+    zuno.io/managed-by: argocd
+  annotations:
+    haproxy.router.openshift.io/timeout: {{ .Values.route.timeout | quote }}
+spec:
+  host: {{ .Values.global.zuno.routeHost }}
+  to: {kind: Service, name: world-model-front-door}
+  port: {targetPort: http}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

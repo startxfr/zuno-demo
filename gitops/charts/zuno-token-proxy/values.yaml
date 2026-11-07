@@ -51,6 +51,20 @@ egress:
     - 10.128.0.0/14
     - 172.30.0.0/16
 
+# ADR-0602 clause 10 (WP-225 lot C): the proxy authenticates its callers. Enabled,
+# a request must carry `Authorization: Bearer <key>` with one of the keys of Vault
+# <vaultKey> (property vaultProperty, one key per line; default <clientId>/token-proxy);
+# anything else is answered 401 and nothing is relayed. The key never reaches a
+# gateway: the gateways see only this client's Keycloak token. The client (Dify's
+# model and MCP providers, the knowledge adapter, kagent) must send the key first:
+# enable it together with the client side (ansible dify_token_proxy_inbound_auth),
+# and grant the Vault key to the namespace in platform/vault/secret-access.yaml.
+# Off by default: any pod of the client namespace, as before (NetworkPolicy only).
+inboundAuth:
+  enabled: false
+  vaultKey: ""
+  vaultProperty: inbound_keys
+
 refreshRatio: "0.7"
 upstreamTimeoutSeconds: "300"
 

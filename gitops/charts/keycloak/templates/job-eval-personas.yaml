@@ -14,7 +14,7 @@ reported and left alone.
 Runs after job-client-reconcile.yaml (wave -5), which creates the agent_*
 groups the personas join.
 */ -}}
-{{- if and .Values.keycloak.enabled .Values.evalPersonas }}
+{{- if and .Values.keycloak.enabled .Values.evalPersonas (or .Values.keycloak.builtIn .Values.keycloakExternal.seedPersonas) }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -52,7 +52,12 @@ spec:
             readOnlyRootFilesystem: true
           env:
             - name: KC_SERVER
-              value: {{ .Values.clientReconcile.serverUrl | quote }}
+              value: {{ ternary .Values.clientReconcile.serverUrl (.Values.keycloakExternal.url | trimSuffix "/") .Values.keycloak.builtIn | quote }}
+            {{- if not .Values.keycloak.builtIn }}
+            # ADR-0352/WP-211 external mode: sign in to this realm (the scoped credential's own), not master.
+            - name: KC_ADMIN_REALM
+              value: {{ .Values.keycloakExternal.adminRealm | quote }}
+            {{- end }}
             - name: KC_REALM
               value: zuno
             - name: KC_ADMIN_USER
@@ -98,6 +103,11 @@ spec:
               readOnly: true
             - name: tmp
               mountPath: /tmp
+            {{- if and (not .Values.keycloak.builtIn) .Values.keycloakExternal.caConfigMap }}
+            - name: external-ca
+              mountPath: /ca
+              readOnly: true
+            {{- end }}
           command:
             - /bin/bash
             - -c
@@ -108,19 +118,37 @@ spec:
               # filesystem, arbitrary UID, no writable home.
               KCADM="/opt/keycloak/bin/kcadm.sh"
               CFG="--config /tmp/kcadm.config"
+{{- if not .Values.keycloak.builtIn }}
+
+              # ADR-0352/WP-211 external mode: trust the supplied CA (same truststore build as
+              # job-client-reconcile-external.yaml).
+              if [ -s /ca/ca-bundle.crt ]; then
+                n=0; cur=""
+                while IFS= read -r line; do
+                  case "$line" in *"BEGIN CERTIFICATE"*) cur="/tmp/ca-$n.pem"; : > "$cur"; n=$((n+1)) ;; esac
+                  [ -n "$cur" ] && printf '%s\n' "$line" >> "$cur"
+                  case "$line" in *"END CERTIFICATE"*) cur="" ;; esac
+                done < /ca/ca-bundle.crt
+                for i in $(seq 0 $((n-1))); do
+                  keytool -importcert -noprompt -alias "ext-$i" -file "/tmp/ca-$i.pem" \
+                    -keystore /tmp/external-ca.p12 -storetype PKCS12 -storepass changeit >/dev/null
+                done
+                [ "$n" -gt 0 ] && $KCADM config truststore $CFG --trustpass changeit /tmp/external-ca.p12
+              fi
+{{- end }}
 
               # ADR-0595: the permanent automation account when it exists, else the
               # bootstrap admin (same rule as the client reconcile Job).
               kc_login() {
                 if [ -n "${KC_AUTOMATION_USER:-}" ] && [ -n "${KC_AUTOMATION_PASSWORD:-}" ] \
                    && $KCADM config credentials $CFG --server "$KC_SERVER" \
-                        --realm master --user "$KC_AUTOMATION_USER" \
+                        --realm {{ if .Values.keycloak.builtIn }}master{{ else }}"$KC_ADMIN_REALM"{{ end }} --user "$KC_AUTOMATION_USER" \
                         --password "$KC_AUTOMATION_PASSWORD" >/dev/null 2>&1; then
                   [ -n "${KC_LOGIN_LOGGED:-}" ] || { echo "signed in as the automation account ($KC_AUTOMATION_USER)"; KC_LOGIN_LOGGED=1; }
                   return 0
                 fi
                 if $KCADM config credentials $CFG --server "$KC_SERVER" \
-                     --realm master --user "$KC_ADMIN_USER" \
+                     --realm {{ if .Values.keycloak.builtIn }}master{{ else }}"$KC_ADMIN_REALM"{{ end }} --user "$KC_ADMIN_USER" \
                      --password "$KC_ADMIN_PASSWORD" >/dev/null 2>&1; then
                   [ -n "${KC_LOGIN_LOGGED:-}" ] || { echo "signed in as the BOOTSTRAP admin ($KC_ADMIN_USER): the automation account did not work"; KC_LOGIN_LOGGED=1; }
                   return 0
@@ -210,4 +238,9 @@ spec:
             name: zuno-keycloak-eval-personas
         - name: tmp
           emptyDir: {}
+        {{- if and (not .Values.keycloak.builtIn) .Values.keycloakExternal.caConfigMap }}
+        - name: external-ca
+          configMap:
+            name: {{ .Values.keycloakExternal.caConfigMap }}
+        {{- end }}
 {{- end }}

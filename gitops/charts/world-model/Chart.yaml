@@ -1,0 +1,6 @@
+apiVersion: v2
+name: world-model
+description: The interactive generative world-model experience (ADR-0604, WP-235)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

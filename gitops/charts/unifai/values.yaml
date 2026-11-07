@@ -61,6 +61,10 @@ stack:
   sharedStorageClass: nfs
   identity:
     realm: zuno
+    # ADR-0352/WP-211: Keycloak base URL (no realm path) and host. Empty = the
+    # built-in instance, https://keycloak.<clusterBaseDomain>.
+    keycloakUrl: ""
+    keycloakHost: ""
     clientId: unifai
     # Vault path of the client secret (seeded by ansible/roles/vault).
     clientSecretVaultPath: keycloak/unifai
@@ -140,6 +144,15 @@ egress:
       reason: RAG source rh-argocd-upstream-stable (web crawl).
     - dnsName: helm.sh
       reason: RAG source rh-helm-upstream-latest (web crawl).
+    # UnifAI 0.1.65 git RAG source (fork e2e review, b9, 2026-11-07): the clone/download path of a
+    # public GitHub repository needs the API, the archive host and the redirect target. Rehearsed in
+    # the throwaway stack before egress.enabled is switched on.
+    - dnsName: github.com
+      reason: git RAG source (UnifAI 0.1.65), redirects of the repository download.
+    - dnsName: api.github.com
+      reason: git RAG source (UnifAI 0.1.65), repository metadata.
+    - dnsName: codeload.github.com
+      reason: git RAG source (UnifAI 0.1.65), archive download.
   # Not listed: us.cloud.langfuse.com (multiagent LANGFUSE_BASE_URL, but
   # LANGFUSE_ENABLED=false live). Add it here when Langfuse is turned on.
 

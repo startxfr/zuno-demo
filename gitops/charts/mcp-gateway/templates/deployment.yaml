@@ -144,11 +144,44 @@ spec:
               value: {{ .Values.aiGatewayUrl | quote }}
             - name: INTERNAL_EMAIL_DOMAINS
               value: {{ .Values.internalEmailDomains | quote }}
+            # ADR-0603 M12, M13, M15 (WP-225 lot B). "{}" = no allowlist / no matcher.
+            - name: EMAIL_RECIPIENT_ALLOWLIST
+              value: {{ .Values.emailReport.recipientAllowlist | default dict | toJson | quote }}
+            - name: METRICS_NAMESPACES_BY_GROUP
+              value: {{ .Values.metricsQuery.namespacesByGroup | default dict | toJson | quote }}
+            - name: MCP_MAX_BATCH_SIZE
+              value: {{ .Values.jsonRpc.maxBatchSize | quote }}
             - name: MCP_GATEWAY_WORKLOAD_TOKEN
               valueFrom:
                 secretKeyRef:
                   name: mcp-gateway-workload-token
                   key: token
+            {{- /* WP-225 lot C: rendered only when set, so the defaults roll no pod. */}}
+            {{- if eq .Values.outboundIdentity.mode "assertion" }}
+            - name: MCP_OUTBOUND_IDENTITY
+              value: assertion
+            - name: MCP_CALL_ASSERTION_KEY_FILE
+              value: /var/run/zuno-call-assertion/private_key
+            - name: MCP_CALL_ASSERTION_TTL_SECONDS
+              value: {{ .Values.outboundIdentity.assertionTtlSeconds | quote }}
+            {{- end }}
+            {{- if .Values.agentChain.verify }}
+            - name: AGENT_CHAIN_VERIFY
+              value: "true"
+            - name: AGENT_CHAIN_PUBLIC_KEY
+              value: {{ .Values.agentChain.publicKey | quote }}
+            {{- end }}
+            {{- if .Values.restAgentEntitlement }}
+            - name: AGENT_ENTITLEMENT_EVERY_CALL
+              value: "true"
+            {{- end }}
+            {{- with .Values.jwtAllowedClients }}
+            {{- if has "*" . }}
+            {{- fail "jwtAllowedClients must list clients; a bare \"*\" would admit every client" }}
+            {{- end }}
+            - name: JWT_ALLOWED_CLIENTS
+              value: {{ join "," . | quote }}
+            {{- end }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
 {{- if .Values.okf.fetch.enabled }}
@@ -171,6 +204,11 @@ spec:
               mountPath: /okf
               readOnly: true
             {{- end }}
+            {{- if eq .Values.outboundIdentity.mode "assertion" }}
+            - name: call-assertion-key
+              mountPath: /var/run/zuno-call-assertion
+              readOnly: true
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /healthz
@@ -188,6 +226,11 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        {{- if eq .Values.outboundIdentity.mode "assertion" }}
+        - name: call-assertion-key
+          secret:
+            secretName: mcp-gateway-call-assertion
+        {{- end }}
         {{- if .Values.okf.fetch.enabled }}
         - name: okf
           emptyDir: {}

@@ -1,0 +1,6 @@
+---
+# ADR-0604 (WP-231): the ServiceAccounts that pull world-model images from zuno-ai-build.
+world_model_namespace: zuno-world-model
+world_model_image_pullers:
+  - world-model-runtime
+  - world-model-web

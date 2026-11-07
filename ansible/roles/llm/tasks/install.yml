@@ -61,14 +61,32 @@
       # ADR-0579 (WP-164 lot 3): mount the generated per-agent guardrail modes.
       guardrails:
         modesGenerated: "{{ zuno_ai_gateway_guardrails_modes_generated | default(false) | bool }}"
+        # ADR-0602 clause 8 (WP-225): block fails closed from this class up.
+        failClosedFrom: "{{ zuno_ai_gateway_guardrails_fail_closed_from | default('C2') }}"
+        # Shipped off: the scan stays the last user message until a cluster turns it on.
+        scanToolResults: "{{ zuno_ai_gateway_guardrails_scan_tool_results | default(false) | bool }}"
+      # ADR-0602 clause 9 (WP-225): metered /v1/messages and /v1/responses (off),
+      # the served models and the optional per-key ceilings (none by default).
+      meteredPaths:
+        enabled: "{{ zuno_ai_gateway_metered_paths | default(false) | bool }}"
+        models: "{{ zuno_ai_gateway_metered_paths_models | default({}) }}"
+        keyCeilings: "{{ zuno_ai_gateway_key_ceilings | default({}) }}"
       # ADR-0565 clause 5 (WP-209): mount the generated classification floors;
       # the level of a header-less call stays C1 unless a cluster sets C3.
+      # WP-225 lot C: verify the a2a-gateway's signed agent chain (public half of Vault a2a/agent-chain).
+      # Off unless a cluster sets both variables in ansible/clusters/<cluster>.yml.
+      agentChain:
+        verify: "{{ zuno_ai_gateway_agent_chain_verify | default(false) | bool }}"
+        publicKey: "{{ zuno_ai_gateway_agent_chain_public_key | default('') }}"
       classification:
         floorsGenerated: "{{ zuno_ai_gateway_classification_floors_generated | default(false) | bool }}"
         defaultWhenAbsent: "{{ zuno_ai_gateway_classification_default_when_absent | default('C1') }}"
         # WP-209 review: floor of a call that names no known agent, per Keycloak
         # client (e.g. {unifai: C2}); empty = none, today's behaviour.
         clientFloors: "{{ zuno_ai_gateway_classification_client_floors | default({}) }}"
+      # ADR-0610 (WP-244): admit the Kuadrant gateway of the workstation entry (NetworkPolicy peer).
+      workstationEntry:
+        enabled: "{{ zuno_ai_gateway_workstation_entry | default(false) | bool }}"
       # ADR-0591 (WP-188): skip not-ready local models / open breakers.
       # Turned on per cluster after the image carrying them is rolled.
       availability:

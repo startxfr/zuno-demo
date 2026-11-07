@@ -1,8 +1,6 @@
 # WP-226: Supply chain and dependency hygiene: digests, enforce mode, lockfiles (delivers ADR-0603)
 
-- **State:** Operator pending (2026-11-07). The repo work is committed locally on branch `wp-226-supply-chain` (cut from
-  `devel` at 2befc90a), not pushed. Every live step below needs the user's go: the image rebuilds, the warn dry run,
-  the switch to enforce, the first rendered release and the `zuno_validate_route_certs` switch.
+- **State:** Done (2026-11-07, user decision). On `devel`; the image policy is in `enforce` on demo333 for the opt-in namespaces after a clean warn run. The live steps still open (first rendered release, `zuno_validate_route_certs`, AAP execution environment digest) are listed in [post-demo-hardening.md](../post-demo-hardening.md) and each needs the user's go.
 - **ADRs:** ADR-0603
 - **Depends on:** WP-222
 - **Blocks:** WP-227
@@ -251,3 +249,20 @@ A read-only review by the main session found the points below, fixed in one foll
 - **The ledger header** in `release_ledger.py` still says no deployment consumes the ledger. It is left as is: the
   ledger file is never hand-edited, and its header changes with the next release write.
 - **History purge** of `evaluations/.venv-gate`: the user's decision (item 16).
+
+## Live finding: warn dry run on demo333 (2026-11-07, user's go)
+
+Namespace `zuno-wp226-cip-test` (label `policy.rhtas.com/include=true`). Both the signed `ai-gateway@sha256:d849b322…`
+and the unsigned `python:3.11-slim` were admitted with the same warning: `signature keyless validation failed …
+Get "https://image-registry.openshift-image-registry.svc:5000/v2/": tls: failed to verify certificate: x509:
+certificate signed by unknown authority`. The policy webhook could not reach the internal registry at all, so warn mode
+had been reporting every image as failed, and enforce would have refused all of them. Fix: the rhtas-config chart
+renders a service-CA-injected ConfigMap and passes it as the upstream chart's `webhook.registryCaBundle`
+(`SSL_CERT_DIR=/etc/custom-ca:/etc/ssl/certs`, system roots kept). Re-run the dry run after the sync before any switch
+to enforce.
+
+Re-run after the sync (2026-11-07): the signed `ai-gateway@sha256:d849b322…` passes the policy, and the unsigned
+`python:3.11-slim` fails on its signature, not on TLS any more. `zuno-first-party-images` is switched to `enforce` in
+git. Opted-in namespaces at the switch: unifai-operator and zuno-unifai, with no first-party image, plus the test
+namespace.
+

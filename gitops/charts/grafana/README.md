@@ -30,6 +30,7 @@ namespace):
 | `dashboard-infra-data.yaml` | `zuno-infra-data` | namespace, node, pod | Node/pod/deployment health, resource consumption |
 | `dashboard-data.yaml` | `zuno-data` | none (one exporter per service) | PostgreSQL/MariaDB/Redis exporter health, throughput, cache efficiency |
 | `dashboard-gitops.yaml` | `zuno-gitops` | none (openshift-gitops only) | ArgoCD sync/health status, apps out of sync, control-plane deployment availability and CPU usage |
+| `dashboard-world-model.yaml` | `zuno-world-model` | none | ADR-0604 world-model demo: the on-demand GPU node, engine step, frames generated and displayed, browser-measured input-to-display latency, prompt treatment, refusals. Empty while the demo is off |
 | `dashboard-mesh-gateway.yaml` | `zuno-mesh-gateway` | dest_service, source_workload, mesh_namespace | Istio/Envoy mesh traffic, Kuadrant Authorino/Limitador |
 
 Several panels (AI models, Agents/tools/RAG, Mesh & gateway) query the

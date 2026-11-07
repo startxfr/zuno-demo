@@ -22,6 +22,17 @@ def _knowledge_bases(raw: str) -> Dict[str, str]:
     return bases
 
 
+def _read_optional(path: str) -> str:
+    """The first non-comment line of `path`; "" when unset. Set but unreadable fails the start."""
+    if not path:
+        return ""
+    with open(path, encoding="utf-8") as handle:
+        for line in handle:
+            if line.strip() and not line.lstrip().startswith("#"):
+                return line.strip()
+    raise ValueError(f"PROXY_KEY_FILE {path} holds no key")
+
+
 @dataclass(frozen=True)
 class Settings:
     api_key: str
@@ -33,6 +44,9 @@ class Settings:
     knowledge_bases: Optional[Dict[str, str]] = None
     max_top_k: int = 20
     upstream_timeout_s: float = 30.0
+    # WP-225 lot C: the key the token proxy asks of its callers (INBOUND_KEYS_FILE there),
+    # sent as `Authorization: Bearer <key>`; empty sends none (the default, as before).
+    proxy_key: str = ""
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -51,4 +65,5 @@ class Settings:
             knowledge_bases=_knowledge_bases(env.get("KNOWLEDGE_BASES", "tech=knowledge.tech")),
             max_top_k=int(env.get("MAX_TOP_K", "20")),
             upstream_timeout_s=float(env.get("UPSTREAM_TIMEOUT_S", "30")),
+            proxy_key=_read_optional(env.get("PROXY_KEY_FILE", "")),
         )

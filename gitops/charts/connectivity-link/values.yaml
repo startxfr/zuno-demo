@@ -74,6 +74,33 @@
 # Application's values so the substitution reaches it). Feeds the default
 # Keycloak issuer of the quota route's AuthPolicy (ADR-0602 clause 6).
 clusterBaseDomain: apps.mycluster.example.com
+# ADR-0610 (WP-244): the ai-gateway's entry for workstation experience clients
+# (templates/workstation-entry.yaml). Off by default; the d1 manifest turns it on.
+# It reuses quotaEnforcement.requiredAudience and the zuno-agent-gateway that
+# quotaEnforcement.gateway renders, so that gateway must be on too.
+workstationEntry:
+  enabled: false
+  # Empty = ai-gateway.<clusterBaseDomain>.
+  hostname: ""
+  # Empty = https://keycloak.<clusterBaseDomain>/realms/zuno.
+  keycloakIssuerUrl: ""
+  # Must mirror gitops/apps/keycloak/application-d1.yaml ingress.acmeWildcardTLS (see the template).
+  keycloakAcmeWildcardTLS: false
+  # Keycloak clients (the token's azp) admitted at the edge. The ai-gateway checks the token again.
+  allowedClients:
+    - blender
+  # Keycloak groups (without the leading slash) whose members may use the entry. Empty = any user of an
+  # allowed client; set it, since a public device-grant client lets every realm user mint a token.
+  allowedGroups: []
+  # Requests per user (token sub) on the entry.
+  rateLimit:
+    limit: 60
+    window: 5m
+  namespace: zuno-ai-run
+  backendService: ai-gateway
+  backendPort: 8080
+  # Router and HTTPRoute timeout: a cold gpt-oss-20b answer can take minutes.
+  timeout: 300s
 quotaEnforcement:
   enabled: true
   gateway:

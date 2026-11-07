@@ -6,11 +6,17 @@
 
 `Authorization` from the client (a dummy key) is dropped and replaced. The configured fixed headers
 replace any header of the same name. Without a valid token the proxy answers 503: it never relays a
-request without one. Ingress is limited to the namespace by NetworkPolicy; the proxy itself has no auth.
+request without one. Ingress is limited to the namespace by NetworkPolicy.
+
+WP-225 lot C (ADR-0602 clause 10): with INBOUND_KEYS_FILE set, a caller must also present one of its
+keys as `Authorization: Bearer <key>`; any other request is answered 401 and nothing is relayed. The
+key never leaves the proxy: the gateways only see the client's own Keycloak token, which they validate
+with the `zuno-admin-api` audience and, when JWT_ALLOWED_CLIENTS is set, the client's `azp`.
 """
 
 from __future__ import annotations
 
+import hmac
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -42,6 +48,18 @@ def _request_headers(incoming: Iterable[Tuple[str, str]], fixed: Dict[str, str],
     headers.update(fixed)
     headers["Authorization"] = f"Bearer {token}"
     return headers
+
+
+def _caller_authenticated(authorization: Optional[str], keys: Tuple[str, ...]) -> bool:
+    """True when no inbound keys are configured, or the bearer is one of them (constant time)."""
+    if not keys:
+        return True
+    value = authorization or ""
+    presented = value[7:].strip() if value[:7].lower() == "bearer " else ""
+    matched = False
+    for key in keys:
+        matched |= hmac.compare_digest(presented.encode("utf-8"), key.encode("utf-8"))
+    return bool(presented) and matched
 
 
 def _response_headers(upstream: httpx.Headers) -> Dict[str, str]:
@@ -80,6 +98,10 @@ def create_app(
 
     async def relay(request: Request, upstream_name: str, base: str, path: str, fixed: Dict[str, str]) -> Response:
         started = time.monotonic()
+        if not _caller_authenticated(request.headers.get("authorization"), settings.inbound_keys):
+            metrics.inc("zuno_token_proxy_requests_total", upstream=upstream_name, code="401")
+            return JSONResponse({"error": "unauthenticated caller"}, status_code=401,
+                                headers={"WWW-Authenticate": "Bearer"})
         try:
             token = await tokens.get()
         except TokenUnavailable:

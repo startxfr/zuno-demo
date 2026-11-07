@@ -1,0 +1,801 @@
+{
+  "date": "2026-11-07",
+  "persona": "eval-ai-dev-01",
+  "gateway": "https://ai-gateway.apps.demo333.startx.fr",
+  "repeats": 2,
+  "prompts": [
+    {
+      "id": "table-lamp",
+      "prompt": "A wooden table with 4 cylindrical legs and a small desk lamp on top",
+      "successes": 1,
+      "runs": 2,
+      "reasons": [
+        "Blender: Error: Script failed, nothing kept: Error: Object 'TableTop' not in collection 'Scene Collection'",
+        "8 objects, 0 modifiers, 0 materials"
+      ],
+      "mean_seconds": 7.4,
+      "stage_ready": false
+    },
+    {
+      "id": "pine-hill",
+      "prompt": "A low-poly pine tree on a small grassy hill",
+      "successes": 1,
+      "runs": 2,
+      "reasons": [
+        "Blender: Error: Script failed, nothing kept: create_cone: keyword \"diameter1\" is invalid for this operator",
+        "3 objects, 0 modifiers, 2 materials"
+      ],
+      "mean_seconds": 8.0,
+      "stage_ready": false
+    },
+    {
+      "id": "office-chair",
+      "prompt": "A modern ergonomic office chair with five wheels",
+      "successes": 1,
+      "runs": 2,
+      "reasons": [
+        "static check: syntax error line 36: invalid syntax",
+        "11 objects, 0 modifiers, 6 materials"
+      ],
+      "mean_seconds": 8.2,
+      "stage_ready": false
+    },
+    {
+      "id": "simple-chair",
+      "prompt": "A simple wooden chair with four legs and a backrest",
+      "successes": 1,
+      "runs": 2,
+      "reasons": [
+        "1 objects, 0 modifiers, 1 materials",
+        "Blender: Error: Script failed, nothing kept: 'Scene' object has no attribute 'object_bases'"
+      ],
+      "mean_seconds": 6.5,
+      "stage_ready": false
+    },
+    {
+      "id": "house",
+      "prompt": "A small house with a pitched roof, a door and two windows",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "1 objects, 0 modifiers, 1 materials",
+        "5 objects, 0 modifiers, 0 materials"
+      ],
+      "mean_seconds": 6.7,
+      "stage_ready": true
+    },
+    {
+      "id": "car",
+      "prompt": "A low-poly car with four wheels",
+      "successes": 1,
+      "runs": 2,
+      "reasons": [
+        "Blender: Error: Script failed, nothing kept: BMElemSeq[index]: index 12 out of range",
+        "5 objects, 0 modifiers, 2 materials"
+      ],
+      "mean_seconds": 7.4,
+      "stage_ready": false
+    },
+    {
+      "id": "rocket",
+      "prompt": "A cartoon rocket with three fins on a launch pad",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "7 objects, 0 modifiers, 3 materials",
+        "6 objects, 0 modifiers, 6 materials"
+      ],
+      "mean_seconds": 10.1,
+      "stage_ready": true
+    },
+    {
+      "id": "castle",
+      "prompt": "A small castle with four corner towers and a gate",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "5 objects, 0 modifiers, 0 materials",
+        "7 objects, 0 modifiers, 1 materials"
+      ],
+      "mean_seconds": 6.6,
+      "stage_ready": true
+    },
+    {
+      "id": "mug",
+      "prompt": "A coffee mug with a handle on a saucer",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "3 objects, 0 modifiers, 2 materials",
+        "2 objects, 0 modifiers, 2 materials"
+      ],
+      "mean_seconds": 6.6,
+      "stage_ready": true
+    },
+    {
+      "id": "bookshelf",
+      "prompt": "A bookshelf with three shelves and a few books",
+      "successes": 1,
+      "runs": 2,
+      "reasons": [
+        "13 objects, 0 modifiers, 9 materials",
+        "Blender: Error: Script failed, nothing kept: Error: Object 'Bookshelf_Base' not in collection 'Scene Collection'"
+      ],
+      "mean_seconds": 6.7,
+      "stage_ready": false
+    },
+    {
+      "id": "street-lamp",
+      "prompt": "A street lamp on a round base",
+      "successes": 2,
+      "runs": 2,
+      "reasons": [
+        "5 objects, 0 modifiers, 4 materials",
+        "4 objects, 0 modifiers, 1 materials"
+      ],
+      "mean_seconds": 6.3,
+      "stage_ready": true
+    },
+    {
+      "id": "bench",
+      "prompt": "A park bench with a backrest and metal legs",
+      "successes": 0,
+      "runs": 2,
+      "reasons": [
+        "Blender: Error: Script failed, nothing kept: faces.new(...): sequence incorrect size, expected [3 - -1], given 2",
+        "Blender: Error: Script failed, nothing kept: BMeshOpsModule: operator \"create_cylinder\" doesn't exist"
+      ],
+      "mean_seconds": 7.8,
+      "stage_ready": false
+    }
+  ],
+  "stage_ready": [
+    "house",
+    "rocket",
+    "castle",
+    "mug",
+    "street-lamp"
+  ],
+  "runs": [
+    {
+      "id": "table-lamp",
+      "prompt": "A wooden table with 4 cylindrical legs and a small desk lamp on top",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 9.7,
+      "lines": 73,
+      "script": "table-lamp-1.py",
+      "check": [],
+      "blender": {
+        "script": "table-lamp-1.py",
+        "outcome": "CANCELLED",
+        "error": "Error: Script failed, nothing kept: Error: Object 'TableTop' not in collection 'Scene Collection'",
+        "check": [],
+        "objects": 0,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [],
+        "render": ""
+      },
+      "ok": false,
+      "reason": "Blender: Error: Script failed, nothing kept: Error: Object 'TableTop' not in collection 'Scene Collection'"
+    },
+    {
+      "id": "table-lamp",
+      "prompt": "A wooden table with 4 cylindrical legs and a small desk lamp on top",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 5.1,
+      "lines": 37,
+      "script": "table-lamp-2.py",
+      "check": [],
+      "blender": {
+        "script": "table-lamp-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 8,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [
+          "LampBase",
+          "LampLightObj",
+          "LampShade",
+          "Leg_1",
+          "Leg_2",
+          "Leg_3",
+          "Leg_4",
+          "TableTop"
+        ],
+        "render": "table-lamp-2.png"
+      },
+      "ok": true,
+      "reason": "8 objects, 0 modifiers, 0 materials"
+    },
+    {
+      "id": "pine-hill",
+      "prompt": "A low-poly pine tree on a small grassy hill",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 7.5,
+      "lines": 62,
+      "script": "pine-hill-1.py",
+      "check": [],
+      "blender": {
+        "script": "pine-hill-1.py",
+        "outcome": "CANCELLED",
+        "error": "Error: Script failed, nothing kept: create_cone: keyword \"diameter1\" is invalid for this operator",
+        "check": [],
+        "objects": 0,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [],
+        "render": ""
+      },
+      "ok": false,
+      "reason": "Blender: Error: Script failed, nothing kept: create_cone: keyword \"diameter1\" is invalid for this operator"
+    },
+    {
+      "id": "pine-hill",
+      "prompt": "A low-poly pine tree on a small grassy hill",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 8.4,
+      "lines": 60,
+      "script": "pine-hill-2.py",
+      "check": [],
+      "blender": {
+        "script": "pine-hill-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 3,
+        "modifiers": 0,
+        "materials": 2,
+        "names": [
+          "Foliage",
+          "Hill",
+          "Trunk"
+        ],
+        "render": "pine-hill-2.png"
+      },
+      "ok": true,
+      "reason": "3 objects, 0 modifiers, 2 materials"
+    },
+    {
+      "id": "office-chair",
+      "prompt": "A modern ergonomic office chair with five wheels",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 7.3,
+      "lines": 47,
+      "script": "office-chair-1.py",
+      "check": [
+        "syntax error line 36: invalid syntax"
+      ],
+      "blender": {},
+      "ok": false,
+      "reason": "static check: syntax error line 36: invalid syntax"
+    },
+    {
+      "id": "office-chair",
+      "prompt": "A modern ergonomic office chair with five wheels",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 9.2,
+      "lines": 58,
+      "script": "office-chair-2.py",
+      "check": [],
+      "blender": {
+        "script": "office-chair-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 11,
+        "modifiers": 0,
+        "materials": 6,
+        "names": [
+          "Armrest_-1",
+          "Armrest_1",
+          "Backrest",
+          "Chair_Empty",
+          "Cushion",
+          "Seat",
+          "Wheel_0",
+          "Wheel_1"
+        ],
+        "render": "office-chair-2.png"
+      },
+      "ok": true,
+      "reason": "11 objects, 0 modifiers, 6 materials"
+    },
+    {
+      "id": "simple-chair",
+      "prompt": "A simple wooden chair with four legs and a backrest",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 6.6,
+      "lines": 53,
+      "script": "simple-chair-1.py",
+      "check": [],
+      "blender": {
+        "script": "simple-chair-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 1,
+        "modifiers": 0,
+        "materials": 1,
+        "names": [
+          "Wooden_Chair"
+        ],
+        "render": "simple-chair-1.png"
+      },
+      "ok": true,
+      "reason": "1 objects, 0 modifiers, 1 materials"
+    },
+    {
+      "id": "simple-chair",
+      "prompt": "A simple wooden chair with four legs and a backrest",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 6.5,
+      "lines": 48,
+      "script": "simple-chair-2.py",
+      "check": [],
+      "blender": {
+        "script": "simple-chair-2.py",
+        "outcome": "CANCELLED",
+        "error": "Error: Script failed, nothing kept: 'Scene' object has no attribute 'object_bases'",
+        "check": [],
+        "objects": 0,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [],
+        "render": ""
+      },
+      "ok": false,
+      "reason": "Blender: Error: Script failed, nothing kept: 'Scene' object has no attribute 'object_bases'"
+    },
+    {
+      "id": "house",
+      "prompt": "A small house with a pitched roof, a door and two windows",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 6.3,
+      "lines": 54,
+      "script": "house-1.py",
+      "check": [],
+      "blender": {
+        "script": "house-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 1,
+        "modifiers": 0,
+        "materials": 1,
+        "names": [
+          "HouseBody"
+        ],
+        "render": "house-1.png"
+      },
+      "ok": true,
+      "reason": "1 objects, 0 modifiers, 1 materials"
+    },
+    {
+      "id": "house",
+      "prompt": "A small house with a pitched roof, a door and two windows",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 7.1,
+      "lines": 48,
+      "script": "house-2.py",
+      "check": [],
+      "blender": {
+        "script": "house-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [
+          "Door",
+          "HouseBase",
+          "Roof",
+          "Window1",
+          "Window2"
+        ],
+        "render": "house-2.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 0 materials"
+    },
+    {
+      "id": "car",
+      "prompt": "A low-poly car with four wheels",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 8.2,
+      "lines": 61,
+      "script": "car-1.py",
+      "check": [],
+      "blender": {
+        "script": "car-1.py",
+        "outcome": "CANCELLED",
+        "error": "Error: Script failed, nothing kept: BMElemSeq[index]: index 12 out of range",
+        "check": [],
+        "objects": 0,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [],
+        "render": ""
+      },
+      "ok": false,
+      "reason": "Blender: Error: Script failed, nothing kept: BMElemSeq[index]: index 12 out of range"
+    },
+    {
+      "id": "car",
+      "prompt": "A low-poly car with four wheels",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 6.6,
+      "lines": 51,
+      "script": "car-2.py",
+      "check": [],
+      "blender": {
+        "script": "car-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 2,
+        "names": [
+          "CarBody",
+          "Wheel_1",
+          "Wheel_2",
+          "Wheel_3",
+          "Wheel_4"
+        ],
+        "render": "car-2.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 2 materials"
+    },
+    {
+      "id": "rocket",
+      "prompt": "A cartoon rocket with three fins on a launch pad",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 10.1,
+      "lines": 84,
+      "script": "rocket-1.py",
+      "check": [],
+      "blender": {
+        "script": "rocket-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 7,
+        "modifiers": 0,
+        "materials": 3,
+        "names": [
+          "Camera",
+          "CartoonRocket",
+          "Fin_1",
+          "Fin_2",
+          "Fin_3",
+          "LaunchPad",
+          "Sun"
+        ],
+        "render": "rocket-1.png"
+      },
+      "ok": true,
+      "reason": "7 objects, 0 modifiers, 3 materials"
+    },
+    {
+      "id": "rocket",
+      "prompt": "A cartoon rocket with three fins on a launch pad",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 10.1,
+      "lines": 85,
+      "script": "rocket-2.py",
+      "check": [],
+      "blender": {
+        "script": "rocket-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 6,
+        "modifiers": 0,
+        "materials": 6,
+        "names": [
+          "Fin_1",
+          "Fin_2",
+          "Fin_3",
+          "LaunchPad",
+          "RocketBody",
+          "Support"
+        ],
+        "render": "rocket-2.png"
+      },
+      "ok": true,
+      "reason": "6 objects, 0 modifiers, 6 materials"
+    },
+    {
+      "id": "castle",
+      "prompt": "A small castle with four corner towers and a gate",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 5.9,
+      "lines": 46,
+      "script": "castle-1.py",
+      "check": [],
+      "blender": {
+        "script": "castle-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [
+          "CastleBase",
+          "Tower_-1.5_-1.5",
+          "Tower_-1.5_1.5",
+          "Tower_1.5_-1.5",
+          "Tower_1.5_1.5"
+        ],
+        "render": "castle-1.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 0 materials"
+    },
+    {
+      "id": "castle",
+      "prompt": "A small castle with four corner towers and a gate",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 7.3,
+      "lines": 60,
+      "script": "castle-2.py",
+      "check": [],
+      "blender": {
+        "script": "castle-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 7,
+        "modifiers": 0,
+        "materials": 1,
+        "names": [
+          "Castle_Base",
+          "Castle_Empty",
+          "Gate",
+          "Tower_NE",
+          "Tower_NW",
+          "Tower_SE",
+          "Tower_SW"
+        ],
+        "render": "castle-2.png"
+      },
+      "ok": true,
+      "reason": "7 objects, 0 modifiers, 1 materials"
+    },
+    {
+      "id": "mug",
+      "prompt": "A coffee mug with a handle on a saucer",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 7.3,
+      "lines": 52,
+      "script": "mug-1.py",
+      "check": [],
+      "blender": {
+        "script": "mug-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 3,
+        "modifiers": 0,
+        "materials": 2,
+        "names": [
+          "MugBody",
+          "MugHandle",
+          "Saucer"
+        ],
+        "render": "mug-1.png"
+      },
+      "ok": true,
+      "reason": "3 objects, 0 modifiers, 2 materials"
+    },
+    {
+      "id": "mug",
+      "prompt": "A coffee mug with a handle on a saucer",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 5.9,
+      "lines": 45,
+      "script": "mug-2.py",
+      "check": [],
+      "blender": {
+        "script": "mug-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 2,
+        "modifiers": 0,
+        "materials": 2,
+        "names": [
+          "MugBody",
+          "Saucer"
+        ],
+        "render": "mug-2.png"
+      },
+      "ok": true,
+      "reason": "2 objects, 0 modifiers, 2 materials"
+    },
+    {
+      "id": "bookshelf",
+      "prompt": "A bookshelf with three shelves and a few books",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 6.9,
+      "lines": 36,
+      "script": "bookshelf-1.py",
+      "check": [],
+      "blender": {
+        "script": "bookshelf-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 13,
+        "modifiers": 0,
+        "materials": 9,
+        "names": [
+          "Book_1",
+          "Book_2",
+          "Book_3",
+          "Book_4",
+          "Book_5",
+          "Book_6",
+          "Book_7",
+          "Book_8"
+        ],
+        "render": "bookshelf-1.png"
+      },
+      "ok": true,
+      "reason": "13 objects, 0 modifiers, 9 materials"
+    },
+    {
+      "id": "bookshelf",
+      "prompt": "A bookshelf with three shelves and a few books",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 6.5,
+      "lines": 49,
+      "script": "bookshelf-2.py",
+      "check": [],
+      "blender": {
+        "script": "bookshelf-2.py",
+        "outcome": "CANCELLED",
+        "error": "Error: Script failed, nothing kept: Error: Object 'Bookshelf_Base' not in collection 'Scene Collection'",
+        "check": [],
+        "objects": 0,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [],
+        "render": ""
+      },
+      "ok": false,
+      "reason": "Blender: Error: Script failed, nothing kept: Error: Object 'Bookshelf_Base' not in collection 'Scene Collection'"
+    },
+    {
+      "id": "street-lamp",
+      "prompt": "A street lamp on a round base",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 7.6,
+      "lines": 59,
+      "script": "street-lamp-1.py",
+      "check": [],
+      "blender": {
+        "script": "street-lamp-1.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 5,
+        "modifiers": 0,
+        "materials": 4,
+        "names": [
+          "StreetLamp_Base",
+          "StreetLamp_Head",
+          "StreetLamp_LightObj",
+          "StreetLamp_Pole",
+          "StreetLamp_Reflector"
+        ],
+        "render": "street-lamp-1.png"
+      },
+      "ok": true,
+      "reason": "5 objects, 0 modifiers, 4 materials"
+    },
+    {
+      "id": "street-lamp",
+      "prompt": "A street lamp on a round base",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 5.0,
+      "lines": 42,
+      "script": "street-lamp-2.py",
+      "check": [],
+      "blender": {
+        "script": "street-lamp-2.py",
+        "outcome": "FINISHED",
+        "error": "",
+        "check": [],
+        "objects": 4,
+        "modifiers": 0,
+        "materials": 1,
+        "names": [
+          "StreetLamp_Base",
+          "StreetLamp_Bulb",
+          "StreetLamp_Point",
+          "StreetLamp_Pole"
+        ],
+        "render": "street-lamp-2.png"
+      },
+      "ok": true,
+      "reason": "4 objects, 0 modifiers, 1 materials"
+    },
+    {
+      "id": "bench",
+      "prompt": "A park bench with a backrest and metal legs",
+      "repeat": 1,
+      "status": 200,
+      "seconds": 8.1,
+      "lines": 67,
+      "script": "bench-1.py",
+      "check": [],
+      "blender": {
+        "script": "bench-1.py",
+        "outcome": "CANCELLED",
+        "error": "Error: Script failed, nothing kept: faces.new(...): sequence incorrect size, expected [3 - -1], given 2",
+        "check": [],
+        "objects": 0,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [],
+        "render": ""
+      },
+      "ok": false,
+      "reason": "Blender: Error: Script failed, nothing kept: faces.new(...): sequence incorrect size, expected [3 - -1], given 2"
+    },
+    {
+      "id": "bench",
+      "prompt": "A park bench with a backrest and metal legs",
+      "repeat": 2,
+      "status": 200,
+      "seconds": 7.6,
+      "lines": 63,
+      "script": "bench-2.py",
+      "check": [],
+      "blender": {
+        "script": "bench-2.py",
+        "outcome": "CANCELLED",
+        "error": "Error: Script failed, nothing kept: BMeshOpsModule: operator \"create_cylinder\" doesn't exist",
+        "check": [],
+        "objects": 0,
+        "modifiers": 0,
+        "materials": 0,
+        "names": [],
+        "render": ""
+      },
+      "ok": false,
+      "reason": "Blender: Error: Script failed, nothing kept: BMeshOpsModule: operator \"create_cylinder\" doesn't exist"
+    }
+  ],
+  "successes": 16,
+  "success_rate": 0.667
+}

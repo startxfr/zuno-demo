@@ -1,0 +1,5 @@
+# WP-225 lot B review (ADR-0603 M13): test-only, never in the image. A real PromQL
+# parser checks that every query app/promql_scope.py rewrites still parses and that
+# every vector selector carries the namespace matcher (tests/test_wp225_lot_b.py).
+# 0.11.0 (2026-10-09), not 0.12.0 (2026-11-06): a version at least two weeks old.
+promql-parser==0.11.0

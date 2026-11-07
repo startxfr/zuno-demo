@@ -18,9 +18,38 @@ zuno_keycloak_google_oauth_enabled: false
 zuno_google_oauth_client_id: "xxxxxx"
 zuno_google_oauth_client_secret: "xxxxxx"
 
+# --- Keycloak internal/external mode (ADR-0352, WP-211) ---------------------
+# internal (default, key absent): the platform deploys Keycloak (RHBK operator, the Keycloak CR, the realm
+# import). external: a Keycloak this platform does not own is used. Then the role deploys nothing, asserts the
+# endpoint and the admin credential, seeds the credential into Vault (zuno/keycloak/admin), publishes the supplied
+# CA, and the reconcile Job creates, when missing, the realm's clients, groups and service accounts (and the demo
+# personas only if asked). Not provisioned, by decision: the Google identity provider (the external owner's), the
+# master realm, any other realm. Only the realm `zuno` is supported. Switching mode is a migration event, not a
+# reconcile (WP-211 runbook). Needs this file: AAP-launched jobs do not carry it, so run the roles locally.
+zuno_keycloak_mode: internal
+# https URL of the external Keycloak, no realm path, TLS-verifiable (there is no skip-verify option).
+zuno_keycloak_external_url: "xxxxxx"
+zuno_keycloak_external_realm: "zuno"
+# PEM bundle that signs its certificate ("" = publicly trusted). May hold several certificates.
+zuno_keycloak_external_ca_bundle: ""
+# The credential the platform signs in with, in the realm below. A user with the realm-management/realm-admin role
+# on the realm zuno is enough (it needs a first name, a last name and an email). The default `zuno` expects the
+# owner to have created the empty realm; `master` with a master-realm admin lets the Job create it.
+zuno_keycloak_external_admin_realm: "zuno"
+zuno_keycloak_external_admin_username: "xxxxxx"
+zuno_keycloak_external_admin_password: "xxxxxx"
+# true = also create the demo personas (same shared password as internal, ADR-0595) when missing. Off by default: a
+# customer's Keycloak should not get demo accounts. The acceptance gate and the probes need them.
+zuno_keycloak_external_seed_personas: false
+
 # --- SMTP technical mail identity ------------------------------------------
 # Set false to skip deploying the smtp component. Defaults to true.
 zuno_smtp_enabled: false
+
+# --- World-model demo (ADR-0604) -------------------------------------------
+# Committed per cluster in ansible/clusters/<cluster>.yml; set it here only to
+# override locally. true provisions the on-demand GPU node (billed by the hour).
+# zuno_world_model_enabled: false
 
 # Example uses AWS SES; any SMTP provider works the same way.   1. Verify the
 # sending domain/address in SES (required before sending;      new accounts
@@ -514,16 +543,26 @@ zuno_vault_kms_secret_access_key: "xxxxxx"
 #   zuno_connectivity_link_channel     RHCL channel (e.g. stable-1.5).
 #   zuno_kueue_channel                 Kueue channel (e.g. stable-v1.5).
 #
-# Where startingCSV is set, and why only there: only RHOAI gets a startingCSV,
-# built from the effective pin by ansible/roles/openshift_ai/tasks/precheck.yml
-# (`<subscription.operator.csv>.<zuno_openshift_ai_version>`, defaulting to
-# gitops/charts/openshift-ai/values.yaml's subscription.version) and enforced
-# by install.yml, which refuses to approve an InstallPlan for another CSV.
-# RHOAI is the operator whose unattended minor-version drift is judged
-# unacceptable. Pinning every operator is rejected on purpose: it would
-# re-hardcode what ADR-0048 removed. For the rest, the known-good set is
-# recorded as data in platform/olm/known-good-<cluster>.yaml (regenerate with
-# `make d3 check operators`; see platform/olm/audit_operator_updates.py).
+# Where a version is pinned (ADR-0607 clause 2): every pre-GA operator
+# (tech-preview, early-access, alpha, staging) is pinned, GA operators are not.
+# - RHOAI: a startingCSV built from the effective pin by
+#   ansible/roles/openshift_ai/tasks/precheck.yml
+#   (`<subscription.operator.csv>.<zuno_openshift_ai_version>`, defaulting to
+#   gitops/charts/openshift-ai/values.yaml's subscription.version), enforced by
+#   install.yml, which refuses to approve an InstallPlan for another CSV.
+# - claw-operator: catalog digest + startingCSV + Manual approval
+#   (gitops/charts/openclaw/values.yaml, platform/supply-chain/pin_claw_catalog.py).
+# - unifai-operator: catalog digest, so Automatic approval is safe (ADR-0574):
+#   the commit that moves the digest is the approval, with the owner's go per
+#   release (platform/supply-chain/pin_operator_catalog.py).
+# Pinning every GA operator is still rejected: it would re-hardcode what
+# ADR-0048 removed. The installed set, with each operator's support class, is
+# recorded in platform/olm/known-good-<cluster>.yaml, and `make d3 check
+# operators` fails when a pre-GA operator differs from it (ADR-0607 clause 8).
+# Regenerate it in the same commit as every pin:
+#   python3 platform/olm/audit_operator_updates.py --oc-context <ctx> \
+#     --format known-good --cluster <cluster> > platform/olm/known-good-<cluster>.yaml
+# The routine is docs/platform/pre-ga-upgrade.md.
 #
 # zuno_openshift_ai_version: "3.5.0"
 # zuno_openshift_ai_channel: "stable-3.5"

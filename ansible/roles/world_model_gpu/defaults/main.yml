@@ -1,0 +1,15 @@
+---
+# ADR-0604 D5 (WP-229). The switch lives in ansible/clusters/<cluster>.yml
+# (committed, read by every checkout) and may be overridden locally from
+# ansible/confidential.yml. Off unless a cluster says otherwise.
+zuno_world_model_enabled: false
+
+world_model_gpu_app_name: zuno-machines-world-model-d0
+world_model_gpu_machineset: zuno-gpu-world-model-a
+world_model_gpu_node_label: "zuno.io/gpu-workload=world-model"
+# The Day-2 application whose presence blocks removing the node.
+world_model_gpu_dependent_app: zuno-world-model-d1
+# First boot of a g7e node (~8-10 min) plus the GPU Operator driver build and
+# device-plugin advertisement: 25 minutes in all.
+world_model_gpu_wait_retries: 50
+world_model_gpu_wait_delay: 30

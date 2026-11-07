@@ -54,6 +54,10 @@ spec:
               value: {{ .Values.toolName | quote }}
             - name: KNOWLEDGE_BASES
               value: {{ .Values.knowledgeBases | quote }}
+            {{- if .Values.proxyAuth.enabled }}
+            - name: PROXY_KEY_FILE
+              value: /var/run/zuno-dify-knowledge/proxy_key
+            {{- end }}
             - name: PYTHONDONTWRITEBYTECODE
               value: "1"
           volumeMounts:

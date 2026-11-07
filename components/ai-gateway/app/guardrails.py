@@ -12,9 +12,14 @@ metric names. What is new is the mode, chosen per data classification:
 - ``block``   - the prompt is evaluated before routing and the reply before it
   is returned; a detection yields an HTTP 400 with a typed error body.
 
-What is sent: the last user message and the model's reply, verbatim - the two
-things detections are ABOUT. Never sent: the caller's bearer token, system
-prompts, retrieved document bodies or tool results.
+What is sent: the last user message, the tool results and retrieved context
+of the current turn (ADR-0602 clause 8: an injection planted in a Confluence
+page or a crawled web page arrives as a tool result), and the model's reply,
+verbatim - the things detections are ABOUT. Never sent: the caller's bearer
+token, system prompts, or the tool results of earlier turns (they were scanned
+in the turn that produced them). The tool-result scan is behind
+GUARDRAILS_SCAN_TOOL_RESULTS=true (chart `guardrails.scanToolResults`, shipped
+false): off, only the last user message is scanned, as before.
 
 Per agent (ADR-0579 clause 3, WP-164 lot 3): GUARDRAILS_AGENT_MODES_PATH
 names a file generated from the agents release (corp minimum mode per
@@ -24,10 +29,13 @@ corp minimum and the calling agent's mode. X-Zuno-Agent is caller-supplied,
 so it may only ever harden the mode, never relax it. A missing or unreadable
 file leaves the per-classification mode alone.
 
-A detector outage never breaks a request in either mode (it is counted as
-``unavailable``): a guardrail that can take inference down would be a worse
-failure than the one it guards against. Making ``block`` fail closed is a
-separate decision.
+A detector outage (``unavailable``) never breaks a request in ``observe``.
+In ``block`` it fails CLOSED from GUARDRAILS_FAIL_CLOSED_FROM up (default C2,
+ADR-0602 clause 8): the request is refused with a typed 503 rather than served
+unchecked. Below that level (C1) it fails open, as before. An empty value or
+``off`` keeps every class open. The optional model-based classifier
+(app/guardrails_classifier.py, off by default) runs next to the selected
+backend; its outage counts as a detector outage.
 """
 
 from __future__ import annotations
@@ -37,11 +45,14 @@ import contextlib
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional, Set
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Sequence, Set
 
 import httpx
 import yaml
 
+from app import guardrails_classifier
+from app.classification_floor import RANK as _CLASS_RANK
 from app.telemetry import guardrails_observe_span, record_guardrails_evaluation
 
 logger = logging.getLogger("ai_gateway.guardrails")
@@ -63,6 +74,36 @@ GUARDRAILS_WARMUP_TIMEOUT_SECONDS = float(os.getenv("GUARDRAILS_WARMUP_TIMEOUT_S
 # So the warm-up repeats on this interval (pattern-only rails, no LLM call, no
 # metric); a restarted NeMo is warm again within one interval. 0 = start only.
 GUARDRAILS_WARMUP_INTERVAL_SECONDS = float(os.getenv("GUARDRAILS_WARMUP_INTERVAL_SECONDS", "60"))
+
+def fail_closed_from() -> str:
+    """The lowest class whose `block` mode fails closed on a detector outage
+    (chart `guardrails.failClosedFrom`). Read per call. "" or "off" = none; an
+    unknown value falls back to C2, never to "none"."""
+    raw = os.getenv("GUARDRAILS_FAIL_CLOSED_FROM", "C2").strip().upper()
+    if raw in ("", "OFF", "NONE"):
+        return ""
+    if raw not in _CLASS_RANK:
+        logger.error("GUARDRAILS_FAIL_CLOSED_FROM=%r is not a classification; using C2", raw)
+        return "C2"
+    return raw
+
+
+def fails_closed(classification: str) -> bool:
+    """Whether a `block`-mode request at this (effective) level is refused when
+    the detector is unavailable."""
+    threshold = fail_closed_from()
+    if not threshold:
+        return False
+    # An unknown level ranks as the highest: it must not slip through open.
+    return _CLASS_RANK.get((classification or "").upper(), max(_CLASS_RANK.values())) >= _CLASS_RANK[threshold]
+
+
+def scan_tool_results() -> bool:
+    """Scan the current turn's tool results and retrieved context (chart
+    `guardrails.scanToolResults`). Off by default, so a merge leaves the scan as it
+    was (the last user message); a deployment turns it on deliberately."""
+    return os.getenv("GUARDRAILS_SCAN_TOOL_RESULTS", "false").strip().lower() in ("1", "true", "yes", "on")
+
 
 MODES = ("off", "observe", "block")
 DEFAULT_MODE = "observe"
@@ -274,19 +315,33 @@ async def evaluate(
             ))
         except Exception:  # noqa: BLE001 - observability is never a dependency
             logger.debug("guardrails span unavailable", exc_info=True)
-        try:
-            detections = await backend(contents)
-        except Exception as exc:  # noqa: BLE001 - a detector outage never breaks a request
+        calls = [backend(contents)]
+        classifier = guardrails_classifier.active()
+        if classifier is not None:
+            calls.append(classifier.classify(contents))
+        results = await asyncio.gather(*calls, return_exceptions=True)
+        detections: List[Dict[str, Any]] = []
+        failures: List[BaseException] = []
+        for result in results:
+            if isinstance(result, BaseException):
+                failures.append(result)
+            else:
+                detections.extend(result or [])
+        for exc in failures:
             # The type, not only str(exc): an httpx timeout has an empty
             # message, which is how the cold start of 2026-11-02 logged nothing.
             logger.warning(
-                "guardrails evaluation unavailable (response unaffected): "
-                "backend=%s mode=%s agent=%s run_id=%s: %s: %s",
-                GUARDRAILS_BACKEND, mode, agent, run_id, type(exc).__name__, exc,
+                "guardrails evaluation unavailable: backend=%s classifier=%s mode=%s agent=%s "
+                "run_id=%s: %s: %s",
+                GUARDRAILS_BACKEND, classifier.name if classifier else "off", mode, agent, run_id,
+                type(exc).__name__, exc,
             )
+        if failures and not detections:
             record_guardrails_evaluation(agent, "unavailable")
             schedule_warm_up()
             return None
+        # A detection found by one engine stands even when the other failed:
+        # what was found is reported (and blocked), never lost to the outage.
         _report(detections, contents, agent=agent, run_id=run_id, mode=mode)
         return detections
 
@@ -360,13 +415,15 @@ def _report(
 
 def observe_exchange(
     *, message: str, reply: str, agent: str, run_id: str = "", project_id: Optional[str] = None,
+    extra: Sequence[str] = (),
 ) -> None:
     """Fire-and-forget evaluation of one finished exchange (observe mode).
 
+    `extra` holds the tool results and retrieved context of the turn.
     Spawned after the response is already on its way, so even a hung
     detector costs the caller nothing.
     """
-    contents = [c for c in (message, reply) if c and c.strip()]
+    contents = [c for c in (message, *extra, reply) if c and c.strip()]
     if not contents or not _endpoint():
         return
     task = asyncio.create_task(evaluate(
@@ -376,14 +433,73 @@ def observe_exchange(
     task.add_done_callback(_pending.discard)
 
 
+# ---------------------------------------------------------------------------
+# What is scanned (ADR-0602 clause 8). One item per text, with its kind, so a
+# refusal names where the detection was: "prompt" (the user's text),
+# "tool_result" (a tool's output fed back to the model) or "retrieved" (a
+# document or search result block). The protocol-specific extractors live with
+# their protocol (app/metered_paths.py for Anthropic and Responses).
+
+@dataclass(frozen=True)
+class ScanItem:
+    kind: str
+    text: str
+
+
+def chat_scan_items(messages: Sequence[Any]) -> List[ScanItem]:
+    """OpenAI chat messages: the last user message, then every `tool` message
+    after it (the tool results of the current turn, all rounds of its loop)."""
+    last_user = None
+    for i in range(len(messages) - 1, -1, -1):
+        if getattr(messages[i], "role", None) == "user":
+            last_user = i
+            break
+    items: List[ScanItem] = []
+    if last_user is not None:
+        items.append(ScanItem("prompt", getattr(messages[last_user], "content", None) or ""))
+    if scan_tool_results():
+        start = last_user + 1 if last_user is not None else 0
+        for m in messages[start:]:
+            if getattr(m, "role", None) == "tool":
+                items.append(ScanItem("tool_result", getattr(m, "content", None) or ""))
+    return [it for it in items if it.text and it.text.strip()]
+
+
+def stage_of(detections: Sequence[Dict[str, Any]], items: Sequence[ScanItem]) -> str:
+    """The refusal stage of a request-side detection: the first non-prompt kind
+    hit (the indirect-injection case), else "prompt"."""
+    kinds = []
+    for d in detections:
+        index = d.get("content_index")
+        if isinstance(index, int) and 0 <= index < len(items):
+            kinds.append(items[index].kind)
+    for kind in kinds:
+        if kind != "prompt":
+            return kind
+    return "prompt"
+
+
 def refusal_body(stage: str, detections: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Typed 400 body. Detection names only - never the matched text."""
     return {
         "error": {
             "type": "guardrails_blocked",
             "code": "guardrails_blocked",
-            "stage": stage,  # "prompt" or "reply"
+            "stage": stage,  # "prompt", "tool_result", "retrieved" or "reply"
             "message": f"the {stage} was refused by the guardrails policy",
             "detections": sorted({str(d.get("detection")) for d in detections}),
+        }
+    }
+
+
+def unavailable_body(stage: str) -> Dict[str, Any]:
+    """Typed 503 body of a fail-closed refusal (detector unavailable, ADR-0602 clause 8)."""
+    return {
+        "error": {
+            "type": "guardrails_unavailable",
+            "code": "guardrails_unavailable",
+            "stage": stage,
+            "message": f"the guardrails detector is unavailable and the {stage} is classified at or "
+                       f"above {fail_closed_from()}; refused rather than served unchecked",
         }
     }

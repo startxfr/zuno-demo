@@ -185,5 +185,35 @@ class SettingsTests(unittest.TestCase):
             Settings.from_env({"API_KEY": "k", "KNOWLEDGE_BASES": "broken"})
 
 
+class ProxyKeyTests(unittest.TestCase):
+    """WP-225 lot C: the token proxy's inbound key, sent only when configured."""
+
+    def test_the_proxy_key_is_sent_to_the_proxy_and_dify_s_key_never_is(self) -> None:
+        import dataclasses
+
+        gw = FakeGateway()
+        settings = dataclasses.replace(SETTINGS, proxy_key="p" * 32)
+        TestClient(create_app(settings, transport=httpx.MockTransport(gw.handler))).post(
+            "/retrieval", json=body(), headers=AUTH)
+        self.assertEqual(gw.seen[0].headers["authorization"], "Bearer " + "p" * 32)
+        self.assertNotIn(KEY, str(gw.seen[0].headers))
+
+    def test_proxy_key_file(self) -> None:
+        import os
+        import tempfile
+
+        base = {"API_KEY": KEY}
+        self.assertEqual(Settings.from_env(base).proxy_key, "")
+        with tempfile.NamedTemporaryFile("w", delete=False) as fh:
+            fh.write("# token proxy inbound key\n" + "p" * 32 + "\n")
+        self.addCleanup(os.unlink, fh.name)
+        self.assertEqual(Settings.from_env({**base, "PROXY_KEY_FILE": fh.name}).proxy_key, "p" * 32)
+        with tempfile.NamedTemporaryFile("w", delete=False) as empty:
+            empty.write("")
+        self.addCleanup(os.unlink, empty.name)
+        with self.assertRaises(ValueError):
+            Settings.from_env({**base, "PROXY_KEY_FILE": empty.name})
+
+
 if __name__ == "__main__":
     unittest.main()

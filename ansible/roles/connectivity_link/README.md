@@ -62,3 +62,23 @@ incorrectly, described a Day 0 placement it never actually had).
 `DAY1_RUN_COMPONENTS` includes `connectivity-link` -
 `make d1 install connectivity-link` (or the default "all" run) installs
 it in that position.
+
+## Stale OLM annotations after RHCL 1.5
+
+RHCL 1.5 takes Authorino, DNS and Limitador off OLM. Their CRDs lose the
+`olm.managed=true` label but keep OLM's
+`operatorframework.io/installed-alongside-*` annotations. On its next start,
+olm-operator counts those CRDs as its own and unlabelled: it labels what it
+can, exits, and does the same again after every restart. The result is a
+CrashLoopBackOff with frozen CSV statuses, and no OLM install can finish.
+
+On demo333 this surfaced on 2026-11-07, when a master reboot restarted
+olm-operator, two days after the RHCL 1.5 upgrade.
+
+`tasks/olm_crd_annotations.yml` handles it:
+
+- `make d1 install connectivity-link` removes the stale annotations.
+- `make d1 check connectivity-link` fails while any of them remain.
+
+Both act only when no authorino-operator, dns-operator or limitador-operator
+CSV is left, so a cluster on RHCL < 1.5 is never touched.

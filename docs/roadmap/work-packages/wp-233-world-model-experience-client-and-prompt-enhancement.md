@@ -1,6 +1,6 @@
 # WP-233: World-model experience client and prompt enhancement (delivers ADR-0604 D1, D8)
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** ADR-0604
 - **Depends on:** WP-228
 - **Blocks:** WP-234

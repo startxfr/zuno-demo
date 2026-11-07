@@ -104,6 +104,30 @@ spec:
               value: {{ .Values.jwtAudience | quote }}
             - name: JWT_AUDIENCE_REQUIRED
               value: {{ .Values.jwtAudienceRequired | quote }}
+            {{- /* WP-225 lot C: rendered only when set, so the defaults roll no pod. */}}
+            {{- with .Values.jwtAllowedClients }}
+            {{- if has "*" . }}
+            {{- fail "jwtAllowedClients must list clients; a bare \"*\" would admit every client" }}
+            {{- end }}
+            - name: JWT_ALLOWED_CLIENTS
+              value: {{ join "," . | quote }}
+            {{- end }}
+            {{- if .Values.agentChain.verify }}
+            {{- if not .Values.agentChain.publicKey }}
+            {{- fail "agentChain.verify needs agentChain.publicKey (the PEM of Vault a2a/agent-chain public_key)" }}
+            {{- end }}
+            - name: AGENT_CHAIN_VERIFY
+              value: "true"
+            - name: AGENT_CHAIN_PUBLIC_KEY
+              value: {{ .Values.agentChain.publicKey | quote }}
+            {{- end }}
+            {{- with .Values.agentChain.requireFor }}
+            {{- if not $.Values.agentChain.verify }}
+            {{- fail "agentChain.requireFor needs agentChain.verify (no chain can be valid without it)" }}
+            {{- end }}
+            - name: AGENT_CHAIN_REQUIRE_FOR
+              value: {{ join "," . | quote }}
+            {{- end }}
             - name: LOCAL_MODEL_ENDPOINT
               value: {{ .Values.localModelEndpoint | quote }}
             - name: LOCAL_MODEL_NAME
@@ -134,6 +158,42 @@ spec:
             # again within one interval (0 = at start only).
             - name: GUARDRAILS_WARMUP_INTERVAL_SECONDS
               value: {{ .Values.guardrails.warmUpIntervalSeconds | default 60 | quote }}
+            # ADR-0602 clause 8 (WP-225): block fails closed from this class up
+            # on a detector outage; tool results scanned; streams held back and cut.
+            {{- if and .Values.guardrails.failClosedFrom (not (has .Values.guardrails.failClosedFrom (list "C1" "C2" "C3" "C4"))) }}
+            {{- fail (printf "guardrails.failClosedFrom must be empty or C1 to C4, not %v" .Values.guardrails.failClosedFrom) }}
+            {{- end }}
+            - name: GUARDRAILS_FAIL_CLOSED_FROM
+              value: {{ .Values.guardrails.failClosedFrom | default "off" | quote }}
+            - name: GUARDRAILS_SCAN_TOOL_RESULTS
+              value: {{ .Values.guardrails.scanToolResults | quote }}
+            - name: GUARDRAILS_STREAM_HOLD_BACK_CHARS
+              value: {{ .Values.guardrails.streamHoldBackChars | quote }}
+            {{- with .Values.guardrails.classifier }}
+            {{- if and .type (or (not .url) (not .detectorId)) (eq .type "detectors-api") }}
+            {{- fail "guardrails.classifier.type detectors-api needs guardrails.classifier.url and guardrails.classifier.detectorId" }}
+            {{- end }}
+            {{- if .type }}
+            # WP-225: the model-based classifier next to the regular expressions.
+            - name: GUARDRAILS_CLASSIFIER
+              value: {{ .type | quote }}
+            - name: GUARDRAILS_CLASSIFIER_URL
+              value: {{ .url | quote }}
+            - name: GUARDRAILS_CLASSIFIER_DETECTOR_ID
+              value: {{ .detectorId | quote }}
+            - name: GUARDRAILS_CLASSIFIER_THRESHOLD
+              value: {{ .threshold | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.meteredPaths.enabled }}
+            # ADR-0602 clause 9 (WP-225): /v1/messages and /v1/responses, metered.
+            - name: METERED_PATHS_ENABLED
+              value: "true"
+            - name: METERED_PATHS_MODELS
+              value: {{ .Values.meteredPaths.models | toJson | quote }}
+            - name: KEY_CEILINGS
+              value: {{ .Values.meteredPaths.keyCeilings | toJson | quote }}
+            {{- end }}
             {{- if .Values.availability.readiness.enabled }}
             # ADR-0591 decisions 1-2: skip local models whose
             # LLMInferenceService is not Ready (polled with the projected

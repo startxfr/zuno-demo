@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Dict, Mapping, Optional
+from typing import Dict, Mapping, Optional, Tuple
 
 
 def _headers(raw: str, name: str) -> Dict[str, str]:
@@ -15,6 +15,22 @@ def _headers(raw: str, name: str) -> Dict[str, str]:
     if not isinstance(value, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
         raise ValueError(f"{name} must be a JSON object of string headers")
     return dict(value)
+
+
+def _inbound_keys(path: str) -> Tuple[str, ...]:
+    """WP-225 lot C: the keys a caller of this proxy must present, one per line of
+    INBOUND_KEYS_FILE (blank lines and `#` comments ignored). Unset: no inbound check,
+    as before. Set but unreadable or empty: the proxy refuses to start rather than
+    run open."""
+    if not path:
+        return ()
+    with open(path, encoding="utf-8") as handle:
+        keys = tuple(line.strip() for line in handle if line.strip() and not line.lstrip().startswith("#"))
+    if not keys:
+        raise ValueError(f"INBOUND_KEYS_FILE {path} holds no key")
+    if any(len(key) < 24 for key in keys):
+        raise ValueError("every inbound key must be at least 24 characters")
+    return keys
 
 
 @dataclass(frozen=True)
@@ -34,6 +50,9 @@ class Settings:
     mcp_timeout_s: float = 30.0
     token_timeout_s: float = 10.0
     ca_bundle: Optional[str] = None
+    # WP-225 lot C (ADR-0602 clause 10): the keys a caller must send as
+    # `Authorization: Bearer <key>`; empty means no inbound check (the default).
+    inbound_keys: Tuple[str, ...] = ()
 
     @classmethod
     def from_env(cls, env: Optional[Mapping[str, str]] = None) -> "Settings":
@@ -64,4 +83,5 @@ class Settings:
             mcp_timeout_s=float(env.get("MCP_TIMEOUT_S", "30")),
             token_timeout_s=float(env.get("TOKEN_TIMEOUT_S", "10")),
             ca_bundle=env.get("CA_BUNDLE") or None,
+            inbound_keys=_inbound_keys(env.get("INBOUND_KEYS_FILE", "")),
         )

@@ -36,6 +36,9 @@
       - keycloak
       - aap
       - aap_config
+      # ADR-0604 (WP-229): the on-demand world-model GPU node. Converges to
+      # zuno_world_model_enabled (off: nothing, or removed if left over).
+      - world_model_gpu
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

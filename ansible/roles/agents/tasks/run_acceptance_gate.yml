@@ -205,6 +205,9 @@
           name: acceptance-gate
           namespace: zuno-ai-run
 
+- name: "acceptance-gate | resolve the Keycloak endpoint (ADR-0352, WP-211)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_keycloak_endpoint.yml"
+
 - name: "acceptance-gate | run the acceptance-gate Job"
   kubernetes.core.k8s:
     state: present
@@ -287,7 +290,7 @@
                   - name: TASK_NAME
                     value: "{{ _gate_task_name }}"
                   - name: KEYCLOAK_URL
-                    value: "https://keycloak.{{ cluster_base_domain }}"
+                    value: "{{ zuno_keycloak_url }}"
                   # WP-156: the gate drives the agent on UnifAI, as its
                   # scenario's persona, in the agent's team workspace
                   # agent-<agent> (id resolved at sign-in). EVAL_TARGET is

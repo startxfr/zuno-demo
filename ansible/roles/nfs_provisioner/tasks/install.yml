@@ -1,0 +1,119 @@
+---
+# ADR-0608 clauses 1 and 2 (WP-241): the operator and the operand behind the
+# StorageClass that gitops/charts/unifai's stack.sharedStorageClass names.
+# Day 1, so it is in place before Day 2's unifai. The chart carries the names
+# and spec of the objects installed by hand on demo333: there the first run
+# adopts them (see README.md for the known differences).
+- name: "nfs_provisioner | read the chart values"
+  ansible.builtin.include_tasks: load_values.yml
+
+- name: "nfs_provisioner | resolve the operator package"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  vars:
+    operator_package_name: "{{ _nfsp_package }}"
+    operator_subscription_name: "{{ _nfsp_subscription }}"
+    operator_subscription_namespace: "{{ _nfsp_namespace }}"
+    # The package publishes `alpha` only; the pin below must sit on it.
+    operator_preferred_channel: alpha
+    operator_package_catalog_hint: "nfs"
+
+- name: "nfs_provisioner | read the existing Subscription"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    namespace: "{{ _nfsp_namespace }}"
+    name: "{{ _nfsp_subscription }}"
+  register: _nfsp_sub_before
+
+- name: "nfs_provisioner | read the catalog entries of the resolved channel"
+  kubernetes.core.k8s_info:
+    api_version: packages.operators.coreos.com/v1
+    kind: PackageManifest
+    namespace: openshift-marketplace
+    name: "{{ _nfsp_package }}"
+  register: _nfsp_pkg
+  when: not (operator_package_skip_d0 | bool)
+
+# ADR-0607 clause 2: startingCSV must be one the channel serves, or OLM never
+# resolves the Subscription. An operator already running the pin does not
+# re-resolve it, so that case passes even if the catalog moved on.
+- name: "nfs_provisioner | refuse a channel that does not serve the pinned CSV"
+  ansible.builtin.assert:
+    that: >-
+      _nfsp_pinned_csv in (
+        (_nfsp_pkg.resources[0].status.channels
+          | selectattr('name', 'equalto', operator_package_channel | trim)
+          | map(attribute='entries') | first | default([]))
+        | map(attribute='name') | list)
+      or (((_nfsp_sub_before.resources | default([]) | first | default({})).status | default({})).installedCSV | default('')) == _nfsp_pinned_csv
+    fail_msg: >-
+      Channel '{{ operator_package_channel | trim }}' of package {{ _nfsp_package }}
+      (catalog {{ operator_package_catalog }}) does not serve the pinned
+      {{ _nfsp_pinned_csv }}. Move the pin in gitops/charts/nfs-provisioner/values.yaml
+      (subscription.version) with the owner's go (ADR-0607 clause 3,
+      docs/platform/pre-ga-upgrade.md), then re-run.
+  when: not (operator_package_skip_d0 | bool)
+
+- name: "nfs_provisioner | apply the nfs-provisioner GitOps Application (d0: namespace, OperatorGroup, Subscription)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  when: not (operator_package_skip_d0 | bool)
+  vars:
+    gitops_component_name: "nfs-provisioner"
+    gitops_app_phase: "d0"
+    gitops_app_name: "zuno-nfs-provisioner-d0"
+    # A first install stays Progressing until the pinned InstallPlan is
+    # approved below (Manual approval): waiting for Healthy here would never end.
+    gitops_app_wait: false
+    gitops_app_extra_helm_values:
+      # project.enabled must be repeated: gitops_app_extra_helm_values
+      # replaces the Application's values wholesale (see
+      # ansible/roles/jobset/tasks/install.yml).
+      project:
+        enabled: true
+      operator:
+        enabled: true
+        subscription:
+          operator:
+            channel: "{{ operator_package_channel | trim }}"
+            source:
+              name: "{{ operator_package_catalog }}"
+
+- name: "nfs_provisioner | approve only the pinned InstallPlan (ADR-0607)"
+  ansible.builtin.include_tasks: approve_installplan.yml
+
+- name: "nfs_provisioner | wait for zuno-nfs-provisioner-d0 to be Synced and Healthy"
+  kubernetes.core.k8s_info:
+    api_version: argoproj.io/v1alpha1
+    kind: Application
+    namespace: openshift-gitops
+    name: zuno-nfs-provisioner-d0
+  register: _nfsp_d0_app
+  until: >-
+    (_nfsp_d0_app.resources | default([{}]))[0].status.sync.status | default('') == 'Synced' and
+    (_nfsp_d0_app.resources | default([{}]))[0].status.health.status | default('') == 'Healthy'
+  retries: 30
+  delay: 10
+  when: not (operator_package_skip_d0 | bool)
+
+- name: "nfs_provisioner | apply the nfs-provisioner GitOps Application (d1: NFSProvisioner instance)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  vars:
+    gitops_component_name: "nfs-provisioner"
+    gitops_app_phase: "d1"
+    gitops_app_name: "zuno-nfs-provisioner-d1"
+    gitops_app_extra_helm_values:
+      nfsProvisioner:
+        enabled: true
+    gitops_app_wait_retries: 30
+    gitops_app_wait_delay: 15
+
+# ArgoCD has no health check for NFSProvisioner: wait on what UnifAI consumes.
+- name: "nfs_provisioner | wait for the StorageClass the operand provides"
+  kubernetes.core.k8s_info:
+    api_version: storage.k8s.io/v1
+    kind: StorageClass
+    name: "{{ _nfsp_storage_class }}"
+  register: _nfsp_sc
+  until: (_nfsp_sc.resources | default([]) | length) > 0
+  retries: 30
+  delay: 10

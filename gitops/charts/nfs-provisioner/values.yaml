@@ -1,0 +1,102 @@
+# project.enabled renders the Namespace (vendored startx `project` chart);
+# operator.enabled renders the OperatorGroup and the Subscription (vendored
+# startx `operator` chart); nfsProvisioner.enabled renders the operand
+# (templates/nfsprovisioner.yaml). All default false. Two ArgoCD
+# Applications set them: zuno-nfs-provisioner-d0 (project + operator) and
+# zuno-nfs-provisioner-d1 (nfsProvisioner) - the same split as
+# gitops/charts/jobset.
+#
+# ADR-0608 clause 1/2 (WP-241): the operator ran on demo333 without a
+# declaration while gitops/charts/unifai's stack.sharedStorageClass (`nfs`)
+# depends on it. Every name and spec field below is the one read live on
+# demo333 (2026-11-07) so that the first `make d1 install nfs-provisioner`
+# adopts the objects in place. The only intended differences are the ADR-0607
+# pin (installPlanApproval Manual + startingCSV) and the labels/annotations
+# the startx charts and ArgoCD add; see ansible/roles/nfs_provisioner/README.md.
+#
+# The CSV supports OwnNamespace and AllNamespaces; the live install uses
+# OwnNamespace (targetNamespaces: [nfs-provisioner]) and so does this chart.
+#
+# subscription.operator.channel/source.name are left empty by default,
+# discovered by ansible and set via gitops_app_extra_helm_values on the -d0
+# apply (ADR-0048). templates/checks.yaml fails the render if either is still
+# empty once operator.enabled is true, or if the pin is missing.
+project:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: nfs-provisioner
+    app: nfs-provisioner
+  project:
+    enabled: true
+    hooked: true  # PreSync ArgoCD hook: applied over the existing namespace, never pruned
+    type: namespace
+    # The live namespace, created by hand on demo333. Never rename it: the
+    # NFS server's backing PVC (nfs-server, gp3-csi) lives here.
+    name: nfs-provisioner
+    display_name: Zuno Infra NFS Provisioner
+    description: "NFS provisioner operator and server, configured by Zuno."
+    requester: zuno
+
+operator:
+  enabled: false
+  context:
+    scope: zuno
+    cluster: zuno-demo
+    environment: demo
+    component: nfs-provisioner
+    app: nfs-provisioner
+  subscription:
+    enabled: true
+    name: nfs-provisioner-operator
+    namespace: nfs-provisioner
+    # ADR-0607 clause 2: a pre-GA operator from a catalog that is not pinned
+    # by digest is pinned by startingCSV with Manual approval. The startx
+    # chart builds startingCSV as "<operator.csv>.<subscription.version>":
+    # nfs-provisioner-operator.v0.0.9, the CSV installed on demo333. Moving
+    # this pin is a commit that names the release and the owner's go
+    # (ADR-0607 clause 3, docs/platform/pre-ga-upgrade.md).
+    version: "v0.0.9"
+    operator:
+      # Must be set explicitly, same name as subscription.name: the vendored
+      # `operator` chart defaults this to "codeready-workspaces".
+      name: nfs-provisioner-operator
+      csv: nfs-provisioner-operator
+      channel: ""
+      # ansible/roles/nfs_provisioner/tasks/approve_installplan.yml approves
+      # only the InstallPlan that installs exactly the pinned CSV.
+      installPlanApproval: Manual
+      source:
+        name: ""
+        namespace: openshift-marketplace
+  operatorGroup:
+    enabled: true
+    # The live OperatorGroup's name (not the startx "<name>-operator-group"
+    # habit): a second OperatorGroup in the namespace would stop OLM.
+    name: nfs-provisioner
+    namespace: nfs-provisioner
+    target: nfs-provisioner  # OwnNamespace, as installed by hand
+    # The value OLM itself writes (the startx default names Eclipse Che's
+    # CheCluster). Matching it keeps the first apply from flapping the
+    # annotation; the Application also ignores it (ignoreDifferences).
+    providedAPIs: NFSProvisioner.v1alpha1.cache.jhouse.com
+
+# The operand. Its spec is the live one, field for field
+# (`oc explain nfsprovisioner.spec`: hostPathDir, nfsImageConfiguration,
+# nodeSelector, pvc, scForNFS, scForNFSPvc, storageSize). The operator creates
+# the StorageClass named scForNFS (provisioner example.com/nfs) and a PVC
+# `nfs-server` of storageSize on scForNFSPvc for the NFS server's data.
+nfsProvisioner:
+  enabled: false
+  name: nfsprovisioner
+  namespace: nfs-provisioner
+  spec:
+    nfsImageConfiguration:
+      image: registry.k8s.io/sig-storage/nfs-provisioner:v4.0.8
+      imagePullPolicy: IfNotPresent
+    # gitops/charts/unifai/values.yaml stack.sharedStorageClass names it.
+    scForNFS: nfs
+    scForNFSPvc: gp3-csi
+    storageSize: 300G

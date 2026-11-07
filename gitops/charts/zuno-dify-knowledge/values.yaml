@@ -23,6 +23,15 @@ knowledgeBases: "tech=knowledge.tech"
 vaultKey: dify/knowledge-api
 vaultProperty: api_key
 
+# WP-225 lot C: the key the token proxy asks of its callers (zuno-token-proxy
+# inboundAuth), sent as `Authorization: Bearer <key>`; the first key of Vault
+# <vaultKey> property vaultProperty (default dify/token-proxy inbound_keys). Enable it
+# before, or together with, the proxy's inboundAuth. Off by default: no key sent.
+proxyAuth:
+  enabled: false
+  vaultKey: dify/token-proxy
+  vaultProperty: inbound_keys
+
 externalSecrets:
   refreshInterval: 1h
   # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).

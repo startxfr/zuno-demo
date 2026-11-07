@@ -36,6 +36,9 @@
       # Report-only OLM update audit (platform/olm/audit_operator_updates.py):
       # an available update never fails the check, only an audit that cannot run.
       - operators
+      # ADR-0608/WP-241: what runs on the cluster that the repository does not
+      # explain (platform/drift/check_drift.py); report-only until zuno_drift_strict.
+      - drift
   tasks:
     - name: Resolve cluster API credentials
       ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"

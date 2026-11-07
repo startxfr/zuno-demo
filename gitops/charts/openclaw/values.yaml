@@ -44,6 +44,8 @@ images:
 
 keycloak:
   realm: zuno
+  # ADR-0352/WP-211: host of the Keycloak issuer. Empty = keycloak.<clusterBaseDomain> (built-in).
+  host: ""
 
 gateways:
   aiDomain: ai-gateway.zuno-ai-run.svc

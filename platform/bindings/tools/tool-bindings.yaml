@@ -47,6 +47,28 @@
 # capabilities lacking a valid binding (ADR-0116 Operational
 # considerations).
 #
+# ADR-0603 M12 (WP-225 lot B), streamable-http only:
+#   caller_context: true   the gateway sends the signed X-Zuno-Caller-* headers
+#                          (caller sub, groups, email, signed for this backend
+#                          name). Only the Zuno servers that scope their shared
+#                          credential with it set it; default false, so a
+#                          third-party backend never receives a caller's identity.
+#   gateway_token: false   X-Zuno-Gateway-Token (ADR-0037) is not sent: for a
+#                          backend that does not check it (the upstream
+#                          kubernetes-mcp-server). Default true.
+#
+# ADR-0602 clause 10 (WP-225 lot C), streamable-http only:
+#   user_token: true       the backend needs the caller's own Keycloak token (a
+#                          provider-delegated backend): it keeps the forwarded
+#                          bearer when the gateway runs with
+#                          outboundIdentity.mode assertion. Default false: a Zuno
+#                          server (gateway_token true) then gets the gateway's
+#                          per-call assertion, a third-party backend
+#                          (gateway_token false) no Authorization at all.
+#                          Required (true) for auth_mode delegated-user and
+#                          provider-delegated, so assertion mode never replaces
+#                          a delegated token.
+#
 # ADR-0119: an optional top-level `backends:` map (backend name -> default
 # {env, default, path}) lets a streamable-http entry omit its own
 # `endpoint:` block when every capability of that backend shares one -
@@ -107,6 +129,7 @@ bindings:
       path: /mcp
     provider_tool: search_pages
     auth_mode: service-identity
+    caller_context: true
 
   - capability: confluence.page.read
     backend: confluence
@@ -117,6 +140,7 @@ bindings:
       path: /mcp
     provider_tool: read_page
     auth_mode: service-identity
+    caller_context: true
 
   - capability: confluence.page.create
     backend: confluence
@@ -127,6 +151,7 @@ bindings:
       path: /mcp
     provider_tool: create_page
     auth_mode: service-identity
+    caller_context: true
 
   - capability: confluence.page.update
     backend: confluence
@@ -137,6 +162,7 @@ bindings:
       path: /mcp
     provider_tool: update_page
     auth_mode: service-identity
+    caller_context: true
 
   # --- unifai-rag: UnifAI's RAG server (WP-156), NOT an MCP server -
   #     proxied via an in-process handler the same way image_gen/
@@ -165,6 +191,7 @@ bindings:
       path: /mcp
     provider_tool: read_opportunity
     auth_mode: service-identity
+    caller_context: true
 
   - capability: salesforce.opportunity.create
     backend: salesforce
@@ -175,6 +202,7 @@ bindings:
       path: /mcp
     provider_tool: create_opportunity
     auth_mode: service-identity
+    caller_context: true
 
   - capability: salesforce.opportunity.update
     backend: salesforce
@@ -185,6 +213,7 @@ bindings:
       path: /mcp
     provider_tool: update_opportunity
     auth_mode: service-identity
+    caller_context: true
 
   # --- demo-mode in-process handlers (replaced by real servers as their
   #     integrations land) ---
@@ -195,6 +224,7 @@ bindings:
     handler: drive
     provider_tool: list_drive_files
     auth_mode: delegated-user
+    user_token: true
     input_schema: {"type": "object", "properties": {"folder": {"type": "string", "description": "Drive folder to list (default \"My Drive\")."}}}
 
   # ADR-0326 (WP-31): Arkos's delegated Drive/Docs write - same in-process
@@ -210,6 +240,7 @@ bindings:
     handler: drive_create
     provider_tool: create_document
     auth_mode: delegated-user
+    user_token: true
     input_schema: {"type": "object", "properties": {"title": {"type": "string", "description": "Title of the new document."}, "content": {"type": "string", "description": "Text content of the new document."}}, "required": ["title"]}
 
   - capability: drive.document.update
@@ -218,6 +249,7 @@ bindings:
     handler: drive_update
     provider_tool: update_document
     auth_mode: delegated-user
+    user_token: true
     input_schema: {"type": "object", "properties": {"document_id": {"type": "string", "description": "Identifier of the document to update."}, "content": {"type": "string", "description": "New text content of the document."}}, "required": ["document_id"]}
 
   - capability: gmail.message.read
@@ -227,6 +259,7 @@ bindings:
     handler: gmail
     provider_tool: read_gmail
     auth_mode: delegated-user
+    user_token: true
     input_schema: {"type": "object", "properties": {"query": {"type": "string", "description": "Gmail search expression (default \"in:inbox\")."}}}
 
   - capability: web.page.search
@@ -266,6 +299,7 @@ bindings:
       path: /mcp
     provider_tool: get_own_profile
     auth_mode: provider-delegated
+    user_token: true
 
   - capability: workday.profile.self.update
     backend: workday
@@ -276,6 +310,7 @@ bindings:
       path: /mcp
     provider_tool: update_own_profile
     auth_mode: provider-delegated
+    user_token: true
 
   - capability: workday.profile.any.read
     backend: workday
@@ -286,6 +321,7 @@ bindings:
       path: /mcp
     provider_tool: get_staff_profile
     auth_mode: provider-delegated
+    user_token: true
 
   # --- git-forge: real MCP server (ADR-0120), streamable-HTTP transport.
   #     One server, two providers (`provider: github|gitlab` is a tool
@@ -296,12 +332,14 @@ bindings:
     transport: streamable-http
     provider_tool: read_repository_content
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.repository.list
     backend: git-forge
     transport: streamable-http
     provider_tool: list_repositories
     auth_mode: service-identity
+    caller_context: true
 
   # ADR-0121: GitLab-only, any visibility (public/internal/private) -
   # this server never grants private GitHub access through any binding.
@@ -314,30 +352,35 @@ bindings:
     transport: streamable-http
     provider_tool: read_private_repository_content
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.repository.private.list
     backend: git-forge
     transport: streamable-http
     provider_tool: list_private_repositories
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.file.write
     backend: git-forge
     transport: streamable-http
     provider_tool: write_file
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.repository.create
     backend: git-forge
     transport: streamable-http
     provider_tool: create_repository
     auth_mode: service-identity
+    caller_context: true
 
   - capability: git.repository.fork
     backend: git-forge
     transport: streamable-http
     provider_tool: fork_repository
     auth_mode: service-identity
+    caller_context: true
 
   # Always refused by the server itself (never deletes) - still a real,
   # policy-gated capability so a caller gets a clear tool-level answer
@@ -347,6 +390,7 @@ bindings:
     transport: streamable-http
     provider_tool: delete_repository
     auth_mode: service-identity
+    caller_context: true
 
   # --- aap: Ansible Automation Platform audits (ADR-0355/WP-074).
   #     service-identity, but NOT the usual shared technical credential:
@@ -359,6 +403,7 @@ bindings:
     transport: streamable-http
     provider_tool: platform_audit
     auth_mode: service-identity
+    caller_context: true
 
   # The first capability in this file that RUNS automation rather than
   # reading state. Its blast radius is fixed by construction, not by
@@ -370,6 +415,7 @@ bindings:
     transport: streamable-http
     provider_tool: cluster_audit
     auth_mode: service-identity
+    caller_context: true
 
   # ADR-0415: not a demo-mode stub like the other in-process handlers
   # above - calls the real, already-deployed components/ai-gateway
@@ -409,27 +455,32 @@ bindings:
     transport: streamable-http
     provider_tool: resources_get
     auth_mode: service-identity
+    gateway_token: false
 
   - capability: k8s.resource.list
     backend: k8s
     transport: streamable-http
     provider_tool: resources_list
     auth_mode: service-identity
+    gateway_token: false
 
   - capability: k8s.events.read
     backend: k8s
     transport: streamable-http
     provider_tool: events_list
     auth_mode: service-identity
+    gateway_token: false
 
   - capability: k8s.logs.read
     backend: k8s
     transport: streamable-http
     provider_tool: pods_log
     auth_mode: service-identity
+    gateway_token: false
 
   - capability: metrics.query
     backend: k8s
     transport: streamable-http
     provider_tool: execute_instant_query
     auth_mode: service-identity
+    gateway_token: false

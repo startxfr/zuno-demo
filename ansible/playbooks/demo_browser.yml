@@ -1,0 +1,24 @@
+---
+# `make demo browser` (ADR-0606 clause 1, WP-243): one browser check per experience - UnifAI, Open WebUI, kagent,
+# Dify (front door) and OpenClaw (front door and Control UI connection) - signed in through Keycloak as the persona
+# the demonstration uses, with a screenshot each. Read-only. Runs evaluations/browser/run.sh on the operator's
+# workstation (podman and `oc` needed); the screenshots go to the directory it prints. ONLY=a,b limits the checks.
+- name: "Demo browser checks (ADR-0606, WP-243)"
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: "browser | run the checks in the Playwright image"
+      ansible.builtin.command:
+        argv: ["{{ zuno_repo_root }}/evaluations/browser/run.sh"]
+      register: _browser
+      changed_when: false
+      failed_when: false
+
+    - name: "browser | report"
+      ansible.builtin.debug:
+        msg: "{{ _browser.stdout_lines }}"
+
+    - name: "browser | fail if a check failed"
+      ansible.builtin.fail:
+        msg: "A browser check failed (see the report and the -failed.png screenshot)."
+      when: _browser.rc != 0

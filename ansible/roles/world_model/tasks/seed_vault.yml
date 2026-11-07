@@ -1,0 +1,16 @@
+---
+# ADR-0604 (WP-235): the two secrets this experience generates, seeded only when missing
+# (vault_seed_if_missing.yml). keycloak/world-model is seeded by the vault role (experienceClients).
+# A short-lived ansible-seeder token (ADR-0602 clause 1), not the root token.
+- name: "world-model | log in to Vault as ansible-seeder"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_login.yml"
+
+# oauth2-proxy's cookie secret is exactly 32 bytes; the web/runtime token is any long random string.
+- name: "world-model | seed the front door cookie secret and the internal token (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  vars:
+    vault_seed_path: world-model/app
+    vault_seed_fields:
+      front_door_cookie_secret: "{{ lookup('ansible.builtin.password', '/dev/null', length=32, chars=['ascii_letters', 'digits']) }}"
+      internal_token: "{{ lookup('ansible.builtin.password', '/dev/null', length=48, chars=['ascii_letters', 'digits']) }}"

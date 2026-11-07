@@ -39,6 +39,9 @@ spec:
     - {server: https://kubernetes.default.svc, namespace: cert-manager-operator}
     - {server: https://kubernetes.default.svc, namespace: kuadrant-system}
     - {server: https://kubernetes.default.svc, namespace: models-as-a-service}
+    # ADR-0608/WP-241: the nfs-provisioner operator and NFS server, a namespace
+    # created by hand on demo333 before the component existed (not renamed).
+    - {server: https://kubernetes.default.svc, namespace: nfs-provisioner}
     - {server: https://kubernetes.default.svc, namespace: nvidia-gpu-operator}
     - {server: https://kubernetes.default.svc, namespace: openshift-authentication}
     - {server: https://kubernetes.default.svc, namespace: openshift-cluster-observability-operator}

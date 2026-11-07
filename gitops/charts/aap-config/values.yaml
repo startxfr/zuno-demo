@@ -90,7 +90,7 @@ jobTemplates:
     playbook: ansible/playbooks/day1_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   - name: zuno-day1-build
     playbook: ansible/playbooks/day1_build.yml
     credential: zuno-aap-installer
@@ -102,19 +102,19 @@ jobTemplates:
     playbook: ansible/playbooks/day1_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
   # WP-103: gated (launch-RBAC)
   - name: zuno-day1-reconcile
     playbook: ansible/playbooks/day1_reconcile.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
+    surveyComponents: [smtp, nfd, nvidia-gpu, custom-metrics-autoscaler, nfs-provisioner, redis, observability, service-mesh, mesh-monitoring, kiali, grafana, mariadb, tempo, openshift-oauth, connectivity-link, lws, jobset, kueue, openshift-ai, lightspeed]
 
   - name: zuno-day2-check
     playbook: ansible/playbooks/day2_check.yml
     credential: zuno-cluster-reader
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, supply-chain]
+    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model, supply-chain]
   - name: zuno-day2-build
     playbook: ansible/playbooks/day2_build.yml
     credential: zuno-aap-installer
@@ -125,7 +125,7 @@ jobTemplates:
     playbook: ansible/playbooks/day2_install.yml
     credential: zuno-aap-installer
     askVariablesOnLaunch: true
-    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent]
+    surveyComponents: [namespaces, llm, models, mcp, agents, mlops, lightspeed-config, unifai, open-webui, openclaw, dify, kagent, world-model]
 
   - name: zuno-day3-test
     playbook: ansible/playbooks/day3_test.yml
@@ -239,6 +239,11 @@ workflowTemplates:
         successNodes: [redis]
       - id: nvidia-gpu
         successNodes: [redis]
+      # ADR-0608/WP-241: an independent wave-0 branch. It needs only OLM and
+      # no Day 1 component needs it: its `nfs` StorageClass is for Day 2's
+      # unifai (sharedStorageClass), whose workflow runs after this one.
+      - id: nfs-provisioner
+        successNodes: []
       # Wave 1: needs smtp + custom-metrics-autoscaler + nvidia-gpu done.
       - id: redis
         successNodes: [observability]
@@ -355,7 +360,7 @@ workflowTemplates:
       # ADR-0574/WP-151: UnifAI stack (operator, UnifaiStack, CRs) after the
       # gateways - it consumes the ai-gateway, mcp-gateway and embeddings set up above.
       - id: unifai
-        successNodes: [open-webui, openclaw, dify, kagent]
+        successNodes: [open-webui, openclaw, dify, kagent, world-model]
       # ADR-0587 (WP-179): the experience clients, independent branches
       # so one track's failure never blocks the other (Dify and kagent: WP-202).
       - id: open-webui
@@ -365,6 +370,9 @@ workflowTemplates:
       - id: dify
         successNodes: []
       - id: kagent
+        successNodes: []
+      # ADR-0604 (WP-235): a no-op while zuno_world_model_enabled is false.
+      - id: world-model
         successNodes: []
   - name: zuno-day2-check-workflow
     jobTemplate: zuno-day2-check
@@ -392,7 +400,7 @@ workflowTemplates:
       - id: lightspeed-config
         successNodes: [unifai]
       - id: unifai
-        successNodes: [open-webui, openclaw, dify, kagent, supply-chain]
+        successNodes: [open-webui, openclaw, dify, kagent, world-model, supply-chain]
       # ADR-0587 (WP-179): experience clients, independent leaves.
       - id: open-webui
         successNodes: []
@@ -401,6 +409,8 @@ workflowTemplates:
       - id: dify
         successNodes: []
       - id: kagent
+        successNodes: []
+      - id: world-model
         successNodes: []
       - id: supply-chain
         successNodes: []

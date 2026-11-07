@@ -48,6 +48,20 @@
 6. **Runs:** dry run Sunday 2026-11-08 14:00 (fix what fails), baseline at the start of the freeze (20:00), then Monday
    07:30 and 08:30. Record each result in the runbook.
 
+## First live run (2026-11-07, user's go)
+
+Every required moment passed on demo333 after one fix: the delegation moment first required a delegated tool call in
+the mcp-gateway audit, which a rejected approval never produces (nothing runs). It is now judged on the a2a-gateway's
+access line for the call to Tekos (`judge_delegation`). Results are in the
+[demo-day runbook](../../demo/demo-day-2026-11-09.md#golden-path-results).
+
+## OpenClaw and Lightspeed made real (2026-11-07)
+
+The two moments that were readiness plus a manual step now get a real answer: OpenClaw from inside each persona's
+assistant pod through the operator's egress proxy (the exact path of its model calls, with the `openclaw-<persona>`
+token injected by the proxy), Lightspeed through its API over a temporary port-forward with the operator's OpenShift
+token. Both are required moments; the world model stays the only `roadmap` row.
+
 ## Acceptance
 
 - `make demo golden-path` reports one row per moment, each pass or fail with its evidence, in about 15 minutes.

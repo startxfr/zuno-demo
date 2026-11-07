@@ -1,0 +1,20 @@
+# ADR-0604 WP-231: the GPU stack of the runtime image, installed on top of
+# ../requirements.txt. Mirrors world_engine's pyproject.toml at commit 68b31639
+# (torch==2.11.0, triton==3.6.0, tensordict==0.10.0, accelerate==1.12.0,
+# transformers>=5.3.0, huggingface-hub>=1.7.0). world_engine, taehv and gemlite
+# themselves are not on PyPI: the Dockerfile installs their pinned archives
+# (sha256-checked) with --no-deps, so their dependencies are listed here.
+torch==2.11.0
+triton==3.6.0
+tensordict==0.10.0
+accelerate==1.12.0
+transformers>=5.3.0
+huggingface-hub>=1.7.0
+diffusers>=0.37.0
+einops
+ftfy
+omegaconf
+tqdm
+safetensors
+# Build backends for the --no-build-isolation archive installs.
+setuptools-scm

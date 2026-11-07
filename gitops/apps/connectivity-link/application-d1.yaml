@@ -46,6 +46,15 @@ spec:
         # Authorino trusts only on the Let's Encrypt certificate - mirror of
         # gitops/apps/keycloak/application-d1.yaml ingress.acmeWildcardTLS.
         clusterBaseDomain: apps.mycluster.example.com
+        # ADR-0610 (WP-244): ai-gateway.<domain> for the Blender add-on; pairs with
+        # zuno_ai_gateway_workstation_entry (the ai-gateway's NetworkPolicy peer).
+        workstationEntry:
+          enabled: true
+          keycloakAcmeWildcardTLS: true
+          # 3c review 2026-11-07: only an existing group, so no live user administration;
+          # the demonstration persona is ai-dev-01.
+          allowedGroups:
+            - ocp-ai-dev
         quotaEnforcement:
           keycloakAcmeWildcardTLS: true
           routes:

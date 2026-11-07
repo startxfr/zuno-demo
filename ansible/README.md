@@ -31,7 +31,8 @@ ingestion), and Day 3 (agent test/stresstest/operational actions):
 2. `make day1 check` / `build` / `install` / `uninstall` (or the `d1`
    alias) walk `DAY1_RUN_COMPONENTS` - the remaining AI-platform-operator
    stack (`smtp`, `nfd`, `nvidia-gpu`, `custom-metrics-autoscaler`
-   (ADR-0421, moved here from Day 0), `redis`, `observability`,
+   (ADR-0421, moved here from Day 0), `nfs-provisioner` (ADR-0608, the
+   `nfs` StorageClass Day 2's `unifai` uses), `redis`, `observability`,
    `service-mesh`, `mesh-monitoring`, `kiali`, `grafana`, `mariadb`,
    `tempo`, `openshift-oauth`, `connectivity-link`, `lws`, `jobset`,
    `kueue`, `openshift-ai`, `lightspeed`, `rhtas`, `rhtas-config`) -

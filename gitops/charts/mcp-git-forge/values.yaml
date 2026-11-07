@@ -47,3 +47,35 @@ credentials:
     # ADR-0602/WP-223: the namespace's own SecretStore (was the cluster-wide vault-backend).
     secretStoreName: vault
     refreshInterval: 1h
+
+# ADR-0603 M12 (WP-225 lot B): the repositories each Keycloak group may reach through
+# the shared technical tokens, checked in the server against the caller context the
+# mcp-gateway signs. {group: [pattern]} over "<provider>:<owner>/<repo>", fnmatch,
+# case-insensitive; "*" is every repository. `*` matches across "/" (fnmatch), so
+# "gitlab:team/*" also admits the subgroups of team; list repositories to be exact.
+# A repository created or forked without an owner is "<provider>:@self/<name>".
+# Empty: no allowlist, today's behaviour.
+#   groups:
+#     consultant: ["github:startxfr/zuno-*", "gitlab:zuno-team/*"]
+#     ocp-paas-ops: ["*"]
+# scope: "all" checks reads, listings (filtered) and writes; "write" only write_file,
+# create_repository and fork_repository.
+repositoryAllowlist:
+  groups: {}
+  scope: all
+
+# ADR-0602 clause 10 / ADR-0603 M14 (WP-225 lot C): verify the mcp-gateway's
+# per-call assertion (Authorization: Bearer <EdDSA JWT, typ zuno-call+jwt>: aud this
+# server, sub the caller, act the gateway, the tool, exp <= 60 s, jti consumed once).
+# publicKey: the PEM of Vault mcp/gateway-call-assertion public_key. Set, an
+# assertion is verified when one is sent (a forged, expired, misaddressed,
+# other-tool or replayed one is refused) and a request without one is still
+# served. required: true refuses every request without a valid assertion; set it
+# only after the mcp-gateway runs with outboundIdentity.mode assertion. Both off by
+# default (today's behaviour).
+# maxBodyBytes: the largest request body read to check a tools/call (a larger one
+# is refused with 413); 16 MiB leaves room for a git.file.write of a large file.
+callAssertion:
+  publicKey: ""
+  required: false
+  maxBodyBytes: 16777216

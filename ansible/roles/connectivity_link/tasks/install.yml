@@ -216,3 +216,12 @@
   retries: 12
   delay: 5
   failed_when: false
+
+# RHCL 1.5 leaves OLM installed-alongside annotations on the Kuadrant CRDs it
+# took over; olm-operator then restarts in a loop on its next start (see the
+# included file). Runs after the operator is installed; touches nothing on a
+# cluster still on RHCL < 1.5.
+- name: "connectivity_link | remove stale OLM annotations from the Kuadrant CRDs (RHCL 1.5)"
+  ansible.builtin.include_tasks: olm_crd_annotations.yml
+  vars:
+    connectivity_link_olm_crd_mode: fix

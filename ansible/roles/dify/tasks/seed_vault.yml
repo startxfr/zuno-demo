@@ -60,6 +60,18 @@
     vault_seed_fields:
       api_key: "{{ lookup('ansible.builtin.password', '/dev/null', length=48, chars=['ascii_letters', 'digits']) }}"
 
+# WP-225 lot C: the key Dify's providers and the knowledge adapter present to the token proxy
+# (one key per line, so a rotation can list the new key next to the old one). Create-if-missing:
+# Dify stores a copy in its provider credentials.
+- name: "dify | seed the token proxy inbound key (idempotent)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_seed_if_missing.yml"
+  no_log: true
+  when: dify_token_proxy_inbound_auth | bool
+  vars:
+    vault_seed_path: dify/token-proxy
+    vault_seed_fields:
+      inbound_keys: "{{ lookup('ansible.builtin.password', '/dev/null', length=48, chars=['ascii_letters', 'digits']) }}"
+
 # Dify's single local administrator (ADR-0599, decision 2026-11-05): the shared demo password of
 # ADR-0595 (zuno_admin_dify_admin_password), email fixed. Seed-only-missing, like every path here:
 # a changed password reaches Dify through the configuration step, not through this seed.
