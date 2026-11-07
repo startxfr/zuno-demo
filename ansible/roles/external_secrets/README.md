@@ -37,3 +37,28 @@ readiness. The second call sets `operatorconfig.enabled`,
 `secretStores.enabled` and the newly-discovered Vault client
 `Service` name (`vaultServiceName`), since `gitops_app_extra_helm_values`
 replaces the Application's Helm values wholesale rather than merging.
+
+## External mode (ADR-0352, WP-216)
+
+`zuno_external_secrets_mode: external` in `ansible/confidential.yml` (absent = `internal`) declares that the External
+Secrets Operator is installed and lifecycle-managed outside this installer. It is a Tier A-operator component: the
+mode key is the whole contract, there is no endpoint and no `_external_*` payload.
+
+| Verb | internal (default) | external |
+|---|---|---|
+| `install` | applies `zuno-external-secrets-d0` (OLM Subscription), then `-d1` | skips `-d0`; asserts the CRDs (`externalsecrets`, `secretstores`, `clustersecretstores`, `operatorconfigs`), a `Succeeded` CSV `external-secrets-operator*` and the Ready controller `openshift-operators/external-secrets-operator-controller-manager`, failing fast otherwise; then applies `-d1` |
+| `check` | SecretStore `zuno-ai-run/vault` Ready | the same, AND the assertion above (record-only) |
+| `uninstall` | removes `-d1`, the operator, then `-d0` | removes `-d1` only; the operator, its CSV and Subscription are never touched |
+
+The `-d1` side, the `OperatorConfig` and the per-namespace Vault `SecretStore`s, is ours in both modes: the ESO to Vault
+wiring exists whatever the mode of either side.
+
+**Installing the operator outside this installer.** Subscribe `external-secrets-operator` (OLM, `openshift-operators`,
+cluster-wide OperatorGroup) from the catalog of your choice, and wait for its CSV to be `Succeeded` and
+`external-secrets-operator-controller-manager` to be Ready. Do not create an `OperatorConfig`: `-d1` does, in
+`zuno-vault`. Then set the mode and run `make d0 install external-secrets`.
+
+**Flipping the mode** is a migration event, not a reconcile (clause 4). Internal to external: hand the Subscription
+over (delete the `zuno-external-secrets-d0` Application without cascade, so the Subscription and CSV stay), then set
+`external`. External to internal: set `internal` and run `make d0 install external-secrets`, which re-adopts the
+Subscription through `-d0`.

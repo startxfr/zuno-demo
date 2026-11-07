@@ -138,6 +138,20 @@ zuno_mariadb_external_db_mlops_password: "xxxxxx"
 zuno_mariadb_external_db_trillian_username: "trillian"
 zuno_mariadb_external_db_trillian_password: "xxxxxx"
 
+# --- External Secrets Operator and cert-manager internal/external mode
+# (ADR-0352 Tier A-operator, WP-216/WP-217). `external` means the operator is
+# installed and lifecycle-managed OUTSIDE this installer (unmanaged): our -d0
+# Application (OLM Subscription, CertManager CR) is not applied, and install /
+# check assert instead that the CRDs, a Succeeded CSV and the controller
+# Deployment are there (see each role's README, "External mode"). The -d1 side
+# stays ours in BOTH modes and is always applied through ArgoCD: the
+# OperatorConfig and per-namespace SecretStores for ESO, the ClusterIssuers,
+# ACME configuration and Certificates for cert-manager. Uninstall in external
+# mode removes only that -d1 side. Mode keys only: no endpoint, no
+# _external_* payload. Absent means internal; a flip is a migration event.
+zuno_external_secrets_mode: internal
+zuno_cert_manager_mode: internal
+
 # --- Quay.io registry (stored in Vault for future cluster-side use, e.g. an
 # image pull secret; NOT the same credential ADR-0115's build-publish.yml CI
 # workflow uses - that one is QUAY_USERNAME/QUAY_PASSWORD as a GitHub Actions

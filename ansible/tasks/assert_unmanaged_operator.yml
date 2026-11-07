@@ -1,0 +1,73 @@
+---
+# ADR-0352 clause 7, Tier A-operator components (external_secrets, cert_manager):
+# in external mode the operator is installed and lifecycle-managed outside this
+# installer. Instead of applying our -d0 Application, assert that it is there:
+# every CRD in `unmanaged_operator_crds` exists, an OLM CSV
+# whose name starts with `unmanaged_operator_csv_prefix` is Succeeded (any
+# namespace), and the controller Deployment is Ready.
+#
+# Inputs:
+#   unmanaged_operator_component      log prefix, e.g. "cert_manager"
+#   unmanaged_operator_crds           list of CRD names
+#   unmanaged_operator_csv_prefix     CSV name prefix, "" skips the CSV check (non-OLM install)
+#   unmanaged_operator_deployment     {namespace, name} of the controller Deployment
+#   unmanaged_operator_fail           true (install: fail fast) | false (precheck: record only)
+# Output:
+#   unmanaged_operator_ok             bool
+#   unmanaged_operator_findings       list of strings, empty when ok
+- name: "{{ unmanaged_operator_component }} | look up the operator CRDs (external mode)"
+  kubernetes.core.k8s_info:
+    api_version: apiextensions.k8s.io/v1
+    kind: CustomResourceDefinition
+    name: "{{ item }}"
+  loop: "{{ unmanaged_operator_crds }}"
+  register: _uo_crds
+
+- name: "{{ unmanaged_operator_component }} | look up the operator CSVs (external mode)"
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+  register: _uo_csvs
+  when: unmanaged_operator_csv_prefix | length > 0
+
+- name: "{{ unmanaged_operator_component }} | look up the controller Deployment (external mode)"
+  kubernetes.core.k8s_info:
+    api_version: apps/v1
+    kind: Deployment
+    namespace: "{{ unmanaged_operator_deployment.namespace }}"
+    name: "{{ unmanaged_operator_deployment.name }}"
+  register: _uo_deploy
+
+- name: "{{ unmanaged_operator_component }} | evaluate the unmanaged operator (external mode)"
+  ansible.builtin.set_fact:
+    unmanaged_operator_findings: >-
+      {{
+        (_uo_crds.results
+          | rejectattr('resources', 'truthy')
+          | map(attribute='item') | map('regex_replace', '^', 'CRD missing: ') | list)
+        + ([] if (unmanaged_operator_csv_prefix | length == 0) or
+               ((_uo_csvs.resources | default([])
+                 | selectattr('metadata.name', 'match', '^' ~ (unmanaged_operator_csv_prefix | regex_escape))
+                 | selectattr('status.phase', 'defined')
+                 | selectattr('status.phase', 'equalto', 'Succeeded') | list | length) > 0)
+           else ['no Succeeded CSV named ' ~ unmanaged_operator_csv_prefix ~ '*'])
+        + ([] if ((_uo_deploy.resources | default([]) | length) > 0 and
+                  (_uo_deploy.resources[0].status.readyReplicas | default(0)) > 0)
+           else ['controller Deployment ' ~ unmanaged_operator_deployment.namespace ~ '/'
+                 ~ unmanaged_operator_deployment.name ~ ' missing or not Ready'])
+      }}
+
+- name: "{{ unmanaged_operator_component }} | record the result"
+  ansible.builtin.set_fact:
+    unmanaged_operator_ok: "{{ unmanaged_operator_findings | length == 0 }}"
+
+- name: "{{ unmanaged_operator_component }} | fail: the external (unmanaged) operator is not usable"
+  ansible.builtin.fail:
+    msg: >-
+      {{ unmanaged_operator_component }} is in external mode (ADR-0352 clause 7), so this installer
+      does not install the operator, and the unmanaged one is not usable:
+      {{ unmanaged_operator_findings | join('; ') }}. Install it outside this installer
+      (see the role README, "External mode"), or set the mode back to internal.
+  when:
+    - unmanaged_operator_fail | bool
+    - not (unmanaged_operator_ok | bool)

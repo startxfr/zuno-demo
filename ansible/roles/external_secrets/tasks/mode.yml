@@ -1,0 +1,38 @@
+---
+# ADR-0352 (WP-216): resolve zuno_external_secrets_mode for install, precheck
+# and uninstall alike (symmetric gating, clause 4). The key lives in
+# ansible/confidential.yml; absent means internal. Tier A-operator components
+# carry only the mode key (clause 2): no endpoint, no _external_* payload.
+- name: "external_secrets | check for ansible/confidential.yml"
+  ansible.builtin.stat:
+    path: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  register: _eso_confidential_file
+
+- name: "external_secrets | load ansible/confidential.yml if present"
+  ansible.builtin.include_vars:
+    file: "{{ zuno_repo_root }}/ansible/confidential.yml"
+  when: _eso_confidential_file.stat.exists
+
+- name: "external_secrets | resolve the mode and what an unmanaged operator must provide"
+  ansible.builtin.set_fact:
+    _eso_mode: "{{ zuno_external_secrets_mode | default('internal') }}"
+    # What clause 7 asserts in external mode. The controller is the OLM
+    # operator's own manager (the operand Deployment in zuno-vault is created by
+    # our -d1 OperatorConfig, so it is not a prerequisite).
+    _eso_unmanaged:
+      crds:
+        - externalsecrets.external-secrets.io
+        - secretstores.external-secrets.io
+        - clustersecretstores.external-secrets.io
+        - operatorconfigs.operator.external-secrets.io
+      csv_prefix: external-secrets-operator
+      deployment:
+        namespace: openshift-operators
+        name: external-secrets-operator-controller-manager
+
+- name: "external_secrets | fail on an unknown mode value"
+  ansible.builtin.fail:
+    msg: >-
+      zuno_external_secrets_mode is '{{ _eso_mode }}' - expected 'internal' or
+      'external' (ADR-0352 clause 1; absent means internal).
+  when: _eso_mode not in ['internal', 'external']

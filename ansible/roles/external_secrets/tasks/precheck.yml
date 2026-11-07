@@ -2,7 +2,22 @@
 # Reuses install.yml's readiness signal: the zuno-ai-run SecretStore `vault`
 # Ready implies the operator/operand are installed and Vault accepts the
 # per-namespace roles (ADR-0602/WP-223). zuno-ai-run is the one namespace
-# every install has a store in.
+# every install has a store in. The signal is the same in both modes
+# (ADR-0352, WP-216): the -d1 stores are ours either way. In external mode the
+# unmanaged operator is also asserted (CRDs, CSV, controller), record-only.
+- name: "external_secrets | resolve the component mode (ADR-0352)"
+  ansible.builtin.include_tasks: mode.yml
+
+- name: "external_secrets | assert the unmanaged operator (external mode, record only)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/assert_unmanaged_operator.yml"
+  when: _eso_mode == 'external'
+  vars:
+    unmanaged_operator_component: external_secrets
+    unmanaged_operator_crds: "{{ _eso_unmanaged.crds }}"
+    unmanaged_operator_csv_prefix: "{{ _eso_unmanaged.csv_prefix }}"
+    unmanaged_operator_deployment: "{{ _eso_unmanaged.deployment }}"
+    unmanaged_operator_fail: false
+
 - name: "external_secrets | look up the zuno-ai-run SecretStore"
   kubernetes.core.k8s_info:
     api_version: external-secrets.io/v1beta1
@@ -17,6 +32,7 @@
       {{
         (_eso_store_lookup.resources | default([]) | length) > 0 and
         (_eso_store_lookup.resources[0].status.conditions | default([]) | selectattr('type', 'equalto', 'Ready') | map(attribute='status') | list | first | default('False')) == 'True'
+        and (_eso_mode == 'internal' or (unmanaged_operator_ok | default(false) | bool))
       }}
 
 - name: "external_secrets | record install state"

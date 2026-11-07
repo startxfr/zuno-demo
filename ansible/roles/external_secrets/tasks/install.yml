@@ -9,14 +9,33 @@
     name: namespaces
     tasks_from: install
 
+# ADR-0352 (WP-216): Tier A-operator. `zuno_external_secrets_mode: external`
+# means the operator is installed and lifecycle-managed outside this installer:
+# the -d0 Application (Subscription) is not applied, its presence is asserted
+# instead. The -d1 operand config (OperatorConfig, per-namespace SecretStores)
+# stays ours in both modes (clause 7). Absent means internal.
+- name: "external_secrets | resolve the component mode (ADR-0352)"
+  ansible.builtin.include_tasks: mode.yml
+
     # Catalog source varies per cluster (e.g. community-operators, not always
     # redhat-operators); discover it from the PackageManifest rather than
     # hardcoding, or the Subscription fails to resolve.
 - name: "external_secrets | resolve the operator package"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/resolve_operator_package.yml"
+  when: _eso_mode == 'internal'
   vars:
     operator_package_name: "external-secrets-operator"
     operator_package_catalog_hint: "external-secrets"
+
+- name: "external_secrets | assert the unmanaged operator (external mode)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/assert_unmanaged_operator.yml"
+  when: _eso_mode == 'external'
+  vars:
+    unmanaged_operator_component: external_secrets
+    unmanaged_operator_crds: "{{ _eso_unmanaged.crds }}"
+    unmanaged_operator_csv_prefix: "{{ _eso_unmanaged.csv_prefix }}"
+    unmanaged_operator_deployment: "{{ _eso_unmanaged.deployment }}"
+    unmanaged_operator_fail: true
 
 # Operator install (d0) is separate from OperatorConfig and the
 # per-namespace Vault-backed SecretStores (both d1, ADR-0602/WP-223; applied below once the Vault
@@ -25,7 +44,9 @@
 # already gone Synced+Healthy (CSV installed).
 - name: "external_secrets | apply the external-secrets GitOps Application (d0: operator install only)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
-  when: not (operator_package_skip_d0 | bool)
+  when:
+    - _eso_mode == 'internal'
+    - not (operator_package_skip_d0 | bool)
   vars:
     gitops_component_name: "external-secrets"
     gitops_app_phase: "d0"

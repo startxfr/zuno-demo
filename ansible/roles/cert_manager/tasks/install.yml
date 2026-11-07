@@ -1,8 +1,28 @@
 ---
 # Operator (d0) and Vault-backed ClusterIssuer (d1) are separate Applications;
 # d1 only applies once d0 is Synced+Healthy.
+#
+# ADR-0352 (WP-217): Tier A-operator. `zuno_cert_manager_mode: external` means
+# the operator is installed and lifecycle-managed outside this installer: the
+# -d0 Application (Subscription, CertManager CR) is not applied, its presence is
+# asserted instead. The -d1 ClusterIssuers, ACME configuration and Certificates
+# stay ours in both modes (clause 7). Absent means internal.
+- name: "cert_manager | resolve the component mode (ADR-0352)"
+  ansible.builtin.include_tasks: mode.yml
+
+- name: "cert_manager | assert the unmanaged operator (external mode)"
+  ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/assert_unmanaged_operator.yml"
+  when: _cert_manager_mode == 'external'
+  vars:
+    unmanaged_operator_component: cert_manager
+    unmanaged_operator_crds: "{{ _cert_manager_unmanaged.crds }}"
+    unmanaged_operator_csv_prefix: "{{ _cert_manager_unmanaged.csv_prefix }}"
+    unmanaged_operator_deployment: "{{ _cert_manager_unmanaged.deployment }}"
+    unmanaged_operator_fail: true
+
 - name: "cert_manager | apply the cert-manager GitOps Application (d0: operator)"
   ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/apply_gitops_app.yml"
+  when: _cert_manager_mode == 'internal'
   vars:
     gitops_component_name: "cert-manager"
     gitops_app_phase: "d0"

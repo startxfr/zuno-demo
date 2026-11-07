@@ -602,3 +602,11 @@ Migration/evolution and Review evidence.
 - [ADR-0547](0547-parameterize-every-cluster-specific-value-in-ansible.md)
 - [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md)
 - [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md)
+
+## Update (2026-11-07) - the two Tier A-operator components are done
+
+WP-216 (External Secrets Operator) and WP-217 (cert-manager) deliver the clause-7 Tier A-operator contract: the mode
+key, symmetric gating of install, check and uninstall, the unmanaged-operator assertion
+(`ansible/tasks/assert_unmanaged_operator.yml`), the README unmanaged-install documents, and a live there-and-back on
+demo333. With MariaDB (WP-143) that is three of the components; the ADR stays `Partially implemented` for Keycloak,
+Vault, PostgreSQL, Redis, AAP and ArgoCD (WP-211 to WP-215, WP-218) and for the clause-10 Day-1 vital gate.
