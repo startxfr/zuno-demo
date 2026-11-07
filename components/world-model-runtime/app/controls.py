@@ -47,6 +47,9 @@ class Ctrl:
     button: FrozenSet[int] = frozenset()
     mouse: Tuple[float, float] = (0.0, 0.0)
     scroll_wheel: int = 0
+    # The last control message folded into this input (-1 before any): the frames generated from it
+    # carry it, so the browser can measure input-to-display latency (ADR-0604 §9.1).
+    seq: int = -1
 
 
 def _clamp(value: float) -> float:
@@ -102,6 +105,7 @@ class ControlState:
                 button=frozenset(self._keys),
                 mouse=(_clamp(self._dx + self._turn), _clamp(self._dy)),
                 scroll_wheel=self._scroll,
+                seq=self._last_seq,
             )
             self._dx = self._dy = 0.0
             self._scroll = 0

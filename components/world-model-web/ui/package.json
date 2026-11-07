@@ -1,0 +1,28 @@
+{
+  "name": "world-model-web-ui",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PatternFly React UI of the world-model demo (ADR-0604, WP-234). Built to static assets by Vite and served by world-model-web.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && vite build",
+    "test": "tsx --test src/video.test.ts"
+  },
+  "dependencies": {
+    "@patternfly/react-core": "6.6.1",
+    "@patternfly/react-icons": "6.6.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.17.9",
+    "@types/react": "18.3.12",
+    "@types/react-dom": "18.3.1",
+    "@vitejs/plugin-react": "4.3.4",
+    "tsx": "4.19.2",
+    "typescript": "5.6.3",
+    "vite": "5.4.21"
+  }
+}

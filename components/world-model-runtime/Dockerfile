@@ -43,6 +43,9 @@ RUN set -eux; mkdir /tmp/src; cd /tmp/src; \
     python -c "import torch, world_engine, taehv, gemlite, diffusers, av; print('torch', torch.__version__, 'cuda', torch.version.cuda)"
 
 COPY components/world-model-runtime/app ./app
+# The pod runs as an arbitrary non-root UID (group 0): files must be world-readable whatever the
+# build context's umask was (a workstation build copies 0600 files).
+RUN chmod -R a+rX /app
 
 # Offline at run time: weights come from the S3 mirror, never from Hugging Face.
 ENV PYTHONUNBUFFERED=1 \

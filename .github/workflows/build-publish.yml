@@ -142,6 +142,13 @@ jobs:
               BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           # ADR-0604/WP-231: the world-model GPU runtime; built in-cluster by
           # ansible/roles/world_model_build, listed here so the ADR-0324 inventory is whole.
+          # ADR-0604/WP-234: the world-model browser API and UI (Node build stage, then Python).
+          - name: world-model-web
+            dockerfile: components/world-model-web/Dockerfile
+            context: .
+            build_args: |
+              NODE_IMAGE=docker.io/library/node:20-alpine@sha256:afdf98210b07b586eb71fa22ba2e432e058e4cd1304d31ed60888755b8c865fb
+              BASE_IMAGE=docker.io/library/python:3.11-slim@sha256:65bd3d9f1d7fa268dd1909973ba7eb4bdf41f6dcf2cfbe76ba9528b170f3fd79
           - name: world-model-runtime
             dockerfile: components/world-model-runtime/Dockerfile
             context: .

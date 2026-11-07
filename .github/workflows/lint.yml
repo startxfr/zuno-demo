@@ -231,6 +231,19 @@ jobs:
           pip install -r requirements.txt
           pip install pytest
           python3 -m pytest -q tests
+      - name: world-model-web tests (ADR-0604)
+        working-directory: components/world-model-web
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
+          python3 -m pytest -q tests
+      # No setup-node action in this repository: the UI is checked in the same pinned Node 20 image the
+      # Dockerfile builds it with (typecheck, unit tests, production build, all from the lockfile).
+      - name: world-model-web UI typecheck, unit tests and build (ADR-0604)
+        run: |
+          docker run --rm -v "$PWD/components/world-model-web/ui:/work" -w /work \
+            docker.io/library/node:20-alpine@sha256:afdf98210b07b586eb71fa22ba2e432e058e4cd1304d31ed60888755b8c865fb \
+            sh -c 'npm ci --ignore-scripts --no-audit --no-fund && npm run typecheck && npm test && npm run build'
       - name: zuno-token-proxy tests (ADR-0601)
         working-directory: components/zuno-token-proxy
         run: |

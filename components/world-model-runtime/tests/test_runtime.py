@@ -113,8 +113,10 @@ def client():
 
 
 def _video(message: bytes):
+    """(keyframe, pts_us, seq or -1, payload) of a binary video message."""
     assert message[:1] == VIDEO_TAG
-    return bool(message[1] & 1), int.from_bytes(message[2:10], "big"), message[10:]
+    seq = int.from_bytes(message[10:14], "big")
+    return bool(message[1] & 1), int.from_bytes(message[2:10], "big"), -1 if seq == 0xFFFFFFFF else seq, message[14:]
 
 
 def test_health_ready_and_metrics(client):
@@ -137,10 +139,18 @@ def test_world_from_prompt_streams_video_and_applies_a_world_edit(client):
         state = json.loads(ws.receive_text())
         assert state["type"] == "state" and state["state"] == "STREAMING" and state["engine"] == "mock"
         first = ws.receive_bytes()
-        assert _video(first)[0], "the stream must open on a keyframe"
+        assert _video(first)[0] and _video(first)[2] == -1, "the stream opens on a keyframe that reflects no control yet"
         ws.send_text(json.dumps({"type": "control", "seq": 1, "keys": ["KeyW"], "mouse": {"dx": 0.2, "dy": 0}}))
+        seen, videos = set(), 0
+        deadline = time.time() + 5
+        while 1 not in seen and time.time() < deadline:
+            msg = ws.receive()
+            if msg.get("bytes"):
+                videos += 1
+                seen.add(_video(msg["bytes"])[2])
+        assert 1 in seen, "frames generated from control 1 must carry its sequence number"
         ws.send_text(json.dumps({"type": "edit", "prompt_version": 1, "prompt": "the sky turns red"}))
-        events, videos = [], 0
+        events = []
         deadline = time.time() + 10
         while time.time() < deadline and not (any(e.get("type") == "prompt" for e in events)
                                                and any(e.get("type") == "stats" for e in events)):

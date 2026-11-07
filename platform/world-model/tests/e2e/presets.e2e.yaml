@@ -1,0 +1,10 @@
+# Test scene for the local end-to-end run (the real presets arrive with WP-236).
+presets:
+  - id: village
+    title: Snowy village
+    description: A snowy medieval village at dusk (end-to-end test scene).
+    prompt: a snowy medieval village at dusk, first-person view
+    seed: 7
+    event:
+      title: The sky turns red
+      prompt: the sky turns red and a volcano erupts beyond the village

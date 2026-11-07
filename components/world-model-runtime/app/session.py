@@ -52,12 +52,16 @@ class NotFound(Exception):
     """No such world."""
 
 
-# Binary video message: b"V", flags (bit 0 = keyframe), pts in microseconds (8 bytes), Annex-B payload.
+# Binary video message: b"V", flags (bit 0 = keyframe), pts in microseconds (8 bytes), the last control
+# sequence the frame reflects (4 bytes, 0xFFFFFFFF = none yet), then the Annex-B payload.
 VIDEO_TAG = b"V"
+NO_SEQ = 0xFFFFFFFF
+HEADER_BYTES = 14
 
 
-def video_message(payload: bytes, keyframe: bool, pts_us: int) -> bytes:
-    return VIDEO_TAG + bytes([1 if keyframe else 0]) + pts_us.to_bytes(8, "big") + payload
+def video_message(payload: bytes, keyframe: bool, pts_us: int, seq: int = -1) -> bytes:
+    seq32 = NO_SEQ if seq < 0 else seq % NO_SEQ  # never the marker itself
+    return VIDEO_TAG + bytes([1 if keyframe else 0]) + pts_us.to_bytes(8, "big") + seq32.to_bytes(4, "big") + payload
 
 
 @dataclass
@@ -207,7 +211,7 @@ class Runtime:
     async def _loop(self, world: World, encoder: FrameEncoder, out, send_event: SendEvent, pts: int) -> str:
         step = asyncio.ensure_future(self._gpu(self._timed_step, world.controls.take()))
         while not self._stop.is_set():
-            frames, step_seconds = await step
+            frames, step_seconds, seq = await step
             metrics.FRAMES_GENERATED.labels(model=self.engine.name, precision=self.precision).inc(len(frames))
             if not self._edits.empty():
                 await self._apply_edit(world, encoder, frames[-1], send_event)
@@ -215,7 +219,7 @@ class Runtime:
             step = asyncio.ensure_future(self._gpu(self._timed_step, world.controls.take()))
             interval = max(step_seconds, 1e-3) / len(frames)
             for frame in frames:
-                pts = self._emit(encoder, frame, pts, out)
+                pts = self._emit(encoder, frame, pts, out, seq=seq)
                 if self._stop.is_set():
                     break
                 await asyncio.sleep(interval)
@@ -231,7 +235,7 @@ class Runtime:
         spent = time.perf_counter() - started
         self.last_step_seconds = spent
         metrics.ENGINE_STEP.labels(model=self.engine.name).observe(spent)
-        return frames, spent
+        return frames, spent, ctrl.seq
 
     async def _apply_edit(self, world: World, encoder: FrameEncoder, current: np.ndarray, send_event) -> None:
         version, prompt = self._edits.get_nowait()
@@ -258,11 +262,12 @@ class Runtime:
         world.state = State.STREAMING
         await send_event({"type": "state", "state": world.state.value})
 
-    def _emit(self, encoder: FrameEncoder, frame: np.ndarray, pts: int, out, keyframe: bool = False) -> int:
+    def _emit(self, encoder: FrameEncoder, frame: np.ndarray, pts: int, out, keyframe: bool = False,
+              seq: int = -1) -> int:
         if keyframe:
             encoder.request_keyframe()
         for payload, is_key in encoder.encode(frame):
-            message = video_message(payload, is_key, int(pts * 1_000_000 / 60))
+            message = video_message(payload, is_key, int(pts * 1_000_000 / 60), seq)
             try:
                 out.put_nowait(message)
             except asyncio.QueueFull:

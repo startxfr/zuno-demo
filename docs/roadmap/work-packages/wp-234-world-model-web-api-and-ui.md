@@ -1,6 +1,6 @@
 # WP-234: World-model web, API and UI (delivers ADR-0604 D4, D7, D8)
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** ADR-0604
 - **Depends on:** WP-231, WP-233
 - **Blocks:** WP-235
@@ -33,6 +33,15 @@ ADR-0604 D4, D7, D8, §4.2, §4.3, §6.1, §6.3, §8, §10.
    `zuno-ai-build` mirrors; second image in `world_model_build` and the build matrix.
 4. Tests: API unit tests registered in `lint.yml`; a local end-to-end run (podman: runtime with mocks + web, OIDC
    stubbed) driven by Playwright with the `chrome` channel, because the bundled Chromium has no H.264 decoder.
+
+## Result (2026-11-07)
+
+`components/world-model-web`: the API (28 tests, mutation-checked on the edit bypass, audience, ownership and lease), the UI
+(typecheck, 5 unit tests, production build), the Dockerfile (built and run locally as an arbitrary UID), the build role and CI
+steps, and `platform/world-model/tests/e2e` (a real Chrome against the mock runtime: 10 steps, three consecutive passes, input to
+display measured). Findings that changed the design: the runtime's video header now carries the control sequence each frame
+reflects (real latency, not an estimate), a detached session frees the GPU after 60 s, and files are made readable for an
+arbitrary UID. OpenTelemetry spans are not in this lot: they ship with the dashboard in WP-236.
 
 ## Verification
 
