@@ -1,9 +1,9 @@
 # WP-222: Quick security wins: audience flag, admin authentication, CQL escaping, secret scan, action pins (delivers ADR-0602, ADR-0603)
 
-- **State:** Operator pending (2026-11-06). The repo work is complete and committed locally on branch
-  `wp-222-security-quick-wins`; nothing is pushed, because both repositories are public and the user publishes the
-  security work only once it is reviewed. The rollout (push, in-cluster build of both gateways, ArgoCD sync, the live
-  checks below) waits for the user's go.
+- **State:** Done (2026-11-07, user decision). The repo work is merged into `devel` locally (not pushed). Named
+  exception: the live checks of the rollout (audience refusal, admin routes, Confluence CQL) are not run; the user
+  closed the package without them. The push, the in-cluster build of both gateways and the ArgoCD sync still wait for
+  the user's go.
 - **ADRs:** ADR-0602, ADR-0603
 - **Depends on:** none
 - **Blocks:** WP-227
@@ -68,7 +68,7 @@ ADR-0602 clauses 6 and 7; ADR-0603 clause 1 (M10, M11, M19, M21).
   client label; its known callers (the same experience clients, UnifAI with user tokens, a2a-gateway forwarding them,
   Lightspeed with opaque OpenShift tokens) carry the audience or skip JWT validation.
 
-## Rollout (needs the user's go)
+## Rollout (needs the user's go; live checks waived at closure)
 
 1. Push, merge to `devel` then `main`, build `ai-gateway` and `mcp-gateway` in-cluster, sync both Applications.
 2. Live checks: an `aap` client token gets 401 on both gateways; a `unifai` or `open-webui` token gets 200;

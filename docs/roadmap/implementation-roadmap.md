@@ -37,7 +37,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
-| v0.15 | 4 | 4 | 8 | WP-209, WP-221, WP-222, WP-223, WP-224, WP-225, WP-226, WP-227 |
+| v0.15 | 4 | 4 | 8 | WP-209, WP-221, WP-223, WP-224, WP-225, WP-226, WP-227 |
 | v0.16 | 4 | 4 | 11 | WP-210, WP-211, WP-212, WP-213, WP-214, WP-215, WP-216, WP-217, WP-218 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -1056,7 +1056,7 @@ Closing the ADRs whose work was done (2026-11-05) left four that stay `Partially
 | WP-219 | [wp-219](work-packages/wp-219-run-the-adr-0570-checks-once-their-blockers-clear.md) | 0570 | WP-177 | Closed — deferred | every check is blocked: vendor route defect (V2, V3, V5), personas get 401 from MaaS (V6), no verified project id (V11) |
 | WP-221 | [wp-221](work-packages/wp-221-agent-lifecycle-states-revocation-list-and-audit-events.md) | 0584 | WP-167 | Not started (2026-11-05: go given by the user, the fork session builds the operator part as soon as it can) | the fork session builds the operator part, a release with the user's go, one pilot on demo333 |
 | WP-220 | [wp-220](work-packages/wp-220-evaluate-the-rhoai-3-6-mcp-lifecycle-portal-and-workbenches-v2-components.md) | 0571 | WP-195 | Done | portal adopted and live; MCP lifecycle operator and Workbenches V2 wait |
-| WP-222 | [wp-222](work-packages/wp-222-quick-security-wins-audience-admin-cql-secret-scan-action-pins.md) | 0602, 0603 | none | Operator pending | committed locally, not pushed (public repos); rollout needs push, in-cluster build of both gateways and the user's go |
+| WP-222 | [wp-222](work-packages/wp-222-quick-security-wins-audience-admin-cql-secret-scan-action-pins.md) | 0602, 0603 | none | Done | merged to `devel` locally, not pushed; live checks waived by the user; push, gateway builds and sync wait for the user's go |
 | WP-223 | [wp-223](work-packages/wp-223-secrets-and-identity-hardening-vault-eso-passwords-keycloak.md) | 0602, 0603 | WP-222 | Not started | cluster rehearsal; needs the user's choice of unseal backend |
 | WP-224 | [wp-224](work-packages/wp-224-network-and-gitops-hardening-mesh-egress-appproject-jwks.md) | 0602, 0603 | WP-222 | Not started | cluster rehearsal, namespace by namespace |
 | WP-225 | [wp-225](work-packages/wp-225-ai-and-agent-surface-guardrails-metering-delegated-scope.md) | 0602, 0603, 0565 | WP-222, WP-209 | Not started | classification itself stays with WP-209 |
@@ -1214,6 +1214,7 @@ moving.
 - 2026-11-05 — WP-167 Done and ADR-0582 Implemented: the user repeated the per-agent sheet proof on UnifAI 0.1.59 as consultant-01 and sale-01. ADR-0584 stays `Accepted`: its lifecycle states, revocation list and audit events are not built and no work package carries them.
 - 2026-11-05 — Unstarted work follows the code releases (user decision). ADR-0565 moves to the new band v0.15; ADR-0110, ADR-0352, ADR-0556 and ADR-0557 move to the new band v0.16, with WP-209 and WP-210 to WP-218 following their ADRs. Closed ADRs, ADRs with a started package, and the past bands are untouched; the old bands v0.1 now has no open ADR or WP, and v0.9 keeps only ADR-0559 (WP-145, WP-195). See the ADR change log.
 - 2026-11-05 — `v0.13.0` tagged on `main` (`388555d6`): the first platform tag since `v0.3.0`, so that tags follow the roadmap bands again. The rule (a tag per band, on `main`, annotated, the in-cluster ledger as a separate step) is in RELEASING.md and the tag table in versions.md. v0.4 to v0.12 are not tagged retroactively; the next tag is `v0.14.0`.
+- 2026-11-07 — WP-222 Done (user decision): the reviewed security quick wins (gateway audience `zuno-admin-api`, authenticated `/admin/*` routes, Confluence CQL and page-id checks, input ceilings, secret scan, SHA-pinned actions, venv out of git) are merged into `devel` locally, not pushed. Named exception: the live checks (audience, admin routes, CQL) were not run; the user closed the package without them. ADR-0602 and ADR-0603 stay `Proposed`, with WP-223 to WP-227 open.
 - 2026-11-06 — WP-220 Done: the user accepted it after a retest on demo333 of the playground shipped by the `openshift-ai` chart (chat, RAG, MCP with the user's own token as `ai-ops-01`; `ai-dev-01` sees no MCP tool by policy). The MaaS consumer portal is adopted for the three `ocp-*` groups; the MCP lifecycle operator and Workbenches V2 wait; Anthropic-format traffic stays uncounted by MaaS (accepted).
 - 2026-11-06 — ADR-0602, ADR-0603 and WP-222 to WP-227 added, all in v0.15: a read-only review of the platform's trust boundaries (identity, secrets, network, the AI and agent surface, the supply chain). Findings are not replayed on a cluster. WP-222 (quick wins) is committed locally and not pushed, because both repositories are public.
 - 2026-11-05 — WP-220 added (evaluation, no cluster change): what the RHOAI 3.6 MCP lifecycle operator, MaaS consumer portal and WorkbenchesV2 would bring to this project, which custom code each could replace, and the questions that gate a pilot. It also records that the MaaS 3.6 documentation describes the WP-195 quota incident (gateway wasm object size) and its levers.
