@@ -89,6 +89,24 @@ class Lightspeed(unittest.TestCase):
         self.assertEqual(r.status, g.FAIL)
 
 
+A2A_200 = '10.0.0.1 - - "POST /agents/tekos/ HTTP/1.1" 200 -\n'
+A2A_404 = '10.0.0.1 - - "POST /agents/tekos/ HTTP/1.1" 404 -\n'
+
+
+class Delegation(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "platform" / "testing"))
+
+    def test_served_call_to_tekos_passes(self):
+        r = g.judge_delegation(A2A_404 + A2A_200)
+        self.assertEqual(r.status, g.PASS)
+        self.assertIn("served 1 call", r.detail)
+
+    def test_no_served_call_fails(self):
+        self.assertEqual(g.judge_delegation(A2A_404).status, g.FAIL)
+        self.assertEqual(g.judge_delegation("").status, g.FAIL)
+
+
 class Aggregate(unittest.TestCase):
     def test_last_json_line(self):
         self.assertEqual(g.last_json_line("noise\n{\"a\": 1}\ntrailing"), {"a": 1})

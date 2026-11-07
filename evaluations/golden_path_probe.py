@@ -7,8 +7,8 @@ One probe per demonstration moment, each a real call that must get a real answer
   sovereignty          two ai-gateway calls from inside the gateway pod: Arkos (floor C3) must be routed to a local
                        model at C3, a Tekos control call stays at its header level
   delegation-approval  Arkos delegates to Tekos, the approval request appears and is rejected, so nothing runs
-                       (evaluations/arkos/approval_proof.py reject), then the delegation evidence in the gateway logs
-                       (platform/testing/a2a_delegation_check.py)
+                       (evaluations/arkos/approval_proof.py reject), then the a2a-gateway's access line for the call to
+                       Tekos (a rejected approval runs no tool, so there is no delegated mcp-gateway call to look for)
   open-webui           one answer through Open WebUI's API, signed in as a persona (OIDC through Keycloak)
   zuno-code            the same, with the declared code model `zuno-code` (ADR-0596, Codestral first)
   dify, kagent         one answer through the experience's own token proxy, from inside its pod (ADR-0601)
@@ -202,22 +202,32 @@ def probe_sovereignty(ctx: Context) -> Result:
     return judge_sovereignty(data.get("calls") or [])
 
 
+def judge_delegation(a2a_log: str, target: str = "tekos") -> Result:
+    """After a rejected approval nothing runs, so no delegated tool call reaches the mcp-gateway. The delegation is
+    proved by the a2a-gateway's access lines: the delegator's call to the target agent was served (200)."""
+    from a2a_delegation_check import parse_a2a_access
+
+    served = [status for agent, status in parse_a2a_access(a2a_log) if agent == target]
+    ok = sum(1 for s in served if s == 200)
+    if ok:
+        return Result("delegation-approval", PASS, f"approval requested and rejected, nothing ran; the a2a-gateway "
+                                                   f"served {ok} call(s) to {target}")
+    return Result("delegation-approval", FAIL, f"approval rejected as asked, but the a2a-gateway served no call to "
+                                               f"{target} in the window ({len(served)} line(s), statuses {sorted(set(served))})")
+
+
 def probe_delegation_approval(ctx: Context) -> Result:
+    sys.path.insert(0, str(REPO / "platform" / "testing"))
+    from a2a_delegation_check import oc_logs
+
     started = time.monotonic()
     proof = subprocess.run([sys.executable, str(HERE / "arkos" / "approval_proof.py"), "reject"],
                            env=ctx.env(), capture_output=True, text=True, timeout=720)
     tail = " | ".join(l.strip() for l in (proof.stdout + proof.stderr).splitlines()[-3:] if l.strip())
     if proof.returncode != 0:
         return Result("delegation-approval", FAIL, f"approval_proof.py reject exit {proof.returncode}: {tail[:240]}")
-    minutes = max(5, int((time.monotonic() - started) / 60) + 3)
-    check_cmd = [sys.executable, str(REPO / "platform" / "testing" / "a2a_delegation_check.py"),
-                 "--delegator", "arkos", "--target", "tekos", "--since", f"{minutes}m"]
-    check = subprocess.run(check_cmd, capture_output=True, text=True, timeout=180)
-    ctail = " | ".join(l.strip() for l in check.stdout.splitlines()[-2:] if l.strip())
-    if check.returncode != 0:
-        return Result("delegation-approval", FAIL, f"approval rejected as asked, but the delegation evidence is "
-                                                   f"missing: {ctail[:240]}")
-    return Result("delegation-approval", PASS, f"approval requested and rejected, nothing ran; delegation seen: {ctail[:200]}")
+    minutes = max(5, int((time.monotonic() - started) / 60) + 2)
+    return judge_delegation(oc_logs("zuno-ai-run", "a2a-gateway", f"{minutes}m"))
 
 
 def _keycloak_form_login(client, start_url: str, username: str, password: str):
