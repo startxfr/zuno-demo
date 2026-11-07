@@ -167,3 +167,8 @@ markers of the tool results in its context, and the floor keeps it at or above t
 built; that is a partial supersession of clause 3, not a change of its rule (a level can only rise). The ADR stays
 `Partially implemented` until the floor is live and the default question is settled.
 
+## Update (2026-11-07) - clause 5 live on demo333
+
+The floor is live (WP-209): a `C1` call that names `cognos` is routed and counted at `C3`, `tekos` and header-less calls
+stay `C1`. What keeps this ADR `Partially implemented` is the user's open decision on the header-less default (`C1`
+today, `C3` built and tested).

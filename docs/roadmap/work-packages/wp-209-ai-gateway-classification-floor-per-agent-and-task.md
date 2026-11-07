@@ -1,8 +1,8 @@
 # WP-209: ai-gateway classification floor per agent and task
 
-- **State:** Operator pending (2026-11-07). The repo work is committed locally on `wp-209-classification-floor`, not
-  pushed. The live probe below needs the push, an in-cluster build of the ai-gateway, the floors switched on for demo333
-  and the user's go. The default for a header-less call stays `C1` (user decision); `C3` is built and tested, not on.
+- **State:** Done (2026-11-07) - live on demo333: ai-gateway image `d849b322` (build ai-gateway-47 from 11c12da9),
+  floors on, probe as expected. The header-less default stays `C1` by user decision, so ADR-0565 stays
+  `Partially implemented` until that is decided (see "Live verification (2026-11-07)")
 - **ADRs:** [ADR-0565](../../adr/0565-derive-data-classification-from-okf-and-only-allow-raising-it.md)
 - **Depends on:** none
 - **Blocks:** WP-225 (builds on `app/classification_floor.py`)
@@ -179,3 +179,21 @@ User decision (2026-11-07): a **per-client floor** (`classification.clientFloors
 UnifAI token can no longer drop below it by omitting or inventing `X-Zuno-Agent`. It ships empty (today's behaviour)
 and is switched on per cluster with the live probe. A caller that claims a known low-floor agent is closed by WP-225
 lot C (verifiable agent identity).
+
+## Live verification (2026-11-07)
+
+With the user's go, on demo333: `make d1 build ai-gateway` (build `ai-gateway-47`, commit `11c12da9`, digest
+`d849b322...`, the first image on the WP-226 hashed lock), `zuno_ai_gateway_classification_floors_generated: true` in
+`ansible/clusters/demo333.yml` (default `C1` and the per-client floor left unset), `make d2 install llm`.
+
+- ConfigMap `ai-gateway-classification-floors`: 8 agents (arkos, cognos `C3`; advantage, comage, finage, soursage `C2`;
+  naveo, tekos `C1`); the pod mounts it at `/app/config-classification`, `CLASSIFICATION_DEFAULT_WHEN_ABSENT=C1`.
+- Probe (the brief's script, `zuno-evaluations` token of consultant-01, accepted):
+  `['C1','cognos','coming-soon'] 200 kind=local provider=local-qwen35-maas classification=C3`,
+  `['C1','tekos','answer-technical-question'] 200 classification=C1`, header-less `200 classification=C1`, and exactly
+  one log line `classification raised by floor: C1 -> C3 agent=cognos task=coming-soon client=zuno-evaluations`.
+- After the roll: `/readyz` 200, no error in the pod log, acceptance gate PASS 17/18 (scenario 11, the RAG citation,
+  failed with no tool call, as on 0.1.62 the same morning), 14/14, 5/5.
+- Finding: the startup line `loaded classification floors from ... (8 agent(s))` is never logged. `ClassificationFloors`
+  is built at import time, before logging is configured, so its INFO line is dropped; the floors are loaded (the probe
+  proves it). Cosmetic: log it again after logging setup, or check the ConfigMap instead of the line.
