@@ -364,7 +364,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 
 | ADR | Status | Decision |
 |---|---|---|
-| [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Partially implemented | Derive data classification from OKF and only allow raising it |
+| [ADR-0565](0565-derive-data-classification-from-okf-and-only-allow-raising-it.md) | Implemented | Derive data classification from OKF and only allow raising it |
 | [ADR-0584](0584-define-agent-lifecycle-states-roles-and-incident-revocation.md) | Accepted | Define agent lifecycle states, roles and incident revocation |
 | [ADR-0602](0602-harden-the-platform-trust-boundaries-before-a-customer-runs-it.md) | Proposed | Harden the platform's trust boundaries before a customer runs it |
 | [ADR-0603](0603-close-the-medium-severity-security-gaps-found-in-the-2026-11-06-review.md) | Proposed | Close the medium-severity security gaps found in the 2026-11-06 review |
@@ -375,7 +375,6 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0110](0110-automate-document-acl-synchronization.md) | Implemented | Automate document ACL synchronization |
 | [ADR-0352](0352-run-day-0-platform-services-in-internal-or-external-mode.md) | Partially implemented | Run day-0 platform services in internal or external mode |
-| [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | Proposed | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
 | [ADR-0557](0557-manage-the-cluster-from-a-remote-argocd-natively-or-via-rhacm.md) | Accepted | Manage the cluster from a remote ArgoCD, natively or via RHACM |
 
 ## OKF v0.1
@@ -408,6 +407,7 @@ part of its decision is still in force.
 | [ADR-0046](0046-make-rag-retrieval-metadata-aware-and-bilingual.md) | v0 | Superseded by ADR-0568 | Make RAG retrieval metadata-aware and bilingual |
 | [ADR-0050](0050-abstract-the-rag-backend-and-integrate-openshift-ai-ogx.md) | v0.1 | Superseded by ADR-0322 | Abstract the RAG backend and integrate OpenShift AI OGX |
 | [ADR-0054](0054-define-the-bff-contract-openapi-first.md) | v0 | Superseded by ADR-0561 | Define the BFF contract OpenAPI-first |
+| [ADR-0556](0556-introduce-a-zuno-operator-with-foundation-infra-and-stack-crds.md) | v0.16 | Deprecated | Introduce a zuno operator with Foundation, Infra and Stack CRDs |
 | [ADR-0103](0103-persist-resumable-long-running-agent-workflows.md) | v0.1 | Superseded by ADR-0561 | Persist resumable long-running agent workflows |
 | [ADR-0105](0105-automate-source-specific-knowledge-ingestion.md) | v0.6 | Superseded by ADR-0218 and ADR-0568 | Automate source-specific knowledge ingestion |
 | [ADR-0111](0111-strengthen-secnumcloud-oriented-security-controls.md) | v0.7 | Superseded by ADR-0549 | Strengthen SecNumCloud-oriented security controls |

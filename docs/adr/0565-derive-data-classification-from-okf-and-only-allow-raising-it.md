@@ -1,6 +1,6 @@
 # ADR-0565: Derive data classification from OKF and only allow raising it
 
-- **Status:** Partially implemented
+- **Status:** Implemented (2026-11-07, WP-209: the floor is live on demo333; clause 5 amended, the header-less default stays C1 by user decision, see the 2026-11-07 amendment)
 - **Target:** v0.15 (retargeted from v0.11 on 2026-11-05: all of its remaining work is not started, so it follows the code release that will carry it)
 - **Date:** 2026-10-17
 - **Decision owners:** Zuno Demo architecture team
@@ -172,3 +172,16 @@ built; that is a partial supersession of clause 3, not a change of its rule (a l
 The floor is live (WP-209): a `C1` call that names `cognos` is routed and counted at `C3`, `tekos` and header-less calls
 stay `C1`. What keeps this ADR `Partially implemented` is the user's open decision on the header-less default (`C1`
 today, `C3` built and tested).
+
+## Amendment (2026-11-07) - clause 5: the header-less default stays C1
+
+By user decision, clause 5's "a request with no classification header is treated as `C3`" is amended: the default
+stays `C1` (`classification.defaultWhenAbsent`, unset on demo333). The protection of a classified agent is the floor
+per agent and task (live, WP-209) and the signed classification markers of ADR-0594; `C3` stays built and tested and
+can be switched on per cluster. Reason: UnifAI's shared `zuno-gateway` LLM sends no header, so `C3` would route every
+unclassified call of the three experiences to local models only.
+
+Known gap, recorded and not closed here: the (agent, task) key is caller-supplied, so a caller that omits the agent,
+names an unknown one or claims a `C1`-floor agent is not raised. Closing it needs a verifiable agent identity (an
+operator-signed header, or the `agent_chain` of WP-225 lot C). With this amendment the decision is in effect as the
+tree stands: `Implemented`.
