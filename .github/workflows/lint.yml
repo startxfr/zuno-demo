@@ -220,6 +220,9 @@ jobs:
           # WP-157: the default-off MaaS switches (429 pass-through, gateway
           # identity and its attested headers, per-class fail modes).
           python3 tests/test_wp157_maas_switches.py
+          # WP-209 (ADR-0565 clause 5): effective = max(header, floor(agent, task)),
+          # and the level of a header-less call (C1 shipped, C3 tested).
+          python3 tests/test_wp209_classification_floor.py
       - name: supply-chain pin_release.py tests (ADR-0115)
         working-directory: platform/supply-chain
         run: |

@@ -188,6 +188,21 @@ maxTokensDefault: 8192
 modelRouting:
   generated: false
 
+# ADR-0565 clause 5 (WP-209): the ai-gateway routes and counts a chat call at
+# max(X-Zuno-Data-Classification, floor(agent, task)).
+classification:
+  # Mount the per-(agent, task) floors generated from the admitted agents
+  # release (files/classification-floors.generated.yaml). Needs an image with
+  # app/classification_floor.py (ai-gateway after WP-209); an older image
+  # ignores the file.
+  floorsGenerated: false
+  # The level of a call that sends no X-Zuno-Data-Classification header:
+  # C1, C2 or C3 (the template refuses anything else). C3 fails closed (local
+  # models only) and is ADR-0565's target, but stays off until the callers the
+  # WP-209 brief lists (the UnifAI shared `zuno-gateway` LLM above all) send a
+  # header. An older image ignores it and keeps C1.
+  defaultWhenAbsent: C1
+
 # ADR-0511/ADR-0528: Keycloak clients (the token's `azp`) whose calls may set
 # a non-standard quota class (X-Zuno-Quota-Class) and a project id
 # (X-Zuno-Project-Id). Any other caller runs under `standard` with no

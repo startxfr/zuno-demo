@@ -61,6 +61,11 @@
       # ADR-0579 (WP-164 lot 3): mount the generated per-agent guardrail modes.
       guardrails:
         modesGenerated: "{{ zuno_ai_gateway_guardrails_modes_generated | default(false) | bool }}"
+      # ADR-0565 clause 5 (WP-209): mount the generated classification floors;
+      # the level of a header-less call stays C1 unless a cluster sets C3.
+      classification:
+        floorsGenerated: "{{ zuno_ai_gateway_classification_floors_generated | default(false) | bool }}"
+        defaultWhenAbsent: "{{ zuno_ai_gateway_classification_default_when_absent | default('C1') }}"
       # ADR-0591 (WP-188): skip not-ready local models / open breakers.
       # Turned on per cluster after the image carrying them is rolled.
       availability:

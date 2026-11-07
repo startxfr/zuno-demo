@@ -259,7 +259,7 @@ with tekos; demo222 cuts over only after full validation.
 **24 ADRs: 21 `Accepted`, 1 `Implemented` (ADR-0586), ADR-0564 superseded in part by ADR-0577 and
 ADR-0578, ADR-0353 `Proposed`.** Open: ADR-0353, ADR-0401, ADR-0402, ADR-0403, ADR-0406, ADR-0409, ADR-0560 – ADR-0563, ADR-0565 – ADR-0575, ADR-0585; WP-146 – WP-157, WP-172 – WP-175.
 
-On 2026-11-05 ADR-0565 moved to v0.15: its remaining clause, the ai-gateway classification floor (WP-209), is not started.
+On 2026-11-05 ADR-0565 moved to v0.15: its remaining clause, the ai-gateway classification floor (WP-209), is not started. On 2026-11-07 WP-209 reached Operator pending: the floor is built, committed locally and not live; the header-less default stays C1.
 
 ## v0.12
 
@@ -310,7 +310,7 @@ The band also holds the agent lifecycle: the `deprecated` and `retired` states, 
 
 The band also holds the security hardening that came out of the 2026-11-06 review: ADR-0602 (the findings that break a trust boundary: Vault, secret reach, mesh enforcement, GitOps scope, shared passwords, audience, guardrails, metering, delegated scope) and ADR-0603 (the medium findings, the supply chain and the hygiene gaps). Six work packages: quick wins first (WP-222), then secrets and identity (WP-223), network and GitOps (WP-224), the AI and agent surface (WP-225), the supply chain (WP-226) and a `hardened` deployment profile that switches them all on (WP-227).
 
-**4 ADRs: ADR-0565 `Partially implemented`, ADR-0584 `Accepted`, ADR-0602 and ADR-0603 `Proposed`.** Open work packages: WP-209, WP-221, WP-223 to WP-227 (WP-222 Done 2026-11-07, live checks waived).
+**4 ADRs: ADR-0565 `Partially implemented`, ADR-0584 `Accepted`, ADR-0602 and ADR-0603 `Proposed`.** Open work packages: WP-209 (Operator pending 2026-11-07), WP-221, WP-223 to WP-227 (WP-222 Done 2026-11-07, live checks waived).
 
 ## v0.16
 

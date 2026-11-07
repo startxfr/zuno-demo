@@ -149,3 +149,21 @@ and returned by the mcp-gateway on `knowledge.tech.search`, with the marker of t
 retrieved chunk (WP-187 set that aside, the work being larger than a field read); the turn is raised by the ai-gateway from the signed marker
 (WP-191, ADR-0594), and the static `local_only_for` of the routing policy stays the control for Confluence-reading tasks. This clause stays partly
 implemented. Live proof: [evidence](../roadmap/evidence/wp-187-live-labels.md).
+
+## Update 2026-11-07 (WP-209): clause 5 built, clause 3 covered by ADR-0594
+
+Clause 5 has code, not yet live. `platform/okf/generate_stack_config.py` writes
+`gitops/charts/ai-gateway/files/classification-floors.generated.yaml` (one floor per agent and task, the agent's
+`preferred_classification`; experience clients get none), the CI drift check covers it, and the ai-gateway
+(`app/classification_floor.py`) routes and counts a chat call at `max(header, floor(agent, task))` and logs a raised
+level, behind the chart value `classification.floorsGenerated`. The absent-header default is the chart value
+`classification.defaultWhenAbsent`: `C3` is supported and tested, but it stays `C1` by user decision until the UnifAI
+shared `zuno-gateway` LLM sends a header (the caller inventory is in the [WP-209 brief](../roadmap/work-packages/wp-209-ai-gateway-classification-floor-per-agent-and-task.md)).
+
+Clause 3 (a monotone level carried by the UnifAI session) is covered in practice by
+[ADR-0594](0594-give-the-three-experiences-the-same-mcp-tools-behind-signed-classification-markers.md): the
+unifai-operator renders the bundle level into the header (clause 4), the ai-gateway raises the call from the signed
+markers of the tool results in its context, and the floor keeps it at or above the bundle level. No session attribute is
+built; that is a partial supersession of clause 3, not a change of its rule (a level can only rise). The ADR stays
+`Partially implemented` until the floor is live and the default question is settled.
+
