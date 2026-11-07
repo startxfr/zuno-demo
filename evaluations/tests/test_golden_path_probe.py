@@ -178,22 +178,73 @@ class WorldModel(unittest.TestCase):
     def test_nothing_printed_fails(self):
         self.assertEqual(g.judge_world({}).status, g.FAIL)
 
-    def test_not_installed_is_roadmap_and_it_asks_argo_by_its_full_name(self):
-        calls = []
+    def probe_with(self, fake):
         saved = g.oc
+        g.oc = fake
+        try:
+            return g.probe_world_model(types.SimpleNamespace(persona_token=lambda u: "t"))
+        finally:
+            g.oc = saved
+
+    def test_positively_absent_is_roadmap_and_it_asks_argo_by_its_full_name(self):
+        calls = []
 
         def fake(*args, **kw):
             calls.append(args)
-            return types.SimpleNamespace(returncode=1, stdout="", stderr="NotFound")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr='Error from server (NotFound): applications.argoproj.io "x" not found')
 
-        g.oc = fake
-        try:
-            r = g.probe_world_model(None)
-        finally:
-            g.oc = saved
+        r = self.probe_with(fake)
         self.assertEqual((r.status, r.required), (g.ROADMAP, False))
+        self.assertIn("not installed", r.detail)
         self.assertIn("applications.argoproj.io", calls[0])
         self.assertNotIn("application", calls[0])
+
+    def test_a_lookup_that_cannot_be_confirmed_is_roadmap_never_a_required_failure(self):
+        import subprocess
+
+        def timeout(*args, **kw):
+            raise subprocess.TimeoutExpired("oc", 120)
+
+        def unreachable(*args, **kw):
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="Unable to connect to the server: dial tcp: i/o timeout")
+
+        def silent(*args, **kw):
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="")
+
+        for name, fake in (("timeout", timeout), ("unreachable", unreachable), ("silent", silent)):
+            with self.subTest(name):
+                r = self.probe_with(fake)
+                self.assertEqual((r.status, r.required), (g.ROADMAP, False))
+                self.assertIn("could not look the Application up", r.detail)
+        # and through run_one, which turns any exception into FAIL: the verdict must still not be required
+        saved = g.PROBES["world-model"]
+        g.PROBES["world-model"] = lambda ctx: self.probe_with(timeout)
+        try:
+            self.assertFalse(g.run_one("world-model", None).required)
+        finally:
+            g.PROBES["world-model"] = saved
+
+    def test_positively_found_runs_the_probe_and_is_then_required(self):
+        calls = []
+        summary = dict(self.OK)
+
+        def fake(*args, **kw):
+            calls.append(args)
+            if args[0] == "get":
+                return types.SimpleNamespace(returncode=0, stdout="application.argoproj.io/zuno-world-model-d1\n", stderr="")
+            return types.SimpleNamespace(returncode=0, stdout=json.dumps(summary) + "\n", stderr="")
+
+        self.assertEqual(self.probe_with(fake).status, g.PASS)
+        self.assertEqual(calls[1][0], "exec")
+        summary["frames"] = 2
+        r = self.probe_with(fake)
+        self.assertEqual(r.status, g.FAIL)
+        saved = g.PROBES["world-model"]
+        g.PROBES["world-model"] = lambda ctx: r
+        try:
+            self.assertTrue(g.run_one("world-model", None).required)
+        finally:
+            g.PROBES["world-model"] = saved
 
     def test_a_held_gpu_is_never_called_a_pass(self):
         self.assertEqual(self.with_(released=False, frames=40).status, g.FAIL)

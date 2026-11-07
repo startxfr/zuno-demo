@@ -602,13 +602,29 @@ def judge_world(s: Dict) -> Result:
                   f"world created, {frames} frames ({s.get('engine')}, {s.get('encoder')}), edit applied{took}, session released")
 
 
+def _world_model_installed() -> "tuple[Optional[bool], str]":
+    """(True, "") only when the Application is positively found; (False, why) when it is positively absent; (None, why)
+    when it cannot be confirmed either way (an oc timeout, an API hiccup, a login problem)."""
+    try:
+        # The full resource name: `oc get application` is ambiguous and answers from app.k8s.io, so it would say
+        # "not found" for an installed demo and the probe would wrongly report roadmap.
+        app = oc("get", "applications.argoproj.io", "zuno-world-model-d1", "-n", "openshift-gitops", "-o", "name")
+    except Exception as exc:  # noqa: BLE001 - a timeout or a missing oc must not decide the verdict
+        return None, f"could not look the Application up ({type(exc).__name__})"
+    if app.returncode == 0 and "zuno-world-model-d1" in (app.stdout or ""):
+        return True, ""
+    err = (app.stderr or "").strip()
+    if "NotFound" in err or "not found" in err:
+        return False, "not installed (zuno_world_model_enabled is false)"
+    return None, f"could not look the Application up ({err[:120] or 'no answer'})"
+
+
 def probe_world_model(ctx: Context) -> Result:
-    # The full resource name: `oc get application` is ambiguous and answers from app.k8s.io, so it would say
-    # "not found" for an installed demo and the probe would wrongly report roadmap.
-    app = oc("get", "applications.argoproj.io", "zuno-world-model-d1", "-n", "openshift-gitops", "-o", "name")
-    if app.returncode != 0:
-        return Result("world-model", ROADMAP, "not installed (zuno_world_model_enabled is false): shown as roadmap, not live",
-                      required=False)
+    """Roadmap unless the demo is POSITIVELY found installed: a lookup that cannot be confirmed must never turn into a
+    required failure for a moment that is not in the demonstration (run_one makes a PASS or FAIL required)."""
+    installed, why = _world_model_installed()
+    if installed is not True:
+        return Result("world-model", ROADMAP, f"{why}: shown as roadmap, not live", required=False)
     persona = os.getenv("GOLDEN_WORLD_PERSONA", "ai-ops-01")
     script = WORLD_PROBE_SCRIPT.replace("__CFG__", json.dumps(
         {"base": "http://127.0.0.1:8080", "token": ctx.persona_token(persona), "frames": WORLD_FRAMES,
