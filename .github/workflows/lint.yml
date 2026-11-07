@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
-      - run: pip install pyyaml
+      - run: pip install pyyaml packaging
       # ADR-0580/WP-165: agents and the corp policies are not in this
       # repository; the steps below read the release pinned in
       # platform/okf/agents.lock, verified offline and extracted once by
@@ -211,6 +211,7 @@ jobs:
         run: |
           pip install -r requirements.txt
           python3 tests/test_token_proxy.py
+          python3 tests/test_tls_verify.py
       - name: zuno-dify-knowledge tests (ADR-0599)
         working-directory: components/zuno-dify-knowledge
         run: |
@@ -232,6 +233,8 @@ jobs:
           # including the via_maas branch structure-demo's own preferred
           # candidate actually uses.
           python3 tests/test_max_tokens_passthrough.py
+          # WP-226: the CA bundle path reaches httpx 0.28 as an SSLContext.
+          python3 tests/test_tls_verify.py
           # WP-157: the default-off MaaS switches (429 pass-through, gateway
           # identity and its attested headers, per-class fail modes).
           python3 tests/test_wp157_maas_switches.py

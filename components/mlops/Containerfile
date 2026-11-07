@@ -40,7 +40,7 @@ COPY components/mlops/requirements.txt /tmp/requirements.txt
 # is upgraded first, as in the other images: older pip releases refuse a lock
 # whose transitive requirements name an extra (`uvicorn` next to
 # `uvicorn[standard]`) in hash-checking mode.
-RUN pip install --no-cache-dir --upgrade pip \
+RUN pip install --no-cache-dir --upgrade pip==26.0.1 \
     && pip install --no-cache-dir -r /tmp/requirements.txt \
     && rm -f /tmp/requirements.txt
 

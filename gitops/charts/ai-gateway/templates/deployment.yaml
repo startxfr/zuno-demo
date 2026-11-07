@@ -43,6 +43,9 @@ spec:
         # on the same container port 8000, so this covers the whole
         # controller-bug class, not just this one model.
         traffic.sidecar.istio.io/excludeOutboundPorts: "8000"
+        {{- with include "ai-gateway.digestAnnotations" .Values }}
+        {{- . | nindent 8 }}
+        {{- end }}
     spec:
       serviceAccountName: ai-gateway
       priorityClassName: zuno-workload-default

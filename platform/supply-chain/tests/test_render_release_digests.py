@@ -160,6 +160,39 @@ def test_rendered_chart_pins_the_deployment() -> None:
     assert "image.openshift.io/triggers" in latest["metadata"]["annotations"]
 
 
+DEPLOYMENT_CHARTS = ("a2a-gateway", "ai-gateway", "diagram-render", "mcp-aap", "mcp-confluence", "mcp-gateway",
+                     "mcp-git-forge", "mcp-salesforce", "zuno-dify-knowledge", "zuno-token-proxy")
+CHART_SETS = {"zuno-token-proxy": ["--set", "namespace=x", "--set", "clientId=y"]}
+
+
+def _deployment(chart: str, *sets: str) -> dict:
+    out = subprocess.run(
+        ["helm", "template", "t", str(REPO_ROOT / "gitops" / "charts" / chart), *CHART_SETS.get(chart, []), *sets,
+         "--show-only", "templates/deployment.yaml"], capture_output=True, text=True, check=True).stdout
+    return yaml.safe_load(out)
+
+
+def test_a_digest_change_changes_the_pod_template() -> None:
+    """The Applications ignore containers[0].image (the :latest trigger patches it), so a move from
+    @A to @B must change a field ArgoCD compares: the pod-template annotation."""
+    if shutil.which("helm") is None:
+        print("  skip: helm not on PATH")
+        return
+    for chart in DEPLOYMENT_CHARTS:
+        a = _deployment(chart, "--set", f"image.digest={DIGEST_A}")
+        b = _deployment(chart, "--set", f"image.digest={DIGEST_B}")
+        none = _deployment(chart)
+        ann = lambda d: (d["spec"]["template"]["metadata"].get("annotations") or {})  # noqa: E731
+        assert ann(a).get("zuno.io/image-digest") == DIGEST_A, chart
+        assert ann(b).get("zuno.io/image-digest") == DIGEST_B, chart
+        assert "zuno.io/image-digest" not in ann(none), chart
+    fetch = _deployment("mcp-gateway", "--set", f"okf.fetch.image.digest={DIGEST_B}", "--set", "okf.fetch.enabled=true",
+                        "--set", "okf.fetch.corpReference=quay.io/zuno/corp@" + DIGEST_A)
+    annotations = fetch["spec"]["template"]["metadata"]["annotations"]
+    assert annotations["zuno.io/okf-fetch-image-digest"] == DIGEST_B
+    assert annotations["zuno.startx.fr/okf-corp-reference"].endswith(DIGEST_A), "the okf annotation is kept"
+
+
 def main() -> int:
     tests = [(name, fn) for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)]
     failed = 0

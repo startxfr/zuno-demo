@@ -34,3 +34,19 @@ chart's pull policy, the ADR-0059 `:latest` path.
 {{- define "diagram-render.imagePullPolicy" -}}
 {{- if .digest -}}IfNotPresent{{- else -}}{{ .pullPolicy }}{{- end -}}
 {{- end -}}
+
+{{/*
+ADR-0603 M16 (WP-226 review): pod-template annotations naming the rendered
+digests. The Applications ignore /spec/template/spec/containers/0/image (the
+:latest image trigger patches it), so a release moving @A to @B changes no
+field ArgoCD compares; this annotation does, and rolls the pods. Empty when no
+digest is rendered, so the :latest path renders exactly as before.
+*/}}
+{{- define "diagram-render.digestAnnotations" -}}
+{{- if .image.digest }}
+zuno.io/image-digest: {{ .image.digest | quote }}
+{{- end }}
+{{- if and .okf .okf.fetch .okf.fetch.image .okf.fetch.image.digest }}
+zuno.io/okf-fetch-image-digest: {{ .okf.fetch.image.digest | quote }}
+{{- end }}
+{{- end -}}

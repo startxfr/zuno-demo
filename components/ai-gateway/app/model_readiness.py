@@ -87,7 +87,9 @@ class ModelReadiness:
 
         with open(TOKEN_PATH) as fh:  # kubelet rotates it in place: read per poll
             token = fh.read().strip()
-        verify = CA_PATH if os.path.exists(CA_PATH) else True
+        from app.tls import verify_for
+
+        verify = verify_for(CA_PATH) if os.path.exists(CA_PATH) else True
         async with httpx.AsyncClient(verify=verify, timeout=5.0) as client:
             resp = await client.get(
                 API_SERVER + API_PATH.format(ns=_namespace()),

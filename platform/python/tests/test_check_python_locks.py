@@ -55,9 +55,34 @@ def test_stale_lock_constraint_drift_and_two_versions_fail() -> None:
     a = _component(root, "a", "httpx==0.28.1\n", _lock(f"httpx==0.27.2 \\\n    {H1}\n"))
     b = _component(root, "b", "httpx\n", _lock(f"httpx==0.28.1 \\\n    {H1}\n"))
     problems = _check(root, [a, b], constraints="httpx==0.28.1\n")
-    assert any("components/a: requirements.in pins httpx==0.28.1" in p for p in problems), problems
+    assert any("components/a: requirements.in asks for httpx==0.28.1" in p for p in problems), problems
     assert any("constraints.txt says 0.28.1" in p for p in problems), problems
     assert any("httpx is locked at 2 versions" in p for p in problems), problems
+
+
+def test_a_library_added_to_the_in_file_without_a_recompile_fails() -> None:
+    root = pathlib.Path(tempfile.mkdtemp(prefix="wp226-locks-"))
+    a = _component(root, "a", "httpx>=0.28,<0.29\nboto3>=1.40,<2\n", _lock(f"httpx==0.28.1 \\\n    {H1}\n"))
+    problems = _check(root, [a])
+    assert any("asks for boto3<2,>=1.40, the lock has nothing" in p for p in problems), problems
+
+
+def test_a_range_bumped_past_the_locked_version_fails() -> None:
+    root = pathlib.Path(tempfile.mkdtemp(prefix="wp226-locks-"))
+    a = _component(root, "a", "httpx>=0.29,<0.30\n", _lock(f"httpx==0.28.1 \\\n    {H1}\n"))
+    ok = _component(root, "b", "httpx[http2]>=0.28,<0.29\n", _lock(f"httpx[http2]==0.28.1 \\\n    {H1}\n"))
+    problems = _check(root, [a, ok])
+    assert any("components/a: requirements.in asks for httpx<0.30,>=0.29" in p for p in problems), problems
+    assert not any(p.startswith("components/b") for p in problems), problems
+
+
+def test_option_lines_are_refused() -> None:
+    for option in ("--extra-index-url https://example.invalid/simple", "--find-links /tmp", "-r other.txt",
+                   "-e ./local"):
+        _, problems = cpl.parse_lock(_lock(f"{option}\nhttpx==0.28.1 \\\n    {H1}\n"))
+        assert any("is not allowed in a lock" in p for p in problems), (option, problems)
+    _, problems = cpl.direct_requirements("-r base.in\nhttpx\n")
+    assert any("not allowed in requirements.in" in p for p in problems), problems
 
 
 def test_a_lock_for_the_wrong_interpreter_fails() -> None:

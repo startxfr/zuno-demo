@@ -22,10 +22,16 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: a2a-gateway
-      {{- if .Values.okf.fetch.enabled }}
+      {{- $digestAnnotations := include "a2a-gateway.digestAnnotations" .Values }}
+      {{- if or .Values.okf.fetch.enabled $digestAnnotations }}
       annotations:
+        {{- if .Values.okf.fetch.enabled }}
         # ADR-0580: a promoted release changes this, which rolls the pods.
         zuno.startx.fr/okf-corp-reference: {{ .Values.okf.fetch.corpReference | quote }}
+        {{- end }}
+        {{- with $digestAnnotations }}
+        {{- . | nindent 8 }}
+        {{- end }}
       {{- end }}
     spec:
       serviceAccountName: a2a-gateway

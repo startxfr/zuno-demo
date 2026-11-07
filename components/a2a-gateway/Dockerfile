@@ -9,7 +9,7 @@ ARG BASE_IMAGE=image-registry.openshift-image-registry.svc:5000/zuno-ai-build/py
 FROM ${BASE_IMAGE} AS base
 
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/* && \
-    pip install --no-cache-dir --upgrade pip setuptools wheel
+    pip install --no-cache-dir --upgrade pip==26.0.1 setuptools==84.2.1 wheel==0.48.0
 
 WORKDIR /app
 

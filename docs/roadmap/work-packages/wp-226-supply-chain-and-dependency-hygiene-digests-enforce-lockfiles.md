@@ -48,15 +48,23 @@ ADR-0603 clause 4.
    `digest: ""` key next to each image `tag` (`image`, `okf.fetch.image`, `images.mlops`) and an `imageRef` and
    `imagePullPolicy` helper. With a digest, the container runs `repository@sha256:...` and pulls `IfNotPresent`, and the
    `image.openshift.io/triggers` annotation is dropped (the `:latest` trigger would rewrite the pinned image). A digest
-   that is not `sha256:<64 hex>` fails the render. With every digest empty the charts render byte for byte what they
-   rendered before (checked with `helm template` against the `devel` charts), so the merge changes nothing live.
+   that is not `sha256:<64 hex>` fails the render. With a digest the pod template also carries
+   `zuno.io/image-digest` (and `zuno.io/okf-fetch-image-digest` for the init container): the Applications ignore
+   `/spec/template/spec/containers/0/image` (the `:latest` trigger patches it) without `RespectIgnoreDifferences`, so
+   without the annotation a release moving `@A` to `@B` would stay `Synced` and roll nothing (review finding). With
+   every digest empty the charts render byte for byte what they rendered at 2befc90a (checked with `helm template`, also
+   with `okf.fetch.enabled`), so the merge changes nothing live.
 2. **The release tooling writes the digests.** `platform/supply-chain/render_release_digests.py --release <tag>` reads the
    last ledger entry of that release and writes each pin's digest into the matching `digest` key, keeping every comment.
    It refuses, and writes nothing, on a `digest: null` pin, on a pin that is not `signed: true`, or on a chart without a
    `digest` key. `--clear` returns to `:latest`. `--check` (now in `lint.yml`) fails on a first-party digest that is not a
    signed ledger pin for that chart and field. `make d3 release TAG=<tag> RENDER_DIGESTS=1` runs it after the ledger is
-   written. Tests: `platform/supply-chain/tests/test_render_release_digests.py` (9 tests, one renders the chart with
-   `helm template`), in the `lint.yml` helm job.
+   written; when the release was routed to AAP, the ledger entry is not in the local checkout, so make prints "pull the
+   ledger commit, then run render_release_digests.py --release <tag>" instead. Tests:
+   `platform/supply-chain/tests/test_render_release_digests.py` (10 tests; two render charts with `helm template`, one
+   of them proves `@A` and `@B` give different pod templates for all 10 Deployment charts), in the `lint.yml` helm job.
+   trustyai-eval has no digest path yet: its image is a plain `image:` string in `gitops/charts/trustyai-config`, outside
+   the ledger's component set.
 3. **The release builds every chart that can be pinned.** `tag_local_release.py` `COMPONENTS` adds a2a-gateway,
    supply-chain-signer (the `okf-fetch` init containers of mcp-gateway and a2a-gateway), zuno-dify-knowledge and
    zuno-token-proxy: 12 components, up from 8.
@@ -72,8 +80,13 @@ ADR-0603 clause 4.
    only `warn` or `enforce`). Live today: `zuno-first-party-images` is `warn`, `zuno-unifai-images` is already `enforce`.
 7. `build-publish.yml`: each build job gets `id-token: write`, signs the pushed digest keylessly (`cosign sign`, public
    Sigstore, GitHub OIDC), attaches the SBOM as a signed `spdxjson` attestation (`cosign attest`) and verifies both
-   against the identity `^https://github.com/startxfr/zuno-demo/.github/workflows/build-publish.yml@`. The workflow
-   stays `workflow_dispatch` only (ADR-0115).
+   against this identity:
+   - issuer `https://token.actions.githubusercontent.com`;
+   - subject `^https://github\.com/startxfr/zuno-demo/\.github/workflows/build-publish\.yml@refs/(heads/main|tags/v[0-9].*)$`;
+   - `--certificate-github-workflow-repository startxfr/zuno-demo`.
+
+   A run dispatched from any other branch signs, but its verify step fails. The workflow stays `workflow_dispatch` only
+   (ADR-0115).
 
 ### M18: cosign checksum, SBOM attestation, Trivy
 
@@ -156,6 +169,24 @@ ADR-0603 clause 4.
 - **Route certificates.** A `uri` task with the new `validate_certs` expression gets 200 from demo333's Keycloak with the
   switch off and on (read-only GET, no credential).
 
+## Review fixes (2026-11-07)
+
+A read-only review by the main session found the points below, fixed in one follow-up commit.
+
+- **A digest-to-digest release did not roll** (high): the pod-template digest annotation, see M16 item 1.
+- **Stale locks behind a range passed** (mlops, mlops/tooling): `check_python_locks.py` now parses every line of a
+  `requirements.in` with `packaging` and requires the locked version to satisfy its specifier. It also refuses any
+  option line (`-r`, `-e`, `--extra-index-url`, `--find-links`, ...) in a lock or a `.in`. New tests: a library added
+  without a recompile, a range bumped past the lock, option lines.
+- **CI verify identity** anchored to `refs/heads/main` or a `v*` tag, plus the workflow-repository check (M17 item 7).
+- **`RENDER_DIGESTS=1` after an AAP-routed release** no longer renders from a ledger that is not local (M16 item 2).
+- **pip, setuptools and wheel** are pinned before each lock (see Not done here for the missing hashes).
+- **httpx 0.28** deprecates `verify=<path>`: ai-gateway (`providers.py`, `maas_adapter.py`, `model_readiness.py`) and
+  zuno-token-proxy pass `app/tls.py`'s `verify_for(path)`, which keeps the old meaning (a bool passes through, a file is
+  `cafile`, a directory `capath`, empty is the default store). Tests: `tests/test_tls_verify.py` in both.
+- `reasoning.py`'s `_astream` mirror was re-read against langchain-openai 0.2.14: same helpers and signatures; the
+  comment says so.
+
 ## Operator pending (each step needs the user's go)
 
 1. **Push and merge** `wp-226-supply-chain` into `devel`, then `main`.
@@ -213,8 +244,10 @@ ADR-0603 clause 4.
 
 - **The AAP execution environment base** (`registry.redhat.io/.../ee-supported-rhel9:latest`) is not digest-pinned:
   resolving its digest needs a registry.redhat.io login that this workstation does not hold. Pin it at its next rebuild.
-- **One-off pip installs** in the Dockerfiles (`pyyaml==6.0.2` in the okf-release stages and the signer, and the
-  `pip install --upgrade pip setuptools wheel` before each lock) stay version-pinned only, without hashes.
+- **Unhashed tool installs.** The pip upgrade before each lock is now pinned exactly (`pip==26.0.1 setuptools==84.2.1
+  wheel==0.48.0`, mlops `pip==26.0.1`), and `pyyaml==6.0.2` in the okf-release stages and the signer is pinned too, but
+  none of them carries a hash: hashing them needs a requirements file the per-directory build contexts of the MCP
+  servers cannot reach. Dependabot does not see these pins; bump them with the base-image refresh.
 - **The ledger header** in `release_ledger.py` still says no deployment consumes the ledger. It is left as is: the
   ledger file is never hand-edited, and its header changes with the next release write.
 - **History purge** of `evaluations/.venv-gate`: the user's decision (item 16).

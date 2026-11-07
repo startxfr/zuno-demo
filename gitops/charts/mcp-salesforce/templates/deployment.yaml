@@ -22,6 +22,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: salesforce-mcp
+      {{- with include "mcp-salesforce.digestAnnotations" .Values }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: salesforce-mcp
       priorityClassName: zuno-workload-default

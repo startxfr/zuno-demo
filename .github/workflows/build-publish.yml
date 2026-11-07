@@ -7,7 +7,9 @@
 # in-cluster Vault Transit key the note below is about. The identity to
 # verify against is this workflow on this repository:
 #   issuer   https://token.actions.githubusercontent.com
-#   subject  ^https://github.com/startxfr/zuno-demo/.github/workflows/build-publish.yml@
+#   subject  ^https://github.com/startxfr/zuno-demo/.github/workflows/build-publish.yml@refs/(heads/main|tags/v[0-9].*)$
+#   repository (certificate extension) startxfr/zuno-demo
+# A run from any other branch signs, but its signature does not verify.
 #
 # ADR-0420/WP-070 (2026-08-22): the signing steps this workflow used to run
 # here (keyless cosign via GitHub's OIDC identity, Sigstore Fulcio/Rekor)
@@ -255,11 +257,13 @@ jobs:
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/${{ matrix.name }}@${{ steps.build.outputs.digest }}
           ISSUER: https://token.actions.githubusercontent.com
-          IDENTITY: '^https://github\.com/startxfr/zuno-demo/\.github/workflows/build-publish\.yml@'
+          IDENTITY: '^https://github\.com/startxfr/zuno-demo/\.github/workflows/build-publish\.yml@refs/(heads/main|tags/v[0-9].*)$'
         run: |
-          cosign verify --certificate-oidc-issuer "$ISSUER" --certificate-identity-regexp "$IDENTITY" "$IMAGE" > /dev/null
+          cosign verify --certificate-oidc-issuer "$ISSUER" --certificate-identity-regexp "$IDENTITY" \
+            --certificate-github-workflow-repository startxfr/zuno-demo "$IMAGE" > /dev/null
           cosign verify-attestation --type spdxjson --certificate-oidc-issuer "$ISSUER" \
-            --certificate-identity-regexp "$IDENTITY" "$IMAGE" > /dev/null
+            --certificate-identity-regexp "$IDENTITY" \
+            --certificate-github-workflow-repository startxfr/zuno-demo "$IMAGE" > /dev/null
           echo "signed and attested: $IMAGE"
 
       # ADR-0603 M18 (WP-226): `ignore-unfixed` is dropped, so the report also
@@ -366,11 +370,13 @@ jobs:
         env:
           IMAGE: ${{ env.REGISTRY }}/${{ env.REGISTRY_NAMESPACE }}/mcp-${{ matrix.name }}@${{ steps.build.outputs.digest }}
           ISSUER: https://token.actions.githubusercontent.com
-          IDENTITY: '^https://github\.com/startxfr/zuno-demo/\.github/workflows/build-publish\.yml@'
+          IDENTITY: '^https://github\.com/startxfr/zuno-demo/\.github/workflows/build-publish\.yml@refs/(heads/main|tags/v[0-9].*)$'
         run: |
-          cosign verify --certificate-oidc-issuer "$ISSUER" --certificate-identity-regexp "$IDENTITY" "$IMAGE" > /dev/null
+          cosign verify --certificate-oidc-issuer "$ISSUER" --certificate-identity-regexp "$IDENTITY" \
+            --certificate-github-workflow-repository startxfr/zuno-demo "$IMAGE" > /dev/null
           cosign verify-attestation --type spdxjson --certificate-oidc-issuer "$ISSUER" \
-            --certificate-identity-regexp "$IDENTITY" "$IMAGE" > /dev/null
+            --certificate-identity-regexp "$IDENTITY" \
+            --certificate-github-workflow-repository startxfr/zuno-demo "$IMAGE" > /dev/null
           echo "signed and attested: $IMAGE"
 
       - name: Scan for vulnerabilities (Trivy) - reports HIGH/CRITICAL, non-blocking

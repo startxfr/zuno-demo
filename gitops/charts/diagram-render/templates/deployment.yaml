@@ -22,6 +22,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: diagram-render
+      {{- with include "diagram-render.digestAnnotations" .Values }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: diagram-render
       priorityClassName: zuno-workload-default

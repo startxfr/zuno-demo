@@ -22,6 +22,7 @@ from fastapi.responses import JSONResponse, PlainTextResponse, Response, Streami
 from starlette.background import BackgroundTask
 
 from app import metrics
+from app.tls import verify_for
 from app.config import Settings
 from app.token import TokenSource, TokenUnavailable
 
@@ -59,7 +60,7 @@ def create_app(
     upstream_transport: Optional[httpx.AsyncBaseTransport] = None,
     token_source: Optional[TokenSource] = None,
 ) -> FastAPI:
-    verify = settings.ca_bundle or True
+    verify = verify_for(settings.ca_bundle)
     token_client = httpx.AsyncClient(transport=token_transport, verify=verify)
     upstream_client = httpx.AsyncClient(
         transport=upstream_transport,

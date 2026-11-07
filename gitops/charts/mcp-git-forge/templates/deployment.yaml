@@ -22,6 +22,10 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: git-forge-mcp
+      {{- with include "mcp-git-forge.digestAnnotations" .Values }}
+      annotations:
+        {{- . | nindent 8 }}
+      {{- end }}
     spec:
       serviceAccountName: git-forge-mcp
       priorityClassName: zuno-workload-default
