@@ -87,3 +87,19 @@ the acceptance proof that the surface is not merely rendered but functional.
 ## Status updates (once live-verified)
 
 - `State` moves to `Done` once checklist items 1-4 pass, including a real UI-launched run.
+
+## Update (2026-11-07) - RHOAI 3.6: the personas had no right to use the page
+
+Three things stood between the personas and a UI-launched run on RHOAI 3.6.0-ea.2:
+
+1. The RHOAI dashboard itself answered 404 on `rh-ai.<domain>` (portal hostname route, fixed under WP-220's update
+   of the same date).
+2. A browser that had loaded the page before the upgrade kept a stale `/_mf/evalHub/remoteEntry.js` (the module server
+   answers 304 to a later `If-Modified-Since`) and asked for a chunk the new module does not have: `ChunkLoadError`.
+   A hard refresh fixes it; nothing on the cluster.
+3. RBAC: the eval-hub-ui BFF lists EvalHub CRs as the user, and the EvalHub server authorizes each call with a
+   SubjectAccessReview on `trustyai.opendatahub.io` collections/providers/evaluations (and `mlflow.kubeflow.org`
+   experiments on job creation). The vendor grants evalhubs read only in redhat-ods-applications, and admin/edit
+   aggregate none of it, so ai-ops-01 (admin of zuno-ai-run) saw nothing. New
+   `templates/evalhub-user-rbac.yaml` (`evalHub.userGroups`: ocp-ai-ops, ocp-ai-dev): live 2026-11-07, SARs allow
+   collections/providers list, evaluations list/create and experiments create; providers create stays refused.

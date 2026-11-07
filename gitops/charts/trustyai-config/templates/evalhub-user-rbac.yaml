@@ -1,0 +1,57 @@
+{{- /*
+WP-115 (RHOAI 3.6.0-ea.2, demo333, 2026-11-07): the Evaluations page showed
+nothing for ai-ops-01 (admin of zuno-ai-run) or ai-dev-01 (edit). The
+eval-hub-ui BFF lists the EvalHub CRs as the signed-in user
+("evalhubs.trustyai.opendatahub.io is forbidden"), and the EvalHub server
+authorizes every call by a SubjectAccessReview on virtual resources of
+trustyai.opendatahub.io (collections, providers, evaluations) and, when a job
+is created, mlflow.kubeflow.org/experiments (auth.yaml of the
+<name>-config ConfigMap). The vendor's own grant (Role trustyai-evalhubs-role)
+covers evalhubs in redhat-ods-applications only, and the admin/edit/view
+ClusterRoles aggregate none of it. This Role gives the userGroups what a user
+of the page needs: read the instance, its collections and providers, and
+create, read and delete evaluation jobs. Not granted: creating collections or
+providers (platform-owned, ConfigMaps in this chart) and status-events (the
+job's own ServiceAccount posts those).
+*/ -}}
+{{- if and .Values.trustyaiConfig.enabled .Values.evalHub.enabled .Values.evalHub.userGroups }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: zuno-evalhub-user
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+rules:
+  - apiGroups: ["trustyai.opendatahub.io"]
+    resources: ["evalhubs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["trustyai.opendatahub.io"]
+    resources: ["collections", "providers"]
+    verbs: ["get", "list"]
+  - apiGroups: ["trustyai.opendatahub.io"]
+    resources: ["evaluations"]
+    verbs: ["get", "list", "create", "delete"]
+  - apiGroups: ["mlflow.kubeflow.org"]
+    resources: ["experiments"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zuno-evalhub-user
+  namespace: {{ .Values.namespace }}
+  labels:
+    zuno.io/managed-by: argocd
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: zuno-evalhub-user
+subjects:
+{{- range .Values.evalHub.userGroups }}
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: {{ . }}
+{{- end }}
+{{- end }}
