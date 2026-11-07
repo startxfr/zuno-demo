@@ -58,3 +58,10 @@ The persona `eval-ai-dev-01` is removed from `evalPersonas` and deleted in the K
   PASS in 10.1 s. Measurement v1 16/24 (5 stage-ready), v2 system prompt 23/24 (11 stage-ready); the probe prompt is
   the mug (2/2 with both prompts), PASS in 12.9 s. Blender joined the 2026-11-09 demonstration (user decision via
   zuno-demo-59): the moment is required once the entry exists.
+- 2026-11-07 21:19-21:22 CET, user acceptance on the presenter's laptop (screenshots kept by the user as evidence):
+  Blender 5.2.0 LTS, the add-on installed from disk (Legacy (User), 0.2.0), cluster domain demo333, signed in as
+  ai-dev-01; "A wooden table with 4 cylindrical legs and a small desk lamp on top" built the table, legs, lamp stand and
+  shade, and "A small house with a pitched roof, a door and two windows" built the house; check passed both times.
+  An F12 render (EEVEE) came out dark because the scripts add no light: the demonstration stays in the viewport with
+  Material Preview shading (demo script, preflight step 4). Stage scenario written in docs/demo/blender-3d.md.
+

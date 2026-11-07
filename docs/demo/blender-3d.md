@@ -74,7 +74,8 @@ oc get httproute,authpolicy,ratelimitpolicy -n zuno-ai-run | grep workstation   
 
 ### Install (once, about 10 minutes)
 
-1. Install **Blender 4.2 LTS** (4.0 or newer works; 4.2.3 is the measured version).
+1. Install **Blender 4.2 LTS or newer** (measured headless on 4.2.3; run by the presenter on 5.2.0 LTS on
+   2026-11-07, where the add-on shows as a Legacy (User) add-on, version 0.2.0).
 2. Download the add-on [evaluations/blender/zuno_3d_generator.py](../../evaluations/blender/zuno_3d_generator.py)
    (on GitHub, branch `devel`: open the file, **Raw**, save it).
 3. Blender: **Edit > Preferences > Add-ons**, menu at the top right, **Install from Disk**, pick the file, tick
@@ -92,7 +93,9 @@ Details, tests and the measurement: [evaluations/blender/README.md](../../evalua
    panel shows **Signed in**. The session holds for the morning (the access token is refreshed by the add-on).
 3. Generate the first stage prompt once (it warms the model), **Run script**, then **Ctrl+Z** and clear the text: the
    scene is empty again, the add-on stays signed in.
-4. Leave Blender open on the 3D Viewport with the **Zuno 3D** tab and the **Scripting** workspace one click away.
+4. Set the 3D Viewport's shading to **Material Preview** (Z, then Material Preview): the generated materials show
+   their colours there. Do not render (F12): the scripts add no light, so a render comes out dark.
+5. Leave Blender open on the 3D Viewport with the **Zuno 3D** tab and the **Scripting** workspace one click away.
 
 ### On stage (about 3 minutes)
 
@@ -107,14 +110,23 @@ Stage prompts, measured 2/2 on `gpt-oss-20b` with the add-on's system prompt v2 
 
 Do not use prompts outside this table on stage. The full results are in `evaluations/blender/results/`.
 
-1. Type prompt 1, **Generate script**. While it streams (about 13 s), say what happens: the prompt leaves Blender
-   with the presenter's own identity, the platform keeps it on its own GPUs (C3), nothing goes to a public cloud.
-2. Switch to **Scripting**: the script is there, `zuno_3d_script.py`, with "Check passed" in the panel. The artist
-   sees and can edit what will run.
-3. **Run script**: the objects appear as one undo step. Select the table top: its dimensions and material are
-   editable, it is not a frozen mesh.
-4. Prompt 2 (the mug) if time allows.
-5. Optional, 30 seconds: Grafana **Zuno Platform / Five experiences**, `client="blender"`.
+#### Scenario (about 3 minutes)
+
+The starting state: Blender full screen, Layout workspace, empty scene, Material Preview shading, tab **Zuno 3D** open
+and **Signed in**, prompt 1 already typed in the prompt field.
+
+| Time | The presenter does | The presenter says | The audience sees |
+|---|---|---|---|
+| 0:00 | Points at the Zuno 3D panel. | "A 3D artist wants help from AI without sending a design brief to a public cloud. This is Blender on my laptop, with a small add-on. I am signed in with my company account, nothing else: no API key in Blender." | The panel: cluster domain, "Status: Signed in". |
+| 0:20 | Clicks **Generate script**. | "My sentence leaves Blender with my own identity. The platform classifies the call C3, so only the models on our own GPUs may answer: here gpt-oss-20b. No public model can see it." | "Working..." for about 13 seconds. |
+| 0:40 | Waits for "Check passed", switches to **Scripting**. | "The model does not draw a mesh. It writes a Blender Python script. The add-on checks it before anything runs: only Blender's own modules, no file or system calls, no network imports. And I can read it." | The script `zuno_3d_script.py`, about 50 lines, object names such as `Leg_1`, `LampStand`, `LampShade`. |
+| 1:10 | Back to **Layout**, clicks **Run script**. | "Nothing runs until I click. Now it runs, in one undo step." | The table, its four legs and the lamp appear. |
+| 1:30 | Selects the table top, changes **Scale X** in the properties, then **Ctrl+Z**. | "These are real Blender objects, with names, dimensions and materials. The artist keeps working on them; it is not a frozen mesh." | The table top stretches, then comes back. |
+| 2:00 | Clears the scene (A, X), types prompt 2, **Generate script**, then **Run script**. | "A second one, a coffee mug: about seven seconds." | The mug on its saucer. |
+| 2:40 | Optional: Grafana, **Zuno Platform / Five experiences**, `client="blender"`. | "On the platform side, Blender is one more experience: same quotas, same telemetry, same rules as the chat and the agents." | The `client="blender"` series. |
+
+The sentences to keep if time is short: the call leaves with the user's identity, it stays on the company's own GPUs,
+the script is shown and checked, and nothing runs before the click.
 
 ### Fallbacks on stage
 
