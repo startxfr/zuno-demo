@@ -73,7 +73,7 @@ cluster-istio:
         # has no ansible InstallPlan-approval step, so every other
         # alias:startx-wrapped operator here (see cert-manager/values.yaml)
         # uses Automatic instead.
-        installPlanApproval: Automatic
+        installPlanApproval: Manual  # demo freeze (2026-11-08): no unattended operator upgrade until after the 2026-11-09 demo; back to Automatic after it
         # Overrides the vendored chart's own default (config.infra: true,
         # which pins the operator pod to infra nodes via a
         # nodeSelector/toleration) - not wanted for this component.
