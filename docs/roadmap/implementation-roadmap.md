@@ -24,16 +24,16 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 |---|---|---|---|---|
 | v0 | 72 | — | 8 | — |
 | v0.1 | 28 | — | 18 | — |
-| v0.2 | 14 | — | 19 | WP-098 |
+| v0.2 | 14 | — | 19 | — |
 | v0.3 | 15 | — | 19 | — |
-| v0.4 | 30 | 4 | 31 | WP-55, WP-101 |
-| v0.5 | 13 | — | 18 | WP-55, WP-101, WP-122 |
+| v0.4 | 30 | 4 | 31 | WP-101 |
+| v0.5 | 13 | — | 18 | WP-101 |
 | v0.6 | 4 | — | 6 | WP-101 |
 | v0.7 | 9 | 2 | 19 | WP-115, WP-125 |
 | v0.8 | 5 | — | 6 | — |
 | v0.9 | 6 | — | 8 | — |
 | v0.10 | 5 | — | 6 | — |
-| v0.11 | 23 | 1 | 28 | — |
+| v0.11 | 23 | — | 28 | — |
 | v0.12 | 8 | — | 9 | — |
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
@@ -485,7 +485,7 @@ separately and added to this phase's table as they land.
 | WP-094 | [wp-094](work-packages/wp-094-generalize-aap-job-templates.md) | 0418 | WP-093 | Done (2026-08-30) - live launch/Survey/credential round-trip confirmed (jobs 180/240/244) | install-type ClusterRole check deliberately deferred (low risk, not required to close Phase 1) |
 | WP-095 | [wp-095](work-packages/wp-095-workflow-templates.md) | 0418 | WP-094 | Done (2026-08-30) - Day 1 `zuno-day1-check-workflow` full green run (job 243); Day 2 `zuno-day2-check-workflow` also full green (job 514, after WP-102) | none |
 | WP-097 | [wp-097](work-packages/wp-097-make-aap-routing.md) | 0418 | WP-095 | Done (2026-08-30) - live-verified `zuno_make_aap_mode=auto` routing both Job and Workflow Template launches, exit-code propagation confirmed | `remote` unreachable-failure and `auto` fallback branches still only offline-tested (isolated shell-logic), not re-exercised live this pass |
-| WP-098 | [wp-098](work-packages/wp-098-remove-aap-shipped-defaults.md) | 0354 | WP-073 | Repo work merged (2026-08-30) - live-verified: "Demo Project"/"Demo Job Template" confirmed gone from the Controller | none |
+| WP-098 | [wp-098](work-packages/wp-098-remove-aap-shipped-defaults.md) | 0354 | WP-073 | Done (2026-11-07; live-verified 2026-08-30: "Demo Project"/"Demo Job Template" confirmed gone from the Controller) | none |
 | WP-099 | [wp-099](work-packages/wp-099-aap-bootstrap-live-defects.md) | 0418 | WP-094, WP-095, WP-098 | Done (2026-08-30) - two consecutive `make d0 install aap-config` runs clean, all 5 defects found+fixed live | none |
 | WP-102 | [wp-102](work-packages/wp-102-aap-execution-environment-kustomize.md) | 0418 | WP-095 | Done (2026-08-30) - custom EE (`kustomize`/`oc`/`cosign`) built, registered, assigned; full green `zuno-day2-check-workflow` (job 514) | none |
 | WP-103 | [wp-103](work-packages/wp-103-aap-launch-rbac.md) | 0418 | WP-094, WP-097 | Done | model Controller RBAC for who may launch which Job/Workflow Template, ahead of Phase 3/4 (renumbered from a WP-101 draft that collided with the pre-existing Salesforce WP-101) |
@@ -701,7 +701,7 @@ genuine `200` with real model output through `local-wesh-maas`.
 
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
-| WP-122 | [wp-122](work-packages/wp-122-maas-gateway-keycloak-identity-gap.md) | 0537, 0521 | none | Repo work merged (2026-09-03) | none - closed with a clean live pass; the downstream re-run it unblocked (WP-112's `img-mockup_request`/security-check) surfaced a separate, real WP-112 gap, tracked there, not here |
+| WP-122 | [wp-122](work-packages/wp-122-maas-gateway-keycloak-identity-gap.md) | 0537, 0521 | none | Done (2026-11-07; clean live pass 2026-09-03) | none - closed with a clean live pass; the downstream re-run it unblocked (WP-112's `img-mockup_request`/security-check) surfaced a separate, real WP-112 gap, tracked there, not here |
 
 ### Phase 32 — ai-gateway's external SaaS egress broken by the mesh (added 2026-09-03)
 Found while verifying WP-112's Comage fix, and far wider than that WP:
@@ -1092,7 +1092,7 @@ component-code package.
 | WP-47 | [wp-47](work-packages/wp-47-task-tabs-frontend.md) | 0505 | soft: WP-44A, ADR-0212 state | Abandoned | superseded by WP-061 (ADR-0515); no code was written |
 | WP-061 | [wp-061](work-packages/wp-061-per-conversation-tabs-frontend.md) | 0515 | WP-44A | Done | none |
 | WP-54 | [wp-54](work-packages/wp-54-quota-policy-and-kuadrant-translation.md) | 0511 | WP-44A | Done (2026-08-25 — 429-exceedance run passed live with a real token: `intensive` 429 at request 11 against 10/5m, `standard` at 61 against 60/5m, zero 5xx. The run itself found three stacked defects that had left enforcement counting nothing while still reporting Accepted+Enforced — missing identity dynamic metadata, CEL error-absorption the shim does not implement, and predicate concatenation shredding an unparenthesized ternary. See ADR-0511's 2026-08-25 note) | none |
-| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 (clause 3 superseded by 0528) | WP-54 (+WP-061A rec.) | Repo work merged; superseded in part 2026-08-27 | none here — ADR-0528 moves Salesforce verification from conversation start to project save, so the live bind/deny pass (still needing sandbox creds — WP-22/33 gap) and the `finance`/`salesforce.opportunity.read` policy decision both carry over to WP-090, Phase 21 above |
+| WP-55 | [wp-55](work-packages/wp-55-project-bound-tasks.md) | 0512 (clause 3 superseded by 0528) | WP-54 (+WP-061A rec.) | Abandoned (2026-11-07: agent-runtime retired by ADR-0561) | none here — ADR-0528 moves Salesforce verification from conversation start to project save, so the live bind/deny pass (still needing sandbox creds — WP-22/33 gap) and the `finance`/`salesforce.opportunity.read` policy decision both carry over to WP-090, Phase 21 above |
 | WP-56 | [wp-56](work-packages/wp-56-rag-tools-policies-schema.md) | 0513 | WP-43 | Done | none |
 
 ### Phase 34 — OKF: extraction

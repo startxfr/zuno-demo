@@ -1,6 +1,6 @@
 # WP-098: Remove AAP's shipped default Project/Job Template/Inventory
 
-- **State:** Repo work merged - live verification pending.
+- **State:** Done (2026-11-07: closed on the live verification already recorded on 2026-08-30 - "Demo Project"/"Demo Job Template" confirmed gone from the Controller; only the state line was stale).
 - **ADRs:** ADR-0354 (clause 4, Project/Job Template registration).
 - **Depends on:** WP-073 (Gateway URL/admin-password bootstrap this task
   reuses).

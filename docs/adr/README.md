@@ -300,7 +300,7 @@ is promoted to a real file by Step 0 of the work package that implements it.
 |---|---|---|
 | [ADR-0353](0353-source-runtime-images-by-family-internal-registry-or-quay-io-zuno.md) | Implemented | Source runtime images by family: the internal registry for zuno components, quay.io/zuno for UnifAI and OKF |
 | [ADR-0401](0401-introduce-agent-delegation-limited-to-targets-an-agent-declares.md) | Implemented | Introduce agent-to-agent delegation limited to the targets an agent declares |
-| [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Accepted | Adopt A2A as the inter-agent protocol |
+| [ADR-0402](0402-adopt-a2a-as-the-inter-agent-protocol.md) | Implemented | Adopt A2A as the inter-agent protocol |
 | [ADR-0403](0403-propagate-the-users-identity-and-the-delegation-chain-across-a2a-calls.md) | Implemented | Propagate the user's identity and the delegation chain across agent-to-agent calls |
 | [ADR-0406](0406-limit-agent-delegation-by-depth-cycle-and-budget.md) | Implemented | Limit agent delegation by depth, cycle and budget |
 | [ADR-0409](0409-introduce-human-approval-for-delegated-operations-resumable-from-persisted-checkpoints.md) | Implemented | Introduce human approval for delegated operations, resumable from persisted checkpoints |

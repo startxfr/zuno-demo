@@ -1,9 +1,8 @@
 # WP-122: Close the MaaS gateway's missing Keycloak identity source
 
-- **State:** Repo work merged (2026-09-03) - clean end-to-end live pass: a
-  real, freshly-minted persona token gets a genuine `200` with real model
-  output through `local-wesh-maas`. See "Live verification (2026-09-03)"
-  below.
+- **State:** Done (2026-11-07: closed on the clean end-to-end live pass of 2026-09-03 - a real,
+  freshly-minted persona token gets a genuine `200` with real model output through
+  `local-wesh-maas`. See "Live verification (2026-09-03)" below; only the state line was stale.)
 - **ADRs:** ADR-0541 (Decision 1/2 - the same `maas-controller` operator
   immaturity class this WP extends with a second, distinct symptom); ADR-0521
   (the local-model MaaS cutover whose per-group `MaaSSubscription`
