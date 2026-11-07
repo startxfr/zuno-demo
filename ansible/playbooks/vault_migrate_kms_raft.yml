@@ -543,6 +543,14 @@
           retries: 60
           delay: 10
 
+        - name: "step 4 | fail if Vault never answered on raft"
+          ansible.builtin.fail:
+            msg: >-
+              Vault did not answer on raft within 10 minutes ({{ _vm_status4.stderr | default(_vm_status4.msg | default('no pod')) }}).
+              Check `oc -n {{ vault_migrate_namespace }} get sts,pod` and the zuno-vault-d1 sync operation, then
+              resume with -e vault_migrate_resume_from=4.
+          when: not ((_vm_status4.stdout | default('') | trim) is match('^\{'))
+
         - name: "step 4 | unseal with the legacy key"
           kubernetes.core.k8s_exec:
             namespace: "{{ vault_migrate_namespace }}"
@@ -591,15 +599,25 @@
             vault_seal_type: awskms
             gitops_app_refresh: true
 
+        # apply_vault_app does not wait for the sync (gitops_app_wait: false):
+        # a pod restarted before the ConfigMap carries the awskms stanza comes
+        # back on Shamir with no pending migration (found live 2026-11-07).
+        - name: "step 5 | wait for the live Vault ConfigMap to carry the awskms seal"
+          kubernetes.core.k8s_info:
+            kind: ConfigMap
+            namespace: "{{ vault_migrate_namespace }}"
+            name: zuno-vault-config
+          register: _vm_cm5
+          until: >-
+            (_vm_cm5.resources | length) > 0
+            and ('seal "awskms"' in ((_vm_cm5.resources[0].data | default({})).values() | join('\n')))
+          retries: 60
+          delay: 5
+
         # The StatefulSet is OnDelete (upstream chart default): the new seal
         # stanza only reaches Vault through a new pod.
         - name: "step 5 | restart the Vault pod on the awskms config"
-          kubernetes.core.k8s:
-            state: absent
-            kind: Pod
-            namespace: "{{ vault_migrate_namespace }}"
-            name: "{{ vault_migrate_pod }}"
-            wait: true
+          ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_restart_pod.yml"
 
         - name: "step 5 | wait for Vault to report a pending seal migration"
           kubernetes.core.k8s_exec:
@@ -658,12 +676,7 @@
           no_log: true
 
         - name: "step 5 | prove auto-unseal: restart the pod once more"
-          kubernetes.core.k8s:
-            state: absent
-            kind: Pod
-            namespace: "{{ vault_migrate_namespace }}"
-            name: "{{ vault_migrate_pod }}"
-            wait: true
+          ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/vault_restart_pod.yml"
 
         - name: "step 5 | wait for Vault to unseal by itself through KMS"
           kubernetes.core.k8s_exec:

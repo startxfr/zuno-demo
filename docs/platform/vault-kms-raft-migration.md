@@ -142,18 +142,33 @@ Store the three new keys like a fresh install's, and destroy the old one.
 
 1. `make d0 install vault` (normal run: configure Job, seeds through
    `ansible-seeder`).
-2. `make d0 install cert-manager`, `make d1 install service-mesh`,
-   `make d1 install mariadb`: the ClusterIssuers move to https with the
+2. `make d1 install service-mesh` FIRST, then `make d0 install cert-manager`,
+   and `make d1 install mariadb` ONLY on a cluster that already runs MariaDB
+   (`oc get applications.argoproj.io -n openshift-gitops zuno-mariadb-d1`):
+   on a cluster without it, the target installs the operator and the
+   component from scratch. The ClusterIssuers move to https with the
    service-CA `caBundle`. Until then they still point at `http://...:8200`,
    which the TLS listener refuses - issuance (not existing certificates)
-   is down for that window.
+   is down for that window. The mesh one matters most: while
+   `vault-issuer-istio` is not Ready, istio-csr is 0/1, no new meshed pod
+   starts anywhere and istiod's own serving certificate can expire
+   (demo333, 2026-11-07: about 25 minutes without mesh issuance).
 3. `make d0 install external-secrets`: per-namespace SecretStores over
    https, then sync the applications so every ExternalSecret moves off
    `vault-backend`. The configure Job keeps the old `eso-reader` role until no
    ExternalSecret references `vault-backend` any more, so run
    `make d0 install vault` once more after this item to retire it (see
    "The `eso-reader` role" below).
-4. After a week without a rollback, delete the old file data
+4. Re-sync every Application whose sync failed while Vault was down: each one
+   retries 5 times and gives up, and the ExternalSecrets created during the
+   outage stay `SecretSyncedError` until forced. List them with
+   `oc -n openshift-gitops get applications.argoproj.io -o json` (last
+   operation `Failed` since the window started), then sync them and
+   annotate the ExternalSecrets with `force-sync=$(date +%s)`. An
+   Application that tracks another branch (demo333: `zuno-rhtas-d1` on
+   `main`) keeps its ExternalSecret on `vault-backend` until that branch
+   carries this change, and `eso-reader` is kept until then.
+5. After a week without a rollback, delete the old file data
    (`/vault/data/file-legacy`, a few MB) from a debug pod mounting the PVC,
    and the `vault-pre-kms-raft-*` VolumeSnapshot.
 

@@ -30,8 +30,12 @@ metadata:
   labels:
     app.kubernetes.io/name: vault
     app.kubernetes.io/component: raft-snapshot
-  annotations:
-    argocd.argoproj.io/sync-wave: "-25"
+  # No early sync wave: the storage class binds on first use
+  # (WaitForFirstConsumer) and the only consumer is the CronJob's pod, so the
+  # claim stays Pending ("Progressing") until the first snapshot run. In wave
+  # -25 it blocked every later wave, the StatefulSet included (found live
+  # 2026-11-07 during the WP-223 migration). In the last wave it only keeps
+  # the Application health at Progressing until the first run.
 spec:
   accessModes: ["ReadWriteOnce"]
   {{- with .Values.raftSnapshot.storageClassName }}
