@@ -1,0 +1,22 @@
+---
+# ADR-0609 (WP-242): create or remove a work package's canary namespace on the cluster.
+#
+#   ansible-playbook -i ansible/inventories/demo/hosts.yml ansible/playbooks/canary_namespace.yml \
+#     -e canary_wp=WP-211 [-e canary_state=absent] [-e '{"canary_egress": [...]}']
+#
+# A cluster change: it needs the owner's go, and none is created or removed inside a freeze
+# (docs/demo/freeze-protocol.md). What can and cannot be rehearsed there: docs/platform/canary-rehearsal.md.
+- name: "Canary namespace (ADR-0609)"
+  hosts: localhost
+  gather_facts: false
+  environment: "{{ k8s_auth_environment | default({}) }}"
+  tasks:
+    - name: Resolve cluster API credentials
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/load_k8s_auth_env.yml"
+
+    - name: "canary | {{ canary_state | default('present') }}"
+      ansible.builtin.include_tasks: "{{ zuno_repo_root }}/ansible/tasks/canary_namespace.yml"
+
+    - name: "canary | result"
+      ansible.builtin.debug:
+        msg: "{{ canary_namespace }} is {{ canary_state | default('present') }}"

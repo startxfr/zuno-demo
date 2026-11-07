@@ -38,7 +38,7 @@ counts `Proposed`/`Accepted`/`Deferred` — an ADR that is `Implemented`,
 | v0.13 | 12 | — | 18 | — |
 | v0.14 | 3 | — | 7 | — |
 | v0.15 | 2 | 1 | 4 | WP-238 |
-| v0.16 | 10 | 7 | 25 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-228, WP-229, WP-230, WP-231, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237, WP-239, WP-241, WP-242, WP-243 |
+| v0.16 | 10 | 6 | 25 | WP-221, WP-224, WP-225, WP-226, WP-227, WP-228, WP-229, WP-230, WP-231, WP-232, WP-233, WP-234, WP-235, WP-236, WP-237, WP-239, WP-241, WP-243 |
 | v0.17 | 3 | 3 | 10 | WP-211, WP-212, WP-213, WP-214, WP-215, WP-218, WP-244 |
 | OKF v0.1 | 8 | 1 | 7 | — |
 
@@ -1097,7 +1097,7 @@ demonstration (v0.16). Phase 51 is held for the world model (ADR-0604).
 | WP-239 | [wp-239](work-packages/wp-239-adr-numbering-check-template-and-band-hygiene.md) | 0606 | none | Repo work in review | none (repository and CI only); done on branch `adr-0605-0609-review`, Done once pushed and CI is green |
 | WP-240 | [wp-240](work-packages/wp-240-pre-ga-classes-known-good-gate-and-upgrade-runbook.md) | 0607 | WP-238 | Done (2026-11-07) | none: known-good regenerated from demo333 with classes, `make d3 check operators` gate PASS live |
 | WP-241 | [wp-241](work-packages/wp-241-drift-check-nfs-provisioner-role-and-eck-decision.md) | 0608 | WP-240 | Repo work in review | drift check live (2 findings: nfs-provisioner, ECK); ECK uninstalled after the demo; the nfs-provisioner role is adopted live in a window with the user's go |
-| WP-242 | [wp-242](work-packages/wp-242-canary-namespace-pattern.md) | 0609 | none | Not started | one rehearsal of the pattern on demo333 |
+| WP-242 | [wp-242](work-packages/wp-242-canary-namespace-pattern.md) | 0609 | none | Done (2026-11-07) | none: pattern rehearsed on demo333 (zuno-canary-wp-242 created, isolation checked, removed) |
 | WP-243 | [wp-243](work-packages/wp-243-browser-tests-for-every-experience.md) | 0606 | WP-238 | Not started | the tests run against demo333 |
 
 ### Phase 53 — Blender objects from text on a local model (added 2026-11-07)

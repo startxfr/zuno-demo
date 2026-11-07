@@ -80,6 +80,23 @@ class Images(unittest.TestCase):
         self.assertEqual(d.image_findings(pods, lambda dg: commits.get(dg, ""), lambda c: True), [])
 
 
+class Canaries(unittest.TestCase):
+    def ns(self, name, wp):
+        return {"metadata": {"name": name, "labels": {"zuno.io/canary": "true", "zuno.io/work-package": wp}}}
+
+    def test_open_wp_canary_passes_closed_wp_canary_is_left_over(self):
+        states = {"WP-211": "Not started", "WP-242": "Done (2026-11-07)"}
+        out = d.leftover_canaries([self.ns("zuno-canary-wp-211", "WP-211"), self.ns("zuno-canary-wp-242", "WP-242")], states)
+        self.assertEqual(len(out), 1)
+        self.assertIn("zuno-canary-wp-242", out[0])
+
+    def test_unknown_wp_is_left_over(self):
+        self.assertEqual(len(d.leftover_canaries([self.ns("zuno-canary-x", "WP-999")], {})), 1)
+
+    def test_tracker_parses(self):
+        self.assertIn("WP-242", d.wp_states())
+
+
 class External(unittest.TestCase):
     def test_the_repository_file_parses_and_names_an_owner(self):
         ext = d.load_external()

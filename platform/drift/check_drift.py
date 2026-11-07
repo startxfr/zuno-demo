@@ -10,6 +10,7 @@ Read-only. Four checks, each a list of findings:
                   that neither ArgoCD nor the Ansible roles own (clause 3)
   images          a first-party image (built in zuno-ai-build) running in a pod whose build commit is not on any
                   origin branch (clause 4)
+  canaries        a canary namespace (zuno.io/canary=true, ADR-0609) whose work package is closed in the tracker
 
     python3 platform/drift/check_drift.py [--strict] [--oc-context CTX]
 
@@ -106,6 +107,34 @@ def unowned(items: List[Dict], kind: str) -> List[str]:
     return out
 
 
+def wp_states(roadmap: pathlib.Path = REPO / "docs" / "roadmap" / "implementation-roadmap.md") -> Dict[str, str]:
+    states = {}
+    for line in roadmap.read_text().splitlines():
+        if line.startswith("| WP-"):
+            cells = [c.strip() for c in line.split("|")]
+            if len(cells) >= 7:
+                states[cells[1]] = cells[5]
+    return states
+
+
+_CLOSED = ("done", "abandoned", "cancelled", "closed")
+
+
+def leftover_canaries(namespaces: List[Dict], states: Dict[str, str]) -> List[str]:
+    out = []
+    for ns in namespaces:
+        md = ns.get("metadata") or {}
+        labels = md.get("labels") or {}
+        if labels.get("zuno.io/canary") != "true":
+            continue
+        wp = labels.get("zuno.io/work-package", "")
+        state = states.get(wp, "")
+        if not wp or wp not in states or state.lower().startswith(_CLOSED):
+            out.append(f"canary namespace {md.get('name')} is left over: its work package {wp or '(none)'} is "
+                       f"{state or 'not in the tracker'}")
+    return out
+
+
 def on_origin(commit: str) -> bool:
     out = subprocess.run(["git", "-C", str(REPO), "branch", "-r", "--contains", commit],
                          capture_output=True, text=True, timeout=60)
@@ -161,6 +190,8 @@ def main(argv: Optional[List[str]] = None) -> int:
             return labels.get("io.openshift.build.commit.id", "")
 
         findings["images"] = image_findings(oc.json("get", "pods", "-A")["items"], commit_of, on_origin)
+        findings["canaries"] = leftover_canaries(oc.json("get", "namespaces", "-l", "zuno.io/canary=true")["items"],
+                                                 wp_states())
     except (RuntimeError, subprocess.SubprocessError, ValueError) as exc:
         print(f"could not run: {exc}", file=sys.stderr)
         return 2
