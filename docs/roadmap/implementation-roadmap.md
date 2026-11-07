@@ -1073,7 +1073,7 @@ the GPU. The 2026-11-09 demo shows it as roadmap, not live; the user plans a wor
 | WP | Brief | ADRs | Depends on | State | Operator actions remaining |
 |---|---|---|---|---|---|
 | WP-228 | [wp-228](work-packages/wp-228-world-model-adr-0604-and-tracking.md) | 0604 | none | Repo work in review | committed on `wm-world-model`, not pushed; push waits for the user's go |
-| WP-229 | [wp-229](work-packages/wp-229-on-demand-world-model-gpu-pool.md) | 0604 | WP-228 | Not started | GPU Operator toleration in an announced maintenance window, with the user's go |
+| WP-229 | [wp-229](work-packages/wp-229-on-demand-world-model-gpu-pool.md) | 0604 | WP-228 | Repo work in review | the GPU Operator toleration is a separate commit, pushed and applied in the announced window (Tue 2026-11-10 morning, user's go); first live create/delete cycle in WP-232 |
 | WP-230 | [wp-230](work-packages/wp-230-mirror-world-model-weights-to-s3.md) | 0604 | WP-228 | Repo work in review | none: copy done and verified 2026-11-07 (25 files, 19.7 GB); lock file not pushed |
 | WP-231 | [wp-231](work-packages/wp-231-world-model-gpu-runtime-image.md) | 0604 | WP-230 | Not started | build-node storage check, then the in-cluster build |
 | WP-232 | [wp-232](work-packages/wp-232-world-model-gpu-smoke-test.md) | 0604 | WP-229, WP-231 | Not started | one GPU window of about 3 h: enable, smoke Job, preset images, disable |

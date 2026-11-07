@@ -91,6 +91,25 @@ platformNamespaces:
     extraLabels:
       zuno.io/managed: "true"
       zuno.io/experience-client: "true"
+  # ADR-0604 (WP-229): the world-model experience, same rules as zuno-openwebui
+  # (outside the mesh, the experience-client label is its ai-gateway grant).
+  # It exists while the demo is off, empty; the quota allows the one whole GPU
+  # of the on-demand node and sizes CPU/memory to the runtime (requests 6 CPU,
+  # 48Gi on a g7e.4xlarge) plus the web pod and its front door.
+  - name: zuno-world-model
+    displayName: Zuno World Model
+    description: The interactive generative world-model experience (ADR-0604).
+    allowedFromNamespaces: []
+    extraLabels:
+      zuno.io/managed: "true"
+      zuno.io/experience-client: "true"
+    resourceQuota:
+      requests: { cpu: "9", memory: "60Gi" }
+      limits: { cpu: "20", memory: "120Gi" }
+      gpu: "1"
+    limitRange:
+      defaultRequest: { cpu: "100m", memory: "128Mi" }
+      default: { cpu: "500m", memory: "512Mi" }
   - name: zuno-kagent
     displayName: Zuno kagent
     description: kagent, the operations experience over governed Kubernetes read tools (ADR-0600).

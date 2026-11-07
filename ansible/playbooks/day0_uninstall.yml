@@ -15,6 +15,8 @@
     # in the shared blocked-findings tasks (ADR-0201 follow-up).
     zuno_day: d0
     day0_components:
+      # ADR-0604 (WP-229): first, so the GPU node goes before anything it relies on.
+      - world_model_gpu
       - aap_config
       - aap
       - keycloak

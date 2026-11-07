@@ -22,6 +22,11 @@ zuno_google_oauth_client_secret: "xxxxxx"
 # Set false to skip deploying the smtp component. Defaults to true.
 zuno_smtp_enabled: false
 
+# --- World-model demo (ADR-0604) -------------------------------------------
+# Committed per cluster in ansible/clusters/<cluster>.yml; set it here only to
+# override locally. true provisions the on-demand GPU node (billed by the hour).
+# zuno_world_model_enabled: false
+
 # Example uses AWS SES; any SMTP provider works the same way.   1. Verify the
 # sending domain/address in SES (required before sending;      new accounts
 # start sandboxed to verified recipients only).   2. Note the SMTP endpoint for

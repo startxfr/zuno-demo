@@ -69,6 +69,9 @@ collector:
 # collector's own enablement since the alerts are meaningless without it.
 alerting:
   enabled: true
+  # ADR-0604 D5 (WP-229): warn when the on-demand world-model GPU node has
+  # existed longer than this (it bills by the hour; nothing deletes it by itself).
+  worldModelGpuMaxHours: 8
 
 # The per-domain RAG freshness-lag alerts (ADR-0109/WP-24) are gone with rag-service
 # (WP-166): UnifAI's incremental source sync exposes no lag metric. Freshness is

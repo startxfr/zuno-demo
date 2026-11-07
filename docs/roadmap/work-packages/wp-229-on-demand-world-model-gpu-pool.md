@@ -1,6 +1,6 @@
 # WP-229: On-demand world-model GPU pool (delivers ADR-0604 D5)
 
-- **State:** Not started
+- **State:** Repo work in review
 - **ADRs:** ADR-0604
 - **Depends on:** WP-228
 - **Blocks:** WP-232, WP-235

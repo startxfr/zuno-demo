@@ -40,6 +40,14 @@ zuno_mariadb_backup_s3_region: "eu-central-1"
 # run after this change rebuilds each image from devel.
 zuno_build_git_ref: "devel"
 
+# ADR-0604 (WP-229, WP-235): the world-model demo and its on-demand GPU node
+# (zuno-gpu-world-model-a, g7e.4xlarge). false = no node and no app; the Day-0
+# role world_model_gpu and the Day-2 role world_model both converge to it.
+# Turning it on starts billing a GPU instance: enable it ~40 minutes before
+# use and back to false (then `make d2 uninstall world-model` and
+# `make d0 uninstall world-model-gpu`) right after. An alert fires after 8 h.
+zuno_world_model_enabled: false
+
 # UnifAI stack on demo333 (WP-154/WP-168): the non-secret overrides that were
 # only kept in a private vars file until now. They are deep-merged over the
 # role defaults by ansible/roles/unifai (zuno_unifai_values); bundle settings
