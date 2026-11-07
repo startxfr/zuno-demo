@@ -1,8 +1,6 @@
 # WP-223: Secrets and identity hardening: Vault, External Secrets, passwords, Keycloak (delivers ADR-0602)
 
-- **State:** Operator pending (2026-11-06). Repo work complete and committed locally on branch
-  `wp-223-secrets-identity` (based on the WP-222 commit), not pushed; the migration was rehearsed end to end with the
-  real KMS key. The demo333 migration waits for the push and the user's go.
+- **State:** Done (2026-11-07). demo333 migrated with the user's go: raft + AWS KMS auto-unseal + TLS, root token revoked, recovery keys 3 shares / threshold 2 (held by the operator). Residual: `eso-reader` is kept until `main` carries this WP (zuno-rhtas-d1 tracks main). Defects found live: see 5c6c396e and the runbook.
 - **ADRs:** ADR-0602, ADR-0603
 - **Depends on:** WP-222
 - **Blocks:** WP-227

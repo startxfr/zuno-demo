@@ -1,6 +1,6 @@
 # WP-224: Network and GitOps hardening: mesh, egress, AppProject, JWKS (delivers ADR-0602, ADR-0603)
 
-- **State:** Repo work in review (2026-11-07): reviewed read-only, fixes applied; push pending the user's go. The code is complete in the worktree `zuno-demo-wp224` (branch
+- **State:** Operator pending (2026-11-07): pushed (55ebf41f) and rolled out on demo333; left: the zuno-unifai firewall rehearsal, the agents scaffold `project:` fix and the GitHub settings on `main`. The code is complete in the worktree `zuno-demo-wp224` (branch
   `wp-224-network-gitops`). A live rehearsal on demo333 is under way: the mesh and egress objects are applied by hand,
   outside ArgoCD, one step at a time, each with the user's go. Nothing is pushed.
 - **ADRs:** ADR-0602, ADR-0603
@@ -103,6 +103,13 @@ old Application specs. That is why the branch renders exactly the live state: ze
 (STRICT) and on the zuno-ai-run firewall, except for the 9 Hugging Face hosts that zuno-demo-96 added by hand for the
 WP-115 EvalHub run (temporary, deliberately not in git, to be removed by that session). The zuno-unifai firewall stays
 off (`egress.enabled: false`, reason recorded) until its own rehearsal.
+
+**Live on demo333, 2026-11-07 (user's go):** steps 1 to 5 done. Push 55ebf41f: PeerAuthentications adopted with no
+change (STRICT in the three namespaces), gateways unchanged (in-cluster JWKS kept). argocd role: three projects
+created, 104 Applications migrated (61 zuno-platform, 43 zuno-apps, 8 startx-cluster-* stay in cluster-admin), legacy
+`zuno` project deleted, no "not permitted". `make d2 install namespaces` passed the real domain: ArgoCD owns the
+zuno-ai-run firewall (20 rules, identical to the hand-applied one). `make d2 install trustyai-config`: Synced/Healthy,
+RAGAS Job rendered again. `appproject.yaml` removed from the kustomization afterwards.
 
 1. Push to devel. Watch zuno-namespaces-d1, the three gateways and trustyai-config. The RAGAS Job is not rendered
    while the Application still passes the placeholder domain.

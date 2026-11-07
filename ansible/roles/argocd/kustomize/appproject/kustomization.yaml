@@ -5,6 +5,4 @@ resources:
   - appproject-platform.yaml
   - appproject-apps.yaml
   - appproject-bootstrap.yaml
-  # Legacy single project, deleted by install.yml once unused (see the file).
-  - appproject.yaml
   - repository-startx.yaml
